@@ -1,0 +1,39 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.render.example
+
+# Python caches and virtualenvs
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.uv-cache/
+
+# Local databases and runtime state
+*.sqlite
+*.sqlite3
+*.db
+nmrcheck.sqlite3
+.nmrcheck/
+
+# Scientific/raw artifacts and generated archives
+raw_data_vault/
+artifacts/
+uploads/
+exports/
+tmp/
+/*.zip
+
+# Logs and OS noise
+*.log
+.DS_Store
+**/.DS_Store

@@ -1,17 +1,69 @@
+# macOS / editor noise
 .DS_Store
 **/.DS_Store
-**/__pycache__/
-**/.pytest_cache/
-**/.venv/
-**/*.sqlite
-**/*.sqlite3
-.next/
-node_modules/
-coverage/
-dist/
-*.tsbuildinfo
+*.swp
+*.swo
+.idea/
+.vscode/
 
-# Canonical source baseline
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.render.example
+
+# Python backend local state
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.coverage
+**/htmlcov/
+**/.venv/
+**/venv/
+**/.uv-cache/
+
+# Backend databases, runtime output, and scientific vault artifacts
+*.sqlite
+*.sqlite3
+*.db
+/*.zip
+moletrace_backend/.nmrcheck/
+moletrace_backend/raw_data_vault/
+moletrace_backend/artifacts/
+moletrace_backend/uploads/
+moletrace_backend/exports/
+moletrace_backend/tmp/
+moletrace_backend/*.zip
+nmrcheck.sqlite3
+*.log
+
+# Frontend dependencies and generated output
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+moletrace_frontend/.next/
+moletrace_frontend/node_modules/
+moletrace_frontend/.vercel/
+moletrace_frontend/.turbo/
+moletrace_frontend/.vite/
+
+# v0 / sandbox generated files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.v0-trash/
+next.user-config.*
+
+# Legacy source snapshots kept locally only
 week6/
 week7/
 week8/
@@ -20,3 +72,4 @@ week8_patch2/
 week8_patch3_ui/
 week8_patch4_ui/
 week9/
+week10/
