@@ -1,0 +1,3 @@
+experiment,f1_ppm,f2_ppm,intensity,assignment
+COSY,3.65,1.26,120,CH2-CH3
+COSY,1.26,3.65,118,CH3-CH2

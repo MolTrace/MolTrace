@@ -1,0 +1,77 @@
+services:
+  - type: web
+    name: nmrcheck-web
+    runtime: python
+    plan: starter
+    buildCommand: uv sync --frozen --no-dev --extra fid
+    startCommand: uv run uvicorn nmrcheck.web:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nmrcheck-db
+          property: connectionString
+      - key: BASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: REQUIRE_VERIFIED_EMAIL
+        value: "true"
+      - key: EMAIL_BACKEND
+        value: database
+      - key: QUEUE_NAME
+        value: nmrcheck
+      - key: HEALTHCHECK_PATH
+        value: /health
+      - key: ALLOWED_UPLOAD_TYPES
+        value: csv,json
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: API_KEY
+        sync: false
+      - key: RELEASE_STAGE
+        value: week21-release-candidate
+      - key: RELEASE_VERSION
+        value: 0.21.0
+
+  - type: worker
+    name: nmrcheck-worker
+    runtime: python
+    plan: starter
+    buildCommand: uv sync --frozen --no-dev --extra fid
+    startCommand: uv run python -m nmrcheck.worker
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nmrcheck-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: QUEUE_NAME
+        value: nmrcheck
+      - key: RELEASE_STAGE
+        value: week21-release-candidate
+      - key: RELEASE_VERSION
+        value: 0.21.0
+
+
+databases:
+  - name: nmrcheck-db
+    databaseName: nmrcheck
+    user: nmrcheck

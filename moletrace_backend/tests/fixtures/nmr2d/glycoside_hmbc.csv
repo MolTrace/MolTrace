@@ -1,0 +1,4 @@
+experiment,f2_ppm,f1_ppm,intensity,assignment
+HMBC,4.82,75.3,140,H1-C3 long range
+HMBC,3.55,101.2,95,H6-C1 long range
+HMBC,3.74,62.1,88,H2-CH2OH long range

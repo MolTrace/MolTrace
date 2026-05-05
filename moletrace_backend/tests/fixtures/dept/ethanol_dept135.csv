@@ -1,0 +1,3 @@
+experiment,shift_ppm,phase,intensity,assignment
+DEPT135,58.3,negative,900,CH2-OH
+DEPT135,18.2,positive,850,CH3

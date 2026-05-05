@@ -1,0 +1,6 @@
+{
+  "sample_id": "ethanol-current-state",
+  "smiles": "CCO",
+  "solvent": "CDCl3",
+  "carbon13_text": "13C NMR (101 MHz, CDCl3) δ 58.3, 18.2."
+}
