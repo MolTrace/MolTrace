@@ -12,3 +12,4 @@ Older `week6` through `week9` snapshot trees were removed so future work starts 
 - `week10/src/nmrcheck/models.py`
 
 Generated state such as virtual environments, sqlite databases, caches, and macOS metadata is not part of the canonical codebase.
+# MolTrace
