@@ -1,0 +1,5 @@
+experiment,shift_ppm,phase,intensity,assignment
+APT,101.2,positive,400,anomeric CH
+APT,75.3,positive,390,O-bearing CH
+APT,72.4,positive,370,O-bearing CH
+APT,62.1,negative,320,CH2OH

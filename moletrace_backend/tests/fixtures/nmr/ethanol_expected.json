@@ -1,0 +1,10 @@
+{
+  "solvent": "CDCl3",
+  "expected_peak_regions_ppm": [
+    3.65,
+    1.26,
+    2.1
+  ],
+  "expected_min_detected_peaks": 2,
+  "expected_label": "consistent"
+}

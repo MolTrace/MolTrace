@@ -1,0 +1,22 @@
+.DS_Store
+**/.DS_Store
+**/__pycache__/
+**/.pytest_cache/
+**/.venv/
+**/*.sqlite
+**/*.sqlite3
+.next/
+node_modules/
+coverage/
+dist/
+*.tsbuildinfo
+
+# Canonical source baseline
+week6/
+week7/
+week8/
+week8_patch1/
+week8_patch2/
+week8_patch3_ui/
+week8_patch4_ui/
+week9/

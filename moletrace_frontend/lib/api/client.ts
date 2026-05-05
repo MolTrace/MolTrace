@@ -1,0 +1,111 @@
+export class ApiError extends Error {
+  status: number
+  data: unknown
+
+  constructor(status: number, data: unknown, message?: string) {
+    super(message || `Request failed with status ${status}`)
+    this.name = "ApiError"
+    this.status = status
+    this.data = data
+  }
+}
+
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/backend"
+export const AUTH_TOKEN_STORAGE_KEY = "moltrace.access_token"
+export const AUTH_USER_STORAGE_KEY = "moltrace.user"
+
+type ApiRequestInit = Omit<RequestInit, "body"> & {
+  body?: unknown
+}
+
+export function buildApiPath(path: string) {
+  const normalizedBase = API_BASE.replace(/\/$/, "")
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`
+  return `${normalizedBase}${normalizedPath}`
+}
+
+export function readStoredAuthToken() {
+  if (typeof window === "undefined") return null
+
+  try {
+    return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function isFormDataBody(body: unknown): body is FormData {
+  return typeof FormData !== "undefined" && body instanceof FormData
+}
+
+function isBodyInit(body: unknown): body is BodyInit {
+  return (
+    typeof body === "string" ||
+    isFormDataBody(body) ||
+    body instanceof Blob ||
+    body instanceof ArrayBuffer ||
+    body instanceof URLSearchParams ||
+    body instanceof ReadableStream
+  )
+}
+
+async function readResponseData(response: Response) {
+  const contentType = response.headers.get("content-type") || ""
+  if (contentType.includes("application/json")) {
+    return response.json()
+  }
+  return response.text()
+}
+
+function messageFromErrorData(data: unknown, fallback: string) {
+  if (data && typeof data === "object") {
+    if ("detail" in data) return String((data as { detail: unknown }).detail)
+    if ("message" in data) return String((data as { message: unknown }).message)
+    if ("error" in data) {
+      const error = (data as { error: unknown }).error
+      if (typeof error === "string") return error
+      if (error && typeof error === "object" && "message" in error) {
+        return String((error as { message: unknown }).message)
+      }
+    }
+  }
+  if (typeof data === "string" && data.trim()) return data
+  return fallback
+}
+
+export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers)
+  const requestBody = init.body
+  let body: BodyInit | undefined
+
+  if (!headers.has("authorization")) {
+    const token = readStoredAuthToken()
+    if (token) headers.set("authorization", `Bearer ${token}`)
+  }
+
+  if (requestBody !== undefined && !isFormDataBody(requestBody) && !headers.has("content-type")) {
+    headers.set("content-type", "application/json")
+  }
+
+  if (requestBody !== undefined) {
+    body = isBodyInit(requestBody) ? requestBody : JSON.stringify(requestBody)
+  }
+
+  const response = await fetch(buildApiPath(path), {
+    ...init,
+    headers,
+    body,
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const data = await readResponseData(response)
+    throw new ApiError(response.status, data, messageFromErrorData(data, response.statusText))
+  }
+
+  if (response.status === 204) {
+    return undefined as T
+  }
+
+  return readResponseData(response) as Promise<T>
+}

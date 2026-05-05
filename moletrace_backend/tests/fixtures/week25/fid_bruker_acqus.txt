@@ -1,0 +1,16 @@
+##TITLE= week25 guarded fixture
+##$TD= 2048
+##$SW_h= 5000.0
+##$SW= 10.0
+##$SFO1= 500.0
+##$BF1= 500.0
+##$O1= 2000.0
+##$O1P= 4.0
+##$NUC1= <1H>
+##$SOLVENT= <CDCl3>
+##$PULPROG= <zg30>
+##$TE= 298.0
+##$RG= 32
+##$BYTORDA= 0
+##$DTYPA= 0
+##$GRPDLY= 0

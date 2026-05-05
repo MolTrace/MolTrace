@@ -1,0 +1,5 @@
+{
+  "solvent": "D2O",
+  "expected_peak_count": 15,
+  "expected_reference_total_h": 26
+}
