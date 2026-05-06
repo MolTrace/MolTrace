@@ -1,5 +1,5 @@
-# Backend-only Render Blueprint for MolTrace.
-# Use the repo-root render.yaml when deploying the backend and frontend together.
+# Render Blueprint for the MolTrace monorepo.
+# Render resolves rootDir paths from the repository root.
 services:
   - type: web
     name: moltrace-backend
@@ -42,6 +42,21 @@ services:
         value: render-production
       - key: RELEASE_VERSION
         value: 0.61.0
+
+  - type: web
+    name: moltrace-frontend
+    runtime: node
+    plan: starter
+    rootDir: moletrace_frontend
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start -- -p $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: /api/backend
+      - key: API_BASE_URL
+        value: https://moltrace-backend.onrender.com
 
 databases:
   - name: moltrace-db
