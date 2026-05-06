@@ -50,7 +50,8 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
   const centers = honeycombCenters(R, 5)
   const highlighted = cornerHighlightIndices(centers)
   const traceBlue = "#42A5F5"
-  const markBlue = "#42A5F5"
+  const honeycombWhite = "#FFFFFF"
+  const markBlue = "#FFFFFF"
   const letterClassName = [
     "relative z-20 flex h-full w-full items-center justify-center font-black leading-none tracking-tight text-base text-white",
     textClassName,
@@ -72,30 +73,13 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
         fill="none"
         aria-hidden="true"
       >
-        {/* Lower sheet — depth cue for 3D stacked graphene */}
-        <g
-          strokeWidth="1.35"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-          transform="translate(2.8 3.4)"
-        >
-          {centers.map(([cx, cy], i) => (
-            <polygon
-              key={`deep-${i}`}
-              points={flatTopHexPoints(cx, cy, R)}
-              stroke={highlighted.has(i) ? traceBlue : "currentColor"}
-              opacity={highlighted.has(i) ? 0.46 : 0.22}
-            />
-          ))}
-        </g>
-        {/* Upper sheet */}
+        {/* Honeycomb */}
         <g strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" fill="none">
           {centers.map(([cx, cy], i) => (
             <polygon
               key={`front-${i}`}
               points={flatTopHexPoints(cx, cy, R)}
-              stroke={highlighted.has(i) ? traceBlue : "currentColor"}
+              stroke={highlighted.has(i) ? traceBlue : honeycombWhite}
             />
           ))}
         </g>
