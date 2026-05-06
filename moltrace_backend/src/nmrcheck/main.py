@@ -21,11 +21,11 @@ def root() -> str:
       <head>
         <meta charset='utf-8' />
         <meta name='viewport' content='width=device-width, initial-scale=1' />
-        <title>NMRCheck API</title>
+        <title>MolTrace API</title>
         <style>body{font-family:Arial,sans-serif;max-width:840px;margin:2rem auto;padding:0 1rem;}code{background:#f5f5f5;padding:0.2rem 0.4rem;}a{display:block;margin:0.5rem 0;}</style>
       </head>
       <body>
-        <h1>NMRCheck API</h1>
+        <h1>MolTrace API</h1>
         <p>The service is running.</p>
         <a href='/docs'>OpenAPI docs</a>
         <a href='/health'>Health check</a>
