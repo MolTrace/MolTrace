@@ -27,7 +27,7 @@ curl http://localhost:8000/openapi.json
 
 ## Run Frontend
 
-From `week10/moletrace_frontend/`:
+From `week10/moltrace_frontend/`:
 
 ```bash
 pnpm install

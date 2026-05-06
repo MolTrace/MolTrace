@@ -30,13 +30,13 @@
 *.sqlite3
 *.db
 /*.zip
-moletrace_backend/.nmrcheck/
-moletrace_backend/raw_data_vault/
-moletrace_backend/artifacts/
-moletrace_backend/uploads/
-moletrace_backend/exports/
-moletrace_backend/tmp/
-moletrace_backend/*.zip
+moltrace_backend/.nmrcheck/
+moltrace_backend/raw_data_vault/
+moltrace_backend/artifacts/
+moltrace_backend/uploads/
+moltrace_backend/exports/
+moltrace_backend/tmp/
+moltrace_backend/*.zip
 nmrcheck.sqlite3
 *.log
 
@@ -49,11 +49,11 @@ dist/
 build/
 coverage/
 *.tsbuildinfo
-moletrace_frontend/.next/
-moletrace_frontend/node_modules/
-moletrace_frontend/.vercel/
-moletrace_frontend/.turbo/
-moletrace_frontend/.vite/
+moltrace_frontend/.next/
+moltrace_frontend/node_modules/
+moltrace_frontend/.vercel/
+moltrace_frontend/.turbo/
+moltrace_frontend/.vite/
 
 # v0 / sandbox generated files
 __v0_runtime_loader.js

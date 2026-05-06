@@ -5,7 +5,7 @@ services:
     name: moltrace-frontend
     runtime: node
     plan: starter
-    rootDir: moletrace_frontend
+    rootDir: moltrace_frontend
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
     startCommand: pnpm start -- -p $PORT
     envVars:

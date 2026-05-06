@@ -5,7 +5,7 @@ services:
     name: moltrace-backend
     runtime: python
     plan: starter
-    rootDir: moletrace_backend
+    rootDir: moltrace_backend
     buildCommand: uv sync --frozen --no-dev --extra fid
     startCommand: uv run uvicorn nmrcheck.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
@@ -47,7 +47,7 @@ services:
     name: moltrace-frontend
     runtime: node
     plan: starter
-    rootDir: moletrace_frontend
+    rootDir: moltrace_frontend
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
     startCommand: pnpm start -- -p $PORT
     envVars:
