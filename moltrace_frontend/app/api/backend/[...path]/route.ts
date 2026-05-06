@@ -20,7 +20,12 @@ const hopByHopHeaders = new Set([
 ])
 
 function backendBaseUrl() {
-  return process.env.API_BASE_URL || "http://localhost:8000"
+  return (
+    process.env.API_BASE_URL ||
+    (process.env.NODE_ENV === "production"
+      ? "https://moltrace-backend.onrender.com"
+      : "http://localhost:8000")
+  )
 }
 
 async function proxy(request: NextRequest, context: RouteContext) {

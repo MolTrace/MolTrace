@@ -2,7 +2,7 @@
 # Use the repo-root render.yaml when deploying the backend and frontend together.
 services:
   - type: web
-    name: moltrace-frontend
+    name: moltrace-frontend1
     runtime: node
     plan: starter
     rootDir: moltrace_frontend
