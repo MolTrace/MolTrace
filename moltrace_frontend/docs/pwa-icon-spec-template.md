@@ -55,9 +55,9 @@ Background can extend to full 512x512.
 
 Place files in:
 
-- `moletrace_frontend/public/icons/icon-192.png`
-- `moletrace_frontend/public/icons/icon-512.png`
-- `moletrace_frontend/public/icons/maskable-icon-512.png`
+- `moltrace_frontend/public/icons/icon-192.png`
+- `moltrace_frontend/public/icons/icon-512.png`
+- `moltrace_frontend/public/icons/maskable-icon-512.png`
 
 ## 7) Quick Verification
 
