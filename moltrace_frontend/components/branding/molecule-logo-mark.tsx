@@ -51,7 +51,7 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
   const highlighted = cornerHighlightIndices(centers)
   const traceBlue = "#42A5F5"
   const honeycombWhite = "#FFFFFF"
-  const markBlue = "#42A5F5"
+  const markColor = "#FFFFFF"
   const letterClassName = [
     "relative z-20 flex h-full w-full items-center justify-center font-black leading-none tracking-tight text-xl text-white",
     textClassName,
@@ -89,7 +89,7 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
         style={{
           textShadow: "0 0 2px rgb(0 0 0), 0 1px 3px rgb(0 0 0 / 0.95)",
           WebkitTextStroke: "0.6px currentColor",
-          color: markBlue,
+          color: markColor,
         }}
       >
         <span className="block -translate-y-px text-center">m</span>
