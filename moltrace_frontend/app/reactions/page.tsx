@@ -1,10 +1,13 @@
+import { Suspense } from "react"
 import { AppShell } from "@/components/app/app-shell"
 import { ReactionProgramInterfaceWorkspace } from "@/components/reaction-optimization/reaction-program-interface-workspace"
 
 export default function ReactionsPage() {
   return (
     <AppShell>
-      <ReactionProgramInterfaceWorkspace />
+      <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading Reaction Optimization…</div>}>
+        <ReactionProgramInterfaceWorkspace />
+      </Suspense>
     </AppShell>
   )
 }
