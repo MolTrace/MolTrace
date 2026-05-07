@@ -23,13 +23,13 @@ function honeycombCenters(R: number, pad: number): Array<[number, number]> {
   const dx = SQRT3 * R
   const dy = 1.5 * R
   const centers: Array<[number, number]> = []
-  for (let row = 0; ; row++) {
+  for (let row = -2; ; row++) {
     const cy = pad + row * dy
-    if (cy > 64 - pad - R * 0.35) break
+    if (cy > 64 + R) break
     const ox = (row % 2) * (dx / 2)
-    for (let col = 0; ; col++) {
+    for (let col = -2; ; col++) {
       const cx = pad + ox + col * dx
-      if (cx > 64 - pad - R * 0.35) break
+      if (cx > 64 + R) break
       centers.push([cx, cy])
     }
   }
@@ -85,11 +85,11 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
         >
           <text
             x="32"
-            y="32"
-            dy="0.35em"
+            y="31.2"
+            dy="0.33em"
             fill="none"
             stroke={LOGO_BACKGROUND_DARK_BLUE}
-            strokeWidth={7.5}
+            strokeWidth={5.8}
             strokeLinecap="round"
             strokeLinejoin="round"
             paintOrder="stroke"
@@ -98,8 +98,8 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
           </text>
           <text
             x="32"
-            y="32"
-            dy="0.35em"
+            y="31.2"
+            dy="0.33em"
             fill="#FFFFFF"
           >
             m
