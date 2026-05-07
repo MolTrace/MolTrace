@@ -74,7 +74,7 @@ function buildLogoSvg({ bg }) {
   <g>${polys}</g>
   <text x="32" y="32" text-anchor="middle" dominant-baseline="central"
     font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-    font-weight="900" font-size="20" fill="${traceBlue}">m</text>
+    font-weight="900" font-size="20" fill="${honeycombWhite}">m</text>
 </svg>`
 }
 
