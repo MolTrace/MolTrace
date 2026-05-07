@@ -85,8 +85,8 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
           dominantBaseline="middle"
         >
           <text
-            x="31.5"
-            y="33.5"
+            x="32"
+            y="32"
             fill="none"
             stroke={LOGO_BACKGROUND_DARK_BLUE}
             strokeWidth={9}
@@ -97,8 +97,8 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
             m
           </text>
           <text
-            x="31.5"
-            y="33.5"
+            x="32"
+            y="32"
             fill="#EAFBFF"
             stroke={HONEYCOMB_BRIGHT_BLUE}
             strokeWidth={2.2}
@@ -109,8 +109,8 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
             m
           </text>
           <text
-            x="31.1"
-            y="32.95"
+            x="32"
+            y="32"
             fill="none"
             stroke={LOGO_BACKGROUND_DARK_BLUE}
             strokeWidth={0.85}
