@@ -218,7 +218,7 @@ function HypotheticalMoleculeScene() {
 
 export function HeroMoleculeBackground() {
   return (
-    <div className="pointer-events-none absolute inset-0 z-[1] min-h-[560px] w-full">
+    <div className="pointer-events-none absolute inset-0 z-[1] min-h-[560px] w-full opacity-40">
       <Canvas
         camera={{ position: [0, 0.15, 10.2], fov: 34 }}
         gl={{

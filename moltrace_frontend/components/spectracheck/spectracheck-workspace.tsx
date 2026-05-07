@@ -97,6 +97,7 @@ import { WorkflowTemplateGallery } from "@/src/components/spectracheck/WorkflowT
 import { WorkflowRunLauncher } from "@/src/components/spectracheck/WorkflowRunLauncher"
 import type { SessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { normalizeSessionFileRecordList } from "@/src/lib/spectracheck/session-file-record"
+import { SpectraCheckValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
 
 function SpectraCheckTabWithTooltip({
   value,
@@ -1019,6 +1020,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             </Card>
           </div>
           <SessionEvidenceReadinessCard sessionId={backendSessionId} />
+          <SpectraCheckValidationReadinessCard sessionId={backendSessionId} />
           <SpectraCheckRegulatoryImpactCard sessionId={backendSessionId} evidenceItemIds={regulatoryEvidenceItemIds} />
           <div className="min-w-0 space-y-4">
             <UploadCenter sessionId={backendSessionId} />

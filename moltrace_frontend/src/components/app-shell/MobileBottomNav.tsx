@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useMemo } from "react"
-import { Bot, Boxes, FileText, FlaskConical, FolderOpen, Home, Library, Scale, Settings, SlidersHorizontal } from "lucide-react"
+import { Bot, Boxes, ClipboardList, FileText, FlaskConical, FolderOpen, Home, Library, Scale, Settings, SlidersHorizontal } from "lucide-react"
 import { SpectraCheckLogoIcon } from "@/components/branding/spectracheck-logo-icon"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -32,6 +32,7 @@ const moreNavItems: MoreNavItem[] = [
   { href: "/projects", label: "Projects", icon: FolderOpen },
   { href: "/compounds", label: "Compounds", icon: Boxes },
   { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/actions", label: "Action Queue", icon: ClipboardList },
   { href: "/knowledge", label: "Knowledge", icon: Library },
   { href: "/ml", label: "ML / AI", icon: Bot },
   { href: "/admin/system", label: "Admin", icon: SlidersHorizontal },

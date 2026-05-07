@@ -3,6 +3,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { OfflineBanner } from '@/src/components/pwa/OfflineBanner'
 import { InstallAppPrompt } from '@/src/components/pwa/InstallAppPrompt'
+import { PWAUpdateManager } from '@/src/components/pwa/PWAUpdateManager'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -11,6 +12,11 @@ export const metadata: Metadata = {
   generator: 'v0.app',
   icons: {
     icon: [
+      {
+        url: '/icons/moltrace-mark.svg',
+        sizes: 'any',
+        type: 'image/svg+xml',
+      },
       {
         url: '/icons/icon-192.png',
         sizes: '192x192',
@@ -23,7 +29,7 @@ export const metadata: Metadata = {
       },
     ],
     apple: [{ url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
-    shortcut: '/icons/icon-192.png',
+    shortcut: '/icons/moltrace-mark.svg',
   },
 }
 
@@ -46,6 +52,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <PWAUpdateManager />
           <OfflineBanner />
           {children}
           <InstallAppPrompt />

@@ -64,6 +64,7 @@ import {
   fetchDashboardCrossModuleCommandCenter,
   type DashboardCrossModuleCommandCenter,
 } from "@/src/lib/dashboard/dashboard-cross-module-command-center"
+import { ValidationReadinessDashboardCards } from "@/components/validation/validation-readiness-summary"
 import type { RoiSnapshotData } from "@/src/lib/analytics/roi-dashboard-data"
 import type { DashboardActivityRow, DashboardJobRow } from "@/src/lib/dashboard/overview-metrics"
 
@@ -890,6 +891,8 @@ export function DashboardV0() {
           </CardContent>
         </Card>
       </div>
+
+      <ValidationReadinessDashboardCards />
 
       {!mlLoading && mlRollup?.available ? (
         <Card>

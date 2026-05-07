@@ -38,11 +38,6 @@ export function InstallAppPrompt() {
       return standalone
     }
     detectInstalled()
-    if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js").catch(() => {
-        // ignore registration failures
-      })
-    }
     if (dismissedRecently()) {
       setHidden(true)
     }

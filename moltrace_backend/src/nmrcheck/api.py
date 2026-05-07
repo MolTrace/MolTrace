@@ -8,7 +8,7 @@ import io
 import json
 import re
 import zipfile
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -32,7 +32,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import select
@@ -59,6 +59,7 @@ from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
 from . import regulatory_surveillance_store as surveillance_store
 from . import spectracheck_store as sc_store
+from . import validation_center_store as validation_store
 from . import workflow_store as wf_store
 from .adduct_inference import AdductInferenceError, infer_adducts_and_isotopes
 from .analysis import analyze_inputs, validate_inputs
@@ -200,6 +201,9 @@ from .models import (
     BenchmarkDatasetCandidateCreate,
     BenchmarkDatasetCandidateUpdate,
     BenchmarkDatasetCreate,
+    CAPARecord,
+    CAPARecordCreate,
+    CAPARecordUpdate,
     CalibrationAssessment,
     CalibrationAssessmentCreate,
     CanaryDeploymentCreate,
@@ -241,6 +245,11 @@ from .models import (
     ConnectorRegistry,
     ConnectorRegistryCreate,
     ConnectorRegistryUpdate,
+    ControlledRecord,
+    ControlledRecordArchiveRequest,
+    ControlledRecordCreate,
+    ControlledRecordLockRequest,
+    ControlledRecordNewVersionRequest,
     CrossModuleActionItem,
     CrossModuleActionItemCreate,
     CrossModuleActionItemUpdate,
@@ -253,6 +262,8 @@ from .models import (
     DatasetVersion,
     DatasetVersionCreate,
     DatasetVersionUpdate,
+    DataIntegrityAssessment,
+    DataIntegrityAssessmentCreate,
     DebugBundle,
     DebugBundleCreate,
     DependencyCheck,
@@ -263,7 +274,12 @@ from .models import (
     DeploymentCandidateResponse,
     DeptAptAnalyzeResult,
     DeptAptPreviewReport,
+    DeviationRecord,
+    DeviationRecordCreate,
+    DeviationRecordUpdate,
     DriftAlert,
+    ElectronicSignatureRecord,
+    ElectronicSignatureRecordCreate,
     EmailActionRequest,
     EmailOutboxRecord,
     EnvironmentCheckResponse,
@@ -295,6 +311,8 @@ from .models import (
     FileRecord,
     FileNormalizationRequest,
     FileNormalizationRun,
+    FunctionalSpecification,
+    FunctionalSpecificationCreate,
     FullStoredAnalysisRecord,
     HRMSCandidateMatchRequest,
     HRMSCandidateMatchResult,
@@ -311,6 +329,8 @@ from .models import (
     InstrumentWatchFolderScanRequest,
     InstrumentWatchFolderUpdate,
     IntegrationImportResponse,
+    InspectionReadinessPackage,
+    InspectionReadinessPackageCreate,
     JobEventRecord,
     JobRecord,
     JurisdictionalRequirementMap,
@@ -451,6 +471,8 @@ from .models import (
     QueueWorkerStatus,
     RawArchiveExportManifest,
     RawArchiveRecord,
+    RecordRetentionPolicy,
+    RecordRetentionPolicyCreate,
     ReactionAdvisorReviewRequest,
     ReactionAnalyticalResult,
     ReactionAnalyticalResultCreate,
@@ -640,6 +662,9 @@ from .models import (
     StoredReportRecord,
     StructureElucidationReportRequest,
     StructureElucidationReportResult,
+    SystemReleaseApproveRequest,
+    SystemReleaseRecord,
+    SystemReleaseRecordCreate,
     SystemHealthResponse,
     SystemStatusResponse,
     TeamMemberCreate,
@@ -649,6 +674,7 @@ from .models import (
     ThresholdProfileCreate,
     ThresholdProfileUpdate,
     TokenActionPreview,
+    TraceabilityMatrix,
     TrainingDatasetCandidate,
     TrainingDatasetCandidateCreate,
     TrainingDatasetCandidateUpdate,
@@ -658,6 +684,8 @@ from .models import (
     UnifiedEvidenceBundleRequest,
     UsageEvent,
     UsageEventCreate,
+    UserRequirementSpecification,
+    UserRequirementSpecificationCreate,
     UserCreate,
     UserFeedbackEvent,
     UserFeedbackEventCreate,
@@ -666,8 +694,19 @@ from .models import (
     UserSignIn,
     UserSignUp,
     ValidationReport,
+    ValidationProject,
+    ValidationProjectCreate,
+    ValidationProjectUpdate,
+    ValidationRiskAssessment,
+    ValidationRiskAssessmentCreate,
     ValidationRun,
     ValidationRunCreate,
+    ValidationTestCase,
+    ValidationTestCaseCreate,
+    ValidationTestExecution,
+    ValidationTestExecutionCreate,
+    ValidationTestProtocol,
+    ValidationTestProtocolCreate,
     VisualizationArtifact,
     VisualizationNormalizeRequest,
     WebhookSubscription,
@@ -7446,6 +7485,16 @@ def _raise_interoperability_http_error(exc: Exception) -> None:
     raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def _raise_validation_center_http_error(exc: Exception) -> None:
+    if isinstance(exc, KeyError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, validation_store.ControlledRecordLockedError):
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if isinstance(exc, validation_store.ValidationCenterError):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get(
     "/connectors",
     response_model=list[ConnectorRegistry],
@@ -8470,6 +8519,1203 @@ def export_reaction_experiments_route(
         entity_type="outbound_sync_job",
         entity_id=record.sync_job_id,
         metadata={"sync_job_id": record.sync_job_id, "review_required": record.review_required},
+    )
+    return record
+
+
+@router.post(
+    "/validation-center/projects",
+    response_model=ValidationProject,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_validation_project_route(
+    payload: ValidationProjectCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationProject:
+    try:
+        record = validation_store.create_validation_project(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="validation_project.create",
+        message="Validation project created for Part 11 readiness and Annex 11 readiness.",
+        entity_type="validation_project",
+        entity_id=record.id,
+        metadata={"scope": record.scope, "validation_type": record.validation_type},
+    )
+    return record
+
+
+@router.get(
+    "/validation-center/projects",
+    response_model=list[ValidationProject],
+    dependencies=[Depends(require_access_context)],
+)
+def list_validation_projects_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    scope: str | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ValidationProject]:
+    return validation_store.list_validation_projects(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        scope=scope,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/validation-center/projects/{validation_project_id}",
+    response_model=ValidationProject,
+    dependencies=[Depends(require_access_context)],
+)
+def get_validation_project_route(
+    validation_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationProject:
+    record = validation_store.get_validation_project(
+        _state(request).session_factory,
+        validation_project_id,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Validation project not found.")
+    return record
+
+
+@router.patch(
+    "/validation-center/projects/{validation_project_id}",
+    response_model=ValidationProject,
+    dependencies=[Depends(require_access_context)],
+)
+def update_validation_project_route(
+    validation_project_id: int,
+    payload: ValidationProjectUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationProject:
+    try:
+        record = validation_store.update_validation_project(
+            _state(request).session_factory,
+            validation_project_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Validation project not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="validation_project.update",
+        message="Validation project updated.",
+        entity_type="validation_project",
+        entity_id=record.id,
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/validation-center/projects/{validation_project_id}/urs",
+    response_model=UserRequirementSpecification,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_urs_route(
+    validation_project_id: int,
+    payload: UserRequirementSpecificationCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> UserRequirementSpecification:
+    try:
+        record = validation_store.create_urs(
+            _state(request).session_factory,
+            validation_project_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="validation_urs.create",
+        message="User requirement specification created.",
+        entity_type="user_requirement_specification",
+        entity_id=record.id,
+        metadata={"validation_project_id": validation_project_id, "module": record.module},
+    )
+    return record
+
+
+@router.get(
+    "/validation-center/projects/{validation_project_id}/urs",
+    response_model=list[UserRequirementSpecification],
+    dependencies=[Depends(require_access_context)],
+)
+def list_urs_route(
+    validation_project_id: int,
+    request: Request,
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[UserRequirementSpecification]:
+    try:
+        return validation_store.list_urs(
+            _state(request).session_factory,
+            validation_project_id,
+            limit=limit,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+
+
+@router.post(
+    "/validation-center/projects/{validation_project_id}/functional-specs",
+    response_model=FunctionalSpecification,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_functional_spec_route(
+    validation_project_id: int,
+    payload: FunctionalSpecificationCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> FunctionalSpecification:
+    try:
+        record = validation_store.create_functional_spec(
+            _state(request).session_factory,
+            validation_project_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="validation_functional_spec.create",
+        message="Functional specification created.",
+        entity_type="functional_specification",
+        entity_id=record.id,
+        metadata={"validation_project_id": validation_project_id, "module": record.module},
+    )
+    return record
+
+
+@router.get(
+    "/validation-center/projects/{validation_project_id}/functional-specs",
+    response_model=list[FunctionalSpecification],
+    dependencies=[Depends(require_access_context)],
+)
+def list_functional_specs_route(
+    validation_project_id: int,
+    request: Request,
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[FunctionalSpecification]:
+    try:
+        return validation_store.list_functional_specs(
+            _state(request).session_factory,
+            validation_project_id,
+            limit=limit,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+
+
+@router.post(
+    "/validation-center/projects/{validation_project_id}/risk-assessment",
+    response_model=ValidationRiskAssessment,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_validation_risk_assessment_route(
+    validation_project_id: int,
+    payload: ValidationRiskAssessmentCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationRiskAssessment:
+    try:
+        record = validation_store.create_risk_assessment(
+            _state(request).session_factory,
+            validation_project_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="validation_risk_assessment.create",
+        message="Validation risk assessment created.",
+        entity_type="validation_risk_assessment",
+        entity_id=record.id,
+        metadata={"validation_project_id": validation_project_id, "risk_priority": record.risk_priority},
+    )
+    return record
+
+
+@router.get(
+    "/validation-center/projects/{validation_project_id}/risk-assessment",
+    response_model=list[ValidationRiskAssessment],
+    dependencies=[Depends(require_access_context)],
+)
+def list_validation_risk_assessments_route(
+    validation_project_id: int,
+    request: Request,
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ValidationRiskAssessment]:
+    try:
+        return validation_store.list_risk_assessments(
+            _state(request).session_factory,
+            validation_project_id,
+            limit=limit,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+
+
+@router.post(
+    "/validation-center/projects/{validation_project_id}/test-protocols",
+    response_model=ValidationTestProtocol,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_validation_test_protocol_route(
+    validation_project_id: int,
+    payload: ValidationTestProtocolCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationTestProtocol:
+    try:
+        record = validation_store.create_test_protocol(
+            _state(request).session_factory,
+            validation_project_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="validation_test_protocol.create",
+        message="Validation test protocol created.",
+        entity_type="validation_test_protocol",
+        entity_id=record.id,
+        metadata={"validation_project_id": validation_project_id, "protocol_type": record.protocol_type},
+    )
+    return record
+
+
+@router.get(
+    "/validation-center/projects/{validation_project_id}/test-protocols",
+    response_model=list[ValidationTestProtocol],
+    dependencies=[Depends(require_access_context)],
+)
+def list_validation_test_protocols_route(
+    validation_project_id: int,
+    request: Request,
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ValidationTestProtocol]:
+    try:
+        return validation_store.list_test_protocols(
+            _state(request).session_factory,
+            validation_project_id,
+            limit=limit,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+
+
+@router.get(
+    "/validation-center/test-protocols/{protocol_id}",
+    response_model=ValidationTestProtocol,
+    dependencies=[Depends(require_access_context)],
+)
+def get_validation_test_protocol_route(
+    protocol_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationTestProtocol:
+    record = validation_store.get_test_protocol(_state(request).session_factory, protocol_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Validation test protocol not found.")
+    return record
+
+
+@router.post(
+    "/validation-center/test-protocols/{protocol_id}/test-cases",
+    response_model=ValidationTestCase,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_validation_test_case_route(
+    protocol_id: int,
+    payload: ValidationTestCaseCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationTestCase:
+    try:
+        record = validation_store.create_test_case(
+            _state(request).session_factory,
+            protocol_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="validation_test_case.create",
+        message="Validation test case created.",
+        entity_type="validation_test_case",
+        entity_id=record.id,
+        metadata={"protocol_id": protocol_id, "test_case_code": record.test_case_code},
+    )
+    return record
+
+
+@router.get(
+    "/validation-center/test-protocols/{protocol_id}/test-cases",
+    response_model=list[ValidationTestCase],
+    dependencies=[Depends(require_access_context)],
+)
+def list_validation_test_cases_route(
+    protocol_id: int,
+    request: Request,
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ValidationTestCase]:
+    try:
+        return validation_store.list_test_cases(
+            _state(request).session_factory,
+            protocol_id,
+            limit=limit,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+
+
+@router.post(
+    "/validation-center/test-cases/{test_case_id}/execute",
+    response_model=ValidationTestExecution,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def execute_validation_test_case_route(
+    test_case_id: int,
+    payload: ValidationTestExecutionCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationTestExecution:
+    try:
+        record = validation_store.execute_test_case(
+            _state(request).session_factory,
+            test_case_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="validation_test_execution.create",
+        message="Validation test execution recorded.",
+        entity_type="validation_test_execution",
+        entity_id=record.id,
+        metadata={
+            "test_case_id": test_case_id,
+            "execution_status": record.execution_status,
+            "deviation_id": record.deviation_id,
+        },
+    )
+    return record
+
+
+@router.get(
+    "/validation-center/test-executions",
+    response_model=list[ValidationTestExecution],
+    dependencies=[Depends(require_access_context)],
+)
+def list_validation_test_executions_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ValidationTestExecution]:
+    return validation_store.list_test_executions(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/validation-center/test-executions/{execution_id}",
+    response_model=ValidationTestExecution,
+    dependencies=[Depends(require_access_context)],
+)
+def get_validation_test_execution_route(
+    execution_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationTestExecution:
+    record = validation_store.get_test_execution(_state(request).session_factory, execution_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Validation test execution not found.")
+    return record
+
+
+@router.get(
+    "/validation-center/projects/{validation_project_id}/traceability",
+    response_model=TraceabilityMatrix,
+    dependencies=[Depends(require_access_context)],
+)
+def get_traceability_matrix_route(
+    validation_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> TraceabilityMatrix:
+    try:
+        record = validation_store.get_latest_traceability(
+            _state(request).session_factory,
+            validation_project_id,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Traceability matrix not found.")
+    return record
+
+
+@router.post(
+    "/validation-center/projects/{validation_project_id}/traceability/generate",
+    response_model=TraceabilityMatrix,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def generate_traceability_matrix_route(
+    validation_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> TraceabilityMatrix:
+    try:
+        record = validation_store.generate_traceability(
+            _state(request).session_factory,
+            validation_project_id,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="traceability_matrix.generate",
+        message="Traceability matrix generated.",
+        entity_type="traceability_matrix",
+        entity_id=record.id,
+        metadata={
+            "validation_project_id": validation_project_id,
+            "status": record.status,
+            "missing_coverage_count": len(record.missing_coverage_json),
+        },
+    )
+    return record
+
+
+@router.post(
+    "/esignatures/records",
+    response_model=ElectronicSignatureRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_esignature_record_route(
+    payload: ElectronicSignatureRecordCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ElectronicSignatureRecord:
+    try:
+        record = validation_store.create_signature(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="esignature.create",
+        message="E-signature record created with server timestamp and signature hash.",
+        entity_type="electronic_signature",
+        entity_id=record.id,
+        metadata={
+            "target_type": record.target_type,
+            "target_id": record.target_id,
+            "signature_meaning": record.signature_meaning,
+        },
+    )
+    return record
+
+
+@router.get(
+    "/esignatures/records",
+    response_model=list[ElectronicSignatureRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_esignature_records_route(
+    request: Request,
+    target_type: str | None = Query(default=None),
+    target_id: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ElectronicSignatureRecord]:
+    return validation_store.list_signatures(
+        _state(request).session_factory,
+        target_type=target_type,
+        target_id=target_id,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/esignatures/records/{signature_id}",
+    response_model=ElectronicSignatureRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def get_esignature_record_route(
+    signature_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ElectronicSignatureRecord:
+    record = validation_store.get_signature(_state(request).session_factory, signature_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="E-signature record not found.")
+    return record
+
+
+@router.post(
+    "/controlled-records",
+    response_model=ControlledRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_controlled_record_route(
+    payload: ControlledRecordCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ControlledRecord:
+    try:
+        record = validation_store.create_controlled_record(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="controlled_record.create",
+        message="Controlled record created.",
+        entity_type="controlled_record",
+        entity_id=record.id,
+        metadata={"record_type": record.record_type, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/controlled-records",
+    response_model=list[ControlledRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_controlled_records_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    record_type: str | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ControlledRecord]:
+    return validation_store.list_controlled_records(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        record_type=record_type,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/controlled-records/{record_id}",
+    response_model=ControlledRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def get_controlled_record_route(
+    record_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ControlledRecord:
+    record = validation_store.get_controlled_record(_state(request).session_factory, record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Controlled record not found.")
+    return record
+
+
+@router.post(
+    "/controlled-records/{record_id}/new-version",
+    response_model=ControlledRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_controlled_record_new_version_route(
+    record_id: int,
+    payload: ControlledRecordNewVersionRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ControlledRecord:
+    try:
+        record = validation_store.create_controlled_record_version(
+            _state(request).session_factory,
+            record_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="controlled_record.new_version",
+        message="New controlled record version created.",
+        entity_type="controlled_record",
+        entity_id=record.id,
+        metadata={"previous_record_id": record_id, "version": record.version},
+    )
+    return record
+
+
+@router.post(
+    "/controlled-records/{record_id}/lock",
+    response_model=ControlledRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def lock_controlled_record_route(
+    record_id: int,
+    payload: ControlledRecordLockRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ControlledRecord:
+    try:
+        record = validation_store.lock_controlled_record(
+            _state(request).session_factory,
+            record_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="controlled_record.lock",
+        message="Controlled record locked.",
+        entity_type="controlled_record",
+        entity_id=record.id,
+        metadata={"locked_by": record.locked_by, "content_hash": record.content_hash},
+    )
+    return record
+
+
+@router.post(
+    "/controlled-records/{record_id}/archive",
+    response_model=ControlledRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def archive_controlled_record_route(
+    record_id: int,
+    payload: ControlledRecordArchiveRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ControlledRecord:
+    try:
+        record = validation_store.archive_controlled_record(
+            _state(request).session_factory,
+            record_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="controlled_record.archive",
+        message="Controlled record archived.",
+        entity_type="controlled_record",
+        entity_id=record.id,
+        metadata={"status": record.status},
+    )
+    return record
+
+
+@router.post(
+    "/record-retention-policies",
+    response_model=RecordRetentionPolicy,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_record_retention_policy_route(
+    payload: RecordRetentionPolicyCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> RecordRetentionPolicy:
+    try:
+        record = validation_store.create_retention_policy(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="record_retention_policy.create",
+        message="Record retention policy created.",
+        entity_type="record_retention_policy",
+        entity_id=record.id,
+        metadata={"record_type": record.record_type, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/record-retention-policies",
+    response_model=list[RecordRetentionPolicy],
+    dependencies=[Depends(require_access_context)],
+)
+def list_record_retention_policies_route(
+    request: Request,
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[RecordRetentionPolicy]:
+    return validation_store.list_retention_policies(
+        _state(request).session_factory,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/data-integrity/assessments",
+    response_model=DataIntegrityAssessment,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_data_integrity_assessment_route(
+    payload: DataIntegrityAssessmentCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> DataIntegrityAssessment:
+    try:
+        record = validation_store.create_data_integrity_assessment(
+            _state(request).session_factory,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="data_integrity_assessment.create",
+        message="Data integrity assessment created.",
+        entity_type="data_integrity_assessment",
+        entity_id=record.id,
+        metadata={"scope": record.scope, "assessment_status": record.assessment_status},
+    )
+    return record
+
+
+@router.get(
+    "/data-integrity/assessments",
+    response_model=list[DataIntegrityAssessment],
+    dependencies=[Depends(require_access_context)],
+)
+def list_data_integrity_assessments_route(
+    request: Request,
+    scope: str | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[DataIntegrityAssessment]:
+    return validation_store.list_data_integrity_assessments(
+        _state(request).session_factory,
+        scope=scope,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/data-integrity/assessments/{assessment_id}",
+    response_model=DataIntegrityAssessment,
+    dependencies=[Depends(require_access_context)],
+)
+def get_data_integrity_assessment_route(
+    assessment_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> DataIntegrityAssessment:
+    record = validation_store.get_data_integrity_assessment(
+        _state(request).session_factory,
+        assessment_id,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Data integrity assessment not found.")
+    return record
+
+
+@router.post(
+    "/inspection-packages",
+    response_model=InspectionReadinessPackage,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_inspection_package_route(
+    payload: InspectionReadinessPackageCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> InspectionReadinessPackage:
+    try:
+        record = validation_store.create_inspection_package(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="inspection_package.create",
+        message="Inspection-ready package created.",
+        entity_type="inspection_readiness_package",
+        entity_id=record.id,
+        metadata={"scope": record.scope, "package_sha256": record.package_sha256},
+    )
+    return record
+
+
+@router.get(
+    "/inspection-packages",
+    response_model=list[InspectionReadinessPackage],
+    dependencies=[Depends(require_access_context)],
+)
+def list_inspection_packages_route(
+    request: Request,
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[InspectionReadinessPackage]:
+    return validation_store.list_inspection_packages(
+        _state(request).session_factory,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/inspection-packages/{package_id}",
+    response_model=InspectionReadinessPackage,
+    dependencies=[Depends(require_access_context)],
+)
+def get_inspection_package_route(
+    package_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> InspectionReadinessPackage:
+    record = validation_store.get_inspection_package(_state(request).session_factory, package_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Inspection package not found.")
+    return record
+
+
+@router.get(
+    "/inspection-packages/{package_id}/download",
+    dependencies=[Depends(require_access_context)],
+)
+def download_inspection_package_route(
+    package_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> StreamingResponse:
+    download = validation_store.get_inspection_package_download(
+        _state(request).session_factory,
+        package_id,
+    )
+    if download is None:
+        raise HTTPException(status_code=404, detail="Inspection package not found.")
+    filename, content = download
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post(
+    "/system-releases",
+    response_model=SystemReleaseRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_system_release_route(
+    payload: SystemReleaseRecordCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SystemReleaseRecord:
+    try:
+        record = validation_store.create_system_release(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="system_release.create",
+        message="System release record created.",
+        entity_type="system_release",
+        entity_id=record.id,
+        metadata={"release_version": record.release_version, "release_type": record.release_type},
+    )
+    return record
+
+
+@router.get(
+    "/system-releases",
+    response_model=list[SystemReleaseRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_system_releases_route(
+    request: Request,
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[SystemReleaseRecord]:
+    return validation_store.list_system_releases(_state(request).session_factory, limit=limit)
+
+
+@router.get(
+    "/system-releases/{release_id}",
+    response_model=SystemReleaseRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def get_system_release_route(
+    release_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SystemReleaseRecord:
+    record = validation_store.get_system_release(_state(request).session_factory, release_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="System release record not found.")
+    return record
+
+
+@router.post(
+    "/system-releases/{release_id}/approve",
+    response_model=SystemReleaseRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def approve_system_release_route(
+    release_id: int,
+    payload: SystemReleaseApproveRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SystemReleaseRecord:
+    try:
+        record = validation_store.approve_system_release(
+            _state(request).session_factory,
+            release_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="system_release.approve",
+        message="System release approved with e-signature record.",
+        entity_type="system_release",
+        entity_id=record.id,
+        metadata={
+            "approval_status": record.approval_status,
+            "signature_id": record.metadata_json.get("approval_signature_id"),
+        },
+    )
+    return record
+
+
+@router.post(
+    "/deviations",
+    response_model=DeviationRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_deviation_route(
+    payload: DeviationRecordCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> DeviationRecord:
+    try:
+        record = validation_store.create_deviation(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="deviation.create",
+        message="Deviation record created.",
+        entity_type="deviation",
+        entity_id=record.id,
+        metadata={"deviation_code": record.deviation_code, "source_type": record.source_type},
+    )
+    return record
+
+
+@router.get(
+    "/deviations",
+    response_model=list[DeviationRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_deviations_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[DeviationRecord]:
+    return validation_store.list_deviations(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        limit=limit,
+    )
+
+
+@router.patch(
+    "/deviations/{deviation_id}",
+    response_model=DeviationRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def update_deviation_route(
+    deviation_id: int,
+    payload: DeviationRecordUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> DeviationRecord:
+    try:
+        record = validation_store.update_deviation(
+            _state(request).session_factory,
+            deviation_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Deviation record not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="deviation.update",
+        message="Deviation record updated.",
+        entity_type="deviation",
+        entity_id=record.id,
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/capa",
+    response_model=CAPARecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_capa_route(
+    payload: CAPARecordCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> CAPARecord:
+    try:
+        record = validation_store.create_capa(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="capa.create",
+        message="CAPA record created.",
+        entity_type="capa",
+        entity_id=record.id,
+        metadata={"capa_code": record.capa_code, "source_deviation_id": record.source_deviation_id},
+    )
+    return record
+
+
+@router.get(
+    "/capa",
+    response_model=list[CAPARecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_capa_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[CAPARecord]:
+    return validation_store.list_capa(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        limit=limit,
+    )
+
+
+@router.patch(
+    "/capa/{capa_id}",
+    response_model=CAPARecord,
+    dependencies=[Depends(require_access_context)],
+)
+def update_capa_route(
+    capa_id: int,
+    payload: CAPARecordUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> CAPARecord:
+    try:
+        record = validation_store.update_capa(
+            _state(request).session_factory,
+            capa_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="CAPA record not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="capa.update",
+        message="CAPA record updated.",
+        entity_type="capa",
+        entity_id=record.id,
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
     )
     return record
 
@@ -19615,6 +20861,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    @app.middleware("http")
+    async def pwa_freshness_headers(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        response.headers["X-MolTrace-Backend-Version"] = settings.release_version
+        return response
+
     app.include_router(router)
     from .nmr2d_routes import router as nmr2d_router
 

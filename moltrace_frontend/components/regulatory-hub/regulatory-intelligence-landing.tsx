@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table"
 import { trackRegulatoryDossierCreated } from "@/src/lib/analytics/analytics-client"
 import { RegulatoryNotificationsCompactCard } from "@/components/regulatory-hub/regulatory-notifications-compact-card"
+import { RegulatoryHubValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
 import { AlertTriangle, BookOpen, ClipboardList, Eye, FolderOpen, Loader2 } from "lucide-react"
 
 type DossierRow = Record<string, unknown>
@@ -549,6 +550,8 @@ export function RegulatoryIntelligenceLanding() {
           }
         />
       </section>
+
+      <RegulatoryHubValidationReadinessCard />
 
       <RegulatoryNotificationsCompactCard />
 

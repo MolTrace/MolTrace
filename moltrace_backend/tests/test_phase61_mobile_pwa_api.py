@@ -93,6 +93,17 @@ def test_mobile_config_returns_integrated_program_order(tmp_path):
         assert body["draft_sync_required"] is True
 
 
+def test_pwa_api_responses_disable_http_cache_and_expose_backend_version(tmp_path):
+    client, headers = _client(tmp_path)
+    with client:
+        response = client.get("/mobile/config", headers=headers)
+        assert response.status_code == 200, response.text
+        assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
+        assert response.headers["pragma"] == "no-cache"
+        assert response.headers["expires"] == "0"
+        assert response.headers["x-moltrace-backend-version"] == "0.21.0"
+
+
 def test_mobile_dashboard_returns_compact_summaries(tmp_path):
     client, headers = _client(tmp_path)
     with client:
@@ -306,4 +317,3 @@ def test_openapi_includes_mobile_endpoints(tmp_path):
         paths = response.json()["paths"]
         for path in REQUIRED_MOBILE_PATHS:
             assert path in paths
-

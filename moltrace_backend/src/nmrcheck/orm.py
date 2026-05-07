@@ -1357,6 +1357,408 @@ class RegulatorySubmissionPackageORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class ValidationProjectORM(Base):
+    __tablename__ = "validation_projects"
+    __table_args__ = (
+        Index("ix_validation_projects_scope_status", "scope", "status"),
+        Index("ix_validation_projects_type_status", "validation_type", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(300))
+    scope: Mapped[str] = mapped_column(String(64), index=True)
+    validation_type: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    intended_use: Mapped[str] = mapped_column(Text)
+    regulated_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    qa_reviewer_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class UserRequirementSpecificationORM(Base):
+    __tablename__ = "user_requirement_specifications"
+    __table_args__ = (
+        Index("ix_urs_project_status", "validation_project_id", "status"),
+        Index("ix_urs_module_criticality", "module", "criticality"),
+        UniqueConstraint(
+            "validation_project_id",
+            "requirement_code",
+            name="uq_urs_project_requirement_code",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    validation_project_id: Mapped[int] = mapped_column(
+        ForeignKey("validation_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    requirement_code: Mapped[str] = mapped_column(String(100), index=True)
+    module: Mapped[str] = mapped_column(String(64), index=True)
+    requirement_text: Mapped[str] = mapped_column(Text)
+    criticality: Mapped[str] = mapped_column(String(32), index=True)
+    gxp_impact: Mapped[str] = mapped_column(String(32), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class FunctionalSpecificationORM(Base):
+    __tablename__ = "functional_specifications"
+    __table_args__ = (
+        Index("ix_functional_specs_project_status", "validation_project_id", "status"),
+        Index("ix_functional_specs_requirement", "requirement_id"),
+        UniqueConstraint(
+            "validation_project_id",
+            "function_code",
+            name="uq_functional_specs_project_function_code",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    validation_project_id: Mapped[int] = mapped_column(
+        ForeignKey("validation_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    requirement_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_requirement_specifications.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    function_code: Mapped[str] = mapped_column(String(100), index=True)
+    function_name: Mapped[str] = mapped_column(String(240))
+    function_description: Mapped[str] = mapped_column(Text)
+    expected_behavior: Mapped[str] = mapped_column(Text)
+    module: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ValidationRiskAssessmentORM(Base):
+    __tablename__ = "validation_risk_assessments"
+    __table_args__ = (
+        Index("ix_validation_risks_project_status", "validation_project_id", "status"),
+        Index("ix_validation_risks_target", "target_type", "target_id"),
+        Index("ix_validation_risks_severity", "severity", "probability", "detectability"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    validation_project_id: Mapped[int] = mapped_column(
+        ForeignKey("validation_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    target_type: Mapped[str] = mapped_column(String(64), index=True)
+    target_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    risk_description: Mapped[str] = mapped_column(Text)
+    severity: Mapped[str] = mapped_column(String(32), index=True)
+    probability: Mapped[str] = mapped_column(String(32), index=True)
+    detectability: Mapped[str] = mapped_column(String(32), index=True)
+    risk_priority: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    mitigation: Mapped[str] = mapped_column(Text)
+    testing_rigor: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="open", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ValidationTestProtocolORM(Base):
+    __tablename__ = "validation_test_protocols"
+    __table_args__ = (
+        Index("ix_validation_protocols_project_status", "validation_project_id", "status"),
+        Index("ix_validation_protocols_module_type", "module", "protocol_type"),
+        UniqueConstraint(
+            "validation_project_id",
+            "protocol_code",
+            name="uq_validation_protocol_project_code",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    validation_project_id: Mapped[int] = mapped_column(
+        ForeignKey("validation_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    protocol_code: Mapped[str] = mapped_column(String(100), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    module: Mapped[str] = mapped_column(String(64), index=True)
+    protocol_type: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ValidationTestCaseORM(Base):
+    __tablename__ = "validation_test_cases"
+    __table_args__ = (
+        Index("ix_validation_test_cases_protocol_status", "protocol_id", "status"),
+        UniqueConstraint("protocol_id", "test_case_code", name="uq_validation_test_case_code"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    protocol_id: Mapped[int] = mapped_column(
+        ForeignKey("validation_test_protocols.id", ondelete="CASCADE"),
+        index=True,
+    )
+    test_case_code: Mapped[str] = mapped_column(String(100), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    preconditions: Mapped[str] = mapped_column(Text)
+    steps_json: Mapped[str] = mapped_column(Text, default="[]")
+    expected_results: Mapped[str] = mapped_column(Text)
+    linked_requirement_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    linked_risk_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ValidationTestExecutionORM(Base):
+    __tablename__ = "validation_test_executions"
+    __table_args__ = (
+        Index("ix_validation_executions_test_case_status", "test_case_id", "execution_status"),
+        Index("ix_validation_executions_executed", "executed_at"),
+        Index("ix_validation_executions_deviation", "deviation_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    test_case_id: Mapped[int] = mapped_column(
+        ForeignKey("validation_test_cases.id", ondelete="CASCADE"),
+        index=True,
+    )
+    executed_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    execution_status: Mapped[str] = mapped_column(String(32), index=True)
+    actual_results: Mapped[str] = mapped_column(Text)
+    evidence_file_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    evidence_artifact_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    deviation_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class TraceabilityMatrixORM(Base):
+    __tablename__ = "traceability_matrices"
+    __table_args__ = (
+        Index("ix_traceability_project_status", "validation_project_id", "status"),
+        Index("ix_traceability_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    validation_project_id: Mapped[int] = mapped_column(
+        ForeignKey("validation_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    matrix_json: Mapped[str] = mapped_column(Text, default="{}")
+    coverage_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    missing_coverage_json: Mapped[str] = mapped_column(Text, default="[]")
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ElectronicSignatureRecordORM(Base):
+    __tablename__ = "electronic_signature_records"
+    __table_args__ = (
+        Index("ix_esignatures_target", "target_type", "target_id"),
+        Index("ix_esignatures_signer_signed", "signer_email", "signed_at"),
+        Index("ix_esignatures_meaning_signed", "signature_meaning", "signed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    signer_name: Mapped[str] = mapped_column(String(200))
+    signer_email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    signature_meaning: Mapped[str] = mapped_column(String(64), index=True)
+    target_type: Mapped[str] = mapped_column(String(100), index=True)
+    target_id: Mapped[int] = mapped_column(Integer, index=True)
+    reason: Mapped[str] = mapped_column(Text)
+    signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    authentication_method: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    signature_hash: Mapped[str] = mapped_column(String(64), index=True)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ControlledRecordORM(Base):
+    __tablename__ = "controlled_records"
+    __table_args__ = (
+        Index("ix_controlled_records_type_status", "record_type", "status"),
+        Index("ix_controlled_records_resource", "record_type", "resource_id"),
+        Index("ix_controlled_records_hash", "content_hash"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    record_type: Mapped[str] = mapped_column(String(64), index=True)
+    resource_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    version: Mapped[str] = mapped_column(String(64), default="1")
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    retention_policy_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class RecordRetentionPolicyORM(Base):
+    __tablename__ = "record_retention_policies"
+    __table_args__ = (
+        Index("ix_retention_policies_type_status", "record_type", "status"),
+        UniqueConstraint("name", "record_type", name="uq_retention_policy_name_type"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(240))
+    record_type: Mapped[str] = mapped_column(String(64), index=True)
+    retention_period_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    archive_strategy: Mapped[str] = mapped_column(Text)
+    legal_hold: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class DataIntegrityAssessmentORM(Base):
+    __tablename__ = "data_integrity_assessments"
+    __table_args__ = (
+        Index("ix_data_integrity_scope_status", "scope", "assessment_status"),
+        Index("ix_data_integrity_scope_id", "scope", "scope_id"),
+        Index("ix_data_integrity_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scope: Mapped[str] = mapped_column(String(64), index=True)
+    scope_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    assessment_status: Mapped[str] = mapped_column(String(32), index=True)
+    attributable_status: Mapped[str] = mapped_column(String(32))
+    legible_status: Mapped[str] = mapped_column(String(32))
+    contemporaneous_status: Mapped[str] = mapped_column(String(32))
+    original_status: Mapped[str] = mapped_column(String(32))
+    accurate_status: Mapped[str] = mapped_column(String(32))
+    complete_status: Mapped[str] = mapped_column(String(32))
+    consistent_status: Mapped[str] = mapped_column(String(32))
+    enduring_status: Mapped[str] = mapped_column(String(32))
+    available_status: Mapped[str] = mapped_column(String(32))
+    findings_json: Mapped[str] = mapped_column(Text, default="[]")
+    recommended_actions_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class InspectionReadinessPackageORM(Base):
+    __tablename__ = "inspection_readiness_packages"
+    __table_args__ = (
+        Index("ix_inspection_packages_scope_status", "scope", "package_status"),
+        Index("ix_inspection_packages_created", "created_at"),
+        Index("ix_inspection_packages_sha", "package_sha256"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(300))
+    scope: Mapped[str] = mapped_column(String(64), index=True)
+    scope_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    package_status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    included_record_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    included_signature_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    included_audit_event_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    included_validation_project_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    package_manifest_json: Mapped[str] = mapped_column(Text, default="{}")
+    package_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class SystemReleaseRecordORM(Base):
+    __tablename__ = "system_release_records"
+    __table_args__ = (
+        Index("ix_system_releases_version", "release_version"),
+        Index("ix_system_releases_type_status", "release_type", "approval_status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    release_version: Mapped[str] = mapped_column(String(120), index=True)
+    release_type: Mapped[str] = mapped_column(String(64), index=True)
+    change_summary: Mapped[str] = mapped_column(Text)
+    validation_project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("validation_projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    test_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    risk_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    approval_status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class DeviationRecordORM(Base):
+    __tablename__ = "deviation_records"
+    __table_args__ = (
+        UniqueConstraint("deviation_code", name="uq_deviation_code"),
+        Index("ix_deviations_status_severity", "status", "severity"),
+        Index("ix_deviations_source", "source_type", "source_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    deviation_code: Mapped[str] = mapped_column(String(100), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str] = mapped_column(Text)
+    severity: Mapped[str] = mapped_column(String(32), index=True)
+    source_type: Mapped[str] = mapped_column(String(64), index=True)
+    source_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="open", index=True)
+    root_cause: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class CAPARecordORM(Base):
+    __tablename__ = "capa_records"
+    __table_args__ = (
+        UniqueConstraint("capa_code", name="uq_capa_code"),
+        Index("ix_capa_status_due", "status", "due_date"),
+        Index("ix_capa_deviation", "source_deviation_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    capa_code: Mapped[str] = mapped_column(String(100), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str] = mapped_column(Text)
+    source_deviation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("deviation_records.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    corrective_action: Mapped[str] = mapped_column(Text)
+    preventive_action: Mapped[str] = mapped_column(Text)
+    owner: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="open", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class QualityFindingORM(Base):
     __tablename__ = "quality_findings"
     __table_args__ = (

@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { moltraceTraceClassName } from "@/components/branding/moltrace-wordmark"
@@ -13,8 +12,6 @@ import {
   LayoutDashboard,
   Bot,
   FolderOpen,
-  FlaskConical,
-  Scale,
   BarChart3,
   Settings,
   ChevronLeft,
@@ -85,22 +82,8 @@ function adminPathActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/")
 }
 
-function isAnyAdminRoute(pathname: string) {
-  return adminNavigation.some((item) => adminPathActive(pathname, item.href))
-}
-
-function isAnySettingsRoute(pathname: string) {
-  return pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/")
-}
-
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   const pathname = usePathname()
-  const prevPathnameRef = useRef(pathname)
-
-  useEffect(() => {
-    const _prev = prevPathnameRef.current
-    prevPathnameRef.current = pathname
-  }, [pathname])
 
   const NavLink = ({
     item,
@@ -140,7 +123,6 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
     return linkContent
   }
 
-  const adminSectionActive = isAnyAdminRoute(pathname)
   return (
     <TooltipProvider delayDuration={0}>
       <aside

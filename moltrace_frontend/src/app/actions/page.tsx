@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2 } from "lucide-react"
 import SavedReportsWorkspace from "@/components/reports/saved-reports-workspace"
 import ReviewQueueWorkspace from "@/components/review/review-queue-workspace"
+import { ValidationCenterWorkspace } from "@/components/validation/validation-center-workspace"
 
 const PROGRAMS = [
   { key: "spectracheck", label: "SpectraCheck" },
@@ -444,6 +445,7 @@ export default function CrossModuleActionQueuePage() {
               <TabsTrigger value="action_queue">Action Queue</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
               <TabsTrigger value="review">Review</TabsTrigger>
+              <TabsTrigger value="validation_center">Validation Center</TabsTrigger>
             </TabsList>
             <TabsContent value="action_queue">
               <CrossModuleActionQueueWorkspace />
@@ -453,6 +455,9 @@ export default function CrossModuleActionQueuePage() {
             </TabsContent>
             <TabsContent value="review">
               <ReviewQueueWorkspace />
+            </TabsContent>
+            <TabsContent value="validation_center">
+              <ValidationCenterWorkspace />
             </TabsContent>
           </Tabs>
         </div>
