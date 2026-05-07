@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import React, { useCallback, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -96,6 +96,19 @@ function nearestDisplayYAtX(xArr: number[], yDisp: number[], xTarget: number): n
   return best
 }
 
+function downsampleXYDisplay(x: number[], y: number[], maxPoints: number): { x: number[]; y: number[]; reduced: boolean } {
+  const len = Math.min(x.length, y.length)
+  if (len <= maxPoints) return { x: x.slice(0, len), y: y.slice(0, len), reduced: false }
+  const step = Math.ceil(len / maxPoints)
+  const dx: number[] = []
+  const dy: number[] = []
+  for (let i = 0; i < len; i += step) {
+    dx.push(x[i]!)
+    dy.push(y[i]!)
+  }
+  return { x: dx, y: dy, reduced: true }
+}
+
 export function SpectrumViewer1D({
   x,
   y,
@@ -116,8 +129,36 @@ export function SpectrumViewer1D({
   const [yZoom, setYZoom] = useState(1)
   const [xRange, setXRange] = useState<[number, number] | null>(null)
   const graphDivRef = useRef<HTMLElement | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(720)
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      setIsMobile(false)
+      return
+    }
+    const mq = window.matchMedia("(max-width: 640px)")
+    const apply = () => setIsMobile(mq.matches)
+    apply()
+    mq.addEventListener("change", apply)
+    const onResize = () => setViewportHeight(window.innerHeight)
+    onResize()
+    window.addEventListener("resize", onResize)
+    return () => {
+      mq.removeEventListener("change", apply)
+      window.removeEventListener("resize", onResize)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isMobile) setShowPeakLabels(false)
+  }, [isMobile])
 
   const displayY = useMemo(() => deriveDisplayY(y, gain01), [y, gain01])
+  const displayPrimary = useMemo(
+    () => downsampleXYDisplay(x, displayY, isMobile ? 1600 : 5000),
+    [x, displayY, isMobile],
+  )
 
   const mismatch =
     x.length > 0 && y.length > 0 && x.length !== y.length
@@ -126,21 +167,29 @@ export function SpectrumViewer1D({
   const overlayYs = useMemo(() => {
     return overlays.map((o) => deriveDisplayY(o.y, gain01))
   }, [overlays, gain01])
+  const displayOverlays = useMemo(
+    () =>
+      overlays.map((o, i) => {
+        const dy = overlayYs[i] ?? []
+        return downsampleXYDisplay(o.x, dy, isMobile ? 1200 : 4000)
+      }),
+    [overlays, overlayYs, isMobile],
+  )
 
   const { xMin, xMax, yMax } = useMemo(() => {
     if (empty || mismatch) {
       return { xMin: 0, xMax: 1, yMax: 1 }
     }
-    const xi = x.map(Number)
-    const ys = displayY
+    const xi = displayPrimary.x.map(Number)
+    const ys = displayPrimary.y
     const localYMax = ys.length ? Math.max(...ys.map((v) => (Number.isFinite(v) ? v : 0))) : 1
     let overlayMax = 0
     if (showOverlaysMaster) {
       overlays.forEach((o, i) => {
         if (o.visible === false) return
-        const dy = overlayYs[i]
-        if (!dy?.length || o.x.length !== dy.length) return
-        overlayMax = Math.max(overlayMax, ...dy.map((v) => (Number.isFinite(v) ? v : 0)))
+        const ov = displayOverlays[i]
+        if (!ov?.y.length || ov.x.length !== ov.y.length) return
+        overlayMax = Math.max(overlayMax, ...ov.y.map((v) => (Number.isFinite(v) ? v : 0)))
       })
     }
     let peakMax = 0
@@ -149,7 +198,7 @@ export function SpectrumViewer1D({
         const py =
           p.y != null
             ? yMinShiftedGain(p.y, y, gain01)
-            : nearestDisplayYAtX(x, displayY, p.x)
+            : nearestDisplayYAtX(displayPrimary.x, displayPrimary.y, p.x)
         peakMax = Math.max(peakMax, Number.isFinite(py) ? py : 0)
       })
     }
@@ -159,12 +208,12 @@ export function SpectrumViewer1D({
       yMax: Math.max(localYMax, overlayMax, peakMax, 1) * yZoom,
     }
   }, [
-    x,
-    displayY,
+    displayPrimary.x,
+    displayPrimary.y,
     empty,
     mismatch,
     overlays,
-    overlayYs,
+    displayOverlays,
     peaks,
     showOverlaysMaster,
     yZoom,
@@ -180,8 +229,8 @@ export function SpectrumViewer1D({
       {
         type: "scattergl",
         mode: "lines",
-        x,
-        y: displayY,
+        x: displayPrimary.x,
+        y: displayPrimary.y,
         name: "Spectrum",
         line: { width: 1.2, color: "#2563eb" },
       },
@@ -189,13 +238,13 @@ export function SpectrumViewer1D({
     if (showOverlaysMaster) {
       overlays.forEach((o, i) => {
         if (o.visible === false) return
-        const dy = overlayYs[i]
-        if (!dy || o.x.length !== dy.length) return
+        const ov = displayOverlays[i]
+        if (!ov || ov.x.length !== ov.y.length) return
         traces.push({
           type: "scattergl",
           mode: "lines",
-          x: o.x,
-          y: dy,
+          x: ov.x,
+          y: ov.y,
           name: o.name,
           line: { width: 1, dash: "dash", color: "#c026d3" },
           opacity: 0.85,
@@ -207,7 +256,7 @@ export function SpectrumViewer1D({
       const py = peaks.map((p) =>
         p.y != null
           ? yMinShiftedGain(p.y, y, gain01)
-          : nearestDisplayYAtX(x, displayY, p.x)
+          : nearestDisplayYAtX(displayPrimary.x, displayPrimary.y, p.x)
       )
       traces.push({
         type: "scattergl",
@@ -225,11 +274,12 @@ export function SpectrumViewer1D({
   }, [
     x,
     y,
-    displayY,
+    displayPrimary.x,
+    displayPrimary.y,
     empty,
     mismatch,
     overlays,
-    overlayYs,
+    displayOverlays,
     peaks,
     showOverlaysMaster,
     showPeakLabels,
@@ -365,10 +415,13 @@ export function SpectrumViewer1D({
   }
 
   const hasOverlayRow = overlays.length > 0
+  const effectiveHeight = isMobile ? Math.min(Math.max(Math.floor(viewportHeight * 0.42), 260), 420) : height
+  const isDisplayDownsampled =
+    displayPrimary.reduced || displayOverlays.some((ov) => ov.reduced)
 
   return (
     <div
-      className={cn("flex flex-col gap-3", className)}
+      className={cn("flex min-w-0 max-w-full flex-col gap-3 overflow-x-hidden", className)}
       aria-label={`${nucleus ?? "Spectrum"} 1D display`}
     >
       {nucleus ? (
@@ -378,6 +431,8 @@ export function SpectrumViewer1D({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2 border-b pb-3">
+        {!isMobile ? (
+          <>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -550,6 +605,52 @@ export function SpectrumViewer1D({
             <p className="max-w-xs">Download the current plot as a PNG image.</p>
           </TooltipContent>
         </Tooltip>
+          </>
+        ) : (
+          <details className="w-full">
+            <summary className="cursor-pointer text-xs text-muted-foreground">More controls</summary>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={fullView}>
+                Full view
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => pan("left")}>
+                Pan left
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => pan("right")}>
+                Pan right
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => bumpPeakHeight(1)}>
+                Increase peak height
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => bumpPeakHeight(-1)}>
+                Decrease peak height
+              </Button>
+              <Button
+                type="button"
+                variant={showPeakLabels ? "secondary" : "outline"}
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setShowPeakLabels((v) => !v)}
+              >
+                Toggle labels
+              </Button>
+              {hasOverlayRow ? (
+                <Button
+                  type="button"
+                  variant={showOverlaysMaster ? "secondary" : "outline"}
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  onClick={() => setShowOverlaysMaster((v) => !v)}
+                >
+                  Toggle overlays
+                </Button>
+              ) : null}
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void exportImage()}>
+                Export image
+              </Button>
+            </div>
+          </details>
+        )}
       </div>
 
       <div className="space-y-2 px-0.5">
@@ -578,12 +679,13 @@ export function SpectrumViewer1D({
           step={0.5}
           onValueChange={(v) => setGain01((v[0] ?? 45) / 100)}
           aria-label="Intensity gain"
+          className="py-2"
         />
       </div>
 
       <div
         className="min-h-[280px] w-full min-w-0 overflow-hidden rounded-lg border bg-card"
-        style={{ height }}
+        style={{ height: effectiveHeight }}
       >
         <Plot
           data={data}
@@ -602,6 +704,9 @@ export function SpectrumViewer1D({
           onClick={handlePlotClick}
         />
       </div>
+      {isDisplayDownsampled ? (
+        <p className="text-xs text-muted-foreground">Display downsampled on mobile. Full resolution available on desktop.</p>
+      ) : null}
     </div>
   )
 }

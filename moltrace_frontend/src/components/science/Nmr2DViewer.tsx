@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import React, { useCallback, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import {
@@ -85,6 +85,14 @@ function markerSizes(peaks: Nmr2DPeak[]): number[] {
   })
 }
 
+function downsamplePeaksDisplay(peaks: Nmr2DPeak[], maxPoints: number): { peaks: Nmr2DPeak[]; reduced: boolean } {
+  if (peaks.length <= maxPoints) return { peaks: peaks.slice(), reduced: false }
+  const step = Math.ceil(peaks.length / maxPoints)
+  const out: Nmr2DPeak[] = []
+  for (let i = 0; i < peaks.length; i += step) out.push(peaks[i]!)
+  return { peaks: out, reduced: true }
+}
+
 export function Nmr2DViewer({
   peaks,
   experiment,
@@ -99,6 +107,30 @@ export function Nmr2DViewer({
   const [xRange, setXRange] = useState<[number, number] | null>(null)
   const [yRange, setYRange] = useState<[number, number] | null>(null)
   const graphDivRef = useRef<HTMLElement | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(720)
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      setIsMobile(false)
+      return
+    }
+    const mq = window.matchMedia("(max-width: 640px)")
+    const apply = () => setIsMobile(mq.matches)
+    apply()
+    mq.addEventListener("change", apply)
+    const onResize = () => setViewportHeight(window.innerHeight)
+    onResize()
+    window.addEventListener("resize", onResize)
+    return () => {
+      mq.removeEventListener("change", apply)
+      window.removeEventListener("resize", onResize)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isMobile) setShowLabels(false)
+  }, [isMobile])
 
   const valid = useMemo(() => filterValidPeaks(peaks), [peaks])
 
@@ -106,6 +138,11 @@ export function Nmr2DViewer({
     if (!suspiciousOnly) return valid
     return valid.filter((p) => statusSuggestsReview(p.status))
   }, [valid, suspiciousOnly])
+  const displayPeaksState = useMemo(
+    () => downsamplePeaksDisplay(displayed, isMobile ? 1800 : 6000),
+    [displayed, isMobile],
+  )
+  const displayPeaks = displayPeaksState.peaks
 
   const empty = valid.length === 0
 
@@ -113,14 +150,14 @@ export function Nmr2DViewer({
     !empty && suspiciousOnly && displayed.length === 0 && valid.length > 0
 
   const plotData = useMemo(() => {
-    if (displayed.length === 0) return []
-    const f2 = displayed.map((p) => p.f2_ppm)
-    const f1 = displayed.map((p) => p.f1_ppm)
-    const sizes = markerSizes(displayed)
-    const flagged = displayed.map((p) => statusSuggestsReview(p.status))
+    if (displayPeaks.length === 0) return []
+    const f2 = displayPeaks.map((p) => p.f2_ppm)
+    const f1 = displayPeaks.map((p) => p.f1_ppm)
+    const sizes = markerSizes(displayPeaks)
+    const flagged = displayPeaks.map((p) => statusSuggestsReview(p.status))
     const colors = flagged.map((f) => (f ? "#ea580c" : "#2563eb"))
     const symbols = flagged.map((f) => (f ? "x" : "circle"))
-    const labels = displayed.map((p) => {
+    const labels = displayPeaks.map((p) => {
       const a = p.assignment?.trim()
       const l = p.label?.trim()
       if (a && l) return `${a} (${l})`
@@ -145,7 +182,7 @@ export function Nmr2DViewer({
         hovertemplate: `<b>${f2Label}</b>: %{x:.4f}<br><b>${f1Label}</b>: %{y:.4f}<extra></extra>`,
       },
     ]
-  }, [displayed, showLabels, f2Label, f1Label])
+  }, [displayPeaks, showLabels, f2Label, f1Label])
 
   const layout = useMemo(
     () => ({
@@ -224,6 +261,9 @@ export function Nmr2DViewer({
     )
   }
 
+  const effectiveHeight = isMobile ? Math.min(Math.max(Math.floor(viewportHeight * 0.42), 260), 420) : height
+  const isDisplayDownsampled = displayPeaksState.reduced
+
   return (
     <div
       className={cn("flex min-w-0 max-w-full flex-col gap-3 overflow-x-hidden", className)}
@@ -247,6 +287,8 @@ export function Nmr2DViewer({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-b pb-3">
+        {!isMobile ? (
+          <>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -328,11 +370,40 @@ export function Nmr2DViewer({
             <p className="max-w-xs">Download the current plot as a PNG image.</p>
           </TooltipContent>
         </Tooltip>
+          </>
+        ) : (
+          <details className="w-full">
+            <summary className="cursor-pointer text-xs text-muted-foreground">More controls</summary>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={showLabels ? "secondary" : "outline"}
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setShowLabels((v) => !v)}
+              >
+                Toggle labels
+              </Button>
+              <Button
+                type="button"
+                variant={suspiciousOnly ? "secondary" : "outline"}
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setSuspiciousOnly((v) => !v)}
+              >
+                Suspicious only
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void exportImage()}>
+                Export image
+              </Button>
+            </div>
+          </details>
+        )}
       </div>
 
       <div
         className="min-h-[280px] w-full min-w-0 max-w-full overflow-hidden rounded-lg border bg-card"
-        style={{ height }}
+        style={{ height: effectiveHeight }}
       >
         {plotEmptyFilter ? (
           <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted-foreground">
@@ -356,46 +427,65 @@ export function Nmr2DViewer({
           />
         )}
       </div>
+      {isDisplayDownsampled ? (
+        <p className="text-xs text-muted-foreground">Display downsampled on mobile. Full resolution available on desktop.</p>
+      ) : null}
 
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">Peak table</p>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>F2 (ppm)</TableHead>
-              <TableHead>F1 (ppm)</TableHead>
-              <TableHead>Intensity</TableHead>
-              <TableHead>Assignment</TableHead>
-              <TableHead>Label</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        {isMobile ? (
+          <div className="space-y-2">
             {valid.map((p, i) => (
-              <TableRow
-                key={i}
-                className={cn(statusSuggestsReview(p.status) && "bg-amber-500/10")}
-              >
-                <TableCell className="font-mono text-xs">{p.f2_ppm.toFixed(4)}</TableCell>
-                <TableCell className="font-mono text-xs">{p.f1_ppm.toFixed(4)}</TableCell>
-                <TableCell className="text-xs">
-                  {typeof p.intensity === "number" && Number.isFinite(p.intensity)
-                    ? p.intensity.toPrecision(4)
-                    : "—"}
-                </TableCell>
-                <TableCell className="max-w-[140px] truncate text-xs" title={p.assignment}>
-                  {p.assignment ?? "—"}
-                </TableCell>
-                <TableCell className="max-w-[120px] truncate text-xs" title={p.label}>
-                  {p.label ?? "—"}
-                </TableCell>
-                <TableCell className="max-w-[160px] truncate text-xs" title={p.status}>
-                  {p.status ?? "—"}
-                </TableCell>
-              </TableRow>
+              <div key={i} className={cn("rounded-md border p-2 text-xs", statusSuggestsReview(p.status) && "bg-amber-500/10")}>
+                <p className="font-mono">F2 {p.f2_ppm.toFixed(4)} · F1 {p.f1_ppm.toFixed(4)}</p>
+                <p>Intensity: {typeof p.intensity === "number" && Number.isFinite(p.intensity) ? p.intensity.toPrecision(4) : "—"}</p>
+                <p className="truncate">Assignment: {p.assignment ?? "—"}</p>
+                <p className="truncate">Label: {p.label ?? "—"}</p>
+                <p className="truncate">Status: {p.status ?? "—"}</p>
+              </div>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+        ) : (
+          <div className="w-full overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>F2 (ppm)</TableHead>
+                  <TableHead>F1 (ppm)</TableHead>
+                  <TableHead>Intensity</TableHead>
+                  <TableHead>Assignment</TableHead>
+                  <TableHead>Label</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {valid.map((p, i) => (
+                  <TableRow
+                    key={i}
+                    className={cn(statusSuggestsReview(p.status) && "bg-amber-500/10")}
+                  >
+                    <TableCell className="font-mono text-xs">{p.f2_ppm.toFixed(4)}</TableCell>
+                    <TableCell className="font-mono text-xs">{p.f1_ppm.toFixed(4)}</TableCell>
+                    <TableCell className="text-xs">
+                      {typeof p.intensity === "number" && Number.isFinite(p.intensity)
+                        ? p.intensity.toPrecision(4)
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[140px] truncate text-xs" title={p.assignment}>
+                      {p.assignment ?? "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[120px] truncate text-xs" title={p.label}>
+                      {p.label ?? "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[160px] truncate text-xs" title={p.status}>
+                      {p.status ?? "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
     </div>
   )
