@@ -7,7 +7,10 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, Bell, Shield, Key, Building2 } from "lucide-react"
+import { ConnectorsCenterWorkspace } from "@/components/settings/connectors-center-workspace"
+import { InstrumentWatchFolderWorkspace } from "@/components/settings/instrument-watch-folder-workspace"
+import { MappingTemplatesWorkspace } from "@/components/settings/mapping-templates-workspace"
+import { User, Bell, Shield, Key, Building2, Plug, FolderSearch, Link2 } from "lucide-react"
 
 export default function SettingsPage() {
   return (
@@ -40,6 +43,10 @@ export default function SettingsPage() {
           <TabsTrigger value="organization" className="gap-2">
             <Building2 className="h-4 w-4" />
             Organization
+          </TabsTrigger>
+          <TabsTrigger value="connectors" className="gap-2">
+            <Plug className="h-4 w-4" />
+            Connectors
           </TabsTrigger>
         </TabsList>
 
@@ -206,6 +213,35 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="connectors">
+          <Tabs defaultValue="connector-center" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="connector-center" className="gap-2">
+                <Plug className="h-4 w-4" />
+                Connector Center
+              </TabsTrigger>
+              <TabsTrigger value="instrument-watch" className="gap-2">
+                <FolderSearch className="h-4 w-4" />
+                Instrument Watch
+              </TabsTrigger>
+              <TabsTrigger value="mapping-templates" className="gap-2">
+                <Link2 className="h-4 w-4" />
+                Mapping Templates
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="connector-center">
+              <ConnectorsCenterWorkspace />
+            </TabsContent>
+            <TabsContent value="instrument-watch">
+              <InstrumentWatchFolderWorkspace />
+            </TabsContent>
+            <TabsContent value="mapping-templates">
+              <MappingTemplatesWorkspace />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
       </Tabs>
     </div>
   )

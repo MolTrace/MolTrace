@@ -15,10 +15,8 @@ import {
   FolderOpen,
   FlaskConical,
   Scale,
-  FileText,
   BarChart3,
   Settings,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   LineChart,
@@ -26,13 +24,11 @@ import {
   Users,
   ClipboardList,
   Boxes,
-  Package,
   Server,
   Shield,
   ScrollText,
   Bug,
   Rocket,
-  Library,
 } from "lucide-react"
 import {
   Tooltip,
@@ -49,17 +45,11 @@ export type SidebarNavItem = {
 
 const navigation: SidebarNavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "AI Services", href: "/ai", icon: Bot },
+  { name: "ML / AI", href: "/ai", icon: Bot },
   { name: "Projects", href: "/projects", icon: FolderOpen },
-  { name: "Compounds", href: "/compounds", icon: Boxes },
-  { name: "Batches", href: "/batches", icon: Package },
-  { name: "SpectraCheck", href: "/spectracheck", icon: SpectraCheckLogoIcon },
-  { name: "Regulatory Hub", href: "/regulatory", icon: Scale },
-  { name: "Reaction Optimization", href: "/reactions", icon: FlaskConical },
+  { name: "Compound / Batch", href: "/compounds", icon: Boxes },
+  { name: "Programs", href: "/spectracheck", icon: SpectraCheckLogoIcon },
   { name: "Action Queue", href: "/actions", icon: ClipboardList },
-  { name: "Knowledge Library", href: "/knowledge", icon: Library },
-  { name: "Reports", href: "/reports", icon: FileText },
-  { name: "Review", href: "/review", icon: ClipboardList },
   { name: "Automation ROI", href: "/roi", icon: BarChart3 },
   { name: "Platform", href: "/platform", icon: LineChart },
 ]
@@ -99,19 +89,17 @@ function isAnyAdminRoute(pathname: string) {
   return adminNavigation.some((item) => adminPathActive(pathname, item.href))
 }
 
+function isAnySettingsRoute(pathname: string) {
+  return pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/")
+}
+
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   const pathname = usePathname()
-  const [adminExpanded, setAdminExpanded] = useState(() =>
-    isAnyAdminRoute(pathname)
-  )
   const prevPathnameRef = useRef(pathname)
 
   useEffect(() => {
-    const prev = prevPathnameRef.current
+    const _prev = prevPathnameRef.current
     prevPathnameRef.current = pathname
-    const enteredAdmin =
-      isAnyAdminRoute(pathname) && !isAnyAdminRoute(prev)
-    if (enteredAdmin) setAdminExpanded(true)
   }, [pathname])
 
   const NavLink = ({
@@ -127,10 +115,10 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
       <Link
         href={item.href}
         className={cn(
-          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+          "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold tracking-tight transition-all duration-200",
           isActive
-            ? "bg-secondary text-foreground"
-            : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
+            ? "bg-secondary text-foreground shadow-sm"
+            : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground hover:shadow-sm",
           collapsed && "justify-center px-2",
           nested && !collapsed && "ml-2 border-l border-border pl-3"
         )}
@@ -153,24 +141,23 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   }
 
   const adminSectionActive = isAnyAdminRoute(pathname)
-
   return (
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "flex h-full flex-col border-r bg-sidebar transition-all duration-200",
+          "flex h-full flex-col border-r border-border/70 bg-sidebar/95 backdrop-blur-sm transition-all duration-200",
           collapsed ? "w-14" : "w-56"
         )}
       >
         {/* Logo */}
         <div className={cn(
-          "flex h-14 items-center border-b px-3",
+          "flex h-14 items-center border-b border-border/70 px-3",
           collapsed ? "justify-center" : "justify-between"
         )}>
           <Link href="/" className="flex items-center gap-2">
             <MoleculeLogoMark className="h-7 w-7" />
             {!collapsed && (
-              <span className="font-semibold">
+              <span className="text-[15px] font-semibold tracking-tight">
                 <span className="text-foreground">Mol</span>
                 <span className={moltraceTraceClassName}>Trace</span>
               </span>
@@ -180,7 +167,7 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
             variant="ghost"
             size="icon"
             onClick={onToggle}
-            className={cn("h-7 w-7", collapsed && "absolute -right-3.5 top-3.5 z-10 rounded-full border bg-background shadow-sm")}
+            className={cn("h-7 w-7", collapsed && "absolute -right-3.5 top-3.5 z-10 rounded-full border border-border/70 bg-background/95 shadow-sm backdrop-blur-sm")}
           >
             {collapsed ? (
               <ChevronRight className="h-3.5 w-3.5" />
@@ -198,72 +185,19 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
         </nav>
 
         {/* Team — above Admin */}
-        <div className="border-t p-2">
+        <div className="border-t border-border/70 p-2">
           {teamNav.map((item) => (
             <NavLink key={item.name} item={item} />
           ))}
         </div>
 
         {/* Admin — collapsible, above Settings */}
-        <div className="border-t p-2">
-          {collapsed ? (
-            <div className="space-y-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setAdminExpanded((e) => !e)}
-                    className={cn(
-                      "flex w-full items-center justify-center rounded-md px-2 py-2 text-sm font-medium transition-colors",
-                      adminSectionActive
-                        ? "bg-secondary text-foreground"
-                        : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                    )}
-                    aria-expanded={adminExpanded}
-                    aria-label="Admin"
-                  >
-                    <SlidersHorizontal className="h-4 w-4 shrink-0" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Admin</TooltipContent>
-              </Tooltip>
-              {adminExpanded &&
-                adminNavigation.map((item) => (
-                  <NavLink key={item.name} item={item} nested />
-                ))}
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => setAdminExpanded((e) => !e)}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  adminSectionActive
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                )}
-                aria-expanded={adminExpanded}
-              >
-                <SlidersHorizontal className="h-4 w-4 shrink-0" />
-                <span className="flex-1 text-left">Admin</span>
-                <ChevronDown
-                  className={cn(
-                    "h-4 w-4 shrink-0 transition-transform",
-                    adminExpanded && "rotate-180"
-                  )}
-                />
-              </button>
-              {adminExpanded &&
-                adminNavigation.map((item) => (
-                  <NavLink key={item.name} item={item} nested />
-                ))}
-            </div>
-          )}
+        <div className="border-t border-border/70 p-2">
+          <NavLink item={{ name: "Admin", href: "/admin/system", icon: SlidersHorizontal }} />
         </div>
 
         {/* Bottom Navigation */}
-        <div className="border-t p-2">
+        <div className="border-t border-border/70 p-2">
           {bottomNav.map((item) => (
             <NavLink key={item.name} item={item} />
           ))}

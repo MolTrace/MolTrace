@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app/app-shell"
-import { ReactionOptimizationLanding } from "@/components/reaction-optimization/reaction-optimization-landing"
+import { ReactionProgramInterfaceWorkspace } from "@/components/reaction-optimization/reaction-program-interface-workspace"
 
 /**
  * Mirror of `app/reactions/page.tsx` — Reaction Optimization landing (GET/POST /reaction-projects).
@@ -7,7 +7,7 @@ import { ReactionOptimizationLanding } from "@/components/reaction-optimization/
 export default function ReactionsPage() {
   return (
     <AppShell>
-      <ReactionOptimizationLanding />
+      <ReactionProgramInterfaceWorkspace />
     </AppShell>
   )
 }

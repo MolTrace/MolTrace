@@ -87,6 +87,12 @@ export function SystemStatusWorkspace() {
   const [errVersion, setErrVersion] = useState("")
   const [errDeps, setErrDeps] = useState("")
   const [errEnv, setErrEnv] = useState("")
+  const [connectorHealthLoading, setConnectorHealthLoading] = useState(true)
+  const [connectorHealthError, setConnectorHealthError] = useState("")
+  const [connectorHealthBackendUnavailable, setConnectorHealthBackendUnavailable] = useState(false)
+  const [connectorActiveCount, setConnectorActiveCount] = useState<number | null>(null)
+  const [connectorWarningCount, setConnectorWarningCount] = useState<number | null>(null)
+  const [connectorLastHealthFailCount, setConnectorLastHealthFailCount] = useState<number | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -136,6 +142,50 @@ export function SystemStatusWorkspace() {
   useEffect(() => {
     void reload()
   }, [reload])
+
+  useEffect(() => {
+    let cancelled = false
+    setConnectorHealthLoading(true)
+    setConnectorHealthError("")
+    setConnectorHealthBackendUnavailable(false)
+
+    void apiFetch<unknown>("/connectors", { method: "GET" })
+      .then((payload) => {
+        if (cancelled) return
+        const rows = Array.isArray(payload)
+          ? payload.filter(isRecord)
+          : isRecord(payload) && Array.isArray(payload.items)
+            ? payload.items.filter(isRecord)
+            : []
+        const active = rows.filter((row) => {
+          const s = readStr(row, ["status", "health_status", "state"]).toLowerCase()
+          return s === "active" || s === "enabled" || s === "connected" || s === "healthy"
+        }).length
+        const warnings = rows.filter((row) => {
+          const s = readStr(row, ["status", "health_status", "state"]).toLowerCase()
+          return s === "warning" || s === "degraded" || s === "error" || s === "failed" || s === "unhealthy"
+        }).length
+        const lastHealthFailed = rows.filter((row) => {
+          const s = readStr(row, ["last_health_check_status", "health_check_status"]).toLowerCase()
+          return s === "failed" || s === "error" || s === "unhealthy"
+        }).length
+        setConnectorActiveCount(active)
+        setConnectorWarningCount(warnings)
+        setConnectorLastHealthFailCount(lastHealthFailed)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setConnectorHealthBackendUnavailable(true)
+        setConnectorHealthError(formatErr(err, "Could not load /connectors."))
+      })
+      .finally(() => {
+        if (!cancelled) setConnectorHealthLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const backendUnreachable =
     !loading &&
@@ -629,6 +679,45 @@ export function SystemStatusWorkspace() {
                 ))}
               </ul>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Connector health</h2>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Connector health</CardTitle>
+            <CardDescription>
+              From <code className="text-xs">GET /connectors</code>. Credentials and secrets are never displayed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Active connectors</p>
+                <p className="text-2xl font-bold tabular-nums">{connectorActiveCount ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Connectors with warnings</p>
+                <p className="text-2xl font-bold tabular-nums">{connectorWarningCount ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Failed last health checks</p>
+                <p className="text-2xl font-bold tabular-nums">{connectorLastHealthFailCount ?? "—"}</p>
+              </div>
+            </div>
+            {connectorHealthLoading ? (
+              <p className="text-xs text-muted-foreground">Loading connector health…</p>
+            ) : null}
+            {!connectorHealthLoading && connectorHealthBackendUnavailable ? (
+              <p className="text-xs text-muted-foreground">
+                Connector health unavailable — current admin system content continues.
+              </p>
+            ) : null}
+            {!connectorHealthLoading && connectorHealthError && connectorHealthBackendUnavailable ? (
+              <p className="text-xs text-muted-foreground">Details: {connectorHealthError}</p>
+            ) : null}
           </CardContent>
         </Card>
       </div>

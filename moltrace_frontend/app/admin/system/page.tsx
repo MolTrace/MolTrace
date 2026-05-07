@@ -1,10 +1,10 @@
 import { AppShell } from "@/components/app/app-shell"
-import { SystemStatusWorkspace } from "@/components/admin/system-status-workspace"
+import { AdminInterfaceWorkspace } from "@/components/admin/admin-interface-workspace"
 
 export default function AdminSystemStatusPage() {
   return (
     <AppShell>
-      <SystemStatusWorkspace />
+      <AdminInterfaceWorkspace />
     </AppShell>
   )
 }

@@ -885,18 +885,17 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         </AlertDescription>
       </Alert>
 
-      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:gap-4">
-        <div className="min-h-0 min-w-0 flex-1">
-          <SpectraCheckWorkspaceSessionProvider
-            value={{
-              backendSessionId,
-              workspaceSampleId: sampleId,
-              sessionFiles: spectracheckSessionFiles,
-              refreshSessionFiles: refreshSpectracheckSessionFiles,
-              registerAnalysisJob: registerSpectracheckAnalysisJob,
-              recentJobIds: recentAnalysisJobIds,
-            }}
-          >
+      <SpectraCheckWorkspaceSessionProvider
+        value={{
+          backendSessionId,
+          workspaceSampleId: sampleId,
+          sessionFiles: spectracheckSessionFiles,
+          refreshSessionFiles: refreshSpectracheckSessionFiles,
+          registerAnalysisJob: registerSpectracheckAnalysisJob,
+          recentJobIds: recentAnalysisJobIds,
+        }}
+      >
+      <div className="min-h-0 min-w-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0">
         <div className="min-w-0 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
           <TabsList className="inline-flex h-auto min-h-9 w-max min-w-0 max-w-full flex-nowrap justify-start gap-1 sm:flex-wrap">
@@ -955,6 +954,13 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               tooltip="HRMS, formula search, adduct inference, MS/MS, fragmentation, and optional LC-MS feature workflows using shared session inputs."
             >
               MS Evidence
+            </SpectraCheckTabWithTooltip>
+            <SpectraCheckTabWithTooltip
+              value="tab-evidence-queue"
+              className={tabTriggerClass}
+              tooltip="Queue session evidence items for triage, review, and unified-evidence preparation."
+            >
+              Evidence Queue
             </SpectraCheckTabWithTooltip>
             <SpectraCheckTabWithTooltip
               value="tab-unified"
@@ -1521,6 +1527,13 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <SpectraCheckMsEvidenceStudio sampleId={sampleId} candidatesText={candidatesText} />
         </TabsContent>
 
+        <TabsContent value="tab-evidence-queue" className="mt-4">
+          <SpectraCheckEvidenceQueuePanel
+            sessionId={backendSessionId}
+            onSendToUnified={() => setActiveTab("tab-unified")}
+          />
+        </TabsContent>
+
         <TabsContent value="tab-unified" className="mt-4 space-y-10">
           <div className="flex flex-wrap items-center justify-end gap-2">
             <FeedbackButton module="unified_evidence" projectId={feedbackProjectId} sessionId={feedbackSessionId} />
@@ -1623,20 +1636,8 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           </Card>
         </TabsContent>
       </Tabs>
-          </SpectraCheckWorkspaceSessionProvider>
-        </div>
-        <aside
-          className="w-full min-w-0 shrink-0 lg:max-w-[20rem] xl:max-w-[22rem]"
-          aria-label="Evidence Queue panel"
-        >
-          <div className="lg:sticky lg:top-4">
-            <SpectraCheckEvidenceQueuePanel
-              sessionId={backendSessionId}
-              onSendToUnified={() => setActiveTab("tab-unified")}
-            />
-          </div>
-        </aside>
       </div>
+      </SpectraCheckWorkspaceSessionProvider>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app/app-shell"
-import { SystemStatusWorkspace } from "@/components/admin/system-status-workspace"
+import { AdminInterfaceWorkspace } from "@/components/admin/admin-interface-workspace"
 
 /**
  * Admin System Status route (`src/app/admin/system`) — matches `app/admin/system/page.tsx`.
@@ -7,7 +7,7 @@ import { SystemStatusWorkspace } from "@/components/admin/system-status-workspac
 export default function AdminSystemStatusPage() {
   return (
     <AppShell>
-      <SystemStatusWorkspace />
+      <AdminInterfaceWorkspace />
     </AppShell>
   )
 }

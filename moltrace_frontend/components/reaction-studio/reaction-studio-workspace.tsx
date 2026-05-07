@@ -1,9 +1,13 @@
 "use client"
 
+import { useState } from "react"
+import { apiFetch } from "@/lib/api/client"
+import { trackOutboundSyncJobCreated } from "@/src/lib/analytics/analytics-client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -68,6 +72,133 @@ const DEMO_NEXT_EXPERIMENT = {
 }
 
 export function ReactionStudioWorkspace() {
+  const [importConnector, setImportConnector] = useState("")
+  const [importExternalRecord, setImportExternalRecord] = useState("")
+  const [importReactionProjectId, setImportReactionProjectId] = useState("")
+  const [importMappingTemplate, setImportMappingTemplate] = useState("")
+  const [importReviewRequired, setImportReviewRequired] = useState(true)
+  const [importBusy, setImportBusy] = useState(false)
+  const [importError, setImportError] = useState("")
+  const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null)
+
+  const [exportConnector, setExportConnector] = useState("")
+  const [exportReactionProjectId, setExportReactionProjectId] = useState("")
+  const [exportApprovedItems, setExportApprovedItems] = useState("")
+  const [exportTargetExternalRecord, setExportTargetExternalRecord] = useState("")
+  const [exportBusy, setExportBusy] = useState(false)
+  const [exportError, setExportError] = useState("")
+  const [exportResult, setExportResult] = useState<Record<string, unknown> | null>(null)
+
+  function readString(result: Record<string, unknown> | null, keys: string[]): string {
+    if (!result) return ""
+    for (const key of keys) {
+      const value = result[key]
+      if (typeof value === "string" && value.trim()) return value.trim()
+      if (typeof value === "number" && Number.isFinite(value)) return String(value)
+    }
+    return ""
+  }
+
+  function readNumber(result: Record<string, unknown> | null, keys: string[]): number | null {
+    if (!result) return null
+    for (const key of keys) {
+      const value = result[key]
+      if (typeof value === "number" && Number.isFinite(value)) return Math.floor(value)
+      if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+        return Math.floor(Number(value))
+      }
+    }
+    return null
+  }
+
+  function readWarnings(result: Record<string, unknown> | null): string[] {
+    if (!result) return []
+    const warnings = result.warnings
+    if (Array.isArray(warnings)) {
+      return warnings
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter((item) => item.length > 0)
+    }
+    if (typeof warnings === "string" && warnings.trim()) return [warnings.trim()]
+    return []
+  }
+
+  async function importExperimentTable() {
+    setImportBusy(true)
+    setImportError("")
+    try {
+      const payload = await apiFetch<unknown>("/integrations/reactions/import-experiment-table", {
+        method: "POST",
+        body: {
+          connector: importConnector.trim(),
+          external_record: importExternalRecord.trim(),
+          reaction_project_id: importReactionProjectId.trim(),
+          mapping_template: importMappingTemplate.trim(),
+          review_required: importReviewRequired,
+        },
+      })
+      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+        setImportResult(payload as Record<string, unknown>)
+      } else {
+        setImportResult({ result: payload })
+      }
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Could not import experiment table.")
+      setImportResult(null)
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
+  async function exportApprovedExperiments() {
+    if (!exportApprovedItems.trim()) {
+      setExportError("approved recommendations / experiments is required.")
+      return
+    }
+    setExportBusy(true)
+    setExportError("")
+    try {
+      const payloadBody: Record<string, unknown> = {
+        connector: exportConnector.trim(),
+        reaction_project_id: exportReactionProjectId.trim(),
+        approved_recommendations_experiments: exportApprovedItems.trim(),
+      }
+      if (exportTargetExternalRecord.trim()) {
+        payloadBody.target_external_record = exportTargetExternalRecord.trim()
+      }
+      const payload = await apiFetch<unknown>("/integrations/reactions/export-approved-experiments", {
+        method: "POST",
+        body: payloadBody,
+      })
+      const rec =
+        payload && typeof payload === "object" && !Array.isArray(payload) ? (payload as Record<string, unknown>) : null
+      const warningCount = Array.isArray(rec?.warnings)
+        ? rec!.warnings.filter((item) => typeof item === "string" && item.trim()).length
+        : 0
+      trackOutboundSyncJobCreated({
+        connector_type: exportConnector.trim(),
+        target_program: "reaction_optimization",
+        status: readString(rec, ["status", "job_status", "sync_status"]) || "created",
+        warning_count: warningCount,
+        failure_count:
+          readString(rec, ["status", "job_status"]).toLowerCase().includes("failed") ||
+          readString(rec, ["status", "job_status"]).toLowerCase().includes("error")
+            ? 1
+            : 0,
+      })
+      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+        setExportResult(payload as Record<string, unknown>)
+      } else {
+        setExportResult({ result: payload })
+      }
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Could not export approved experiments.")
+      setExportResult(null)
+    } finally {
+      setExportBusy(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[1400px] space-y-8 pb-12">
       <header className="space-y-3 border-b pb-6">
@@ -75,7 +206,7 @@ export function ReactionStudioWorkspace() {
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="font-mono text-xs">
-                Reaction Studio
+                Reaction Studio (program-level)
               </Badge>
               <Badge variant="secondary" className="gap-1 border-dashed border-warning/60 bg-warning/10 text-warning-foreground">
                 <AlertTriangle className="h-3 w-3" />
@@ -200,6 +331,154 @@ export function ReactionStudioWorkspace() {
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section aria-labelledby="connector-import-heading">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle id="connector-import-heading" className="text-lg">
+                ELN / LIMS Experiment Import
+              </CardTitle>
+              <CardDescription>
+                POST <code className="text-xs">/integrations/reactions/import-experiment-table</code>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="rxn-import-connector">connector</Label>
+                  <Input id="rxn-import-connector" value={importConnector} onChange={(e) => setImportConnector(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rxn-import-external-record">external record</Label>
+                  <Input
+                    id="rxn-import-external-record"
+                    value={importExternalRecord}
+                    onChange={(e) => setImportExternalRecord(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rxn-import-project-id">reaction project ID</Label>
+                  <Input
+                    id="rxn-import-project-id"
+                    value={importReactionProjectId}
+                    onChange={(e) => setImportReactionProjectId(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rxn-import-mapping-template">mapping template</Label>
+                  <Input
+                    id="rxn-import-mapping-template"
+                    value={importMappingTemplate}
+                    onChange={(e) => setImportMappingTemplate(e.target.value)}
+                  />
+                </div>
+                <div className="md:col-span-2 flex items-center gap-3 rounded-md border p-3">
+                  <Checkbox
+                    id="rxn-import-review-required"
+                    checked={importReviewRequired}
+                    onCheckedChange={(checked) => setImportReviewRequired(checked === true)}
+                  />
+                  <Label htmlFor="rxn-import-review-required">review required</Label>
+                </div>
+              </div>
+              {importError ? <p className="text-xs text-destructive">{importError}</p> : null}
+              <Button type="button" onClick={() => void importExperimentTable()} disabled={importBusy}>
+                {importBusy ? "Importing…" : "Import experiments"}
+              </Button>
+              {importResult ? (
+                <div className="space-y-2 rounded-md border p-3 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">imported experiment count:</span>{" "}
+                    {readNumber(importResult, ["imported_experiment_count", "imported_count"]) ?? "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">skipped count:</span>{" "}
+                    {readNumber(importResult, ["skipped_count"]) ?? "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">records requiring review:</span>{" "}
+                    {readNumber(importResult, ["records_requiring_review", "requiring_review_count"]) ?? "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">warnings:</span> {readWarnings(importResult).join("; ") || "—"}
+                  </p>
+                  <details className="rounded-md border p-2">
+                    <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                    <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(importResult, null, 2)}</pre>
+                  </details>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section aria-labelledby="connector-export-heading">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle id="connector-export-heading" className="text-lg">
+                Export approved experiments
+              </CardTitle>
+              <CardDescription>
+                POST <code className="text-xs">/integrations/reactions/export-approved-experiments</code>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="rxn-export-connector">connector</Label>
+                  <Input id="rxn-export-connector" value={exportConnector} onChange={(e) => setExportConnector(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rxn-export-project-id">reaction project ID</Label>
+                  <Input
+                    id="rxn-export-project-id"
+                    value={exportReactionProjectId}
+                    onChange={(e) => setExportReactionProjectId(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="rxn-export-approved-items">approved recommendations / experiments</Label>
+                  <Input
+                    id="rxn-export-approved-items"
+                    value={exportApprovedItems}
+                    onChange={(e) => setExportApprovedItems(e.target.value)}
+                    placeholder="ids or payload from approved recommendations / experiments"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="rxn-export-target-external-record">target external record optional</Label>
+                  <Input
+                    id="rxn-export-target-external-record"
+                    value={exportTargetExternalRecord}
+                    onChange={(e) => setExportTargetExternalRecord(e.target.value)}
+                  />
+                </div>
+              </div>
+              {exportError ? <p className="text-xs text-destructive">{exportError}</p> : null}
+              <Button type="button" onClick={() => void exportApprovedExperiments()} disabled={exportBusy}>
+                {exportBusy ? "Exporting…" : "Export approved experiments"}
+              </Button>
+              {exportResult ? (
+                <div className="space-y-2 rounded-md border p-3 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">status:</span>{" "}
+                    {readString(exportResult, ["status", "export_status"]) || "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">warnings:</span>{" "}
+                    {readWarnings(exportResult).join("; ") || "—"}
+                  </p>
+                  <details className="rounded-md border p-2">
+                    <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                    <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(exportResult, null, 2)}</pre>
+                  </details>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </section>
@@ -369,7 +648,7 @@ export function ReactionStudioWorkspace() {
       {/* Footer strip */}
       <Card className="border-dashed bg-muted/30">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4 text-xs text-muted-foreground">
-          <span>MolTrace Reaction Studio · shell build · no inference executed</span>
+          <span>MolTrace Reaction Studio (program-level) · shell build · no inference executed</span>
           <Badge variant="outline" className="font-normal">
             Progress: UI scaffold
           </Badge>
