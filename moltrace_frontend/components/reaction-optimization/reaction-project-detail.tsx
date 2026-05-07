@@ -3631,7 +3631,7 @@ export function ReactionProjectDetail() {
               reaction_project_id={reactionProjectId}
             </Badge>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Reaction Studio</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Reaction Studio (project-level)</h1>
           <p className="text-muted-foreground">{loading ? "Loading…" : projectName}</p>
         </div>
         <div className="flex items-center gap-2">

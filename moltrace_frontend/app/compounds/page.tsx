@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app/app-shell"
-import { CompoundRegistryWorkspace } from "@/components/compounds/compound-registry-workspace"
+import { CompoundsBatchesInterfaceWorkspace } from "@/components/compounds/compounds-batches-interface-workspace"
 
 /**
  * Compounds route mirror (`app/compounds`) — matches `src/app/compounds/page.tsx`.
@@ -7,7 +7,7 @@ import { CompoundRegistryWorkspace } from "@/components/compounds/compound-regis
 export default function CompoundsPage() {
   return (
     <AppShell>
-      <CompoundRegistryWorkspace />
+      <CompoundsBatchesInterfaceWorkspace />
     </AppShell>
   )
 }

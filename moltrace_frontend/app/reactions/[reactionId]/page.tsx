@@ -9,7 +9,7 @@ export default function ReactionProjectDetailPage() {
         <ReactionProjectDetail />
         <AiModulePredictionAugmentation
           moduleKey="reaction_optimization"
-          moduleTitle="Reaction Studio"
+          moduleTitle="Reaction Studio (project-level)"
           serviceOptions={[
             {
               id: "reaction-outcome-predictor",

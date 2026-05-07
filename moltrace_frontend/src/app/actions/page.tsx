@@ -12,8 +12,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Loader2 } from "lucide-react"
+import SavedReportsWorkspace from "@/components/reports/saved-reports-workspace"
+import ReviewQueueWorkspace from "@/components/review/review-queue-workspace"
 
 const PROGRAMS = [
   { key: "spectracheck", label: "SpectraCheck" },
@@ -436,7 +439,22 @@ export default function CrossModuleActionQueuePage() {
     <AppShell>
       <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading action queue…</p>}>
         <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
-          <CrossModuleActionQueueWorkspace />
+          <Tabs defaultValue="action_queue" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="action_queue">Action Queue</TabsTrigger>
+              <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="review">Review</TabsTrigger>
+            </TabsList>
+            <TabsContent value="action_queue">
+              <CrossModuleActionQueueWorkspace />
+            </TabsContent>
+            <TabsContent value="reports">
+              <SavedReportsWorkspace />
+            </TabsContent>
+            <TabsContent value="review">
+              <ReviewQueueWorkspace />
+            </TabsContent>
+          </Tabs>
         </div>
       </Suspense>
     </AppShell>

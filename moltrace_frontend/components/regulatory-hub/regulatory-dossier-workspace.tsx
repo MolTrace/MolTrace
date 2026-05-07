@@ -17,6 +17,7 @@ import {
   trackRegulatoryRequirementAdded,
   trackRegulatoryResidualSolventAssessed,
   trackRegulatoryReviewCompleted,
+  trackSubmissionPackageCreated,
 } from "@/src/lib/analytics/analytics-client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
@@ -166,6 +167,15 @@ const AI_GOVERNANCE_STATUSES = [
   "gaps_identified",
   "ready_for_review",
   "reviewed",
+] as const
+
+const SUBMISSION_PACKAGE_TYPES = [
+  "ctd_module3",
+  "impurity_report",
+  "qnmr_validation",
+  "ai_governance",
+  "readiness_bundle",
+  "other",
 ] as const
 
 const METADATA_REDACT_KEY_RE =
@@ -660,6 +670,24 @@ export function RegulatoryDossierWorkspace() {
 
   const [changeImpact, setChangeImpact] = useState<Record<string, unknown> | null>(null)
   const [changeImpactErr, setChangeImpactErr] = useState("")
+  const [activeTab, setActiveTab] = useState("overview")
+
+  const [submissionPackageByDossier, setSubmissionPackageByDossier] = useState<Record<string, unknown> | null>(null)
+  const [submissionPackageById, setSubmissionPackageById] = useState<Record<string, unknown> | null>(null)
+  const [submissionPackageIdInput, setSubmissionPackageIdInput] = useState("")
+  const [submissionPackageType, setSubmissionPackageType] = useState<string>("readiness_bundle")
+  const [spIncludeSpectraCheckReport, setSpIncludeSpectraCheckReport] = useState(true)
+  const [spIncludeImpurityRegister, setSpIncludeImpurityRegister] = useState(true)
+  const [spIncludeResidualSolventAssessment, setSpIncludeResidualSolventAssessment] = useState(true)
+  const [spIncludeNitrosamineWatch, setSpIncludeNitrosamineWatch] = useState(true)
+  const [spIncludeQnmrValidation, setSpIncludeQnmrValidation] = useState(true)
+  const [spIncludeAiGovernanceRecord, setSpIncludeAiGovernanceRecord] = useState(true)
+  const [spIncludeSourceCitations, setSpIncludeSourceCitations] = useState(true)
+  const [spIncludeProvenanceHashes, setSpIncludeProvenanceHashes] = useState(true)
+  const [spIncludeReviewDecisions, setSpIncludeReviewDecisions] = useState(true)
+  const [submissionPackageBusy, setSubmissionPackageBusy] = useState(false)
+  const [submissionPackageLookupBusy, setSubmissionPackageLookupBusy] = useState(false)
+  const [submissionPackageErr, setSubmissionPackageErr] = useState("")
 
   const jurisdictions = useMemo(() => {
     return [...jurisdictionNameById.entries()]
@@ -1923,6 +1951,100 @@ export function RegulatoryDossierWorkspace() {
     }
   }
 
+  async function refreshSubmissionPackageByDossier() {
+    if (!Number.isFinite(dossierId)) return
+    try {
+      const rec = await apiFetch<Record<string, unknown>>(`/regulatory/dossiers/${dossierId}/submission-package`, {
+        method: "GET",
+      })
+      setSubmissionPackageByDossier(rec)
+    } catch {
+      setSubmissionPackageByDossier(null)
+    }
+  }
+
+  async function createSubmissionPackage() {
+    if (!Number.isFinite(dossierId)) return
+    setSubmissionPackageBusy(true)
+    setSubmissionPackageErr("")
+    try {
+      const rec = await apiFetch<Record<string, unknown>>(`/regulatory/dossiers/${dossierId}/submission-package`, {
+        method: "POST",
+        body: {
+          package_type: submissionPackageType,
+          include_spectracheck_report: spIncludeSpectraCheckReport,
+          include_impurity_register: spIncludeImpurityRegister,
+          include_residual_solvent_assessment: spIncludeResidualSolventAssessment,
+          include_nitrosamine_watch: spIncludeNitrosamineWatch,
+          include_qnmr_method_validation: spIncludeQnmrValidation,
+          include_ai_governance_record: spIncludeAiGovernanceRecord,
+          include_source_citations: spIncludeSourceCitations,
+          include_provenance_hashes: spIncludeProvenanceHashes,
+          include_review_decisions: spIncludeReviewDecisions,
+        },
+      })
+      setSubmissionPackageByDossier(rec)
+      trackSubmissionPackageCreated({
+        target_program: "regulatory_hub",
+        status: readRecordString(rec, "status") ?? "created",
+        file_kind: submissionPackageType,
+        warning_count: readWarningLines(rec).length,
+      })
+      const packageId = readRecordNumber(rec, "id") ?? readRecordNumber(rec, "package_id")
+      if (packageId != null) {
+        setSubmissionPackageIdInput(String(packageId))
+      }
+    } catch (e) {
+      setSubmissionPackageErr(formatApiError(e, "Create package failed."))
+    } finally {
+      setSubmissionPackageBusy(false)
+    }
+  }
+
+  async function loadSubmissionPackageById() {
+    const raw = submissionPackageIdInput.trim()
+    if (!raw) {
+      setSubmissionPackageErr("package_id is required.")
+      return
+    }
+    setSubmissionPackageLookupBusy(true)
+    setSubmissionPackageErr("")
+    try {
+      const rec = await apiFetch<Record<string, unknown>>(
+        `/regulatory/submission-packages/${encodeURIComponent(raw)}`,
+        { method: "GET" }
+      )
+      setSubmissionPackageById(rec)
+    } catch (e) {
+      setSubmissionPackageErr(formatApiError(e, "Load package failed."))
+      setSubmissionPackageById(null)
+    } finally {
+      setSubmissionPackageLookupBusy(false)
+    }
+  }
+
+  function readNumericListFromKeys(row: Record<string, unknown> | null, keys: string[]): number[] {
+    if (!row) return []
+    for (const key of keys) {
+      const val = row[key]
+      if (!Array.isArray(val)) continue
+      const parsed = val.filter((x): x is number => typeof x === "number" && Number.isFinite(x))
+      if (parsed.length > 0) return parsed
+    }
+    return []
+  }
+
+  function readWarningLines(row: Record<string, unknown> | null): string[] {
+    if (!row) return []
+    const merged = [...readStringArray(row, "warnings"), ...readStringArray(row, "warnings_json")]
+    return merged
+  }
+
+  useEffect(() => {
+    if (!Number.isFinite(dossierId)) return
+    void refreshSubmissionPackageByDossier()
+  }, [dossierId])
+
   const devPayload = useMemo(
     () => ({
       dossier,
@@ -1932,8 +2054,20 @@ export function RegulatoryDossierWorkspace() {
       review_decisions: reviews,
       readiness_report: readinessReport,
       regulatory_query_result: queryResult,
+      submission_package_by_dossier: submissionPackageByDossier,
+      submission_package_by_id: submissionPackageById,
     }),
-    [dossier, requirements, evidenceLinks, riskAssessment, reviews, readinessReport, queryResult]
+    [
+      dossier,
+      requirements,
+      evidenceLinks,
+      riskAssessment,
+      reviews,
+      readinessReport,
+      queryResult,
+      submissionPackageByDossier,
+      submissionPackageById,
+    ]
   )
 
   const dossierJurisdictionLine = useMemo(() => {
@@ -2018,26 +2152,14 @@ export function RegulatoryDossierWorkspace() {
           Loading dossier…
         </div>
       ) : dossier ? (
-        <Tabs defaultValue="overview" className="gap-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
           <TabsList className="inline-flex h-auto min-h-9 w-full max-w-full flex-wrap justify-start gap-1 p-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="requirements">Requirements</TabsTrigger>
-            <TabsTrigger value="evidence">Evidence Links</TabsTrigger>
-            <TabsTrigger value="compliance-rules">Compliance Rules</TabsTrigger>
-            <TabsTrigger value="impurity-register">Impurity Risk Register</TabsTrigger>
-            <TabsTrigger value="residual-solvents">Residual Solvent Watch</TabsTrigger>
-            <TabsTrigger value="nitrosamine-watch">Nitrosamine Watch</TabsTrigger>
-            <TabsTrigger value="qnmr-method-validation" className="max-w-[200px] whitespace-normal py-1.5 text-center leading-tight">
-              qNMR / Method Validation
-            </TabsTrigger>
-            <TabsTrigger value="ai-governance">AI Governance</TabsTrigger>
             <TabsTrigger value="jurisdictional-map">Jurisdictional Map</TabsTrigger>
             <TabsTrigger value="change-impact">Change Impact</TabsTrigger>
             <TabsTrigger value="action-items">Action Items</TabsTrigger>
-            <TabsTrigger value="qa">Cited Q&amp;A</TabsTrigger>
-            <TabsTrigger value="risk">Risk Assessment</TabsTrigger>
-            <TabsTrigger value="review">Review</TabsTrigger>
-            <TabsTrigger value="readiness">Readiness Report</TabsTrigger>
+            <TabsTrigger value="submission-package">Submission Package Builder</TabsTrigger>
             <TabsTrigger value="json">Developer JSON</TabsTrigger>
           </TabsList>
 
@@ -2231,6 +2353,34 @@ export function RegulatoryDossierWorkspace() {
 
           <TabsContent value="requirements" className="min-w-0 max-w-full space-y-4">
             <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Requirements Sections</CardTitle>
+                <CardDescription>
+                  Requirements parent section for evidence, compliance, impurity, solvent, nitrosamine, qNMR, and AI governance.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-w-md space-y-2">
+                  <Label>Requirements dropdown</Label>
+                  <Select value="requirements" onValueChange={setActiveTab}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select requirements section" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="requirements">Requirements</SelectItem>
+                      <SelectItem value="evidence">Evidence Links</SelectItem>
+                      <SelectItem value="compliance-rules">Compliance Rules</SelectItem>
+                      <SelectItem value="impurity-register">Impurity Risk Register</SelectItem>
+                      <SelectItem value="residual-solvents">Residual Solvent Watch</SelectItem>
+                      <SelectItem value="nitrosamine-watch">Nitrosamine Watch</SelectItem>
+                      <SelectItem value="qnmr-method-validation">qNMR / Method Validation</SelectItem>
+                      <SelectItem value="ai-governance">AI Governance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className="text-lg">Requirements</CardTitle>
@@ -2419,6 +2569,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="evidence" className="min-w-0 max-w-full space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+                Back to Requirements
+              </Button>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Evidence Links</CardTitle>
@@ -2585,6 +2740,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="compliance-rules" className="min-w-0 max-w-full space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+                Back to Requirements
+              </Button>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Compliance Rules</CardTitle>
@@ -2619,6 +2779,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="impurity-register" className="min-w-0 max-w-full space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+                Back to Requirements
+              </Button>
+            </div>
             <Card>
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
                 <div className="space-y-1">
@@ -2875,6 +3040,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="residual-solvents" className="min-w-0 max-w-full space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+                Back to Requirements
+              </Button>
+            </div>
             <Card>
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
                 <div className="space-y-1">
@@ -3153,6 +3323,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="nitrosamine-watch" className="min-w-0 max-w-full space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+                Back to Requirements
+              </Button>
+            </div>
             <Card>
               <CardHeader>
                 <div className="space-y-1">
@@ -3497,6 +3672,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="qnmr-method-validation" className="min-w-0 max-w-full space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+                Back to Requirements
+              </Button>
+            </div>
             <Card>
               <CardHeader>
                 <div className="space-y-1">
@@ -3956,6 +4136,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="ai-governance" className="min-w-0 max-w-full space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
+                Back to Requirements
+              </Button>
+            </div>
             <Card>
               <CardHeader>
                 <div className="space-y-1">
@@ -4799,6 +4984,31 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="action-items" className="min-w-0 max-w-full space-y-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Action Items Sections</CardTitle>
+                <CardDescription>
+                  Action Items parent section for cited Q&A, risk, review, and readiness.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-w-md space-y-2">
+                  <Label>Action Items dropdown</Label>
+                  <Select value="action-items" onValueChange={setActiveTab}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select action item section" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="action-items">Action Items</SelectItem>
+                      <SelectItem value="qa">Cited Q&amp;A</SelectItem>
+                      <SelectItem value="risk">Risk Assessment</SelectItem>
+                      <SelectItem value="review">Review</SelectItem>
+                      <SelectItem value="readiness">Readiness Report</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
             {Number.isFinite(dossierId) ? (
               <RegulatoryActionQueueCard dossierId={dossierId} />
             ) : (
@@ -4818,6 +5028,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="qa" className="min-w-0 max-w-full space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
+                Back to Action Items
+              </Button>
+            </div>
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Mandatory</AlertTitle>
@@ -5081,6 +5296,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="risk" className="min-w-0 max-w-full space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
+                Back to Action Items
+              </Button>
+            </div>
             <Card>
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
                 <div>
@@ -5205,6 +5425,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="review" className="min-w-0 max-w-full space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
+                Back to Action Items
+              </Button>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Review</CardTitle>
@@ -5355,6 +5580,11 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="readiness" className="min-w-0 max-w-full space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
+                Back to Action Items
+              </Button>
+            </div>
             <Card>
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
                 <div>
@@ -5552,6 +5782,221 @@ export function RegulatoryDossierWorkspace() {
               </CardContent>
             </Card>
             <CtdModule3BundleCard dossierId={dossierId} />
+          </TabsContent>
+
+          <TabsContent value="submission-package" className="min-w-0 max-w-full space-y-3">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Submission Package Builder</CardTitle>
+                <CardDescription>
+                  POST /regulatory/dossiers/{"{dossier_id}"}/submission-package · GET
+                  /regulatory/dossiers/{"{dossier_id}"}/submission-package · GET
+                  /regulatory/submission-packages/{"{package_id}"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert>
+                  <AlertDescription className="text-xs text-muted-foreground">
+                    Build a <span className="font-medium text-foreground">draft package</span> with source-backed artifacts.
+                    Package status is backend-driven; treat outputs as <span className="font-medium text-foreground">ready for review</span> or{" "}
+                    <span className="font-medium text-foreground">exported package</span> only when status fields explicitly say so.
+                  </AlertDescription>
+                </Alert>
+
+                {submissionPackageErr ? (
+                  <Alert variant="destructive">
+                    <AlertDescription className="text-sm">{submissionPackageErr}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>package type</Label>
+                    <Select value={submissionPackageType} onValueChange={setSubmissionPackageType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUBMISSION_PACKAGE_TYPES.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sp-package-id">package id lookup</Label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        id="sp-package-id"
+                        value={submissionPackageIdInput}
+                        onChange={(e) => setSubmissionPackageIdInput(e.target.value)}
+                        placeholder="package_id"
+                        className="max-w-[220px]"
+                      />
+                      <Button type="button" variant="outline" size="sm" disabled={submissionPackageLookupBusy} onClick={() => void loadSubmissionPackageById()}>
+                        {submissionPackageLookupBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        Load package
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <Label htmlFor="sp-include-sr">include SpectraCheck report</Label>
+                    <Switch id="sp-include-sr" checked={spIncludeSpectraCheckReport} onCheckedChange={setSpIncludeSpectraCheckReport} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <Label htmlFor="sp-include-ir">include impurity register</Label>
+                    <Switch id="sp-include-ir" checked={spIncludeImpurityRegister} onCheckedChange={setSpIncludeImpurityRegister} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <Label htmlFor="sp-include-rs">include residual solvent assessment</Label>
+                    <Switch id="sp-include-rs" checked={spIncludeResidualSolventAssessment} onCheckedChange={setSpIncludeResidualSolventAssessment} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <Label htmlFor="sp-include-na">include nitrosamine watch</Label>
+                    <Switch id="sp-include-na" checked={spIncludeNitrosamineWatch} onCheckedChange={setSpIncludeNitrosamineWatch} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <Label htmlFor="sp-include-qnmr">include qNMR/method validation</Label>
+                    <Switch id="sp-include-qnmr" checked={spIncludeQnmrValidation} onCheckedChange={setSpIncludeQnmrValidation} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <Label htmlFor="sp-include-ai">include AI governance record</Label>
+                    <Switch id="sp-include-ai" checked={spIncludeAiGovernanceRecord} onCheckedChange={setSpIncludeAiGovernanceRecord} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <Label htmlFor="sp-include-citations">include source citations</Label>
+                    <Switch id="sp-include-citations" checked={spIncludeSourceCitations} onCheckedChange={setSpIncludeSourceCitations} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <Label htmlFor="sp-include-hashes">include provenance hashes</Label>
+                    <Switch id="sp-include-hashes" checked={spIncludeProvenanceHashes} onCheckedChange={setSpIncludeProvenanceHashes} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-3 sm:col-span-2">
+                    <Label htmlFor="sp-include-review-decisions">include review decisions</Label>
+                    <Switch id="sp-include-review-decisions" checked={spIncludeReviewDecisions} onCheckedChange={setSpIncludeReviewDecisions} />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" disabled={submissionPackageBusy} onClick={() => void createSubmissionPackage()}>
+                    {submissionPackageBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Create package
+                  </Button>
+                  <Button type="button" variant="outline" disabled={submissionPackageLookupBusy} onClick={() => void refreshSubmissionPackageByDossier()}>
+                    Refresh package
+                  </Button>
+                </div>
+
+                {(() => {
+                  const pkg = submissionPackageById ?? submissionPackageByDossier
+                  if (!pkg) {
+                    return <p className="text-sm text-muted-foreground">No package loaded yet.</p>
+                  }
+                  const packageSha =
+                    readRecordString(pkg, "sha256") ??
+                    readRecordString(pkg, "package_sha256") ??
+                    readRecordString(pkg, "hash")
+                  const packageStatus = readRecordString(pkg, "status") ?? "—"
+                  const packageManifest = pkg.manifest_json && isRecord(pkg.manifest_json) ? pkg.manifest_json : pkg
+                  const fileIds = readNumericListFromKeys(pkg, ["included_file_ids", "file_ids", "included_files"])
+                  const artifactIds = readNumericListFromKeys(pkg, [
+                    "included_artifact_ids",
+                    "artifact_ids",
+                    "included_artifacts",
+                  ])
+                  const warnings = readWarningLines(pkg)
+                  const downloadLinks = downloadLinksFromMetadata(pkg)
+                  const directUrl =
+                    readRecordString(pkg, "download_url") ??
+                    readRecordString(pkg, "package_url") ??
+                    readRecordString(pkg, "open_url")
+                  return (
+                    <div className="space-y-4 rounded-md border p-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-xs font-medium uppercase text-muted-foreground">status</p>
+                          <p className="mt-1 text-sm">{packageStatus}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase text-muted-foreground">package SHA-256</p>
+                          <p className="mt-1 break-all font-mono text-xs">{packageSha ?? "—"}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">package manifest</p>
+                        <pre className="max-h-72 overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] leading-relaxed">
+                          {JSON.stringify(packageManifest, null, 2)}
+                        </pre>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">included file IDs</p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {fileIds.length ? fileIds.join(", ") : "—"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">included artifact IDs</p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {artifactIds.length ? artifactIds.join(", ") : "—"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">warnings</p>
+                        {warnings.length ? (
+                          <ul className="list-inside list-disc text-xs text-muted-foreground">
+                            {warnings.map((w, i) => (
+                              <li key={i}>{w}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">—</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">download/open package</p>
+                        <div className="flex flex-wrap gap-2">
+                          {directUrl ? (
+                            <Button variant="outline" size="sm" asChild>
+                              <a href={directUrl} target="_blank" rel="noreferrer">
+                                Open package
+                              </a>
+                            </Button>
+                          ) : null}
+                          {downloadLinks.map((l) => (
+                            <Button key={l.key} variant="outline" size="sm" asChild>
+                              <a href={l.url} target="_blank" rel="noreferrer">
+                                Download ({l.key})
+                              </a>
+                            </Button>
+                          ))}
+                          {!directUrl && downloadLinks.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">No package URL returned.</p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <details className="rounded-md border p-2">
+                        <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                        <pre className="mt-2 max-h-72 overflow-auto text-[11px] leading-relaxed">
+                          {JSON.stringify(pkg, null, 2)}
+                        </pre>
+                      </details>
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="json" className="min-w-0 max-w-full space-y-3">

@@ -209,7 +209,12 @@ export function ReactionOptimizationLanding() {
             Design, track, model, and review reaction-condition experiments.
           </p>
         </div>
-        <BackendStatusIndicator />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/reactions?tab=reaction-studio">Open Reaction Studio (program-level)</Link>
+          </Button>
+          <BackendStatusIndicator />
+        </div>
       </div>
 
       {showListUnavailable ? (
@@ -421,7 +426,7 @@ export function ReactionOptimizationLanding() {
                         </TableCell>
                         <TableCell>
                           <Button variant="outline" size="sm" asChild>
-                            <Link href={`/reactions/${p.id}`}>open</Link>
+                            <Link href={`/reactions/${p.id}`}>Open Reaction Studio (project-level)</Link>
                           </Button>
                         </TableCell>
                       </TableRow>

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { AUTH_USER_STORAGE_KEY } from "@/lib/api/client"
+import { ApiError, apiFetch, AUTH_USER_STORAGE_KEY } from "@/lib/api/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -66,6 +66,43 @@ import {
 } from "@/src/lib/dashboard/dashboard-cross-module-command-center"
 import type { RoiSnapshotData } from "@/src/lib/analytics/roi-dashboard-data"
 import type { DashboardActivityRow, DashboardJobRow } from "@/src/lib/dashboard/overview-metrics"
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return Boolean(v) && typeof v === "object" && !Array.isArray(v)
+}
+
+function asRows(payload: unknown): Record<string, unknown>[] {
+  if (Array.isArray(payload)) return payload.filter(isRecord)
+  if (isRecord(payload) && Array.isArray(payload.items)) return payload.items.filter(isRecord)
+  return []
+}
+
+function readNum(o: Record<string, unknown>, keys: string[]): number | null {
+  for (const k of keys) {
+    const v = o[k]
+    if (typeof v === "number" && Number.isFinite(v)) return v
+    if (typeof v === "string" && v.trim() && Number.isFinite(Number(v))) return Number(v)
+  }
+  return null
+}
+
+function readStr(o: Record<string, unknown>, keys: string[]): string {
+  for (const k of keys) {
+    const v = o[k]
+    if (typeof v === "string" && v.trim()) return v.trim()
+  }
+  return ""
+}
+
+function formatApiErr(err: unknown): string {
+  if (err instanceof ApiError) {
+    const d = err.data
+    if (isRecord(d) && typeof d.detail === "string") return d.detail
+    return err.message
+  }
+  if (err instanceof Error) return err.message
+  return "Request failed."
+}
 
 function formatJobTimeLabel(iso: string | null): string {
   if (!iso) return "—"
@@ -285,6 +322,14 @@ export function DashboardV0() {
   const [aiSummary, setAiSummary] = useState<DashboardAiInferenceSummary | null>(null)
   const [crossModuleLoading, setCrossModuleLoading] = useState(true)
   const [crossModuleSummary, setCrossModuleSummary] = useState<DashboardCrossModuleCommandCenter | null>(null)
+  const [connectorSummaryLoading, setConnectorSummaryLoading] = useState(true)
+  const [connectorSummaryBackendUnavailable, setConnectorSummaryBackendUnavailable] = useState(false)
+  const [connectorSummaryError, setConnectorSummaryError] = useState("")
+  const [activeConnectors, setActiveConnectors] = useState<number | null>(null)
+  const [ingestionRunsToday, setIngestionRunsToday] = useState<number | null>(null)
+  const [failedIngestions, setFailedIngestions] = useState<number | null>(null)
+  const [filesNeedNormalizationReview, setFilesNeedNormalizationReview] = useState<number | null>(null)
+  const [failedSyncJobs, setFailedSyncJobs] = useState<number | null>(null)
   const crossModuleDisplay = crossModuleSummary ?? {
     available: false,
     partial: false,
@@ -310,6 +355,82 @@ export function DashboardV0() {
       if (typeof o.email === "string" && o.email.trim()) setViewerEmail(o.email.trim())
     } catch {
       /* ignore */
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setConnectorSummaryLoading(true)
+    setConnectorSummaryBackendUnavailable(false)
+    setConnectorSummaryError("")
+
+    void Promise.all([
+      apiFetch<unknown>("/connectors", { method: "GET" }),
+      apiFetch<unknown>("/ingestion-runs", { method: "GET" }),
+      apiFetch<unknown>("/outbound-sync-jobs", { method: "GET" }),
+    ])
+      .then(([connectorsPayload, ingestionPayload, outboundSyncPayload]) => {
+        if (cancelled) return
+        const connectors = asRows(connectorsPayload)
+        const ingestionRuns = asRows(ingestionPayload)
+        const outboundSyncJobs = asRows(outboundSyncPayload)
+
+        const activeConnectorCount = connectors.filter((row) => {
+          const status = readStr(row, ["status", "health_status", "state"]).toLowerCase()
+          return status === "active" || status === "enabled" || status === "connected" || status === "healthy"
+        }).length
+
+        const startOfToday = new Date()
+        startOfToday.setHours(0, 0, 0, 0)
+        const endOfToday = new Date(startOfToday)
+        endOfToday.setDate(endOfToday.getDate() + 1)
+        const createdTodayCount = ingestionRuns.filter((row) => {
+          const ts =
+            readStr(row, ["created_at", "started_at", "updated_at", "submitted_at"]) ||
+            readStr(row, ["createdAt", "startedAt", "updatedAt", "submittedAt"])
+          if (!ts) return false
+          const ms = Date.parse(ts)
+          return Number.isFinite(ms) && ms >= startOfToday.getTime() && ms < endOfToday.getTime()
+        }).length
+
+        const failedIngestionCount = ingestionRuns.filter((row) => {
+          const status = readStr(row, ["status", "run_status"]).toLowerCase()
+          return status === "failed" || status === "error"
+        }).length
+
+        const normalizationReviewCount = ingestionRuns.reduce((sum, row) => {
+          const directCount = readNum(row, [
+            "files_requiring_normalization_review",
+            "normalization_review_required_count",
+            "requires_normalization_review_count",
+          ])
+          if (directCount != null) return sum + Math.max(0, Math.floor(directCount))
+          const normalizationStatus = readStr(row, ["normalization_status", "normalization_review_status"]).toLowerCase()
+          return normalizationStatus === "review_required" ? sum + 1 : sum
+        }, 0)
+
+        const failedSyncCount = outboundSyncJobs.filter((row) => {
+          const status = readStr(row, ["status", "job_status"]).toLowerCase()
+          return status === "failed" || status === "error"
+        }).length
+
+        setActiveConnectors(activeConnectorCount)
+        setIngestionRunsToday(createdTodayCount)
+        setFailedIngestions(failedIngestionCount)
+        setFilesNeedNormalizationReview(normalizationReviewCount)
+        setFailedSyncJobs(failedSyncCount)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setConnectorSummaryBackendUnavailable(true)
+        setConnectorSummaryError(formatApiErr(err))
+      })
+      .finally(() => {
+        if (!cancelled) setConnectorSummaryLoading(false)
+      })
+
+    return () => {
+      cancelled = true
     }
   }, [])
 
@@ -1264,6 +1385,51 @@ export function DashboardV0() {
             <p className="text-xs text-muted-foreground">
               Some operations endpoints did not complete — summary may be partial.
             </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Connector and ingestion summary</CardTitle>
+          <CardDescription>
+            <code className="text-xs">GET /connectors</code>, <code className="text-xs">GET /ingestion-runs</code>,{" "}
+            <code className="text-xs">GET /outbound-sync-jobs</code> — aggregate operational counts only.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <p className="text-xs text-muted-foreground">Active connectors</p>
+              <p className="text-2xl font-bold tabular-nums">{activeConnectors ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Ingestion runs today</p>
+              <p className="text-2xl font-bold tabular-nums">{ingestionRunsToday ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Failed ingestions</p>
+              <p className="text-2xl font-bold tabular-nums">{failedIngestions ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Files requiring normalization review</p>
+              <p className="text-2xl font-bold tabular-nums">{filesNeedNormalizationReview ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Failed sync jobs</p>
+              <p className="text-2xl font-bold tabular-nums">{failedSyncJobs ?? "—"}</p>
+            </div>
+          </div>
+          {connectorSummaryLoading ? (
+            <p className="text-xs text-muted-foreground">Loading connector and ingestion summary…</p>
+          ) : null}
+          {!connectorSummaryLoading && connectorSummaryBackendUnavailable ? (
+            <p className="text-xs text-muted-foreground">
+              Connector and ingestion summary unavailable — current dashboard content continues.
+            </p>
+          ) : null}
+          {!connectorSummaryLoading && connectorSummaryError && connectorSummaryBackendUnavailable ? (
+            <p className="text-xs text-muted-foreground">Details: {connectorSummaryError}</p>
           ) : null}
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectracheck/spectracheck-workspace-session-context"
 import { QualityAssessmentCard } from "@/src/components/spectracheck/QualityAssessmentCard"
 import { QualityFindingsTable } from "@/src/components/spectracheck/QualityFindingsTable"
@@ -60,6 +61,7 @@ const SESSION_ROLE_OPTIONS = [
 
 type FileKind = (typeof FILE_KIND_OPTIONS)[number]
 type SessionRole = (typeof SESSION_ROLE_OPTIONS)[number]
+type ConnectorTargetRoute = "processed_nmr" | "raw_fid" | "msms" | "lcms"
 
 type FileRecord = SessionFileRecord
 
@@ -107,6 +109,15 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
   const [qcAssessFileId, setQcAssessFileId] = useState<string | null>(null)
   const [qcViewFileId, setQcViewFileId] = useState<string | null>(null)
   const qcFindingsRef = useRef<HTMLDivElement | null>(null)
+  const [connector, setConnector] = useState("")
+  const [externalRecord, setExternalRecord] = useState("")
+  const [fileIdInput, setFileIdInput] = useState("")
+  const [externalObjectId, setExternalObjectId] = useState("")
+  const [connectorTargetRoute, setConnectorTargetRoute] = useState<ConnectorTargetRoute>("processed_nmr")
+  const [connectorSampleId, setConnectorSampleId] = useState("")
+  const [connectorSessionId, setConnectorSessionId] = useState(sessionId ?? "")
+  const [connectorImportBusy, setConnectorImportBusy] = useState(false)
+  const [connectorImportResult, setConnectorImportResult] = useState<Record<string, unknown> | null>(null)
 
   const hasSession = Boolean(sessionId && sessionId.trim())
   const canUpload = Boolean(selectedFile) && !uploadBusy
@@ -204,6 +215,69 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
   }
 
   const tableRows = useMemo(() => sessionFiles, [sessionFiles])
+
+  useEffect(() => {
+    setConnectorSessionId(sessionId ?? "")
+  }, [sessionId])
+
+  function readImportString(payload: Record<string, unknown> | null, keys: string[]): string {
+    if (!payload) return ""
+    for (const key of keys) {
+      const value = payload[key]
+      if (typeof value === "string" && value.trim()) return value.trim()
+      if (typeof value === "number" && Number.isFinite(value)) return String(value)
+    }
+    return ""
+  }
+
+  function readImportWarnings(payload: Record<string, unknown> | null): string[] {
+    if (!payload) return []
+    const warnings = payload.warnings
+    if (Array.isArray(warnings)) {
+      return warnings
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter((item) => item.length > 0)
+    }
+    if (typeof warnings === "string" && warnings.trim()) return [warnings.trim()]
+    return []
+  }
+
+  async function onImportFromConnector() {
+    setConnectorImportBusy(true)
+    setError("")
+    try {
+      const body: Record<string, unknown> = {
+        connector: connector.trim(),
+        external_record: externalRecord.trim(),
+        target_route: connectorTargetRoute,
+        sample_id: connectorSampleId.trim(),
+        session_id: connectorSessionId.trim(),
+      }
+      if (fileIdInput.trim()) body.file_id = fileIdInput.trim()
+      if (externalObjectId.trim()) body.external_object_id = externalObjectId.trim()
+      const data = await apiFetch<unknown>("/integrations/spectracheck/import-file", {
+        method: "POST",
+        body,
+      })
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        setConnectorImportResult(data as Record<string, unknown>)
+      } else {
+        setConnectorImportResult({ result: data })
+      }
+      if (connectorSessionId.trim()) {
+        if (workspaceSession) {
+          await workspaceSession.refreshSessionFiles()
+        } else {
+          await loadSessionFiles(connectorSessionId.trim())
+        }
+      }
+    } catch (err) {
+      setError(errorText(err, "Import from connector failed."))
+      setConnectorImportResult(null)
+    } finally {
+      setConnectorImportBusy(false)
+    }
+  }
 
   function setRoleSelection(role: SessionRole, file: FileRecord) {
     setActiveRoleFile((prev) => ({ ...prev, [role]: file.file_id }))
@@ -408,6 +482,142 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
             </CardContent>
           </Card>
         ) : null}
+
+        <Card className="border-muted">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Import from Connector</CardTitle>
+            <CardDescription>
+              POST <code className="text-xs">/integrations/spectracheck/import-file</code>. Imported files remain immutable.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-connector">connector</Label>
+                <Input
+                  id="connector-import-connector"
+                  value={connector}
+                  onChange={(e) => setConnector(e.target.value)}
+                  placeholder="connector key or id"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-external-record">external record</Label>
+                <Input
+                  id="connector-import-external-record"
+                  value={externalRecord}
+                  onChange={(e) => setExternalRecord(e.target.value)}
+                  placeholder="external record id"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-file-id">file ID</Label>
+                <Input
+                  id="connector-import-file-id"
+                  value={fileIdInput}
+                  onChange={(e) => setFileIdInput(e.target.value)}
+                  placeholder="file_id"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-external-object-id">external object ID</Label>
+                <Input
+                  id="connector-import-external-object-id"
+                  value={externalObjectId}
+                  onChange={(e) => setExternalObjectId(e.target.value)}
+                  placeholder="external_object_id"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-target-route">target route</Label>
+                <select
+                  id="connector-import-target-route"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+                  value={connectorTargetRoute}
+                  onChange={(e) => setConnectorTargetRoute(e.target.value as ConnectorTargetRoute)}
+                >
+                  <option value="processed_nmr">processed_nmr</option>
+                  <option value="raw_fid">raw_fid</option>
+                  <option value="msms">msms</option>
+                  <option value="lcms">lcms</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-sample-id">sample ID</Label>
+                <Input
+                  id="connector-import-sample-id"
+                  value={connectorSampleId}
+                  onChange={(e) => setConnectorSampleId(e.target.value)}
+                  placeholder="sample id"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="connector-import-session-id">session ID</Label>
+                <Input
+                  id="connector-import-session-id"
+                  value={connectorSessionId}
+                  onChange={(e) => setConnectorSessionId(e.target.value)}
+                  placeholder="spectracheck session id"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => void onImportFromConnector()} disabled={connectorImportBusy}>
+                {connectorImportBusy ? "Importing..." : "Import into SpectraCheck"}
+              </Button>
+            </div>
+
+            {connectorImportResult ? (
+              <Card className="border-muted">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Imported connector file</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">imported file:</span>{" "}
+                    {readImportString(connectorImportResult, ["imported_file", "filename", "file_name", "file_id"]) || "—"}
+                  </p>
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">SHA-256:</span>{" "}
+                    {readImportString(connectorImportResult, ["sha256", "file_sha256"]) || "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">normalization status:</span>{" "}
+                    {readImportString(connectorImportResult, ["normalization_status", "normalization", "status"]) || "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">linked session:</span>{" "}
+                    {readImportString(connectorImportResult, ["linked_session", "session_id"]) || "—"}
+                  </p>
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">warnings:</span>{" "}
+                    {readImportWarnings(connectorImportResult).join("; ") || "—"}
+                  </p>
+                  <div className="sm:col-span-2">
+                    {readImportString(connectorImportResult, ["output_artifact_id", "artifact_id"]) ? (
+                      <Button type="button" size="sm" variant="outline" asChild>
+                        <Link
+                          href={`/spectracheck?tab=tab-overview&artifactId=${encodeURIComponent(
+                            readImportString(connectorImportResult, ["output_artifact_id", "artifact_id"]),
+                          )}`}
+                        >
+                          Open artifact
+                        </Link>
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Open artifact button unavailable for this response.</span>
+                    )}
+                  </div>
+                  <details className="sm:col-span-2 rounded-md border p-2">
+                    <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                    <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(connectorImportResult, null, 2)}</pre>
+                  </details>
+                </CardContent>
+              </Card>
+            ) : null}
+          </CardContent>
+        </Card>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">

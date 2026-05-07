@@ -93,6 +93,16 @@ export function RegulatorySourceLibraryWorkspace() {
   const [uploadBusy, setUploadBusy] = useState(false)
   const [uploadErr, setUploadErr] = useState("")
   const [uploadOk, setUploadOk] = useState("")
+  const [connectorImportConnector, setConnectorImportConnector] = useState("")
+  const [connectorImportExternalRecord, setConnectorImportExternalRecord] = useState("")
+  const [connectorImportSourceType, setConnectorImportSourceType] = useState<string>("guidance")
+  const [connectorImportJurisdiction, setConnectorImportJurisdiction] = useState("")
+  const [connectorImportDossier, setConnectorImportDossier] = useState("")
+  const [connectorImportFileId, setConnectorImportFileId] = useState("")
+  const [connectorImportExternalObjectId, setConnectorImportExternalObjectId] = useState("")
+  const [connectorImportBusy, setConnectorImportBusy] = useState(false)
+  const [connectorImportErr, setConnectorImportErr] = useState("")
+  const [connectorImportResult, setConnectorImportResult] = useState<Record<string, unknown> | null>(null)
 
   const [searchQuery, setSearchQuery] = useState("")
   const [searchJurisdictionId, setSearchJurisdictionId] = useState<string>("")
@@ -291,6 +301,62 @@ export function RegulatorySourceLibraryWorkspace() {
     ? (asArray(searchResult.citations).filter(isRecord) as Record<string, unknown>[])
     : []
 
+  function readConnectorImportString(keys: string[]): string {
+    if (!connectorImportResult) return ""
+    for (const key of keys) {
+      const value = connectorImportResult[key]
+      if (typeof value === "string" && value.trim()) return value.trim()
+      if (typeof value === "number" && Number.isFinite(value)) return String(value)
+    }
+    return ""
+  }
+
+  function readConnectorImportWarnings(): string[] {
+    if (!connectorImportResult) return []
+    const warnings = connectorImportResult.warnings
+    if (Array.isArray(warnings)) {
+      return warnings
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter((item) => item.length > 0)
+    }
+    if (typeof warnings === "string" && warnings.trim()) return [warnings.trim()]
+    return []
+  }
+
+  async function submitConnectorImport() {
+    setConnectorImportBusy(true)
+    setConnectorImportErr("")
+    try {
+      const body: Record<string, unknown> = {
+        connector: connectorImportConnector.trim(),
+        external_record: connectorImportExternalRecord.trim(),
+        source_type: connectorImportSourceType,
+        jurisdiction: connectorImportJurisdiction.trim(),
+      }
+      const dossier = connectorImportDossier.trim()
+      if (dossier) body.dossier = dossier
+      const fileId = connectorImportFileId.trim()
+      if (fileId) body.file_id = fileId
+      const externalObjectId = connectorImportExternalObjectId.trim()
+      if (externalObjectId) body.external_object_id = externalObjectId
+      const data = await apiFetch<unknown>("/integrations/regulatory/import-source", {
+        method: "POST",
+        body,
+      })
+      if (isRecord(data)) {
+        setConnectorImportResult(data)
+      } else {
+        setConnectorImportResult({ result: data })
+      }
+      await loadSources()
+    } catch (e) {
+      setConnectorImportErr(formatApiError(e, "Import source from connector failed."))
+      setConnectorImportResult(null)
+    } finally {
+      setConnectorImportBusy(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[1200px] space-y-8 pb-12">
       <div className="flex flex-wrap items-center gap-2">
@@ -433,6 +499,132 @@ export function RegulatorySourceLibraryWorkspace() {
               {uploadBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Register source
             </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section aria-labelledby="connector-import-heading">
+        <Card>
+          <CardHeader>
+            <CardTitle id="connector-import-heading" className="text-lg">
+              Import source from connector
+            </CardTitle>
+            <CardDescription>POST /integrations/regulatory/import-source</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-connector">connector</Label>
+                <Input
+                  id="connector-import-connector"
+                  value={connectorImportConnector}
+                  onChange={(e) => setConnectorImportConnector(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-external-record">external record</Label>
+                <Input
+                  id="connector-import-external-record"
+                  value={connectorImportExternalRecord}
+                  onChange={(e) => setConnectorImportExternalRecord(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>source type</Label>
+                <Select value={connectorImportSourceType} onValueChange={setConnectorImportSourceType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOURCE_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-jurisdiction">jurisdiction</Label>
+                <Input
+                  id="connector-import-jurisdiction"
+                  value={connectorImportJurisdiction}
+                  onChange={(e) => setConnectorImportJurisdiction(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-dossier">dossier optional</Label>
+                <Input
+                  id="connector-import-dossier"
+                  value={connectorImportDossier}
+                  onChange={(e) => setConnectorImportDossier(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-file-id">file ID</Label>
+                <Input
+                  id="connector-import-file-id"
+                  value={connectorImportFileId}
+                  onChange={(e) => setConnectorImportFileId(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="connector-import-external-object-id">external object ID</Label>
+                <Input
+                  id="connector-import-external-object-id"
+                  value={connectorImportExternalObjectId}
+                  onChange={(e) => setConnectorImportExternalObjectId(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+            {connectorImportErr ? (
+              <Alert variant="destructive">
+                <AlertDescription className="text-sm">{connectorImportErr}</AlertDescription>
+              </Alert>
+            ) : null}
+            <Button type="button" disabled={connectorImportBusy} onClick={() => void submitConnectorImport()}>
+              {connectorImportBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Import regulatory source
+            </Button>
+            {connectorImportResult ? (
+              <Card className="border-muted">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Imported source</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">imported source title:</span>{" "}
+                    {readConnectorImportString(["imported_source_title", "title", "source_title"]) || "—"}
+                  </p>
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">SHA-256:</span>{" "}
+                    {readConnectorImportString(["sha256", "file_sha256"]) || "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">source type:</span>{" "}
+                    {readConnectorImportString(["source_type"]) || "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">citation extraction status:</span>{" "}
+                    {readConnectorImportString(["citation_extraction_status", "citation_status"]) || "—"}
+                  </p>
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">warnings:</span>{" "}
+                    {readConnectorImportWarnings().join("; ") || "—"}
+                  </p>
+                  <details className="sm:col-span-2 rounded-md border p-2">
+                    <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                    <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(connectorImportResult, null, 2)}</pre>
+                  </details>
+                </CardContent>
+              </Card>
+            ) : null}
           </CardContent>
         </Card>
       </section>

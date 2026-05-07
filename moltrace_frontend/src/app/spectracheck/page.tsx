@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { AppShell } from "@/components/app/app-shell"
-import { SpectraCheckWorkspace } from "@/components/spectracheck/spectracheck-workspace"
+import { ProgramsInterfaceWorkspace } from "@/components/programs/programs-interface-workspace"
 
 /**
  * SpectraCheck route (mirror of `app/spectracheck/page.tsx`).
@@ -11,7 +11,7 @@ export default function SpectraCheckPage() {
   return (
     <AppShell>
       <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading SpectraCheck…</div>}>
-        <SpectraCheckWorkspace />
+        <ProgramsInterfaceWorkspace />
       </Suspense>
     </AppShell>
   )

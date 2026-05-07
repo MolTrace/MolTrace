@@ -18,6 +18,13 @@ type ModuleSummary = {
   buttonLabel: string
 }
 
+type ConnectorMobileSummary = {
+  connectorWarnings: number
+  ingestionFailures: number
+  filesAwaitingReview: number
+  exportPackageStatus: string
+}
+
 function isRecord(v: unknown): v is JsonRecord {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
@@ -157,10 +164,65 @@ async function fetchMobileCommandCenter(): Promise<{ sourceEndpoint: string; mod
   return null
 }
 
+function asRows(payload: unknown): JsonRecord[] {
+  if (Array.isArray(payload)) return payload.filter(isRecord)
+  if (isRecord(payload) && Array.isArray(payload.items)) return payload.items.filter(isRecord)
+  return []
+}
+
+async function fetchMobileConnectorSummary(): Promise<ConnectorMobileSummary | null> {
+  try {
+    const [connectorsPayload, ingestionPayload, outboundSyncPayload] = await Promise.all([
+      apiFetch<unknown>("/connectors", { method: "GET" }),
+      apiFetch<unknown>("/ingestion-runs", { method: "GET" }),
+      apiFetch<unknown>("/outbound-sync-jobs", { method: "GET" }),
+    ])
+
+    const connectors = asRows(connectorsPayload)
+    const ingestionRuns = asRows(ingestionPayload)
+    const outboundSyncJobs = asRows(outboundSyncPayload)
+
+    const connectorWarnings = connectors.filter((row) => {
+      const status = readFirstString(row, ["status", "health_status", "state"]).toLowerCase()
+      return status === "warning" || status === "degraded" || status === "error" || status === "failed" || status === "unhealthy"
+    }).length
+
+    const ingestionFailures = ingestionRuns.filter((row) => {
+      const status = readFirstString(row, ["status", "run_status"]).toLowerCase()
+      return status === "failed" || status === "error"
+    }).length
+
+    const filesAwaitingReview = ingestionRuns.reduce((sum, row) => {
+      const explicitCount = readFirstNumber(row, [
+        "files_requiring_normalization_review",
+        "normalization_review_required_count",
+        "requires_normalization_review_count",
+      ])
+      if (explicitCount != null) return sum + Math.max(0, explicitCount)
+      const reviewStatus = readFirstString(row, ["normalization_status", "normalization_review_status"]).toLowerCase()
+      return reviewStatus === "review_required" ? sum + 1 : sum
+    }, 0)
+
+    const exportJobCandidates = outboundSyncJobs.filter((row) => {
+      const kind = readFirstString(row, ["job_type", "sync_type", "target_type", "resource_type"]).toLowerCase()
+      return kind.includes("export") || kind.includes("package")
+    })
+    const exportStatusSource = exportJobCandidates[0] ?? outboundSyncJobs[0] ?? null
+    const exportPackageStatus =
+      readFirstString(exportStatusSource, ["status", "job_status", "export_package_status", "package_status"]) || "Unknown"
+
+    return { connectorWarnings, ingestionFailures, filesAwaitingReview, exportPackageStatus }
+  } catch {
+    return null
+  }
+}
+
 export function MobileCommandCenter() {
   const [loading, setLoading] = useState(true)
   const [sourceEndpoint, setSourceEndpoint] = useState<string | null>(null)
   const [modules, setModules] = useState<ModuleSummary[]>([])
+  const [connectorSummary, setConnectorSummary] = useState<ConnectorMobileSummary | null>(null)
+  const [connectorSummaryLoading, setConnectorSummaryLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -178,6 +240,22 @@ export function MobileCommandCenter() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setConnectorSummaryLoading(true)
+    void fetchMobileConnectorSummary()
+      .then((summary) => {
+        if (cancelled) return
+        setConnectorSummary(summary)
+      })
+      .finally(() => {
+        if (!cancelled) setConnectorSummaryLoading(false)
       })
     return () => {
       cancelled = true
@@ -229,6 +307,37 @@ export function MobileCommandCenter() {
         {!loading && orderedModules.length === 0 ? (
           <p className="text-xs text-muted-foreground">Mobile command center summary unavailable.</p>
         ) : null}
+
+        <div className="rounded-md border bg-muted/20 p-3">
+          <p className="text-xs font-medium uppercase text-muted-foreground">Connector status (view/triage only)</p>
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <p>
+              <span className="font-medium text-foreground">connector warnings:</span>{" "}
+              {connectorSummary ? connectorSummary.connectorWarnings : "—"}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">ingestion failures:</span>{" "}
+              {connectorSummary ? connectorSummary.ingestionFailures : "—"}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">files awaiting review:</span>{" "}
+              {connectorSummary ? connectorSummary.filesAwaitingReview : "—"}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">export package status:</span>{" "}
+              {connectorSummary ? connectorSummary.exportPackageStatus : "—"}
+            </p>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Mobile connector actions are view/triage only. Credential edits require admin permissions and backend support.
+          </p>
+          {connectorSummaryLoading ? (
+            <p className="mt-1 text-xs text-muted-foreground">Loading connector status…</p>
+          ) : null}
+          {!connectorSummaryLoading && !connectorSummary ? (
+            <p className="mt-1 text-xs text-muted-foreground">Connector status summary unavailable.</p>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   )

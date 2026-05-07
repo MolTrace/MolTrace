@@ -174,6 +174,95 @@ export function trackUnifiedEvidenceBuilt(payload: WorkflowLifecyclePayload): vo
   trackUsageEvent({ ...payload, event_type: "unified_evidence_built" })
 }
 
+/** Connector/interoperability analytics metadata whitelist (privacy-safe categorical/count fields only). */
+export type ConnectorInteropAnalyticsMetadata = {
+  connector_type?: string
+  target_program?: string
+  status?: string
+  file_kind?: string
+  source_format?: string
+  target_format?: string
+  success_count?: number
+  failure_count?: number
+  warning_count?: number
+}
+
+function connectorInteropMetadata(meta: ConnectorInteropAnalyticsMetadata): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {}
+  if (typeof meta.connector_type === "string" && meta.connector_type.trim()) {
+    out.connector_type = meta.connector_type.trim().slice(0, 120)
+  }
+  if (typeof meta.target_program === "string" && meta.target_program.trim()) {
+    out.target_program = meta.target_program.trim().slice(0, 120)
+  }
+  if (typeof meta.status === "string" && meta.status.trim()) {
+    out.status = meta.status.trim().slice(0, 120)
+  }
+  if (typeof meta.file_kind === "string" && meta.file_kind.trim()) {
+    out.file_kind = meta.file_kind.trim().slice(0, 120)
+  }
+  if (typeof meta.source_format === "string" && meta.source_format.trim()) {
+    out.source_format = meta.source_format.trim().slice(0, 120)
+  }
+  if (typeof meta.target_format === "string" && meta.target_format.trim()) {
+    out.target_format = meta.target_format.trim().slice(0, 120)
+  }
+  if (typeof meta.success_count === "number" && Number.isFinite(meta.success_count)) {
+    out.success_count = Math.max(0, Math.round(meta.success_count))
+  }
+  if (typeof meta.failure_count === "number" && Number.isFinite(meta.failure_count)) {
+    out.failure_count = Math.max(0, Math.round(meta.failure_count))
+  }
+  if (typeof meta.warning_count === "number" && Number.isFinite(meta.warning_count)) {
+    out.warning_count = Math.max(0, Math.round(meta.warning_count))
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+function trackConnectorInteropEvent(event_type: string, meta: ConnectorInteropAnalyticsMetadata): void {
+  trackUsageEvent({ event_type, metadata: connectorInteropMetadata(meta) })
+}
+
+export function trackConnectorCreated(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("connector_created", meta)
+}
+
+export function trackConnectorHealthCheckRun(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("connector_health_check_run", meta)
+}
+
+export function trackWatchFolderScanRun(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("watch_folder_scan_run", meta)
+}
+
+export function trackIngestionRunStarted(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("ingestion_run_started", meta)
+}
+
+export function trackIngestionRunCompleted(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("ingestion_run_completed", meta)
+}
+
+export function trackFileNormalizationRun(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("file_normalization_run", meta)
+}
+
+export function trackExternalObjectLinkCreated(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("external_object_link_created", meta)
+}
+
+export function trackMappingTemplateCreated(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("mapping_template_created", meta)
+}
+
+export function trackOutboundSyncJobCreated(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("outbound_sync_job_created", meta)
+}
+
+export function trackSubmissionPackageCreated(meta: ConnectorInteropAnalyticsMetadata): void {
+  trackConnectorInteropEvent("submission_package_created", meta)
+}
+
 /** Allowed metadata for controlled AI inference analytics only. */
 export type AiInferenceAnalyticsMetadata = {
   service_key?: string
