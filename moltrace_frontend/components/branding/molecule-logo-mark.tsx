@@ -51,9 +51,9 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
   const highlighted = cornerHighlightIndices(centers)
   const traceBlue = "#42A5F5"
   const honeycombWhite = "#FFFFFF"
-  const markBlue = "#FFFFFF"
+  const markBlue = "#42A5F5"
   const letterClassName = [
-    "relative z-20 flex h-full w-full items-center justify-center font-black leading-none tracking-tight text-base text-white",
+    "relative z-20 flex h-full w-full items-center justify-center font-black leading-none tracking-tight text-xl text-white",
     textClassName,
   ]
     .filter(Boolean)

@@ -1,7 +1,7 @@
 const STATIC_CACHE = "moltrace-static-v1"
 const OFFLINE_URL = "/offline"
 
-const SHELL_ASSETS = ["/", OFFLINE_URL, "/icon.svg"]
+const SHELL_ASSETS = ["/", OFFLINE_URL, "/icons/icon-192.png"]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
