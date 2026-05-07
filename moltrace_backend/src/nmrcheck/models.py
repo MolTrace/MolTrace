@@ -11510,3 +11510,610 @@ class AdminSystemSummary(BaseModel):
     audit_events: int
     queue_backend: str
     redis_configured: bool
+
+
+ConnectorType = Literal[
+    "instrument_watch_folder",
+    "object_storage",
+    "eln",
+    "lims",
+    "sdms",
+    "chromatography_data_system",
+    "regulatory_document_system",
+    "webhook",
+    "generic_rest",
+    "other",
+]
+ConnectorTargetProgram = Literal[
+    "spectracheck",
+    "regulatory_hub",
+    "reaction_optimization",
+    "cross_module",
+]
+ConnectorRegistryStatus = Literal["draft", "active", "disabled", "error"]
+ConnectorCredentialType = Literal[
+    "api_key",
+    "oauth",
+    "basic_auth",
+    "token",
+    "service_account",
+    "none",
+]
+ConnectorCredentialStatus = Literal["active", "revoked", "expired", "missing"]
+ConnectorHealthStatus = Literal["ok", "warning", "error", "unknown"]
+InstrumentTargetRoute = Literal[
+    "processed_nmr",
+    "raw_fid",
+    "msms",
+    "lcms",
+    "regulatory_source",
+    "reaction_outcome",
+    "other",
+]
+InstrumentWatchFolderStatus = Literal["active", "paused", "error"]
+IngestionRunStatus = Literal[
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "partial",
+    "requires_review",
+]
+FileNormalizationSourceFormat = Literal[
+    "bruker_zip",
+    "agilent_varian_zip",
+    "jcamp_dx",
+    "csv",
+    "tsv",
+    "txt",
+    "mzml",
+    "mzxml",
+    "sdf",
+    "pdf",
+    "docx",
+    "unknown",
+]
+FileNormalizationTargetFormat = Literal[
+    "moltrace_spectrum_json",
+    "moltrace_lcms_json",
+    "moltrace_regulatory_source_json",
+    "moltrace_reaction_table_json",
+    "unchanged",
+    "unsupported",
+]
+FileNormalizationStatus = Literal[
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "unsupported",
+    "requires_review",
+]
+ExternalObjectType = Literal[
+    "project",
+    "sample",
+    "experiment",
+    "batch",
+    "report",
+    "document",
+    "result",
+    "file",
+    "action_item",
+    "other",
+]
+MolTraceResourceType = Literal[
+    "project",
+    "sample",
+    "spectracheck_session",
+    "regulatory_dossier",
+    "reaction_project",
+    "reaction_experiment",
+    "compound",
+    "batch",
+    "report",
+    "file",
+    "artifact",
+    "action_item",
+    "other",
+]
+ExternalRelationType = Literal[
+    "source_of",
+    "exported_to",
+    "linked_to",
+    "synchronized_with",
+    "derived_from",
+    "evidence_for",
+    "other",
+]
+MappingTemplateSourceType = Literal[
+    "eln_experiment",
+    "lims_sample",
+    "instrument_file",
+    "regulatory_document",
+    "reaction_table",
+    "ctd_package",
+    "other",
+]
+MappingTemplateTargetType = Literal[
+    "spectracheck_session",
+    "regulatory_dossier",
+    "reaction_experiment",
+    "compound_batch",
+    "file_record",
+    "action_item",
+    "other",
+]
+MappingTemplateStatus = Literal["draft", "active", "archived"]
+OutboundSyncStatus = Literal["queued", "running", "succeeded", "failed", "requires_review"]
+WebhookSubscriptionStatus = Literal["active", "disabled", "error"]
+RegulatorySubmissionPackageType = Literal[
+    "ctd_module3",
+    "impurity_report",
+    "qnmr_validation",
+    "ai_governance",
+    "readiness_bundle",
+    "other",
+]
+RegulatorySubmissionPackageStatus = Literal[
+    "draft",
+    "ready_for_review",
+    "exported",
+    "failed",
+]
+
+
+class ConnectorRegistryCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_key: str = Field(min_length=1, max_length=120)
+    display_name: str = Field(min_length=1, max_length=240)
+    connector_type: ConnectorType
+    target_program: ConnectorTargetProgram
+    status: ConnectorRegistryStatus = "draft"
+    config_schema_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConnectorRegistryUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_key: str | None = Field(default=None, min_length=1, max_length=120)
+    display_name: str | None = Field(default=None, min_length=1, max_length=240)
+    connector_type: ConnectorType | None = None
+    target_program: ConnectorTargetProgram | None = None
+    status: ConnectorRegistryStatus | None = None
+    config_schema_json: dict[str, Any] | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class ConnectorRegistry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    connector_key: str
+    display_name: str
+    connector_type: ConnectorType
+    target_program: ConnectorTargetProgram
+    status: ConnectorRegistryStatus
+    config_schema_json: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConnectorCredentialReferenceCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    credential_type: ConnectorCredentialType
+    secret_ref: str | None = Field(default=None, max_length=1000)
+    status: ConnectorCredentialStatus = "active"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConnectorCredentialReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    connector_id: int
+    credential_type: ConnectorCredentialType
+    secret_ref: str | None = None
+    status: ConnectorCredentialStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConnectorHealthCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: ConnectorHealthStatus | None = None
+    latency_ms: int | None = Field(default=None, ge=0)
+    message: str | None = Field(default=None, max_length=1000)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConnectorHealthCheck(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    connector_id: int
+    status: ConnectorHealthStatus
+    latency_ms: int | None = None
+    message: str | None = None
+    checked_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class InstrumentWatchFolderCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    folder_path: str = Field(min_length=1)
+    file_patterns_json: list[str] = Field(default_factory=lambda: ["*"], max_length=100)
+    recursive: bool = False
+    target_program: Literal["spectracheck", "regulatory_hub", "reaction_optimization"]
+    target_route: InstrumentTargetRoute
+    status: InstrumentWatchFolderStatus = "active"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class InstrumentWatchFolderUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    folder_path: str | None = Field(default=None, min_length=1)
+    file_patterns_json: list[str] | None = Field(default=None, max_length=100)
+    recursive: bool | None = None
+    target_program: Literal["spectracheck", "regulatory_hub", "reaction_optimization"] | None = None
+    target_route: InstrumentTargetRoute | None = None
+    status: InstrumentWatchFolderStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class InstrumentWatchFolder(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    connector_id: int | None = None
+    folder_path: str
+    file_patterns_json: list[str] = Field(default_factory=list)
+    recursive: bool
+    target_program: Literal["spectracheck", "regulatory_hub", "reaction_optimization"]
+    target_route: InstrumentTargetRoute
+    status: InstrumentWatchFolderStatus
+    last_scan_at: datetime | None = None
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class InstrumentWatchFolderScanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    force: bool = False
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class IngestionFileInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    filename: str = Field(min_length=1, max_length=255)
+    content_base64: str | None = None
+    content_text: str | None = None
+    content_type: str | None = Field(default=None, max_length=100)
+    file_kind: ManagedFileKind = "other"
+    source_path: str | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _require_content(self) -> IngestionFileInput:
+        if self.content_base64 is None and self.content_text is None:
+            raise ValueError("Either content_base64 or content_text is required.")
+        return self
+
+
+class IngestionRunCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    watch_folder_id: int | None = Field(default=None, ge=1)
+    source_system: str | None = Field(default=None, max_length=120)
+    source_path: str | None = None
+    status: IngestionRunStatus = "queued"
+    files_json: list[IngestionFileInput] = Field(default_factory=list, max_length=500)
+    force: bool = False
+    warnings_json: list[str] = Field(default_factory=list)
+    notes_json: list[str] = Field(default_factory=list)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class IngestionRun(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    connector_id: int | None = None
+    watch_folder_id: int | None = None
+    source_system: str | None = None
+    source_path: str | None = None
+    status: IngestionRunStatus
+    discovered_count: int = Field(ge=0)
+    ingested_count: int = Field(ge=0)
+    skipped_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    warnings_json: list[str] = Field(default_factory=list)
+    notes_json: list[str] = Field(default_factory=list)
+    created_at: datetime
+    finished_at: datetime | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class FileNormalizationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_format: FileNormalizationSourceFormat | None = None
+    target_format: FileNormalizationTargetFormat | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class FileNormalizationRun(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    file_id: int
+    source_format: FileNormalizationSourceFormat
+    target_format: FileNormalizationTargetFormat
+    status: FileNormalizationStatus
+    output_artifact_id: int | None = None
+    warnings_json: list[str] = Field(default_factory=list)
+    notes_json: list[str] = Field(default_factory=list)
+    created_at: datetime
+    finished_at: datetime | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExternalSystemRecordCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int = Field(ge=1)
+    external_system: str = Field(min_length=1, max_length=160)
+    external_object_type: ExternalObjectType
+    external_object_id: str = Field(min_length=1, max_length=240)
+    external_url: str | None = None
+    title: str | None = Field(default=None, max_length=300)
+    status: str | None = Field(default=None, max_length=64)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExternalSystemRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    connector_id: int
+    external_system: str
+    external_object_type: ExternalObjectType
+    external_object_id: str
+    external_url: str | None = None
+    title: str | None = None
+    status: str | None = None
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExternalObjectLinkCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    external_record_id: int = Field(ge=1)
+    moltrace_resource_type: MolTraceResourceType
+    moltrace_resource_id: int = Field(ge=1)
+    relation_type: ExternalRelationType
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExternalObjectLink(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    external_record_id: int
+    moltrace_resource_type: MolTraceResourceType
+    moltrace_resource_id: int
+    relation_type: ExternalRelationType
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class MappingTemplateCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    name: str = Field(min_length=1, max_length=240)
+    source_type: MappingTemplateSourceType
+    target_type: MappingTemplateTargetType
+    field_map_json: dict[str, Any] = Field(default_factory=dict)
+    status: MappingTemplateStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class MappingTemplateUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=240)
+    source_type: MappingTemplateSourceType | None = None
+    target_type: MappingTemplateTargetType | None = None
+    field_map_json: dict[str, Any] | None = None
+    status: MappingTemplateStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class MappingTemplate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    connector_id: int | None = None
+    name: str
+    source_type: MappingTemplateSourceType
+    target_type: MappingTemplateTargetType
+    field_map_json: dict[str, Any] = Field(default_factory=dict)
+    status: MappingTemplateStatus
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class OutboundSyncJobCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int = Field(ge=1)
+    target_system: str = Field(min_length=1, max_length=160)
+    source_resource_type: str = Field(min_length=1, max_length=64)
+    source_resource_id: int = Field(ge=1)
+    payload_summary_json: dict[str, Any] = Field(default_factory=dict)
+    status: OutboundSyncStatus = "requires_review"
+    warnings_json: list[str] = Field(default_factory=list)
+    notes_json: list[str] = Field(default_factory=list)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class OutboundSyncJob(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    connector_id: int
+    target_system: str
+    source_resource_type: str
+    source_resource_id: int
+    payload_summary_json: dict[str, Any] = Field(default_factory=dict)
+    status: OutboundSyncStatus
+    warnings_json: list[str] = Field(default_factory=list)
+    notes_json: list[str] = Field(default_factory=list)
+    created_at: datetime
+    finished_at: datetime | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class WebhookSubscriptionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    name: str = Field(min_length=1, max_length=240)
+    event_types_json: list[str] = Field(default_factory=list, max_length=100)
+    target_url: str | None = Field(default=None, exclude=True)
+    target_url_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    status: WebhookSubscriptionStatus = "active"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _require_webhook_target(self) -> WebhookSubscriptionCreate:
+        if self.target_url is None and self.target_url_hash is None:
+            raise ValueError("Either target_url or target_url_hash is required.")
+        return self
+
+
+class WebhookSubscriptionUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=240)
+    event_types_json: list[str] | None = Field(default=None, max_length=100)
+    target_url: str | None = Field(default=None, exclude=True)
+    target_url_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    status: WebhookSubscriptionStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class WebhookSubscription(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    connector_id: int | None = None
+    name: str
+    event_types_json: list[str] = Field(default_factory=list)
+    target_url_hash: str
+    status: WebhookSubscriptionStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class RegulatorySubmissionPackageCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    report_id: int | None = Field(default=None, ge=1)
+    package_type: RegulatorySubmissionPackageType = "ctd_module3"
+    status: RegulatorySubmissionPackageStatus = "ready_for_review"
+    file_ids_json: list[int] = Field(default_factory=list)
+    artifact_ids_json: list[int] = Field(default_factory=list)
+    source_citations_json: list[dict[str, Any]] = Field(default_factory=list)
+    warnings_json: list[str] = Field(default_factory=list)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class RegulatorySubmissionPackage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    dossier_id: int | None = None
+    report_id: int | None = None
+    package_type: RegulatorySubmissionPackageType
+    status: RegulatorySubmissionPackageStatus
+    file_ids_json: list[int] = Field(default_factory=list)
+    artifact_ids_json: list[int] = Field(default_factory=list)
+    package_manifest_json: dict[str, Any] = Field(default_factory=dict)
+    package_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class SpectraCheckImportFileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    file_id: int = Field(ge=1)
+    spectracheck_session_id: int | None = Field(default=None, ge=1)
+    route: InstrumentTargetRoute = "processed_nmr"
+    external_record_id: int | None = Field(default=None, ge=1)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class RegulatoryImportSourceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    file_id: int = Field(ge=1)
+    dossier_id: int | None = Field(default=None, ge=1)
+    external_record_id: int | None = Field(default=None, ge=1)
+    source_citation_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReactionExperimentTableImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int | None = Field(default=None, ge=1)
+    file_id: int = Field(ge=1)
+    reaction_project_id: int | None = Field(default=None, ge=1)
+    external_record_id: int | None = Field(default=None, ge=1)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReactionApprovedExperimentsExportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector_id: int = Field(ge=1)
+    target_system: str = Field(min_length=1, max_length=160)
+    experiment_ids_json: list[int] = Field(default_factory=list)
+    payload_summary_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class IntegrationImportResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["imported", "requires_review"]
+    review_required: bool
+    file_id: int | None = None
+    ingestion_run_id: int | None = None
+    normalization_run_id: int | None = None
+    external_record_id: int | None = None
+    external_link_id: int | None = None
+    sync_job_id: int | None = None
+    warnings_json: list[str] = Field(default_factory=list)
+    notes_json: list[str] = Field(default_factory=list)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
