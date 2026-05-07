@@ -36,21 +36,18 @@ function honeycombCenters(R: number, pad: number): Array<[number, number]> {
   return centers
 }
 
-function cornerHighlightIndices(centers: Array<[number, number]>): Set<number> {
-  const indexed = centers.map(([x, y], index) => ({ index, x, y }))
-  const topLeft = [...indexed].sort((a, b) => (a.x + a.y) - (b.x + b.y))[0]?.index
-  const topRight = [...indexed].sort((a, b) => (b.x - b.y) - (a.x - a.y))[0]?.index
-  const bottomLeft = [...indexed].sort((a, b) => (b.y - b.x) - (a.y - a.x))[0]?.index
-  const bottomRight = [...indexed].sort((a, b) => (b.x + b.y) - (a.x + a.y))[0]?.index
-  return new Set([topLeft, topRight, bottomLeft, bottomRight].filter((v): v is number => v != null))
-}
+/** Dark blue tile behind the mark (explicit hex so PWA raster matches). */
+const LOGO_BACKGROUND_DARK_BLUE = "#051f3a"
+/** Honeycomb stroke color — Bright honeycomb stroke color. */
+const HONEYCOMB_BRIGHT_BLUE = "#26C6FF"
+
+/** Flat-top regular hexagon inscribed in the logo box (aligned with honeycomb cells). */
+const LOGO_HEX_CLIP =
+  "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)"
 
 export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkProps) {
   const R = 5.35
   const centers = honeycombCenters(R, 5)
-  const highlighted = cornerHighlightIndices(centers)
-  const traceBlue = "#42A5F5"
-  const honeycombWhite = "#FFFFFF"
   const markColor = "#FFFFFF"
   const letterClassName = [
     "relative z-20 flex h-full w-full items-center justify-center font-black leading-none tracking-tight text-xl text-white",
@@ -61,38 +58,36 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
 
   return (
     <div
-      className={cn(
-        "relative flex items-center justify-center overflow-hidden rounded-md bg-black",
-        className
-      )}
+      className={cn("relative flex items-center justify-center overflow-hidden", className)}
+      style={{
+        backgroundColor: LOGO_BACKGROUND_DARK_BLUE,
+        clipPath: LOGO_HEX_CLIP,
+        WebkitClipPath: LOGO_HEX_CLIP,
+      }}
       aria-hidden="true"
     >
       <svg
-        className="absolute inset-0 h-full w-full text-zinc-300 dark:text-zinc-200"
+        className="absolute inset-0 h-full w-full"
         viewBox="0 0 64 64"
         fill="none"
         aria-hidden="true"
       >
-        {/* Honeycomb */}
-        <g strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" fill="none">
+        {/* Honeycomb — crisp strokes, no opacity/filter */}
+        <g strokeWidth={2} strokeLinejoin="miter" strokeLinecap="butt" fill="none">
           {centers.map(([cx, cy], i) => (
             <polygon
               key={`front-${i}`}
               points={flatTopHexPoints(cx, cy, R)}
-              stroke={highlighted.has(i) ? traceBlue : honeycombWhite}
+              stroke={HONEYCOMB_BRIGHT_BLUE}
             />
           ))}
         </g>
       </svg>
       <span
         className={letterClassName}
-        style={{
-          textShadow: "0 0 2px rgb(0 0 0), 0 1px 3px rgb(0 0 0 / 0.95)",
-          WebkitTextStroke: "0.6px currentColor",
-          color: markColor,
-        }}
+        style={{ color: markColor }}
       >
-        <span className="block -translate-y-px text-center">m</span>
+        <span className="block -translate-y-px -translate-x-px text-center">m</span>
       </span>
     </div>
   )
