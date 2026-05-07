@@ -256,14 +256,15 @@ export function MobileReportPreview({ reportId: reportIdProp = null }: { reportI
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => updateDraft({ comment: draft?.comment ?? "" })}>
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => updateDraft({ comment: draft?.comment ?? "" })}>
             Add review comment
           </Button>
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className="w-full sm:w-auto"
             disabled={!preview?.canApproveReject}
             onClick={() => updateDraft({ decision: "approve" })}
           >
@@ -273,6 +274,7 @@ export function MobileReportPreview({ reportId: reportIdProp = null }: { reportI
             type="button"
             size="sm"
             variant="outline"
+            className="w-full sm:w-auto"
             disabled={!preview?.canApproveReject}
             onClick={() => updateDraft({ decision: "reject" })}
           >
@@ -282,12 +284,13 @@ export function MobileReportPreview({ reportId: reportIdProp = null }: { reportI
             type="button"
             size="sm"
             variant="outline"
+            className="w-full sm:w-auto"
             disabled={!preview?.canShare}
             onClick={() => updateDraft({ share_requested: true })}
           >
             Share
           </Button>
-          <Button type="button" size="sm" asChild>
+          <Button type="button" size="sm" className="w-full sm:w-auto" asChild>
             <Link href={desktopHref}>Download/open full report</Link>
           </Button>
         </div>

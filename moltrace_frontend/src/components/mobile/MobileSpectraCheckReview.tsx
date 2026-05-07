@@ -236,20 +236,20 @@ export function MobileSpectraCheckReview({ sessionId: sessionIdProp = null }: { 
 
         {loading ? <p className="text-xs text-muted-foreground">Loading mobile SpectraCheck summary…</p> : null}
 
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" asChild>
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" asChild>
             <Link href={desktopHref}>Add comment</Link>
           </Button>
-          <Button type="button" size="sm" variant="outline" asChild>
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" asChild>
             <Link href={desktopHref}>Mark reviewed</Link>
           </Button>
-          <Button type="button" size="sm" variant="outline" asChild>
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" asChild>
             <Link href={desktopHref}>Open Regulatory Impact</Link>
           </Button>
-          <Button type="button" size="sm" variant="outline" asChild>
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" asChild>
             <Link href={desktopHref}>Open Report Preview</Link>
           </Button>
-          <Button type="button" size="sm" asChild>
+          <Button type="button" size="sm" className="w-full sm:w-auto" asChild>
             <Link href={desktopHref}>Open full desktop view</Link>
           </Button>
         </div>
