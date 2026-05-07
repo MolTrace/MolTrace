@@ -42,6 +42,7 @@ from . import ai_inference_store as ai_store
 from . import analytics_store as analytics_store
 from . import collaboration_store as collab_store
 from . import compound_registry_store as compound_store
+from . import interoperability_store as interop_store
 from . import knowledge_flywheel_store as knowledge_store
 from . import method_registry_store as method_store
 from . import mobile_store as mobile_store
@@ -233,6 +234,13 @@ from .models import (
     CompoundStructureRecordCreate,
     ComplianceDrivenOptimizationObjective,
     ComplianceDrivenOptimizationObjectiveCreate,
+    ConnectorCredentialReference,
+    ConnectorCredentialReferenceCreate,
+    ConnectorHealthCheck,
+    ConnectorHealthCheckRequest,
+    ConnectorRegistry,
+    ConnectorRegistryCreate,
+    ConnectorRegistryUpdate,
     CrossModuleActionItem,
     CrossModuleActionItemCreate,
     CrossModuleActionItemUpdate,
@@ -268,6 +276,10 @@ from .models import (
     ExtractedAnalyticalRecord,
     ExtractedReactionRecord,
     ExtractedRegulatoryRecord,
+    ExternalObjectLink,
+    ExternalObjectLinkCreate,
+    ExternalSystemRecord,
+    ExternalSystemRecordCreate,
     FeaturePipeline,
     FeaturePipelineCreate,
     FeatureRecord,
@@ -281,6 +293,8 @@ from .models import (
     FIDRunReviewCreate,
     FIDRunReviewDecisionRecord,
     FileRecord,
+    FileNormalizationRequest,
+    FileNormalizationRun,
     FullStoredAnalysisRecord,
     HRMSCandidateMatchRequest,
     HRMSCandidateMatchResult,
@@ -290,6 +304,13 @@ from .models import (
     ImpurityRiskRegisterCreate,
     InferenceExplanation,
     InferenceExplanationCreate,
+    IngestionRun,
+    IngestionRunCreate,
+    InstrumentWatchFolder,
+    InstrumentWatchFolderCreate,
+    InstrumentWatchFolderScanRequest,
+    InstrumentWatchFolderUpdate,
+    IntegrationImportResponse,
     JobEventRecord,
     JobRecord,
     JurisdictionalRequirementMap,
@@ -321,6 +342,9 @@ from .models import (
     LCMSImportBridgeResult,
     LCMSLibraryDereplicationResult,
     ManagedFileKind,
+    MappingTemplate,
+    MappingTemplateCreate,
+    MappingTemplateUpdate,
     MessageResponse,
     MethodComparisonRun,
     MethodComparisonRunCreate,
@@ -390,6 +414,8 @@ from .models import (
     OperationalMetric,
     OrganizationCreate,
     OrganizationRecord,
+    OutboundSyncJob,
+    OutboundSyncJobCreate,
     OutOfDomainAssessment,
     OutOfDomainAssessmentCreate,
     PasswordResetConfirm,
@@ -447,10 +473,12 @@ from .models import (
     ReactionExecutionItemCreate,
     ReactionExecutionItemUpdate,
     ReactionExecutionStatusUpdate,
+    ReactionApprovedExperimentsExportRequest,
     ReactionExperiment,
     ReactionExperimentCreate,
     ReactionExperimentEvidence,
     ReactionExperimentSpectraCheckLink,
+    ReactionExperimentTableImportRequest,
     ReactionExperimentUpdate,
     ReactionLiteraturePrior,
     ReactionLiteraturePriorCreate,
@@ -509,6 +537,7 @@ from .models import (
     RegulatoryImpactAssessmentCreate,
     RegulatoryImpactNotification,
     RegulatoryImpactNotificationUpdate,
+    RegulatoryImportSourceRequest,
     RegulatoryJurisdiction,
     RegulatoryJurisdictionCreate,
     RegulatoryQuery,
@@ -540,6 +569,8 @@ from .models import (
     RegulatorySourceWatcherUpdate,
     RegulatorySurveillanceRun,
     RegulatorySurveillanceRunCreate,
+    RegulatorySubmissionPackage,
+    RegulatorySubmissionPackageCreate,
     RegulatoryToReactionBridge,
     RegulatoryToReactionBridgeCreate,
     RenewalValueReport,
@@ -581,6 +612,7 @@ from .models import (
     ShadowEvaluationRunCreate,
     SpectroscopyToRegulatoryBridge,
     SpectroscopyToRegulatoryBridgeCreate,
+    SpectraCheckImportFileRequest,
     SpectraCheckAuditEventRecord,
     SpectraCheckEvidenceCreate,
     SpectraCheckEvidenceRecord,
@@ -638,6 +670,9 @@ from .models import (
     ValidationRunCreate,
     VisualizationArtifact,
     VisualizationNormalizeRequest,
+    WebhookSubscription,
+    WebhookSubscriptionCreate,
+    WebhookSubscriptionUpdate,
     WorkflowAnalyticsSummary,
     WorkflowRunArtifactRecord,
     WorkflowRunCreate,
@@ -7401,6 +7436,1042 @@ def delete_managed_file_route(
     return MessageResponse(
         detail="Managed file record deleted; immutable stored bytes were not overwritten."
     )
+
+
+def _raise_interoperability_http_error(exc: Exception) -> None:
+    if isinstance(exc, KeyError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, interop_store.InteroperabilityError):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/connectors",
+    response_model=list[ConnectorRegistry],
+    dependencies=[Depends(require_access_context)],
+)
+def list_connectors_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    target_program: str | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ConnectorRegistry]:
+    return interop_store.list_connectors(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        target_program=target_program,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/connectors",
+    response_model=ConnectorRegistry,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_connector_route(
+    payload: ConnectorRegistryCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ConnectorRegistry:
+    try:
+        record = interop_store.create_connector(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="connector.create",
+        message="Connector registry entry created.",
+        entity_type="connector",
+        entity_id=record.id,
+        metadata={"connector_key": record.connector_key, "target_program": record.target_program},
+    )
+    return record
+
+
+@router.get(
+    "/connectors/{connector_id}",
+    response_model=ConnectorRegistry,
+    dependencies=[Depends(require_access_context)],
+)
+def get_connector_route(
+    connector_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ConnectorRegistry:
+    record = interop_store.get_connector(_state(request).session_factory, connector_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Connector not found.")
+    return record
+
+
+@router.patch(
+    "/connectors/{connector_id}",
+    response_model=ConnectorRegistry,
+    dependencies=[Depends(require_access_context)],
+)
+def update_connector_route(
+    connector_id: int,
+    payload: ConnectorRegistryUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ConnectorRegistry:
+    try:
+        record = interop_store.update_connector(
+            _state(request).session_factory,
+            connector_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Connector not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="connector.update",
+        message="Connector registry entry updated.",
+        entity_type="connector",
+        entity_id=record.id,
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/connectors/{connector_id}/health-check",
+    response_model=ConnectorHealthCheck,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_connector_health_check_route(
+    connector_id: int,
+    request: Request,
+    payload: ConnectorHealthCheckRequest | None = None,
+    context: AccessContext = Depends(require_access_context),
+) -> ConnectorHealthCheck:
+    try:
+        record = interop_store.create_connector_health_check(
+            _state(request).session_factory,
+            connector_id,
+            payload or ConnectorHealthCheckRequest(),
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="connector.health_check",
+        message="Connector health check recorded without exposing credentials.",
+        entity_type="connector",
+        entity_id=connector_id,
+        metadata={"health_check_id": record.id, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/connectors/{connector_id}/health-checks",
+    response_model=list[ConnectorHealthCheck],
+    dependencies=[Depends(require_access_context)],
+)
+def list_connector_health_checks_route(
+    connector_id: int,
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ConnectorHealthCheck]:
+    try:
+        return interop_store.list_connector_health_checks(
+            _state(request).session_factory,
+            connector_id,
+            limit=limit,
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+
+
+@router.post(
+    "/connectors/{connector_id}/credentials",
+    response_model=ConnectorCredentialReference,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_connector_credential_route(
+    connector_id: int,
+    payload: ConnectorCredentialReferenceCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ConnectorCredentialReference:
+    try:
+        record = interop_store.create_connector_credential(
+            _state(request).session_factory,
+            connector_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="connector.credential_reference.create",
+        message="Connector credential reference created; no raw credential value was returned.",
+        entity_type="connector",
+        entity_id=connector_id,
+        metadata={"credential_reference_id": record.id, "credential_type": record.credential_type},
+    )
+    return record
+
+
+@router.get(
+    "/connectors/{connector_id}/credentials",
+    response_model=list[ConnectorCredentialReference],
+    dependencies=[Depends(require_access_context)],
+)
+def list_connector_credentials_route(
+    connector_id: int,
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ConnectorCredentialReference]:
+    try:
+        return interop_store.list_connector_credentials(
+            _state(request).session_factory,
+            connector_id,
+            limit=limit,
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+
+
+@router.post(
+    "/instrument-watch-folders",
+    response_model=InstrumentWatchFolder,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_instrument_watch_folder_route(
+    payload: InstrumentWatchFolderCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> InstrumentWatchFolder:
+    try:
+        record = interop_store.create_watch_folder(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="instrument_watch_folder.create",
+        message="Instrument watch folder created.",
+        entity_type="instrument_watch_folder",
+        entity_id=record.id,
+        metadata={"target_program": record.target_program, "target_route": record.target_route},
+    )
+    return record
+
+
+@router.get(
+    "/instrument-watch-folders",
+    response_model=list[InstrumentWatchFolder],
+    dependencies=[Depends(require_access_context)],
+)
+def list_instrument_watch_folders_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[InstrumentWatchFolder]:
+    return interop_store.list_watch_folders(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/instrument-watch-folders/{watch_folder_id}",
+    response_model=InstrumentWatchFolder,
+    dependencies=[Depends(require_access_context)],
+)
+def get_instrument_watch_folder_route(
+    watch_folder_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> InstrumentWatchFolder:
+    record = interop_store.get_watch_folder(_state(request).session_factory, watch_folder_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Instrument watch folder not found.")
+    return record
+
+
+@router.patch(
+    "/instrument-watch-folders/{watch_folder_id}",
+    response_model=InstrumentWatchFolder,
+    dependencies=[Depends(require_access_context)],
+)
+def update_instrument_watch_folder_route(
+    watch_folder_id: int,
+    payload: InstrumentWatchFolderUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> InstrumentWatchFolder:
+    try:
+        record = interop_store.update_watch_folder(
+            _state(request).session_factory,
+            watch_folder_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Instrument watch folder not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="instrument_watch_folder.update",
+        message="Instrument watch folder updated.",
+        entity_type="instrument_watch_folder",
+        entity_id=record.id,
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/instrument-watch-folders/{watch_folder_id}/scan",
+    response_model=IngestionRun,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def scan_instrument_watch_folder_route(
+    watch_folder_id: int,
+    payload: InstrumentWatchFolderScanRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> IngestionRun:
+    try:
+        record = interop_store.scan_watch_folder(
+            _state(request).session_factory,
+            watch_folder_id,
+            payload,
+            storage_root=_orchestration_storage_root(request),
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="instrument_watch_folder.scan",
+        message="Instrument watch folder scan recorded.",
+        entity_type="ingestion_run",
+        entity_id=record.id,
+        metadata={
+            "watch_folder_id": watch_folder_id,
+            "ingested_count": record.ingested_count,
+            "skipped_count": record.skipped_count,
+            "failed_count": record.failed_count,
+        },
+    )
+    return record
+
+
+@router.post(
+    "/ingestion-runs",
+    response_model=IngestionRun,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_ingestion_run_route(
+    payload: IngestionRunCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> IngestionRun:
+    try:
+        record = interop_store.create_ingestion_run(
+            _state(request).session_factory,
+            payload,
+            storage_root=_orchestration_storage_root(request),
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="ingestion_run.create",
+        message="Ingestion run recorded with source hashes.",
+        entity_type="ingestion_run",
+        entity_id=record.id,
+        metadata={
+            "status": record.status,
+            "ingested_count": record.ingested_count,
+            "skipped_count": record.skipped_count,
+            "failed_count": record.failed_count,
+        },
+    )
+    return record
+
+
+@router.get(
+    "/ingestion-runs",
+    response_model=list[IngestionRun],
+    dependencies=[Depends(require_access_context)],
+)
+def list_ingestion_runs_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[IngestionRun]:
+    return interop_store.list_ingestion_runs(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/ingestion-runs/{ingestion_run_id}",
+    response_model=IngestionRun,
+    dependencies=[Depends(require_access_context)],
+)
+def get_ingestion_run_route(
+    ingestion_run_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> IngestionRun:
+    record = interop_store.get_ingestion_run(_state(request).session_factory, ingestion_run_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Ingestion run not found.")
+    return record
+
+
+@router.post(
+    "/files/{file_id}/normalize",
+    response_model=FileNormalizationRun,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def normalize_file_route(
+    file_id: int,
+    payload: FileNormalizationRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> FileNormalizationRun:
+    try:
+        record = interop_store.normalize_file(
+            _state(request).session_factory,
+            file_id,
+            payload,
+            storage_root=_orchestration_storage_root(request),
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="file_normalization.create",
+        message="File normalization run created a normalized artifact or warning.",
+        entity_type="file_normalization_run",
+        entity_id=record.id,
+        metadata={
+            "file_id": file_id,
+            "source_format": record.source_format,
+            "target_format": record.target_format,
+            "status": record.status,
+            "output_artifact_id": record.output_artifact_id,
+        },
+    )
+    return record
+
+
+@router.get(
+    "/files/{file_id}/normalization-runs",
+    response_model=list[FileNormalizationRun],
+    dependencies=[Depends(require_access_context)],
+)
+def list_file_normalization_runs_route(
+    file_id: int,
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[FileNormalizationRun]:
+    return interop_store.list_normalization_runs_for_file(
+        _state(request).session_factory,
+        file_id,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/normalization-runs/{normalization_run_id}",
+    response_model=FileNormalizationRun,
+    dependencies=[Depends(require_access_context)],
+)
+def get_normalization_run_route(
+    normalization_run_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> FileNormalizationRun:
+    record = interop_store.get_normalization_run(
+        _state(request).session_factory,
+        normalization_run_id,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Normalization run not found.")
+    return record
+
+
+@router.post(
+    "/external-records",
+    response_model=ExternalSystemRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_external_record_route(
+    payload: ExternalSystemRecordCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ExternalSystemRecord:
+    try:
+        record = interop_store.create_external_record(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="external_record.create",
+        message="External system record created.",
+        entity_type="external_record",
+        entity_id=record.id,
+        metadata={"external_system": record.external_system, "external_object_type": record.external_object_type},
+    )
+    return record
+
+
+@router.get(
+    "/external-records",
+    response_model=list[ExternalSystemRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_external_records_route(
+    request: Request,
+    connector_id: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ExternalSystemRecord]:
+    return interop_store.list_external_records(
+        _state(request).session_factory,
+        connector_id=connector_id,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/external-records/{external_record_id}",
+    response_model=ExternalSystemRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def get_external_record_route(
+    external_record_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ExternalSystemRecord:
+    record = interop_store.get_external_record(
+        _state(request).session_factory,
+        external_record_id,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="External system record not found.")
+    return record
+
+
+@router.post(
+    "/external-object-links",
+    response_model=ExternalObjectLink,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_external_object_link_route(
+    payload: ExternalObjectLinkCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ExternalObjectLink:
+    try:
+        record = interop_store.create_external_object_link(
+            _state(request).session_factory,
+            payload,
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="external_object_link.create",
+        message="External object link created.",
+        entity_type="external_object_link",
+        entity_id=record.id,
+        metadata={
+            "external_record_id": record.external_record_id,
+            "moltrace_resource_type": record.moltrace_resource_type,
+            "relation_type": record.relation_type,
+        },
+    )
+    return record
+
+
+@router.get(
+    "/external-object-links",
+    response_model=list[ExternalObjectLink],
+    dependencies=[Depends(require_access_context)],
+)
+def list_external_object_links_route(
+    request: Request,
+    external_record_id: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ExternalObjectLink]:
+    return interop_store.list_external_object_links(
+        _state(request).session_factory,
+        external_record_id=external_record_id,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/mapping-templates",
+    response_model=MappingTemplate,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_mapping_template_route(
+    payload: MappingTemplateCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> MappingTemplate:
+    try:
+        record = interop_store.create_mapping_template(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="mapping_template.create",
+        message="Mapping template created.",
+        entity_type="mapping_template",
+        entity_id=record.id,
+        metadata={"source_type": record.source_type, "target_type": record.target_type},
+    )
+    return record
+
+
+@router.get(
+    "/mapping-templates",
+    response_model=list[MappingTemplate],
+    dependencies=[Depends(require_access_context)],
+)
+def list_mapping_templates_route(
+    request: Request,
+    connector_id: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[MappingTemplate]:
+    return interop_store.list_mapping_templates(
+        _state(request).session_factory,
+        connector_id=connector_id,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/mapping-templates/{template_id}",
+    response_model=MappingTemplate,
+    dependencies=[Depends(require_access_context)],
+)
+def get_mapping_template_route(
+    template_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> MappingTemplate:
+    record = interop_store.get_mapping_template(_state(request).session_factory, template_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Mapping template not found.")
+    return record
+
+
+@router.patch(
+    "/mapping-templates/{template_id}",
+    response_model=MappingTemplate,
+    dependencies=[Depends(require_access_context)],
+)
+def update_mapping_template_route(
+    template_id: int,
+    payload: MappingTemplateUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> MappingTemplate:
+    try:
+        record = interop_store.update_mapping_template(
+            _state(request).session_factory,
+            template_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Mapping template not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="mapping_template.update",
+        message="Mapping template updated.",
+        entity_type="mapping_template",
+        entity_id=record.id,
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/outbound-sync-jobs",
+    response_model=OutboundSyncJob,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_outbound_sync_job_route(
+    payload: OutboundSyncJobCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> OutboundSyncJob:
+    try:
+        record = interop_store.create_outbound_sync_job(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="outbound_sync_job.create",
+        message="Outbound sync job created for review.",
+        entity_type="outbound_sync_job",
+        entity_id=record.id,
+        metadata={"target_system": record.target_system, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/outbound-sync-jobs",
+    response_model=list[OutboundSyncJob],
+    dependencies=[Depends(require_access_context)],
+)
+def list_outbound_sync_jobs_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[OutboundSyncJob]:
+    return interop_store.list_outbound_sync_jobs(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/outbound-sync-jobs/{sync_job_id}",
+    response_model=OutboundSyncJob,
+    dependencies=[Depends(require_access_context)],
+)
+def get_outbound_sync_job_route(
+    sync_job_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> OutboundSyncJob:
+    record = interop_store.get_outbound_sync_job(_state(request).session_factory, sync_job_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Outbound sync job not found.")
+    return record
+
+
+@router.post(
+    "/webhooks/subscriptions",
+    response_model=WebhookSubscription,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_webhook_subscription_route(
+    payload: WebhookSubscriptionCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> WebhookSubscription:
+    try:
+        record = interop_store.create_webhook_subscription(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="webhook_subscription.create",
+        message="Webhook subscription created with hashed target URL.",
+        entity_type="webhook_subscription",
+        entity_id=record.id,
+        metadata={"event_types_json": record.event_types_json, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/webhooks/subscriptions",
+    response_model=list[WebhookSubscription],
+    dependencies=[Depends(require_access_context)],
+)
+def list_webhook_subscriptions_route(
+    request: Request,
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[WebhookSubscription]:
+    return interop_store.list_webhook_subscriptions(
+        _state(request).session_factory,
+        limit=limit,
+    )
+
+
+@router.patch(
+    "/webhooks/subscriptions/{subscription_id}",
+    response_model=WebhookSubscription,
+    dependencies=[Depends(require_access_context)],
+)
+def update_webhook_subscription_route(
+    subscription_id: int,
+    payload: WebhookSubscriptionUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> WebhookSubscription:
+    try:
+        record = interop_store.update_webhook_subscription(
+            _state(request).session_factory,
+            subscription_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Webhook subscription not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="webhook_subscription.update",
+        message="Webhook subscription updated.",
+        entity_type="webhook_subscription",
+        entity_id=record.id,
+        metadata={"updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/regulatory/dossiers/{dossier_id}/submission-package",
+    response_model=RegulatorySubmissionPackage,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_regulatory_submission_package_route(
+    dossier_id: int,
+    payload: RegulatorySubmissionPackageCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> RegulatorySubmissionPackage:
+    try:
+        record = interop_store.create_submission_package(
+            _state(request).session_factory,
+            dossier_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="regulatory_submission_package.create",
+        message="Regulatory export package created for review.",
+        entity_type="regulatory_submission_package",
+        entity_id=record.id,
+        metadata={"dossier_id": dossier_id, "package_type": record.package_type, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/regulatory/dossiers/{dossier_id}/submission-package",
+    response_model=list[RegulatorySubmissionPackage],
+    dependencies=[Depends(require_access_context)],
+)
+def list_regulatory_submission_packages_for_dossier_route(
+    dossier_id: int,
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[RegulatorySubmissionPackage]:
+    return interop_store.list_submission_packages_for_dossier(
+        _state(request).session_factory,
+        dossier_id,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/regulatory/submission-packages/{package_id}",
+    response_model=RegulatorySubmissionPackage,
+    dependencies=[Depends(require_access_context)],
+)
+def get_regulatory_submission_package_route(
+    package_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> RegulatorySubmissionPackage:
+    record = interop_store.get_submission_package(_state(request).session_factory, package_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Regulatory submission package not found.")
+    return record
+
+
+@router.post(
+    "/integrations/spectracheck/import-file",
+    response_model=IntegrationImportResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def import_spectracheck_file_route(
+    payload: SpectraCheckImportFileRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> IntegrationImportResponse:
+    try:
+        record = interop_store.import_spectracheck_file(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="integration.spectracheck.import_file",
+        message="SpectraCheck file import recorded.",
+        entity_type="ingestion_run",
+        entity_id=record.ingestion_run_id,
+        metadata={"file_id": record.file_id, "review_required": record.review_required},
+    )
+    return record
+
+
+@router.post(
+    "/integrations/regulatory/import-source",
+    response_model=IntegrationImportResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def import_regulatory_source_route(
+    payload: RegulatoryImportSourceRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> IntegrationImportResponse:
+    try:
+        record = interop_store.import_regulatory_source(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="integration.regulatory.import_source",
+        message="Regulatory source imported with citation metadata.",
+        entity_type="ingestion_run",
+        entity_id=record.ingestion_run_id,
+        metadata={"file_id": record.file_id, "review_required": record.review_required},
+    )
+    return record
+
+
+@router.post(
+    "/integrations/reactions/import-experiment-table",
+    response_model=IntegrationImportResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def import_reaction_experiment_table_route(
+    payload: ReactionExperimentTableImportRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> IntegrationImportResponse:
+    try:
+        record = interop_store.import_reaction_experiment_table(
+            _state(request).session_factory,
+            payload,
+            storage_root=_orchestration_storage_root(request),
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="integration.reactions.import_experiment_table",
+        message="Reaction experiment table imported as a normalized artifact; review required.",
+        entity_type="file_normalization_run",
+        entity_id=record.normalization_run_id,
+        metadata={"file_id": record.file_id, "review_required": record.review_required},
+    )
+    return record
+
+
+@router.post(
+    "/integrations/reactions/export-approved-experiments",
+    response_model=IntegrationImportResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def export_reaction_experiments_route(
+    payload: ReactionApprovedExperimentsExportRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> IntegrationImportResponse:
+    try:
+        record = interop_store.export_reaction_experiments(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="integration.reactions.export_experiments",
+        message="Reaction experiment export package created for review.",
+        entity_type="outbound_sync_job",
+        entity_id=record.sync_job_id,
+        metadata={"sync_job_id": record.sync_job_id, "review_required": record.review_required},
+    )
+    return record
 
 
 @router.get(
