@@ -11,16 +11,17 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const PUBLIC_DIR = join(__dirname, "..", "public")
 const ICONS_DIR = join(__dirname, "..", "public", "icons")
 
 /** Matches `molecule-logo-mark.tsx` */
 const LOGO_BACKGROUND_DARK_BLUE = "#051f3a"
-/**  */
-const HEX_STROKE = "#26C6FF"
-const HEX_STROKE_WIDTH = "2"
+/** Honeycomb stroke color. */
+const HONEYCOMB_BRIGHT_BLUE = "#26C6FF"
 const MARK_FILL = "#FFFFFF"
+const WORDMARK_FILL = "#111827"
 
-/** Flat-top hex in 64×64 viewBox — matches `LOGO_HEX_CLIP` in molecule-logo-mark.tsx */
+/** Flat-top hex in 64x64 viewBox - matches `LOGO_HEX_CLIP` in molecule-logo-mark.tsx */
 const LOGO_HEX_POLYGON_POINTS = "16,0 48,0 64,32 48,64 16,64 0,32"
 
 const SQRT3 = Math.sqrt(3)
@@ -40,20 +41,20 @@ function honeycombCenters(R, pad) {
   const dx = SQRT3 * R
   const dy = 1.5 * R
   const centers = []
-  for (let row = 0; ; row++) {
+  for (let row = -2; ; row++) {
     const cy = pad + row * dy
-    if (cy > 64 - pad - R * 0.35) break
+    if (cy > 64 + R) break
     const ox = (row % 2) * (dx / 2)
-    for (let col = 0; ; col++) {
+    for (let col = -2; ; col++) {
       const cx = pad + ox + col * dx
-      if (cx > 64 - pad - R * 0.35) break
+      if (cx > 64 + R) break
       centers.push([cx, cy])
     }
   }
   return centers
 }
 
-function buildLogoSvg({ bg }) {
+function buildLogoMarkSvg() {
   const R = 5.35
   const pad = 5
   const centers = honeycombCenters(R, pad)
@@ -61,27 +62,67 @@ function buildLogoSvg({ bg }) {
   const polys = centers
     .map(([cx, cy]) => {
       const pts = flatTopHexPoints(cx, cy, R)
-      return `<polygon points="${pts}" fill="none" stroke="${HEX_STROKE}" stroke-width="${HEX_STROKE_WIDTH}" stroke-linecap="butt" stroke-linejoin="miter"/>`
+      return `<polygon points="${pts}"/>`
     })
     .join("\n")
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="moltrace-mark-title">
+  <title id="moltrace-mark-title">MolTrace logo</title>
   <defs>
-    <clipPath id="moltrace-logo-hex"><polygon points="${LOGO_HEX_POLYGON_POINTS}"/></clipPath>
+    <clipPath id="moltrace-mark-hex" clipPathUnits="userSpaceOnUse">
+      <polygon points="${LOGO_HEX_POLYGON_POINTS}"/>
+    </clipPath>
   </defs>
-  <g clip-path="url(#moltrace-logo-hex)">
-    <rect width="64" height="64" fill="${bg}"/>
-    <g>${polys}</g>
-    <text x="31.5" y="32" text-anchor="middle" dominant-baseline="central"
+  <g clip-path="url(#moltrace-mark-hex)">
+    <rect width="64" height="64" fill="${LOGO_BACKGROUND_DARK_BLUE}"/>
+    <g fill="none" stroke="${HONEYCOMB_BRIGHT_BLUE}" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" shape-rendering="geometricPrecision">
+${polys}
+    </g>
+    <g
       font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-      font-weight="900" font-size="20" fill="${MARK_FILL}">m</text>
+      font-size="36"
+      font-weight="900"
+      text-anchor="middle"
+      text-rendering="geometricPrecision"
+    >
+      <text x="32" y="31.2" dy="0.33em" fill="none" stroke="${LOGO_BACKGROUND_DARK_BLUE}" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke">m</text>
+      <text x="32" y="31.2" dy="0.33em" fill="${MARK_FILL}">m</text>
+    </g>
   </g>
 </svg>`
 }
 
+function buildWordmarkSvg() {
+  const mark = buildLogoMarkSvg()
+    .replace(/<\?xml version="1\.0" encoding="UTF-8"\?>\n/, "")
+    .replace(/<svg[^>]*>/, '<svg x="0" y="0" width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true">')
+    .replace(/ role="img" aria-labelledby="moltrace-mark-title"/, "")
+    .replace(/moltrace-mark-hex/g, "moltrace-wordmark-mark-hex")
+    .replace(/\s*<title[^>]*>MolTrace logo<\/title>\n/, "\n")
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="80" viewBox="0 0 320 80" fill="none" role="img" aria-labelledby="moltrace-wordmark-title">
+  <title id="moltrace-wordmark-title">MolTrace</title>
+  <g transform="translate(8 8)">
+    ${mark}
+  </g>
+  <text
+    x="88"
+    y="49"
+    font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="32"
+    font-weight="700"
+    letter-spacing="0"
+    text-rendering="geometricPrecision"
+  ><tspan fill="${WORDMARK_FILL}">Mol</tspan><tspan fill="${HONEYCOMB_BRIGHT_BLUE}" font-weight="800">Trace</tspan></text>
+</svg>`
+}
+
 async function main() {
-  const logoRgb = Buffer.from(buildLogoSvg({ bg: LOGO_BACKGROUND_DARK_BLUE }), "utf8")
+  const logoSvg = buildLogoMarkSvg()
+  const wordmarkSvg = buildWordmarkSvg()
+  const logoRgb = Buffer.from(logoSvg, "utf8")
   const logo512 = await sharp(logoRgb).resize(512, 512, { kernel: sharp.kernel.lanczos3 }).png().toBuffer()
   const logo192 = await sharp(logoRgb).resize(192, 192, { kernel: sharp.kernel.lanczos3 }).png().toBuffer()
 
@@ -104,7 +145,9 @@ async function main() {
   writeFileSync(join(ICONS_DIR, "icon-192.png"), logo192)
   writeFileSync(join(ICONS_DIR, "maskable-icon-512.png"), maskable512)
 
-  writeFileSync(join(ICONS_DIR, "moltrace-mark.svg"), buildLogoSvg({ bg: LOGO_BACKGROUND_DARK_BLUE }), "utf8")
+  writeFileSync(join(PUBLIC_DIR, "icon.svg"), logoSvg, "utf8")
+  writeFileSync(join(ICONS_DIR, "moltrace-mark.svg"), logoSvg, "utf8")
+  writeFileSync(join(ICONS_DIR, "moltrace-wordmark.svg"), wordmarkSvg, "utf8")
 
   console.log("Wrote MolTrace PWA icons to public/icons/")
 }

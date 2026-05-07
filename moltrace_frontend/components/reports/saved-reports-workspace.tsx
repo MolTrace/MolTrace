@@ -33,6 +33,7 @@ import {
 import { ReportLockControls } from "@/components/reports/report-lock-controls"
 import { ReportCompoundProvenanceDialog } from "@/components/reports/report-compound-provenance-dialog"
 import { ReportsRegulatoryComplianceSection } from "@/components/reports/reports-regulatory-compliance-section"
+import { ReportsValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
 
 const DEMO_STAT_CARDS = { ready: 12, generating: 3, month: 47 } as const
 
@@ -286,6 +287,8 @@ export default function SavedReportsWorkspace() {
           </CardContent>
         </Card>
       </div>
+
+      <ReportsValidationReadinessCard />
 
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

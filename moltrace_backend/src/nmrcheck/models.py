@@ -12117,3 +12117,705 @@ class IntegrationImportResponse(BaseModel):
     warnings_json: list[str] = Field(default_factory=list)
     notes_json: list[str] = Field(default_factory=list)
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+ValidationProjectScope = Literal[
+    "spectracheck",
+    "regulatory_hub",
+    "reaction_optimization",
+    "cross_module",
+    "full_platform",
+]
+ValidationType = Literal[
+    "initial_validation",
+    "change_validation",
+    "periodic_review",
+    "release_validation",
+    "supplier_assessment",
+]
+ValidationProjectStatus = Literal[
+    "draft",
+    "in_progress",
+    "ready_for_qa_review",
+    "approved",
+    "rejected",
+    "archived",
+]
+ValidationModule = Literal[
+    "spectracheck",
+    "regulatory_hub",
+    "reaction_optimization",
+    "cross_module",
+    "system",
+    "mobile",
+    "ai_ml",
+    "connectors",
+]
+ValidationCriticality = Literal["low", "medium", "high", "critical"]
+GxPImpact = Literal["none", "indirect", "direct", "unknown"]
+SpecificationStatus = Literal["draft", "approved", "retired"]
+ValidationTargetType = Literal[
+    "requirement",
+    "function",
+    "module",
+    "workflow",
+    "connector",
+    "ai_model",
+    "report",
+    "mobile",
+    "system",
+]
+ValidationRiskScale = Literal["low", "medium", "high", "critical"]
+ValidationProbability = Literal["low", "medium", "high", "unknown"]
+ValidationDetectability = Literal["low", "medium", "high", "unknown"]
+ValidationTestingRigor = Literal[
+    "scripted",
+    "unscripted",
+    "exploratory",
+    "automated",
+    "supplier_evidence",
+]
+ValidationRiskStatus = Literal["open", "mitigated", "accepted", "rejected"]
+ValidationProtocolType = Literal[
+    "installation",
+    "operational",
+    "performance",
+    "regression",
+    "security",
+    "data_integrity",
+    "electronic_signature",
+    "ai_model",
+    "connector",
+    "mobile",
+]
+ValidationProtocolStatus = Literal["draft", "approved", "executed", "failed", "archived"]
+ValidationTestCaseStatus = Literal["draft", "approved", "executed", "retired"]
+ValidationExecutionStatus = Literal["pass", "fail", "blocked", "not_run", "requires_review"]
+TraceabilityStatus = Literal["draft", "complete", "gaps_identified", "approved"]
+SignatureMeaning = Literal[
+    "reviewed",
+    "approved",
+    "rejected",
+    "authored",
+    "verified",
+    "released",
+    "locked",
+    "override",
+    "other",
+]
+ControlledRecordType = Literal[
+    "report",
+    "validation_protocol",
+    "validation_result",
+    "regulatory_dossier",
+    "ctd_bundle",
+    "ai_model_card",
+    "workflow_template",
+    "sop",
+    "release_record",
+    "other",
+]
+ControlledRecordStatus = Literal[
+    "draft",
+    "in_review",
+    "approved",
+    "locked",
+    "archived",
+    "superseded",
+]
+RetentionPolicyStatus = Literal["draft", "active", "retired"]
+DataIntegrityScope = Literal[
+    "system",
+    "project",
+    "spectracheck_session",
+    "regulatory_dossier",
+    "reaction_project",
+    "report",
+    "connector",
+    "ai_model",
+    "mobile",
+]
+DataIntegrityStatus = Literal["pass", "warning", "fail", "requires_review"]
+InspectionPackageScope = Literal[
+    "project",
+    "dossier",
+    "report",
+    "validation_project",
+    "full_platform",
+]
+InspectionPackageStatus = Literal["draft", "ready_for_review", "approved", "exported", "failed"]
+SystemReleaseType = Literal[
+    "frontend",
+    "backend",
+    "full_platform",
+    "model_update",
+    "connector_update",
+    "regulatory_rule_update",
+]
+SystemReleaseApprovalStatus = Literal["draft", "ready_for_qa", "approved", "rejected", "released"]
+DeviationSeverity = Literal["low", "medium", "high", "critical"]
+DeviationSourceType = Literal[
+    "validation_test",
+    "production_issue",
+    "data_integrity",
+    "audit",
+    "report",
+    "ai_model",
+    "connector",
+    "other",
+]
+DeviationStatus = Literal["open", "investigation", "resolved", "closed", "rejected"]
+CAPAStatus = Literal["open", "in_progress", "effectiveness_check", "closed", "canceled"]
+
+
+class ValidationProjectCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=300)
+    scope: ValidationProjectScope
+    validation_type: ValidationType
+    status: ValidationProjectStatus = "draft"
+    intended_use: str = Field(min_length=1)
+    regulated_context: str | None = None
+    owner_name: str | None = Field(default=None, max_length=200)
+    qa_reviewer_name: str | None = Field(default=None, max_length=200)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationProjectUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    scope: ValidationProjectScope | None = None
+    validation_type: ValidationType | None = None
+    status: ValidationProjectStatus | None = None
+    intended_use: str | None = Field(default=None, min_length=1)
+    regulated_context: str | None = None
+    owner_name: str | None = Field(default=None, max_length=200)
+    qa_reviewer_name: str | None = Field(default=None, max_length=200)
+    metadata_json: dict[str, Any] | None = None
+
+
+class ValidationProject(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    title: str
+    scope: ValidationProjectScope
+    validation_type: ValidationType
+    status: ValidationProjectStatus
+    intended_use: str
+    regulated_context: str | None = None
+    owner_name: str | None = None
+    qa_reviewer_name: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class UserRequirementSpecificationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requirement_code: str = Field(min_length=1, max_length=100)
+    module: ValidationModule
+    requirement_text: str = Field(min_length=1)
+    criticality: ValidationCriticality
+    gxp_impact: GxPImpact
+    status: SpecificationStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class UserRequirementSpecification(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    validation_project_id: int
+    requirement_code: str
+    module: ValidationModule
+    requirement_text: str
+    criticality: ValidationCriticality
+    gxp_impact: GxPImpact
+    status: SpecificationStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class FunctionalSpecificationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requirement_id: int | None = Field(default=None, ge=1)
+    function_code: str = Field(min_length=1, max_length=100)
+    function_name: str = Field(min_length=1, max_length=240)
+    function_description: str = Field(min_length=1)
+    expected_behavior: str = Field(min_length=1)
+    module: ValidationModule
+    status: SpecificationStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class FunctionalSpecification(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    validation_project_id: int
+    requirement_id: int | None = None
+    function_code: str
+    function_name: str
+    function_description: str
+    expected_behavior: str
+    module: ValidationModule
+    status: SpecificationStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationRiskAssessmentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    target_type: ValidationTargetType
+    target_id: int | None = Field(default=None, ge=1)
+    risk_description: str = Field(min_length=1)
+    severity: ValidationRiskScale
+    probability: ValidationProbability
+    detectability: ValidationDetectability
+    risk_priority: int | None = Field(default=None, ge=1)
+    mitigation: str = Field(min_length=1)
+    testing_rigor: ValidationTestingRigor
+    status: ValidationRiskStatus = "open"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationRiskAssessment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    validation_project_id: int
+    target_type: ValidationTargetType
+    target_id: int | None = None
+    risk_description: str
+    severity: ValidationRiskScale
+    probability: ValidationProbability
+    detectability: ValidationDetectability
+    risk_priority: int | None = None
+    mitigation: str
+    testing_rigor: ValidationTestingRigor
+    status: ValidationRiskStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationTestProtocolCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    protocol_code: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=300)
+    module: ValidationModule
+    protocol_type: ValidationProtocolType
+    status: ValidationProtocolStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationTestProtocol(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    validation_project_id: int
+    protocol_code: str
+    title: str
+    module: ValidationModule
+    protocol_type: ValidationProtocolType
+    status: ValidationProtocolStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationTestCaseCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    test_case_code: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=300)
+    preconditions: str = Field(min_length=1)
+    steps_json: list[dict[str, Any]] = Field(default_factory=list)
+    expected_results: str = Field(min_length=1)
+    linked_requirement_ids_json: list[int] = Field(default_factory=list)
+    linked_risk_ids_json: list[int] = Field(default_factory=list)
+    status: ValidationTestCaseStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationTestCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    protocol_id: int
+    test_case_code: str
+    title: str
+    preconditions: str
+    steps_json: list[dict[str, Any]] = Field(default_factory=list)
+    expected_results: str
+    linked_requirement_ids_json: list[int] = Field(default_factory=list)
+    linked_risk_ids_json: list[int] = Field(default_factory=list)
+    status: ValidationTestCaseStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationTestExecutionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    executed_by: str | None = Field(default=None, max_length=200)
+    execution_status: ValidationExecutionStatus
+    actual_results: str = Field(min_length=1)
+    evidence_file_ids_json: list[int] = Field(default_factory=list)
+    evidence_artifact_ids_json: list[int] = Field(default_factory=list)
+    deviation_id: int | None = Field(default=None, ge=1)
+    create_deviation_on_fail: bool = True
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationTestExecution(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    test_case_id: int
+    executed_by: str | None = None
+    execution_status: ValidationExecutionStatus
+    actual_results: str
+    evidence_file_ids_json: list[int] = Field(default_factory=list)
+    evidence_artifact_ids_json: list[int] = Field(default_factory=list)
+    deviation_id: int | None = None
+    executed_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TraceabilityMatrix(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    validation_project_id: int
+    matrix_json: dict[str, Any] = Field(default_factory=dict)
+    coverage_summary_json: dict[str, Any] = Field(default_factory=dict)
+    missing_coverage_json: list[dict[str, Any]] = Field(default_factory=list)
+    status: TraceabilityStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ElectronicSignatureRecordCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    signer_name: str = Field(min_length=1, max_length=200)
+    signer_email: str | None = Field(default=None, max_length=255)
+    signature_meaning: SignatureMeaning
+    target_type: str = Field(min_length=1, max_length=100)
+    target_id: int = Field(ge=1)
+    reason: str = Field(min_length=1)
+    authentication_method: str | None = Field(default=None, max_length=120)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ElectronicSignatureRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    signer_name: str
+    signer_email: str | None = None
+    signature_meaning: SignatureMeaning
+    target_type: str
+    target_id: int
+    reason: str
+    signed_at: datetime
+    authentication_method: str | None = None
+    signature_hash: str = Field(min_length=64, max_length=64)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ControlledRecordCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    record_type: ControlledRecordType
+    resource_id: int | None = Field(default=None, ge=1)
+    title: str = Field(min_length=1, max_length=300)
+    version: str = Field(default="1", min_length=1, max_length=64)
+    status: ControlledRecordStatus = "draft"
+    content_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    content_json: dict[str, Any] | None = Field(default=None, exclude=True)
+    retention_policy_id: int | None = Field(default=None, ge=1)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ControlledRecordNewVersionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    version: str | None = Field(default=None, min_length=1, max_length=64)
+    content_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    content_json: dict[str, Any] | None = Field(default=None, exclude=True)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ControlledRecordLockRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    locked_by: str = Field(min_length=1, max_length=200)
+    content_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    reason: str = Field(min_length=1)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ControlledRecordArchiveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=1)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ControlledRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    record_type: ControlledRecordType
+    resource_id: int | None = None
+    title: str
+    version: str
+    status: ControlledRecordStatus
+    content_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    locked_at: datetime | None = None
+    locked_by: str | None = None
+    retention_policy_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class RecordRetentionPolicyCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=240)
+    record_type: ControlledRecordType
+    retention_period_years: int | None = Field(default=None, ge=0)
+    archive_strategy: str = Field(min_length=1)
+    legal_hold: bool = False
+    status: RetentionPolicyStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class RecordRetentionPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    name: str
+    record_type: ControlledRecordType
+    retention_period_years: int | None = None
+    archive_strategy: str
+    legal_hold: bool
+    status: RetentionPolicyStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class DataIntegrityAssessmentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scope: DataIntegrityScope
+    scope_id: int | None = Field(default=None, ge=1)
+    assessment_status: DataIntegrityStatus | None = None
+    attributable_status: DataIntegrityStatus = "requires_review"
+    legible_status: DataIntegrityStatus = "requires_review"
+    contemporaneous_status: DataIntegrityStatus = "requires_review"
+    original_status: DataIntegrityStatus = "requires_review"
+    accurate_status: DataIntegrityStatus = "requires_review"
+    complete_status: DataIntegrityStatus = "requires_review"
+    consistent_status: DataIntegrityStatus = "requires_review"
+    enduring_status: DataIntegrityStatus = "requires_review"
+    available_status: DataIntegrityStatus = "requires_review"
+    findings_json: list[dict[str, Any]] = Field(default_factory=list)
+    recommended_actions_json: list[dict[str, Any]] = Field(default_factory=list)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class DataIntegrityAssessment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    scope: DataIntegrityScope
+    scope_id: int | None = None
+    assessment_status: DataIntegrityStatus
+    attributable_status: DataIntegrityStatus
+    legible_status: DataIntegrityStatus
+    contemporaneous_status: DataIntegrityStatus
+    original_status: DataIntegrityStatus
+    accurate_status: DataIntegrityStatus
+    complete_status: DataIntegrityStatus
+    consistent_status: DataIntegrityStatus
+    enduring_status: DataIntegrityStatus
+    available_status: DataIntegrityStatus
+    findings_json: list[dict[str, Any]] = Field(default_factory=list)
+    recommended_actions_json: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class InspectionReadinessPackageCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=300)
+    scope: InspectionPackageScope
+    scope_id: int | None = Field(default=None, ge=1)
+    package_status: InspectionPackageStatus = "ready_for_review"
+    included_record_ids_json: list[int] = Field(default_factory=list)
+    included_signature_ids_json: list[int] = Field(default_factory=list)
+    included_audit_event_ids_json: list[int] = Field(default_factory=list)
+    included_validation_project_ids_json: list[int] = Field(default_factory=list)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class InspectionReadinessPackage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    title: str
+    scope: InspectionPackageScope
+    scope_id: int | None = None
+    package_status: InspectionPackageStatus
+    included_record_ids_json: list[int] = Field(default_factory=list)
+    included_signature_ids_json: list[int] = Field(default_factory=list)
+    included_audit_event_ids_json: list[int] = Field(default_factory=list)
+    included_validation_project_ids_json: list[int] = Field(default_factory=list)
+    package_manifest_json: dict[str, Any] = Field(default_factory=dict)
+    package_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class SystemReleaseRecordCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    release_version: str = Field(min_length=1, max_length=120)
+    release_type: SystemReleaseType
+    change_summary: str = Field(min_length=1)
+    validation_project_id: int | None = Field(default=None, ge=1)
+    test_summary_json: dict[str, Any] = Field(default_factory=dict)
+    risk_summary_json: dict[str, Any] = Field(default_factory=dict)
+    approval_status: SystemReleaseApprovalStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class SystemReleaseApproveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    signer_name: str = Field(min_length=1, max_length=200)
+    signer_email: str | None = Field(default=None, max_length=255)
+    reason: str = Field(min_length=1)
+    authentication_method: str | None = Field(default=None, max_length=120)
+    signature_meaning: Literal["approved", "released"] = "approved"
+    release: bool = False
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class SystemReleaseRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    release_version: str
+    release_type: SystemReleaseType
+    change_summary: str
+    validation_project_id: int | None = None
+    test_summary_json: dict[str, Any] = Field(default_factory=dict)
+    risk_summary_json: dict[str, Any] = Field(default_factory=dict)
+    approval_status: SystemReleaseApprovalStatus
+    created_at: datetime
+    released_at: datetime | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class DeviationRecordCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deviation_code: str | None = Field(default=None, max_length=100)
+    title: str = Field(min_length=1, max_length=300)
+    description: str = Field(min_length=1)
+    severity: DeviationSeverity
+    source_type: DeviationSourceType
+    source_id: int | None = Field(default=None, ge=1)
+    status: DeviationStatus = "open"
+    root_cause: str | None = None
+    resolution: str | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class DeviationRecordUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = Field(default=None, min_length=1)
+    severity: DeviationSeverity | None = None
+    status: DeviationStatus | None = None
+    root_cause: str | None = None
+    resolution: str | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class DeviationRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    deviation_code: str
+    title: str
+    description: str
+    severity: DeviationSeverity
+    source_type: DeviationSourceType
+    source_id: int | None = None
+    status: DeviationStatus
+    root_cause: str | None = None
+    resolution: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class CAPARecordCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capa_code: str | None = Field(default=None, max_length=100)
+    title: str = Field(min_length=1, max_length=300)
+    description: str = Field(min_length=1)
+    source_deviation_id: int | None = Field(default=None, ge=1)
+    corrective_action: str = Field(min_length=1)
+    preventive_action: str = Field(min_length=1)
+    owner: str | None = Field(default=None, max_length=200)
+    due_date: datetime | None = None
+    status: CAPAStatus = "open"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class CAPARecordUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = Field(default=None, min_length=1)
+    source_deviation_id: int | None = Field(default=None, ge=1)
+    corrective_action: str | None = Field(default=None, min_length=1)
+    preventive_action: str | None = Field(default=None, min_length=1)
+    owner: str | None = Field(default=None, max_length=200)
+    due_date: datetime | None = None
+    status: CAPAStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class CAPARecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    capa_code: str
+    title: str
+    description: str
+    source_deviation_id: int | None = None
+    corrective_action: str
+    preventive_action: str
+    owner: str | None = None
+    due_date: datetime | None = None
+    status: CAPAStatus
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)

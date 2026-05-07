@@ -36,6 +36,7 @@ import {
   type ProjectCounts,
 } from "@/src/lib/reaction-projects/reaction-projects-data"
 import { trackReactionProjectCreated } from "@/src/lib/analytics/analytics-client"
+import { ReactionValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
 
 function readCreatedReactionProjectId(raw: unknown): number | undefined {
   if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return undefined
@@ -270,6 +271,8 @@ export function ReactionOptimizationLanding() {
           }
         />
       </div>
+
+      <ReactionValidationReadinessCard />
 
       <Card>
         <CardHeader className="pb-2">

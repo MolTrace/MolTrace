@@ -6,22 +6,19 @@ import { HeroMoleculeLayer } from "./hero-molecule-layer"
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-background text-foreground">
+    <section className="hero-compat-surface relative overflow-hidden bg-background text-foreground">
       <div className="scientific-grid-subtle absolute inset-0 z-0" aria-hidden />
       <HeroMoleculeLayer />
-      <div
-        className="pointer-events-none absolute inset-0 z-[5] bg-gradient-to-b from-background/92 via-background/82 to-background/92"
-        aria-hidden
-      />
+      <div className="hero-compat-overlay pointer-events-none absolute inset-0 z-[5]" aria-hidden />
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 lg:py-40">
         <div className="mx-auto max-w-4xl text-center">
           <Badge variant="outline" className="mb-6 px-4 py-1.5 text-sm font-medium">
             Trusted by 50+ pharmaceutical R&D teams
           </Badge>
-          <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+          <h1 className="hero-copy-wrap text-balance text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
             AI-native spectroscopy, regulatory intelligence and reaction optimization.
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl">
+          <p className="hero-copy-wrap mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl">
             Evidence-backed decisions. Human review at every step. Regulatory-ready reports generated in
             minutes. Built for academic, chemical and pharmaceutical R&D teams.
           </p>
@@ -42,7 +39,7 @@ export function Hero() {
         </div>
 
         {/* Stats bar */}
-        <div className="mx-auto mt-20 grid max-w-4xl grid-cols-2 gap-8 border-t pt-10 sm:grid-cols-4">
+        <div className="hero-stat-grid mx-auto mt-20 grid max-w-4xl grid-cols-2 gap-8 border-t pt-10 sm:grid-cols-4">
           {[
             { value: "94%", label: "Structure elucidation accuracy" },
             { value: "12x", label: "Faster than manual analysis" },
