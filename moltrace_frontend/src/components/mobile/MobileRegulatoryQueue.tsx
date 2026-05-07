@@ -36,6 +36,7 @@ type QueueItem = {
   sourceEvidence: string
   dueDate: string
   humanReviewRequired: string
+  canAssignOwner: boolean
 }
 
 const ACTION_DRAFTS_KEY = "moltrace:mobile:action-drafts:v1"
@@ -79,6 +80,14 @@ function parseQueueRow(row: Row): QueueItem | null {
   })()
   const humanReviewRequiredRaw =
     row.human_review_required ?? row.requires_human_review ?? row.needs_human_review ?? row.manual_review_required
+  const canAssignOwnerRaw =
+    row.assign_owner_allowed ?? row.can_assign_owner ?? row.owner_assignment_allowed ?? row.permissions_assign_owner
+  const canAssignOwner =
+    typeof canAssignOwnerRaw === "boolean"
+      ? canAssignOwnerRaw
+      : typeof canAssignOwnerRaw === "string"
+        ? ["true", "1", "yes", "allowed"].includes(canAssignOwnerRaw.trim().toLowerCase())
+        : false
   return {
     id,
     title: readStr(row.title) || "—",
@@ -93,6 +102,7 @@ function parseQueueRow(row: Row): QueueItem | null {
           ? "Yes"
           : "No"
         : readStr(humanReviewRequiredRaw) || "Unknown",
+    canAssignOwner,
   }
 }
 
@@ -143,7 +153,7 @@ export function MobileRegulatoryQueue() {
     setLoading(true)
     setError("")
     void (async () => {
-      const endpoints = ["/mobile/action-queue", "/regulatory/action-items?limit=200"]
+      const endpoints = ["/mobile/action-queue", "/regulatory/action-items"]
       let loaded = false
       for (const endpoint of endpoints) {
         try {
@@ -315,7 +325,13 @@ export function MobileRegulatoryQueue() {
                 <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void handleAddComment(item)}>
                   Add comment
                 </Button>
-                <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void handleAssignOwner(item)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || !item.canAssignOwner}
+                  onClick={() => void handleAssignOwner(item)}
+                >
                   Assign owner
                 </Button>
                 <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void handleChangeStatus(item)}>

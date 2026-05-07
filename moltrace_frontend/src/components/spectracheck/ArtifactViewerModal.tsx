@@ -411,6 +411,26 @@ export function ArtifactViewerModal({
   const [artifactCommentDraft, setArtifactCommentDraft] = useState("")
   const [artifactCommentPostBusy, setArtifactCommentPostBusy] = useState(false)
   const [artifactCommentPostErr, setArtifactCommentPostErr] = useState("")
+  const [isMobile, setIsMobile] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(720)
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      setIsMobile(false)
+      return
+    }
+    const mq = window.matchMedia("(max-width: 640px)")
+    const apply = () => setIsMobile(mq.matches)
+    apply()
+    mq.addEventListener("change", apply)
+    const onResize = () => setViewportHeight(window.innerHeight)
+    onResize()
+    window.addEventListener("resize", onResize)
+    return () => {
+      mq.removeEventListener("change", apply)
+      window.removeEventListener("resize", onResize)
+    }
+  }, [])
 
   const loadArtifactComments = useCallback(async () => {
     if (!sid || !artifact?.row?.artifact_id) {
@@ -478,6 +498,7 @@ export function ArtifactViewerModal({
 
   const showSpectrum1D =
     spectrumXY != null && spectrumXY.x.length > 0 && spectrumXY.y.length > 0
+  const mobileViewerHeight = isMobile ? Math.min(Math.max(Math.floor(viewportHeight * 0.38), 240), 380) : 360
 
   const handleDownload = () => {
     if (!row) return
@@ -528,6 +549,7 @@ export function ArtifactViewerModal({
               overlays={overlays1d}
               nucleus="1H"
               title={row?.title}
+              height={mobileViewerHeight}
             />
           </div>
         ) : (
@@ -546,6 +568,7 @@ export function ArtifactViewerModal({
                   peaks={peaks1d.length > 0 ? peaks1d : undefined}
                   overlays={overlays1d}
                   nucleus="1H"
+                  height={mobileViewerHeight}
                 />
               </div>
             ) : (
@@ -574,7 +597,7 @@ export function ArtifactViewerModal({
               toleranceDa={msmsBundle.toleranceDa}
               tolerancePpm={msmsBundle.tolerancePpm}
               title={row?.title}
-              height={360}
+              height={mobileViewerHeight}
             />
           </div>
         ) : (
@@ -590,7 +613,7 @@ export function ArtifactViewerModal({
             traces={chromaTraces}
             features={chromaFeatures.length > 0 ? chromaFeatures : undefined}
             title={row?.title}
-            height={360}
+            height={mobileViewerHeight}
           />
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -628,7 +651,7 @@ export function ArtifactViewerModal({
             sandbox=""
             title="Report HTML preview"
             srcDoc={reportHtml}
-            className="min-h-[360px] w-full rounded-md border bg-background"
+            className="min-h-[320px] w-full min-w-0 rounded-md border bg-background"
           />
         ) : (
           <p className="text-sm text-muted-foreground">No HTML body found on this artifact.</p>
@@ -823,7 +846,7 @@ export function ArtifactViewerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(90vh,880px)] max-w-4xl overflow-y-auto">
+      <DialogContent className="max-h-[min(90vh,880px)] w-[95vw] max-w-4xl overflow-x-hidden overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="pr-8">{row?.title ?? "Artifact"}</DialogTitle>
           <DialogDescription className="font-mono text-xs">

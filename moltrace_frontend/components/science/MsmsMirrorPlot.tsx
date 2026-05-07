@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import React, { useCallback, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import {
@@ -112,6 +112,14 @@ function buildStickXY(rel: number[], peaks: ReadonlyArray<{ mz: number }>, sign:
   return { x, y }
 }
 
+function downsamplePeakSeries<T extends { mz: number; intensity: number }>(peaks: T[], maxPoints: number): { peaks: T[]; reduced: boolean } {
+  if (peaks.length <= maxPoints) return { peaks: peaks.slice(), reduced: false }
+  const step = Math.ceil(peaks.length / maxPoints)
+  const out: T[] = []
+  for (let i = 0; i < peaks.length; i += step) out.push(peaks[i]!)
+  return { peaks: out, reduced: true }
+}
+
 export function MsmsMirrorPlot({
   observedPeaks,
   referencePeaks = [],
@@ -128,6 +136,30 @@ export function MsmsMirrorPlot({
   const [showMatchedLabels, setShowMatchedLabels] = useState(true)
   const [showReference, setShowReference] = useState(true)
   const graphDivRef = useRef<HTMLElement | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(720)
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      setIsMobile(false)
+      return
+    }
+    const mq = window.matchMedia("(max-width: 640px)")
+    const apply = () => setIsMobile(mq.matches)
+    apply()
+    mq.addEventListener("change", apply)
+    const onResize = () => setViewportHeight(window.innerHeight)
+    onResize()
+    window.addEventListener("resize", onResize)
+    return () => {
+      mq.removeEventListener("change", apply)
+      window.removeEventListener("resize", onResize)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isMobile) setShowMatchedLabels(false)
+  }, [isMobile])
 
   const tolDa = toleranceDa
   const tolPpm = tolerancePpm
@@ -145,15 +177,27 @@ export function MsmsMirrorPlot({
     }
     return { observedMatched: matched, observedUnmatched: unmatched }
   }, [observedPeaks, fragmentMatches, tolDa, tolPpm, precursorMz])
+  const dsObservedMatched = useMemo(
+    () => downsamplePeakSeries(observedMatched, isMobile ? 1200 : 4000),
+    [observedMatched, isMobile],
+  )
+  const dsObservedUnmatched = useMemo(
+    () => downsamplePeakSeries(observedUnmatched, isMobile ? 1200 : 4000),
+    [observedUnmatched, isMobile],
+  )
+  const dsReference = useMemo(
+    () => downsamplePeakSeries(referencePeaks, isMobile ? 1200 : 4000),
+    [referencePeaks, isMobile],
+  )
 
-  const relObsMatched = useMemo(() => relativeIntensitySeries(observedMatched), [observedMatched])
-  const relObsUnmatched = useMemo(() => relativeIntensitySeries(observedUnmatched), [observedUnmatched])
-  const relRef = useMemo(() => relativeIntensitySeries(referencePeaks), [referencePeaks])
+  const relObsMatched = useMemo(() => relativeIntensitySeries(dsObservedMatched.peaks), [dsObservedMatched.peaks])
+  const relObsUnmatched = useMemo(() => relativeIntensitySeries(dsObservedUnmatched.peaks), [dsObservedUnmatched.peaks])
+  const relRef = useMemo(() => relativeIntensitySeries(dsReference.peaks), [dsReference.peaks])
 
   const plotData = useMemo(() => {
     const traces: object[] = []
-    if (observedUnmatched.length > 0) {
-      const { x, y } = buildStickXY(relObsUnmatched, observedUnmatched, 1)
+    if (dsObservedUnmatched.peaks.length > 0) {
+      const { x, y } = buildStickXY(relObsUnmatched, dsObservedUnmatched.peaks, 1)
       traces.push({
         type: "scattergl",
         mode: "lines",
@@ -165,8 +209,8 @@ export function MsmsMirrorPlot({
           "<b>m/z</b> %{x:.4f}<br><b>Rel. intensity</b> %{y:.1f}<br><extra></extra>",
       })
     }
-    if (observedMatched.length > 0) {
-      const { x, y } = buildStickXY(relObsMatched, observedMatched, 1)
+    if (dsObservedMatched.peaks.length > 0) {
+      const { x, y } = buildStickXY(relObsMatched, dsObservedMatched.peaks, 1)
       traces.push({
         type: "scattergl",
         mode: "lines",
@@ -178,8 +222,8 @@ export function MsmsMirrorPlot({
           "<b>m/z</b> %{x:.4f}<br><b>Rel. intensity</b> %{y:.1f}<br><b>Match</b> exploratory<br><extra></extra>",
       })
     }
-    if (showReference && referencePeaks.length > 0) {
-      const { x, y } = buildStickXY(relRef, referencePeaks, -1)
+    if (showReference && dsReference.peaks.length > 0) {
+      const { x, y } = buildStickXY(relRef, dsReference.peaks, -1)
       traces.push({
         type: "scattergl",
         mode: "lines",
@@ -193,11 +237,11 @@ export function MsmsMirrorPlot({
     }
     return traces
   }, [
-    observedMatched,
-    observedUnmatched,
+    dsObservedMatched.peaks,
+    dsObservedUnmatched.peaks,
     relObsMatched,
     relObsUnmatched,
-    referencePeaks,
+    dsReference.peaks,
     relRef,
     showReference,
   ])
@@ -360,8 +404,11 @@ export function MsmsMirrorPlot({
     )
   }
 
+  const effectiveHeight = isMobile ? Math.min(Math.max(Math.floor(viewportHeight * 0.42), 260), 420) : height
+  const isDisplayDownsampled = dsObservedMatched.reduced || dsObservedUnmatched.reduced || dsReference.reduced
+
   return (
-    <div className={cn("flex flex-col gap-3", className)} aria-label="MS/MS mirror comparison plot">
+    <div className={cn("flex min-w-0 max-w-full flex-col gap-3 overflow-x-hidden", className)} aria-label="MS/MS mirror comparison plot">
       <div className="flex flex-wrap items-start justify-end gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <InfoTooltip content="Mirror plots help compare observed MS/MS fragments against reference, predicted, or candidate-derived fragment evidence." />
@@ -385,6 +432,8 @@ export function MsmsMirrorPlot({
       </p>
 
       <div className="flex flex-wrap items-center gap-2 border-b pb-3">
+        {!isMobile ? (
+          <>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -460,11 +509,40 @@ export function MsmsMirrorPlot({
             <p className="max-w-xs">Download the current plot as a PNG image.</p>
           </TooltipContent>
         </Tooltip>
+          </>
+        ) : (
+          <details className="w-full">
+            <summary className="cursor-pointer text-xs text-muted-foreground">More controls</summary>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={showMatchedLabels ? "secondary" : "outline"}
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setShowMatchedLabels((v) => !v)}
+              >
+                Toggle matched labels
+              </Button>
+              <Button
+                type="button"
+                variant={showReference ? "secondary" : "outline"}
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setShowReference((v) => !v)}
+              >
+                Toggle reference peaks
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void exportImage()}>
+                Export image
+              </Button>
+            </div>
+          </details>
+        )}
       </div>
 
       <div
         className="min-h-[280px] w-full min-w-0 overflow-hidden rounded-lg border bg-card"
-        style={{ height }}
+        style={{ height: effectiveHeight }}
       >
         <Plot
           data={plotData}
@@ -481,6 +559,9 @@ export function MsmsMirrorPlot({
           onInitialized={onInitialized}
         />
       </div>
+      {isDisplayDownsampled ? (
+        <p className="text-xs text-muted-foreground">Display downsampled on mobile. Full resolution available on desktop.</p>
+      ) : null}
     </div>
   )
 }

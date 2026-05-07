@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import React, { useCallback, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
@@ -116,6 +116,24 @@ function interpolateIntensityAtRt(
   return Number.isFinite(best) ? best : 0
 }
 
+function downsampleTraceDisplay(trace: ChromatogramTrace, maxPoints: number): { trace: ChromatogramTrace; reduced: boolean } {
+  const len = Math.min(trace.rt.length, trace.intensity.length)
+  if (len <= maxPoints) {
+    return {
+      trace: { ...trace, rt: trace.rt.slice(0, len), intensity: trace.intensity.slice(0, len) },
+      reduced: false,
+    }
+  }
+  const step = Math.ceil(len / maxPoints)
+  const rt: number[] = []
+  const intensity: number[] = []
+  for (let i = 0; i < len; i += step) {
+    rt.push(trace.rt[i]!)
+    intensity.push(trace.intensity[i]!)
+  }
+  return { trace: { ...trace, rt, intensity }, reduced: true }
+}
+
 export function ChromatogramViewer({
   traces,
   features = [],
@@ -129,23 +147,48 @@ export function ChromatogramViewer({
   const [showTraces, setShowTraces] = useState(true)
   const [showFeatureWindows, setShowFeatureWindows] = useState(true)
   const graphDivRef = useRef<HTMLElement | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(720)
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      setIsMobile(false)
+      return
+    }
+    const mq = window.matchMedia("(max-width: 640px)")
+    const apply = () => setIsMobile(mq.matches)
+    apply()
+    mq.addEventListener("change", apply)
+    const onResize = () => setViewportHeight(window.innerHeight)
+    onResize()
+    window.addEventListener("resize", onResize)
+    return () => {
+      mq.removeEventListener("change", apply)
+      window.removeEventListener("resize", onResize)
+    }
+  }, [])
 
   const validTraces = useMemo(() => filterValidTraces(traces), [traces])
+  const displayTracesState = useMemo(
+    () => validTraces.map((t) => downsampleTraceDisplay(t, isMobile ? 1600 : 6000)),
+    [validTraces, isMobile],
+  )
+  const displayTraces = useMemo(() => displayTracesState.map((x) => x.trace), [displayTracesState])
   const empty = validTraces.length === 0
 
   const yMax = useMemo(() => {
     let m = 1
-    validTraces.forEach((t) => {
+    displayTraces.forEach((t) => {
       t.intensity.forEach((v) => {
         if (Number.isFinite(v) && v > m) m = v
       })
     })
     return m
-  }, [validTraces])
+  }, [displayTraces])
 
   const plotData = useMemo(() => {
     const out: object[] = []
-    validTraces.forEach((t, idx) => {
+    displayTraces.forEach((t, idx) => {
       const legend =
         t.type != null
           ? `${t.name} (${t.type}${typeof t.mz === "number" ? `, m/z ${t.mz.toFixed(5)}` : ""})`
@@ -163,7 +206,7 @@ export function ChromatogramViewer({
     })
 
     if (showFeatureWindows && features.length > 0) {
-      const primary = validTraces[0]
+      const primary = displayTraces[0]
       features.forEach((f, fi) => {
         if (typeof f.rtApex !== "number" || !Number.isFinite(f.rtApex)) return
         const iy = primary
@@ -189,7 +232,7 @@ export function ChromatogramViewer({
     }
 
     return out
-  }, [validTraces, features, showTraces, showFeatureWindows, xLabel, yLabel, yMax])
+  }, [displayTraces, features, showTraces, showFeatureWindows, xLabel, yLabel, yMax])
 
   const shapes = useMemo(() => {
     if (!showFeatureWindows) return []
@@ -299,6 +342,9 @@ export function ChromatogramViewer({
     )
   }
 
+  const effectiveHeight = isMobile ? Math.min(Math.max(Math.floor(viewportHeight * 0.42), 260), 420) : height
+  const isDisplayDownsampled = displayTracesState.some((s) => s.reduced)
+
   return (
     <div
       className={cn("flex min-w-0 max-w-full flex-col gap-3 overflow-x-hidden", className)}
@@ -310,6 +356,8 @@ export function ChromatogramViewer({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-b pb-3">
+        {!isMobile ? (
+          <>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -404,11 +452,43 @@ export function ChromatogramViewer({
             <p className="max-w-xs">Download the current plot as a PNG image.</p>
           </TooltipContent>
         </Tooltip>
+          </>
+        ) : (
+          <details className="w-full">
+            <summary className="cursor-pointer text-xs text-muted-foreground">More controls</summary>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={fullRtRange}>
+                Full RT range
+              </Button>
+              <Button
+                type="button"
+                variant={showTraces ? "secondary" : "outline"}
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setShowTraces((v) => !v)}
+              >
+                Toggle traces
+              </Button>
+              <Button
+                type="button"
+                variant={showFeatureWindows ? "secondary" : "outline"}
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setShowFeatureWindows((v) => !v)}
+              >
+                Toggle feature windows
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void exportImage()}>
+                Export image
+              </Button>
+            </div>
+          </details>
+        )}
       </div>
 
       <div
         className="min-h-[280px] w-full min-w-0 max-w-full overflow-hidden rounded-lg border bg-card"
-        style={{ height }}
+        style={{ height: effectiveHeight }}
       >
         <Plot
           data={plotData}
@@ -425,6 +505,9 @@ export function ChromatogramViewer({
           onInitialized={onInitialized}
         />
       </div>
+      {isDisplayDownsampled ? (
+        <p className="text-xs text-muted-foreground">Display downsampled on mobile. Full resolution available on desktop.</p>
+      ) : null}
 
       {features.length > 0 ? (
         <div className="flex min-w-0 max-w-full flex-wrap gap-2">
