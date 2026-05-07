@@ -24,7 +24,7 @@ export function Header() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
-            <MoleculeLogoMark className="h-8 w-8" textClassName="text-sm" />
+            <MoleculeLogoMark className="h-8 w-8" />
             <span className="text-lg font-semibold tracking-tight">
               <span className="text-foreground">Mol</span>
               <span className={moltraceTraceClassName}>Trace</span>

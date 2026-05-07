@@ -48,13 +48,7 @@ const LOGO_HEX_CLIP =
 export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkProps) {
   const R = 5.35
   const centers = honeycombCenters(R, 5)
-  const markColor = "#FFFFFF"
-  const letterClassName = [
-    "relative z-20 flex h-full w-full items-center justify-center font-black leading-none tracking-tight text-xl text-white",
-    textClassName,
-  ]
-    .filter(Boolean)
-    .join(" ")
+  const letterClassName = cn("select-none", textClassName)
 
   return (
     <div
@@ -82,13 +76,53 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
             />
           ))}
         </g>
+        <g
+          className={letterClassName}
+          fontFamily="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          fontSize={36}
+          fontWeight={900}
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          <text
+            x="31.5"
+            y="33.5"
+            fill="none"
+            stroke={LOGO_BACKGROUND_DARK_BLUE}
+            strokeWidth={9}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            paintOrder="stroke"
+          >
+            m
+          </text>
+          <text
+            x="31.5"
+            y="33.5"
+            fill="#EAFBFF"
+            stroke={HONEYCOMB_BRIGHT_BLUE}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            paintOrder="stroke fill"
+          >
+            m
+          </text>
+          <text
+            x="31.1"
+            y="32.95"
+            fill="none"
+            stroke={LOGO_BACKGROUND_DARK_BLUE}
+            strokeWidth={0.85}
+            strokeOpacity={0.35}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            paintOrder="stroke"
+          >
+            m
+          </text>
+        </g>
       </svg>
-      <span
-        className={letterClassName}
-        style={{ color: markColor }}
-      >
-        <span className="block -translate-y-px -translate-x-px text-center">m</span>
-      </span>
     </div>
   )
 }

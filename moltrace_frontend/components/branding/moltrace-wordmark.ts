@@ -1,3 +1,3 @@
-/** Styling for the “Trace” segment of MolTrace (stronger weight + full-opacity brand blue). */
+/** Styling for the “Trace” segment of MolTrace using the logo honeycomb cyan. */
 export const moltraceTraceClassName =
-  "font-extrabold tracking-tight text-[#42A5F5] opacity-100 antialiased"
+  "font-extrabold tracking-tight text-[#26C6FF] opacity-100 antialiased"
