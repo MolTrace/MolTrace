@@ -171,14 +171,14 @@ export function MobileDraftQueue() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={handleAddDraft}>
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" onClick={handleAddDraft}>
             Add draft
           </Button>
-          <Button type="button" size="sm" onClick={() => void handleSyncNow()} disabled={!online || loading}>
+          <Button type="button" size="sm" className="w-full sm:w-auto" onClick={() => void handleSyncNow()} disabled={!online || loading}>
             Sync now
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={handleClearRejected}>
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" onClick={handleClearRejected}>
             Clear rejected draft
           </Button>
         </div>

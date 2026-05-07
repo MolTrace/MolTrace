@@ -342,23 +342,23 @@ export function MobileReactionApprovalBoard({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={handleApprove}>
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" onClick={handleApprove}>
             Approve recommendation
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={handleReject}>
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" onClick={handleReject}>
             Reject recommendation
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => updateDraft({ comment: draft?.comment ?? "" })}>
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => updateDraft({ comment: draft?.comment ?? "" })}>
             Add review comment
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={handleConfirmExecution}>
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" onClick={handleConfirmExecution}>
             Confirm execution status
           </Button>
-          <Button type="button" size="sm" asChild>
+          <Button type="button" size="sm" className="w-full sm:w-auto" asChild>
             <Link href={regulatoryHref}>View linked Regulatory Hub constraint</Link>
           </Button>
-          <Button type="button" size="sm" variant="secondary" asChild>
+          <Button type="button" size="sm" variant="secondary" className="w-full sm:w-auto" asChild>
             <Link href={reactionHref}>Open full reaction view</Link>
           </Button>
         </div>

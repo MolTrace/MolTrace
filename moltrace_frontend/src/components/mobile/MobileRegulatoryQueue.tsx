@@ -318,26 +318,27 @@ export function MobileRegulatoryQueue() {
                 </p>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void handleMarkRead(item)}>
+              <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" disabled={busy} onClick={() => void handleMarkRead(item)}>
                   Mark read
                 </Button>
-                <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void handleAddComment(item)}>
+                <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" disabled={busy} onClick={() => void handleAddComment(item)}>
                   Add comment
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="w-full sm:w-auto"
                   disabled={busy || !item.canAssignOwner}
                   onClick={() => void handleAssignOwner(item)}
                 >
                   Assign owner
                 </Button>
-                <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void handleChangeStatus(item)}>
+                <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" disabled={busy} onClick={() => void handleChangeStatus(item)}>
                   Change status
                 </Button>
-                <Button type="button" size="sm" asChild>
+                <Button type="button" size="sm" className="w-full sm:w-auto" asChild>
                   <Link href="/regulatory/action-queue">Open action</Link>
                 </Button>
               </div>
