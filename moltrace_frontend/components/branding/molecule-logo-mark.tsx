@@ -100,12 +100,7 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
             x="32"
             y="32"
             dy="0.35em"
-            fill="#EAFBFF"
-            stroke={HONEYCOMB_BRIGHT_BLUE}
-            strokeWidth={2.2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            paintOrder="stroke fill"
+            fill="#FFFFFF"
           >
             m
           </text>
