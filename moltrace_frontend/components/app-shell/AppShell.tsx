@@ -27,7 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen flex-col lg:flex-row">
         <aside className="hidden w-72 shrink-0 border-r border-white/10 bg-white/[0.035] px-4 py-5 backdrop-blur lg:block">
           <Link href="/" className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-            <MoleculeLogoMark className="h-10 w-10 rounded-xl" textClassName="text-sm" />
+            <MoleculeLogoMark className="h-10 w-10 rounded-xl" />
             <span>
               <span className="block text-sm font-semibold tracking-wide">
                 <span className="text-white">Mol</span>
