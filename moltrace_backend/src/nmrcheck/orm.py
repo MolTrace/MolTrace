@@ -1061,6 +1061,302 @@ class ArtifactRecordORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class ConnectorRegistryORM(Base):
+    __tablename__ = "connector_registry"
+    __table_args__ = (
+        UniqueConstraint("connector_key", name="uq_connector_registry_key"),
+        Index("ix_connector_registry_type_status", "connector_type", "status"),
+        Index("ix_connector_registry_target_status", "target_program", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connector_key: Mapped[str] = mapped_column(String(120), index=True)
+    display_name: Mapped[str] = mapped_column(String(240))
+    connector_type: Mapped[str] = mapped_column(String(64), index=True)
+    target_program: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    config_schema_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ConnectorCredentialReferenceORM(Base):
+    __tablename__ = "connector_credential_references"
+    __table_args__ = (
+        Index("ix_connector_credentials_connector_status", "connector_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connector_id: Mapped[int] = mapped_column(
+        ForeignKey("connector_registry.id", ondelete="CASCADE"),
+        index=True,
+    )
+    credential_type: Mapped[str] = mapped_column(String(32), index=True)
+    secret_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ConnectorHealthCheckORM(Base):
+    __tablename__ = "connector_health_checks"
+    __table_args__ = (
+        Index("ix_connector_health_connector_checked", "connector_id", "checked_at"),
+        Index("ix_connector_health_status_checked", "status", "checked_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connector_id: Mapped[int] = mapped_column(
+        ForeignKey("connector_registry.id", ondelete="CASCADE"),
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(String(32), default="unknown", index=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class InstrumentWatchFolderORM(Base):
+    __tablename__ = "instrument_watch_folders"
+    __table_args__ = (
+        Index("ix_watch_folders_connector_status", "connector_id", "status"),
+        Index("ix_watch_folders_target_status", "target_program", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connector_id: Mapped[int | None] = mapped_column(
+        ForeignKey("connector_registry.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    folder_path: Mapped[str] = mapped_column(Text)
+    file_patterns_json: Mapped[str] = mapped_column(Text, default="[]")
+    recursive: Mapped[bool] = mapped_column(Boolean, default=False)
+    target_program: Mapped[str] = mapped_column(String(64), index=True)
+    target_route: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    last_scan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class IngestionRunORM(Base):
+    __tablename__ = "ingestion_runs"
+    __table_args__ = (
+        Index("ix_ingestion_runs_connector_created", "connector_id", "created_at"),
+        Index("ix_ingestion_runs_watch_folder_created", "watch_folder_id", "created_at"),
+        Index("ix_ingestion_runs_status_created", "status", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connector_id: Mapped[int | None] = mapped_column(
+        ForeignKey("connector_registry.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    watch_folder_id: Mapped[int | None] = mapped_column(
+        ForeignKey("instrument_watch_folders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    source_system: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    source_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    discovered_count: Mapped[int] = mapped_column(Integer, default=0)
+    ingested_count: Mapped[int] = mapped_column(Integer, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0)
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    notes_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class FileNormalizationRunORM(Base):
+    __tablename__ = "file_normalization_runs"
+    __table_args__ = (
+        Index("ix_file_normalization_file_created", "file_id", "created_at"),
+        Index("ix_file_normalization_status_created", "status", "created_at"),
+        Index("ix_file_normalization_format_status", "source_format", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    file_id: Mapped[int] = mapped_column(
+        ForeignKey("managed_file_records.id", ondelete="CASCADE"),
+        index=True,
+    )
+    source_format: Mapped[str] = mapped_column(String(48), index=True)
+    target_format: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    output_artifact_id: Mapped[int | None] = mapped_column(
+        ForeignKey("artifact_records.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    notes_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ExternalSystemRecordORM(Base):
+    __tablename__ = "external_system_records"
+    __table_args__ = (
+        Index("ix_external_records_connector_created", "connector_id", "created_at"),
+        Index("ix_external_records_system_object", "external_system", "external_object_type"),
+        UniqueConstraint(
+            "connector_id",
+            "external_system",
+            "external_object_type",
+            "external_object_id",
+            name="uq_external_records_connector_object",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connector_id: Mapped[int] = mapped_column(
+        ForeignKey("connector_registry.id", ondelete="CASCADE"),
+        index=True,
+    )
+    external_system: Mapped[str] = mapped_column(String(160), index=True)
+    external_object_type: Mapped[str] = mapped_column(String(48), index=True)
+    external_object_id: Mapped[str] = mapped_column(String(240), index=True)
+    external_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ExternalObjectLinkORM(Base):
+    __tablename__ = "external_object_links"
+    __table_args__ = (
+        Index("ix_external_links_external_created", "external_record_id", "created_at"),
+        Index(
+            "ix_external_links_moltrace_resource",
+            "moltrace_resource_type",
+            "moltrace_resource_id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    external_record_id: Mapped[int] = mapped_column(
+        ForeignKey("external_system_records.id", ondelete="CASCADE"),
+        index=True,
+    )
+    moltrace_resource_type: Mapped[str] = mapped_column(String(64), index=True)
+    moltrace_resource_id: Mapped[int] = mapped_column(Integer, index=True)
+    relation_type: Mapped[str] = mapped_column(String(48), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class MappingTemplateORM(Base):
+    __tablename__ = "mapping_templates"
+    __table_args__ = (
+        Index("ix_mapping_templates_connector_status", "connector_id", "status"),
+        Index("ix_mapping_templates_source_target", "source_type", "target_type"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connector_id: Mapped[int | None] = mapped_column(
+        ForeignKey("connector_registry.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(240))
+    source_type: Mapped[str] = mapped_column(String(64), index=True)
+    target_type: Mapped[str] = mapped_column(String(64), index=True)
+    field_map_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class OutboundSyncJobORM(Base):
+    __tablename__ = "outbound_sync_jobs"
+    __table_args__ = (
+        Index("ix_outbound_sync_connector_created", "connector_id", "created_at"),
+        Index("ix_outbound_sync_status_created", "status", "created_at"),
+        Index("ix_outbound_sync_resource", "source_resource_type", "source_resource_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connector_id: Mapped[int] = mapped_column(
+        ForeignKey("connector_registry.id", ondelete="CASCADE"),
+        index=True,
+    )
+    target_system: Mapped[str] = mapped_column(String(160), index=True)
+    source_resource_type: Mapped[str] = mapped_column(String(64), index=True)
+    source_resource_id: Mapped[int] = mapped_column(Integer, index=True)
+    payload_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    notes_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class WebhookSubscriptionORM(Base):
+    __tablename__ = "webhook_subscriptions"
+    __table_args__ = (
+        Index("ix_webhook_subscriptions_connector_status", "connector_id", "status"),
+        Index("ix_webhook_subscriptions_target_hash", "target_url_hash"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connector_id: Mapped[int | None] = mapped_column(
+        ForeignKey("connector_registry.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(240))
+    event_types_json: Mapped[str] = mapped_column(Text, default="[]")
+    target_url_hash: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class RegulatorySubmissionPackageORM(Base):
+    __tablename__ = "regulatory_submission_packages"
+    __table_args__ = (
+        Index("ix_submission_packages_dossier_created", "dossier_id", "created_at"),
+        Index("ix_submission_packages_status_created", "status", "created_at"),
+        Index("ix_submission_packages_type_status", "package_type", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dossier_id: Mapped[int | None] = mapped_column(
+        ForeignKey("regulatory_dossiers.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    report_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    package_type: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    file_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    artifact_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    package_manifest_json: Mapped[str] = mapped_column(Text, default="{}")
+    package_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class QualityFindingORM(Base):
     __tablename__ = "quality_findings"
     __table_args__ = (
