@@ -117,7 +117,7 @@
       text-anchor="middle"
       text-rendering="geometricPrecision"
     >
-      <text x="32" y="31.2" dy="0.33em" fill="none" stroke="#051f3a" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke">m</text>
+      <text x="32" y="31.2" dy="0.33em" fill="none" stroke="#051f3a" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke">m</text>
       <text x="32" y="31.2" dy="0.33em" fill="#FFFFFF">m</text>
     </g>
   </g>
