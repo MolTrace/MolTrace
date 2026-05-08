@@ -1,8 +1,16 @@
-var SW_VERSION = "2026-05-07-v3"
+var SW_VERSION = "2026-05-08-v1"
 var STATIC_CACHE = "moltrace-static-" + SW_VERSION
 var RUNTIME_CACHE = "moltrace-runtime-" + SW_VERSION
 var OFFLINE_URL = "/offline"
-var SHELL_ASSETS = [OFFLINE_URL, "/icons/icon-192.png"]
+var ICON_VERSION = "v=" + SW_VERSION
+var SHELL_ASSETS = [
+  OFFLINE_URL,
+  "/icons/moltrace-mark.svg?" + ICON_VERSION,
+  "/icons/icon-192.png?" + ICON_VERSION,
+  "/icons/icon-512.png?" + ICON_VERSION,
+  "/icons/maskable-icon-512.png?" + ICON_VERSION,
+  "/apple-icon.png?" + ICON_VERSION,
+]
 var ALLOWED_CACHES = [STATIC_CACHE, RUNTIME_CACHE]
 
 function isAllowedCache(cacheName) {

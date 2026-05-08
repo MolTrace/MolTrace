@@ -6,6 +6,9 @@ import { InstallAppPrompt } from '@/src/components/pwa/InstallAppPrompt'
 import { PWAUpdateManager } from '@/src/components/pwa/PWAUpdateManager'
 import './globals.css'
 
+const PWA_ASSET_VERSION = '2026-05-08-v1'
+const versionedIcon = (src: string) => `${src}?v=${PWA_ASSET_VERSION}`
+
 export const metadata: Metadata = {
   title: 'MolTrace | AI-Native Scientific Intelligence Platform',
   description: 'AI-powered spectroscopy interpretation, reaction optimization, and regulatory intelligence for chemistry and R&D teams.',
@@ -13,23 +16,23 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/icons/moltrace-mark.svg',
+        url: versionedIcon('/icons/moltrace-mark.svg'),
         sizes: 'any',
         type: 'image/svg+xml',
       },
       {
-        url: '/icons/icon-192.png',
+        url: versionedIcon('/icons/icon-192.png'),
         sizes: '192x192',
         type: 'image/png',
       },
       {
-        url: '/icons/icon-512.png',
+        url: versionedIcon('/icons/icon-512.png'),
         sizes: '512x512',
         type: 'image/png',
       },
     ],
-    apple: [{ url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
-    shortcut: '/icons/moltrace-mark.svg',
+    apple: [{ url: versionedIcon('/apple-icon.png'), sizes: '192x192', type: 'image/png' }],
+    shortcut: versionedIcon('/icons/moltrace-mark.svg'),
   },
 }
 
