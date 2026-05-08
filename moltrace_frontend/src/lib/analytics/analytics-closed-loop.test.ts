@@ -40,7 +40,19 @@ import {
   trackRegulatoryRuleUpdateProposalRejected,
   trackRegulatorySurveillanceRunStarted,
   trackRegulatoryWatcherCreated,
+  trackDataBoundaryCreated,
+  trackEntitlementUpdated,
+  trackFeatureFlagUpdated,
+  trackOnboardingProjectCreated,
+  trackOnboardingTaskCompleted,
+  trackPilotProgramCreated,
+  trackProcurementPackageCreated,
+  trackSecurityProfileUpdated,
+  trackTenantAuditExportRequested,
+  trackTenantCreated,
+  trackTenantEnvironmentCreated,
   trackUsageEvent,
+  trackValidationProfileUpdated,
 } from "@/src/lib/analytics/analytics-client"
 
 const ALLOWED_METADATA_KEY_SET = new Set([
@@ -86,6 +98,17 @@ const COMPOUND_REGISTRY_METADATA_KEY_SET = new Set([
   "has_batch",
   "linked_resource_type",
   "status",
+])
+
+const TENANT_SAAS_METADATA_KEY_SET = new Set([
+  "tenant_type",
+  "program",
+  "feature_key",
+  "status",
+  "implementation_stage",
+  "package_type",
+  "health_status",
+  "task_type",
 ])
 
 function lastAnalyticsPayload(): { event_source?: string; event_type?: string; metadata?: Record<string, unknown> } {
@@ -369,5 +392,62 @@ describe("compound registry analytics metadata", () => {
     for (const k of Object.keys(metadata ?? {})) {
       expect(COMPOUND_REGISTRY_METADATA_KEY_SET.has(k)).toBe(true)
     }
+  })
+})
+
+describe("tenant SaaS analytics metadata", () => {
+  it("emits tenant onboarding and entitlement event types", () => {
+    apiFetchMock.mockResolvedValue(undefined)
+    trackTenantCreated({ tenant_type: "pilot", status: "onboarding" })
+    expect(lastAnalyticsPayload().event_type).toBe("tenant_created")
+    trackTenantEnvironmentCreated({ status: "active" })
+    expect(lastAnalyticsPayload().event_type).toBe("tenant_environment_created")
+    trackEntitlementUpdated({ feature_key: "spectracheck_core", program: "spectracheck", status: "enabled" })
+    expect(lastAnalyticsPayload().event_type).toBe("entitlement_updated")
+    trackFeatureFlagUpdated({ feature_key: "tenant_flags", program: "admin", status: "active" })
+    expect(lastAnalyticsPayload().event_type).toBe("feature_flag_updated")
+    trackPilotProgramCreated({ status: "planned" })
+    expect(lastAnalyticsPayload().event_type).toBe("pilot_program_created")
+    trackOnboardingProjectCreated({ implementation_stage: "discovery", status: "not_started" })
+    expect(lastAnalyticsPayload().event_type).toBe("onboarding_project_created")
+    trackOnboardingTaskCompleted({ task_type: "training", program: "cross_module", status: "completed" })
+    expect(lastAnalyticsPayload().event_type).toBe("onboarding_task_completed")
+    trackDataBoundaryCreated({ status: "draft" })
+    expect(lastAnalyticsPayload().event_type).toBe("data_boundary_created")
+    trackSecurityProfileUpdated({ status: "active" })
+    expect(lastAnalyticsPayload().event_type).toBe("security_profile_updated")
+    trackValidationProfileUpdated({ status: "ready_for_review" })
+    expect(lastAnalyticsPayload().event_type).toBe("validation_profile_updated")
+    trackProcurementPackageCreated({ package_type: "security_review", status: "ready_for_review" })
+    expect(lastAnalyticsPayload().event_type).toBe("procurement_package_created")
+    trackTenantAuditExportRequested({ status: "queued" })
+    expect(lastAnalyticsPayload().event_type).toBe("tenant_audit_export_requested")
+  })
+
+  it("allows only privacy-safe tenant SaaS metadata keys", () => {
+    apiFetchMock.mockResolvedValue(undefined)
+    trackEntitlementUpdated({
+      tenant_type: "regulated_customer",
+      program: "spectracheck",
+      feature_key: "spectracheck_core",
+      status: "enabled",
+      implementation_stage: "spectracheck_rollout",
+      package_type: "full_procurement",
+      health_status: "watch",
+      task_type: "training",
+      token: "secret",
+      ip_allowlist_json: ["10.0.0.1"],
+      allowed_domains_json: ["sensitive.example"],
+      notes_json: "private tenant note",
+    } as Record<string, unknown>)
+    const { metadata, event_source } = lastAnalyticsPayload()
+    expect(event_source).toBe("frontend")
+    for (const k of Object.keys(metadata ?? {})) {
+      expect(TENANT_SAAS_METADATA_KEY_SET.has(k)).toBe(true)
+    }
+    expect(metadata?.token).toBeUndefined()
+    expect(metadata?.ip_allowlist_json).toBeUndefined()
+    expect(metadata?.allowed_domains_json).toBeUndefined()
+    expect(metadata?.notes_json).toBeUndefined()
   })
 })

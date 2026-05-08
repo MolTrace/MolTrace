@@ -3,11 +3,28 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useMemo } from "react"
-import { Bot, Boxes, ClipboardList, FileText, FlaskConical, FolderOpen, Home, Library, Scale, Settings, SlidersHorizontal } from "lucide-react"
+import {
+  Bot,
+  Boxes,
+  Building2,
+  ClipboardCheck,
+  ClipboardList,
+  FileText,
+  FlaskConical,
+  FolderOpen,
+  HeartPulse,
+  Home,
+  Library,
+  PackageCheck,
+  Scale,
+  Settings,
+  SlidersHorizontal,
+} from "lucide-react"
 import { SpectraCheckLogoIcon } from "@/components/branding/spectracheck-logo-icon"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { useTenant } from "@/src/lib/tenant/tenant-context"
 
 type PrimaryNavItem = {
   href: string
@@ -28,7 +45,7 @@ const primaryNavItems: PrimaryNavItem[] = [
   { href: "/reactions", label: "Reactions", icon: FlaskConical },
 ]
 
-const moreNavItems: MoreNavItem[] = [
+const baseMoreNavItems: MoreNavItem[] = [
   { href: "/projects", label: "Projects", icon: FolderOpen },
   { href: "/compounds", label: "Compounds", icon: Boxes },
   { href: "/reports", label: "Reports", icon: FileText },
@@ -39,11 +56,27 @@ const moreNavItems: MoreNavItem[] = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
+const adminMoreNavItems: MoreNavItem[] = [
+  { href: "/admin/tenants", label: "Tenant Admin", icon: Building2 },
+  { href: "/admin/tenant-summary#onboarding", label: "Onboarding", icon: ClipboardCheck },
+  { href: "/admin/tenant-summary#health-score", label: "Health Score", icon: HeartPulse },
+  { href: "/admin/tenant-summary#procurement-packages", label: "Procurement Packages", icon: PackageCheck },
+]
+
+function hrefPath(href: string) {
+  return href.split(/[?#]/)[0] || href
+}
+
 export function MobileBottomNav() {
   const pathname = usePathname()
+  const { isAdmin } = useTenant()
+  const moreNavItems = useMemo(
+    () => (isAdmin ? [...baseMoreNavItems, ...adminMoreNavItems] : baseMoreNavItems),
+    [isAdmin],
+  )
   const moreActive = useMemo(
-    () => moreNavItems.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)),
-    [pathname],
+    () => moreNavItems.some((item) => pathname === hrefPath(item.href) || pathname.startsWith(`${hrefPath(item.href)}/`)),
+    [moreNavItems, pathname],
   )
 
   return (
@@ -88,7 +121,8 @@ export function MobileBottomNav() {
             </SheetHeader>
             <div className="mt-3 grid grid-cols-1 gap-1 px-2">
               {moreNavItems.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                const itemPath = hrefPath(item.href)
+                const isActive = pathname === itemPath || pathname.startsWith(`${itemPath}/`)
                 return (
                   <Link
                     key={item.href}
