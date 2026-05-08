@@ -144,6 +144,7 @@ async function main() {
   writeFileSync(join(ICONS_DIR, "icon-512.png"), logo512)
   writeFileSync(join(ICONS_DIR, "icon-192.png"), logo192)
   writeFileSync(join(ICONS_DIR, "maskable-icon-512.png"), maskable512)
+  writeFileSync(join(PUBLIC_DIR, "apple-icon.png"), logo192)
 
   writeFileSync(join(PUBLIC_DIR, "icon.svg"), logoSvg, "utf8")
   writeFileSync(join(ICONS_DIR, "moltrace-mark.svg"), logoSvg, "utf8")
