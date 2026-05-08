@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch, ApiError } from "@/lib/api/client"
+import { formatStableUtcDateTime } from "@/lib/utils"
 import {
   trackRegulatoryAiGovernanceRecordCreated,
   trackRegulatoryBatchAssessmentRun,
@@ -343,10 +344,7 @@ function asArray(data: unknown): unknown[] {
 }
 
 function formatWhen(iso: string | undefined): string {
-  if (!iso?.trim()) return "—"
-  const d = Date.parse(iso)
-  if (Number.isNaN(d)) return iso
-  return new Date(d).toLocaleString()
+  return formatStableUtcDateTime(iso)
 }
 
 function truncateText(s: string, max: number): string {

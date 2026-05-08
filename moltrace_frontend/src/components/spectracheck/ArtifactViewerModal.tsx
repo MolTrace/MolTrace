@@ -296,7 +296,10 @@ function extractAnnotationRowsForTable(json: unknown): { columns: string[]; rows
 }
 
 function sanitizeReportHtml(html: string): string {
-  return html.replace(/<script\b[\s\S]*?<\/script>/gi, "")
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<script\b[^>]*\/\s*>/gi, "")
+    .replace(/<script\b[^>]*>/gi, "")
 }
 
 function extractReportHtmlString(json: unknown, detail: unknown): string | null {

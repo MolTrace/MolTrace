@@ -519,9 +519,7 @@ export function WorkflowRunLauncher({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Workflow Run Launcher</CardTitle>
         <CardDescription>
-          Create a workflow run with <code className="text-xs">POST /workflow-runs</code>, then start it with{" "}
-          <code className="text-xs">POST /workflow-runs/{"{workflow_run_id}"}/start</code>. Runs are not started
-          automatically.
+          Create a workflow run, then start it manually. Runs are never started automatically.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

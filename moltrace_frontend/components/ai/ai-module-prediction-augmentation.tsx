@@ -10,7 +10,6 @@ import {
   trackAiPredictionRunStarted,
 } from "@/src/lib/analytics/analytics-client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,6 +17,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle, Loader2 } from "lucide-react"
+import {
+  EvidenceCard,
+  type EvidenceModule,
+  type EvidenceRiskLevel,
+  type EvidenceStatus,
+} from "@/components/science/evidence-card"
 
 type ServiceOption = {
   id: string
@@ -56,6 +61,33 @@ function confidenceBucket(value: unknown): string {
   if (n == null) return "unknown"
   if (n <= 1) return n < 0.5 ? "low" : n < 0.8 ? "medium" : "high"
   return n < 50 ? "low" : n < 80 ? "medium" : "high"
+}
+
+function evidenceModuleFor(moduleKey: Props["moduleKey"]): EvidenceModule {
+  if (moduleKey === "reaction_optimization") return "reactions"
+  if (moduleKey === "knowledge_extraction") return "ai_services"
+  return moduleKey
+}
+
+function evidenceStatusFor(status: string | undefined, humanReviewRequired: boolean): EvidenceStatus {
+  const normalized = (status ?? "").trim().toLowerCase().replace(/\s+/g, "_")
+  if (normalized === "approved") return "approved"
+  if (normalized === "rejected") return "rejected"
+  if (normalized === "contradiction") return "contradiction"
+  if (humanReviewRequired || normalized === "pending_review" || normalized === "submitted") return "pending_review"
+  if (normalized === "failed" || normalized === "error") return "unavailable"
+  return "draft"
+}
+
+function evidenceRiskFor(prediction: AnyRecord | null, humanReviewRequired: boolean): EvidenceRiskLevel {
+  if (!prediction) return "unknown"
+  const ood =
+    prediction.is_ood === true ||
+    readRecordString(prediction, "ood_status")?.toLowerCase() === "ood" ||
+    readRecordString(prediction, "is_ood")?.toLowerCase() === "true"
+  if (ood) return "high"
+  if (humanReviewRequired) return "medium"
+  return "unknown"
 }
 
 export function AiModulePredictionAugmentation({
@@ -102,6 +134,7 @@ export function AiModulePredictionAugmentation({
 
   const predictionId = readRecordString(prediction ?? {}, "prediction_id") ?? readRecordString(prediction ?? {}, "id")
   const confidence = readRecordNumber(prediction ?? {}, "confidence") ?? readRecordNumber(prediction ?? {}, "confidence_score")
+  const predictionStatus = readRecordString(prediction ?? {}, "status")
   const humanReviewRequired =
     readRecordString(prediction ?? {}, "human_review_required")?.toLowerCase() === "true" ||
     (prediction?.human_review_required as boolean | undefined) === true
@@ -312,21 +345,27 @@ export function AiModulePredictionAugmentation({
 
         {prediction ? (
           <div className="space-y-3 rounded-md border p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">prediction {predictionId ?? "-"}</Badge>
-              <Badge variant="outline">status {readRecordString(prediction, "status") ?? "-"}</Badge>
-              <Badge variant="outline">model artifact {readRecordString(prediction, "model_artifact_id") ?? "-"}</Badge>
-              <Badge variant="outline">deployment candidate {readRecordString(prediction, "deployment_candidate_id") ?? "-"}</Badge>
-              {humanReviewRequired ? <Badge variant="destructive">human review required</Badge> : <Badge variant="outline">requires review</Badge>}
-            </div>
-            <p className="text-sm">
-              <span className="font-medium">prediction result:</span>{" "}
-              {readRecordString(prediction, "prediction_result") ?? readRecordString(prediction, "result") ?? "-"}
-            </p>
-            <p className="text-sm">
-              <span className="font-medium">confidence:</span>{" "}
-              {confidence == null ? "-" : confidence}
-            </p>
+            <EvidenceCard
+              title={`Prediction ${predictionId ?? "-"}`}
+              module={evidenceModuleFor(moduleKey)}
+              status={evidenceStatusFor(predictionStatus, humanReviewRequired)}
+              confidence_score={confidence}
+              confidence_label={confidenceBucket(confidence)}
+              risk_level={evidenceRiskFor(prediction, humanReviewRequired)}
+              summary={readRecordString(prediction, "prediction_result") ?? readRecordString(prediction, "result") ?? "Prediction result unavailable."}
+              evidence_items={[
+                `Service: ${selected.serviceKey}`,
+                `Task: ${selected.taskKey}`,
+                `Status: ${predictionStatus ?? "-"}`,
+                `Model artifact: ${readRecordString(prediction, "model_artifact_id") ?? "-"}`,
+                `Deployment candidate: ${readRecordString(prediction, "deployment_candidate_id") ?? "-"}`,
+              ]}
+              citations={[]}
+              model_name={readRecordString(prediction, "model_name") ?? selected.label}
+              model_version={readRecordString(prediction, "model_version") ?? readRecordString(prediction, "model_artifact_id")}
+              last_updated_at={readRecordString(prediction, "updated_at") ?? readRecordString(prediction, "created_at")}
+              review_status={humanReviewRequired ? "human review required" : "requires review"}
+            />
 
             <div className="grid gap-2 md:grid-cols-3">
               <Select value={feedbackType} onValueChange={setFeedbackType}>

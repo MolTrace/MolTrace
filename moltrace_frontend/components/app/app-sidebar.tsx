@@ -42,7 +42,7 @@ export type SidebarNavItem = {
 
 const navigation: SidebarNavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "ML / AI", href: "/ai", icon: Bot },
+  { name: "ML / AI Governance", href: "/ai", icon: Bot },
   { name: "Projects", href: "/projects", icon: FolderOpen },
   { name: "Compound / Batch", href: "/compounds", icon: Boxes },
   { name: "Programs", href: "/spectracheck", icon: SpectraCheckLogoIcon },

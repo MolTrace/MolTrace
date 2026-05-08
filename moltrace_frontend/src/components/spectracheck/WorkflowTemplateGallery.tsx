@@ -229,9 +229,8 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
             <InfoTooltip content={GALLERY_TOOLTIP} label="About workflow templates" />
           </CardTitle>
           <CardDescription>
-            Browse predefined workflows from <code className="text-xs">GET /workflow-templates</code>. Select a workflow,
-            then configure and create a run in <span className="font-medium text-foreground">Workflow Run Launcher</span>{" "}
-            below.
+            Browse predefined analysis workflows. Select one, then configure and create a run in the{" "}
+            <span className="font-medium text-foreground">Workflow Run Launcher</span> below.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -244,9 +243,9 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
         <Alert className="border-muted bg-muted/40">
           <AlertTitle className="text-sm">Workflow templates unavailable</AlertTitle>
           <AlertDescription className="text-xs text-muted-foreground">
-            The backend did not return workflow templates ({load.message}). Check that the API is running and{" "}
-            <code className="text-[10px]">GET /workflow-templates</code> is exposed via your proxy. No template data is
-            shown below to avoid misleading placeholders.
+            Workflow templates couldn&apos;t load ({load.message}). Check that the analysis service is
+            running and reachable through your proxy. No template data is shown below to avoid
+            misleading placeholders.
           </AlertDescription>
         </Alert>
       ) : null}

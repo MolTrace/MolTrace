@@ -1,4 +1,4 @@
-var SW_VERSION = "2026-05-08-v1"
+var SW_VERSION = "2026-05-08-v2"
 var STATIC_CACHE = "moltrace-static-" + SW_VERSION
 var RUNTIME_CACHE = "moltrace-runtime-" + SW_VERSION
 var OFFLINE_URL = "/offline"
@@ -21,8 +21,13 @@ function isSameOrigin(url) {
   return url.origin === self.location.origin
 }
 
+function isLocalDevelopment() {
+  return self.location.hostname === "localhost" || self.location.hostname === "127.0.0.1"
+}
+
 function isNeverCached(url) {
   if (!isSameOrigin(url)) return true
+  if (isLocalDevelopment() && url.pathname.indexOf("/_next/") === 0) return true
   if (url.pathname === "/sw.js") return true
   if (url.pathname === "/manifest.webmanifest") return true
   if (url.pathname === "/manifest.json") return true
@@ -38,6 +43,7 @@ function isNeverCached(url) {
 function isImmutableNextAsset(request, url) {
   if (request.method !== "GET") return false
   if (!isSameOrigin(url)) return false
+  if (isLocalDevelopment()) return false
   return url.pathname.indexOf("/_next/static/") === 0
 }
 

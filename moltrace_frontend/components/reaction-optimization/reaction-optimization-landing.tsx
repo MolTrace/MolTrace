@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CheckCircle2, FlaskConical, LineChart, ListChecks, Plus } from "lucide-react"
+import { CheckCircle2, FlaskConical, ListChecks, Plus, ShieldCheck } from "lucide-react"
 import { apiFetch } from "@/lib/api/client"
+import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -37,6 +38,8 @@ import {
 } from "@/src/lib/reaction-projects/reaction-projects-data"
 import { trackReactionProjectCreated } from "@/src/lib/analytics/analytics-client"
 import { ReactionValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
+import { EvidenceCard } from "@/components/science/evidence-card"
+import { DataState, DataStateBadge, type DataStateKind } from "@/components/science/data-state"
 
 function readCreatedReactionProjectId(raw: unknown): number | undefined {
   if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return undefined
@@ -55,15 +58,7 @@ const OBJECTIVES: { value: ReactionObjectiveValue; label: string }[] = [
 ]
 
 function fmtDate(iso: string): string {
-  if (!iso?.trim()) return "—"
-  const ms = Date.parse(iso)
-  if (Number.isNaN(ms)) return iso
-  return new Date(ms).toLocaleString()
-}
-
-function fmtYield(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—"
-  return `${n.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`
+  return formatStableUtcDateTime(iso)
 }
 
 function fmtInt(n: number | null | undefined): string {
@@ -139,19 +134,15 @@ export function ReactionOptimizationLanding() {
     let active = 0
     let experimentsCompleted = 0
     let pendingReview = 0
-    let bestYield: number | null = null
     for (const p of projects) {
       if (p.status === "active") active += 1
       const c = countsById.get(p.id)
       if (c) {
         experimentsCompleted += c.experimentsCompleted
         pendingReview += c.recommendationsPendingReview
-        if (c.bestYieldPercent != null) {
-          if (bestYield == null || c.bestYieldPercent > bestYield) bestYield = c.bestYieldPercent
-        }
       }
     }
-    return { active, experimentsCompleted, pendingReview, bestYield }
+    return { active, experimentsCompleted, pendingReview }
   }, [projects, countsById])
 
   async function handleCreate(e: React.FormEvent) {
@@ -199,7 +190,15 @@ export function ReactionOptimizationLanding() {
     }
   }
 
-  const showListUnavailable = !listLoading && listError
+  const showListUnavailable = !listLoading && Boolean(listError)
+  const reactionDataState: DataStateKind =
+    listLoading || countsLoading
+      ? "loading"
+      : showListUnavailable
+        ? "unavailable"
+        : projects.length > 0
+          ? "live"
+          : "empty"
 
   return (
     <div className="space-y-6">
@@ -207,7 +206,7 @@ export function ReactionOptimizationLanding() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Reaction Optimization</h1>
           <p className="text-muted-foreground">
-            Design, track, model, and review reaction-condition experiments.
+            Review next-best-experiment recommendations, constraints, and optimization history.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -225,61 +224,124 @@ export function ReactionOptimizationLanding() {
         </Alert>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryMetricCard
-          title="Active reaction projects"
-          icon={<FlaskConical className="h-4 w-4 text-muted-foreground" />}
-          value={listLoading ? "…" : fmtInt(aggregate.active)}
-          sub={
-            <p className="text-xs text-muted-foreground">
-              {listLoading ? "Loading…" : "status = active (GET /reaction-projects)."}
-            </p>
-          }
-        />
-        <SummaryMetricCard
-          title="Experiments completed"
-          icon={<CheckCircle2 className="h-4 w-4 text-muted-foreground" />}
-          value={listLoading || countsLoading ? "…" : fmtInt(aggregate.experimentsCompleted)}
-          sub={
-            <p className="text-xs text-muted-foreground">
-              {listLoading || countsLoading
-                ? "Loading…"
-                : "Summed from GET …/experiments (status completed)."}
-            </p>
-          }
-        />
-        <SummaryMetricCard
-          title="Recommendations pending review"
-          icon={<ListChecks className="h-4 w-4 text-muted-foreground" />}
-          value={listLoading || countsLoading ? "…" : fmtInt(aggregate.pendingReview)}
-          sub={
-            <p className="text-xs text-muted-foreground">
-              {listLoading || countsLoading
-                ? "Loading…"
-                : "Summed from GET …/recommendations (status proposed)."}
-            </p>
-          }
-        />
-        <SummaryMetricCard
-          title="Best yield observed"
-          icon={<LineChart className="h-4 w-4 text-muted-foreground" />}
-          value={listLoading || countsLoading ? "…" : fmtYield(aggregate.bestYield)}
-          sub={
-            <p className="text-xs text-muted-foreground">
-              {listLoading || countsLoading ? "Loading…" : "Max yield_percent from completed experiments."}
-            </p>
-          }
-        />
-      </div>
+      <Alert className="border-warning/40 bg-warning/10">
+        <AlertTitle className="text-sm">Chemist approval required</AlertTitle>
+        <AlertDescription className="text-xs">
+          AI recommendations require chemist approval before execution.
+        </AlertDescription>
+      </Alert>
+
+      <section aria-labelledby="campaign-summary-heading" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="campaign-summary-heading" className="text-lg font-semibold tracking-tight">
+            Campaign summary
+          </h2>
+          <DataStateBadge state={reactionDataState} />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <SummaryMetricCard
+            title="Active campaigns"
+            icon={<FlaskConical className="h-4 w-4 text-muted-foreground" />}
+            value={listLoading ? "…" : fmtInt(aggregate.active)}
+            sub={
+              <p className="text-xs text-muted-foreground">
+                {listLoading ? "Loading campaign list…" : "Loaded campaigns with active status."}
+              </p>
+            }
+          />
+          <SummaryMetricCard
+            title="Pending recommendations"
+            icon={<ListChecks className="h-4 w-4 text-muted-foreground" />}
+            value={listLoading || countsLoading ? "…" : fmtInt(aggregate.pendingReview)}
+            sub={
+              <p className="text-xs text-muted-foreground">
+                {listLoading || countsLoading
+                  ? "Loading recommendation counts…"
+                  : "Recommendations proposed and waiting for review."}
+              </p>
+            }
+          />
+          <SummaryMetricCard
+            title="Experiments completed"
+            icon={<CheckCircle2 className="h-4 w-4 text-muted-foreground" />}
+            value={listLoading || countsLoading ? "…" : fmtInt(aggregate.experimentsCompleted)}
+            sub={
+              <p className="text-xs text-muted-foreground">
+                {listLoading || countsLoading
+                  ? "Loading experiment counts…"
+                  : "Completed experiments across loaded campaigns."}
+              </p>
+            }
+          />
+          <SummaryMetricCard
+            title="Experiments avoided"
+            icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
+            value={listLoading || countsLoading ? "…" : "—"}
+            sub={<p className="text-xs text-muted-foreground">Not returned by loaded campaign data.</p>}
+          />
+        </div>
+        {reactionDataState === "empty" ? (
+          <DataState
+            state="empty"
+            title="No optimization campaigns yet."
+            description="Create or open a reaction project to begin reviewing recommendations."
+          />
+        ) : null}
+        {reactionDataState === "unavailable" ? (
+          <DataState
+            state="unavailable"
+            title="Campaign data unavailable."
+            description="Loaded data could not be reached, so no optimization results are shown."
+          />
+        ) : null}
+      </section>
 
       <ReactionValidationReadinessCard />
+
+      <section aria-labelledby="recommendation-evidence-heading" className="space-y-3">
+        <h2 id="recommendation-evidence-heading" className="text-lg font-semibold tracking-tight">
+          Recommendation evidence
+        </h2>
+        <EvidenceCard
+          title="Recommendation evidence"
+          module="reactions"
+          status={
+            reactionDataState === "loading" || reactionDataState === "unavailable"
+              ? "unavailable"
+              : aggregate.pendingReview > 0
+                ? "pending_review"
+                : "draft"
+          }
+          risk_level={aggregate.pendingReview > 0 ? "medium" : "unknown"}
+          summary={
+            reactionDataState === "loading"
+              ? "Loading recommendation review evidence from reaction project summaries."
+              : reactionDataState === "unavailable"
+                ? "Recommendation evidence is unavailable while campaign data cannot be reached."
+                : projects.length === 0
+                  ? "No optimization campaigns yet."
+                  : aggregate.pendingReview > 0
+                    ? "One or more optimization recommendations are waiting for human review before experimental action."
+                    : "No pending optimization recommendations are loaded from the current project list."
+          }
+          evidence_items={[
+            `Active campaigns: ${listLoading ? "loading" : fmtInt(aggregate.active)}`,
+            `Pending recommendations: ${listLoading || countsLoading ? "loading" : fmtInt(aggregate.pendingReview)}`,
+            projects.length === 0
+              ? "No optimization campaigns yet."
+              : "Review recommendations in project-level Reaction Studio before converting them into experiments.",
+          ]}
+          citations={[]}
+          review_status={
+            listLoading || countsLoading ? "loading" : aggregate.pendingReview > 0 ? "pending review" : "none pending"
+          }
+        />
+      </section>
 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Create reaction project</CardTitle>
-          <CardDescription>
-            POST <code className="text-xs">/reaction-projects</code>
-          </CardDescription>
+          <CardDescription>Create a project record for optimization review.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={(ev) => void handleCreate(ev)}>
@@ -292,7 +354,7 @@ export function ReactionOptimizationLanding() {
             {createOk ? (
               <Alert>
                 <AlertTitle className="text-sm">Project created</AlertTitle>
-                <AlertDescription className="text-xs">Reloaded list from GET /reaction-projects.</AlertDescription>
+                <AlertDescription className="text-xs">Reloaded project list from the server.</AlertDescription>
               </Alert>
             ) : null}
             <div className="grid gap-4 md:grid-cols-2">
@@ -372,10 +434,10 @@ export function ReactionOptimizationLanding() {
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-base">Reaction projects</CardTitle>
             <Badge variant="secondary" className="font-normal">
-              GET /reaction-projects
+              Project list
             </Badge>
           </div>
-          <CardDescription>Columns include linked experiment and recommendation counts when detail endpoints respond.</CardDescription>
+          <CardDescription>Columns include linked experiment and recommendation counts when project details respond.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="table-scroll">

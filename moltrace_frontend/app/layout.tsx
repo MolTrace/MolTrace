@@ -6,7 +6,7 @@ import { InstallAppPrompt } from '@/src/components/pwa/InstallAppPrompt'
 import { PWAUpdateManager } from '@/src/components/pwa/PWAUpdateManager'
 import './globals.css'
 
-const PWA_ASSET_VERSION = '2026-05-08-v1'
+const PWA_ASSET_VERSION = '2026-05-08-v2'
 const versionedIcon = (src: string) => `${src}?v=${PWA_ASSET_VERSION}`
 
 export const metadata: Metadata = {

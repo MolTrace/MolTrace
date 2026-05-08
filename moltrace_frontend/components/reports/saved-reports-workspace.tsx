@@ -14,7 +14,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Download, Eye, Clock, CheckCircle2, AlertTriangle, FileText, FileWarning, Share2 } from "lucide-react"
+import {
+  Download,
+  Eye,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  FileText,
+  FileCode,
+  FileJson,
+  FileWarning,
+  FlaskConical,
+  Microscope,
+  Share2,
+  SlidersHorizontal,
+} from "lucide-react"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { SecureShareDialog } from "@/src/components/collaboration/SecureShareDialog"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { normalizeProjectListPayload } from "@/components/projects/project-workspace-utils"
@@ -34,6 +49,8 @@ import { ReportLockControls } from "@/components/reports/report-lock-controls"
 import { ReportCompoundProvenanceDialog } from "@/components/reports/report-compound-provenance-dialog"
 import { ReportsRegulatoryComplianceSection } from "@/components/reports/reports-regulatory-compliance-section"
 import { ReportsValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
+import { KpiCard } from "@/components/dashboard/kpi-card"
+import { StatusFilterPills } from "@/components/dashboard/status-filter-pills"
 
 const DEMO_STAT_CARDS = { ready: 12, generating: 3, month: 47 } as const
 
@@ -65,6 +82,21 @@ function downloadText(content: string, filename: string, mime: string) {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function filterLabel(f: FilterChoice): string {
+  switch (f) {
+    case "all":
+      return "All"
+    case "draft":
+      return "Draft"
+    case "review_required":
+      return "Review required"
+    case "approved":
+      return "Approved"
+    case "blocked":
+      return "Blocked"
+  }
 }
 
 function bucketBadge(bucket: ReportFilterBucket) {
@@ -183,6 +215,12 @@ export default function SavedReportsWorkspace() {
     }
   }, [rows])
 
+  const filterCounts = useMemo(() => {
+    const counts = { draft: 0, review_required: 0, approved: 0, blocked: 0 }
+    for (const r of rows) counts[r.filterBucket]++
+    return counts
+  }, [rows])
+
   function openReport(row: SavedReportRow) {
     if (row.openUrl) {
       window.open(row.openUrl, "_blank", "noopener,noreferrer")
@@ -220,7 +258,7 @@ export default function SavedReportsWorkspace() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
           <p className="text-muted-foreground">
-            Saved reports from SpectraCheck sessions (loaded per session).
+            Reports generated from your SpectraCheck sessions.
           </p>
           {loadError ? (
             <p className="mt-1 text-xs text-destructive">{loadError}</p>
@@ -234,58 +272,41 @@ export default function SavedReportsWorkspace() {
         </div>
       </div>
 
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">How reports are listed</CardTitle>
-          <CardDescription>
-            There is no global report catalog endpoint in this client. Reports are fetched with{" "}
-            <code className="text-xs">GET /spectracheck/sessions</code> followed by{" "}
-            <code className="text-xs">GET /spectracheck/sessions/{"{session_id}"}/reports</code> for each
-            session. Sessions without saved reports produce no rows.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Ready for Export</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {stats ? stats.ready : DEMO_STAT_CARDS.ready}
-            </div>
+        <KpiCard
+          title="Ready for Export"
+          icon={CheckCircle2}
+          severity={stats && stats.ready > 0 ? "success" : "neutral"}
+          value={stats ? stats.ready : DEMO_STAT_CARDS.ready}
+          sub={
             <p className="text-xs text-muted-foreground">
-              {stats ? "Backend: approved_for_release / released" : "Demo summary"}
+              {stats ? "Approved or released for export" : "Example value"}
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Generating</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {stats ? stats.generating : DEMO_STAT_CARDS.generating}
-            </div>
+          }
+          onClick={() => setFilter("approved")}
+          onClickLabel="Show approved reports"
+        />
+        <KpiCard
+          title="Generating"
+          icon={Clock}
+          severity={stats && stats.generating > 0 ? "warning" : "neutral"}
+          value={stats ? stats.generating : DEMO_STAT_CARDS.generating}
+          sub={
             <p className="text-xs text-muted-foreground">
-              {stats ? "Draft or review required (live)" : "Demo summary"}
+              {stats ? "Drafts and items awaiting review" : "Example value"}
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">This Month</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {stats ? stats.total : DEMO_STAT_CARDS.month}
-            </div>
+          }
+        />
+        <KpiCard
+          title="This Month"
+          icon={FileText}
+          value={stats ? stats.total : DEMO_STAT_CARDS.month}
+          sub={
             <p className="text-xs text-muted-foreground">
-              {stats ? "Report records loaded" : "Demo summary"}
+              {stats ? "Total saved reports" : "Example value"}
             </p>
-          </CardContent>
-        </Card>
+          }
+        />
       </div>
 
       <ReportsValidationReadinessCard />
@@ -294,42 +315,61 @@ export default function SavedReportsWorkspace() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle>Saved reports</CardTitle>
-            <CardDescription>Filter by automated report gate label from the backend.</CardDescription>
+            <CardDescription>Filter reports by their gate status.</CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                ["all", "All"],
-                ["draft", "Draft"],
-                ["review_required", "Review required"],
-                ["approved", "Approved"],
-                ["blocked", "Blocked"],
-              ] as const
-            ).map(([id, label]) => (
-              <Button
-                key={id}
-                type="button"
-                variant={filter === id ? "secondary" : "outline"}
-                size="sm"
-                className="h-8"
-                onClick={() => setFilter(id)}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
+          <StatusFilterPills
+            label="Filter reports by status"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: "all", label: "All", count: rows.length },
+              { value: "draft", label: "Draft", count: filterCounts.draft },
+              { value: "review_required", label: "Review required", count: filterCounts.review_required },
+              { value: "approved", label: "Approved", count: filterCounts.approved },
+              { value: "blocked", label: "Blocked", count: filterCounts.blocked },
+            ]}
+          />
         </CardHeader>
         <CardContent>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading sessions and reports…</p>
           ) : null}
           {!loading && showLiveTable && rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No saved report records returned for your sessions yet.
-            </p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Microscope />
+                </EmptyMedia>
+                <EmptyTitle>No saved reports yet</EmptyTitle>
+                <EmptyDescription>
+                  Reports are generated when you complete a SpectraCheck analysis. Start a session to
+                  produce your first one.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button asChild>
+                  <Link href="/spectracheck">Open SpectraCheck</Link>
+                </Button>
+              </EmptyContent>
+            </Empty>
           ) : null}
           {!loading && showLiveTable && rows.length > 0 && filteredRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No reports match this filter.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <SlidersHorizontal />
+                </EmptyMedia>
+                <EmptyTitle>No matches for this filter</EmptyTitle>
+                <EmptyDescription>
+                  No reports match the “{filterLabel(filter)}” filter right now.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button variant="outline" onClick={() => setFilter("all")}>
+                  Show all reports
+                </Button>
+              </EmptyContent>
+            </Empty>
           ) : null}
           {showLiveTable && filteredRows.length > 0 ? (
             <div className="table-scroll">
@@ -355,12 +395,7 @@ export default function SavedReportsWorkspace() {
                       <TableCell>
                         <Badge variant="outline">{report.projectLabel}</Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          {bucketBadge(report.filterBucket)}
-                          <span className="text-[11px] text-muted-foreground">{report.statusDisplay}</span>
-                        </div>
-                      </TableCell>
+                      <TableCell>{bucketBadge(report.filterBucket)}</TableCell>
                       <TableCell className="text-sm">{report.reviewer}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{report.generatedAt}</TableCell>
                       <TableCell className="font-mono text-[11px] text-muted-foreground">{report.hashPreview}</TableCell>
@@ -377,21 +412,23 @@ export default function SavedReportsWorkspace() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-2">
-                          <Button variant="outline" size="sm" className="h-8 w-fit shrink-0 text-xs" asChild>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" asChild>
                             <Link
                               href={
                                 report.sessionNumericId != null
                                   ? `/regulatory?spectracheck_session_id=${encodeURIComponent(String(report.sessionNumericId))}`
                                   : "/regulatory"
                               }
+                              title={
+                                report.sessionNumericId != null
+                                  ? "Create a regulatory dossier from this report"
+                                  : "Link this report to a regulatory dossier"
+                              }
                             >
-                              {report.sessionNumericId != null
-                                ? "Create regulatory dossier from this report"
-                                : "Link report to regulatory dossier"}
+                              Regulatory
                             </Link>
                           </Button>
-                          <div className="flex flex-wrap gap-1">
                           {report.reportNumericId != null ? (
                             <ReportCompoundProvenanceDialog
                               reportId={report.reportNumericId}
@@ -399,8 +436,14 @@ export default function SavedReportsWorkspace() {
                               reportTitle={report.reportTitle}
                               hashPreview={report.hashPreview}
                             >
-                              <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 text-xs">
-                                Compound provenance
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="Compound provenance"
+                              >
+                                <FlaskConical className="h-4 w-4" />
                               </Button>
                             </ReportCompoundProvenanceDialog>
                           ) : null}
@@ -441,7 +484,7 @@ export default function SavedReportsWorkspace() {
                             title="Download JSON"
                             onClick={() => downloadJson(report)}
                           >
-                            <Download className="h-4 w-4" />
+                            <FileJson className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -451,9 +494,8 @@ export default function SavedReportsWorkspace() {
                             title="Download HTML"
                             onClick={() => downloadHtml(report)}
                           >
-                            <FileText className="h-4 w-4" />
+                            <FileCode className="h-4 w-4" />
                           </Button>
-                          </div>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -470,9 +512,9 @@ export default function SavedReportsWorkspace() {
       {showIllustration ? (
         <Card className="border-dashed">
           <CardHeader>
-            <CardTitle className="text-base">UI illustration (demo only)</CardTitle>
+            <CardTitle className="text-base">Example layout</CardTitle>
             <CardDescription>
-              Placeholder layout when no live rows are available — not claimed as approved or signed off.
+              Shown when live report data is unavailable — these values are not approved or signed off.
             </CardDescription>
           </CardHeader>
           <CardContent>

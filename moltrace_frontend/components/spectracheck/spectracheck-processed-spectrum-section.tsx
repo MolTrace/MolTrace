@@ -371,7 +371,7 @@ export function SpectraCheckProcessedSpectrumSection({
           </div>
 
           <div className="space-y-3 border-t pt-4">
-            <p className="text-xs font-medium text-muted-foreground">Analysis jobs (POST /jobs)</p>
+            <p className="text-xs font-medium text-muted-foreground">Analysis jobs (run in the background)</p>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void startProcessedPreviewJob()}>
                 Start as job (preview)

@@ -13,7 +13,6 @@ import {
 import { FeedbackButton, toFeedbackProjectId, toFeedbackSessionId } from "@/src/components/analytics/FeedbackButton"
 import { useRouter, useSearchParams } from "next/navigation"
 import { apiFetch, ApiError } from "@/lib/api/client"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -54,6 +53,7 @@ import {
   saveSpectraCheckEvidenceSession,
   sanitizeEvidenceItemsForStorage,
 } from "@/src/lib/spectracheck/spectracheck-evidence-session"
+import type { EvidenceItem } from "@/src/lib/spectracheck/evidence-types"
 import { SpectraCheckEvidenceProvider, useSpectraCheckEvidence } from "@/src/lib/spectracheck/useSpectraCheckEvidence"
 import {
   SpectraCheckEvidenceQueuePanel,
@@ -98,6 +98,11 @@ import { WorkflowRunLauncher } from "@/src/components/spectracheck/WorkflowRunLa
 import type { SessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { normalizeSessionFileRecordList } from "@/src/lib/spectracheck/session-file-record"
 import { SpectraCheckValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
+import { useOptionalOverviewData } from "@/components/app/overview-data-context"
+import { DataState, DataStateBadge, type DataStateKind } from "@/components/science/data-state"
+import { EvidenceCard, type EvidenceRiskLevel, type EvidenceStatus } from "@/components/science/evidence-card"
+import { KpiCard } from "@/components/dashboard/kpi-card"
+import { AlertCircle, AlertTriangle, BarChart3, FileText } from "lucide-react"
 
 function SpectraCheckTabWithTooltip({
   value,
@@ -139,6 +144,20 @@ const defaultProton =
 
 const defaultCarbon = "13C NMR (101 MHz, CDCl3) δ 58.3, 18.2."
 
+function mapEvidenceCardStatus(item: EvidenceItem): EvidenceStatus {
+  if ((item.contradictions?.length ?? 0) > 0) return "contradiction"
+  if (item.status === "pending_review" || item.status === "warning") return "pending_review"
+  if (item.status === "error") return "unavailable"
+  return "draft"
+}
+
+function mapEvidenceRisk(item: EvidenceItem): EvidenceRiskLevel {
+  if ((item.contradictions?.length ?? 0) > 0) return "high"
+  if (item.status === "warning" || item.status === "pending_review") return "medium"
+  if (item.status === "error") return "critical"
+  return "unknown"
+}
+
 type SpectraCheckWorkspaceProps = {
   /** Used by tests or embeds; defaults to Overview. */
   defaultTab?: string
@@ -164,6 +183,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
     setLatestReportResult,
     replaceEvidenceItems,
   } = useSpectraCheckEvidence()
+  const overview = useOptionalOverviewData()
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -768,6 +788,31 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         .filter((v): v is number => typeof v === "number"),
     [evidenceItems],
   )
+  const overviewDataState: DataStateKind =
+    overview?.loading === true ? "loading" : overview?.sessionsDataAvailable === true ? "live" : "unavailable"
+  const localAnalysisCount =
+    recentAnalysisJobIds.length +
+    (nmrResult != null ? 1 : 0) +
+    (deptAnalyzeResult != null ? 1 : 0) +
+    (nmr2dResult != null ? 1 : 0) +
+    (simResult != null ? 1 : 0) +
+    (candResult != null ? 1 : 0)
+  const totalAnalyses =
+    overview?.sessionsDataAvailable === true ? overview.sessions.length : localAnalysisCount
+  const pendingReviewCount =
+    overview?.sessionsDataAvailable === true && overview.metrics
+      ? overview.metrics.reviewRequired
+      : evidenceItems.filter((item) => item.status === "pending_review" || item.status === "warning").length
+  const contradictionCount =
+    overview?.sessionsDataAvailable === true && overview.metrics
+      ? overview.metrics.reviewRequiredWithContradictions
+      : evidenceItems.filter((item) => (item.contradictions?.length ?? 0) > 0).length
+  const reportsReadyCount =
+    overview?.sessionsDataAvailable === true && overview.metrics
+      ? overview.metrics.reportsReady
+      : latestReportResult != null
+        ? 1
+        : 0
 
   const workspaceHydratedRef = useRef(false)
   useLayoutEffect(() => {
@@ -830,8 +875,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   return (
     <div className="min-w-0 space-y-6">
       <div>
-        <Badge variant="outline">SpectraCheck</Badge>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">SpectraCheck</h1>
             <InfoTooltip
@@ -846,7 +890,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           </div>
         </div>
         <p className="text-muted-foreground">
-          AI-assisted NMR/MS structure validation and candidate evidence ranking.
+          Review spectral evidence, structure candidates, contradictions, and human sign-off.
         </p>
       </div>
 
@@ -874,11 +918,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
 
       <SpectraCheckKnowledgeLinksCard backendSessionId={backendSessionId} />
 
-      <Alert className="border-muted">
-        <AlertTitle className="text-sm">Local session storage</AlertTitle>
-        <AlertDescription className="flex flex-col gap-3 text-xs sm:flex-row sm:items-end sm:justify-between">
-          <span className="text-muted-foreground">
-            Local session state is stored in this browser for convenience. Do not use this for regulated storage.
+      <Alert className="border-warning/40 bg-warning/10">
+        <AlertTitle className="text-sm">Human review required · local session</AlertTitle>
+        <AlertDescription className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            AI spectral interpretation requires chemist review before final reporting. Session state is
+            stored locally in this browser — not for regulated storage.
           </span>
           <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={clearSessionEvidence}>
             Clear session evidence
@@ -988,6 +1033,113 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         </div>
 
         <TabsContent value="tab-overview" className="mt-4 space-y-4">
+          <section className="space-y-3" aria-labelledby="spectracheck-summary-heading">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 id="spectracheck-summary-heading" className="text-lg font-semibold tracking-tight">
+                  Analysis summary
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Current SpectraCheck activity from saved sessions and local workbench state.
+                </p>
+              </div>
+              <DataStateBadge state={overviewDataState} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <KpiCard
+                title="Total analyses"
+                icon={BarChart3}
+                value={overview?.loading ? "…" : totalAnalyses}
+                sub={
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {overview?.sessionsDataAvailable ? "Saved SpectraCheck sessions." : "Local analysis activity only."}
+                  </p>
+                }
+              />
+              <KpiCard
+                title="Pending review"
+                icon={AlertCircle}
+                severity={!overview?.loading && pendingReviewCount > 0 ? "warning" : "neutral"}
+                value={overview?.loading ? "…" : pendingReviewCount}
+                sub={<p className="mt-1 text-xs text-muted-foreground">Items requiring reviewer attention.</p>}
+                onClick={() => setActiveTab("tab-evidence-queue")}
+                onClickLabel="Open Evidence Queue tab"
+              />
+              <KpiCard
+                title="Contradictions"
+                icon={AlertTriangle}
+                severity={!overview?.loading && contradictionCount > 0 ? "critical" : "neutral"}
+                value={overview?.loading ? "…" : contradictionCount}
+                sub={<p className="mt-1 text-xs text-muted-foreground">Conflicting evidence signals.</p>}
+                onClick={() => setActiveTab("tab-evidence-queue")}
+                onClickLabel="Open Evidence Queue tab"
+              />
+              <KpiCard
+                title="Reports ready"
+                icon={FileText}
+                severity={!overview?.loading && reportsReadyCount > 0 ? "success" : "neutral"}
+                value={overview?.loading ? "…" : reportsReadyCount}
+                sub={<p className="mt-1 text-xs text-muted-foreground">Report-ready or locally generated outputs.</p>}
+                onClick={() => setActiveTab("tab-report")}
+                onClickLabel="Open Report tab"
+              />
+            </div>
+            {!overview?.loading && totalAnalyses === 0 ? (
+              <DataState
+                state={overviewDataState === "live" ? "empty" : overviewDataState}
+                title="No SpectraCheck analyses yet."
+                description="Use the existing session controls or upload/start-analysis areas below to begin; no new upload flow is created here."
+              />
+            ) : null}
+          </section>
+
+          <section className="space-y-3" aria-labelledby="spectracheck-evidence-workbench-heading">
+            <div>
+              <h2 id="spectracheck-evidence-workbench-heading" className="text-lg font-semibold tracking-tight">
+                Evidence queue
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Human-review view of queued spectral evidence and contradictions.
+              </p>
+            </div>
+            {evidenceItems.length > 0 ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {evidenceItems.slice(0, 2).map((item) => (
+                  <EvidenceCard
+                    key={item.id}
+                    title={item.title}
+                    module="spectracheck"
+                    status={mapEvidenceCardStatus(item)}
+                    confidence_score={item.score}
+                    confidence_label={item.label}
+                    risk_level={mapEvidenceRisk(item)}
+                    summary={item.summary ?? item.evidenceSummary?.[0] ?? "Queued evidence is available for review."}
+                    evidence_items={item.evidenceSummary ?? item.notes ?? []}
+                    contradictions={item.contradictions ?? []}
+                    citations={[]}
+                    model_name={item.modelName}
+                    model_version={item.modelVersion}
+                    last_updated_at={item.createdAt}
+                    review_status={item.qcStatus ?? item.readinessStatus ?? item.status}
+                    onOpenDetails={() => setActiveTab("tab-evidence-queue")}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EvidenceCard
+                title="SpectraCheck evidence queue"
+                module="spectracheck"
+                status="unavailable"
+                risk_level="unknown"
+                summary="No queued spectral evidence is available in this session."
+                evidence_items={["No SpectraCheck analyses yet."]}
+                citations={[]}
+                review_status="empty"
+                onOpenDetails={() => setActiveTab("tab-evidence-queue")}
+              />
+            )}
+          </section>
+
           <SessionValueSummaryCard sessionId={backendSessionId} />
           <SpectraCheckLinkedCompoundCard
             backendSessionId={backendSessionId}
@@ -998,24 +1150,26 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Workflow overview</CardTitle>
-                <CardDescription>SpectraCheck combines textual evidence, uploaded spectra, MS/LC-MS, and reporting.</CardDescription>
+                <CardTitle>How the workflow runs</CardTitle>
+                <CardDescription>From session inputs to a reviewer-ready report.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>Edit Shared session inputs above, then use tabs for uploads, prediction, cross-modal evidence, and exports.</p>
                 <p>
-                  Processed 1D uploads post to <code className="text-xs">/nmr/processed/*</code>; raw FIDs post to{" "}
-                  <code className="text-xs">/nmr/raw-fid/*</code> when the backend is enabled.
+                  Set the session inputs above (project, sample, candidates, NMR text). Then use the tabs
+                  to upload spectra, run predictions, build cross-modal evidence, and generate a report.
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Evidence hierarchy</CardTitle>
-                <CardDescription>Scientific credibility requires traceability.</CardDescription>
+                <CardTitle>How to read the evidence</CardTitle>
+                <CardDescription>Scores help you triage; the spectra decide.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>Prefer cited measurements and reviewer-visible payloads — numeric scores support triage, not proof.</p>
+                <p>
+                  Confidence numbers help prioritize what to review first. Cited measurements and the
+                  underlying spectra are the source of truth — not the score.
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -1247,15 +1401,15 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base">Running DEPT preview</CardTitle>
-                      <CardDescription>POST /carbon13/dept/preview</CardDescription>
+                      <CardDescription>Generating a quick DEPT carbon-typing preview…</CardDescription>
                     </CardHeader>
                   </Card>
                 )}
                 {deptAnalyzeLoading && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base">Running DEPT analyze</CardTitle>
-                      <CardDescription>POST /carbon13/dept/analyze</CardDescription>
+                      <CardTitle className="text-base">Running DEPT analysis</CardTitle>
+                      <CardDescription>Computing carbon multiplicities from your DEPT/APT data…</CardDescription>
                     </CardHeader>
                   </Card>
                 )}
@@ -1354,7 +1508,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 error={nmr2dError}
                 loading={nmr2dLoading}
                 loadingTitle="Running 2D NMR analysis"
-                loadingHint="POST /nmr2d/analyze"
+                loadingHint="Analyzing 2D NMR correlations…"
                 emptyHint="Attach a processed 2D peak table and SMILES, then analyze."
                 result={nmr2dResult}
                 unifiedEvidence={{
@@ -1401,7 +1555,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 error={nmrError}
                 loading={nmrLoading}
                 loadingTitle="Running 1H / 13C evidence match"
-                loadingHint="POST /prediction/nmr/match/evidence"
+                loadingHint="Matching predicted NMR signals to candidates…"
                 emptyHint="Use the shared session inputs above, then run the analyzer."
                 result={nmrResult}
                 unifiedEvidence={{
@@ -1460,7 +1614,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 error={simError}
                 loading={simLoading}
                 loadingTitle="Scoring spectral similarity"
-                loadingHint="POST /similarity/score/evidence"
+                loadingHint="Scoring spectral similarity…"
                 emptyHint="Run scoring — 2D files require both observed and reference uploads."
                 result={simResult}
                 unifiedEvidence={{
@@ -1510,7 +1664,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 error={candError}
                 loading={candLoading}
                 loadingTitle="Comparing candidates"
-                loadingHint="POST /candidates/compare/evidence"
+                loadingHint="Comparing candidate structures…"
                 emptyHint="Uses shared candidates and NMR text; add uploads only if you have them."
                 result={candResult}
                 unifiedEvidence={{

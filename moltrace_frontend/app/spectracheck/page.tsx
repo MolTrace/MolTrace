@@ -2,13 +2,14 @@ import { Suspense } from "react"
 import { AppShell } from "@/components/app/app-shell"
 import { ProgramsInterfaceWorkspace } from "@/components/programs/programs-interface-workspace"
 
-export default function SpectraCheckPage({
+export default async function SpectraCheckPage({
   searchParams,
 }: {
-  searchParams?: { [key: string]: string | string[] | undefined }
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const desktopMode = searchParams?.desktop === "1"
-  const sessionIdParam = searchParams?.sessionId
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+  const desktopMode = resolvedSearchParams?.desktop === "1"
+  const sessionIdParam = resolvedSearchParams?.sessionId
   const sessionId = typeof sessionIdParam === "string" ? sessionIdParam : null
   return (
     <AppShell>

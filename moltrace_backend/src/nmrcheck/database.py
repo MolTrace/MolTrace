@@ -1771,17 +1771,32 @@ def _audit_to_record(row: AuditEventORM) -> AuditEventRecord:
         metadata = dict(json.loads(row.metadata_json))
     except Exception:
         metadata = {}
+    tenant_id = metadata.get("tenant_id")
+    before_state = metadata.get("before_state")
+    after_state = metadata.get("after_state")
     return AuditEventRecord(
         id=row.id,
         created_at=row.created_at,
         event_type=row.event_type,
         message=row.message,
+        tenant_id=tenant_id if isinstance(tenant_id, int) else None,
+        action=_metadata_str(metadata, "action"),
+        module=_metadata_str(metadata, "module"),
         actor_user_id=row.actor_user_id,
         actor_email=row.actor_email,
         entity_type=row.entity_type,
         entity_id=row.entity_id,
+        before_state=before_state if isinstance(before_state, dict) else None,
+        after_state=after_state if isinstance(after_state, dict) else None,
+        reason=_metadata_str(metadata, "reason"),
+        correlation_id=_metadata_str(metadata, "correlation_id"),
         metadata=metadata,
     )
+
+
+def _metadata_str(metadata: dict[str, object], key: str) -> str | None:
+    value = metadata.get(key)
+    return value if isinstance(value, str) and value else None
 
 
 def _report_to_record(row: ReportORM) -> StoredReportRecord:

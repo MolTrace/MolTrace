@@ -17,6 +17,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
+import { EvidenceCard } from "@/components/science/evidence-card"
 import {
   candidateLabel,
   candidateScore,
@@ -322,15 +323,16 @@ export function TabResultSection({
       )}
 
       {loading && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{loadingTitle}</CardTitle>
-            <CardDescription>{loadingHint}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Calling the backend through /api/backend …</p>
-          </CardContent>
-        </Card>
+        <EvidenceCard
+          title={loadingTitle}
+          module="spectracheck"
+          status="unavailable"
+          risk_level="unknown"
+          summary={loadingHint}
+          evidence_items={["Calling the backend through /api/backend."]}
+          citations={[]}
+          review_status="waiting for evidence"
+        />
       )}
 
       {summary && !loading ? (
@@ -341,15 +343,16 @@ export function TabResultSection({
           unifiedEvidence={unifiedEvidence}
         />
       ) : !loading && !error ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Results</CardTitle>
-            <CardDescription>{emptyHint}</CardDescription>
-          </CardHeader>
-          <CardContent className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Run an analysis to see evidence summaries and developer JSON.
-          </CardContent>
-        </Card>
+        <EvidenceCard
+          title="Results"
+          module="spectracheck"
+          status="unavailable"
+          risk_level="unknown"
+          summary={emptyHint}
+          evidence_items={["Run an analysis to see evidence summaries and developer JSON."]}
+          citations={[]}
+          review_status="not generated"
+        />
       ) : null}
     </div>
   )

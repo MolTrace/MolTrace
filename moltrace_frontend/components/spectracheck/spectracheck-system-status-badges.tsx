@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { apiFetch } from "@/lib/api/client"
-import { cn } from "@/lib/utils"
+import { cn, formatStableUtcDateTime } from "@/lib/utils"
 
 type SubsystemHealth = "healthy" | "degraded" | "unknown"
 
@@ -22,16 +22,7 @@ function mapDependencyStatus(raw: unknown): SubsystemHealth {
 }
 
 function formatCheckTime(iso: string | null): string {
-  if (!iso) return "—"
-  const ms = Date.parse(iso)
-  if (Number.isNaN(ms)) return "—"
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
+  return formatStableUtcDateTime(iso, "—", { includeSeconds: true })
 }
 
 export function SpectraCheckSystemStatusBadges() {
@@ -148,8 +139,8 @@ export function SpectraCheckSystemStatusBadges() {
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-xs text-xs">
               {statusOk
-                ? "From GET /system/status (job queue dependency)."
-                : "Detailed job queue status requires GET /system/status (sign in if unavailable)."}
+                ? "Live job-queue status from the system health check."
+                : "Job-queue status needs the system health check — sign in if unavailable."}
             </TooltipContent>
           </Tooltip>
           <Tooltip>
@@ -160,13 +151,13 @@ export function SpectraCheckSystemStatusBadges() {
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-xs text-xs">
               {statusOk
-                ? "From GET /system/status (storage dependency)."
-                : "Detailed storage status requires GET /system/status (sign in if unavailable)."}
+                ? "Live storage status from the system health check."
+                : "Storage status needs the system health check — sign in if unavailable."}
             </TooltipContent>
           </Tooltip>
           <span
             className="text-[10px] tabular-nums text-muted-foreground sm:text-[11px]"
-            title="Last successful GET /system/health response time"
+            title="Last successful health-check response time"
           >
             {backendConnected ? `Checked ${formatCheckTime(lastHealthIso)}` : "No health check"}
           </span>

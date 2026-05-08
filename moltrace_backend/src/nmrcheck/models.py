@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import re
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import (
@@ -32,6 +33,11 @@ DiagnosticLabel = Literal[
 ]
 
 JobStatus = Literal["pending", "queued", "processing", "completed", "failed"]
+DataMode = Literal["live", "demo", "partially_synced", "unavailable", "stale"]
+AIEvidenceModule = Literal["spectracheck", "regulatory", "reactions", "ai_services"]
+AIEvidenceStatus = Literal["draft", "pending_review", "approved", "rejected", "contradiction"]
+AIEvidenceReviewStatus = Literal["approved", "rejected", "pending_review"]
+AIEvidenceRiskLevel = Literal["low", "medium", "high", "critical", "unknown"]
 ActionTokenPurpose = Literal["verify_email", "reset_password"]
 ReviewStatus = Literal["pending_review", "approved", "rejected", "needs_revision"]
 ReviewAction = Literal["approve", "reject", "override", "request_changes", "review"]
@@ -42,6 +48,23 @@ FIDPresetId = Literal[
     "higher_resolution",
     "custom",
 ]
+
+_PLAIN_TEXT_TAG_RE = re.compile(r"<\s*/?\s*[A-Za-z][^>]*>")
+
+
+def generated_at_utc() -> datetime:
+    return datetime.now(UTC)
+
+
+def sanitize_optional_plain_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    text = "".join(ch if ch in {"\n", "\t"} or ord(ch) >= 32 else " " for ch in text)
+    text = "\n".join(line.strip() for line in text.splitlines()).strip()
+    return text or None
+
+
 FIDQualityLabel = Literal["good", "review", "poor", "failed"]
 MolTraceEvidenceLabel = Literal[
     "best_supported",
@@ -5005,6 +5028,9 @@ class AIModelMonitoringSummary(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    generated_at: datetime = Field(default_factory=generated_at_utc)
 
 
 class PredictionAuditEntry(BaseModel):
@@ -5391,6 +5417,9 @@ class CrossModuleCommandCenterSummary(BaseModel):
     notes_json: list[str] = Field(default_factory=list)
     created_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    generated_at: datetime = Field(default_factory=generated_at_utc)
 
 
 MobileDeviceType = Literal["phone", "tablet", "desktop", "unknown"]
@@ -5685,6 +5714,9 @@ class MobileDashboardResponse(BaseModel):
     summary: CompactModuleSummary
     compact_payload: bool = True
     generated_at: datetime
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class MobileCommandCenterSection(BaseModel):
@@ -5703,6 +5735,9 @@ class MobileCommandCenterResponse(BaseModel):
     sections: list[MobileCommandCenterSection]
     action_summary_json: dict[str, Any] = Field(default_factory=dict)
     generated_at: datetime
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class MobileResourceSummary(BaseModel):
@@ -5740,6 +5775,9 @@ class MobileActionQueueResponse(BaseModel):
     items: list[MobileActionQueueItem] = Field(default_factory=list)
     counts_json: dict[str, int] = Field(default_factory=dict)
     generated_at: datetime
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class MobileReportPreview(BaseModel):
@@ -5768,6 +5806,9 @@ class MobileJobsSummary(BaseModel):
     jobs: list[dict[str, Any]] = Field(default_factory=list)
     generated_at: datetime
     compact_payload: bool = True
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class MobileOfflineSafeSummary(BaseModel):
@@ -5779,6 +5820,9 @@ class MobileOfflineSafeSummary(BaseModel):
     safety_rules: list[str] = Field(default_factory=list)
     draft_counts_json: dict[str, int] = Field(default_factory=dict)
     generated_at: datetime
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class MLModelHealthSummary(BaseModel):
@@ -5804,6 +5848,9 @@ class MLModelHealthSummary(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    generated_at: datetime = Field(default_factory=generated_at_utc)
 
 
 CompoundType = Literal[
@@ -8969,6 +9016,9 @@ class ModelHealthSummary(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    generated_at: datetime = Field(default_factory=generated_at_utc)
 
 
 DependencyStatus = Literal["ok", "warning", "error", "unknown"]
@@ -9013,6 +9063,9 @@ class SystemHealthResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    generated_at: datetime = Field(default_factory=generated_at_utc)
 
 
 class SystemStatusResponse(BaseModel):
@@ -9029,6 +9082,9 @@ class SystemStatusResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    generated_at: datetime = Field(default_factory=generated_at_utc)
 
 
 class EnvironmentCheckResponse(BaseModel):
@@ -9307,6 +9363,9 @@ class RoiSnapshot(BaseModel):
     created_at: datetime
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    generated_at: datetime = Field(default_factory=generated_at_utc)
 
 
 class AnalyticsSummary(BaseModel):
@@ -9326,6 +9385,9 @@ class AnalyticsSummary(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    data_mode: DataMode = "live"
+    last_synced_at: datetime | None = None
+    generated_at: datetime = Field(default_factory=generated_at_utc)
 
 
 class WorkflowAnalyticsSummary(BaseModel):
@@ -11323,6 +11385,50 @@ class ReviewQueueItem(BaseModel):
     recommended_action: ReviewStatus | None = None
 
 
+class AIEvidenceItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    module: AIEvidenceModule
+    entity_type: str
+    entity_id: int
+    status: AIEvidenceStatus
+    confidence_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    risk_level: AIEvidenceRiskLevel = "unknown"
+    summary: str
+    reviewer_id: int | None = None
+    reviewed_at: datetime | None = None
+    review_comment: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AIEvidenceReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: AIEvidenceReviewStatus
+    review_comment: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("review_comment", mode="before")
+    @classmethod
+    def _sanitize_review_comment(cls, value: str | None) -> str | None:
+        text = sanitize_optional_plain_text(value)
+        if text is not None and _PLAIN_TEXT_TAG_RE.search(text):
+            raise ValueError("review_comment must be plain text.")
+        return text
+
+
+class AIEvidenceReviewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_item: AIEvidenceItem
+    audit_event_id: int
+    updated_status: AIEvidenceStatus
+    reviewed_at: datetime
+    reviewer_id: int | None = None
+    reviewer_display_name: str | None = None
+
+
 class AuditEventRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -11330,10 +11436,17 @@ class AuditEventRecord(BaseModel):
     created_at: datetime
     event_type: str
     message: str
+    tenant_id: int | None = None
+    action: str | None = None
+    module: str | None = None
     actor_user_id: int | None = None
     actor_email: str | None = None
     entity_type: str | None = None
     entity_id: int | None = None
+    before_state: dict[str, Any] | None = None
+    after_state: dict[str, Any] | None = None
+    reason: str | None = None
+    correlation_id: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

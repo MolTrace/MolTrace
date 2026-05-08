@@ -419,9 +419,7 @@ export function ArtifactBrowser({ sessionId }: Props) {
           />
         </CardTitle>
         <CardDescription>
-          Browse artifacts attached to this SpectraCheck session (
-          <code className="text-xs">GET /spectracheck/sessions/&lt;session_id&gt;/artifacts</code>
-          ).
+          Browse artifacts attached to this SpectraCheck session.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

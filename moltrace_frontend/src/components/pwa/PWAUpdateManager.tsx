@@ -34,6 +34,21 @@ function registerUpdateListeners(registration: ServiceWorkerRegistration) {
 export function PWAUpdateManager() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return
+    if (process.env.NODE_ENV !== "production") {
+      void navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => {
+          void registration.unregister()
+        })
+      })
+      if ("caches" in window) {
+        void caches.keys().then((keys) => {
+          keys.forEach((key) => {
+            void caches.delete(key)
+          })
+        })
+      }
+      return
+    }
 
     const hadController = Boolean(navigator.serviceWorker.controller)
     let didReloadForUpdate = false

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { apiFetch, ApiError } from "@/lib/api/client"
+import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { normalizeProjectListPayload, readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { parseReactionProjectList, type ReactionProjectRow } from "@/src/lib/reaction-projects/reaction-projects-data"
@@ -33,6 +34,8 @@ import { trackRegulatoryDossierCreated } from "@/src/lib/analytics/analytics-cli
 import { RegulatoryNotificationsCompactCard } from "@/components/regulatory-hub/regulatory-notifications-compact-card"
 import { RegulatoryHubValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
 import { AlertTriangle, BookOpen, ClipboardList, Eye, FolderOpen, Loader2 } from "lucide-react"
+import { EvidenceCard } from "@/components/science/evidence-card"
+import { DataState, DataStateBadge, type DataStateKind } from "@/components/science/data-state"
 
 type DossierRow = Record<string, unknown>
 type JurisdictionRow = { id: number; name: string }
@@ -71,10 +74,7 @@ function dossierNumericId(row: DossierRow): number | undefined {
 }
 
 function formatWhen(iso: string | undefined): string {
-  if (!iso?.trim()) return "—"
-  const d = Date.parse(iso)
-  if (Number.isNaN(d)) return iso
-  return new Date(d).toLocaleString()
+  return formatStableUtcDateTime(iso)
 }
 
 function parseJurisdictionList(raw: unknown): JurisdictionRow[] {
@@ -152,6 +152,29 @@ function SummaryMetricCard({
     </Card>
   )
 }
+
+const REGULATORY_ACTION_CARD_TYPES = [
+  {
+    title: "Impurity threshold",
+    description: "Review impurity limits, missing evidence, and threshold-driven action items when dossiers provide them.",
+  },
+  {
+    title: "Residual solvent",
+    description: "Review solvent class, exposure, and batch evidence when residual solvent assessments are loaded.",
+  },
+  {
+    title: "Nitrosamine watch",
+    description: "Review route risk, source monitoring, and follow-up actions when nitrosamine watch data exists.",
+  },
+  {
+    title: "qNMR output",
+    description: "Review quantitative NMR readiness and reviewer state when qNMR profiles are attached.",
+  },
+  {
+    title: "AI governance",
+    description: "Review model provenance, citation support, and human review state for AI-assisted records.",
+  },
+] as const
 
 export function RegulatoryIntelligenceLanding() {
   const searchParams = useSearchParams()
@@ -388,6 +411,13 @@ export function RegulatoryIntelligenceLanding() {
   const reviewQueueRows = useMemo(() => {
     return dossiers.filter((d) => readRecordString(d, "status") === "in_review")
   }, [dossiers])
+  const regulatoryDataState: DataStateKind = loading
+    ? "loading"
+    : dossierListError
+      ? "unavailable"
+      : dossiers.length > 0
+        ? "live"
+        : "empty"
 
   async function submitCreate() {
     setCreateBusy(true)
@@ -492,11 +522,18 @@ export function RegulatoryIntelligenceLanding() {
   return (
     <div className="mx-auto max-w-[1200px] space-y-8 pb-12">
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Regulatory Intelligence</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Regulatory Hub</h1>
         <p className="max-w-3xl text-muted-foreground">
-          Build cited, reviewable dossiers from analytical evidence, requirements, and source documents.
+          Review impurity, qNMR, nitrosamine, and jurisdictional action cards.
         </p>
       </header>
+
+      <Alert className="border-warning/40 bg-warning/10">
+        <AlertTitle className="text-sm">Qualified review required</AlertTitle>
+        <AlertDescription className="text-sm text-muted-foreground">
+          Regulatory outputs are decision support and require qualified review.
+        </AlertDescription>
+      </Alert>
 
       {dossierListError ? (
         <Alert variant="destructive">
@@ -555,13 +592,113 @@ export function RegulatoryIntelligenceLanding() {
 
       <RegulatoryNotificationsCompactCard />
 
+      <section className="space-y-3" aria-labelledby="regulatory-action-cards-heading">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 id="regulatory-action-cards-heading" className="text-lg font-semibold tracking-tight">
+              Regulatory action cards
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Workbench categories for reviewable regulatory evidence. Empty cards do not imply completed assessments.
+            </p>
+          </div>
+          <DataStateBadge state={regulatoryDataState} />
+        </div>
+        {regulatoryDataState === "empty" ? (
+          <DataState
+            state="empty"
+            title="No regulatory action cards yet."
+            description="Create or open a dossier to attach impurity, residual solvent, nitrosamine, qNMR, or AI governance records."
+          />
+        ) : regulatoryDataState === "unavailable" ? (
+          <DataState
+            state="unavailable"
+            title="No regulatory action cards yet."
+            description="Regulatory action cards could not be loaded from the backend right now."
+          />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {REGULATORY_ACTION_CARD_TYPES.map((card) => (
+              <Card key={card.title} className="min-w-0">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-muted-foreground">
+                  <p>{card.description}</p>
+                  <Badge variant="outline" className="font-normal">
+                    {loading ? "Loading" : "No card loaded"}
+                  </Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3" aria-labelledby="regulatory-evidence-queue-heading">
+        <div>
+          <h2 id="regulatory-evidence-queue-heading" className="text-lg font-semibold tracking-tight">
+            Evidence queue
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Human-review queue for regulatory dossiers and source-backed action cards.
+          </p>
+        </div>
+        {reviewQueueRows.length > 0 ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {reviewQueueRows.slice(0, 2).map((row) => {
+              const id = dossierNumericId(row)
+              const title = readRecordString(row, "title") ?? "Regulatory dossier"
+              const jid = readRecordNumber(row, "jurisdiction_id")
+              const jLabel = jid != null ? jurisdictionNameById.get(jid) ?? `Jurisdiction ${jid}` : "Jurisdiction not set"
+              return (
+                <EvidenceCard
+                  key={id ?? title}
+                  title={title}
+                  module="regulatory"
+                  status="pending_review"
+                  risk_level={(enrichmentById[id ?? -1]?.risk?.toLowerCase() === "critical"
+                    ? "critical"
+                    : enrichmentById[id ?? -1]?.risk?.toLowerCase() === "high"
+                      ? "high"
+                      : "unknown")}
+                  summary={`Dossier is in review for ${jLabel}.`}
+                  evidence_items={[
+                    `Requirements needing evidence: ${id != null ? enrichmentById[id]?.missingEvidenceCount ?? "not loaded" : "not loaded"}`,
+                    `Risk level: ${id != null ? enrichmentById[id]?.risk ?? "not loaded" : "not loaded"}`,
+                  ]}
+                  citations={sources.slice(0, 3).map((source) => ({
+                    id: source.id,
+                    title: source.title,
+                    type: source.source_type,
+                  }))}
+                  last_updated_at={readRecordString(row, "updated_at")}
+                  review_status="in_review"
+                />
+              )
+            })}
+          </div>
+        ) : (
+          <EvidenceCard
+            title="Regulatory evidence queue"
+            module="regulatory"
+            status={regulatoryDataState === "unavailable" ? "unavailable" : "draft"}
+            risk_level="unknown"
+            summary="No regulatory action cards are queued for review."
+            evidence_items={["No regulatory action cards yet."]}
+            citations={sources.slice(0, 3).map((source) => ({ id: source.id, title: source.title, type: source.source_type }))}
+            review_status={loading ? "loading" : "empty"}
+          />
+        )}
+      </section>
+
       <section aria-labelledby="create-dossier-heading">
         <Card>
           <CardHeader>
             <CardTitle id="create-dossier-heading" className="text-lg">
               Create dossier
             </CardTitle>
-            <CardDescription>POST /regulatory/dossiers — optional links are omitted when empty.</CardDescription>
+            <CardDescription>Create a dossier; optional links are omitted when empty.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -729,7 +866,7 @@ export function RegulatoryIntelligenceLanding() {
             <h2 id="dossiers-table-heading" className="text-lg font-semibold tracking-tight">
               Dossiers
             </h2>
-            <p className="text-sm text-muted-foreground">GET /regulatory/dossiers</p>
+            <p className="text-sm text-muted-foreground">Current dossier list and evidence metrics.</p>
           </div>
           {enrichBusy ? (
             <Badge variant="outline" className="gap-1 font-normal">
@@ -832,7 +969,7 @@ export function RegulatoryIntelligenceLanding() {
         <h2 className="text-lg font-semibold tracking-tight">Source library</h2>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">GET /regulatory/sources</CardTitle>
+            <CardTitle className="text-base">Source library</CardTitle>
             <CardDescription>Catalog entries only — file contents are not shown here.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -872,17 +1009,46 @@ export function RegulatoryIntelligenceLanding() {
 
       <section id="regulatory-review-queue" className="space-y-3 scroll-mt-8">
         <h2 className="text-lg font-semibold tracking-tight">Regulatory review queue</h2>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Dossiers with status in_review</CardTitle>
-            <CardDescription>Human review is required before relying on outputs for regulatory decisions.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {dossierListError ? (
-              <p className="text-sm text-muted-foreground">Unavailable while the dossier service is unreachable.</p>
-            ) : reviewQueueRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No dossiers are currently in review.</p>
-            ) : (
+        {loading ? (
+          <EvidenceCard
+            title="Regulatory review evidence"
+            module="regulatory"
+            status="unavailable"
+            risk_level="unknown"
+            summary="Loading dossiers that require human review."
+            evidence_items={["Regulatory dossier review queue is loading."]}
+            citations={[]}
+            review_status="loading"
+          />
+        ) : dossierListError ? (
+          <EvidenceCard
+            title="Regulatory review evidence"
+            module="regulatory"
+            status="unavailable"
+            risk_level="unknown"
+            summary="Unavailable while the dossier service is unreachable."
+            evidence_items={[dossierListError]}
+            citations={[]}
+            review_status="unavailable"
+          />
+        ) : reviewQueueRows.length === 0 ? (
+          <EvidenceCard
+            title="Regulatory review evidence"
+            module="regulatory"
+            status="unavailable"
+            risk_level="unknown"
+            summary="No dossiers are currently in review."
+            evidence_items={["Human-review evidence will appear here when a dossier enters in_review status."]}
+            citations={[]}
+            review_status="no active review items"
+          />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Dossiers with status in_review</CardTitle>
+              <CardDescription>Human review is required before relying on outputs for regulatory decisions.</CardDescription>
+            </CardHeader>
+            <CardContent>
               <div className="table-scroll">
                 <Table>
                   <TableHeader>
@@ -921,9 +1087,9 @@ export function RegulatoryIntelligenceLanding() {
                   </TableBody>
                 </Table>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </section>
 
       <Card className="border-dashed bg-muted/30">

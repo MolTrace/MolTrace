@@ -6,7 +6,7 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -14,15 +14,18 @@ from sqlalchemy.orm import Session, sessionmaker
 from .database import session_scope
 from .models import (
     AuditEventRecord,
+    DataMode,
     DebugBundle,
     DebugBundleCreate,
     DependencyCheck,
+    DependencyStatus,
     EnvironmentCheckResponse,
     OperationalMetric,
     SecurityEvent,
     SecurityEventCreate,
     SecuritySummary,
     SystemHealthResponse,
+    SystemHealthStatus,
     SystemStatusResponse,
 )
 from .orm import (
@@ -68,9 +71,10 @@ def system_health(
     checks = [database_check(session_factory)]
     status = _aggregate_status(checks)
     warnings = _local_dev_warnings(local_auth_disabled)
+    generated_at = utcnow()
     return SystemHealthResponse(
         status=status,
-        timestamp=utcnow(),
+        timestamp=generated_at,
         backend_version=settings.release_version,
         environment=settings.app_env,
         uptime_seconds=uptime_seconds,
@@ -78,6 +82,9 @@ def system_health(
         warnings=warnings,
         notes=["Lightweight health check for uptime monitoring.", _SAFE_NOTE],
         metadata={"auth_mode": "local-dev-disabled" if local_auth_disabled else "enforced"},
+        data_mode=_data_mode_for_health_status(status),
+        last_synced_at=generated_at if status != "unhealthy" else None,
+        generated_at=generated_at,
     )
 
 
@@ -99,8 +106,10 @@ def system_status(
     warnings = _local_dev_warnings(local_auth_disabled)
     if not openapi_available:
         warnings.append("OpenAPI schema could not be generated.")
+    status = _aggregate_status(checks)
+    generated_at = utcnow()
     return SystemStatusResponse(
-        status=_aggregate_status(checks),
+        status=status,
         backend_version=settings.release_version,
         api_version=settings.release_version,
         database_status=by_name.get("database", _unknown_check("database")).status,
@@ -111,6 +120,9 @@ def system_status(
         warnings=warnings,
         notes=[_SAFE_NOTE],
         metadata={"dependency_count": len(checks), "environment": settings.app_env},
+        data_mode=_data_mode_for_health_status(status),
+        last_synced_at=generated_at if status != "unhealthy" else None,
+        generated_at=generated_at,
     )
 
 
@@ -155,7 +167,7 @@ def storage_check(storage_root: Path) -> DependencyCheck:
     try:
         exists = storage_root.exists()
         writable = storage_root.exists() and os.access(storage_root, os.W_OK)
-        status = "ok" if exists and writable else "warning"
+        status: DependencyStatus = "ok" if exists and writable else "warning"
         message = "Storage root is available." if exists else "Storage root does not exist yet."
         return DependencyCheck(
             name="storage",
@@ -596,27 +608,30 @@ def _build_safe_bundle_payload(
         "openapi_available": openapi_available,
         "storage_root_exists": storage_root.exists(),
     }
-    return _sanitize(
-        {
-            "safe_bundle": True,
-            "created_at": utcnow().isoformat(),
-            "scope": payload.scope,
-            "resource_id": payload.resource_id,
-            "backend_version": settings.release_version,
-            "system_status": status,
-            "job_ids": [job["id"] for job in jobs],
-            "jobs": jobs,
-            "session_ids": [item["id"] for item in sessions],
-            "sessions": sessions,
-            "artifact_ids": [item["id"] for item in artifacts],
-            "artifacts": artifacts,
-            "file_hashes": file_hashes,
-            "recent_audit_events": audit_events,
-            "recent_errors": recent_errors,
-            "warnings": [],
-            "notes": [_SAFE_NOTE],
-            "metadata": {"contains_raw_files": False, "contains_secret_values": False},
-        }
+    return cast(
+        dict[str, Any],
+        _sanitize(
+            {
+                "safe_bundle": True,
+                "created_at": utcnow().isoformat(),
+                "scope": payload.scope,
+                "resource_id": payload.resource_id,
+                "backend_version": settings.release_version,
+                "system_status": status,
+                "job_ids": [job["id"] for job in jobs],
+                "jobs": jobs,
+                "session_ids": [item["id"] for item in sessions],
+                "sessions": sessions,
+                "artifact_ids": [item["id"] for item in artifacts],
+                "artifacts": artifacts,
+                "file_hashes": file_hashes,
+                "recent_audit_events": audit_events,
+                "recent_errors": recent_errors,
+                "warnings": [],
+                "notes": [_SAFE_NOTE],
+                "metadata": {"contains_raw_files": False, "contains_secret_values": False},
+            }
+        ),
     )
 
 
@@ -810,31 +825,50 @@ def _debug_bundle_to_record(row: DebugBundleORM) -> DebugBundle:
 
 
 def _audit_to_record(row: AuditEventORM) -> AuditEventRecord:
+    metadata = _json_dict(row.metadata_json)
+    tenant_id = metadata.get("tenant_id")
+    before_state = metadata.get("before_state")
+    after_state = metadata.get("after_state")
     return AuditEventRecord(
         id=row.id,
         created_at=row.created_at,
         event_type=row.event_type,
         message=row.message,
+        tenant_id=tenant_id if isinstance(tenant_id, int) else None,
+        action=_metadata_str(metadata, "action"),
+        module=_metadata_str(metadata, "module"),
         actor_user_id=row.actor_user_id,
         actor_email=row.actor_email,
         entity_type=row.entity_type,
         entity_id=row.entity_id,
-        metadata=_json_dict(row.metadata_json),
+        before_state=before_state if isinstance(before_state, dict) else None,
+        after_state=after_state if isinstance(after_state, dict) else None,
+        reason=_metadata_str(metadata, "reason"),
+        correlation_id=_metadata_str(metadata, "correlation_id"),
+        metadata=metadata,
     )
 
 
+def _metadata_str(metadata: dict[str, Any], key: str) -> str | None:
+    value = metadata.get(key)
+    return value if isinstance(value, str) and value else None
+
+
 def _safe_audit_payload(row: AuditEventORM) -> dict[str, Any]:
-    return _sanitize(
-        {
-            "id": row.id,
-            "created_at": row.created_at.isoformat(),
-            "event_type": row.event_type,
-            "message": row.message,
-            "entity_type": row.entity_type,
-            "entity_id": row.entity_id,
-            "actor_email_present": bool(row.actor_email),
-            "metadata": _json_dict(row.metadata_json),
-        }
+    return cast(
+        dict[str, Any],
+        _sanitize(
+            {
+                "id": row.id,
+                "created_at": row.created_at.isoformat(),
+                "event_type": row.event_type,
+                "message": row.message,
+                "entity_type": row.entity_type,
+                "entity_id": row.entity_id,
+                "actor_email_present": bool(row.actor_email),
+                "metadata": _json_dict(row.metadata_json),
+            }
+        ),
     )
 
 
@@ -875,13 +909,21 @@ def _count_where(session: Session, model: type[Any], criterion: Any) -> int:
     return int(session.scalar(select(func.count(model.id)).where(criterion)) or 0)
 
 
-def _aggregate_status(checks: list[DependencyCheck]) -> str:
+def _aggregate_status(checks: list[DependencyCheck]) -> SystemHealthStatus:
     statuses = {check.status for check in checks}
     if "error" in statuses:
         return "unhealthy"
     if "warning" in statuses or "unknown" in statuses:
         return "degraded"
     return "healthy"
+
+
+def _data_mode_for_health_status(status: SystemHealthStatus) -> DataMode:
+    if status == "healthy":
+        return "live"
+    if status == "degraded":
+        return "partially_synced"
+    return "unavailable"
 
 
 def _unknown_check(name: str) -> DependencyCheck:

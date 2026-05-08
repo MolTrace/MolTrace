@@ -6,7 +6,9 @@ import hmac
 import importlib.util
 import io
 import json
+import logging
 import re
+import uuid
 import zipfile
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager
@@ -26,18 +28,21 @@ from fastapi import (
     Form,
     Header,
     HTTPException,
+    Path as ApiPath,
     Query,
     Request,
     UploadFile,
     status,
 )
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import ai_evidence_store as ai_evidence_store
 from . import ai_inference_store as ai_store
 from . import analytics_store as analytics_store
 from . import collaboration_store as collab_store
@@ -170,6 +175,11 @@ from .models import (
     ActiveLearningCandidateUpdate,
     AdminSystemSummary,
     AdminUserRecord,
+    AIEvidenceItem,
+    AIEvidenceModule,
+    AIEvidenceReviewRequest,
+    AIEvidenceReviewResponse,
+    AIEvidenceStatus,
     AIGovernanceRecord,
     AIGovernanceRecordCreate,
     AIModelMonitoringSummary,
@@ -824,6 +834,34 @@ from .visualization import normalize_artifact_record, normalize_visualization_re
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
+logger = logging.getLogger(__name__)
+
+CORRELATION_ID_HEADER = "X-Correlation-ID"
+REQUEST_ID_HEADER = "X-Request-ID"
+DATA_MODE_HEADER = "X-MolTrace-Data-Mode"
+GENERATED_AT_HEADER = "X-MolTrace-Generated-At"
+UNAVAILABLE_WARNING = "Service temporarily unavailable"
+INTERNAL_ERROR_DETAIL = "Internal server error."
+
+_ERROR_SECRET_KEY_RE = re.compile(
+    r"(api[_-]?key|access[_-]?token|refresh[_-]?token|bearer|password|passwd|secret|credential|private[_-]?key|service[_-]?account)",
+    re.IGNORECASE,
+)
+_ERROR_SECRET_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|credential|private[_-]?key)\b\s*[:=]\s*([^\s,;}\]]+)"
+)
+_ERROR_BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
+_ERROR_DB_URL_RE = re.compile(
+    r"(?i)\b(?:postgres(?:ql)?(?:\+\w+)?|mysql(?:\+\w+)?|mariadb(?:\+\w+)?|mssql(?:\+\w+)?|oracle(?:\+\w+)?|sqlite)://[^\s'\"<>]+"
+)
+_ERROR_SIGNED_URL_RE = re.compile(
+    r"(?i)https?://[^\s'\"<>]*(?:x-amz-signature|signature=|sig=|access_token=|token=)[^\s'\"<>]*"
+)
+_ERROR_PATH_RE = re.compile(
+    r"(?:(?:/(?:Users|private|tmp|var|home|app|workspace|opt|srv|mnt|Volumes)"
+    r"(?:/[A-Za-z0-9._ -]+)+)|[A-Za-z]:\\[^\s'\"<>]+)"
+)
+_ERROR_STACK_RE = re.compile(r"(?i)(traceback \(most recent call last\)|\n\s*file \"[^\"]+\")")
 
 
 @dataclass(frozen=True)
@@ -1958,6 +1996,26 @@ def _ai_actor(context: AccessContext) -> ai_store.AIInferenceActor:
     )
 
 
+def _ai_evidence_actor(context: AccessContext) -> ai_evidence_store.AIEvidenceActor:
+    if context.user is None:
+        raise HTTPException(
+            status_code=403,
+            detail="A user bearer token is required to review AI evidence.",
+        )
+    return ai_evidence_store.AIEvidenceActor(
+        user_id=context.user.id,
+        email=context.user.email,
+    )
+
+
+def _raise_ai_evidence_http_error(exc: Exception) -> None:
+    if isinstance(exc, ai_evidence_store.AIEvidenceNotFoundError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, ai_evidence_store.AIEvidenceError):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    raise exc
+
+
 def _raise_ai_http_error(exc: Exception) -> None:
     if isinstance(exc, ai_store.AIInferenceNotFoundError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -2019,6 +2077,100 @@ def _app_uptime_seconds(request: Request) -> float | None:
     if not isinstance(started_at, datetime):
         return None
     return round((datetime.now(UTC) - started_at).total_seconds(), 3)
+
+
+def _generated_at_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _correlation_id_from_request(request: Request) -> str:
+    incoming = request.headers.get(CORRELATION_ID_HEADER) or request.headers.get(
+        REQUEST_ID_HEADER
+    )
+    if incoming:
+        cleaned = incoming.strip()
+        if 0 < len(cleaned) <= 128 and re.fullmatch(r"[A-Za-z0-9._:-]+", cleaned):
+            return cleaned
+    return uuid.uuid4().hex
+
+
+def _request_correlation_id(request: Request) -> str:
+    existing = getattr(request.state, "correlation_id", None)
+    if isinstance(existing, str) and existing:
+        return existing
+    correlation_id = _correlation_id_from_request(request)
+    request.state.correlation_id = correlation_id
+    return correlation_id
+
+
+def _stable_unavailable_payload(request: Request | None = None) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "detail": UNAVAILABLE_WARNING,
+        "data_mode": "unavailable",
+        "warnings": [UNAVAILABLE_WARNING],
+        "generated_at": _generated_at_iso(),
+    }
+    if request is not None:
+        payload["correlation_id"] = _request_correlation_id(request)
+    return payload
+
+
+def _redact_secret_assignment(match: re.Match[str]) -> str:
+    key = match.group(1)
+    value = match.group(2)
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.:-]*", value) and value.startswith(
+        ("forbidden_", "invalid_", "missing_", "required_", "unsupported_")
+    ):
+        return match.group(0)
+    return f"{key}=[redacted]"
+
+
+def _redact_public_error_text(value: str) -> str:
+    text = str(value)
+    if _ERROR_STACK_RE.search(text):
+        return INTERNAL_ERROR_DETAIL
+    text = _ERROR_SIGNED_URL_RE.sub("[redacted signed URL]", text)
+    text = _ERROR_DB_URL_RE.sub("[redacted database URL]", text)
+    text = _ERROR_BEARER_RE.sub("Bearer [redacted]", text)
+    text = _ERROR_SECRET_ASSIGNMENT_RE.sub(_redact_secret_assignment, text)
+    text = _ERROR_PATH_RE.sub("[redacted path]", text)
+    return text
+
+
+def _sanitize_public_error_detail(value: Any) -> Any:
+    if isinstance(value, str):
+        return _redact_public_error_text(value)
+    if value is None or isinstance(value, bool | int | float):
+        return value
+    if isinstance(value, list):
+        return [_sanitize_public_error_detail(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_public_error_detail(item) for item in value]
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            key_str = str(key)
+            if key_str == "input" or _ERROR_SECRET_KEY_RE.search(key_str):
+                sanitized[key_str] = "[redacted]"
+            else:
+                sanitized[key_str] = _sanitize_public_error_detail(item)
+        return sanitized
+    return _redact_public_error_text(str(value))
+
+
+def _safe_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]:
+    safe_errors: list[dict[str, Any]] = []
+    for error in exc.errors():
+        safe: dict[str, Any] = {
+            "type": _sanitize_public_error_detail(error.get("type")),
+            "loc": _sanitize_public_error_detail(error.get("loc")),
+            "msg": _sanitize_public_error_detail(error.get("msg")),
+        }
+        ctx = error.get("ctx")
+        if isinstance(ctx, dict):
+            safe["ctx"] = _sanitize_public_error_detail(ctx)
+        safe_errors.append(safe)
+    return safe_errors
 
 
 def _client_ip(request: Request) -> str | None:
@@ -2090,8 +2242,12 @@ def _health_response(request: Request | None = None) -> dict[str, object]:
             with _state(request).session_factory() as session:
                 session.execute(select(1))
             checks["database"] = "ok"
-        except Exception as exc:
-            checks["database"] = f"error: {exc}"
+        except Exception:
+            logger.exception(
+                "Health check database probe failed",
+                extra={"correlation_id": _request_correlation_id(request)},
+            )
+            checks["database"] = "error"
     status_value = "ok" if all(value == "ok" for value in checks.values()) else "degraded"
     return {"status": status_value, "checks": checks}
 
@@ -2189,11 +2345,11 @@ def system_dependencies_route(
 @router.get(
     "/system/environment-check",
     response_model=EnvironmentCheckResponse,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_admin)],
 )
 def system_environment_check_route(
     request: Request,
-    context: AccessContext = Depends(require_access_context),
+    context: AccessContext = Depends(require_admin),
 ) -> EnvironmentCheckResponse:
     state = _state(request)
     return ops_store.environment_check(
@@ -14079,6 +14235,58 @@ def list_ml_prediction_service_configs_route(
 
 
 @router.get(
+    "/ai/evidence-queue",
+    response_model=list[AIEvidenceItem],
+    dependencies=[Depends(require_access_context)],
+)
+def list_ai_evidence_queue_route(
+    request: Request,
+    module: AIEvidenceModule | None = Query(default=None),
+    status_filter: AIEvidenceStatus | None = Query(default=None, alias="status"),
+    tenant_id: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=100, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[AIEvidenceItem]:
+    try:
+        return ai_evidence_store.list_evidence_queue(
+            _state(request).session_factory,
+            module=module,
+            status=status_filter,
+            tenant_id=tenant_id,
+            limit=limit,
+        )
+    except Exception as exc:
+        _raise_ai_evidence_http_error(exc)
+        raise
+
+
+@router.patch(
+    "/ai/evidence-queue/{evidence_id}/review",
+    response_model=AIEvidenceReviewResponse,
+    dependencies=[Depends(require_access_context)],
+)
+def review_ai_evidence_queue_item_route(
+    payload: AIEvidenceReviewRequest,
+    request: Request,
+    evidence_id: int = ApiPath(..., ge=1),
+    tenant_id: int | None = Query(default=None, ge=1),
+    context: AccessContext = Depends(require_access_context),
+) -> AIEvidenceReviewResponse:
+    try:
+        return ai_evidence_store.review_evidence_item(
+            _state(request).session_factory,
+            evidence_id,
+            payload,
+            actor=_ai_evidence_actor(context),
+            correlation_id=_request_correlation_id(request),
+            tenant_id=tenant_id,
+        )
+    except Exception as exc:
+        _raise_ai_evidence_http_error(exc)
+        raise
+
+
+@router.get(
     "/ai/services",
     response_model=list[AIServiceRegistry],
     dependencies=[Depends(require_access_context)],
@@ -20156,7 +20364,53 @@ def audit_log(
     limit: int = Query(default=100, ge=1, le=500),
     event_type: str | None = Query(default=None),
     entity_type: str | None = Query(default=None),
-    entity_id: int | None = Query(default=None),
+    entity_id: int | None = Query(default=None, ge=1),
+) -> list[AuditEventRecord]:
+    return _audit_events_for_context(
+        request,
+        context=context,
+        limit=limit,
+        event_type=event_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+
+
+@router.get(
+    "/audit/events",
+    response_model=list[AuditEventRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def audit_events_log(
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+    limit: int = Query(default=100, ge=1, le=500),
+    event_type: str | None = Query(
+        default=None, min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_.:-]+$"
+    ),
+    entity_type: str | None = Query(
+        default=None, min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_.:-]+$"
+    ),
+    entity_id: int | None = Query(default=None, ge=1),
+) -> list[AuditEventRecord]:
+    return _audit_events_for_context(
+        request,
+        context=context,
+        limit=limit,
+        event_type=event_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+
+
+def _audit_events_for_context(
+    request: Request,
+    *,
+    context: AccessContext,
+    limit: int,
+    event_type: str | None,
+    entity_type: str | None,
+    entity_id: int | None,
 ) -> list[AuditEventRecord]:
     state = _state(request)
     limit_value = limit if isinstance(limit, int) else 100
@@ -23212,12 +23466,71 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        response = await call_next(request)
+        correlation_id = _correlation_id_from_request(request)
+        request.state.correlation_id = correlation_id
+        generated_at = _generated_at_iso()
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.exception(
+                "Unhandled API error",
+                extra={"correlation_id": correlation_id, "path": request.url.path},
+            )
+            response = JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content=_stable_unavailable_payload(request),
+            )
+        data_mode = "unavailable" if response.status_code >= 500 else "live"
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         response.headers["X-MolTrace-Backend-Version"] = settings.release_version
+        response.headers[CORRELATION_ID_HEADER] = correlation_id
+        response.headers[REQUEST_ID_HEADER] = correlation_id
+        response.headers[DATA_MODE_HEADER] = data_mode
+        response.headers[GENERATED_AT_HEADER] = generated_at
         return response
+
+    @app.exception_handler(HTTPException)
+    async def safe_http_exception_handler(
+        request: Request, exc: HTTPException
+    ) -> JSONResponse:
+        if exc.status_code >= 500:
+            logger.warning(
+                "HTTP exception returned as safe error response",
+                extra={
+                    "correlation_id": _request_correlation_id(request),
+                    "path": request.url.path,
+                    "status_code": exc.status_code,
+                    "detail": exc.detail,
+                },
+            )
+            content = _stable_unavailable_payload(request)
+            status_code = exc.status_code
+        else:
+            content = {"detail": _sanitize_public_error_detail(exc.detail)}
+            status_code = exc.status_code
+        return JSONResponse(
+            status_code=status_code,
+            content=content,
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def safe_validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        logger.info(
+            "Request validation failed",
+            extra={
+                "correlation_id": _request_correlation_id(request),
+                "path": request.url.path,
+            },
+        )
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": _safe_validation_errors(exc)},
+        )
 
     app.include_router(router)
     from .nmr2d_routes import router as nmr2d_router

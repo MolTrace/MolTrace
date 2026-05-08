@@ -1,12 +1,11 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { X, AlertTriangle, CheckCircle2, Clock, ChevronRight } from "lucide-react"
+import { X, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { useOptionalOverviewData } from "@/components/app/overview-data-context"
+import { EvidenceCard, type EvidenceRiskLevel, type EvidenceStatus } from "@/components/science/evidence-card"
 
 const DEMO_QUEUE_ITEMS = [
   {
@@ -35,8 +34,35 @@ const DEMO_QUEUE_ITEMS = [
   },
 ]
 
+type QueueItem = {
+  id: string
+  type: string
+  confidence: number
+  status: "contradiction" | "high_confidence" | "pending"
+  project: string
+  timeAgo: string
+}
+
 interface AIEvidenceQueueProps {
   onClose: () => void
+}
+
+function mapQueueStatus(status: QueueItem["status"]): EvidenceStatus {
+  if (status === "contradiction") return "contradiction"
+  if (status === "pending") return "pending_review"
+  return "draft"
+}
+
+function mapQueueRisk(status: QueueItem["status"]): EvidenceRiskLevel {
+  if (status === "contradiction") return "high"
+  if (status === "pending") return "medium"
+  return "low"
+}
+
+function queueConfidenceLabel(status: QueueItem["status"]): string {
+  if (status === "high_confidence") return "high estimate"
+  if (status === "contradiction") return "conflicting"
+  return "needs review"
 }
 
 export function AIEvidenceQueue({ onClose }: AIEvidenceQueueProps) {
@@ -82,46 +108,22 @@ export function AIEvidenceQueue({ onClose }: AIEvidenceQueueProps) {
             {sessionsOk && !loading && queueItems.length === 0 ? (
               <p className="px-1 text-xs text-muted-foreground">No flagged sessions.</p>
             ) : null}
-            {queueItems.map((item) => (
-              <Card key={item.id} className="cursor-pointer transition-shadow hover:shadow-md">
-                <CardHeader className="p-3 pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-sm font-medium">{item.id}</CardTitle>
-                      <p className="text-xs text-muted-foreground">{item.type}</p>
-                    </div>
-                    {item.status === "contradiction" && (
-                      <Badge variant="outline" className="gap-1 border-warning/50 text-warning">
-                        <AlertTriangle className="h-3 w-3" />
-                        Contradiction
-                      </Badge>
-                    )}
-                    {item.status === "high_confidence" && (
-                      <Badge variant="outline" className="gap-1 border-success/50 text-success">
-                        <CheckCircle2 className="h-3 w-3" />
-                        High
-                      </Badge>
-                    )}
-                    {item.status === "pending" && (
-                      <Badge variant="outline" className="gap-1">
-                        <Clock className="h-3 w-3" />
-                        Pending
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="p-3 pt-0">
-                  <div className="mb-2 flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Confidence</span>
-                    <span className="font-mono font-medium">{item.confidence}%</span>
-                  </div>
-                  <Progress value={item.confidence} className="h-1.5" />
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{item.project}</span>
-                    <span className="text-xs text-muted-foreground">{item.timeAgo}</span>
-                  </div>
-                </CardContent>
-              </Card>
+            {(queueItems as QueueItem[]).map((item) => (
+              <EvidenceCard
+                key={item.id}
+                compact
+                title={item.id}
+                module="spectracheck"
+                status={mapQueueStatus(item.status)}
+                confidence_score={item.confidence}
+                confidence_label={queueConfidenceLabel(item.status)}
+                risk_level={mapQueueRisk(item.status)}
+                summary={item.type}
+                evidence_items={[`Project: ${item.project}`, `Updated: ${item.timeAgo}`]}
+                citations={[]}
+                review_status={item.status === "pending" ? "triage pending" : undefined}
+                className="transition-shadow hover:shadow-md"
+              />
             ))}
           </div>
         </div>
