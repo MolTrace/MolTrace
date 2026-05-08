@@ -8,6 +8,7 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import { MlModelProvenanceSummary } from "@/components/ml/ml-model-provenance-summary"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { apiFetch } from "@/lib/api/client"
+import { formatStableUtcDateTime } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -287,8 +288,7 @@ function readNum(v: unknown): number | null {
 
 function fmtIso(iso: unknown): string {
   if (typeof iso !== "string" || !iso.trim()) return "—"
-  const ms = Date.parse(iso)
-  return Number.isNaN(ms) ? iso : new Date(ms).toLocaleString()
+  return formatStableUtcDateTime(iso)
 }
 
 /** Convert `<input type="datetime-local">` value to ISO-8601 for POST/PATCH batch planned_start / planned_end. */

@@ -16,7 +16,10 @@ import {
   patchSessionReviewTask,
   type TaskStatusGroup,
 } from "@/src/lib/spectracheck/review-queue"
-import { ExternalLink, Loader2 } from "lucide-react"
+import { AlertCircle, CheckCircle2, ClipboardCheck, Clock, ExternalLink, Loader2, PlayCircle, X } from "lucide-react"
+import { KpiCard } from "@/components/dashboard/kpi-card"
+import { StatusFilterPills } from "@/components/dashboard/status-filter-pills"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 
 type EnrichedTask = {
   task: Record<string, unknown>
@@ -30,6 +33,24 @@ const COLUMNS: { key: TaskStatusGroup; label: string }[] = [
   { key: "resolved", label: "Resolved" },
   { key: "dismissed", label: "Dismissed" },
 ]
+
+type PriorityBucket = "critical" | "high" | "normal" | "low"
+type PriorityFilter = "all" | PriorityBucket
+
+function priorityBucketOf(row: Record<string, unknown>): PriorityBucket {
+  const raw = String(row.priority ?? "").toLowerCase()
+  if (raw === "critical") return "critical"
+  if (raw === "high") return "high"
+  if (raw === "low") return "low"
+  return "normal"
+}
+
+function humanizeStatus(status: string): string {
+  const trimmed = status.trim()
+  if (!trimmed || trimmed === "—") return "—"
+  const spaced = trimmed.replace(/[_-]+/g, " ")
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase()
+}
 
 function readStr(row: Record<string, unknown>, keys: string[]): string {
   for (const k of keys) {
@@ -67,6 +88,7 @@ export default function ReviewQueueWorkspace() {
   const [tasks, setTasks] = useState<EnrichedTask[]>([])
   const [patchBusyKey, setPatchBusyKey] = useState<string | null>(null)
   const [patchErr, setPatchErr] = useState("")
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -122,7 +144,7 @@ export default function ReviewQueueWorkspace() {
 
     if (sessionErrors > 0) {
       setPartialErr(
-        `${sessionErrors} session(s) had tasks that could not be loaded (permissions or connectivity).`,
+        `Couldn't load tasks for ${sessionErrors} session${sessionErrors === 1 ? "" : "s"} — check permissions or connection.`,
       )
     }
     setTasks(collected)
@@ -133,6 +155,17 @@ export default function ReviewQueueWorkspace() {
     void load()
   }, [load])
 
+  const priorityCounts = useMemo(() => {
+    const counts: Record<PriorityBucket, number> = { critical: 0, high: 0, normal: 0, low: 0 }
+    for (const et of tasks) counts[priorityBucketOf(et.task)]++
+    return counts
+  }, [tasks])
+
+  const filteredTasks = useMemo(() => {
+    if (priorityFilter === "all") return tasks
+    return tasks.filter((et) => priorityBucketOf(et.task) === priorityFilter)
+  }, [tasks, priorityFilter])
+
   const grouped = useMemo(() => {
     const buckets: Record<TaskStatusGroup, EnrichedTask[]> = {
       open: [],
@@ -140,12 +173,12 @@ export default function ReviewQueueWorkspace() {
       resolved: [],
       dismissed: [],
     }
-    for (const et of tasks) {
+    for (const et of filteredTasks) {
       const k = normalizeTaskStatus(et.task)
       buckets[k].push(et)
     }
     return buckets
-  }, [tasks])
+  }, [filteredTasks])
 
   async function patchStatus(et: EnrichedTask, status: TaskStatusGroup) {
     const tid = readStr(et.task, ["id", "task_id"])
@@ -169,10 +202,7 @@ export default function ReviewQueueWorkspace() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Review Queue</h1>
           <p className="text-muted-foreground">
-            Review tasks collected per SpectraCheck session. There is no global review-task index in this API — tasks are
-            merged from{" "}
-            <code className="text-xs">GET /spectracheck/sessions/{'{session_id}'}/review-tasks</code> for each session
-            returned by <code className="text-xs">GET /spectracheck/sessions</code>.
+            Tasks awaiting review across your SpectraCheck sessions.
           </p>
           {loadErr ? <p className="mt-1 text-xs text-destructive">{loadErr}</p> : null}
           {partialErr ? <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">{partialErr}</p> : null}
@@ -191,15 +221,74 @@ export default function ReviewQueueWorkspace() {
       ) : null}
 
       {!loading && tasks.length === 0 && !loadErr ? (
-        <Card className="border-muted">
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            No review tasks returned for your sessions yet.
-          </CardContent>
-        </Card>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ClipboardCheck />
+            </EmptyMedia>
+            <EmptyTitle>No review tasks yet</EmptyTitle>
+            <EmptyDescription>
+              Tasks appear here when SpectraCheck flags an analysis for human review. When your sessions
+              produce findings, they&apos;ll show up in this queue.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button asChild>
+              <Link href="/spectracheck">Open SpectraCheck</Link>
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : null}
 
       {!loading && tasks.length > 0 ? (
-        <div className="grid gap-4 xl:grid-cols-4">
+        <>
+          <StatusFilterPills
+            label="Filter by priority"
+            value={priorityFilter}
+            onChange={setPriorityFilter}
+            options={[
+              { value: "all", label: "All", count: tasks.length },
+              { value: "critical", label: "Critical", count: priorityCounts.critical },
+              { value: "high", label: "High", count: priorityCounts.high },
+              { value: "normal", label: "Normal", count: priorityCounts.normal },
+              { value: "low", label: "Low", count: priorityCounts.low },
+            ]}
+          />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <KpiCard
+              title="Open"
+              icon={AlertCircle}
+              severity={grouped.open.length > 0 ? "warning" : "neutral"}
+              value={grouped.open.length}
+              sub={
+                <p className="text-xs text-muted-foreground">
+                  {grouped.open.length === 0 ? "Nothing waiting" : "Tasks waiting to be picked up"}
+                </p>
+              }
+            />
+            <KpiCard
+              title="In progress"
+              icon={Clock}
+              value={grouped.in_progress.length}
+              sub={
+                <p className="text-xs text-muted-foreground">
+                  {grouped.in_progress.length === 0 ? "Nothing in progress" : "Tasks currently being worked"}
+                </p>
+              }
+            />
+            <KpiCard
+              title="Resolved"
+              icon={CheckCircle2}
+              severity={grouped.resolved.length > 0 ? "success" : "neutral"}
+              value={grouped.resolved.length}
+              sub={
+                <p className="text-xs text-muted-foreground">
+                  {grouped.resolved.length === 0 ? "Nothing resolved yet" : "Completed reviews"}
+                </p>
+              }
+            />
+          </div>
+          <div className="grid gap-4 xl:grid-cols-4">
           {COLUMNS.map((col) => (
             <div key={col.key} className="min-w-0 space-y-3">
               <div className="flex items-center justify-between gap-2 border-b pb-2">
@@ -233,10 +322,7 @@ export default function ReviewQueueWorkspace() {
                         <CardHeader className="space-y-1 pb-2">
                           <CardTitle className="text-base leading-snug">{title}</CardTitle>
                           <CardDescription className="text-xs">
-                            Session / sample:{" "}
-                            <span className="font-mono text-[11px]">{et.sessionSampleLabel}</span>
-                            <span className="text-muted-foreground"> · session_id </span>
-                            <span className="font-mono text-[11px]">{et.sessionId}</span>
+                            Sample <span className="font-mono text-[11px]">{et.sessionSampleLabel}</span>
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
@@ -245,7 +331,7 @@ export default function ReviewQueueWorkspace() {
                               {priority}
                             </Badge>
                             <Badge variant="outline" className="font-normal">
-                              {status}
+                              {humanizeStatus(status)}
                             </Badge>
                           </div>
                           <div className="space-y-0.5 text-xs text-muted-foreground">
@@ -260,13 +346,15 @@ export default function ReviewQueueWorkspace() {
                             <div className="rounded-md border bg-muted/30 px-2 py-1.5 text-[11px] text-muted-foreground">
                               {evidenceId ? (
                                 <span>
-                                  evidence_id: <span className="font-mono text-foreground">{evidenceId}</span>
+                                  Linked evidence{" "}
+                                  <span className="font-mono text-foreground">#{evidenceId}</span>
                                 </span>
                               ) : null}
                               {evidenceId && reportId ? <span className="mx-1">·</span> : null}
                               {reportId ? (
                                 <span>
-                                  report_id: <span className="font-mono text-foreground">{reportId}</span>
+                                  Linked report{" "}
+                                  <span className="font-mono text-foreground">#{reportId}</span>
                                 </span>
                               ) : null}
                             </div>
@@ -276,7 +364,7 @@ export default function ReviewQueueWorkspace() {
                               type="button"
                               size="sm"
                               variant="secondary"
-                              className="h-8 text-xs"
+                              className="h-8 gap-1.5 text-xs"
                               disabled={
                                 normalizeTaskStatus(row) === "in_progress" ||
                                 normalizeTaskStatus(row) === "resolved" ||
@@ -285,13 +373,18 @@ export default function ReviewQueueWorkspace() {
                               }
                               onClick={() => void patchStatus(et, "in_progress")}
                             >
-                              {patchBusyKey === `${busyBase}:in_progress` ? "…" : "Mark in progress"}
+                              {patchBusyKey === `${busyBase}:in_progress` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <PlayCircle className="h-3 w-3" />
+                              )}
+                              Start review
                             </Button>
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
-                              className="h-8 text-xs"
+                              className="h-8 gap-1.5 text-xs"
                               disabled={
                                 normalizeTaskStatus(row) === "resolved" ||
                                 normalizeTaskStatus(row) === "dismissed" ||
@@ -299,13 +392,18 @@ export default function ReviewQueueWorkspace() {
                               }
                               onClick={() => void patchStatus(et, "resolved")}
                             >
-                              {patchBusyKey === `${busyBase}:resolved` ? "…" : "Resolve"}
+                              {patchBusyKey === `${busyBase}:resolved` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-3 w-3" />
+                              )}
+                              Resolve
                             </Button>
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
-                              className="h-8 text-xs"
+                              className="h-8 gap-1.5 text-xs"
                               disabled={
                                 normalizeTaskStatus(row) === "dismissed" ||
                                 normalizeTaskStatus(row) === "resolved" ||
@@ -313,7 +411,12 @@ export default function ReviewQueueWorkspace() {
                               }
                               onClick={() => void patchStatus(et, "dismissed")}
                             >
-                              {patchBusyKey === `${busyBase}:dismissed` ? "…" : "Dismiss"}
+                              {patchBusyKey === `${busyBase}:dismissed` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <X className="h-3 w-3" />
+                              )}
+                              Dismiss
                             </Button>
                             <Button type="button" size="sm" variant="ghost" className="h-8 gap-1 px-2 text-xs" asChild>
                               <Link
@@ -333,7 +436,8 @@ export default function ReviewQueueWorkspace() {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        </>
       ) : null}
     </div>
   )

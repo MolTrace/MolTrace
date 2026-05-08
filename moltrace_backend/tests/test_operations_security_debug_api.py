@@ -56,6 +56,9 @@ def test_operations_security_and_debug_workflow(tmp_path, monkeypatch):
         assert "super-secret-test-value" not in env_text
         assert "test-key" not in env_text
 
+        viewer_env = client.get("/system/environment-check", headers=viewer_headers)
+        assert viewer_env.status_code == 403, viewer_env.text
+
         metrics = client.get("/system/metrics", headers=admin_headers)
         assert metrics.status_code == 200, metrics.text
         assert any(metric["name"] == "security_events_total" for metric in metrics.json())

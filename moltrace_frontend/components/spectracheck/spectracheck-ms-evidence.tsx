@@ -2668,7 +2668,7 @@ export function SpectraCheckMsEvidence({
                 error={hrmsMatchError}
                 loading={hrmsMatchLoading}
                 loadingTitle="Running HRMS candidate match"
-                loadingHint="POST /ms/hrms/candidates/match/evidence"
+                loadingHint="Matching candidates against HRMS data…"
                 emptyHint="Enter observed m/z and candidate structures, then run."
                 result={hrmsMatchResult}
                 summaryTone="ms"
@@ -2754,7 +2754,7 @@ export function SpectraCheckMsEvidence({
                 error={formulaError}
                 loading={formulaLoading}
                 loadingTitle="Searching formulas by HRMS"
-                loadingHint="POST /ms/hrms/formulas/search"
+                loadingHint="Searching molecular formulas for the target mass…"
                 emptyHint="Set observed m/z, adduct, and tolerances, then search."
                 result={formulaResult}
                 summaryTone="ms"
@@ -2911,7 +2911,7 @@ export function SpectraCheckMsEvidence({
                 error={adductError}
                 loading={adductLoading}
                 loadingTitle="Inferring adducts and isotope clusters"
-                loadingHint="POST /ms/adducts/infer/evidence"
+                loadingHint="Inferring adducts and charge states…"
                 emptyHint="Paste a peak list and run."
                 result={adductResult}
                 summaryTone="ms"
@@ -3044,7 +3044,7 @@ export function SpectraCheckMsEvidence({
                 error={msmsError}
                 loading={msmsLoading}
                 loadingTitle="Annotating processed MS/MS"
-                loadingHint="POST /ms/msms/annotate/evidence"
+                loadingHint="Annotating MS/MS fragments…"
                 emptyHint="Provide precursor m/z and daughter-ion peak list."
                 result={msmsResult}
                 summaryTone="ms"
@@ -3157,7 +3157,7 @@ export function SpectraCheckMsEvidence({
                 error={fragError}
                 loading={fragLoading}
                 loadingTitle="Building fragmentation-tree evidence"
-                loadingHint="POST /ms/msms/fragmentation-tree/evidence"
+                loadingHint="Building MS/MS fragmentation tree…"
                 emptyHint="Provide precursor and MS/MS peak list; optionally include shared candidates."
                 result={fragResult}
                 summaryTone="ms"
@@ -3247,7 +3247,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                   <div className="space-y-2 border-t pt-4">
-                    <p className="text-xs font-medium text-muted-foreground">Long-running job (POST /jobs)</p>
+                    <p className="text-xs font-medium text-muted-foreground">Long-running analysis job</p>
                     <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void startLcmsImportJob()}>
                       Start as job (lcms_import)
                     </Button>
@@ -3298,7 +3298,7 @@ export function SpectraCheckMsEvidence({
                 error={lcmsImportError}
                 loading={lcmsImportLoading}
                 loadingTitle="Importing LC-MS/MS source"
-                loadingHint="POST /ms/lcms/import/bridge/upload"
+                loadingHint="Importing LC-MS data through the ingest bridge…"
                 emptyHint="Upload a raw or processed LC-MS file to extract peaks."
                 result={lcmsImportResult}
                 summaryTone="ms"
@@ -3416,7 +3416,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                   <div className="space-y-2 border-t pt-4">
-                    <p className="text-xs font-medium text-muted-foreground">Long-running job (POST /jobs)</p>
+                    <p className="text-xs font-medium text-muted-foreground">Long-running analysis job</p>
                     <Button
                       type="button"
                       variant="outline"
@@ -3445,7 +3445,7 @@ export function SpectraCheckMsEvidence({
                 error={lcmsFeatureError}
                 loading={lcmsFeatureLoading}
                 loadingTitle="Detecting LC-MS features"
-                loadingHint="POST /ms/lcms/features/detect/upload"
+                loadingHint="Detecting LC-MS features…"
                 emptyHint="Upload a file and target m/z list to detect features."
                 result={lcmsFeatureResult}
                 summaryTone="ms"
@@ -3568,7 +3568,7 @@ export function SpectraCheckMsEvidence({
                 error={lcmsGrpError}
                 loading={lcmsGrpLoading}
                 loadingTitle="Grouping LC-MS features"
-                loadingHint="POST /ms/lcms/features/group/evidence"
+                loadingHint="Grouping LC-MS features and aligning retention times…"
                 emptyHint="Paste sample (and optional blank) peak tables, then run."
                 result={lcmsGrpResult}
                 summaryTone="ms"
@@ -3693,7 +3693,7 @@ export function SpectraCheckMsEvidence({
                 error={lcmsConError}
                 loading={lcmsConLoading}
                 loadingTitle="Scoring LC-MS feature-family consensus"
-                loadingHint="POST /ms/lcms/features/consensus/evidence"
+                loadingHint="Building feature-family consensus across runs…"
                 emptyHint="Paste a grouped feature table (or load from grouping), then run."
                 result={lcmsConResult}
                 summaryTone="ms"
@@ -3848,7 +3848,7 @@ export function SpectraCheckMsEvidence({
                 error={lcmsDerError}
                 loading={lcmsDerLoading}
                 loadingTitle="Running LC-MS dereplication"
-                loadingHint="POST /ms/lcms/dereplication/evidence"
+                loadingHint="Running library dereplication…"
                 emptyHint="Provide candidates and/or family table evidence to rank library entries."
                 result={lcmsDerResult}
                 summaryTone="ms"
@@ -3970,7 +3970,7 @@ export function SpectraCheckMsEvidence({
                 error={lcmsBridgeError}
                 loading={lcmsBridgeLoading}
                 loadingTitle="Bridging LC-MS consensus to candidates"
-                loadingHint="POST /confidence/candidates/lcms-consensus-bridge"
+                loadingHint="Bridging LC-MS consensus into unified confidence…"
                 emptyHint="Enter candidates and supply consensus evidence (table or prior consensus run)."
                 result={lcmsBridgeResult}
                 summaryTone="ms"

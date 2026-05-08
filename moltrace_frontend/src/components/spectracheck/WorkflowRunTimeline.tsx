@@ -493,8 +493,7 @@ export function WorkflowRunTimeline({
           <InfoTooltip content={TIMELINE_TOOLTIP} label="Workflow run timeline information" />
         </CardTitle>
         <CardDescription>
-          Live status from <code className="text-xs">GET /workflow-runs/{"{id}"}</code>,{" "}
-          <code className="text-xs">/events</code>, and <code className="text-xs">/steps</code>. Polling pauses when the run
+          Live status of the run, with events and per-step progress. Polling pauses once the run
           settles.
         </CardDescription>
       </CardHeader>

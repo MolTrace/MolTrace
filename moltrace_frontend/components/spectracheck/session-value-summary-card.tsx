@@ -8,7 +8,8 @@ import type { RoiSnapshotData } from "@/src/lib/analytics/roi-dashboard-data"
 function fmtMinutes(n: number | null | undefined, loading: boolean): string {
   if (loading) return "…"
   if (n == null) return "—"
-  return n.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 0 })
+  const rounded = Math.round(n * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
 }
 
 function fmtInt(n: number | null | undefined, loading: boolean): string {
@@ -53,7 +54,7 @@ export function SessionValueSummaryCard({ sessionId }: { sessionId: string | nul
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Session Value Summary</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /analytics/sessions/{"{session_id}"}/roi</code>
+            Tasks automated, time saved, and reports produced for this session.
           </CardDescription>
         </CardHeader>
         <CardContent>

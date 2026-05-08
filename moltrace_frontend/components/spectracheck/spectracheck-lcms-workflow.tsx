@@ -61,12 +61,12 @@ type StepDef = {
 }
 
 const STEPS: StepDef[] = [
-  { key: "import", title: "Import Bridge", endpoint: "POST /ms/lcms/import/bridge/upload" },
-  { key: "detect", title: "Feature Detection", endpoint: "POST /ms/lcms/features/detect/upload" },
-  { key: "group", title: "Grouping / Blank / RT align", endpoint: "POST /ms/lcms/features/group/upload" },
-  { key: "consensus", title: "Feature-Family Consensus", endpoint: "POST /ms/lcms/features/consensus/upload" },
-  { key: "dereplication", title: "Library Dereplication", endpoint: "POST /ms/lcms/dereplication/upload" },
-  { key: "bridge", title: "LC-MS Consensus Bridge", endpoint: "POST /confidence/candidates/lcms-consensus-bridge" },
+  { key: "import", title: "Import Bridge", endpoint: "Ingest LC-MS data and prepare it for downstream analysis." },
+  { key: "detect", title: "Feature Detection", endpoint: "Detect chromatographic features (peaks) across runs." },
+  { key: "group", title: "Grouping / Blank / RT align", endpoint: "Group features, subtract blanks, and align retention times." },
+  { key: "consensus", title: "Feature-Family Consensus", endpoint: "Combine feature families into a per-sample consensus." },
+  { key: "dereplication", title: "Library Dereplication", endpoint: "Match features against compound libraries to remove known hits." },
+  { key: "bridge", title: "LC-MS Consensus Bridge", endpoint: "Bridge the LC-MS consensus into the unified candidate confidence." },
 ]
 
 function parseCandidateInputs(text: string): { name?: string; smiles: string; role?: string }[] {
@@ -399,7 +399,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
     } catch (err) {
       if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
         setDereplicationErr(
-          "This backend build does not expose POST /ms/lcms/dereplication/upload (not found). Library dereplication is shown as a workflow placeholder.",
+          "Library dereplication isn't available on this server build — the step is shown as a workflow placeholder only.",
         )
       } else {
         setDereplicationErr(formatApiError(err, "Library dereplication failed"))
@@ -548,9 +548,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <CardTitle className="text-xl">{current.title}</CardTitle>
-              <CardDescription className="mt-1">
-                <code className="text-xs">{current.endpoint}</code>
-              </CardDescription>
+              <CardDescription className="mt-1">{current.endpoint}</CardDescription>
             </div>
             <Badge variant="outline" className="shrink-0">
               Step {stepIndex + 1} / {STEPS.length}

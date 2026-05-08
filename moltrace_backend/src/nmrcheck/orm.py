@@ -6305,6 +6305,35 @@ class ScientificKnowledgeGraphEdgeORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class AIEvidenceItemORM(Base):
+    __tablename__ = "ai_evidence_items"
+    __table_args__ = (
+        Index("ix_ai_evidence_items_module_status", "module", "status"),
+        Index("ix_ai_evidence_items_entity", "entity_type", "entity_id"),
+        Index("ix_ai_evidence_items_tenant_status", "tenant_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    module: Mapped[str] = mapped_column(String(32), index=True)
+    entity_type: Mapped[str] = mapped_column(String(100), index=True)
+    entity_id: Mapped[int] = mapped_column(Integer, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending_review", index=True)
+    confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    risk_level: Mapped[str] = mapped_column(String(32), default="unknown")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    reviewer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class AuditEventORM(Base):
     __tablename__ = "audit_events"
     __table_args__ = (

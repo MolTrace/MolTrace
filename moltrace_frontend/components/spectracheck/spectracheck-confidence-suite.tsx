@@ -121,7 +121,10 @@ function pickHtmlFromWorkflowReportPayload(root: Record<string, unknown>): strin
 }
 
 function sanitizeReportHtml(html: string): string {
-  return html.replace(/<script\b[\s\S]*?<\/script>/gi, "")
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<script\b[^>]*\/\s*>/gi, "")
+    .replace(/<script\b[^>]*>/gi, "")
 }
 
 function normalizeAuditEventsPayload(data: unknown): unknown[] {
@@ -723,7 +726,9 @@ function UnifiedConfidenceTab({
               <CardHeader>
                 <CardTitle className="text-base">{busy ? "Running unified confidence" : "Building unified evidence"}</CardTitle>
                 <CardDescription>
-                  {busy ? "POST /confidence/candidates/unified/evidence" : "POST bundle → unified synthesis"}
+                  {busy
+                    ? "Synthesizing unified candidate confidence from evidence layers…"
+                    : "Bundling evidence into a unified synthesis…"}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -1152,7 +1157,7 @@ function ReportComposerTab({
       let msg = formatApiError(err, "Report compose failed")
       if (err instanceof ApiError && (err.status === 404 || err.status === 405 || err.status === 503)) {
         msg +=
-          " The report compose endpoint may be unavailable (check deployment or API proxy for POST /reports/structure-elucidation/compose/evidence)."
+          " The report-composition service may be unavailable — check the deployment or API proxy."
       }
       if (err instanceof ApiError && (err.status === 400 || err.status === 422)) {
         msg +=
@@ -1248,9 +1253,7 @@ function ReportComposerTab({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Structure elucidation report composer</CardTitle>
           <CardDescription>
-            Compose via{" "}
-            <code className="text-xs">POST /reports/structure-elucidation/compose/evidence</code> — optional HTML via{" "}
-            <code className="text-xs">POST /reports/structure-elucidation/compose/html</code>.
+            Compose a structure-elucidation report from your evidence — with an optional HTML preview.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -2326,9 +2329,9 @@ function ReportComposerTab({
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Report lock &amp; release</CardTitle>
                     <CardDescription>
-                      Lock status uses <code className="text-xs">GET /reports/{'{report_id}'}/lock</code>. Release follows
-                      session approval records (<code className="text-[10px]">approved_confirmed</code>) unless an admin
-                      override is recorded in the release dialog.
+                      Lock status comes from the report itself. Release follows the session&apos;s
+                      approval record (status <em>approved &amp; confirmed</em>) unless an admin override
+                      is recorded in the release dialog.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -2346,8 +2349,7 @@ function ReportComposerTab({
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Secure share</CardTitle>
                     <CardDescription>
-                      Scoped link via <code className="text-xs">POST /share-links</code> — permission and expiry follow
-                      backend policy.
+                      Generate a scoped share link — permissions and expiry follow your tenant&apos;s policy.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

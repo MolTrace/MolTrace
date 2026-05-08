@@ -7,6 +7,7 @@ import {
   trackRegulatoryImpactAssessmentRun,
 } from "@/src/lib/analytics/analytics-client"
 import { apiFetch } from "@/lib/api/client"
+import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
@@ -43,10 +44,7 @@ function asArray(data: unknown): unknown[] {
 }
 
 function formatWhen(iso: string | undefined): string {
-  if (!iso?.trim()) return "—"
-  const d = Date.parse(iso)
-  if (Number.isNaN(d)) return iso
-  return new Date(d).toLocaleString()
+  return formatStableUtcDateTime(iso)
 }
 
 function readStringList(v: unknown): string[] {

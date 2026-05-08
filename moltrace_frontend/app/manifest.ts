@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const PWA_ASSET_VERSION = "2026-05-08-v1"
+const PWA_ASSET_VERSION = "2026-05-08-v2"
 
 function versionedIcon(src: string) {
   return `${src}?v=${PWA_ASSET_VERSION}`

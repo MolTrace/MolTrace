@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { trackRegulatoryNotificationResolved } from "@/src/lib/analytics/analytics-client"
 import { apiFetch } from "@/lib/api/client"
+import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -35,10 +36,7 @@ function asArray(data: unknown): unknown[] {
 }
 
 function formatWhen(iso: string | undefined): string {
-  if (!iso?.trim()) return "—"
-  const d = Date.parse(iso)
-  if (Number.isNaN(d)) return iso
-  return new Date(d).toLocaleString()
+  return formatStableUtcDateTime(iso)
 }
 
 export function RegulatoryNotificationsWorkspace() {

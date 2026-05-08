@@ -27,9 +27,9 @@ import {
   LineChart,
   Lock,
   Shield,
-  Sparkles,
   Target,
 } from "lucide-react"
+import { EvidenceCard } from "@/components/science/evidence-card"
 
 /** Static fictional numbers for layout only — not computed by MolTrace or any backend. */
 const DEMO_CONDITION_ROWS = [
@@ -486,33 +486,22 @@ export function ReactionStudioWorkspace() {
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {/* Model prediction */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <CardTitle className="text-base">Model prediction</CardTitle>
-            </div>
-            <CardDescription>{DEMO_PREDICTION.disclaimer}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{DEMO_PREDICTION.label}</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-md border bg-card px-3 py-2">
-                <p className="text-xs text-muted-foreground">Predicted yield</p>
-                <p className="font-mono text-2xl font-semibold tabular-nums">{DEMO_PREDICTION.predicted_yield_pct}%</p>
-              </div>
-              <div className="rounded-md border bg-card px-3 py-2">
-                <p className="text-xs text-muted-foreground">Predicted selectivity</p>
-                <p className="font-mono text-2xl font-semibold tabular-nums">
-                  {DEMO_PREDICTION.predicted_selectivity_pct}%
-                </p>
-              </div>
-            </div>
-            <Button variant="secondary" size="sm" className="w-full" disabled>
-              Run predictor (no backend)
-            </Button>
-          </CardContent>
-        </Card>
+        <EvidenceCard
+          title="Model prediction evidence"
+          module="reactions"
+          status="unavailable"
+          risk_level="unknown"
+          summary={DEMO_PREDICTION.disclaimer}
+          evidence_items={[
+            `${DEMO_PREDICTION.label}: predicted yield placeholder ${DEMO_PREDICTION.predicted_yield_pct}%`,
+            `${DEMO_PREDICTION.label}: predicted selectivity placeholder ${DEMO_PREDICTION.predicted_selectivity_pct}%`,
+            "Predictor execution is disabled until backend model evidence is connected.",
+          ]}
+          citations={[]}
+          model_name="reaction surrogate placeholder"
+          review_status="not generated"
+          className="h-full"
+        />
 
         {/* Uncertainty */}
         <Card>

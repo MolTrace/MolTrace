@@ -14,6 +14,8 @@ type KpiCardProps = {
   value: ReactNode
   sub?: ReactNode
   href?: string
+  onClick?: () => void
+  onClickLabel?: string
   severity?: KpiCardSeverity
 }
 
@@ -37,14 +39,17 @@ export function KpiCard({
   value,
   sub,
   href,
+  onClick,
+  onClickLabel,
   severity = "neutral",
 }: KpiCardProps) {
+  const interactive = Boolean(href || onClick)
   const card = (
     <Card
       className={cn(
         "h-full",
         SEVERITY_CARD_CLASS[severity],
-        href && "transition-colors hover:border-foreground/20 hover:bg-muted/40",
+        interactive && "transition-colors hover:border-foreground/20 hover:bg-muted/40",
       )}
     >
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -57,15 +62,25 @@ export function KpiCard({
       </CardContent>
     </Card>
   )
+  const wrapperClass =
+    "block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
   if (href) {
     return (
-      <Link
-        href={href}
-        className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        aria-label={`${title} — open detail`}
-      >
+      <Link href={href} className={wrapperClass} aria-label={`${title} — open detail`}>
         {card}
       </Link>
+    )
+  }
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={wrapperClass}
+        aria-label={onClickLabel ?? title}
+      >
+        {card}
+      </button>
     )
   }
   return card
