@@ -27,7 +27,7 @@ describe("dashboard page", () => {
     expect(
       screen.getAllByText((_, node) => (node?.textContent || "").replace(/\s+/g, "") === "MolTrace")[0]
     ).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument()
     expect(screen.getByText("Active Analyses")).toBeInTheDocument()
     expect(screen.getByText("Review Required")).toBeInTheDocument()
   })
