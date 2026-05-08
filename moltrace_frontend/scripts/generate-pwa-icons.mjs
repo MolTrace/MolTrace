@@ -86,7 +86,7 @@ ${polys}
       text-anchor="middle"
       text-rendering="geometricPrecision"
     >
-      <text x="32" y="31.2" dy="0.33em" fill="none" stroke="${LOGO_BACKGROUND_DARK_BLUE}" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke">m</text>
+      <text x="32" y="31.2" dy="0.33em" fill="none" stroke="${LOGO_BACKGROUND_DARK_BLUE}" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke">m</text>
       <text x="32" y="31.2" dy="0.33em" fill="${MARK_FILL}">m</text>
     </g>
   </g>

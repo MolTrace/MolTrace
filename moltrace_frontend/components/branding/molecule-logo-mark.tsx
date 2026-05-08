@@ -89,7 +89,7 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
             dy="0.33em"
             fill="none"
             stroke={LOGO_BACKGROUND_DARK_BLUE}
-            strokeWidth={0}
+            strokeWidth={5.8}
             strokeLinecap="round"
             strokeLinejoin="round"
             paintOrder="stroke"
