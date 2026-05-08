@@ -12819,3 +12819,1219 @@ class CAPARecord(BaseModel):
     created_at: datetime
     updated_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+TenantType = Literal[
+    "internal",
+    "pilot",
+    "customer",
+    "sandbox",
+    "demo",
+    "regulated_customer",
+]
+TenantStatus = Literal["active", "suspended", "archived", "onboarding", "trial"]
+TenantEnvironmentType = Literal["dev", "sandbox", "validation", "production", "demo"]
+TenantEnvironmentStatus = Literal["active", "disabled", "archived"]
+SaaSProgram = Literal[
+    "spectracheck",
+    "regulatory_hub",
+    "reaction_optimization",
+    "validation_center",
+    "connectors",
+    "ml_ai",
+    "mobile",
+    "admin",
+    "cross_module",
+]
+SubscriptionPlanStatus = Literal["active", "deprecated", "archived"]
+FeatureFlagStatus = Literal["active", "disabled", "archived"]
+PilotProgramStatus = Literal["planned", "active", "completed", "paused", "failed", "archived"]
+OnboardingProjectStatus = Literal[
+    "not_started",
+    "in_progress",
+    "blocked",
+    "ready_for_go_live",
+    "completed",
+    "archived",
+]
+ImplementationStage = Literal[
+    "discovery",
+    "security_review",
+    "data_setup",
+    "spectracheck_rollout",
+    "regulatory_rollout",
+    "reaction_rollout",
+    "validation",
+    "go_live",
+    "renewal_review",
+]
+ImplementationTaskType = Literal[
+    "security",
+    "data_ingestion",
+    "connector_setup",
+    "spectracheck_configuration",
+    "regulatory_configuration",
+    "reaction_configuration",
+    "validation",
+    "training",
+    "mobile_setup",
+    "roi",
+    "procurement",
+    "other",
+]
+ImplementationTaskProgram = Literal[
+    "spectracheck",
+    "regulatory_hub",
+    "reaction_optimization",
+    "cross_module",
+    "system",
+]
+ImplementationTaskStatus = Literal["open", "in_progress", "blocked", "completed", "dismissed"]
+TenantIsolationMode = Literal[
+    "shared_database_tenant_scoped",
+    "dedicated_schema",
+    "dedicated_database",
+    "dedicated_deployment",
+]
+TenantProfileStatus = Literal["draft", "active", "requires_review"]
+TenantValidationProfileStatus = Literal[
+    "draft",
+    "in_progress",
+    "ready_for_review",
+    "approved_internal",
+    "not_required",
+]
+CustomerSuccessStatus = Literal["healthy", "watch", "at_risk", "unknown"]
+ProcurementPackageType = Literal[
+    "security_review",
+    "validation_readiness",
+    "ai_governance",
+    "data_integrity",
+    "roi",
+    "full_procurement",
+]
+ProcurementPackageStatus = Literal["draft", "ready_for_review", "exported", "failed"]
+TenantAuditExportScope = Literal[
+    "all",
+    "security",
+    "validation",
+    "regulatory",
+    "spectracheck",
+    "reaction",
+    "ai_ml",
+    "connectors",
+]
+TenantAuditExportStatus = Literal["queued", "succeeded", "failed"]
+
+
+class TenantCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_key: str = Field(min_length=1, max_length=120)
+    display_name: str = Field(min_length=1, max_length=240)
+    tenant_type: TenantType
+    status: TenantStatus = "onboarding"
+    primary_contact_email: str | None = Field(default=None, max_length=255)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_key: str | None = Field(default=None, min_length=1, max_length=120)
+    display_name: str | None = Field(default=None, min_length=1, max_length=240)
+    tenant_type: TenantType | None = None
+    status: TenantStatus | None = None
+    primary_contact_email: str | None = Field(default=None, max_length=255)
+    metadata_json: dict[str, Any] | None = None
+
+
+class Tenant(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_key: str
+    display_name: str
+    tenant_type: TenantType
+    status: TenantStatus
+    primary_contact_email: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantEnvironmentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    environment_type: TenantEnvironmentType
+    base_url: str | None = Field(default=None, max_length=500)
+    status: TenantEnvironmentStatus = "active"
+    data_retention_policy_id: int | None = Field(default=None, ge=1)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantEnvironmentUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    environment_type: TenantEnvironmentType | None = None
+    base_url: str | None = Field(default=None, max_length=500)
+    status: TenantEnvironmentStatus | None = None
+    data_retention_policy_id: int | None = Field(default=None, ge=1)
+    metadata_json: dict[str, Any] | None = None
+
+
+class TenantEnvironment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    environment_type: TenantEnvironmentType
+    base_url: str | None = None
+    status: TenantEnvironmentStatus
+    data_retention_policy_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class SubscriptionPlanCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plan_key: str = Field(min_length=1, max_length=120)
+    display_name: str = Field(min_length=1, max_length=240)
+    description: str = Field(min_length=1)
+    default_entitlements_json: dict[str, Any] = Field(default_factory=dict)
+    status: SubscriptionPlanStatus = "active"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class SubscriptionPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    plan_key: str
+    display_name: str
+    description: str
+    default_entitlements_json: dict[str, Any] = Field(default_factory=dict)
+    status: SubscriptionPlanStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantEntitlementCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plan_id: int | None = Field(default=None, ge=1)
+    feature_key: str = Field(min_length=1, max_length=160)
+    program: SaaSProgram
+    enabled: bool = True
+    limit_json: dict[str, Any] = Field(default_factory=dict)
+    effective_start: datetime | None = None
+    effective_end: datetime | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantEntitlementUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plan_id: int | None = Field(default=None, ge=1)
+    feature_key: str | None = Field(default=None, min_length=1, max_length=160)
+    program: SaaSProgram | None = None
+    enabled: bool | None = None
+    limit_json: dict[str, Any] | None = None
+    effective_start: datetime | None = None
+    effective_end: datetime | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class TenantEntitlement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    plan_id: int | None = None
+    feature_key: str
+    program: SaaSProgram
+    enabled: bool
+    limit_json: dict[str, Any] = Field(default_factory=dict)
+    effective_start: datetime | None = None
+    effective_end: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class FeatureFlagCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    flag_key: str = Field(min_length=1, max_length=160)
+    display_name: str = Field(min_length=1, max_length=240)
+    description: str = Field(min_length=1)
+    program: SaaSProgram
+    default_enabled: bool = False
+    rollout_rules_json: dict[str, Any] = Field(default_factory=dict)
+    status: FeatureFlagStatus = "active"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class FeatureFlagUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    flag_key: str | None = Field(default=None, min_length=1, max_length=160)
+    display_name: str | None = Field(default=None, min_length=1, max_length=240)
+    description: str | None = Field(default=None, min_length=1)
+    program: SaaSProgram | None = None
+    default_enabled: bool | None = None
+    rollout_rules_json: dict[str, Any] | None = None
+    status: FeatureFlagStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class FeatureFlag(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    flag_key: str
+    display_name: str
+    description: str
+    program: SaaSProgram
+    default_enabled: bool
+    rollout_rules_json: dict[str, Any] = Field(default_factory=dict)
+    status: FeatureFlagStatus
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotProgramCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=300)
+    objective: str = Field(min_length=1)
+    status: PilotProgramStatus = "planned"
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    target_programs_json: list[str] = Field(default_factory=list)
+    success_criteria_json: list[dict[str, Any]] = Field(default_factory=list)
+    risks_json: list[dict[str, Any]] = Field(default_factory=list)
+    notes_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotProgramUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    objective: str | None = Field(default=None, min_length=1)
+    status: PilotProgramStatus | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    target_programs_json: list[str] | None = None
+    success_criteria_json: list[dict[str, Any]] | None = None
+    risks_json: list[dict[str, Any]] | None = None
+    notes_json: dict[str, Any] | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class PilotProgram(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    title: str
+    objective: str
+    status: PilotProgramStatus
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    target_programs_json: list[str] = Field(default_factory=list)
+    success_criteria_json: list[dict[str, Any]] = Field(default_factory=list)
+    risks_json: list[dict[str, Any]] = Field(default_factory=list)
+    notes_json: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerOnboardingProjectCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pilot_program_id: int | None = Field(default=None, ge=1)
+    title: str = Field(min_length=1, max_length=300)
+    status: OnboardingProjectStatus = "not_started"
+    owner_name: str | None = Field(default=None, max_length=200)
+    customer_contact: str | None = Field(default=None, max_length=255)
+    implementation_stage: ImplementationStage = "discovery"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerOnboardingProjectUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pilot_program_id: int | None = Field(default=None, ge=1)
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    status: OnboardingProjectStatus | None = None
+    owner_name: str | None = Field(default=None, max_length=200)
+    customer_contact: str | None = Field(default=None, max_length=255)
+    implementation_stage: ImplementationStage | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class CustomerOnboardingProject(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    pilot_program_id: int | None = None
+    title: str
+    status: OnboardingProjectStatus
+    owner_name: str | None = None
+    customer_contact: str | None = None
+    implementation_stage: ImplementationStage
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ImplementationTaskCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=300)
+    description: str | None = None
+    task_type: ImplementationTaskType
+    program: ImplementationTaskProgram
+    status: ImplementationTaskStatus = "open"
+    owner: str | None = Field(default=None, max_length=200)
+    due_date: datetime | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ImplementationTaskUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = None
+    task_type: ImplementationTaskType | None = None
+    program: ImplementationTaskProgram | None = None
+    status: ImplementationTaskStatus | None = None
+    owner: str | None = Field(default=None, max_length=200)
+    due_date: datetime | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class ImplementationTask(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    onboarding_project_id: int
+    title: str
+    description: str | None = None
+    task_type: ImplementationTaskType
+    program: ImplementationTaskProgram
+    status: ImplementationTaskStatus
+    owner: str | None = None
+    due_date: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantDataBoundaryCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    isolation_mode: TenantIsolationMode
+    encryption_profile: str | None = Field(default=None, max_length=160)
+    storage_prefix: str | None = Field(default=None, max_length=300)
+    allowed_regions_json: list[str] = Field(default_factory=list)
+    data_residency_notes: str | None = None
+    status: TenantProfileStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantDataBoundaryUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    isolation_mode: TenantIsolationMode | None = None
+    encryption_profile: str | None = Field(default=None, max_length=160)
+    storage_prefix: str | None = Field(default=None, max_length=300)
+    allowed_regions_json: list[str] | None = None
+    data_residency_notes: str | None = None
+    status: TenantProfileStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class TenantDataBoundary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    isolation_mode: TenantIsolationMode
+    encryption_profile: str | None = None
+    storage_prefix: str | None = None
+    allowed_regions_json: list[str] = Field(default_factory=list)
+    data_residency_notes: str | None = None
+    status: TenantProfileStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantSecurityProfileCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sso_enabled: bool = False
+    mfa_required: bool = False
+    allowed_domains_json: list[str] = Field(default_factory=list)
+    session_timeout_minutes: int | None = Field(default=None, ge=1)
+    ip_allowlist_json: list[str] = Field(default_factory=list)
+    security_frameworks_json: list[str] = Field(default_factory=list)
+    risk_summary_json: dict[str, Any] = Field(default_factory=dict)
+    status: TenantProfileStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantSecurityProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sso_enabled: bool | None = None
+    mfa_required: bool | None = None
+    allowed_domains_json: list[str] | None = None
+    session_timeout_minutes: int | None = Field(default=None, ge=1)
+    ip_allowlist_json: list[str] | None = None
+    security_frameworks_json: list[str] | None = None
+    risk_summary_json: dict[str, Any] | None = None
+    status: TenantProfileStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class TenantSecurityProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    sso_enabled: bool
+    mfa_required: bool
+    allowed_domains_json: list[str] = Field(default_factory=list)
+    session_timeout_minutes: int | None = None
+    ip_allowlist_json: list[str] = Field(default_factory=list)
+    security_frameworks_json: list[str] = Field(default_factory=list)
+    risk_summary_json: dict[str, Any] = Field(default_factory=dict)
+    status: TenantProfileStatus
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantValidationProfileCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    validation_required: bool = False
+    validation_project_ids_json: list[int] = Field(default_factory=list)
+    controlled_record_policy: str | None = None
+    esignature_required: bool = False
+    data_integrity_assessment_ids_json: list[int] = Field(default_factory=list)
+    inspection_package_ids_json: list[int] = Field(default_factory=list)
+    status: TenantValidationProfileStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantValidationProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    validation_required: bool | None = None
+    validation_project_ids_json: list[int] | None = None
+    controlled_record_policy: str | None = None
+    esignature_required: bool | None = None
+    data_integrity_assessment_ids_json: list[int] | None = None
+    inspection_package_ids_json: list[int] | None = None
+    status: TenantValidationProfileStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class TenantValidationProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    validation_required: bool
+    validation_project_ids_json: list[int] = Field(default_factory=list)
+    controlled_record_policy: str | None = None
+    esignature_required: bool
+    data_integrity_assessment_ids_json: list[int] = Field(default_factory=list)
+    inspection_package_ids_json: list[int] = Field(default_factory=list)
+    status: TenantValidationProfileStatus
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerSuccessHealthScore(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    score: float | None = None
+    status: CustomerSuccessStatus
+    usage_summary_json: dict[str, Any] = Field(default_factory=dict)
+    onboarding_summary_json: dict[str, Any] = Field(default_factory=dict)
+    support_summary_json: dict[str, Any] = Field(default_factory=dict)
+    roi_summary_json: dict[str, Any] = Field(default_factory=dict)
+    blockers_json: list[dict[str, Any]] = Field(default_factory=list)
+    recommended_actions_json: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantUsageSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    period_start: datetime
+    period_end: datetime
+    spectracheck_usage_json: dict[str, Any] = Field(default_factory=dict)
+    regulatory_usage_json: dict[str, Any] = Field(default_factory=dict)
+    reaction_usage_json: dict[str, Any] = Field(default_factory=dict)
+    reports_generated: int
+    actions_completed: int
+    hours_saved: float | None = None
+    warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantRoiSnapshot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    period_start: datetime
+    period_end: datetime
+    total_hours_saved: float
+    tasks_automated: int
+    reports_generated: int
+    regulatory_actions_created: int
+    reaction_recommendations_approved: int
+    renewal_summary_json: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProcurementEvidencePackageCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=300)
+    package_type: ProcurementPackageType
+    status: ProcurementPackageStatus = "ready_for_review"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProcurementEvidencePackage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    title: str
+    package_type: ProcurementPackageType
+    status: ProcurementPackageStatus
+    package_json: dict[str, Any] = Field(default_factory=dict)
+    package_html: str | None = None
+    package_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantAuditExportCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    export_scope: TenantAuditExportScope = "all"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantAuditExport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    export_scope: TenantAuditExportScope
+    status: TenantAuditExportStatus
+    export_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class TenantModuleReadiness(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int
+    product_order: list[str] = Field(default_factory=list)
+    modules: list[dict[str, Any]] = Field(default_factory=list)
+    entitlement_summary_json: dict[str, Any] = Field(default_factory=dict)
+    warnings_json: list[str] = Field(default_factory=list)
+
+
+class TenantGoLiveReadiness(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int
+    status: str
+    onboarding_readiness: dict[str, Any] = Field(default_factory=dict)
+    validation_readiness: dict[str, Any] = Field(default_factory=dict)
+    security_profile: dict[str, Any] = Field(default_factory=dict)
+    data_boundary: dict[str, Any] = Field(default_factory=dict)
+    blockers_json: list[dict[str, Any]] = Field(default_factory=list)
+    product_order: list[str] = Field(default_factory=list)
+
+
+GoldenDatasetType = Literal[
+    "spectracheck",
+    "regulatory",
+    "reaction_optimization",
+    "cross_module",
+    "mobile",
+    "validation",
+    "connector",
+    "ai_ml",
+]
+GoldenDatasetSourceType = Literal[
+    "internal_demo",
+    "curated_literature",
+    "synthetic_demo",
+    "customer_pilot",
+    "benchmark",
+    "other",
+]
+GoldenDatasetStatus = Literal["draft", "ready_for_review", "approved_demo", "archived"]
+GoldenScenarioType = Literal[
+    "spectracheck_structure_evidence",
+    "impurity_threshold_trigger",
+    "residual_solvent_qnmr",
+    "nitrosamine_watch",
+    "regulatory_to_reaction_constraint",
+    "full_product_workflow",
+    "connector_import",
+    "mobile_review",
+    "validation_readiness",
+]
+GoldenScenarioStatus = Literal["draft", "ready_for_review", "approved", "archived"]
+GoldenWorkflowCaseStatus = Literal["draft", "active", "archived"]
+GoldenTargetModule = Literal[
+    "spectracheck",
+    "regulatory_hub",
+    "reaction_optimization",
+    "cross_module",
+    "mobile",
+    "validation",
+]
+ExpectedOutputType = Literal[
+    "evidence_item",
+    "regulatory_action_item",
+    "reaction_constraint",
+    "report_bundle",
+    "ct_dossier_section",
+    "review_task",
+    "qc_warning",
+    "mobile_summary",
+    "validation_record",
+    "roi_summary",
+    "other",
+]
+PilotRunStatus = Literal[
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "requires_review",
+    "accepted",
+    "rejected",
+]
+PilotRunStepStatus = Literal[
+    "pending",
+    "running",
+    "succeeded",
+    "failed",
+    "skipped",
+    "requires_review",
+]
+ScenarioValidationStatus = Literal["pass", "fail", "warning", "not_assessed", "requires_review"]
+CustomerAcceptanceScope = Literal[
+    "spectracheck",
+    "regulatory_hub",
+    "reaction_optimization",
+    "cross_module",
+    "full_platform",
+]
+CustomerAcceptanceProtocolStatus = Literal[
+    "draft",
+    "ready_for_review",
+    "active",
+    "completed",
+    "archived",
+]
+CustomerAcceptanceTestStatus = Literal["not_run", "pass", "fail", "blocked", "requires_review"]
+PilotSuccessMetricStatus = Literal["met", "not_met", "warning", "not_assessed"]
+PilotReadinessStatus = Literal[
+    "not_ready",
+    "partially_ready",
+    "ready_for_pilot",
+    "ready_for_customer_review",
+    "blocked",
+]
+PilotSignoffDecision = Literal["accepted", "accepted_with_limitations", "rejected", "deferred"]
+DemoTenantSeedType = Literal[
+    "spectracheck_demo",
+    "regulatory_demo",
+    "reaction_demo",
+    "full_product_demo",
+    "mobile_demo",
+    "validation_demo",
+]
+DemoTenantSeedStatus = Literal["queued", "running", "succeeded", "failed", "requires_review"]
+PilotEvidenceBundleStatus = Literal["draft", "ready_for_review", "exported", "failed"]
+
+
+class GoldenDatasetCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_key: str = Field(min_length=1, max_length=160)
+    title: str = Field(min_length=1, max_length=300)
+    description: str = Field(min_length=1)
+    dataset_type: GoldenDatasetType
+    source_type: GoldenDatasetSourceType
+    status: GoldenDatasetStatus = "draft"
+    source_references_json: list[dict[str, Any]] = Field(default_factory=list)
+    file_ids_json: list[int] = Field(default_factory=list)
+    artifact_ids_json: list[int] = Field(default_factory=list)
+    warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    notes_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoldenDatasetUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_key: str | None = Field(default=None, min_length=1, max_length=160)
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = Field(default=None, min_length=1)
+    dataset_type: GoldenDatasetType | None = None
+    source_type: GoldenDatasetSourceType | None = None
+    status: GoldenDatasetStatus | None = None
+    source_references_json: list[dict[str, Any]] | None = None
+    file_ids_json: list[int] | None = None
+    artifact_ids_json: list[int] | None = None
+    warnings_json: list[dict[str, Any]] | None = None
+    notes_json: dict[str, Any] | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class GoldenDataset(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    dataset_key: str
+    title: str
+    description: str
+    dataset_type: GoldenDatasetType
+    source_type: GoldenDatasetSourceType
+    status: GoldenDatasetStatus
+    source_references_json: list[dict[str, Any]] = Field(default_factory=list)
+    file_ids_json: list[int] = Field(default_factory=list)
+    artifact_ids_json: list[int] = Field(default_factory=list)
+    warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    notes_json: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoldenPilotScenarioCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenario_key: str = Field(min_length=1, max_length=160)
+    title: str = Field(min_length=1, max_length=300)
+    description: str = Field(min_length=1)
+    scenario_type: GoldenScenarioType
+    program_sequence_json: list[str] = Field(default_factory=list)
+    dataset_ids_json: list[int] = Field(default_factory=list)
+    required_inputs_json: dict[str, Any] = Field(default_factory=dict)
+    expected_outputs_json: dict[str, Any] = Field(default_factory=dict)
+    acceptance_criteria_json: list[dict[str, Any]] = Field(default_factory=list)
+    status: GoldenScenarioStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoldenPilotScenarioUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenario_key: str | None = Field(default=None, min_length=1, max_length=160)
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = Field(default=None, min_length=1)
+    scenario_type: GoldenScenarioType | None = None
+    program_sequence_json: list[str] | None = None
+    dataset_ids_json: list[int] | None = None
+    required_inputs_json: dict[str, Any] | None = None
+    expected_outputs_json: dict[str, Any] | None = None
+    acceptance_criteria_json: list[dict[str, Any]] | None = None
+    status: GoldenScenarioStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class GoldenPilotScenario(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    scenario_key: str
+    title: str
+    description: str
+    scenario_type: GoldenScenarioType
+    program_sequence_json: list[str] = Field(default_factory=list)
+    dataset_ids_json: list[int] = Field(default_factory=list)
+    required_inputs_json: dict[str, Any] = Field(default_factory=dict)
+    expected_outputs_json: dict[str, Any] = Field(default_factory=dict)
+    acceptance_criteria_json: list[dict[str, Any]] = Field(default_factory=list)
+    status: GoldenScenarioStatus
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoldenWorkflowCaseCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_key: str = Field(min_length=1, max_length=160)
+    title: str = Field(min_length=1, max_length=300)
+    input_payload_json: dict[str, Any] = Field(default_factory=dict)
+    expected_step_order_json: list[str] = Field(default_factory=list)
+    expected_resource_links_json: list[dict[str, Any]] = Field(default_factory=list)
+    expected_warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    status: GoldenWorkflowCaseStatus = "active"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoldenWorkflowCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    scenario_id: int
+    case_key: str
+    title: str
+    input_payload_json: dict[str, Any] = Field(default_factory=dict)
+    expected_step_order_json: list[str] = Field(default_factory=list)
+    expected_resource_links_json: list[dict[str, Any]] = Field(default_factory=list)
+    expected_warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    status: GoldenWorkflowCaseStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExpectedOutputContractCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    step_key: str = Field(min_length=1, max_length=160)
+    target_module: GoldenTargetModule
+    expected_output_type: ExpectedOutputType
+    required_fields_json: list[str] = Field(default_factory=list)
+    forbidden_fields_json: list[str] = Field(default_factory=list)
+    expected_statuses_json: list[str] = Field(default_factory=list)
+    tolerance_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExpectedOutputContract(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    scenario_id: int
+    step_key: str
+    target_module: GoldenTargetModule
+    expected_output_type: ExpectedOutputType
+    required_fields_json: list[str] = Field(default_factory=list)
+    forbidden_fields_json: list[str] = Field(default_factory=list)
+    expected_statuses_json: list[str] = Field(default_factory=list)
+    tolerance_json: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class DemoTenantSeedCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int = Field(ge=1)
+    seed_type: DemoTenantSeedType = "full_product_demo"
+    use_customer_data: bool = False
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class DemoTenantSeed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int
+    scenario_id: int | None = None
+    seed_type: DemoTenantSeedType
+    status: DemoTenantSeedStatus
+    created_resource_ids_json: dict[str, Any] = Field(default_factory=dict)
+    warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    notes_json: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotRunCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int | None = Field(default=None, ge=1)
+    project_id: int | None = Field(default=None, ge=1)
+    sample_id: int | None = Field(default=None, ge=1)
+    run_label: str = Field(default="Golden scenario run", min_length=1, max_length=300)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotRun(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    scenario_id: int
+    tenant_id: int | None = None
+    project_id: int | None = None
+    sample_id: int | None = None
+    run_label: str
+    status: PilotRunStatus
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    summary_json: dict[str, Any] = Field(default_factory=dict)
+    score: float | None = None
+    warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    notes_json: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotRunStep(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    pilot_run_id: int
+    step_key: str
+    module: GoldenTargetModule
+    status: PilotRunStepStatus
+    input_summary_json: dict[str, Any] = Field(default_factory=dict)
+    output_summary_json: dict[str, Any] = Field(default_factory=dict)
+    linked_resource_type: str | None = None
+    linked_resource_id: int | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    notes_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotRunDetail(PilotRun):
+    steps: list[PilotRunStep] = Field(default_factory=list)
+
+
+class ScenarioValidationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    pilot_run_id: int
+    scenario_id: int
+    contract_id: int | None = None
+    validation_status: ScenarioValidationStatus
+    expected_json: dict[str, Any] = Field(default_factory=dict)
+    actual_json: dict[str, Any] = Field(default_factory=dict)
+    differences_json: dict[str, Any] = Field(default_factory=dict)
+    score: float | None = None
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerAcceptanceProtocolCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int | None = Field(default=None, ge=1)
+    pilot_program_id: int | None = Field(default=None, ge=1)
+    title: str = Field(min_length=1, max_length=300)
+    scope: CustomerAcceptanceScope
+    scenario_ids_json: list[int] = Field(default_factory=list)
+    acceptance_tests_json: list[dict[str, Any]] = Field(default_factory=list)
+    success_criteria_json: list[dict[str, Any]] = Field(default_factory=list)
+    status: CustomerAcceptanceProtocolStatus = "draft"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerAcceptanceProtocolUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int | None = Field(default=None, ge=1)
+    pilot_program_id: int | None = Field(default=None, ge=1)
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    scope: CustomerAcceptanceScope | None = None
+    scenario_ids_json: list[int] | None = None
+    acceptance_tests_json: list[dict[str, Any]] | None = None
+    success_criteria_json: list[dict[str, Any]] | None = None
+    status: CustomerAcceptanceProtocolStatus | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class CustomerAcceptanceProtocol(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int | None = None
+    pilot_program_id: int | None = None
+    title: str
+    scope: CustomerAcceptanceScope
+    scenario_ids_json: list[int] = Field(default_factory=list)
+    acceptance_tests_json: list[dict[str, Any]] = Field(default_factory=list)
+    success_criteria_json: list[dict[str, Any]] = Field(default_factory=list)
+    status: CustomerAcceptanceProtocolStatus
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerAcceptanceTestExecute(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: CustomerAcceptanceTestStatus = "pass"
+    executed_by: str | None = Field(default=None, max_length=200)
+    evidence_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerAcceptanceTest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    protocol_id: int
+    test_key: str
+    title: str
+    description: str
+    scenario_id: int | None = None
+    expected_result: str
+    status: CustomerAcceptanceTestStatus
+    executed_by: str | None = None
+    executed_at: datetime | None = None
+    evidence_json: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotSuccessMetric(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    pilot_run_id: int | None = None
+    tenant_id: int | None = None
+    metric_key: str
+    metric_name: str
+    metric_value: float | None = None
+    metric_unit: str | None = None
+    target_value: float | None = None
+    status: PilotSuccessMetricStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotReadinessAssessmentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int | None = Field(default=None, ge=1)
+    pilot_program_id: int | None = Field(default=None, ge=1)
+    onboarding_project_id: int | None = Field(default=None, ge=1)
+    readiness_status: PilotReadinessStatus | None = None
+    spectracheck_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    regulatory_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    reaction_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    connector_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    validation_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    mobile_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    security_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    recommended_actions_json: list[dict[str, Any]] = Field(default_factory=list)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotReadinessAssessment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int | None = None
+    pilot_program_id: int | None = None
+    onboarding_project_id: int | None = None
+    readiness_status: PilotReadinessStatus
+    spectracheck_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    regulatory_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    reaction_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    connector_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    validation_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    mobile_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    security_readiness_json: dict[str, Any] = Field(default_factory=dict)
+    warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+    recommended_actions_json: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotSignoffCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int | None = Field(default=None, ge=1)
+    pilot_run_id: int | None = Field(default=None, ge=1)
+    protocol_id: int | None = Field(default=None, ge=1)
+    signer_name: str = Field(min_length=1, max_length=200)
+    signer_email: str | None = Field(default=None, max_length=255)
+    decision: PilotSignoffDecision
+    rationale: str = Field(min_length=1)
+    signature_record_id: int | None = Field(default=None, ge=1)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotSignoffRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: int | None = None
+    pilot_run_id: int | None = None
+    protocol_id: int | None = None
+    signer_name: str
+    signer_email: str | None = None
+    decision: PilotSignoffDecision
+    rationale: str
+    signed_at: datetime
+    signature_record_id: int | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotEvidenceBundleCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=300)
+    status: PilotEvidenceBundleStatus = "ready_for_review"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotEvidenceBundle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    pilot_run_id: int
+    title: str
+    included_resource_ids_json: dict[str, Any] = Field(default_factory=dict)
+    package_json: dict[str, Any] = Field(default_factory=dict)
+    package_html: str | None = None
+    package_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    status: PilotEvidenceBundleStatus
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class PilotCustomerDashboard(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int
+    product_order: list[str] = Field(default_factory=list)
+    latest_readiness: dict[str, Any] = Field(default_factory=dict)
+    pilot_runs: list[dict[str, Any]] = Field(default_factory=list)
+    acceptance_protocols: list[dict[str, Any]] = Field(default_factory=list)
+    signoffs: list[dict[str, Any]] = Field(default_factory=list)
+    warnings_json: list[dict[str, Any]] = Field(default_factory=list)

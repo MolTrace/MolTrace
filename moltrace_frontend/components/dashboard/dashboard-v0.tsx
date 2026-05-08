@@ -31,6 +31,7 @@ import { RegulatoryNotificationsCompactCard } from "@/components/regulatory-hub/
 import { MobileCommandCenter } from "@/src/components/mobile/MobileCommandCenter"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { useOverviewData } from "@/components/app/overview-data-context"
+import { useTenant } from "@/src/lib/tenant/tenant-context"
 import {
   fetchDashboardQcAlertsAggregate,
   type DashboardRecentFailedQcRow,
@@ -110,6 +111,14 @@ function formatJobTimeLabel(iso: string | null): string {
   const d = Date.parse(iso)
   if (Number.isNaN(d)) return iso
   return new Date(d).toLocaleString()
+}
+
+type CustomerDeploymentSummary = {
+  onboardingStatus: string
+  pilotStatus: string
+  validationReadiness: string
+  healthScore: string
+  nextOnboardingTask: string
 }
 
 const DEMO_STATS = {
@@ -262,6 +271,14 @@ const DEMO_RECENT_JOBS: DashboardJobRow[] = [
 
 export function DashboardV0() {
   const overview = useOverviewData()
+  const tenantContext = useTenant()
+  const {
+    currentTenantId,
+    tenant,
+    tenantDisplayName,
+    isAdmin,
+    moduleAccess,
+  } = tenantContext
   const live = overview.metrics != null
   const metrics = overview.metrics
   const recentRows =
@@ -331,6 +348,9 @@ export function DashboardV0() {
   const [failedIngestions, setFailedIngestions] = useState<number | null>(null)
   const [filesNeedNormalizationReview, setFilesNeedNormalizationReview] = useState<number | null>(null)
   const [failedSyncJobs, setFailedSyncJobs] = useState<number | null>(null)
+  const [deploymentSummaryLoading, setDeploymentSummaryLoading] = useState(false)
+  const [deploymentSummary, setDeploymentSummary] = useState<CustomerDeploymentSummary | null>(null)
+  const [deploymentSummaryError, setDeploymentSummaryError] = useState("")
   const crossModuleDisplay = crossModuleSummary ?? {
     available: false,
     partial: false,
@@ -347,6 +367,85 @@ export function DashboardV0() {
     warnings: [],
     nextRecommendedAction: null,
   }
+
+  const showCustomerDeploymentCard = isAdmin || tenant.tenant_type === "internal"
+
+  useEffect(() => {
+    if (!showCustomerDeploymentCard || !currentTenantId || currentTenantId === "local-development") {
+      setDeploymentSummary(null)
+      setDeploymentSummaryLoading(false)
+      setDeploymentSummaryError("")
+      return
+    }
+
+    let cancelled = false
+    setDeploymentSummaryLoading(true)
+    setDeploymentSummaryError("")
+
+    async function loadDeploymentSummary() {
+      const encodedTenantId = encodeURIComponent(currentTenantId)
+      const [onboardingPayload, pilotsPayload, validationPayload, healthPayload] = await Promise.all([
+        apiFetch<unknown>(`/tenants/${encodedTenantId}/onboarding-projects`, { method: "GET" }),
+        apiFetch<unknown>(`/tenants/${encodedTenantId}/pilot-programs`, { method: "GET" }),
+        apiFetch<unknown>(`/tenants/${encodedTenantId}/validation-profile`, { method: "GET" }),
+        apiFetch<unknown>(`/tenants/${encodedTenantId}/health-score`, { method: "GET" }),
+      ])
+
+      const onboardingRows = asRows(onboardingPayload)
+      const pilotRows = asRows(pilotsPayload)
+      const validationProfile = isRecord(validationPayload) ? validationPayload : null
+      const healthScore = isRecord(healthPayload) ? healthPayload : null
+      const firstOnboarding = onboardingRows[0] ?? null
+      let nextOnboardingTask = "—"
+
+      if (firstOnboarding) {
+        const projectId = readStr(firstOnboarding, ["id", "project_id", "onboarding_project_id"])
+        if (projectId) {
+          const taskPayload = await apiFetch<unknown>(`/onboarding-projects/${encodeURIComponent(projectId)}/tasks`, {
+            method: "GET",
+          })
+          const tasks = asRows(taskPayload)
+          const nextTask = tasks.find((task) => {
+            const status = readStr(task, ["status"]).toLowerCase()
+            return status === "open" || status === "in_progress" || status === "blocked"
+          })
+          nextOnboardingTask = nextTask ? readStr(nextTask, ["title"]) || "—" : "—"
+        }
+      }
+
+      const healthScoreValue = healthScore ? readNum(healthScore, ["score"]) : null
+
+      return {
+        onboardingStatus: firstOnboarding ? readStr(firstOnboarding, ["status"]) || "—" : "—",
+        pilotStatus: pilotRows[0] ? readStr(pilotRows[0], ["status"]) || "—" : "—",
+        validationReadiness: validationProfile ? readStr(validationProfile, ["status"]) || "—" : "—",
+        healthScore: healthScore
+          ? healthScoreValue != null
+            ? String(healthScoreValue)
+            : readStr(healthScore, ["status"]) || "—"
+          : "—",
+        nextOnboardingTask,
+      }
+    }
+
+    void loadDeploymentSummary()
+      .then((summary) => {
+        if (!cancelled) setDeploymentSummary(summary)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setDeploymentSummary(null)
+          setDeploymentSummaryError(formatApiErr(err))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDeploymentSummaryLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentTenantId, showCustomerDeploymentCard])
 
   useEffect(() => {
     try {
@@ -893,6 +992,64 @@ export function DashboardV0() {
       </div>
 
       <ValidationReadinessDashboardCards />
+
+      {showCustomerDeploymentCard ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="text-base">Customer Deployment</CardTitle>
+                <CardDescription>Tenant onboarding and readiness summary.</CardDescription>
+              </div>
+              <Badge variant="outline">{tenant.status}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {deploymentSummaryError ? <p className="text-xs text-muted-foreground">{deploymentSummaryError}</p> : null}
+            {deploymentSummaryLoading ? <p className="text-xs text-muted-foreground">Loading deployment summary…</p> : null}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div>
+                <p className="text-xs text-muted-foreground">tenant</p>
+                <p className="font-medium">{tenantDisplayName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">onboarding status</p>
+                <p className="font-medium">{deploymentSummary?.onboardingStatus ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">pilot status</p>
+                <p className="font-medium">{deploymentSummary?.pilotStatus ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">validation readiness</p>
+                <p className="font-medium">{deploymentSummary?.validationReadiness ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">health score</p>
+                <p className="font-medium">{deploymentSummary?.healthScore ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">next onboarding task</p>
+                <p className="font-medium">{deploymentSummary?.nextOnboardingTask ?? "—"}</p>
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {moduleAccess.map((module, index) => (
+                <div key={module.key} className="rounded-md border bg-muted/20 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      {index + 1}. {module.label}
+                    </span>
+                    <Badge variant={module.enabled ? "secondary" : "outline"}>
+                      {module.enabled ? "enabled" : "locked"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {!mlLoading && mlRollup?.available ? (
         <Card>

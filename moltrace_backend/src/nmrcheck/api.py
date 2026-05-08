@@ -42,6 +42,7 @@ from . import ai_inference_store as ai_store
 from . import analytics_store as analytics_store
 from . import collaboration_store as collab_store
 from . import compound_registry_store as compound_store
+from . import golden_pilot_store as golden_pilot_store
 from . import interoperability_store as interop_store
 from . import knowledge_flywheel_store as knowledge_store
 from . import method_registry_store as method_store
@@ -59,6 +60,7 @@ from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
 from . import regulatory_surveillance_store as surveillance_store
 from . import spectracheck_store as sc_store
+from . import tenant_saas_store as tenant_store
 from . import validation_center_store as validation_store
 from . import workflow_store as wf_store
 from .adduct_inference import AdductInferenceError, infer_adducts_and_isotopes
@@ -259,6 +261,15 @@ from .models import (
     CrossModuleWorkflowTemplateCreate,
     CTDModule3ReportBundle,
     CTDModule3ReportBundleCreate,
+    CustomerOnboardingProject,
+    CustomerOnboardingProjectCreate,
+    CustomerOnboardingProjectUpdate,
+    CustomerAcceptanceProtocol,
+    CustomerAcceptanceProtocolCreate,
+    CustomerAcceptanceProtocolUpdate,
+    CustomerAcceptanceTest,
+    CustomerAcceptanceTestExecute,
+    CustomerSuccessHealthScore,
     DatasetVersion,
     DatasetVersionCreate,
     DatasetVersionUpdate,
@@ -296,6 +307,9 @@ from .models import (
     ExternalObjectLinkCreate,
     ExternalSystemRecord,
     ExternalSystemRecordCreate,
+    FeatureFlag,
+    FeatureFlagCreate,
+    FeatureFlagUpdate,
     FeaturePipeline,
     FeaturePipelineCreate,
     FeatureRecord,
@@ -313,7 +327,19 @@ from .models import (
     FileNormalizationRun,
     FunctionalSpecification,
     FunctionalSpecificationCreate,
+    DemoTenantSeed,
+    DemoTenantSeedCreate,
+    ExpectedOutputContract,
+    ExpectedOutputContractCreate,
     FullStoredAnalysisRecord,
+    GoldenDataset,
+    GoldenDatasetCreate,
+    GoldenDatasetUpdate,
+    GoldenPilotScenario,
+    GoldenPilotScenarioCreate,
+    GoldenPilotScenarioUpdate,
+    GoldenWorkflowCase,
+    GoldenWorkflowCaseCreate,
     HRMSCandidateMatchRequest,
     HRMSCandidateMatchResult,
     HRMSFormulaSearchRequest,
@@ -322,6 +348,9 @@ from .models import (
     ImpurityRiskRegisterCreate,
     InferenceExplanation,
     InferenceExplanationCreate,
+    ImplementationTask,
+    ImplementationTaskCreate,
+    ImplementationTaskUpdate,
     IngestionRun,
     IngestionRunCreate,
     InstrumentWatchFolder,
@@ -439,6 +468,19 @@ from .models import (
     OutOfDomainAssessment,
     OutOfDomainAssessmentCreate,
     PasswordResetConfirm,
+    PilotCustomerDashboard,
+    PilotEvidenceBundle,
+    PilotEvidenceBundleCreate,
+    PilotProgram,
+    PilotProgramCreate,
+    PilotProgramUpdate,
+    PilotReadinessAssessment,
+    PilotReadinessAssessmentCreate,
+    PilotRun,
+    PilotRunCreate,
+    PilotRunDetail,
+    PilotSignoffCreate,
+    PilotSignoffRecord,
     PredictedNMRReport,
     PredictionAuditEntry,
     PredictionFeedbackCreate,
@@ -451,6 +493,8 @@ from .models import (
     PredictionServiceConfigCreate,
     ProductProgramOrderPatch,
     ProductProgramRegistry,
+    ProcurementEvidencePackage,
+    ProcurementEvidencePackageCreate,
     ProjectCreate,
     ProjectDashboardRecord,
     ProjectPermissionCreate,
@@ -620,6 +664,7 @@ from .models import (
     ScoringProfile,
     ScoringProfileCreate,
     ScoringProfileUpdate,
+    ScenarioValidationResult,
     SecureShareLinkCreate,
     SecureShareLinkRecord,
     SecurityEvent,
@@ -662,6 +707,8 @@ from .models import (
     StoredReportRecord,
     StructureElucidationReportRequest,
     StructureElucidationReportResult,
+    SubscriptionPlan,
+    SubscriptionPlanCreate,
     SystemReleaseApproveRequest,
     SystemReleaseRecord,
     SystemReleaseRecordCreate,
@@ -670,6 +717,30 @@ from .models import (
     TeamMemberCreate,
     TeamMemberRecord,
     TeamMemberUpdate,
+    Tenant,
+    TenantAuditExport,
+    TenantAuditExportCreate,
+    TenantCreate,
+    TenantDataBoundary,
+    TenantDataBoundaryCreate,
+    TenantDataBoundaryUpdate,
+    TenantEntitlement,
+    TenantEntitlementCreate,
+    TenantEntitlementUpdate,
+    TenantEnvironment,
+    TenantEnvironmentCreate,
+    TenantEnvironmentUpdate,
+    TenantGoLiveReadiness,
+    TenantModuleReadiness,
+    TenantRoiSnapshot,
+    TenantSecurityProfile,
+    TenantSecurityProfileCreate,
+    TenantSecurityProfileUpdate,
+    TenantUpdate,
+    TenantUsageSummary,
+    TenantValidationProfile,
+    TenantValidationProfileCreate,
+    TenantValidationProfileUpdate,
     ThresholdProfile,
     ThresholdProfileCreate,
     ThresholdProfileUpdate,
@@ -7495,6 +7566,47 @@ def _raise_validation_center_http_error(exc: Exception) -> None:
     raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def _raise_tenant_saas_http_error(exc: Exception) -> None:
+    if isinstance(exc, tenant_store.TenantIsolationError):
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    if isinstance(exc, tenant_store.TenantNotFoundError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, tenant_store.TenantSaaSError):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _raise_golden_pilot_http_error(exc: Exception) -> None:
+    if isinstance(exc, golden_pilot_store.GoldenPilotNotFoundError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, golden_pilot_store.GoldenPilotError):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _is_internal_super_admin(context: AccessContext) -> bool:
+    return bool(context.system_api_key or (context.user and context.user.is_admin))
+
+
+def _require_tenant_scope_header(
+    *,
+    context: AccessContext,
+    requested_tenant_id: int | None,
+    actual_tenant_id: int,
+) -> None:
+    if _is_internal_super_admin(context):
+        return
+    if requested_tenant_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Tenant-scoped access requires an x-tenant-id header.",
+        )
+    try:
+        tenant_store.ensure_tenant_scope(requested_tenant_id, actual_tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+
+
 @router.get(
     "/connectors",
     response_model=list[ConnectorRegistry],
@@ -9718,6 +9830,2239 @@ def update_capa_route(
         metadata={"updated_fields": sorted(payload.model_fields_set)},
     )
     return record
+
+
+@router.post(
+    "/tenants",
+    response_model=Tenant,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_tenant_route(
+    payload: TenantCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> Tenant:
+    if not _is_internal_super_admin(context):
+        raise HTTPException(status_code=403, detail="Tenant admin access is required.")
+    try:
+        record = tenant_store.create_tenant(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant.create",
+        message="Tenant isolation record created.",
+        entity_type="tenant",
+        entity_id=record.id,
+        metadata={"tenant_id": record.id, "tenant_type": record.tenant_type, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/tenants",
+    response_model=list[Tenant],
+    dependencies=[Depends(require_access_context)],
+)
+def list_tenants_route(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[Tenant]:
+    if not _is_internal_super_admin(context):
+        raise HTTPException(status_code=403, detail="Internal super-admin access is required.")
+    return tenant_store.list_tenants(
+        _state(request).session_factory,
+        status_filter=status_filter,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/tenants/{tenant_id}",
+    response_model=Tenant,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> Tenant:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    record = tenant_store.get_tenant(_state(request).session_factory, tenant_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant not found.")
+    return record
+
+
+@router.patch(
+    "/tenants/{tenant_id}",
+    response_model=Tenant,
+    dependencies=[Depends(require_access_context)],
+)
+def update_tenant_route(
+    tenant_id: int,
+    payload: TenantUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> Tenant:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.update_tenant(_state(request).session_factory, tenant_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant.update",
+        message="Tenant isolation record updated.",
+        entity_type="tenant",
+        entity_id=record.id,
+        metadata={"tenant_id": record.id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/tenants/{tenant_id}/environments",
+    response_model=TenantEnvironment,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_tenant_environment_route(
+    tenant_id: int,
+    payload: TenantEnvironmentCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantEnvironment:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.create_environment(_state(request).session_factory, tenant_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_environment.create",
+        message="Tenant environment created.",
+        entity_type="tenant_environment",
+        entity_id=record.id,
+        metadata={"tenant_id": tenant_id, "environment_type": record.environment_type, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/environments",
+    response_model=list[TenantEnvironment],
+    dependencies=[Depends(require_access_context)],
+)
+def list_tenant_environments_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[TenantEnvironment]:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.list_environments(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.patch(
+    "/tenant-environments/{environment_id}",
+    response_model=TenantEnvironment,
+    dependencies=[Depends(require_access_context)],
+)
+def update_tenant_environment_route(
+    environment_id: int,
+    payload: TenantEnvironmentUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantEnvironment:
+    try:
+        record = tenant_store.update_environment(
+            _state(request).session_factory,
+            environment_id,
+            payload,
+            requested_tenant_id=x_tenant_id,
+            is_internal_super_admin=_is_internal_super_admin(context),
+        )
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant environment not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_environment.update",
+        message="Tenant environment updated.",
+        entity_type="tenant_environment",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/subscription-plans",
+    response_model=SubscriptionPlan,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_subscription_plan_route(
+    payload: SubscriptionPlanCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SubscriptionPlan:
+    if not _is_internal_super_admin(context):
+        raise HTTPException(status_code=403, detail="Tenant admin access is required.")
+    try:
+        record = tenant_store.create_subscription_plan(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="subscription_plan.create",
+        message="Subscription plan created.",
+        entity_type="subscription_plan",
+        entity_id=record.id,
+        metadata={"plan_key": record.plan_key, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/subscription-plans",
+    response_model=list[SubscriptionPlan],
+    dependencies=[Depends(require_access_context)],
+)
+def list_subscription_plans_route(
+    request: Request,
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[SubscriptionPlan]:
+    return tenant_store.list_subscription_plans(_state(request).session_factory, limit=limit)
+
+
+@router.get(
+    "/subscription-plans/{plan_id}",
+    response_model=SubscriptionPlan,
+    dependencies=[Depends(require_access_context)],
+)
+def get_subscription_plan_route(
+    plan_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SubscriptionPlan:
+    record = tenant_store.get_subscription_plan(_state(request).session_factory, plan_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Subscription plan not found.")
+    return record
+
+
+@router.post(
+    "/tenants/{tenant_id}/entitlements",
+    response_model=TenantEntitlement,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_tenant_entitlement_route(
+    tenant_id: int,
+    payload: TenantEntitlementCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantEntitlement:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.create_entitlement(_state(request).session_factory, tenant_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_entitlement.create",
+        message="Tenant entitlement created.",
+        entity_type="tenant_entitlement",
+        entity_id=record.id,
+        metadata={
+            "tenant_id": tenant_id,
+            "feature_key": record.feature_key,
+            "program": record.program,
+            "enabled": record.enabled,
+        },
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/entitlements",
+    response_model=list[TenantEntitlement],
+    dependencies=[Depends(require_access_context)],
+)
+def list_tenant_entitlements_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[TenantEntitlement]:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.list_entitlements(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.patch(
+    "/tenant-entitlements/{entitlement_id}",
+    response_model=TenantEntitlement,
+    dependencies=[Depends(require_access_context)],
+)
+def update_tenant_entitlement_route(
+    entitlement_id: int,
+    payload: TenantEntitlementUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantEntitlement:
+    try:
+        record = tenant_store.update_entitlement(
+            _state(request).session_factory,
+            entitlement_id,
+            payload,
+            requested_tenant_id=x_tenant_id,
+            is_internal_super_admin=_is_internal_super_admin(context),
+        )
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant entitlement not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_entitlement.update",
+        message="Tenant entitlement updated.",
+        entity_type="tenant_entitlement",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/feature-flags",
+    response_model=FeatureFlag,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_feature_flag_route(
+    payload: FeatureFlagCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> FeatureFlag:
+    if not _is_internal_super_admin(context):
+        raise HTTPException(status_code=403, detail="Tenant admin access is required.")
+    try:
+        record = tenant_store.create_feature_flag(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="feature_flag.create",
+        message="Feature flag created without changing core program order.",
+        entity_type="feature_flag",
+        entity_id=record.id,
+        metadata={"flag_key": record.flag_key, "program": record.program, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/feature-flags",
+    response_model=list[FeatureFlag],
+    dependencies=[Depends(require_access_context)],
+)
+def list_feature_flags_route(
+    request: Request,
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[FeatureFlag]:
+    return tenant_store.list_feature_flags(_state(request).session_factory, limit=limit)
+
+
+@router.get(
+    "/feature-flags/{flag_id}",
+    response_model=FeatureFlag,
+    dependencies=[Depends(require_access_context)],
+)
+def get_feature_flag_route(
+    flag_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> FeatureFlag:
+    record = tenant_store.get_feature_flag(_state(request).session_factory, flag_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Feature flag not found.")
+    return record
+
+
+@router.patch(
+    "/feature-flags/{flag_id}",
+    response_model=FeatureFlag,
+    dependencies=[Depends(require_access_context)],
+)
+def update_feature_flag_route(
+    flag_id: int,
+    payload: FeatureFlagUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> FeatureFlag:
+    if not _is_internal_super_admin(context):
+        raise HTTPException(status_code=403, detail="Tenant admin access is required.")
+    try:
+        record = tenant_store.update_feature_flag(_state(request).session_factory, flag_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Feature flag not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="feature_flag.update",
+        message="Feature flag updated without changing core program order.",
+        entity_type="feature_flag",
+        entity_id=record.id,
+        metadata={"flag_key": record.flag_key, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/tenants/{tenant_id}/pilot-programs",
+    response_model=PilotProgram,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_pilot_program_route(
+    tenant_id: int,
+    payload: PilotProgramCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotProgram:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.create_pilot_program(_state(request).session_factory, tenant_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="pilot_program.create",
+        message="Pilot scope created.",
+        entity_type="pilot_program",
+        entity_id=record.id,
+        metadata={"tenant_id": tenant_id, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/pilot-programs",
+    response_model=list[PilotProgram],
+    dependencies=[Depends(require_access_context)],
+)
+def list_pilot_programs_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[PilotProgram]:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.list_pilot_programs(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.get(
+    "/pilot-programs/{pilot_id}",
+    response_model=PilotProgram,
+    dependencies=[Depends(require_access_context)],
+)
+def get_pilot_program_route(
+    pilot_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotProgram:
+    record = tenant_store.get_pilot_program(_state(request).session_factory, pilot_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Pilot program not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    return record
+
+
+@router.patch(
+    "/pilot-programs/{pilot_id}",
+    response_model=PilotProgram,
+    dependencies=[Depends(require_access_context)],
+)
+def update_pilot_program_route(
+    pilot_id: int,
+    payload: PilotProgramUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotProgram:
+    try:
+        record = tenant_store.update_pilot_program(_state(request).session_factory, pilot_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Pilot program not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="pilot_program.update",
+        message="Pilot scope updated.",
+        entity_type="pilot_program",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/tenants/{tenant_id}/onboarding-projects",
+    response_model=CustomerOnboardingProject,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_onboarding_project_route(
+    tenant_id: int,
+    payload: CustomerOnboardingProjectCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> CustomerOnboardingProject:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.create_onboarding_project(_state(request).session_factory, tenant_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="onboarding_project.create",
+        message="Customer onboarding readiness project created.",
+        entity_type="onboarding_project",
+        entity_id=record.id,
+        metadata={"tenant_id": tenant_id, "implementation_stage": record.implementation_stage},
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/onboarding-projects",
+    response_model=list[CustomerOnboardingProject],
+    dependencies=[Depends(require_access_context)],
+)
+def list_onboarding_projects_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[CustomerOnboardingProject]:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.list_onboarding_projects(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.get(
+    "/onboarding-projects/{project_id}",
+    response_model=CustomerOnboardingProject,
+    dependencies=[Depends(require_access_context)],
+)
+def get_onboarding_project_route(
+    project_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> CustomerOnboardingProject:
+    record = tenant_store.get_onboarding_project(_state(request).session_factory, project_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Onboarding project not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    return record
+
+
+@router.patch(
+    "/onboarding-projects/{project_id}",
+    response_model=CustomerOnboardingProject,
+    dependencies=[Depends(require_access_context)],
+)
+def update_onboarding_project_route(
+    project_id: int,
+    payload: CustomerOnboardingProjectUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> CustomerOnboardingProject:
+    try:
+        record = tenant_store.update_onboarding_project(_state(request).session_factory, project_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Onboarding project not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="onboarding_project.update",
+        message="Customer onboarding readiness project updated.",
+        entity_type="onboarding_project",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/onboarding-projects/{project_id}/tasks",
+    response_model=ImplementationTask,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_implementation_task_route(
+    project_id: int,
+    payload: ImplementationTaskCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> ImplementationTask:
+    project = tenant_store.get_onboarding_project(_state(request).session_factory, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Onboarding project not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=project.tenant_id,
+    )
+    try:
+        record = tenant_store.create_implementation_task(
+            _state(request).session_factory,
+            project_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="implementation_task.create",
+        message="Implementation task created.",
+        entity_type="implementation_task",
+        entity_id=record.id,
+        metadata={"tenant_id": project.tenant_id, "program": record.program, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/onboarding-projects/{project_id}/tasks",
+    response_model=list[ImplementationTask],
+    dependencies=[Depends(require_access_context)],
+)
+def list_implementation_tasks_route(
+    project_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ImplementationTask]:
+    project = tenant_store.get_onboarding_project(_state(request).session_factory, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Onboarding project not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=project.tenant_id,
+    )
+    try:
+        return tenant_store.list_implementation_tasks(_state(request).session_factory, project_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.patch(
+    "/implementation-tasks/{task_id}",
+    response_model=ImplementationTask,
+    dependencies=[Depends(require_access_context)],
+)
+def update_implementation_task_route(
+    task_id: int,
+    payload: ImplementationTaskUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> ImplementationTask:
+    task_tenant_id = tenant_store.get_implementation_task_tenant_id(
+        _state(request).session_factory,
+        task_id,
+    )
+    if task_tenant_id is None:
+        raise HTTPException(status_code=404, detail="Implementation task not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=task_tenant_id,
+    )
+    try:
+        record = tenant_store.update_implementation_task(_state(request).session_factory, task_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Implementation task not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="implementation_task.update",
+        message="Implementation task updated.",
+        entity_type="implementation_task",
+        entity_id=record.id,
+        metadata={"tenant_id": task_tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/tenants/{tenant_id}/data-boundary",
+    response_model=TenantDataBoundary,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_tenant_data_boundary_route(
+    tenant_id: int,
+    payload: TenantDataBoundaryCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantDataBoundary:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.create_data_boundary(_state(request).session_factory, tenant_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_data_boundary.create",
+        message="Tenant data boundary created.",
+        entity_type="tenant_data_boundary",
+        entity_id=record.id,
+        metadata={"tenant_id": tenant_id, "isolation_mode": record.isolation_mode, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/data-boundary",
+    response_model=TenantDataBoundary,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_data_boundary_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantDataBoundary:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.get_data_boundary(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant data boundary not found.")
+    return record
+
+
+@router.patch(
+    "/tenant-data-boundaries/{boundary_id}",
+    response_model=TenantDataBoundary,
+    dependencies=[Depends(require_access_context)],
+)
+def update_tenant_data_boundary_route(
+    boundary_id: int,
+    payload: TenantDataBoundaryUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantDataBoundary:
+    try:
+        record = tenant_store.update_data_boundary(_state(request).session_factory, boundary_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant data boundary not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_data_boundary.update",
+        message="Tenant data boundary updated.",
+        entity_type="tenant_data_boundary",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/tenants/{tenant_id}/security-profile",
+    response_model=TenantSecurityProfile,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_tenant_security_profile_route(
+    tenant_id: int,
+    payload: TenantSecurityProfileCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantSecurityProfile:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.create_security_profile(_state(request).session_factory, tenant_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_security_profile.create",
+        message="Tenant security profile created.",
+        entity_type="tenant_security_profile",
+        entity_id=record.id,
+        metadata={"tenant_id": tenant_id, "status": record.status, "mfa_required": record.mfa_required},
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/security-profile",
+    response_model=TenantSecurityProfile,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_security_profile_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantSecurityProfile:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.get_security_profile(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant security profile not found.")
+    return record
+
+
+@router.patch(
+    "/tenant-security-profiles/{profile_id}",
+    response_model=TenantSecurityProfile,
+    dependencies=[Depends(require_access_context)],
+)
+def update_tenant_security_profile_route(
+    profile_id: int,
+    payload: TenantSecurityProfileUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantSecurityProfile:
+    try:
+        record = tenant_store.update_security_profile(_state(request).session_factory, profile_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant security profile not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_security_profile.update",
+        message="Tenant security profile updated.",
+        entity_type="tenant_security_profile",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/tenants/{tenant_id}/validation-profile",
+    response_model=TenantValidationProfile,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_tenant_validation_profile_route(
+    tenant_id: int,
+    payload: TenantValidationProfileCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantValidationProfile:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.create_validation_profile(_state(request).session_factory, tenant_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_validation_profile.create",
+        message="Tenant validation readiness profile created.",
+        entity_type="tenant_validation_profile",
+        entity_id=record.id,
+        metadata={"tenant_id": tenant_id, "status": record.status, "validation_required": record.validation_required},
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/validation-profile",
+    response_model=TenantValidationProfile,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_validation_profile_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantValidationProfile:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.get_validation_profile(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant validation profile not found.")
+    return record
+
+
+@router.patch(
+    "/tenant-validation-profiles/{profile_id}",
+    response_model=TenantValidationProfile,
+    dependencies=[Depends(require_access_context)],
+)
+def update_tenant_validation_profile_route(
+    profile_id: int,
+    payload: TenantValidationProfileUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantValidationProfile:
+    try:
+        record = tenant_store.update_validation_profile(_state(request).session_factory, profile_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant validation profile not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_validation_profile.update",
+        message="Tenant validation readiness profile updated.",
+        entity_type="tenant_validation_profile",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/usage-summary",
+    response_model=TenantUsageSummary,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_usage_summary_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantUsageSummary:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.get_usage_summary(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.get(
+    "/tenants/{tenant_id}/roi",
+    response_model=TenantRoiSnapshot,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_roi_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantRoiSnapshot:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.get_roi_snapshot(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.get(
+    "/tenants/{tenant_id}/health-score",
+    response_model=CustomerSuccessHealthScore,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_health_score_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> CustomerSuccessHealthScore:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.get_health_score(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.post(
+    "/tenants/{tenant_id}/procurement-package",
+    response_model=ProcurementEvidencePackage,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_tenant_procurement_package_route(
+    tenant_id: int,
+    payload: ProcurementEvidencePackageCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> ProcurementEvidencePackage:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.create_procurement_package(
+            _state(request).session_factory,
+            tenant_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="procurement_package.create",
+        message="Procurement evidence package created with safe summaries.",
+        entity_type="procurement_evidence_package",
+        entity_id=record.id,
+        metadata={"tenant_id": tenant_id, "package_type": record.package_type, "package_sha256": record.package_sha256},
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/procurement-packages",
+    response_model=list[ProcurementEvidencePackage],
+    dependencies=[Depends(require_access_context)],
+)
+def list_tenant_procurement_packages_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ProcurementEvidencePackage]:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.list_procurement_packages(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.get(
+    "/procurement-packages/{package_id}",
+    response_model=ProcurementEvidencePackage,
+    dependencies=[Depends(require_access_context)],
+)
+def get_procurement_package_route(
+    package_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> ProcurementEvidencePackage:
+    record = tenant_store.get_procurement_package(_state(request).session_factory, package_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Procurement evidence package not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    return record
+
+
+@router.post(
+    "/tenants/{tenant_id}/audit-export",
+    response_model=TenantAuditExport,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_tenant_audit_export_route(
+    tenant_id: int,
+    payload: TenantAuditExportCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantAuditExport:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        record = tenant_store.create_audit_export(_state(request).session_factory, tenant_id, payload)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant_audit_export.create",
+        message="Tenant audit export created with safe manifest.",
+        entity_type="tenant_audit_export",
+        entity_id=record.id,
+        metadata={"tenant_id": tenant_id, "export_scope": record.export_scope, "export_sha256": record.export_sha256},
+    )
+    return record
+
+
+@router.get(
+    "/tenant-audit-exports/{export_id}",
+    response_model=TenantAuditExport,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_audit_export_route(
+    export_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantAuditExport:
+    record = tenant_store.get_audit_export(_state(request).session_factory, export_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Tenant audit export not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/module-readiness",
+    response_model=TenantModuleReadiness,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_module_readiness_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantModuleReadiness:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.get_module_readiness(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.get(
+    "/tenants/{tenant_id}/go-live-readiness",
+    response_model=TenantGoLiveReadiness,
+    dependencies=[Depends(require_access_context)],
+)
+def get_tenant_go_live_readiness_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> TenantGoLiveReadiness:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.get_go_live_readiness(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.post(
+    "/pilot/golden-datasets",
+    response_model=GoldenDataset,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_golden_dataset_route(
+    payload: GoldenDatasetCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> GoldenDataset:
+    try:
+        record = golden_pilot_store.create_golden_dataset(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="golden_dataset.create",
+        message="Golden dataset created as labeled demo/test or customer pilot data.",
+        entity_type="golden_dataset",
+        entity_id=record.id,
+        metadata={"dataset_type": record.dataset_type, "source_type": record.source_type, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/golden-datasets",
+    response_model=list[GoldenDataset],
+    dependencies=[Depends(require_access_context)],
+)
+def list_golden_datasets_route(
+    request: Request,
+    dataset_type: str | None = Query(default=None),
+    source_type: str | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[GoldenDataset]:
+    return golden_pilot_store.list_golden_datasets(
+        _state(request).session_factory,
+        dataset_type=dataset_type,
+        source_type=source_type,
+        status_filter=status_filter,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/pilot/golden-datasets/{dataset_id}",
+    response_model=GoldenDataset,
+    dependencies=[Depends(require_access_context)],
+)
+def get_golden_dataset_route(
+    dataset_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> GoldenDataset:
+    record = golden_pilot_store.get_golden_dataset(_state(request).session_factory, dataset_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Golden dataset not found.")
+    return record
+
+
+@router.patch(
+    "/pilot/golden-datasets/{dataset_id}",
+    response_model=GoldenDataset,
+    dependencies=[Depends(require_access_context)],
+)
+def update_golden_dataset_route(
+    dataset_id: int,
+    payload: GoldenDatasetUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> GoldenDataset:
+    try:
+        record = golden_pilot_store.update_golden_dataset(_state(request).session_factory, dataset_id, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Golden dataset not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="golden_dataset.update",
+        message="Golden dataset updated.",
+        entity_type="golden_dataset",
+        entity_id=record.id,
+        metadata={"updated_fields": sorted(payload.model_fields_set), "status": record.status},
+    )
+    return record
+
+
+@router.post(
+    "/pilot/scenarios",
+    response_model=GoldenPilotScenario,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_golden_scenario_route(
+    payload: GoldenPilotScenarioCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> GoldenPilotScenario:
+    try:
+        record = golden_pilot_store.create_scenario(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="golden_scenario.create",
+        message="Golden scenario created with fixed core product order.",
+        entity_type="golden_scenario",
+        entity_id=record.id,
+        metadata={"scenario_type": record.scenario_type, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/scenarios",
+    response_model=list[GoldenPilotScenario],
+    dependencies=[Depends(require_access_context)],
+)
+def list_golden_scenarios_route(
+    request: Request,
+    scenario_type: str | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=500),
+    context: AccessContext = Depends(require_access_context),
+) -> list[GoldenPilotScenario]:
+    return golden_pilot_store.list_scenarios(
+        _state(request).session_factory,
+        scenario_type=scenario_type,
+        status_filter=status_filter,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/pilot/scenarios/{scenario_id}",
+    response_model=GoldenPilotScenario,
+    dependencies=[Depends(require_access_context)],
+)
+def get_golden_scenario_route(
+    scenario_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> GoldenPilotScenario:
+    record = golden_pilot_store.get_scenario(_state(request).session_factory, scenario_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Golden scenario not found.")
+    return record
+
+
+@router.patch(
+    "/pilot/scenarios/{scenario_id}",
+    response_model=GoldenPilotScenario,
+    dependencies=[Depends(require_access_context)],
+)
+def update_golden_scenario_route(
+    scenario_id: int,
+    payload: GoldenPilotScenarioUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> GoldenPilotScenario:
+    try:
+        record = golden_pilot_store.update_scenario(_state(request).session_factory, scenario_id, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Golden scenario not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="golden_scenario.update",
+        message="Golden scenario updated.",
+        entity_type="golden_scenario",
+        entity_id=record.id,
+        metadata={"updated_fields": sorted(payload.model_fields_set), "status": record.status},
+    )
+    return record
+
+
+@router.post(
+    "/pilot/scenarios/{scenario_id}/workflow-cases",
+    response_model=GoldenWorkflowCase,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_golden_workflow_case_route(
+    scenario_id: int,
+    payload: GoldenWorkflowCaseCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> GoldenWorkflowCase:
+    try:
+        record = golden_pilot_store.create_workflow_case(_state(request).session_factory, scenario_id, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="golden_workflow_case.create",
+        message="Golden workflow case created.",
+        entity_type="golden_workflow_case",
+        entity_id=record.id,
+        metadata={"scenario_id": scenario_id, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/scenarios/{scenario_id}/workflow-cases",
+    response_model=list[GoldenWorkflowCase],
+    dependencies=[Depends(require_access_context)],
+)
+def list_golden_workflow_cases_route(
+    scenario_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[GoldenWorkflowCase]:
+    try:
+        return golden_pilot_store.list_workflow_cases(_state(request).session_factory, scenario_id)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+
+
+@router.post(
+    "/pilot/scenarios/{scenario_id}/expected-output-contracts",
+    response_model=ExpectedOutputContract,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_expected_output_contract_route(
+    scenario_id: int,
+    payload: ExpectedOutputContractCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ExpectedOutputContract:
+    try:
+        record = golden_pilot_store.create_expected_output_contract(
+            _state(request).session_factory,
+            scenario_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="expected_output_contract.create",
+        message="Expected output contract created.",
+        entity_type="expected_output_contract",
+        entity_id=record.id,
+        metadata={"scenario_id": scenario_id, "target_module": record.target_module},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/scenarios/{scenario_id}/expected-output-contracts",
+    response_model=list[ExpectedOutputContract],
+    dependencies=[Depends(require_access_context)],
+)
+def list_expected_output_contracts_route(
+    scenario_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[ExpectedOutputContract]:
+    try:
+        return golden_pilot_store.list_expected_output_contracts(_state(request).session_factory, scenario_id)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+
+
+@router.post(
+    "/pilot/scenarios/{scenario_id}/seed-tenant",
+    response_model=DemoTenantSeed,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def seed_demo_tenant_route(
+    scenario_id: int,
+    payload: DemoTenantSeedCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> DemoTenantSeed:
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=payload.tenant_id,
+    )
+    try:
+        record = golden_pilot_store.seed_demo_tenant(_state(request).session_factory, scenario_id, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="demo_tenant_seed.create",
+        message="Demo tenant seed created with safe demo records.",
+        entity_type="demo_tenant_seed",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "scenario_id": scenario_id, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/demo-seeds/{seed_id}",
+    response_model=DemoTenantSeed,
+    dependencies=[Depends(require_access_context)],
+)
+def get_demo_tenant_seed_route(
+    seed_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> DemoTenantSeed:
+    record = golden_pilot_store.get_demo_seed(_state(request).session_factory, seed_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Demo tenant seed not found.")
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=record.tenant_id,
+    )
+    return record
+
+
+@router.post(
+    "/pilot/scenarios/{scenario_id}/run",
+    response_model=PilotRunDetail,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def run_pilot_scenario_route(
+    scenario_id: int,
+    payload: PilotRunCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotRunDetail:
+    if payload.tenant_id is not None:
+        _require_tenant_scope_header(
+            context=context,
+            requested_tenant_id=x_tenant_id,
+            actual_tenant_id=payload.tenant_id,
+        )
+    try:
+        record = golden_pilot_store.run_pilot_scenario(_state(request).session_factory, scenario_id, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="pilot_run.create",
+        message="Golden scenario pilot run executed or simulated with safe summaries.",
+        entity_type="pilot_run",
+        entity_id=record.id,
+        metadata={"scenario_id": scenario_id, "tenant_id": record.tenant_id, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/runs",
+    response_model=list[PilotRun],
+    dependencies=[Depends(require_access_context)],
+)
+def list_pilot_runs_route(
+    request: Request,
+    tenant_id: int | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[PilotRun]:
+    if tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
+    elif not _is_internal_super_admin(context):
+        raise HTTPException(status_code=403, detail="Tenant-scoped access requires a tenant_id filter.")
+    return golden_pilot_store.list_pilot_runs(_state(request).session_factory, tenant_id=tenant_id, limit=limit)
+
+
+@router.get(
+    "/pilot/runs/{pilot_run_id}",
+    response_model=PilotRunDetail,
+    dependencies=[Depends(require_access_context)],
+)
+def get_pilot_run_route(
+    pilot_run_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotRunDetail:
+    record = golden_pilot_store.get_pilot_run(_state(request).session_factory, pilot_run_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Pilot run not found.")
+    if record.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
+    return record
+
+
+@router.post(
+    "/pilot/runs/{pilot_run_id}/validate",
+    response_model=list[ScenarioValidationResult],
+    dependencies=[Depends(require_access_context)],
+)
+def validate_pilot_run_route(
+    pilot_run_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ScenarioValidationResult]:
+    run = golden_pilot_store.get_pilot_run(_state(request).session_factory, pilot_run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Pilot run not found.")
+    if run.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
+    try:
+        records = golden_pilot_store.validate_pilot_run(_state(request).session_factory, pilot_run_id)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="pilot_run.validate",
+        message="Pilot run validated against expected output contracts.",
+        entity_type="pilot_run",
+        entity_id=pilot_run_id,
+        metadata={"result_count": len(records)},
+    )
+    return records
+
+
+@router.get(
+    "/pilot/runs/{pilot_run_id}/validation-results",
+    response_model=list[ScenarioValidationResult],
+    dependencies=[Depends(require_access_context)],
+)
+def list_pilot_run_validation_results_route(
+    pilot_run_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ScenarioValidationResult]:
+    run = golden_pilot_store.get_pilot_run(_state(request).session_factory, pilot_run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Pilot run not found.")
+    if run.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
+    try:
+        return golden_pilot_store.list_validation_results(_state(request).session_factory, pilot_run_id)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+
+
+@router.post(
+    "/pilot/acceptance-protocols",
+    response_model=CustomerAcceptanceProtocol,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_acceptance_protocol_route(
+    payload: CustomerAcceptanceProtocolCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> CustomerAcceptanceProtocol:
+    if payload.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=payload.tenant_id)
+    try:
+        record = golden_pilot_store.create_acceptance_protocol(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="customer_acceptance_protocol.create",
+        message="Customer pilot acceptance protocol created.",
+        entity_type="customer_acceptance_protocol",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "scope": record.scope, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/acceptance-protocols",
+    response_model=list[CustomerAcceptanceProtocol],
+    dependencies=[Depends(require_access_context)],
+)
+def list_acceptance_protocols_route(
+    request: Request,
+    tenant_id: int | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[CustomerAcceptanceProtocol]:
+    if tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
+    elif not _is_internal_super_admin(context):
+        raise HTTPException(status_code=403, detail="Tenant-scoped access requires a tenant_id filter.")
+    return golden_pilot_store.list_acceptance_protocols(
+        _state(request).session_factory,
+        tenant_id=tenant_id,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/pilot/acceptance-protocols/{protocol_id}",
+    response_model=CustomerAcceptanceProtocol,
+    dependencies=[Depends(require_access_context)],
+)
+def get_acceptance_protocol_route(
+    protocol_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> CustomerAcceptanceProtocol:
+    record = golden_pilot_store.get_acceptance_protocol(_state(request).session_factory, protocol_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Customer acceptance protocol not found.")
+    if record.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
+    return record
+
+
+@router.patch(
+    "/pilot/acceptance-protocols/{protocol_id}",
+    response_model=CustomerAcceptanceProtocol,
+    dependencies=[Depends(require_access_context)],
+)
+def update_acceptance_protocol_route(
+    protocol_id: int,
+    payload: CustomerAcceptanceProtocolUpdate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> CustomerAcceptanceProtocol:
+    existing = golden_pilot_store.get_acceptance_protocol(_state(request).session_factory, protocol_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Customer acceptance protocol not found.")
+    scope_tenant_id = payload.tenant_id or existing.tenant_id
+    if scope_tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=scope_tenant_id)
+    try:
+        record = golden_pilot_store.update_acceptance_protocol(_state(request).session_factory, protocol_id, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Customer acceptance protocol not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="customer_acceptance_protocol.update",
+        message="Customer pilot acceptance protocol updated.",
+        entity_type="customer_acceptance_protocol",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.post(
+    "/pilot/acceptance-tests/{test_id}/execute",
+    response_model=CustomerAcceptanceTest,
+    dependencies=[Depends(require_access_context)],
+)
+def execute_acceptance_test_route(
+    test_id: int,
+    payload: CustomerAcceptanceTestExecute,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> CustomerAcceptanceTest:
+    existing = golden_pilot_store.get_acceptance_test(_state(request).session_factory, test_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Customer acceptance test not found.")
+    protocol = golden_pilot_store.get_acceptance_protocol(_state(request).session_factory, existing.protocol_id)
+    if protocol is not None and protocol.tenant_id is not None:
+        _require_tenant_scope_header(
+            context=context,
+            requested_tenant_id=x_tenant_id,
+            actual_tenant_id=protocol.tenant_id,
+        )
+    try:
+        record = golden_pilot_store.execute_acceptance_test(_state(request).session_factory, test_id, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Customer acceptance test not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="customer_acceptance_test.execute",
+        message="Customer pilot acceptance test executed.",
+        entity_type="customer_acceptance_test",
+        entity_id=record.id,
+        metadata={"protocol_id": record.protocol_id, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/acceptance-protocols/{protocol_id}/tests",
+    response_model=list[CustomerAcceptanceTest],
+    dependencies=[Depends(require_access_context)],
+)
+def list_acceptance_tests_route(
+    protocol_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[CustomerAcceptanceTest]:
+    protocol = golden_pilot_store.get_acceptance_protocol(_state(request).session_factory, protocol_id)
+    if protocol is None:
+        raise HTTPException(status_code=404, detail="Customer acceptance protocol not found.")
+    if protocol.tenant_id is not None:
+        _require_tenant_scope_header(
+            context=context,
+            requested_tenant_id=x_tenant_id,
+            actual_tenant_id=protocol.tenant_id,
+        )
+    try:
+        return golden_pilot_store.list_acceptance_tests(_state(request).session_factory, protocol_id)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+
+
+@router.post(
+    "/pilot/readiness-assessments",
+    response_model=PilotReadinessAssessment,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_pilot_readiness_assessment_route(
+    payload: PilotReadinessAssessmentCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotReadinessAssessment:
+    if payload.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=payload.tenant_id)
+    try:
+        record = golden_pilot_store.create_readiness_assessment(_state(request).session_factory, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="pilot_readiness_assessment.create",
+        message="Pilot readiness assessment created.",
+        entity_type="pilot_readiness_assessment",
+        entity_id=record.id,
+        metadata={"tenant_id": record.tenant_id, "readiness_status": record.readiness_status},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/readiness-assessments",
+    response_model=list[PilotReadinessAssessment],
+    dependencies=[Depends(require_access_context)],
+)
+def list_pilot_readiness_assessments_route(
+    request: Request,
+    tenant_id: int | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[PilotReadinessAssessment]:
+    if tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
+    elif not _is_internal_super_admin(context):
+        raise HTTPException(status_code=403, detail="Tenant-scoped access requires a tenant_id filter.")
+    return golden_pilot_store.list_readiness_assessments(
+        _state(request).session_factory,
+        tenant_id=tenant_id,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/pilot/readiness-assessments/{assessment_id}",
+    response_model=PilotReadinessAssessment,
+    dependencies=[Depends(require_access_context)],
+)
+def get_pilot_readiness_assessment_route(
+    assessment_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotReadinessAssessment:
+    record = golden_pilot_store.get_readiness_assessment(_state(request).session_factory, assessment_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Pilot readiness assessment not found.")
+    if record.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
+    return record
+
+
+@router.post(
+    "/pilot/signoff",
+    response_model=PilotSignoffRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_pilot_signoff_route(
+    payload: PilotSignoffCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotSignoffRecord:
+    if payload.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=payload.tenant_id)
+    try:
+        record = golden_pilot_store.create_signoff(_state(request).session_factory, payload)
+        if record.signature_record_id is None:
+            signature = validation_store.create_signature(
+                _state(request).session_factory,
+                ElectronicSignatureRecordCreate(
+                    signer_name=record.signer_name,
+                    signer_email=record.signer_email,
+                    signature_meaning="reviewed" if record.decision != "rejected" else "rejected",
+                    target_type="pilot_signoff",
+                    target_id=record.id,
+                    reason=record.rationale,
+                    authentication_method="server_side_api",
+                    metadata_json={
+                        "pilot_signoff_decision": record.decision,
+                        "pilot_run_id": record.pilot_run_id,
+                        "protocol_id": record.protocol_id,
+                    },
+                ),
+            )
+            linked = golden_pilot_store.set_signoff_signature_record_id(
+                _state(request).session_factory,
+                record.id,
+                signature.id,
+            )
+            if linked is not None:
+                record = linked
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="pilot_signoff.create",
+        message="Pilot signoff record created with rationale and e-signature linkage.",
+        entity_type="pilot_signoff",
+        entity_id=record.id,
+        metadata={
+            "tenant_id": record.tenant_id,
+            "pilot_run_id": record.pilot_run_id,
+            "decision": record.decision,
+            "signature_record_id": record.signature_record_id,
+        },
+    )
+    return record
+
+
+@router.get(
+    "/pilot/signoff/{signoff_id}",
+    response_model=PilotSignoffRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def get_pilot_signoff_route(
+    signoff_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotSignoffRecord:
+    record = golden_pilot_store.get_signoff(_state(request).session_factory, signoff_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Pilot signoff record not found.")
+    if record.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
+    return record
+
+
+@router.post(
+    "/pilot/runs/{pilot_run_id}/evidence-bundle",
+    response_model=PilotEvidenceBundle,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_pilot_evidence_bundle_route(
+    pilot_run_id: int,
+    payload: PilotEvidenceBundleCreate,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotEvidenceBundle:
+    run = golden_pilot_store.get_pilot_run(_state(request).session_factory, pilot_run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Pilot run not found.")
+    if run.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
+    try:
+        record = golden_pilot_store.create_evidence_bundle(_state(request).session_factory, pilot_run_id, payload)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="pilot_evidence_bundle.create",
+        message="Pilot evidence bundle created with safe summaries and hashes.",
+        entity_type="pilot_evidence_bundle",
+        entity_id=record.id,
+        metadata={"pilot_run_id": pilot_run_id, "package_sha256": record.package_sha256, "status": record.status},
+    )
+    return record
+
+
+@router.get(
+    "/pilot/runs/{pilot_run_id}/evidence-bundle",
+    response_model=list[PilotEvidenceBundle],
+    dependencies=[Depends(require_access_context)],
+)
+def list_pilot_evidence_bundles_route(
+    pilot_run_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> list[PilotEvidenceBundle]:
+    run = golden_pilot_store.get_pilot_run(_state(request).session_factory, pilot_run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Pilot run not found.")
+    if run.tenant_id is not None:
+        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
+    try:
+        return golden_pilot_store.list_evidence_bundles(_state(request).session_factory, pilot_run_id)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
+
+
+@router.get(
+    "/pilot/customer-dashboard/{tenant_id}",
+    response_model=PilotCustomerDashboard,
+    dependencies=[Depends(require_access_context)],
+)
+def get_pilot_customer_dashboard_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> PilotCustomerDashboard:
+    _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
+    try:
+        return golden_pilot_store.get_customer_dashboard(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_golden_pilot_http_error(exc)
+        raise
 
 
 @router.get(

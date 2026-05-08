@@ -1759,6 +1759,800 @@ class CAPARecordORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class TenantORM(Base):
+    __tablename__ = "tenants"
+    __table_args__ = (
+        UniqueConstraint("tenant_key", name="uq_tenants_key"),
+        Index("ix_tenants_type_status", "tenant_type", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_key: Mapped[str] = mapped_column(String(120), index=True)
+    display_name: Mapped[str] = mapped_column(String(240))
+    tenant_type: Mapped[str] = mapped_column(String(40), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="onboarding", index=True)
+    primary_contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class TenantEnvironmentORM(Base):
+    __tablename__ = "tenant_environments"
+    __table_args__ = (
+        Index("ix_tenant_environments_tenant_status", "tenant_id", "status"),
+        Index("ix_tenant_environments_type_status", "environment_type", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    environment_type: Mapped[str] = mapped_column(String(32), index=True)
+    base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    data_retention_policy_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class SubscriptionPlanORM(Base):
+    __tablename__ = "subscription_plans"
+    __table_args__ = (
+        UniqueConstraint("plan_key", name="uq_subscription_plans_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    plan_key: Mapped[str] = mapped_column(String(120), index=True)
+    display_name: Mapped[str] = mapped_column(String(240))
+    description: Mapped[str] = mapped_column(Text)
+    default_entitlements_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class TenantEntitlementORM(Base):
+    __tablename__ = "tenant_entitlements"
+    __table_args__ = (
+        Index("ix_tenant_entitlements_tenant_program", "tenant_id", "program"),
+        Index("ix_tenant_entitlements_feature", "feature_key", "enabled"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subscription_plans.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    feature_key: Mapped[str] = mapped_column(String(160), index=True)
+    program: Mapped[str] = mapped_column(String(64), index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    limit_json: Mapped[str] = mapped_column(Text, default="{}")
+    effective_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    effective_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class FeatureFlagORM(Base):
+    __tablename__ = "feature_flags"
+    __table_args__ = (
+        UniqueConstraint("flag_key", name="uq_feature_flags_key"),
+        Index("ix_feature_flags_program_status", "program", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    flag_key: Mapped[str] = mapped_column(String(160), index=True)
+    display_name: Mapped[str] = mapped_column(String(240))
+    description: Mapped[str] = mapped_column(Text)
+    program: Mapped[str] = mapped_column(String(64), index=True)
+    default_enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    rollout_rules_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class PilotProgramORM(Base):
+    __tablename__ = "pilot_programs"
+    __table_args__ = (
+        Index("ix_pilot_programs_tenant_status", "tenant_id", "status"),
+        Index("ix_pilot_programs_dates", "start_date", "end_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    objective: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="planned", index=True)
+    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    target_programs_json: Mapped[str] = mapped_column(Text, default="[]")
+    success_criteria_json: Mapped[str] = mapped_column(Text, default="[]")
+    risks_json: Mapped[str] = mapped_column(Text, default="[]")
+    notes_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class CustomerOnboardingProjectORM(Base):
+    __tablename__ = "customer_onboarding_projects"
+    __table_args__ = (
+        Index("ix_onboarding_projects_tenant_status", "tenant_id", "status"),
+        Index("ix_onboarding_projects_stage", "implementation_stage"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    pilot_program_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pilot_programs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    status: Mapped[str] = mapped_column(String(40), default="not_started", index=True)
+    owner_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    customer_contact: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    implementation_stage: Mapped[str] = mapped_column(String(64), default="discovery", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ImplementationTaskORM(Base):
+    __tablename__ = "implementation_tasks"
+    __table_args__ = (
+        Index("ix_implementation_tasks_project_status", "onboarding_project_id", "status"),
+        Index("ix_implementation_tasks_program_status", "program", "status"),
+        Index("ix_implementation_tasks_due", "due_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    onboarding_project_id: Mapped[int] = mapped_column(
+        ForeignKey("customer_onboarding_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    task_type: Mapped[str] = mapped_column(String(64), index=True)
+    program: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="open", index=True)
+    owner: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class TenantDataBoundaryORM(Base):
+    __tablename__ = "tenant_data_boundaries"
+    __table_args__ = (
+        Index("ix_tenant_data_boundaries_tenant_status", "tenant_id", "status"),
+        Index("ix_tenant_data_boundaries_isolation", "isolation_mode"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    isolation_mode: Mapped[str] = mapped_column(String(64), index=True)
+    encryption_profile: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    storage_prefix: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    allowed_regions_json: Mapped[str] = mapped_column(Text, default="[]")
+    data_residency_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class TenantSecurityProfileORM(Base):
+    __tablename__ = "tenant_security_profiles"
+    __table_args__ = (
+        Index("ix_tenant_security_profiles_tenant_status", "tenant_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    sso_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    mfa_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    allowed_domains_json: Mapped[str] = mapped_column(Text, default="[]")
+    session_timeout_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ip_allowlist_json: Mapped[str] = mapped_column(Text, default="[]")
+    security_frameworks_json: Mapped[str] = mapped_column(Text, default="[]")
+    risk_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class TenantValidationProfileORM(Base):
+    __tablename__ = "tenant_validation_profiles"
+    __table_args__ = (
+        Index("ix_tenant_validation_profiles_tenant_status", "tenant_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    validation_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    validation_project_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    controlled_record_policy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    esignature_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    data_integrity_assessment_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    inspection_package_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class CustomerSuccessHealthScoreORM(Base):
+    __tablename__ = "customer_success_health_scores"
+    __table_args__ = (
+        Index("ix_customer_health_tenant_created", "tenant_id", "created_at"),
+        Index("ix_customer_health_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="unknown", index=True)
+    usage_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    onboarding_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    support_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    roi_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    blockers_json: Mapped[str] = mapped_column(Text, default="[]")
+    recommended_actions_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class TenantUsageSummaryORM(Base):
+    __tablename__ = "tenant_usage_summaries"
+    __table_args__ = (
+        Index("ix_tenant_usage_tenant_period", "tenant_id", "period_start", "period_end"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    spectracheck_usage_json: Mapped[str] = mapped_column(Text, default="{}")
+    regulatory_usage_json: Mapped[str] = mapped_column(Text, default="{}")
+    reaction_usage_json: Mapped[str] = mapped_column(Text, default="{}")
+    reports_generated: Mapped[int] = mapped_column(Integer, default=0)
+    actions_completed: Mapped[int] = mapped_column(Integer, default=0)
+    hours_saved: Mapped[float | None] = mapped_column(Float, nullable=True)
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class TenantRoiSnapshotORM(Base):
+    __tablename__ = "tenant_roi_snapshots"
+    __table_args__ = (
+        Index("ix_tenant_roi_tenant_period", "tenant_id", "period_start", "period_end"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    total_hours_saved: Mapped[float] = mapped_column(Float, default=0.0)
+    tasks_automated: Mapped[int] = mapped_column(Integer, default=0)
+    reports_generated: Mapped[int] = mapped_column(Integer, default=0)
+    regulatory_actions_created: Mapped[int] = mapped_column(Integer, default=0)
+    reaction_recommendations_approved: Mapped[int] = mapped_column(Integer, default=0)
+    renewal_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ProcurementEvidencePackageORM(Base):
+    __tablename__ = "procurement_evidence_packages"
+    __table_args__ = (
+        Index("ix_procurement_packages_tenant_status", "tenant_id", "status"),
+        Index("ix_procurement_packages_type", "package_type"),
+        Index("ix_procurement_packages_sha", "package_sha256"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    package_type: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    package_json: Mapped[str] = mapped_column(Text, default="{}")
+    package_html: Mapped[str | None] = mapped_column(Text, nullable=True)
+    package_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class TenantAuditExportORM(Base):
+    __tablename__ = "tenant_audit_exports"
+    __table_args__ = (
+        Index("ix_tenant_audit_exports_tenant_scope", "tenant_id", "export_scope"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    export_scope: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    export_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class GoldenDatasetORM(Base):
+    __tablename__ = "golden_datasets"
+    __table_args__ = (
+        UniqueConstraint("dataset_key", name="uq_golden_datasets_key"),
+        Index("ix_golden_datasets_type_status", "dataset_type", "status"),
+        Index("ix_golden_datasets_source", "source_type"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dataset_key: Mapped[str] = mapped_column(String(160), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str] = mapped_column(Text)
+    dataset_type: Mapped[str] = mapped_column(String(64), index=True)
+    source_type: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    source_references_json: Mapped[str] = mapped_column(Text, default="[]")
+    file_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    artifact_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    notes_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class GoldenPilotScenarioORM(Base):
+    __tablename__ = "golden_pilot_scenarios"
+    __table_args__ = (
+        UniqueConstraint("scenario_key", name="uq_golden_pilot_scenarios_key"),
+        Index("ix_golden_scenarios_type_status", "scenario_type", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scenario_key: Mapped[str] = mapped_column(String(160), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str] = mapped_column(Text)
+    scenario_type: Mapped[str] = mapped_column(String(80), index=True)
+    program_sequence_json: Mapped[str] = mapped_column(Text, default="[]")
+    dataset_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    required_inputs_json: Mapped[str] = mapped_column(Text, default="{}")
+    expected_outputs_json: Mapped[str] = mapped_column(Text, default="{}")
+    acceptance_criteria_json: Mapped[str] = mapped_column(Text, default="[]")
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class GoldenWorkflowCaseORM(Base):
+    __tablename__ = "golden_workflow_cases"
+    __table_args__ = (
+        Index("ix_golden_workflow_cases_scenario_status", "scenario_id", "status"),
+        Index("ix_golden_workflow_cases_key", "case_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scenario_id: Mapped[int] = mapped_column(
+        ForeignKey("golden_pilot_scenarios.id", ondelete="CASCADE"),
+        index=True,
+    )
+    case_key: Mapped[str] = mapped_column(String(160), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    input_payload_json: Mapped[str] = mapped_column(Text, default="{}")
+    expected_step_order_json: Mapped[str] = mapped_column(Text, default="[]")
+    expected_resource_links_json: Mapped[str] = mapped_column(Text, default="[]")
+    expected_warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ExpectedOutputContractORM(Base):
+    __tablename__ = "expected_output_contracts"
+    __table_args__ = (
+        Index("ix_expected_contracts_scenario_module", "scenario_id", "target_module"),
+        Index("ix_expected_contracts_step", "step_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scenario_id: Mapped[int] = mapped_column(
+        ForeignKey("golden_pilot_scenarios.id", ondelete="CASCADE"),
+        index=True,
+    )
+    step_key: Mapped[str] = mapped_column(String(160), index=True)
+    target_module: Mapped[str] = mapped_column(String(64), index=True)
+    expected_output_type: Mapped[str] = mapped_column(String(80), index=True)
+    required_fields_json: Mapped[str] = mapped_column(Text, default="[]")
+    forbidden_fields_json: Mapped[str] = mapped_column(Text, default="[]")
+    expected_statuses_json: Mapped[str] = mapped_column(Text, default="[]")
+    tolerance_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class PilotRunORM(Base):
+    __tablename__ = "pilot_runs"
+    __table_args__ = (
+        Index("ix_pilot_runs_scenario_status", "scenario_id", "status"),
+        Index("ix_pilot_runs_tenant_created", "tenant_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scenario_id: Mapped[int] = mapped_column(
+        ForeignKey("golden_pilot_scenarios.id", ondelete="CASCADE"),
+        index=True,
+    )
+    tenant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    project_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    sample_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    run_label: Mapped[str] = mapped_column(String(300))
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    notes_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class PilotRunStepORM(Base):
+    __tablename__ = "pilot_run_steps"
+    __table_args__ = (
+        Index("ix_pilot_run_steps_run_module", "pilot_run_id", "module"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pilot_run_id: Mapped[int] = mapped_column(
+        ForeignKey("pilot_runs.id", ondelete="CASCADE"),
+        index=True,
+    )
+    step_key: Mapped[str] = mapped_column(String(160), index=True)
+    module: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    input_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    output_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    linked_resource_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    linked_resource_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    notes_json: Mapped[str] = mapped_column(Text, default="{}")
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ScenarioValidationResultORM(Base):
+    __tablename__ = "scenario_validation_results"
+    __table_args__ = (
+        Index("ix_scenario_validation_run_status", "pilot_run_id", "validation_status"),
+        Index("ix_scenario_validation_contract", "contract_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pilot_run_id: Mapped[int] = mapped_column(
+        ForeignKey("pilot_runs.id", ondelete="CASCADE"),
+        index=True,
+    )
+    scenario_id: Mapped[int] = mapped_column(
+        ForeignKey("golden_pilot_scenarios.id", ondelete="CASCADE"),
+        index=True,
+    )
+    contract_id: Mapped[int | None] = mapped_column(
+        ForeignKey("expected_output_contracts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    validation_status: Mapped[str] = mapped_column(String(32), default="not_assessed", index=True)
+    expected_json: Mapped[str] = mapped_column(Text, default="{}")
+    actual_json: Mapped[str] = mapped_column(Text, default="{}")
+    differences_json: Mapped[str] = mapped_column(Text, default="{}")
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class CustomerAcceptanceProtocolORM(Base):
+    __tablename__ = "customer_acceptance_protocols"
+    __table_args__ = (
+        Index("ix_customer_acceptance_tenant_status", "tenant_id", "status"),
+        Index("ix_customer_acceptance_scope", "scope"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    pilot_program_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pilot_programs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    scope: Mapped[str] = mapped_column(String(64), index=True)
+    scenario_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    acceptance_tests_json: Mapped[str] = mapped_column(Text, default="[]")
+    success_criteria_json: Mapped[str] = mapped_column(Text, default="[]")
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class CustomerAcceptanceTestORM(Base):
+    __tablename__ = "customer_acceptance_tests"
+    __table_args__ = (
+        Index("ix_customer_acceptance_tests_protocol_status", "protocol_id", "status"),
+        Index("ix_customer_acceptance_tests_scenario", "scenario_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    protocol_id: Mapped[int] = mapped_column(
+        ForeignKey("customer_acceptance_protocols.id", ondelete="CASCADE"),
+        index=True,
+    )
+    test_key: Mapped[str] = mapped_column(String(160), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str] = mapped_column(Text)
+    scenario_id: Mapped[int | None] = mapped_column(
+        ForeignKey("golden_pilot_scenarios.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    expected_result: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="not_run", index=True)
+    executed_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    evidence_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class PilotSuccessMetricORM(Base):
+    __tablename__ = "pilot_success_metrics"
+    __table_args__ = (
+        Index("ix_pilot_success_metrics_run", "pilot_run_id"),
+        Index("ix_pilot_success_metrics_tenant", "tenant_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pilot_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pilot_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    tenant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    metric_key: Mapped[str] = mapped_column(String(160), index=True)
+    metric_name: Mapped[str] = mapped_column(String(240))
+    metric_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    metric_unit: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    target_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="not_assessed", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class PilotReadinessAssessmentORM(Base):
+    __tablename__ = "pilot_readiness_assessments"
+    __table_args__ = (
+        Index("ix_pilot_readiness_tenant_created", "tenant_id", "created_at"),
+        Index("ix_pilot_readiness_status", "readiness_status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    pilot_program_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pilot_programs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    onboarding_project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("customer_onboarding_projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    readiness_status: Mapped[str] = mapped_column(String(40), default="partially_ready", index=True)
+    spectracheck_readiness_json: Mapped[str] = mapped_column(Text, default="{}")
+    regulatory_readiness_json: Mapped[str] = mapped_column(Text, default="{}")
+    reaction_readiness_json: Mapped[str] = mapped_column(Text, default="{}")
+    connector_readiness_json: Mapped[str] = mapped_column(Text, default="{}")
+    validation_readiness_json: Mapped[str] = mapped_column(Text, default="{}")
+    mobile_readiness_json: Mapped[str] = mapped_column(Text, default="{}")
+    security_readiness_json: Mapped[str] = mapped_column(Text, default="{}")
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    recommended_actions_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class PilotSignoffRecordORM(Base):
+    __tablename__ = "pilot_signoff_records"
+    __table_args__ = (
+        Index("ix_pilot_signoffs_tenant", "tenant_id"),
+        Index("ix_pilot_signoffs_run", "pilot_run_id"),
+        Index("ix_pilot_signoffs_protocol", "protocol_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    pilot_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pilot_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    protocol_id: Mapped[int | None] = mapped_column(
+        ForeignKey("customer_acceptance_protocols.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    signer_name: Mapped[str] = mapped_column(String(200))
+    signer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    decision: Mapped[str] = mapped_column(String(40), index=True)
+    rationale: Mapped[str] = mapped_column(Text)
+    signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    signature_record_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class DemoTenantSeedORM(Base):
+    __tablename__ = "demo_tenant_seeds"
+    __table_args__ = (
+        Index("ix_demo_tenant_seeds_tenant_status", "tenant_id", "status"),
+        Index("ix_demo_tenant_seeds_scenario", "scenario_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
+    )
+    scenario_id: Mapped[int | None] = mapped_column(
+        ForeignKey("golden_pilot_scenarios.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    seed_type: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    created_resource_ids_json: Mapped[str] = mapped_column(Text, default="{}")
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    notes_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class PilotEvidenceBundleORM(Base):
+    __tablename__ = "pilot_evidence_bundles"
+    __table_args__ = (
+        Index("ix_pilot_evidence_bundles_run_status", "pilot_run_id", "status"),
+        Index("ix_pilot_evidence_bundles_sha", "package_sha256"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pilot_run_id: Mapped[int] = mapped_column(
+        ForeignKey("pilot_runs.id", ondelete="CASCADE"),
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    included_resource_ids_json: Mapped[str] = mapped_column(Text, default="{}")
+    package_json: Mapped[str] = mapped_column(Text, default="{}")
+    package_html: Mapped[str | None] = mapped_column(Text, nullable=True)
+    package_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class QualityFindingORM(Base):
     __tablename__ = "quality_findings"
     __table_args__ = (

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { TenantSelector } from "@/components/app/tenant-selector"
 import {
   Search,
   Bell,
@@ -86,6 +87,8 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
           >
             <Sparkles className="h-4 w-4" />
           </Button>
+
+          <TenantSelector />
 
           <ThemeToggle />
 

@@ -263,6 +263,97 @@ export function trackSubmissionPackageCreated(meta: ConnectorInteropAnalyticsMet
   trackConnectorInteropEvent("submission_package_created", meta)
 }
 
+/** Tenant SaaS analytics metadata whitelist — categorical fields only; no tenant notes, domains, IPs, secrets, or raw data. */
+export type TenantSaasAnalyticsMetadata = {
+  tenant_type?: string
+  program?: string
+  feature_key?: string
+  status?: string
+  implementation_stage?: string
+  package_type?: string
+  health_status?: string
+  task_type?: string
+}
+
+function tenantSaasString(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 160) : ""
+}
+
+function tenantSaasMetadata(meta: TenantSaasAnalyticsMetadata): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {}
+  const tenantType = tenantSaasString(meta.tenant_type)
+  const program = tenantSaasString(meta.program)
+  const featureKey = tenantSaasString(meta.feature_key)
+  const status = tenantSaasString(meta.status)
+  const implementationStage = tenantSaasString(meta.implementation_stage)
+  const packageType = tenantSaasString(meta.package_type)
+  const healthStatus = tenantSaasString(meta.health_status)
+  const taskType = tenantSaasString(meta.task_type)
+
+  if (tenantType) out.tenant_type = tenantType
+  if (program) out.program = program
+  if (featureKey) out.feature_key = featureKey
+  if (status) out.status = status
+  if (implementationStage) out.implementation_stage = implementationStage
+  if (packageType) out.package_type = packageType
+  if (healthStatus) out.health_status = healthStatus
+  if (taskType) out.task_type = taskType
+
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+function trackTenantSaasEvent(event_type: string, meta: TenantSaasAnalyticsMetadata = {}): void {
+  trackUsageEvent({ event_type, metadata: tenantSaasMetadata(meta) })
+}
+
+export function trackTenantCreated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("tenant_created", meta)
+}
+
+export function trackTenantEnvironmentCreated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("tenant_environment_created", meta)
+}
+
+export function trackEntitlementUpdated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("entitlement_updated", meta)
+}
+
+export function trackFeatureFlagUpdated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("feature_flag_updated", meta)
+}
+
+export function trackPilotProgramCreated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("pilot_program_created", meta)
+}
+
+export function trackOnboardingProjectCreated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("onboarding_project_created", meta)
+}
+
+export function trackOnboardingTaskCompleted(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("onboarding_task_completed", meta)
+}
+
+export function trackDataBoundaryCreated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("data_boundary_created", meta)
+}
+
+export function trackSecurityProfileUpdated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("security_profile_updated", meta)
+}
+
+export function trackValidationProfileUpdated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("validation_profile_updated", meta)
+}
+
+export function trackProcurementPackageCreated(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("procurement_package_created", meta)
+}
+
+export function trackTenantAuditExportRequested(meta: TenantSaasAnalyticsMetadata): void {
+  trackTenantSaasEvent("tenant_audit_export_requested", meta)
+}
+
 /** Allowed metadata for controlled AI inference analytics only. */
 export type AiInferenceAnalyticsMetadata = {
   service_key?: string

@@ -13,6 +13,7 @@ export class ApiError extends Error {
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/backend"
 export const AUTH_TOKEN_STORAGE_KEY = "moltrace.access_token"
 export const AUTH_USER_STORAGE_KEY = "moltrace.user"
+export const TENANT_ID_STORAGE_KEY = "moltrace.current_tenant_id"
 
 type ApiRequestInit = Omit<RequestInit, "body"> & {
   body?: unknown
@@ -29,6 +30,18 @@ export function readStoredAuthToken() {
 
   try {
     return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function readStoredTenantId() {
+  if (typeof window === "undefined") return null
+
+  try {
+    const tenantId = window.localStorage.getItem(TENANT_ID_STORAGE_KEY)
+    if (!tenantId || tenantId === "local-development") return null
+    return tenantId
   } catch {
     return null
   }
@@ -81,6 +94,11 @@ export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Prom
   if (!headers.has("authorization")) {
     const token = readStoredAuthToken()
     if (token) headers.set("authorization", `Bearer ${token}`)
+  }
+
+  if (!headers.has("x-tenant-id")) {
+    const tenantId = readStoredTenantId()
+    if (tenantId) headers.set("x-tenant-id", tenantId)
   }
 
   if (requestBody !== undefined && !isFormDataBody(requestBody) && !headers.has("content-type")) {
