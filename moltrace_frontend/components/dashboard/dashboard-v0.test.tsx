@@ -94,13 +94,13 @@ describe("DashboardV0 connector/ingestion fallback", () => {
   it("shows subtle summary unavailable message and keeps dashboard content", async () => {
     render(<DashboardV0 />)
 
-    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument()
     expect(screen.getByText("Active Analyses")).toBeInTheDocument()
 
     await waitFor(() => {
       expect(screen.getByText("Connector and ingestion summary")).toBeInTheDocument()
       expect(
-        screen.getByText("Connector and ingestion summary unavailable — current dashboard content continues.")
+        screen.getByText("Connector and ingestion summary unavailable for now.")
       ).toBeInTheDocument()
     })
   })

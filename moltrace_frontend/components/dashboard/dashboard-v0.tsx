@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch, AUTH_USER_STORAGE_KEY } from "@/lib/api/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,9 +24,19 @@ import {
   AlertTriangle,
   Eye,
   FolderOpen,
+  LayoutDashboard,
   Microscope,
   Cpu,
+  ShieldCheck,
 } from "lucide-react"
+import { DashboardSection } from "@/components/dashboard/dashboard-section"
+import { DashboardGreeting } from "@/components/dashboard/dashboard-greeting"
+import {
+  DashboardPriorityCallout,
+  type DashboardPriority,
+} from "@/components/dashboard/dashboard-priority-callout"
+import { KpiCard } from "@/components/dashboard/kpi-card"
+import { StatusFilterPills } from "@/components/dashboard/status-filter-pills"
 import { RegulatoryNotificationsCompactCard } from "@/components/regulatory-hub/regulatory-notifications-compact-card"
 import { MobileCommandCenter } from "@/src/components/mobile/MobileCommandCenter"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
@@ -810,8 +820,8 @@ export function DashboardV0() {
     ? DEMO_COLLAB_ROLLUP
     : collabRollup ?? DEMO_COLLAB_ROLLUP
 
-  const reviewRequiredForCollabCard =
-    live && metrics ? metrics.reviewRequired : DEMO_STATS.review
+  const reviewRequiredCount = live && metrics ? metrics.reviewRequired : DEMO_STATS.review
+  const reviewRequiredForCollabCard = reviewRequiredCount
 
   const methodHealthUseDemo =
     !methodHealthLoading && (methodHealthRollup == null || !methodHealthRollup.available)
@@ -871,124 +881,187 @@ export function DashboardV0() {
     return String(Math.round(n))
   }
 
+  type ActivityStatusFilter = "all" | DashboardActivityRow["status"]
+  type JobsStatusFilter = "all" | "running" | "queued" | "succeeded" | "failed"
+
+  const [activityFilter, setActivityFilter] = useState<ActivityStatusFilter>("all")
+  const [jobsFilter, setJobsFilter] = useState<JobsStatusFilter>("all")
+
+  const activityStatusCounts = useMemo(() => {
+    const counts = { approved: 0, review: 0, running: 0, contradiction: 0 }
+    for (const row of recentRows) counts[row.status]++
+    return counts
+  }, [recentRows])
+
+  const jobsStatusCounts = useMemo(() => {
+    const counts: Record<JobsStatusFilter, number> = {
+      all: 0,
+      running: 0,
+      queued: 0,
+      succeeded: 0,
+      failed: 0,
+    }
+    for (const j of jobRows) {
+      const s = j.status.toLowerCase()
+      if (s === "running") counts.running++
+      else if (s === "queued" || s === "pending") counts.queued++
+      else if (s === "succeeded" || s === "completed" || s === "success") counts.succeeded++
+      else if (s === "failed" || s === "error") counts.failed++
+    }
+    return counts
+  }, [jobRows])
+
+  const filteredActivityRows = useMemo(
+    () => (activityFilter === "all" ? recentRows : recentRows.filter((r) => r.status === activityFilter)),
+    [recentRows, activityFilter],
+  )
+
+  const filteredJobRows = useMemo(() => {
+    if (jobsFilter === "all") return jobRows
+    return jobRows.filter((j) => {
+      const s = j.status.toLowerCase()
+      if (jobsFilter === "running") return s === "running"
+      if (jobsFilter === "queued") return s === "queued" || s === "pending"
+      if (jobsFilter === "succeeded") return s === "succeeded" || s === "completed" || s === "success"
+      if (jobsFilter === "failed") return s === "failed" || s === "error"
+      return true
+    })
+  }, [jobRows, jobsFilter])
+
+  const priorities = useMemo<DashboardPriority[]>(() => {
+    const items: DashboardPriority[] = []
+
+    if (regulatoryCompliance?.available && regulatoryCompliance.criticalActionItems > 0) {
+      const n = regulatoryCompliance.criticalActionItems
+      items.push({
+        severity: "critical",
+        text: `${n} critical compliance ${n === 1 ? "item" : "items"} need attention`,
+        href: "/regulatory",
+        cta: "Open regulatory",
+      })
+    }
+
+    if (qcBackendAvailable && qcFailures > 0) {
+      items.push({
+        severity: "warning",
+        text: `${qcFailures} QC ${qcFailures === 1 ? "failure" : "failures"} across recent sessions`,
+        href: "/spectracheck",
+        cta: "Open SpectraCheck",
+      })
+    }
+
+    if (live && metrics && metrics.reviewRequired > 0) {
+      const n = metrics.reviewRequired
+      items.push({
+        severity: "warning",
+        text: `${n} ${n === 1 ? "analysis" : "analyses"} awaiting review`,
+        href: "/review",
+        cta: "Open reviews",
+      })
+    }
+
+    if (opsRollup?.available && (opsRollup.failedJobs ?? 0) > 0) {
+      const n = opsRollup.failedJobs as number
+      items.push({
+        severity: "warning",
+        text: `${n} ${n === 1 ? "job" : "jobs"} failed recently`,
+        href: "/dashboard",
+        cta: "View jobs",
+      })
+    }
+
+    return items
+  }, [regulatoryCompliance, qcBackendAvailable, qcFailures, live, metrics, opsRollup])
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Overview of your analytical workflows and pending reviews.
-          </p>
-          {!overview.loading && !overview.sessionsDataAvailable ? (
-            <p className="mt-1 text-xs text-muted-foreground">Saved session data unavailable.</p>
-          ) : null}
-          {!overview.loading && !overview.jobsDataAvailable ? (
-            <p className="mt-1 text-xs text-muted-foreground">Job telemetry unavailable.</p>
-          ) : null}
-          {!mlLoading && (!mlRollup || !mlRollup.available) ? (
-            <p className="mt-1 text-xs text-muted-foreground">ML factory health unavailable.</p>
-          ) : null}
-          {!overview.loading && overview.sessionsDataAvailable && collabLoading ? (
-            <p className="mt-1 text-xs text-muted-foreground">Loading collaboration summary…</p>
-          ) : null}
-          {!overview.loading &&
-          overview.sessionsDataAvailable &&
-          !collabLoading &&
-          collabRollup &&
-          !collabRollup.available &&
-          overview.sessions.length > 0 ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Collaboration endpoints unavailable — summary uses illustrative values.
-            </p>
-          ) : null}
-          {!crLoading && crSummary && !crSummary.available ? (
-            <p className="mt-1 text-xs text-muted-foreground">Compound registry summary unavailable.</p>
-          ) : null}
-        </div>
+        <DashboardGreeting email={viewerEmail} tenantName={tenantDisplayName} />
         <BackendStatusIndicator />
       </div>
+
+      <DashboardPriorityCallout priorities={priorities} />
 
       <div className="lg:hidden">
         <MobileCommandCenter />
       </div>
 
+      <DashboardSection
+        title="Overview"
+        description="Top metrics, validation readiness, and tenant onboarding."
+        icon={LayoutDashboard}
+      >
       {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Active Analyses</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{live && metrics ? metrics.activeAnalyses : DEMO_STATS.active}</div>
-            {activeSub}
-            {overview.workflowRunsDataAvailable && overview.workflowStatusSummary ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Workflows active (queued / running): {overview.workflowStatusSummary.active}
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+        <KpiCard
+          title="Active Analyses"
+          icon={Activity}
+          href="/spectracheck"
+          value={live && metrics ? metrics.activeAnalyses : DEMO_STATS.active}
+          sub={
+            <>
+              {activeSub}
+              {overview.workflowRunsDataAvailable && overview.workflowStatusSummary ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Workflows active (queued / running): {overview.workflowStatusSummary.active}
+                </p>
+              ) : null}
+            </>
+          }
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Review Required</CardTitle>
-            <AlertCircle className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{live && metrics ? metrics.reviewRequired : DEMO_STATS.review}</div>
-            {reviewSub}
-            {overview.workflowRunsDataAvailable && overview.workflowStatusSummary ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Workflows requiring review: {overview.workflowStatusSummary.reviewRequired}
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+        <KpiCard
+          title="Review Required"
+          icon={AlertCircle}
+          href="/review"
+          severity={reviewRequiredCount > 0 ? "warning" : "neutral"}
+          value={reviewRequiredCount}
+          sub={
+            <>
+              {reviewSub}
+              {overview.workflowRunsDataAvailable && overview.workflowStatusSummary ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Workflows requiring review: {overview.workflowStatusSummary.reviewRequired}
+                </p>
+              ) : null}
+            </>
+          }
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Reports Ready</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{live && metrics ? metrics.reportsReady : DEMO_STATS.reports}</div>
-            {reportsSub}
-          </CardContent>
-        </Card>
+        <KpiCard
+          title="Reports Ready"
+          icon={FileText}
+          href="/reports"
+          value={live && metrics ? metrics.reportsReady : DEMO_STATS.reports}
+          sub={reportsSub}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Hours Saved</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tabular-nums">{hoursSavedDisplay}</div>
-            {roiLoading ? (
+        <KpiCard
+          title="Hours Saved"
+          icon={Clock}
+          href="/roi"
+          value={hoursSavedDisplay}
+          sub={
+            roiLoading ? (
               <p className="mt-1 text-xs text-muted-foreground">Loading ROI snapshot…</p>
             ) : roiLive ? (
-              <p className="mt-1 text-xs text-muted-foreground">From GET /analytics/roi (total_hours_saved).</p>
+              <p className="mt-1 text-xs text-muted-foreground">Total hours saved across automated workflows.</p>
             ) : (
               <>
                 {DEMO_STATS.hoursSub}
-                <p className="mt-1 text-xs text-muted-foreground">ROI snapshot unavailable — illustrative total shown.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Live ROI data couldn't load — showing an example total.</p>
               </>
-            )}
-          </CardContent>
-        </Card>
+            )
+          }
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Model Confidence</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{DEMO_STATS.modelPct}%</span>
-            </div>
-            <Progress value={DEMO_STATS.modelPct} className="mt-2 h-1.5" />
-          </CardContent>
-        </Card>
+        <KpiCard
+          title="Model Confidence"
+          icon={TrendingUp}
+          href="/ml"
+          value={`${DEMO_STATS.modelPct}%`}
+          sub={<Progress value={DEMO_STATS.modelPct} className="mt-2 h-1.5" />}
+        />
       </div>
 
       <ValidationReadinessDashboardCards />
@@ -1051,6 +1124,13 @@ export function DashboardV0() {
         </Card>
       ) : null}
 
+      </DashboardSection>
+
+      <DashboardSection
+        title="Science"
+        description="Methods, compounds, ML and AI summaries."
+        icon={Microscope}
+      >
       {!mlLoading && mlRollup?.available ? (
         <Card>
           <CardHeader className="pb-2">
@@ -1059,51 +1139,43 @@ export function DashboardV0() {
               <Cpu className="h-4 w-4 text-muted-foreground" aria-hidden />
             </div>
             <CardDescription>
-              <code className="text-xs">GET /ml/model-health</code>, <code className="text-xs">GET /ml/deployment-candidates</code>,{" "}
-              <code className="text-xs">GET /ml/evaluation-runs</code> — aggregate counts only.
+              Health and review status of the ML models powering your analyses.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {mlRollup.partial ? (
               <p className="text-xs text-muted-foreground">
-                One or more list endpoints did not complete — some values may be omitted.
+                Some live data didn't load — values may be partial.
               </p>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <p className="text-xs text-muted-foreground">Active serving configs</p>
                 <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.activeModelCount)}</p>
-                <p className="text-[11px] text-muted-foreground">active_model_count</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Approved deployment candidates</p>
                 <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.approvedDeploymentCandidateCount)}</p>
-                <p className="text-[11px] text-muted-foreground">approved_deployment_candidate_count</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Models / deployment review queue</p>
                 <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.modelsRequiringReviewHint)}</p>
-                <p className="text-[11px] text-muted-foreground">metadata or proposed / in_review candidates</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Failed evaluations</p>
                 <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.failedEvaluationsCount)}</p>
-                <p className="text-[11px] text-muted-foreground">evaluation_runs status failed</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Open deployment candidates</p>
                 <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.openDeploymentCandidatesCount)}</p>
-                <p className="text-[11px] text-muted-foreground">status proposed or in_review</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Error-analysis warning signals</p>
                 <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.errorAnalysisWarningsHint)}</p>
-                <p className="text-[11px] text-muted-foreground">metadata or model-health warnings</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Drift / dataset warning signals</p>
                 <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.driftWarningsHint)}</p>
-                <p className="text-[11px] text-muted-foreground">metadata or model-health warnings</p>
               </div>
             </div>
             <p>
@@ -1123,14 +1195,13 @@ export function DashboardV0() {
               <Cpu className="h-4 w-4 text-muted-foreground" aria-hidden />
             </div>
             <CardDescription>
-              <code className="text-xs">GET /ai/model-monitoring</code>, <code className="text-xs">GET /ai/services</code>,{" "}
-              <code className="text-xs">GET /ai/predictions</code>, <code className="text-xs">GET /ai/active-learning/candidates</code> — aggregate counts only.
+              Live AI predictions and the active-learning queue across your tenant.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {aiSummary.partial ? (
               <p className="text-xs text-muted-foreground">
-                One or more AI list endpoints did not complete — some values may be omitted.
+                Some AI live data didn't load — values may be partial.
               </p>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1168,7 +1239,7 @@ export function DashboardV0() {
         </Card>
       ) : null}
       {!aiSummaryLoading && aiSummary != null && !aiSummary.available ? (
-        <p className="text-xs text-muted-foreground">AI inference summary unavailable — current dashboard content continues.</p>
+        <p className="text-xs text-muted-foreground">AI inference summary unavailable for now.</p>
       ) : null}
 
       <Card>
@@ -1178,9 +1249,8 @@ export function DashboardV0() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </div>
           <CardDescription>
-            <code className="text-xs">{`GET ${crossModuleDisplay.sourceEndpoint}`}</code> with fallback to{" "}
-            <code className="text-xs">GET /cross-module/command-center</code> — integrated workflow summary is draft and
-            requires review.
+            How SpectraCheck evidence, regulatory blockers, and reaction constraints connect across
+            modules. Draft summary — review before action.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -1246,8 +1316,7 @@ export function DashboardV0() {
               <Microscope className="h-4 w-4 text-muted-foreground" />
             </div>
             <CardDescription>
-              <code className="text-xs">GET /compound-registry/compounds</code>,{" "}
-              <code className="text-xs">GET /compound-registry/batches</code> — counts for traceability; not identity or
+              Compounds and batches in your registry — traceability counts only, not identity or
               release certification.
             </CardDescription>
           </CardHeader>
@@ -1256,29 +1325,25 @@ export function DashboardV0() {
               <div>
                 <p className="text-xs text-muted-foreground">Active compounds</p>
                 <p className="text-2xl font-bold tabular-nums">{crSummary.activeCompounds}</p>
-                <p className="text-xs text-muted-foreground">status active</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Active batches</p>
                 <p className="text-2xl font-bold tabular-nums">
                   {crSummary.activeBatches != null ? crSummary.activeBatches : "—"}
                 </p>
-                <p className="text-xs text-muted-foreground">status active</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Compounds needing review</p>
                 <p className="text-2xl font-bold tabular-nums">{crSummary.compoundsNeedingReview}</p>
-                <p className="text-xs text-muted-foreground">needs_review status or review flags on list rows.</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Evidence-linked compounds</p>
                 <p className="text-2xl font-bold tabular-nums">{crSummary.evidenceLinkedCompounds}</p>
-                <p className="text-xs text-muted-foreground">Non-zero evidence link counts or flags when present.</p>
               </div>
             </div>
             {crSummary.partial ? (
               <p className="text-xs text-muted-foreground">
-                GET /compound-registry/batches did not complete — active batch count omitted.
+                Batch summary couldn't load — active batch count is unavailable.
               </p>
             ) : null}
             <p className="flex flex-wrap gap-x-4 gap-y-1">
@@ -1293,6 +1358,13 @@ export function DashboardV0() {
         </Card>
       ) : null}
 
+      </DashboardSection>
+
+      <DashboardSection
+        title="Regulatory"
+        description="Dossiers, compliance, surveillance, and notifications."
+        icon={ShieldCheck}
+      >
       {!regulatoryLoading && regulatorySummary?.available ? (
         <Card>
           <CardHeader className="pb-2">
@@ -1301,8 +1373,8 @@ export function DashboardV0() {
               <FolderOpen className="h-4 w-4 text-muted-foreground" />
             </div>
             <CardDescription>
-              <code className="text-xs">GET /regulatory/dossiers</code> — workflow counts from your tenant; not legal or
-              compliance certification.
+              Active dossiers and review workload across your tenant — not a legal or compliance
+              certification.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
@@ -1315,12 +1387,10 @@ export function DashboardV0() {
               <div>
                 <p className="text-xs text-muted-foreground">Dossiers in review</p>
                 <p className="text-2xl font-bold tabular-nums">{regulatorySummary.inReview}</p>
-                <p className="text-xs text-muted-foreground">status in_review</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Requirements needing evidence</p>
                 <p className="text-2xl font-bold tabular-nums">{regulatorySummary.reqsNeedEvidence}</p>
-                <p className="text-xs text-muted-foreground">Sum of evidence_needed rows.</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">High-risk dossiers</p>
@@ -1345,9 +1415,8 @@ export function DashboardV0() {
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </div>
             <CardDescription>
-              <code className="text-xs">GET /regulatory/action-items</code>,{" "}
-              <code className="text-xs">GET /regulatory/dossiers</code> — open workflow items and triage labels from your
-              tenant; not legal conclusions.
+              Open compliance action items, blocked dossiers, and triage by category — workflow
+              signals, not legal conclusions.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -1367,12 +1436,10 @@ export function DashboardV0() {
               <div>
                 <p className="text-xs text-muted-foreground">qNMR gaps (open items)</p>
                 <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.qNmrGaps}</p>
-                <p className="text-[11px] text-muted-foreground">action_type qnmr_validation_gap</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Nitrosamine review items</p>
                 <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.nitrosamineReviewItems}</p>
-                <p className="text-[11px] text-muted-foreground">action_type nitrosamine_risk_review</p>
               </div>
             </div>
             <p>
@@ -1392,9 +1459,7 @@ export function DashboardV0() {
               <Activity className="h-4 w-4 text-muted-foreground" />
             </div>
             <CardDescription>
-              <code className="text-xs">GET /regulatory/changes</code>,{" "}
-              <code className="text-xs">GET /regulatory/notifications</code>,{" "}
-              <code className="text-xs">GET /regulatory/rule-update-proposals</code> — tenant workflow signals only.
+              External rule changes, dossiers affected, and pending rule-update proposals.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -1442,12 +1507,19 @@ export function DashboardV0() {
 
       <RegulatoryNotificationsCompactCard />
 
+      </DashboardSection>
+
+      <DashboardSection
+        title="Operations"
+        description="System health, QC, workflows, jobs, and ROI."
+        icon={Cpu}
+      >
       {/* Automation ROI — GET /analytics/roi */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Automation ROI</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /analytics/roi</code> — aggregate automation value (no event logs).
+            Hours saved, tasks automated, reports generated, and workflows completed.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -1480,7 +1552,7 @@ export function DashboardV0() {
           ) : null}
           {!roiLoading && !roiLive ? (
             <p className="text-xs text-muted-foreground">
-              ROI snapshot unavailable — hours match the summary card above; task and workflow counts not loaded.
+              Live ROI data couldn't load — hours match the summary card above; task and workflow counts unavailable.
             </p>
           ) : null}
         </CardContent>
@@ -1491,9 +1563,8 @@ export function DashboardV0() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Operations summary</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /system/health</code>, <code className="text-xs">GET /system/jobs/summary</code>,{" "}
-            <code className="text-xs">GET /security/summary</code>, <code className="text-xs">GET /model-health/drift-alerts</code>
-            ; QC failures match the Quality Alerts card.
+            System health, running and failed jobs, security warnings, and drift alerts. QC failures
+            match the Quality Alerts card above.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -1538,12 +1609,12 @@ export function DashboardV0() {
           ) : null}
           {!opsLoading && opsUseDemo ? (
             <p className="text-xs text-muted-foreground">
-              Operations endpoints unavailable — illustrative values shown (QC failures follow Quality Alerts).
+              Live operations data couldn't load — showing example values (QC failures match the Quality Alerts card above).
             </p>
           ) : null}
           {!opsLoading && opsRollup?.available && opsRollup.partial ? (
             <p className="text-xs text-muted-foreground">
-              Some operations endpoints did not complete — summary may be partial.
+              Some operations data didn't load — summary may be partial.
             </p>
           ) : null}
         </CardContent>
@@ -1553,8 +1624,7 @@ export function DashboardV0() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Connector and ingestion summary</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /connectors</code>, <code className="text-xs">GET /ingestion-runs</code>,{" "}
-            <code className="text-xs">GET /outbound-sync-jobs</code> — aggregate operational counts only.
+            Connector health, today's ingestion runs, and outbound sync status.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -1585,7 +1655,7 @@ export function DashboardV0() {
           ) : null}
           {!connectorSummaryLoading && connectorSummaryBackendUnavailable ? (
             <p className="text-xs text-muted-foreground">
-              Connector and ingestion summary unavailable — current dashboard content continues.
+              Connector and ingestion summary unavailable for now.
             </p>
           ) : null}
           {!connectorSummaryLoading && connectorSummaryError && connectorSummaryBackendUnavailable ? (
@@ -1644,11 +1714,11 @@ export function DashboardV0() {
             <p className="text-xs text-muted-foreground">Loading QC summaries…</p>
           ) : null}
           {!overview.sessionsDataAvailable ? (
-            <p className="text-xs text-muted-foreground">Saved session list unavailable — QC rollup shows illustrative values.</p>
+            <p className="text-xs text-muted-foreground">Session data couldn't load — QC summary shows example values.</p>
           ) : null}
           {overview.sessionsDataAvailable && !qcLoading && !qcBackendAvailable ? (
             <p className="text-xs text-muted-foreground">
-              QC endpoint unavailable — illustrative values shown.
+              QC data couldn't load — showing example values.
             </p>
           ) : null}
         </CardContent>
@@ -1659,8 +1729,7 @@ export function DashboardV0() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Method Health</CardTitle>
           <CardDescription>
-            Registry snapshot from <code className="text-xs">GET /model-health</code> and drift signals from{" "}
-            <code className="text-xs">GET /model-health/drift-alerts</code>.
+            Registered methods, validation status, and open drift alerts.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -1711,14 +1780,14 @@ export function DashboardV0() {
           ) : null}
           {!methodHealthLoading && methodHealthUseDemo ? (
             <p className="text-xs text-muted-foreground">
-              Model health endpoints unavailable — illustrative values shown.
+              Method health data couldn't load — showing example values.
             </p>
           ) : null}
           {!methodHealthLoading &&
           methodHealthRollup?.available &&
           methodHealthRollup.partial ? (
             <p className="text-xs text-muted-foreground">
-              One method health request did not complete — some metrics may be unavailable.
+              Some method health data didn't load — metrics may be partial.
             </p>
           ) : null}
         </CardContent>
@@ -1729,8 +1798,7 @@ export function DashboardV0() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Collaboration &amp; review</CardTitle>
           <CardDescription>
-            Rolled up from <code className="text-xs">/spectracheck/sessions</code> plus per-session review tasks, comments,
-            and reports when endpoints respond.
+            Open review tasks, unresolved comments, and reports awaiting approval.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -1768,11 +1836,11 @@ export function DashboardV0() {
           </div>
           {!overview.sessionsDataAvailable ? (
             <p className="text-xs text-muted-foreground">
-              Saved session list unavailable — collaboration rollup shows illustrative values.
+              Session data couldn't load — collaboration summary shows example values.
             </p>
           ) : null}
           {overview.sessionsDataAvailable && collabRollup?.partial ? (
-            <p className="text-xs text-muted-foreground">Some session collaboration requests did not complete.</p>
+            <p className="text-xs text-muted-foreground">Some collaboration data didn't load.</p>
           ) : null}
         </CardContent>
       </Card>
@@ -1805,7 +1873,7 @@ export function DashboardV0() {
             </div>
           </div>
           {!overview.workflowRunsDataAvailable ? (
-            <p className="text-xs text-muted-foreground">Workflow runs unavailable — illustrative values.</p>
+            <p className="text-xs text-muted-foreground">Workflow runs data couldn't load — showing example values.</p>
           ) : null}
         </CardContent>
       </Card>
@@ -1820,7 +1888,19 @@ export function DashboardV0() {
               : "Illustrative preview when job telemetry is unavailable."}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <StatusFilterPills
+            label="Filter jobs by status"
+            value={jobsFilter}
+            onChange={setJobsFilter}
+            options={[
+              { value: "all", label: "All", count: jobRows.length },
+              { value: "running", label: "Running", count: jobsStatusCounts.running },
+              { value: "queued", label: "Queued", count: jobsStatusCounts.queued },
+              { value: "succeeded", label: "Succeeded", count: jobsStatusCounts.succeeded },
+              { value: "failed", label: "Failed", count: jobsStatusCounts.failed },
+            ]}
+          />
           <div className="table-scroll">
             <Table>
               <TableHeader>
@@ -1833,14 +1913,16 @@ export function DashboardV0() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {jobRows.length === 0 ? (
+                {filteredJobRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                      No jobs yet.
+                      {jobRows.length === 0
+                        ? "No jobs yet."
+                        : `No jobs match the "${jobsFilter}" filter.`}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  jobRows.map((j) => (
+                  filteredJobRows.map((j) => (
                     <TableRow key={j.id}>
                       <TableCell className="max-w-[180px] truncate font-mono text-xs">{j.jobType}</TableCell>
                       <TableCell>
@@ -1874,6 +1956,13 @@ export function DashboardV0() {
         </CardContent>
       </Card>
 
+      </DashboardSection>
+
+      <DashboardSection
+        title="Recent Activity"
+        description="Latest sessions and workflow runs."
+        icon={Activity}
+      >
       {/* Recent Activity Table */}
       <Card>
         <CardHeader>
@@ -1882,7 +1971,19 @@ export function DashboardV0() {
             Latest SpectraCheck sessions and workflow runs (newest first when workflow data is available).
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <StatusFilterPills
+            label="Filter activity by status"
+            value={activityFilter}
+            onChange={setActivityFilter}
+            options={[
+              { value: "all", label: "All", count: recentRows.length },
+              { value: "approved", label: "Approved", count: activityStatusCounts.approved },
+              { value: "review", label: "Review", count: activityStatusCounts.review },
+              { value: "running", label: "Running", count: activityStatusCounts.running },
+              { value: "contradiction", label: "Contradiction", count: activityStatusCounts.contradiction },
+            ]}
+          />
           <div className="table-scroll">
             <Table>
               <TableHeader>
@@ -1897,19 +1998,28 @@ export function DashboardV0() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentRows.length === 0 ? (
+                {filteredActivityRows.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={7}
                       className="py-8 text-center text-sm text-muted-foreground"
                     >
-                      No saved SpectraCheck sessions yet.
+                      {recentRows.length === 0
+                        ? "No saved SpectraCheck sessions yet."
+                        : `No analyses match the "${activityFilter}" filter.`}
                     </TableCell>
                   </TableRow>
                 ) : null}
-                {recentRows.map((item: DashboardActivityRow) => (
-                  <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50">
-                    <TableCell className="font-mono text-sm">{item.id}</TableCell>
+                {filteredActivityRows.map((item: DashboardActivityRow) => (
+                  <TableRow key={item.id} className="hover:bg-muted/50">
+                    <TableCell className="font-mono text-sm">
+                      <Link
+                        href={`/spectracheck?sessionId=${encodeURIComponent(item.id)}`}
+                        className="hover:underline"
+                      >
+                        {item.id}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-sm">{item.sampleId}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{item.module}</Badge>
@@ -1961,6 +2071,7 @@ export function DashboardV0() {
           </div>
         </CardContent>
       </Card>
+      </DashboardSection>
     </div>
   )
 }
