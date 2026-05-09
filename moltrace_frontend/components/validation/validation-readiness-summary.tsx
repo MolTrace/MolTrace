@@ -370,7 +370,7 @@ export function ValidationReadinessDashboardCards() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tabular-nums">{formatCount(snapshot, openDeviations(snapshot.deviations).length)}</div>
-          <p className="text-xs text-muted-foreground">GET /deviations, excluding closed/resolved/rejected.</p>
+          <p className="text-xs text-muted-foreground">Open deviations — excludes closed, resolved, and rejected.</p>
         </CardContent>
       </Card>
       <Card>
@@ -379,7 +379,7 @@ export function ValidationReadinessDashboardCards() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tabular-nums">{formatCount(snapshot, openCapa(snapshot.capa).length)}</div>
-          <p className="text-xs text-muted-foreground">GET /capa, excluding closed/canceled.</p>
+          <p className="text-xs text-muted-foreground">Open CAPA entries — excludes closed and canceled.</p>
         </CardContent>
       </Card>
       <Card>

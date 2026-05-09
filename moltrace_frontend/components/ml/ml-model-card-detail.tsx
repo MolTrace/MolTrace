@@ -265,7 +265,7 @@ export function MlModelCardDetail() {
                 <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
               </CardTitle>
               <CardDescription>
-                <code className="text-xs">PATCH /ml/model-cards/{cardIdNum}</code>
+                Update the model card — revise intended use, limitations, training data summary, and evaluation summary for governance review.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

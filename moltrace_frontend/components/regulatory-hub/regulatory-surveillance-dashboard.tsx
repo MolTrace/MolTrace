@@ -294,7 +294,7 @@ export function RegulatorySurveillanceDashboard() {
           title="Watched sources"
           icon={<Eye className="h-4 w-4 text-muted-foreground" />}
           value={loading ? "—" : String(summary.watched)}
-          sub={<p className="text-xs text-muted-foreground">GET /regulatory/surveillance/sources</p>}
+          sub={<p className="text-xs text-muted-foreground">Regulatory sources under active surveillance</p>}
         />
         <SummaryMetricCard
           title="Changes detected"
@@ -337,7 +337,7 @@ export function RegulatorySurveillanceDashboard() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Source watchlist</CardTitle>
-          <CardDescription>GET /regulatory/surveillance/sources</CardDescription>
+          <CardDescription>Regulatory guidance documents and agency publications under active automated surveillance.</CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
           {loading ? (
@@ -433,7 +433,7 @@ export function RegulatorySurveillanceDashboard() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Add source watcher</CardTitle>
-          <CardDescription>POST /regulatory/surveillance/sources</CardDescription>
+          <CardDescription>Register a new regulatory source for automated surveillance — agency guidance, pharmacopoeial standards, or jurisdiction-specific publications.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {createErr ? (
@@ -534,7 +534,7 @@ export function RegulatorySurveillanceDashboard() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Recent changes</CardTitle>
-          <CardDescription>GET /regulatory/changes</CardDescription>
+          <CardDescription>Recently detected regulatory changes across all watched sources — sorted by severity and detection date.</CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
           {loading ? (
@@ -600,7 +600,7 @@ export function RegulatorySurveillanceDashboard() {
             <Bell className="h-4 w-4 text-muted-foreground" aria-hidden />
             <CardTitle className="text-lg">Notifications</CardTitle>
           </div>
-          <CardDescription>GET /regulatory/notifications</CardDescription>
+          <CardDescription>Workflow signals for detected regulatory changes — not legal conclusions. Review each notification and act through the appropriate dossier workflow.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {loading ? (

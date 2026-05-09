@@ -399,7 +399,7 @@ export function RegulatorySourceLibraryWorkspace() {
             <CardTitle id="upload-heading" className="text-lg">
               Upload / source registration
             </CardTitle>
-            <CardDescription>POST /regulatory/sources/upload (multipart form)</CardDescription>
+            <CardDescription>Upload a regulatory source document (guideline, monograph, FAQ) and register its metadata.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">
@@ -507,7 +507,7 @@ export function RegulatorySourceLibraryWorkspace() {
             <CardTitle id="connector-import-heading" className="text-lg">
               Import source from connector
             </CardTitle>
-            <CardDescription>POST /integrations/regulatory/import-source</CardDescription>
+            <CardDescription>Pull a regulatory document directly from a configured connector instead of manual upload.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -633,7 +633,7 @@ export function RegulatorySourceLibraryWorkspace() {
           <h2 id="sources-table-heading" className="text-lg font-semibold tracking-tight">
             Source documents
           </h2>
-          <p className="text-sm text-muted-foreground">GET /regulatory/sources</p>
+          <p className="text-sm text-muted-foreground">All regulatory sources registered in the library.</p>
         </div>
         <Card>
           <CardContent className="pt-6">
@@ -724,7 +724,7 @@ export function RegulatorySourceLibraryWorkspace() {
             <CardTitle id="search-heading" className="text-lg">
               Source search
             </CardTitle>
-            <CardDescription>POST /regulatory/sources/search</CardDescription>
+            <CardDescription>Full-text search across all regulatory documents in the library.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -834,7 +834,7 @@ export function RegulatorySourceLibraryWorkspace() {
             <CardTitle id="citations-heading" className="text-lg">
               Citation viewer
             </CardTitle>
-            <CardDescription>GET /regulatory/sources/{"{source_id}"}/citations</CardDescription>
+            <CardDescription>Citations and excerpts that reference the selected source document.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {selectedSourceId == null ? (

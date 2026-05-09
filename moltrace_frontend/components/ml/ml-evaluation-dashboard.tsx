@@ -347,10 +347,7 @@ export function MlEvaluationDashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Run evaluation</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ml/evaluation-runs</code> — provide{" "}
-            <code className="text-xs">model_artifact_id</code> and either <code className="text-xs">dataset_version_id</code>{" "}
-            or <code className="text-xs">benchmark_dataset_id</code>. Split is stored in{" "}
-            <code className="text-xs">metadata_json.evaluation_split</code>.
+            Launch a model evaluation run against a dataset version or benchmark dataset. Evaluation split and configuration are stored with the run for reproducibility.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -507,8 +504,7 @@ export function MlEvaluationDashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Evaluation runs</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/evaluation-runs</code> — select <strong>Load detail</strong> for{" "}
-            <code className="text-xs">GET /ml/evaluation-runs/{"{evaluation_run_id}"}</code>.
+            All model evaluation runs — status, metric summary, and artifact linkage. Select Load detail to expand full metrics and per-split breakdowns.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

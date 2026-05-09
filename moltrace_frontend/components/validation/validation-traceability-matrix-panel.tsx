@@ -223,9 +223,7 @@ export function ValidationTraceabilityMatrixPanel({
               <InfoTooltip content={TRACEABILITY_TOOLTIP} label="About Traceability Matrix" />
             </CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /validation-center/projects/{"{validation_project_id}"}/traceability</code>
-              {" · "}
-              <code className="text-xs">POST /validation-center/projects/{"{validation_project_id}"}/traceability/generate</code>
+              Requirement-to-test traceability matrix for this validation project — generate or refresh to map test protocols to validation requirements and identify coverage gaps.
             </CardDescription>
           </div>
           <BackendStatusIndicator />

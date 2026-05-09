@@ -1466,7 +1466,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 <CardHeader>
                   <CardTitle>2D NMR analyze</CardTitle>
                   <CardDescription>
-                    POST <code className="text-xs">/nmr2d/analyze</code> — requires backend <code className="text-xs">ENABLE_2D_NMR</code>.
+                    Submit a 2D peak table for HSQC, HMBC, or COSY correlation analysis against a candidate SMILES structure.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1531,7 +1531,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 <CardHeader>
                   <CardTitle>1H / 13C evidence match</CardTitle>
                   <CardDescription>
-                    POST <code className="text-xs">/prediction/nmr/match/evidence</code> — multipart via Next.js proxy.
+                    Match observed NMR chemical shifts against predicted spectra for each candidate structure.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1635,7 +1635,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 <CardHeader>
                   <CardTitle>Candidate prediction / comparison</CardTitle>
                   <CardDescription>
-                    POST <code className="text-xs">/candidates/compare/evidence</code> — shared text plus optional DEPT and 2D uploads.
+                    Compare candidates using predicted vs. observed NMR chemical shifts. Accepts optional DEPT/APT data and 2D correlation tables.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

@@ -125,9 +125,7 @@ export function KnowledgeLinkMiniForm({
   return (
     <div className="space-y-2 rounded-md border bg-muted/20 p-3">
       <p className="text-xs font-medium text-muted-foreground">
-        <code className="text-[11px]">POST /knowledge/records/</code>
-        {"{record_id}"}
-        <code className="text-[11px]">/link</code>
+        Link knowledge record
       </p>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-1">

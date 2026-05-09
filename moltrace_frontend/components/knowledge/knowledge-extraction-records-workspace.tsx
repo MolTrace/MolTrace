@@ -794,9 +794,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
             <div className="space-y-3 border-t pt-4">
               <p className="text-sm font-medium">Link to target entity</p>
               <p className="text-xs text-muted-foreground">
-                <code className="text-xs">POST /knowledge/records/</code>
-                {"{record_id}"}
-                <code className="text-xs">/link</code> — requires review_status <strong>accepted</strong>.
+                Attach this extracted record to a project, sample, compound, or batch. Available once review status is <strong>accepted</strong>.
               </p>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
@@ -870,7 +868,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   Create training candidate
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  <code className="text-xs">POST /knowledge/training-dataset-candidates</code>
+                  Nominates this extraction record as a training data candidate for ML model development.
                 </p>
               </div>
               <div className="space-y-2">
@@ -892,7 +890,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   Create benchmark candidate
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  <code className="text-xs">POST /knowledge/benchmark-dataset-candidates</code>
+                  Nominates this extraction record as a held-out benchmark candidate for model evaluation.
                 </p>
               </div>
             </div>

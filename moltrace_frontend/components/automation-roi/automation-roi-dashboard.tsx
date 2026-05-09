@@ -170,8 +170,7 @@ export default function AutomationRoiDashboard() {
         <Alert>
           <AlertTitle className="text-sm">Backend unavailable</AlertTitle>
           <AlertDescription className="text-xs">
-            Analytics endpoints did not return data. Metrics below are not loaded; illustrative charts are shown only in
-            the labeled Demo data section.
+            We couldn&apos;t load live analytics. Metrics below are blank; illustrative trends appear only in the labeled Demo data section.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -189,7 +188,7 @@ export default function AutomationRoiDashboard() {
           value={loading ? "…" : roi ? fmtNum(roi.total_hours_saved) : "—"}
           sub={
             <p className="text-xs text-muted-foreground">
-              {loading ? "Loading…" : roi ? "From GET /analytics/roi (total_hours_saved)." : "No data."}
+              {loading ? "Loading…" : roi ? "Total hours saved across all automated tasks." : "No data."}
             </p>
           }
         />
@@ -204,7 +203,7 @@ export default function AutomationRoiDashboard() {
           value={loading ? "…" : roi ? fmtInt(roi.tasks_automated) : "—"}
           sub={
             <p className="text-xs text-muted-foreground">
-              {loading ? "Loading…" : roi ? "From GET /analytics/roi (tasks_automated)." : "No data."}
+              {loading ? "Loading…" : roi ? "Total automated task runs across the platform." : "No data."}
             </p>
           }
         />
@@ -250,9 +249,7 @@ export default function AutomationRoiDashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Regulatory Hub events</CardTitle>
           <CardDescription>
-            Frontend POSTs to <code className="text-xs">/analytics/events</code> with privacy-safe metadata only (no
-            regulatory questions, answers, or raw scientific payloads). Allowed keys: dossier_id, jurisdiction_id,
-            status, requirement_count, evidence_link_count, risk_level, review_status.
+            Privacy-safe activity events tracked in Regulatory Hub — only metadata such as dossier ID, jurisdiction, status, and review state. No regulatory questions, answers, or raw scientific payloads are recorded.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
@@ -271,8 +268,7 @@ export default function AutomationRoiDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Top automated tasks</CardTitle>
             <CardDescription>
-              Task definitions from GET /analytics/automation-tasks. Run counts are not provided by this endpoint; minutes
-              reflect default_minutes_saved per definition.
+              Catalog of all automation task definitions with their default minutes-saved value. Run counts are populated when a per-task event stream is available.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -325,7 +321,7 @@ export default function AutomationRoiDashboard() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Feedback summary</CardTitle>
-          <CardDescription>Rows from GET /analytics/feedback (preview only).</CardDescription>
+          <CardDescription>Recent reviewer feedback events across all programs (preview only).</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="table-scroll">
@@ -444,8 +440,7 @@ function WorkflowValueCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Workflow value summary</CardTitle>
         <CardDescription>
-          From GET /analytics/workflows/summary. Per-template breakdown is not in the response; one aggregate row is
-          shown. Hours saved uses total_minutes_saved / 60.
+          Aggregate workflow completion and time-saved totals across all templates. Hours saved are computed from total minutes saved (÷ 60).
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -276,14 +276,13 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Batches for compound <span className="font-mono text-xs">{compoundId}</span> from GET /compound-registry/batches
-        (filtered client-side).
+        Registered batches for compound <span className="font-mono text-xs">{compoundId}</span> — filtered to this compound.
       </p>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">Create batch for this compound</CardTitle>
-          <CardDescription>compound_id is taken from this page. POST /compound-registry/batches</CardDescription>
+          <CardDescription>Register a new batch for this compound — compound ID is carried forward from the current compound page.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleCreateBatch}>

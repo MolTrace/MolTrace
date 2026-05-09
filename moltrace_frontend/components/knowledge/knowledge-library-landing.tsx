@@ -397,7 +397,7 @@ export function KnowledgeLibraryLanding() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Data science / ML readiness</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/dataset-versions</code> — approved versions in snapshot:{" "}
+            Approved dataset snapshots ready for ML training — versions in snapshot:{" "}
             <span className="tabular-nums font-medium">{errDatasetVersions ? "—" : String(approvedDatasetVersions)}</span>
           </CardDescription>
         </CardHeader>
@@ -418,7 +418,7 @@ export function KnowledgeLibraryLanding() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Source library preview</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/sources</code>
+            Scientific literature and structured knowledge sources registered for extraction and review.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -471,7 +471,7 @@ export function KnowledgeLibraryLanding() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Recent extraction runs</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/extractions/runs</code>
+            Recent knowledge extraction pipeline runs — source, status, extracted entity count, and run timestamp.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -521,7 +521,7 @@ export function KnowledgeLibraryLanding() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Review queue preview</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/review-tasks</code>
+            Extracted knowledge claims pending expert review — status, source, and entity type for each queued review task.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -574,7 +574,7 @@ export function KnowledgeLibraryLanding() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Training dataset candidates</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/training-dataset-candidates</code>
+            Reviewed knowledge claims nominated as training data for ML models — type, source, and curation status.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -618,7 +618,7 @@ export function KnowledgeLibraryLanding() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Benchmark dataset candidates</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/benchmark-dataset-candidates</code>
+            Knowledge claims nominated as held-out benchmark evaluation data — type, source, and curation status.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -662,7 +662,7 @@ export function KnowledgeLibraryLanding() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Model improvement queue</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/model-improvement-queue</code>
+            Active model improvement signals — edge cases, failure modes, and feedback items queued for retraining consideration.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -706,7 +706,7 @@ export function KnowledgeLibraryLanding() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Dataset versions</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/dataset-versions</code>
+            Versioned knowledge dataset snapshots — approval status, entity counts, and provenance for each curated release.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">

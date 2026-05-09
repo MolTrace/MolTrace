@@ -80,7 +80,7 @@ export function RegulatoryNotificationsCompactCard({ dossierId }: RegulatoryNoti
           ) : null}
         </div>
         <CardDescription>
-          GET /regulatory/notifications — workflow signals only; not legal conclusions.
+          Regulatory workflow signals — change alerts, dossier updates, and review triggers. Not legal conclusions.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

@@ -238,7 +238,7 @@ export function MlErrorAnalysisWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Create error analysis slice</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ml/error-analysis</code>
+            Define an error analysis slice on an evaluation run — specify slice type, severity, sample count, per-slice metrics, and representative failure cases.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -330,7 +330,7 @@ export function MlErrorAnalysisWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Slices</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/error-analysis</code>
+            Error analysis slices logged for this tenant — slice type, severity, sample count, and linked evaluation run.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

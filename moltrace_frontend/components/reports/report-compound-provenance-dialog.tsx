@@ -481,7 +481,7 @@ export function ReportCompoundProvenanceDialog({
 
         <section className="space-y-3 border-t pt-4">
           <h3 className="text-sm font-semibold">Link compound to report</h3>
-          <p className="text-xs text-muted-foreground">POST /reports/{"{report_id}"}/link-compound</p>
+          <p className="text-xs text-muted-foreground">Search for a compound and link it to this report for provenance tracking.</p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1 space-y-2">
               <Label htmlFor="rp-search">compound search</Label>

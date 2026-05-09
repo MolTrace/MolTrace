@@ -559,9 +559,7 @@ export function KnowledgeDatasetsDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">1. Training dataset candidates</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /knowledge/training-dataset-candidates</code> — identifiers and review
-              metadata only. <code className="text-xs">record_type</code> is the linked knowledge record class (not
-              bibliographic source_type).
+              Curated knowledge claims nominated for ML model training — identifiers, record type, review metadata, and curation status.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -654,9 +652,9 @@ export function KnowledgeDatasetsDashboard() {
 
             <Card className="border-dashed">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">POST training candidate</CardTitle>
+                <CardTitle className="text-base">Nominate training candidate</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">POST /knowledge/training-dataset-candidates</code>
+                  Nominate a knowledge claim as a training candidate by specifying the record type, record ID, dataset type, source, citation IDs, and quality flags.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -771,10 +769,7 @@ export function KnowledgeDatasetsDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">2. Benchmark dataset candidates</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /knowledge/benchmark-dataset-candidates</code> — includes{" "}
-              <code className="text-xs">leakage_risk_label</code> and <code className="text-xs">split_recommendation</code>.
-              Benchmark candidate rows do not expose <code className="text-xs">citation_ids_json</code> in the API model;
-              citation column shows <span className="font-mono text-xs">—</span>.
+              Knowledge claims nominated for ML benchmark evaluation — includes leakage risk label and split recommendation. Citation IDs are not modeled on benchmark candidates and display as blank.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -872,9 +867,9 @@ export function KnowledgeDatasetsDashboard() {
 
             <Card className="border-dashed">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">POST benchmark candidate</CardTitle>
+                <CardTitle className="text-base">Nominate benchmark candidate</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">POST /knowledge/benchmark-dataset-candidates</code>
+                  Nominate a knowledge claim as a benchmark evaluation candidate by specifying the record type, record ID, benchmark type, and leakage risk classification.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -1011,8 +1006,7 @@ export function KnowledgeDatasetsDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">3. Dataset versions</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /knowledge/dataset-versions</code> ·{" "}
-              <code className="text-xs">GET /knowledge/dataset-versions/{"{dataset_version_id}"}</code>
+              Versioned snapshots of training and benchmark splits — each version locks candidate IDs into train, validation, test, and holdout partitions for reproducible model training.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

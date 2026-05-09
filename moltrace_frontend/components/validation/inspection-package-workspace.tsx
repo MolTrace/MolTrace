@@ -323,7 +323,7 @@ export function InspectionPackageWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Create inspection package</CardTitle>
-            <CardDescription>POST /inspection-packages</CardDescription>
+            <CardDescription>Assemble an inspection-ready package — bundles controlled records, deviation reports, CAPA evidence, and validation artefacts for regulatory inspection readiness.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -414,7 +414,7 @@ export function InspectionPackageWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Package detail</CardTitle>
-            <CardDescription>GET /inspection-packages/{"{package_id}"}</CardDescription>
+            <CardDescription>Selected package detail — included artefacts, status, and export readiness for this inspection package.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {detailPackage ? (
@@ -506,7 +506,7 @@ export function InspectionPackageWorkspace() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">Inspection packages</CardTitle>
-            <CardDescription>GET /inspection-packages</CardDescription>
+            <CardDescription>All inspection packages — status, included artefacts, and export history for managing inspection readiness across programs.</CardDescription>
           </div>
           <Button type="button" variant="outline" onClick={() => void loadPackages()} disabled={loading}>
             Refresh

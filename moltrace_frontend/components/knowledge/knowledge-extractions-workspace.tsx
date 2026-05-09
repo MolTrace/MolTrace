@@ -245,7 +245,7 @@ export function KnowledgeExtractionsWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Run extraction</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /knowledge/extractions/run</code>
+            Trigger an extraction pipeline run on a source document to parse and classify knowledge claims for review queue intake.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -350,7 +350,7 @@ export function KnowledgeExtractionsWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Extraction runs</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/extractions/runs</code>
+            History of extraction pipeline runs — status, extracted claim count, and completion timestamp for each source document processed.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -427,8 +427,7 @@ export function KnowledgeExtractionsWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Extraction run detail</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /knowledge/extractions/runs/</code>
-              {"{run_id}"}
+              Full detail for the selected extraction run — extracted claims, warnings, and processing metadata.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

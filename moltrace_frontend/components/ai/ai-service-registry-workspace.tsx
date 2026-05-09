@@ -313,7 +313,7 @@ export function AiServiceRegistryWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle>Service table</CardTitle>
-          <CardDescription>Select a row to load service details from <code className="text-xs">GET /ai/services/{`{service_id}`}</code>.</CardDescription>
+          <CardDescription>All registered AI/ML services. Click a row to load full configuration and edit.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
@@ -366,7 +366,7 @@ export function AiServiceRegistryWorkspace() {
         <CardHeader>
           <CardTitle>Create / update service</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ai/services</code> and <code className="text-xs">PATCH /ai/services/{`{service_id}`}</code>
+            Register a new AI/ML service or update its active and fallback model artifacts, target module, and lifecycle status.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -391,7 +391,7 @@ export function AiServiceRegistryWorkspace() {
             <Alert variant="destructive">
               <AlertTitle>Active status blocked</AlertTitle>
               <AlertDescription>
-                Cannot set status to <code className="text-xs">active</code> for an unapproved model when backend experimental allowance is absent.
+                The selected model is not approved. Activate an approved artifact, or have an administrator enable experimental mode before setting this service to active.
               </AlertDescription>
             </Alert>
           ) : null}

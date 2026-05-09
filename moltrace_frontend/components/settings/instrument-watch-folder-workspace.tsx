@@ -327,7 +327,7 @@ export function InstrumentWatchFolderWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Create watch folder</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /instrument-watch-folders</code>
+            Configure a new directory for the platform to monitor for new instrument files.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -425,7 +425,7 @@ export function InstrumentWatchFolderWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Watch folder list</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /instrument-watch-folders</code>
+            All configured watch folders with their connector, scan cadence, and last activity.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -489,9 +489,7 @@ export function InstrumentWatchFolderWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Watch folder detail</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /instrument-watch-folders/{"{watch_folder_id}"}</code>,{" "}
-            <code className="text-xs">PATCH /instrument-watch-folders/{"{watch_folder_id}"}</code>, and{" "}
-            <code className="text-xs">POST /instrument-watch-folders/{"{watch_folder_id}"}/scan</code>
+            View, edit, or trigger an on-demand scan of the selected watch folder.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

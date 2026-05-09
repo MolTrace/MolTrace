@@ -330,7 +330,7 @@ export function FeatureFlagsWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Feature flags</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /feature-flags</code>
+            All registered feature flags with their default values and tenant overrides.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -423,7 +423,7 @@ export function FeatureFlagsWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Feature flag detail</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /feature-flags/{"{flag_id}"}</code>
+            Definition, current value, and override history for the selected flag.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -465,7 +465,7 @@ export function FeatureFlagsWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Create feature flag</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /feature-flags</code>
+            Register a new feature flag with its key, default value, and tenant scope.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -549,7 +549,7 @@ export function FeatureFlagsWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Subscription plans</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /subscription-plans</code>
+            All subscription plan tiers with their feature entitlements.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -604,7 +604,7 @@ export function FeatureFlagsWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Create subscription plan</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /subscription-plans</code>
+            Register a new subscription tier with the entitlements and quotas it grants.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

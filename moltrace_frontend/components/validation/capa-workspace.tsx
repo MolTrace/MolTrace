@@ -385,7 +385,7 @@ export function CapaWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Create CAPA</CardTitle>
-            <CardDescription>POST /capa</CardDescription>
+            <CardDescription>Log a new Corrective and Preventive Action with root cause, description, priority, and responsible owner.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -471,7 +471,7 @@ export function CapaWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Selected CAPA</CardTitle>
-            <CardDescription>PATCH /capa/{"{capa_id}"}</CardDescription>
+            <CardDescription>Selected CAPA details — update status, effectiveness, due date, and resolution notes.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {detailCapa ? (
@@ -598,7 +598,7 @@ export function CapaWorkspace() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">CAPA table</CardTitle>
-            <CardDescription>GET /capa</CardDescription>
+            <CardDescription>All CAPA records — filter by status, priority, and responsible owner to manage the corrective action backlog.</CardDescription>
           </div>
           <Button type="button" variant="outline" onClick={() => void loadWorkspace()} disabled={loading}>
             Refresh

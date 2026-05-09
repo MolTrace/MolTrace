@@ -644,8 +644,7 @@ function UnifiedConfidenceTab({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Unified candidate confidence</CardTitle>
           <CardDescription>
-            POST <code className="text-xs">/confidence/candidates/unified/evidence</code> — uses shared session inputs
-            plus optional MS / LC-MS layers below.
+            Compute a unified confidence score by integrating NMR, MS, and LC-MS evidence layers across all session candidates.
           </CardDescription>
         </CardHeader>
       </Card>

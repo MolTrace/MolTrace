@@ -183,8 +183,7 @@ export function KnowledgeReviewWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Filters</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/review-tasks</code> query params <code className="text-xs">status</code>,{" "}
-            <code className="text-xs">record_type</code>
+            Filter review tasks by status and record type to focus on the most relevant claims in the curation queue.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">
@@ -309,8 +308,7 @@ export function KnowledgeReviewWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Update task</CardTitle>
             <CardDescription>
-              <code className="text-xs">PATCH /knowledge/review-tasks/</code>
-              {"{task_id}"}
+              Record an expert review decision on this extracted knowledge claim — approve, reject, or flag for further review.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

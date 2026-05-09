@@ -241,12 +241,12 @@ export function AuditSearchWorkspace() {
             <InfoTooltip content={AUDIT_SEARCH_TOOLTIP} label="About Audit Search" />
           </div>
           <p className="text-muted-foreground">
-            Search global audit events returned by <code className="text-xs">GET /admin/audit/search</code>.
+            Search the global audit log across all entities, actors, and events for compliance and forensics.
           </p>
           {!loading && backendUnreachable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Backend unavailable — check connectivity and <code className="text-xs">/api/backend</code> proxy.
+              Backend unavailable — try again in a moment, or contact your platform administrator.
             </p>
           ) : null}
         </div>
@@ -263,7 +263,7 @@ export function AuditSearchWorkspace() {
         <Alert variant="destructive">
           <AlertTitle>Backend unavailable</AlertTitle>
           <AlertDescription className="text-xs">
-            Audit search could not be reached. Ensure admin access and proxy health, then retry.
+            Audit search is not reachable. Verify you&apos;re signed in as an administrator and try again.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -305,13 +305,7 @@ export function AuditSearchWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Filters</CardTitle>
             <CardDescription>
-              Query params sent to the API: <code className="text-xs">event_type</code>,{" "}
-              <code className="text-xs">entity_type</code>, <code className="text-xs">entity_id</code>,{" "}
-              <code className="text-xs">actor_email</code>, <code className="text-xs">q</code>,{" "}
-              <code className="text-xs">limit</code>. MolTrace workspace project uses <code className="text-xs">project</code>;
-              SpectraCheck persistence uses <code className="text-xs">spectracheck_project</code> /{" "}
-              <code className="text-xs">spectracheck_sample</code>. Session ID and report ID are appended to{" "}
-              <code className="text-xs">q</code> (message substring search). Date range filters results in the browser after fetch.
+              Narrow audit results by event type, entity, actor email, or free-text search. MolTrace and SpectraCheck projects use distinct entity types — pick whichever matches your investigation. The date range is applied locally after results load.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

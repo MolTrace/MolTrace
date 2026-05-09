@@ -230,7 +230,7 @@ function CrossModuleActionQueueWorkspace() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">New action item</CardTitle>
-          <CardDescription>POST /cross-module/action-items</CardDescription>
+          <CardDescription>Create a follow-up task that links a finding in one program to a reviewer or owner in another.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {createErr ? <p className="text-xs text-destructive">{createErr}</p> : null}
@@ -306,7 +306,7 @@ function CrossModuleActionQueueWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Cross-Module Action Queue</CardTitle>
           <CardDescription>
-            GET /cross-module/action-items · PATCH /cross-module/action-items/{"{action_item_id}"}
+            All open and resolved action items across SpectraCheck, Regulatory Hub, and Reaction Optimization. Update status inline as work progresses.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

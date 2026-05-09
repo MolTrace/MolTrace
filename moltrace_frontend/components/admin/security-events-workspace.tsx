@@ -231,7 +231,7 @@ export function SecurityEventsWorkspace() {
           {!loading && backendUnreachable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Backend unavailable — check connectivity and <code className="text-xs">/api/backend</code> proxy.
+              Backend unavailable — try again in a moment, or contact your platform administrator.
             </p>
           ) : null}
         </div>
@@ -248,8 +248,7 @@ export function SecurityEventsWorkspace() {
         <Alert variant="destructive">
           <AlertTitle>Backend unavailable</AlertTitle>
           <AlertDescription className="text-xs">
-            Security endpoints could not be reached. Ensure you are signed in as an admin when required and that the proxy
-            is healthy.
+            Security event services are not reachable. Verify you&apos;re signed in as an administrator and try again.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -258,8 +257,8 @@ export function SecurityEventsWorkspace() {
         <Alert variant="destructive">
           <AlertTitle>Partial load</AlertTitle>
           <AlertDescription className="space-y-1 text-xs">
-            {errSummary ? <p>GET /security/summary: {errSummary}</p> : null}
-            {errEvents ? <p>GET /security/events: {errEvents}</p> : null}
+            {errSummary ? <p>Summary: {errSummary}</p> : null}
+            {errEvents ? <p>Events list: {errEvents}</p> : null}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -276,7 +275,7 @@ export function SecurityEventsWorkspace() {
               <div className="text-2xl font-bold tabular-nums">
                 {loading ? "…" : totalEvents != null ? String(totalEvents) : "—"}
               </div>
-              <p className="text-xs text-muted-foreground">total_events from GET /security/summary</p>
+              <p className="text-xs text-muted-foreground">Total security events recorded.</p>
             </CardContent>
           </Card>
           <Card>
@@ -287,7 +286,7 @@ export function SecurityEventsWorkspace() {
               <div className="text-2xl font-bold tabular-nums">
                 {loading ? "…" : openWarnings != null ? String(openWarnings) : "—"}
               </div>
-              <p className="text-xs text-muted-foreground">open_warnings from GET /security/summary</p>
+              <p className="text-xs text-muted-foreground">Unresolved warnings awaiting review.</p>
             </CardContent>
           </Card>
           <Card className="sm:col-span-2">
@@ -346,10 +345,7 @@ export function SecurityEventsWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Filters</CardTitle>
             <CardDescription>
-              Query params <code className="text-xs">severity</code>, <code className="text-xs">event_type</code>,{" "}
-              <code className="text-xs">actor_email</code>, <code className="text-xs">limit</code> are sent to GET{" "}
-              <code className="text-xs">/security/events</code>. Date range and resource type filter the loaded rows in
-              the browser.
+              Severity, event type, actor email, and limit are applied server-side. Date range and resource type narrow the loaded rows in your browser.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -428,7 +424,7 @@ export function SecurityEventsWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Events</CardTitle>
             <CardDescription>
-              Rows from GET <code className="text-xs">/security/events</code> after client filters.
+              Security events matching the filters above, with the most recent shown first.
             </CardDescription>
           </CardHeader>
           <CardContent>

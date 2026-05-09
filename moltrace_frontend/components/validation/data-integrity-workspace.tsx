@@ -266,7 +266,7 @@ export function DataIntegrityWorkspace() {
               Run data integrity assessment
               <InfoTooltip content={DATA_INTEGRITY_TOOLTIP} label="About data integrity assessment" />
             </CardTitle>
-            <CardDescription>POST /data-integrity/assessments</CardDescription>
+            <CardDescription>Run a data integrity assessment across a defined scope — checks ALCOA+ principles, audit trail coverage, and access-control compliance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -304,7 +304,7 @@ export function DataIntegrityWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Assessment detail</CardTitle>
-            <CardDescription>GET /data-integrity/assessments/{"{assessment_id}"}</CardDescription>
+            <CardDescription>Selected assessment detail — scope, findings, ALCOA+ flags, and recommended remediation actions.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {detailAssessment ? (
@@ -390,7 +390,7 @@ export function DataIntegrityWorkspace() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">Data integrity assessments</CardTitle>
-            <CardDescription>GET /data-integrity/assessments</CardDescription>
+            <CardDescription>All data integrity assessments — scope, status, and findings summary across all completed and in-progress runs.</CardDescription>
           </div>
           <Button type="button" variant="outline" onClick={() => void loadAssessments()} disabled={loading}>
             Refresh

@@ -45,9 +45,9 @@ const navigation: SidebarNavItem[] = [
   { name: "Projects", href: "/projects", icon: FolderOpen },
   { name: "Compound / Batch", href: "/compounds", icon: Boxes },
   { name: "Programs", href: "/spectracheck", icon: ProgramsLogoIcon },
-  { name: "ML / AI Governance", href: "/ai", icon: Bot },
   { name: "Action Queue", href: "/actions", icon: ClipboardList },
   { name: "Automation ROI", href: "/roi", icon: BarChart3 },
+  { name: "ML / AI Governance", href: "/ai", icon: Bot },
   { name: "Platform", href: "/platform", icon: LineChart },
 ]
 

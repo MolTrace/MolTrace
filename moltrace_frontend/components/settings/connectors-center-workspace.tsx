@@ -257,7 +257,7 @@ export function ConnectorsCenterWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Connector table</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /connectors</code>
+            All configured external integrations with their type, status, and last health check.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -317,7 +317,7 @@ export function ConnectorsCenterWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Create connector card</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /connectors</code>
+            Register a new connector to LIMS, ELN, vendor instruments, or other external systems.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -386,8 +386,7 @@ export function ConnectorsCenterWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Health check panel</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /connectors/{"{connector_id}"}/health-check</code> and{" "}
-            <code className="text-xs">GET /connectors/{"{connector_id}"}/health-checks</code>
+            Trigger an on-demand connectivity test and review the most recent health check results for the selected connector.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

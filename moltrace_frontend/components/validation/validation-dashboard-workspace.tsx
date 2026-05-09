@@ -408,7 +408,7 @@ export function ValidationDashboardWorkspace() {
           {!loading && showGlobalUnavailable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Validation services unavailable — check backend and <code className="text-xs">/api/backend</code> proxy.
+              Validation services unavailable — try again in a moment, or contact your platform administrator.
             </p>
           ) : null}
           {!loading && errRuns && !showGlobalUnavailable ? (
@@ -823,7 +823,7 @@ export function ValidationDashboardWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Method comparison summary</CardTitle>
-          <CardDescription>Comparisons returned by <code className="text-xs">GET /method-comparisons</code>.</CardDescription>
+          <CardDescription>Analytical method comparison records — matched method pairs and their performance deltas across reference and candidate procedures.</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (

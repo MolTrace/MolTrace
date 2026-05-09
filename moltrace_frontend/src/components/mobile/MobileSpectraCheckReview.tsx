@@ -156,8 +156,7 @@ export function MobileSpectraCheckReview({ sessionId: sessionIdProp = null }: { 
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Mobile SpectraCheck Review</CardTitle>
         <CardDescription>
-          <code className="text-xs">GET /mobile/spectracheck/sessions/{"{session_id}"}/summary</code> — compact review
-          mode for phone workflows.
+          Compact SpectraCheck session summary optimized for phone review workflows — analytical flags, identity confirmation, and reviewer decision panel.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

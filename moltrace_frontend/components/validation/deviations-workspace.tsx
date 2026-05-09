@@ -314,7 +314,7 @@ export function DeviationsWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Create deviation</CardTitle>
-            <CardDescription>POST /deviations</CardDescription>
+            <CardDescription>Log a process or procedural deviation with description, category, severity, and responsible owner for GxP traceability.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -421,7 +421,7 @@ export function DeviationsWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Selected deviation</CardTitle>
-            <CardDescription>PATCH /deviations/{"{deviation_id}"}</CardDescription>
+            <CardDescription>Selected deviation details — update status, root cause, CAPA linkage, and resolution notes.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {detailDeviation ? (
@@ -539,7 +539,7 @@ export function DeviationsWorkspace() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">Deviation table</CardTitle>
-            <CardDescription>GET /deviations</CardDescription>
+            <CardDescription>All deviation records — filter by category, severity, and status to manage the open deviation backlog.</CardDescription>
           </div>
           <Button type="button" variant="outline" onClick={() => void loadDeviations()} disabled={loading}>
             Refresh

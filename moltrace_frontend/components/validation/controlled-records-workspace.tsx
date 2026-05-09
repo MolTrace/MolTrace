@@ -367,7 +367,7 @@ export function ControlledRecordsWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Create controlled record</CardTitle>
-            <CardDescription>POST /controlled-records</CardDescription>
+            <CardDescription>Register a new controlled document with title, type, version, and responsible owner for GxP audit trail compliance.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -440,7 +440,7 @@ export function ControlledRecordsWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Selected controlled record</CardTitle>
-            <CardDescription>GET /controlled-records/{"{record_id}"}</CardDescription>
+            <CardDescription>Selected controlled record details — version, status, owner, and full audit history.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {detailRecord ? (
@@ -479,7 +479,7 @@ export function ControlledRecordsWorkspace() {
                 <div className="space-y-3 rounded-lg border p-3">
                   <div>
                     <h3 className="text-sm font-medium">Create new version</h3>
-                    <p className="text-xs text-muted-foreground">POST /controlled-records/{"{record_id}"}/new-version</p>
+                    <p className="text-xs text-muted-foreground">Create a new controlled version of this record — specify title, version identifier, and content hash.</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Input
@@ -515,7 +515,7 @@ export function ControlledRecordsWorkspace() {
                 <div className="space-y-3 rounded-lg border p-3">
                   <div>
                     <h3 className="text-sm font-medium">Lock record</h3>
-                    <p className="text-xs text-muted-foreground">POST /controlled-records/{"{record_id}"}/lock</p>
+                    <p className="text-xs text-muted-foreground">Lock this record to prevent further edits — specify the reviewer, content hash, and reason for locking.</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Input
@@ -552,7 +552,7 @@ export function ControlledRecordsWorkspace() {
                 <div className="space-y-3 rounded-lg border p-3">
                   <div>
                     <h3 className="text-sm font-medium">Archive record</h3>
-                    <p className="text-xs text-muted-foreground">POST /controlled-records/{"{record_id}"}/archive</p>
+                    <p className="text-xs text-muted-foreground">Archive this record and remove it from active controlled document workflows — provide a reason for audit trail.</p>
                   </div>
                   <Textarea
                     aria-label="archive reason"
@@ -584,7 +584,7 @@ export function ControlledRecordsWorkspace() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">Controlled records</CardTitle>
-            <CardDescription>GET /controlled-records</CardDescription>
+            <CardDescription>All controlled documents across this environment — SOPs, validation plans, analytical methods, and other GxP-controlled records.</CardDescription>
           </div>
           <Button type="button" variant="outline" onClick={() => void loadRecords()} disabled={loading}>
             Refresh

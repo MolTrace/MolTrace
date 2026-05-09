@@ -338,7 +338,7 @@ export function AiServicesDashboard() {
           <CardHeader>
             <CardTitle>AI service table</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /ai/services</code>
+              All registered AI/ML services with their model, current status, and version.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -383,7 +383,7 @@ export function AiServicesDashboard() {
           <CardHeader>
             <CardTitle>Recent predictions</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /ai/predictions</code>
+              The most recent inference requests across all AI services with their confidence and review status.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -428,7 +428,7 @@ export function AiServicesDashboard() {
           <CardHeader>
             <CardTitle>Active-learning preview</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /ai/active-learning/candidates</code>
+              Predictions queued for human labeling — selected because the model was uncertain or the input was out-of-distribution.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -469,7 +469,7 @@ export function AiServicesDashboard() {
           <CardHeader>
             <CardTitle>Model monitoring preview</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /ai/model-monitoring</code>
+              Live operational metrics — drift, latency, throughput, and out-of-distribution rate — across deployed services.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">

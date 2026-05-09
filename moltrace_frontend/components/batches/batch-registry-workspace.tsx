@@ -352,7 +352,7 @@ export function BatchRegistryWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Create batch</CardTitle>
-          <CardDescription>POST /compound-registry/batches</CardDescription>
+          <CardDescription>Register a new compound batch with synthesis route, purity, mass, and source provenance for compound registry traceability.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleCreateBatch}>
@@ -450,7 +450,7 @@ export function BatchRegistryWorkspace() {
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle className="text-base">Batches</CardTitle>
-            <CardDescription>GET /compound-registry/batches</CardDescription>
+            <CardDescription>All registered compound batches — synthesis route, purity, mass, status, and compound provenance across the compound registry.</CardDescription>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => void loadBatches()}>
             Refresh

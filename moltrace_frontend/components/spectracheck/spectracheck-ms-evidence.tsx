@@ -2589,8 +2589,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/hrms/candidates/match/evidence</code> — multipart FormData; browser sets{" "}
-                  <code className="text-xs">Content-Type</code>.
+                  Match candidates by high-resolution exact mass, adduct form, ppm error tolerance, isotope pattern, and degree of unsaturation (DBE/IHD).
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -2699,8 +2698,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/hrms/formulas/search</code> — JSON body; other element bounds use
-                  backend defaults (see developer JSON).
+                  Search candidate molecular formulas from observed exact mass within CHNOPSClBr composition limits. Use as a screening step, not final identification.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -2783,8 +2781,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/adducts/infer/evidence</code> — multipart FormData; browser sets{" "}
-                  <code className="text-xs">Content-Type</code>.
+                  Infer adduct form, charge state, isotope cluster, and halogen signature from MS1 or HRMS peak data.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -2940,8 +2937,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/msms/annotate/evidence</code> — multipart FormData; browser sets{" "}
-                  <code className="text-xs">Content-Type</code>.
+                  Annotate centroid MS/MS fragments with candidate-specific matches, neutral losses, and diagnostic ion series.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -3073,8 +3069,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/msms/fragmentation-tree/evidence</code> — multipart FormData; browser sets{" "}
-                  <code className="text-xs">Content-Type</code>.
+                  Build a precursor-to-fragment tree using diagnostic neutral losses and candidate-specific bond-cleavage plausibility.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -3186,8 +3181,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/lcms/import/bridge/upload</code> — multipart FormData; parsing runs on
-                  the backend (no vendor decoding in the browser).
+                  Import mzML/mzXML or a processed peak table. The file is parsed server-side; scan summaries and MS1/MS2 peak lists are extracted for downstream analysis.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -3329,8 +3323,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/lcms/features/detect/upload</code> — multipart FormData; detection runs
-                  on the server.
+                  Detect chromatographic features, extract EIC/XIC traces, estimate co-elution purity, and link proximal MS/MS scans.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -3476,8 +3469,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/lcms/features/group/evidence</code> — multipart FormData. Optional file
-                  inputs override the textareas.
+                  Group and align features across sample, blank, QC, and reference runs; subtract background signals; flag sample-enriched peaks.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -3597,7 +3589,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/lcms/features/consensus/evidence</code> — multipart FormData.
+                  Score feature families using blank subtraction, isotope envelope fit, adduct consistency, and MS/MS linkage evidence.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -3722,9 +3714,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/ms/lcms/dereplication/evidence</code>. Optional lines below are prefixed with{" "}
-                  <code className="text-xs">#</code> so they stay in <code className="text-xs">candidates_text</code> for audit without
-                  replacing SMILES rows.
+                  Rank candidates against the spectral library using precursor m/z, MS/MS dot-product similarity, optional RT/CCS, and feature-family provenance. Comment lines (prefixed #) are retained in the audit trail.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -3877,8 +3867,7 @@ export function SpectraCheckMsEvidence({
                   />
                 </CardTitle>
                 <CardDescription>
-                  POST <code className="text-xs">/confidence/candidates/lcms-consensus-bridge</code> — JSON body. Provide either a
-                  consensus family table or run consensus above so <code className="text-xs">lcms_consensus_result</code> is included.
+                  Link promoted LC-MS feature families to candidate confidence scoring when theoretical adduct masses match a consensus anchor. Run LC-MS consensus above to populate automatically.
                 </CardDescription>
               </CardHeader>
               <CardContent>

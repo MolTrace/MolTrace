@@ -154,13 +154,12 @@ export function AiShadowEvaluationsWorkspace() {
         <Button type="button" variant="outline" size="sm" onClick={() => setReloadToken((x) => x + 1)} disabled={loading}>
           {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />} Refresh
         </Button>
-        <Badge variant="outline">/ai/shadow-evaluations</Badge>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Run shadow evaluation</CardTitle>
-          <CardDescription><code className="text-xs">POST /ai/shadow-evaluations</code></CardDescription>
+          <CardDescription>Compare a candidate model against the production model on the same dataset, without serving traffic.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
@@ -181,7 +180,7 @@ export function AiShadowEvaluationsWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle>Shadow runs</CardTitle>
-          <CardDescription><code className="text-xs">GET /ai/shadow-evaluations</code></CardDescription>
+          <CardDescription>All offline candidate-vs-production comparisons with their status and timing.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {loadErr ? <p className="mb-3 text-sm text-destructive">{loadErr}</p> : null}

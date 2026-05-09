@@ -367,10 +367,10 @@ export function MlTrainingRunLauncher() {
         <Alert variant="destructive">
           <AlertTitle>Partial load</AlertTitle>
           <AlertDescription className="space-y-1 text-xs">
-            {errTasks ? <p>GET /ml/tasks: {errTasks}</p> : null}
-            {errVersions ? <p>GET /knowledge/dataset-versions: {errVersions}</p> : null}
-            {errPipelines ? <p>GET /ml/feature-pipelines: {errPipelines}</p> : null}
-            {errRuns ? <p>GET /ml/training-runs: {errRuns}</p> : null}
+            {errTasks ? <p>Task list: {errTasks}</p> : null}
+            {errVersions ? <p>Dataset versions: {errVersions}</p> : null}
+            {errPipelines ? <p>Feature pipelines: {errPipelines}</p> : null}
+            {errRuns ? <p>Training runs: {errRuns}</p> : null}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -379,9 +379,7 @@ export function MlTrainingRunLauncher() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Start training run</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ml/training-runs</code> — dataset_version_id references{" "}
-            <code className="text-xs">GET /knowledge/dataset-versions</code>. Only IDs and parameters are sent — no raw
-            dataset payload.
+            Launch a supervised ML training run against a curated knowledge dataset version. Only dataset IDs and hyperparameters are sent — no raw data payload.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -527,8 +525,7 @@ export function MlTrainingRunLauncher() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Training runs</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/training-runs</code> — status and metrics come from the API; artifact IDs
-            appear when the backend reports success.
+            ML training run history — status, metrics, and artifact IDs for each completed or in-progress run. Artifact IDs appear when the backend reports success.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -252,7 +252,7 @@ export function TenantAdminWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Tenant table</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /tenants</code>
+            All registered tenants with their organization, plan, and lifecycle status.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -309,7 +309,7 @@ export function TenantAdminWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Create tenant card</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /tenants</code>
+            Provision a new tenant organization with its initial plan and admin contact.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -134,10 +134,9 @@ export function CtdModule3BundleCard({ dossierId }: Props) {
             />
           </CardTitle>
           <CardDescription>
-            POST /regulatory/dossiers/{"{dossier_id}"}/ctd-module3-bundle · GET
-            /regulatory/dossiers/{"{dossier_id}"}/ctd-module3-bundle · GET /ctd-module3-bundles/{"{bundle_id}"}.
-            Generates a <span className="font-medium text-foreground">draft CTD support bundle</span> that is{" "}
-            <span className="font-medium text-foreground">review required</span> before use.
+            Assembles analytical evidence, impurity data, residual solvents, nitrosamine watch, qNMR/validation, AI governance, and source citations into a{" "}
+            <span className="font-medium text-foreground">draft CTD Module 3 support bundle</span> —{" "}
+            <span className="font-medium text-foreground">review required</span> before submission use.
           </CardDescription>
         </div>
         <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void generateBundle()}>

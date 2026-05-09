@@ -193,7 +193,7 @@ export function AiModelMonitoringWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle>Log monitoring event</CardTitle>
-          <CardDescription><code className="text-xs">POST /ai/model-monitoring/events</code></CardDescription>
+          <CardDescription>Record a drift, latency, failure, or audit event for a deployed AI service.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {postErr ? <p className="text-sm text-destructive">{postErr}</p> : null}
@@ -214,7 +214,7 @@ export function AiModelMonitoringWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle>Monitoring events</CardTitle>
-          <CardDescription><code className="text-xs">GET /ai/model-monitoring/events</code></CardDescription>
+          <CardDescription>Recent operational events across all monitored AI services, ordered by timestamp.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {eventsErr ? <p className="mb-3 text-sm text-destructive">{eventsErr}</p> : null}

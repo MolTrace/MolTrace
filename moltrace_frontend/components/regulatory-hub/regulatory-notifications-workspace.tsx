@@ -121,8 +121,7 @@ export function RegulatoryNotificationsWorkspace() {
         <CardHeader>
           <CardTitle className="text-lg">Notifications</CardTitle>
           <CardDescription>
-            GET /regulatory/notifications · PATCH /regulatory/notifications/
-            {"{notification_id}"}
+            Regulatory workflow signals — change alerts, dossier updates, and review triggers. Mark notifications as read after review.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

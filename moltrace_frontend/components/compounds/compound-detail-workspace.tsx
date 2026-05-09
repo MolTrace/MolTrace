@@ -736,8 +736,7 @@ export function CompoundDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Knowledge Graph (this page)</CardTitle>
                 <CardDescription>
-                  Edges derived from relationships and evidence links already loaded for this compound detail view (not
-                  the full GET /compound-registry/graph payload).
+                  Network of relationships and evidence links derived from data already loaded for this compound. For the complete graph across all linked compounds, open the Knowledge Graph view.
                 </CardDescription>
               </CardHeader>
               <CardContent>

@@ -331,7 +331,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Create proposal</CardTitle>
-          <CardDescription>POST /regulatory/changes/{`{change_id}`}/rule-update-proposal</CardDescription>
+          <CardDescription>Propose a rule set or guidance update in response to a detected regulatory change — includes proposal type, rationale, and affected rule set.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {createErr ? (
@@ -434,7 +434,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Proposal table</CardTitle>
-          <CardDescription>GET /regulatory/rule-update-proposals</CardDescription>
+          <CardDescription>All rule update proposals across regulatory changes — filter by status, proposal type, or source change to manage the review queue.</CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
           {loading ? (
@@ -509,7 +509,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
         <CardHeader>
           <CardTitle className="text-lg">Proposal detail & review</CardTitle>
           <CardDescription>
-            GET /regulatory/rule-update-proposals/{`{proposal_id}`} · POST …/approve · POST …/reject
+            Review a rule update proposal in detail and record a formal approval or rejection decision with reviewer attribution.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

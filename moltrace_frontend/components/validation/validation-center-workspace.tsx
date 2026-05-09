@@ -272,7 +272,7 @@ export function ValidationCenterWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Validation projects table</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /validation-center/projects</code>
+            All validation projects for this tenant — title, scope, validation type, status, owner, and QA reviewer.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -334,7 +334,7 @@ export function ValidationCenterWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Create validation project card</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /validation-center/projects</code>
+            Create a new validation project — specify title, scope, validation type, owner, and QA reviewer to open the project workspace.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

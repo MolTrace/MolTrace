@@ -367,7 +367,7 @@ export function ESignatureRecordsWorkspace() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">e-Signature records</CardTitle>
-            <CardDescription>GET /esignatures/records</CardDescription>
+            <CardDescription>Electronic signature records for GxP-critical actions — approval events, reviewer sign-offs, and controlled-record authorizations.</CardDescription>
           </div>
           <Button type="button" variant="outline" onClick={() => void loadRecords()} disabled={loading}>
             Refresh

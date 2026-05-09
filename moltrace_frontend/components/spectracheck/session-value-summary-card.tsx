@@ -71,7 +71,7 @@ export function SessionValueSummaryCard({ sessionId }: { sessionId: string | nul
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Session Value Summary</CardTitle>
         <CardDescription>
-          <code className="text-xs">GET /analytics/sessions/{"{session_id}"}/roi</code>
+          Session-level automation and value metrics for the active analysis session.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">

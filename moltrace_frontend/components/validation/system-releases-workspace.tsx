@@ -318,7 +318,7 @@ export function SystemReleasesWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Create system release</CardTitle>
-            <CardDescription>POST /system-releases</CardDescription>
+            <CardDescription>Create a system release record documenting a validated software version with qualification evidence and release approval status.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -393,7 +393,7 @@ export function SystemReleasesWorkspace() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Release detail</CardTitle>
-            <CardDescription>GET /system-releases/{"{release_id}"}</CardDescription>
+            <CardDescription>Selected release detail — version, release notes, qualification status, and linked validation artefacts.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {detailRelease ? (
@@ -444,7 +444,7 @@ export function SystemReleasesWorkspace() {
                 <div className="space-y-3 rounded-lg border p-3">
                   <div>
                     <h3 className="text-sm font-medium">Approval</h3>
-                    <p className="text-xs text-muted-foreground">POST /system-releases/{"{release_id}"}/approve</p>
+                    <p className="text-xs text-muted-foreground">Record the reviewer name and approval decision to advance this release to approved status.</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1">
@@ -492,7 +492,7 @@ export function SystemReleasesWorkspace() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">System releases</CardTitle>
-            <CardDescription>GET /system-releases</CardDescription>
+            <CardDescription>All system release records — version history, qualification status, and release approval audit trail.</CardDescription>
           </div>
           <Button type="button" variant="outline" onClick={() => void loadReleases()} disabled={loading}>
             Refresh
