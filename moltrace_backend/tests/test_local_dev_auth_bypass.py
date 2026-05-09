@@ -83,3 +83,27 @@ def test_production_never_disables_auth_even_if_flag_is_set(tmp_path) -> None:
 
     assert blocked.status_code == 401
     assert allowed.status_code == 200
+
+
+def test_cors_exposes_download_and_trace_headers_for_direct_frontend_calls(tmp_path) -> None:
+    app = create_app(
+        Settings(
+            app_env="production",
+            debug=False,
+            allowed_origins=("https://moltrace-frontend1.onrender.com",),
+            database_url=f"sqlite:///{tmp_path / 'prod-cors.sqlite3'}",
+            api_key="test-key",
+        )
+    )
+
+    with TestClient(app) as client:
+        res = client.get(
+            "/health",
+            headers={"Origin": "https://moltrace-frontend1.onrender.com"},
+        )
+
+    assert res.status_code == 200
+    exposed = res.headers.get("access-control-expose-headers", "").lower()
+    assert "content-disposition" in exposed
+    assert "x-correlation-id" in exposed
+    assert "x-moltrace-backend-version" in exposed

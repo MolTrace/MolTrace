@@ -847,6 +847,14 @@ PUBLIC_AUTH_REQUIRED_DETAIL = (
 )
 PUBLIC_ACCESS_DENIED_DETAIL = "You do not have access to perform this action."
 PUBLIC_REQUEST_FAILED_DETAIL = "Request could not be completed. Please try again."
+CORS_EXPOSE_HEADERS = (
+    "Content-Disposition",
+    "X-MolTrace-Backend-Version",
+    CORRELATION_ID_HEADER,
+    REQUEST_ID_HEADER,
+    DATA_MODE_HEADER,
+    GENERATED_AT_HEADER,
+)
 
 _ERROR_SECRET_KEY_RE = re.compile(
     r"(api[_-]?key|access[_-]?token|refresh[_-]?token|bearer|password|passwd|secret|credential|private[_-]?key|service[_-]?account)",
@@ -23476,6 +23484,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+            expose_headers=list(CORS_EXPOSE_HEADERS),
         )
 
     @app.middleware("http")
