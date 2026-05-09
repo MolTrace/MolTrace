@@ -79,17 +79,17 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
         <g
           className={letterClassName}
           fontFamily="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          fontSize={36}
+          fontSize={44}
           fontWeight={900}
           textAnchor="middle"
         >
           <text
             x="32"
-            y="31.2"
+            y="31.5"
             dy="0.33em"
             fill="none"
             stroke={LOGO_BACKGROUND_DARK_BLUE}
-            strokeWidth={5.8}
+            strokeWidth={7}
             strokeLinecap="round"
             strokeLinejoin="round"
             paintOrder="stroke"
@@ -98,7 +98,7 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
           </text>
           <text
             x="32"
-            y="31.2"
+            y="31.5"
             dy="0.33em"
             fill="#FFFFFF"
           >

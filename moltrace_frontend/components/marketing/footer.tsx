@@ -39,7 +39,7 @@ export function Footer() {
             <Link href="/" className="flex items-center gap-2">
               <MoleculeLogoMark className="h-8 w-8" />
               <span className="text-lg font-semibold tracking-tight">
-                <span className="text-foreground">Mol</span>
+                <span className="font-bold text-foreground">Mol</span>
                 <span className={moltraceTraceClassName}>Trace</span>
               </span>
             </Link>

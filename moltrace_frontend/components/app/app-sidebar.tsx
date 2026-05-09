@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { moltraceTraceClassName } from "@/components/branding/moltrace-wordmark"
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
-import { SpectraCheckLogoIcon } from "@/components/branding/spectracheck-logo-icon"
+import { ProgramsLogoIcon } from "@/components/branding/programs-logo-icon"
 import type { LucideIcon } from "lucide-react"
 import {
   LayoutDashboard,
@@ -37,15 +37,15 @@ import {
 export type SidebarNavItem = {
   name: string
   href: string
-  icon: LucideIcon | typeof SpectraCheckLogoIcon
+  icon: LucideIcon | typeof ProgramsLogoIcon
 }
 
 const navigation: SidebarNavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "ML / AI Governance", href: "/ai", icon: Bot },
   { name: "Projects", href: "/projects", icon: FolderOpen },
   { name: "Compound / Batch", href: "/compounds", icon: Boxes },
-  { name: "Programs", href: "/spectracheck", icon: SpectraCheckLogoIcon },
+  { name: "Programs", href: "/spectracheck", icon: ProgramsLogoIcon },
+  { name: "ML / AI Governance", href: "/ai", icon: Bot },
   { name: "Action Queue", href: "/actions", icon: ClipboardList },
   { name: "Automation ROI", href: "/roi", icon: BarChart3 },
   { name: "Platform", href: "/platform", icon: LineChart },
@@ -140,7 +140,7 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
             <MoleculeLogoMark className="h-7 w-7" />
             {!collapsed && (
               <span className="text-[15px] font-semibold tracking-tight">
-                <span className="text-foreground">Mol</span>
+                <span className="font-bold text-foreground">Mol</span>
                 <span className={moltraceTraceClassName}>Trace</span>
               </span>
             )}

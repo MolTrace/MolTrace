@@ -197,30 +197,32 @@ function HypotheticalMoleculeScene() {
   })
 
   return (
-    <group ref={root}>
-      {bonds.map(([i, j], k) => (
-        <BondCylinder
-          key={`b-${k}`}
-          from={atoms[i].position}
-          to={atoms[j].position}
-          rStart={atoms[i].radius}
-          rEnd={atoms[j].radius}
-        />
-      ))}
-      {atoms.map((atom, i) => (
-        <group key={`a-${i}`} position={atom.position}>
-          <GlassAtom color={atom.color} radius={atom.radius} />
-        </group>
-      ))}
+    <group rotation={[Math.PI, 0, 0]}>
+      <group ref={root}>
+        {bonds.map(([i, j], k) => (
+          <BondCylinder
+            key={`b-${k}`}
+            from={atoms[i].position}
+            to={atoms[j].position}
+            rStart={atoms[i].radius}
+            rEnd={atoms[j].radius}
+          />
+        ))}
+        {atoms.map((atom, i) => (
+          <group key={`a-${i}`} position={atom.position}>
+            <GlassAtom color={atom.color} radius={atom.radius} />
+          </group>
+        ))}
+      </group>
     </group>
   )
 }
 
 export function HeroMoleculeBackground() {
   return (
-    <div className="pointer-events-none absolute inset-0 z-[1] min-h-[560px] w-full opacity-40">
+    <div className="pointer-events-none absolute inset-0 z-[1] min-h-[560px] w-full opacity-[0.14]">
       <Canvas
-        camera={{ position: [0, 0.15, 10.2], fov: 34 }}
+        camera={{ position: [0, 0, 10.25], fov: 34 }}
         gl={{
           alpha: true,
           antialias: true,
