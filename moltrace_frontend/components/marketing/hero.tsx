@@ -16,11 +16,11 @@ export function Hero() {
             Trusted by 50+ pharmaceutical R&D teams
           </Badge>
           <h1 className="hero-copy-wrap text-balance text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-            AI-native spectroscopy, regulatory intelligence and reaction optimization.
+            The Unified Intelligence Platform for Chemical and Pharmaceutical R&D.
           </h1>
           <p className="hero-copy-wrap mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl">
-            Evidence-backed decisions. Human review at every step. Regulatory-ready reports generated in
-            minutes. Built for academic, chemical and pharmaceutical R&D teams.
+            Accelerate discovery from raw spectral data to compliant, optimized reactions with MolTrace&apos;s hybrid AI
+            architecture.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Button size="lg" className="min-w-[180px] gap-2" asChild>

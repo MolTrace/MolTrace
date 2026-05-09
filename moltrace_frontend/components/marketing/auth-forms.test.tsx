@@ -71,6 +71,31 @@ describe("landing page auth forms", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Signed in with admin access.")
   })
 
+  it("shows a credential-focused message when sign-in fails", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(
+        { detail: "Sign in to continue. If you already signed in, your session may have expired." },
+        { status: 401, statusText: "Unauthorized" }
+      )
+    )
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<SignInForm />)
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "chemist@example.com" },
+    })
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "WrongPassword123!" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't sign you in. Check your email and password, then try again."
+    )
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
   it("creates an account from the landing page and stores the session", async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse(
