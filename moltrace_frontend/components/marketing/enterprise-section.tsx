@@ -1,67 +1,73 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Shield, Users, Lock, Server, FileCheck, Globe } from "lucide-react"
 
 const features = [
   {
     icon: Users,
-    title: "Role-Based Access Control",
-    description: "Granular permissions for analysts, reviewers, and administrators with project-level isolation.",
+    title: "Role-Based Access",
+    desc: "Granular permissions for analysts, reviewers, and administrators with project-level isolation.",
   },
   {
     icon: FileCheck,
     title: "Complete Audit Logs",
-    description: "Every action timestamped and attributed. Export audit packages for regulatory inspection.",
+    desc: "Every action timestamped and attributed. Export audit packages for regulatory inspection.",
   },
   {
     icon: Lock,
     title: "End-to-End Encryption",
-    description: "Data encrypted at rest and in transit. Customer-managed keys available for enterprise.",
+    desc: "Data encrypted at rest (AES-256) and in transit. Customer-managed keys for enterprise.",
   },
   {
     icon: Server,
     title: "Flexible Deployment",
-    description: "Cloud-hosted SaaS, VPC deployment, or on-premises installation for air-gapped environments.",
+    desc: "Cloud SaaS, VPC deployment, or on-premises installation for air-gapped environments.",
   },
   {
     icon: Shield,
-    title: "SOC 2 Type II Certified",
-    description: "Annual third-party audits verify our security controls meet enterprise requirements.",
+    title: "SOC 2 Type II",
+    desc: "Annual third-party audits verify our security controls meet enterprise requirements.",
   },
   {
     icon: Globe,
-    title: "Data Residency Options",
-    description: "Choose data storage regions to comply with local data sovereignty requirements.",
+    title: "Data Residency",
+    desc: "Choose storage regions to comply with data sovereignty requirements. EU and US regions.",
   },
 ]
 
 export function EnterpriseSection() {
   return (
-    <section className="py-24" id="enterprise">
+    <section className="border-t py-24" id="enterprise">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
+
+        {/* Section header */}
+        <div className="mb-16 text-center">
+          <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-cyan-500 dark:text-cyan-400">
+            Enterprise
+          </p>
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Enterprise-grade security and compliance
+            Enterprise-grade security and compliance.
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Built for regulated industries. Your data stays yours, with the controls 
+          <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-muted-foreground">
+            Built for regulated industries. Your data stays yours, with the controls
             and audit trails required for GxP environments.
           </p>
         </div>
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
-            <Card key={feature.title} className="border-0 bg-muted/30 shadow-none">
-              <CardHeader className="pb-2">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-                  <feature.icon className="h-5 w-5" />
-                </div>
-                <CardTitle className="text-base">{feature.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-sm">{feature.description}</CardDescription>
-              </CardContent>
-            </Card>
+
+        {/* Divided grid — gap-px + bg-border creates hairline dividers between cells */}
+        <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f) => (
+            <div key={f.title} className="flex flex-col bg-card p-7">
+              <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/10">
+                <f.icon
+                  className="h-[18px] w-[18px] text-cyan-500 dark:text-cyan-400"
+                  strokeWidth={1.8}
+                />
+              </div>
+              <div className="mb-2 text-sm font-bold text-foreground">{f.title}</div>
+              <div className="text-sm leading-relaxed text-muted-foreground">{f.desc}</div>
+            </div>
           ))}
         </div>
+
       </div>
     </section>
   )

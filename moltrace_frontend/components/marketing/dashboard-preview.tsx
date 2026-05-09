@@ -1,119 +1,73 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Clock, FileText, CheckSquare, TrendingUp } from "lucide-react"
+const metrics = [
+  {
+    value: "847",
+    label: "Hours saved this month",
+    sub: "+23% vs last month",
+    border: "border-t-teal-500 dark:border-t-teal-400",
+    text: "text-teal-500 dark:text-teal-400",
+  },
+  {
+    value: "156",
+    label: "Reports generated",
+    sub: "Avg. 12 min generation",
+    border: "border-t-cyan-500 dark:border-t-cyan-400",
+    text: "text-cyan-500 dark:text-cyan-400",
+  },
+  {
+    value: "2,341",
+    label: "Manual steps automated",
+    sub: "Peak picking, correction",
+    border: "border-t-violet-500 dark:border-t-violet-400",
+    text: "text-violet-500 dark:text-violet-400",
+  },
+  {
+    value: "94.2%",
+    label: "Model confidence",
+    sub: "Calibration accuracy",
+    border: "border-t-amber-500 dark:border-t-amber-400",
+    text: "text-amber-500 dark:text-amber-400",
+  },
+]
 
 export function DashboardPreview() {
   return (
-    <section className="border-y bg-muted/30 py-24">
+    <section className="border-t py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <Badge variant="outline" className="mb-4">ROI Dashboard</Badge>
+
+        {/* Section header */}
+        <div className="mb-16 text-center">
+          <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-violet-500 dark:text-violet-400">
+            ROI Dashboard
+          </p>
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Measure the impact
+            Measure the impact.
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Track hours saved, reports generated, and automation ROI across your organization.
+          <p className="mx-auto mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
+            Track hours saved, reports generated, and automation ROI across your
+            organisation in real time.
           </p>
         </div>
 
-        <div className="mt-12">
-          <Card className="overflow-hidden">
-            <CardContent className="p-6">
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                {/* Hours Saved */}
-                <Card className="border-0 bg-muted/50 shadow-none">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      Hours Saved This Month
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-semibold">847</div>
-                    <div className="mt-1 flex items-center gap-1 text-xs text-success">
-                      <TrendingUp className="h-3 w-3" />
-                      <span>+23% vs last month</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Reports Generated */}
-                <Card className="border-0 bg-muted/50 shadow-none">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <FileText className="h-4 w-4" />
-                      Reports Generated
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-semibold">156</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Avg. 12 min generation time
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Review Steps Avoided */}
-                <Card className="border-0 bg-muted/50 shadow-none">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <CheckSquare className="h-4 w-4" />
-                      Manual Steps Avoided
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-semibold">2,341</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Peak picking, baseline correction
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Model Confidence */}
-                <Card className="border-0 bg-muted/50 shadow-none">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      Model Confidence Calibration
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-3xl font-semibold">94.2%</div>
-                      <div className="text-sm text-muted-foreground">accuracy</div>
-                    </div>
-                    <Progress value={94.2} className="mt-2 h-1.5" />
-                  </CardContent>
-                </Card>
+        {/* Divided metric grid */}
+        <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-border sm:grid-cols-2 lg:grid-cols-4">
+          {metrics.map((m) => (
+            <div
+              key={m.label}
+              className={`flex flex-col bg-card px-6 py-8 border-t-[3px] ${m.border}`}
+            >
+              <div className={`font-mono text-5xl font-bold leading-none ${m.text}`}>
+                {m.value}
               </div>
-
-              {/* Chart placeholder */}
-              <div className="mt-6 rounded-lg border bg-muted/30 p-8">
-                <div className="flex h-48 items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Hours Saved Trend
-                    </div>
-                    <div className="mt-4 flex items-end justify-center gap-1">
-                      {[40, 55, 45, 60, 75, 65, 80, 85, 70, 90, 95, 100].map((height, i) => (
-                        <div
-                          key={i}
-                          className="w-6 rounded-t bg-accent/80 transition-all hover:bg-accent"
-                          style={{ height: `${height}%` }}
-                        />
-                      ))}
-                    </div>
-                    <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                      <span>Jan</span>
-                      <span>Jun</span>
-                      <span>Dec</span>
-                    </div>
-                  </div>
-                </div>
+              <div className="mt-3 text-sm font-semibold text-foreground">
+                {m.label}
               </div>
-            </CardContent>
-          </Card>
+              <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                {m.sub}
+              </div>
+            </div>
+          ))}
         </div>
+
       </div>
     </section>
   )
