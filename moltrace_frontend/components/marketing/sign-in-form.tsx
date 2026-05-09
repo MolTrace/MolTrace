@@ -31,6 +31,9 @@ type AuthPageResponse = {
   detail?: string
 }
 
+const SIGN_IN_FAILURE_MESSAGE =
+  "We couldn't sign you in. Check your email and password, then try again."
+
 function formValue(formData: FormData, key: string, trim = true) {
   const value = formData.get(key)
   if (typeof value !== "string") return ""
@@ -47,6 +50,7 @@ function storeAuthSession(data: AuthPageResponse) {
 }
 
 function authErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError && error.status === 401) return SIGN_IN_FAILURE_MESSAGE
   if (error instanceof ApiError) return error.message
   if (error instanceof Error) return error.message
   return fallback
