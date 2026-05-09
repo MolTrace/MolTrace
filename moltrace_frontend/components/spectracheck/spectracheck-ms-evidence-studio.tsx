@@ -2,9 +2,9 @@
 
 import { SpectraCheckLcmsWorkflow } from "@/components/spectracheck/spectracheck-lcms-workflow"
 import { SpectraCheckMsEvidence } from "@/components/spectracheck/spectracheck-ms-evidence"
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
+import { ModuleCard } from "@/components/dashboard/module-card"
 
 type Props = {
   sampleId: string
@@ -18,22 +18,21 @@ type Props = {
 export function SpectraCheckMsEvidenceStudio({ sampleId, candidatesText }: Props) {
   return (
     <div className="min-w-0 space-y-6">
-      <Card className="min-w-0 border-muted">
-        <CardHeader className="space-y-2">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Spectroscopy · MS Studio"
+        title={
+          <span className="inline-flex items-center gap-2">
             MS Evidence Studio
             <InfoTooltip
               label="About MS Evidence Studio"
               content="High-resolution MS and MS/MS tools use shared sample ID and candidate structures from the session. Expand LC-MS when you need import through the consensus bridge."
             />
-          </CardTitle>
-          <CardDescription>
-            HRMS exact mass, formula search, adduct and isotope inference, processed MS/MS, and fragmentation tree run in
-            the panel below. LC-MS import, feature workflows, and the unified confidence bridge are grouped under
-            Advanced LC-MS.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+          </span>
+        }
+        description="HRMS exact mass, formula search, adduct and isotope inference, processed MS/MS, and fragmentation tree run in the panel below. LC-MS import, feature workflows, and the unified confidence bridge are grouped under Advanced LC-MS."
+        className="min-w-0"
+      />
 
       <div className="min-w-0">
         <SpectraCheckMsEvidence sampleId={sampleId} candidatesText={candidatesText} />

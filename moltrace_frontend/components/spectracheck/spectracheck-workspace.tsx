@@ -61,7 +61,6 @@ import {
 } from "@/components/spectracheck/spectracheck-evidence-queue"
 import { SpectraCheckReviewCollaborationPanel } from "@/components/spectracheck/spectracheck-review-collaboration-panel"
 import { cn } from "@/lib/utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { normalizeProjectListPayload } from "@/components/projects/project-workspace-utils"
 import {
   applySharedInputsFromJson,
@@ -102,6 +101,8 @@ import { useOptionalOverviewData } from "@/components/app/overview-data-context"
 import { DataState, DataStateBadge, type DataStateKind } from "@/components/science/data-state"
 import { EvidenceCard, type EvidenceRiskLevel, type EvidenceStatus } from "@/components/science/evidence-card"
 import { KpiCard } from "@/components/dashboard/kpi-card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { AlertCircle, AlertTriangle, BarChart3, FileText } from "lucide-react"
 
 function SpectraCheckTabWithTooltip({
@@ -131,7 +132,8 @@ function SpectraCheckTabWithTooltip({
 
 const tabTriggerClass = cn(
   "shrink-0 whitespace-normal text-left text-xs sm:text-sm sm:text-center sm:whitespace-nowrap",
-  "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:font-semibold data-[state=active]:shadow-sm",
+  "font-mono",
+  "data-[state=active]:[background-color:var(--mt-teal)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm",
   "data-[state=inactive]:text-muted-foreground",
 )
 
@@ -874,10 +876,16 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
 
   return (
     <div className="min-w-0 space-y-6">
-      <div>
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-teal)" }}
+        >
+          MolTrace · SpectraCheck
+        </p>
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">SpectraCheck</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">SpectraCheck</h1>
             <InfoTooltip
               className="shrink-0"
               content="SpectraCheck combines NMR and MS evidence to rank candidate structures, surface contradictions, and prepare report-ready results."
@@ -889,7 +897,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <SpectraCheckSystemStatusBadges />
           </div>
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Review spectral evidence, structure candidates, contradictions, and human sign-off.
         </p>
       </div>
@@ -918,18 +926,16 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
 
       <SpectraCheckKnowledgeLinksCard backendSessionId={backendSessionId} />
 
-      <Alert className="border-warning/40 bg-warning/10">
-        <AlertTitle className="text-sm">Human review required · local session</AlertTitle>
-        <AlertDescription className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            AI spectral interpretation requires chemist review before final reporting. Session state is
-            stored locally in this browser — not for regulated storage.
-          </span>
+      <AlertCard
+        variant="warning"
+        title="Human review required · local session"
+        description="AI spectral interpretation requires chemist review before final reporting. Session state is stored locally in this browser — not for regulated storage."
+        action={
           <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={clearSessionEvidence}>
             Clear session evidence
           </Button>
-        </AlertDescription>
-      </Alert>
+        }
+      />
 
       <SpectraCheckWorkspaceSessionProvider
         value={{
@@ -1036,7 +1042,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-3" aria-labelledby="spectracheck-summary-heading">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 id="spectracheck-summary-heading" className="text-lg font-semibold tracking-tight">
+                <h2 id="spectracheck-summary-heading" className="font-mono text-lg font-bold tracking-tight">
                   Analysis summary
                 </h2>
                 <p className="text-sm text-muted-foreground">
@@ -1049,6 +1055,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               <KpiCard
                 title="Total analyses"
                 icon={BarChart3}
+                accent="teal"
                 value={overview?.loading ? "…" : totalAnalyses}
                 sub={
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -1059,6 +1066,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               <KpiCard
                 title="Pending review"
                 icon={AlertCircle}
+                accent="teal"
                 severity={!overview?.loading && pendingReviewCount > 0 ? "warning" : "neutral"}
                 value={overview?.loading ? "…" : pendingReviewCount}
                 sub={<p className="mt-1 text-xs text-muted-foreground">Items requiring reviewer attention.</p>}
@@ -1068,6 +1076,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               <KpiCard
                 title="Contradictions"
                 icon={AlertTriangle}
+                accent="teal"
                 severity={!overview?.loading && contradictionCount > 0 ? "critical" : "neutral"}
                 value={overview?.loading ? "…" : contradictionCount}
                 sub={<p className="mt-1 text-xs text-muted-foreground">Conflicting evidence signals.</p>}
@@ -1077,6 +1086,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               <KpiCard
                 title="Reports ready"
                 icon={FileText}
+                accent="teal"
                 severity={!overview?.loading && reportsReadyCount > 0 ? "success" : "neutral"}
                 value={overview?.loading ? "…" : reportsReadyCount}
                 sub={<p className="mt-1 text-xs text-muted-foreground">Report-ready or locally generated outputs.</p>}
@@ -1095,7 +1105,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
 
           <section className="space-y-3" aria-labelledby="spectracheck-evidence-workbench-heading">
             <div>
-              <h2 id="spectracheck-evidence-workbench-heading" className="text-lg font-semibold tracking-tight">
+              <h2 id="spectracheck-evidence-workbench-heading" className="font-mono text-lg font-bold tracking-tight">
                 Evidence queue
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -1148,30 +1158,28 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             onSessionRefresh={refreshLoadedSession}
           />
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>How the workflow runs</CardTitle>
-                <CardDescription>From session inputs to a reviewer-ready report.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  Set the session inputs above (project, sample, candidates, NMR text). Then use the tabs
-                  to upload spectra, run predictions, build cross-modal evidence, and generate a report.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>How to read the evidence</CardTitle>
-                <CardDescription>Scores help you triage; the spectra decide.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  Confidence numbers help prioritize what to review first. Cited measurements and the
-                  underlying spectra are the source of truth — not the score.
-                </p>
-              </CardContent>
-            </Card>
+            <ModuleCard
+              accent="teal"
+              eyebrow="Spectroscopy · Workflow"
+              title="How the workflow runs"
+              description="From session inputs to a reviewer-ready report."
+            >
+              <p className="text-muted-foreground">
+                Set the session inputs above (project, sample, candidates, NMR text). Then use the tabs
+                to upload spectra, run predictions, build cross-modal evidence, and generate a report.
+              </p>
+            </ModuleCard>
+            <ModuleCard
+              accent="teal"
+              eyebrow="Spectroscopy · Evidence"
+              title="How to read the evidence"
+              description="Scores help you triage; the spectra decide."
+            >
+              <p className="text-muted-foreground">
+                Confidence numbers help prioritize what to review first. Cited measurements and the
+                underlying spectra are the source of truth — not the score.
+              </p>
+            </ModuleCard>
           </div>
           <SessionEvidenceReadinessCard sessionId={backendSessionId} />
           <SpectraCheckValidationReadinessCard sessionId={backendSessionId} />
@@ -1205,21 +1213,21 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         </TabsContent>
 
         <TabsContent value="tab-nmr-text" className="mt-4 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex flex-wrap items-center gap-2">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Spectroscopy · Session"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Shared session inputs
                 <InfoTooltip
                   content="These values are shared across SpectraCheck tabs and are sent with analysis requests when available."
                   label="About Shared session inputs"
                 />
-              </CardTitle>
-              <CardDescription>
-                Paste or edit once — every tab sends these fields when relevant. Nothing here is required until you run an
-                action in a tab.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
+              </span>
+            }
+            description="Paste or edit once — every tab sends these fields when relevant. Nothing here is required until you run an action in a tab."
+          >
+            <div className="space-y-5">
               <div className="block space-y-2">
                 <div className="flex items-center gap-1.5 text-sm font-medium">
                   <label htmlFor="spectracheck-sample-id">Sample ID</label>
@@ -1293,21 +1301,20 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 </div>
                 <Textarea id="spectracheck-carbon" value={carbonText} onChange={(e) => setCarbonText(e.target.value)} rows={3} />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>NMR text + candidates</CardTitle>
-              <CardDescription>Controlled by the Shared session inputs card above this tab strip.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>
-                Candidate lines support <code className="text-xs">Label | SMILES | role</code> formatting; SMILES is used for 2D and MS workflows when needed.
-              </p>
-              <p>1H and 13C paste fields feed prediction and similarity tools unless you override with uploads in other tabs.</p>
-            </CardContent>
-          </Card>
+          <ModuleCard
+            accent="teal"
+            eyebrow="Spectroscopy · NMR text"
+            title="NMR text + candidates"
+            description="Controlled by the Shared session inputs card above this tab strip."
+          >
+            <p className="text-muted-foreground">
+              Candidate lines support <code className="text-xs">Label | SMILES | role</code> formatting; SMILES is used for 2D and MS workflows when needed.
+            </p>
+            <p className="text-muted-foreground">1H and 13C paste fields feed prediction and similarity tools unless you override with uploads in other tabs.</p>
+          </ModuleCard>
         </TabsContent>
 
         <TabsContent value="tab-processed" className="mt-4">
@@ -1331,16 +1338,21 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
 
         <TabsContent value="tab-dept-2d" className="mt-4 space-y-16">
           <section className="space-y-6">
-            <p className="text-sm font-medium text-muted-foreground">DEPT / APT</p>
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-teal)" }}
+            >
+              Spectroscopy · DEPT / APT
+            </p>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-              <Card className="min-w-0">
-                <CardHeader>
-                  <CardTitle>DEPT / APT peak table</CardTitle>
-                  <CardDescription>
-                    Preview parses the table; analyze combines it with shared 13C text and solvent.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <ModuleCard
+                accent="teal"
+                eyebrow="DEPT · Form"
+                title="DEPT / APT peak table"
+                description="Preview parses the table; analyze combines it with shared 13C text and solvent."
+                className="min-w-0"
+              >
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="dept-file">Peak table file</Label>
                     <Input id="dept-file" ref={deptFileRef} type="file" accept=".csv,.tsv,.txt,.json" />
@@ -1378,24 +1390,22 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                       {deptAnalyzeLoading ? "Analyzing…" : "Analyze"}
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
               <div className="min-w-0 space-y-6">
                 {deptPreviewError && (
-                  <Card className="border-warning/40 bg-warning/10">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base text-warning">Preview error</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm text-warning">{deptPreviewError}</CardContent>
-                  </Card>
+                  <AlertCard
+                    variant="error"
+                    title="Preview error"
+                    description={deptPreviewError}
+                  />
                 )}
                 {deptAnalyzeError && (
-                  <Card className="border-warning/40 bg-warning/10">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base text-warning">Analyze error</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm text-warning">{deptAnalyzeError}</CardContent>
-                  </Card>
+                  <AlertCard
+                    variant="error"
+                    title="Analyze error"
+                    description={deptAnalyzeError}
+                  />
                 )}
                 {deptPreviewLoading && (
                   <Card>
@@ -1460,16 +1470,21 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           </section>
 
           <section className="space-y-6">
-            <p className="text-sm font-medium text-muted-foreground">2D NMR</p>
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-teal)" }}
+            >
+              Spectroscopy · 2D NMR
+            </p>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-              <Card className="min-w-0">
-                <CardHeader>
-                  <CardTitle>2D NMR analyze</CardTitle>
-                  <CardDescription>
-                    Submit a 2D peak table for HSQC, HMBC, or COSY correlation analysis against a candidate SMILES structure.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <ModuleCard
+                accent="teal"
+                eyebrow="2D NMR · Form"
+                title="2D NMR analyze"
+                description="Submit a 2D peak table for HSQC, HMBC, or COSY correlation analysis against a candidate SMILES structure."
+                className="min-w-0"
+              >
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="nmr2d-file">2D peak table file</Label>
                     <Input id="nmr2d-file" ref={nmr2dFileRef} type="file" accept=".csv,.tsv,.txt,.json" />
@@ -1502,8 +1517,8 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   <Button type="button" className="w-full sm:w-auto" disabled={nmr2dLoading} onClick={runNmr2dAnalyze}>
                     {nmr2dLoading ? "Analyzing…" : "Analyze 2D NMR"}
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
               <TabResultSection
                 error={nmr2dError}
                 loading={nmr2dLoading}
@@ -1525,17 +1540,21 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
 
         <TabsContent value="tab-predicted" className="mt-4 space-y-16">
           <section className="space-y-6">
-            <p className="text-sm font-medium text-muted-foreground">1H / 13C evidence match</p>
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-teal)" }}
+            >
+              Spectroscopy · Evidence Match
+            </p>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-              <Card className="min-w-0">
-                <CardHeader>
-                  <CardTitle>1H / 13C evidence match</CardTitle>
-                  <CardDescription>
-                    Match observed NMR chemical shifts against predicted spectra for each candidate structure.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={runNmrEvidence} className="space-y-4">
+              <ModuleCard
+                accent="teal"
+                eyebrow="Predicted · 1H/13C"
+                title="1H / 13C evidence match"
+                description="Match observed NMR chemical shifts against predicted spectra for each candidate structure."
+                className="min-w-0"
+              >
+                <form onSubmit={runNmrEvidence} className="space-y-4">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="inline-flex w-full sm:w-auto">
@@ -1549,8 +1568,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                       </TooltipContent>
                     </Tooltip>
                   </form>
-                </CardContent>
-              </Card>
+              </ModuleCard>
               <TabResultSection
                 error={nmrError}
                 loading={nmrLoading}
@@ -1570,16 +1588,21 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           </section>
 
           <section className="space-y-6">
-            <p className="text-sm font-medium text-muted-foreground">Spectral similarity</p>
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-teal)" }}
+            >
+              Spectroscopy · Similarity
+            </p>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-              <Card className="min-w-0">
-                <CardHeader>
-                  <CardTitle>Spectral similarity</CardTitle>
-                  <CardDescription>
-                    Observed spectra default from shared 1H / 13C text. Optionally add reference spectra or paired 2D files.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <ModuleCard
+                accent="teal"
+                eyebrow="Predicted · Similarity"
+                title="Spectral similarity"
+                description="Observed spectra default from shared 1H / 13C text. Optionally add reference spectra or paired 2D files."
+                className="min-w-0"
+              >
+                <div className="space-y-4">
                   <label className="block space-y-2">
                     <span className="text-sm font-medium">Reference 1H text (optional)</span>
                     <Textarea
@@ -1608,8 +1631,8 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   <Button type="button" className="w-full sm:w-auto" disabled={simLoading} onClick={runSimilarity}>
                     {simLoading ? "Scoring…" : "Score similarity"}
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
               <TabResultSection
                 error={simError}
                 loading={simLoading}
@@ -1629,16 +1652,21 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           </section>
 
           <section className="space-y-6">
-            <p className="text-sm font-medium text-muted-foreground">Candidate prediction / comparison</p>
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-teal)" }}
+            >
+              Spectroscopy · Candidate Compare
+            </p>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-              <Card className="min-w-0">
-                <CardHeader>
-                  <CardTitle>Candidate prediction / comparison</CardTitle>
-                  <CardDescription>
-                    Compare candidates using predicted vs. observed NMR chemical shifts. Accepts optional DEPT/APT data and 2D correlation tables.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <ModuleCard
+                accent="teal"
+                eyebrow="Predicted · Compare"
+                title="Candidate prediction / comparison"
+                description="Compare candidates using predicted vs. observed NMR chemical shifts. Accepts optional DEPT/APT data and 2D correlation tables."
+                className="min-w-0"
+              >
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="cand-dept">Optional DEPT/APT file</Label>
                     <Input id="cand-dept" ref={candDeptRef} type="file" accept=".csv,.tsv,.txt,.json" />
@@ -1658,8 +1686,8 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   <Button type="button" className="w-full sm:w-auto" disabled={candLoading} onClick={runCandidateCompare}>
                     {candLoading ? "Comparing…" : "Compare candidates (evidence)"}
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
               <TabResultSection
                 error={candError}
                 loading={candLoading}
@@ -1725,18 +1753,21 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         </TabsContent>
 
         <TabsContent value="tab-dev-json" className="mt-4 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex flex-wrap items-center gap-2">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Spectroscopy · Developer JSON"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Developer JSON hub
                 <InfoTooltip
                   content="Use this for debugging backend response shape, warnings, and raw evidence data."
                   label="About Developer JSON hub"
                 />
-              </CardTitle>
-              <CardDescription>Latest payloads returned in this browser session (including upload previews).</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </span>
+            }
+            description="Latest payloads returned in this browser session (including upload previews)."
+          >
+            <div className="space-y-6">
               {nmrResult != null && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">1H / 13C evidence</p>
@@ -1788,8 +1819,8 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 Object.keys(devSnapshots).length === 0 && (
                   <p className="text-sm text-muted-foreground">Run an action in any tab to populate JSON snapshots.</p>
                 )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </TabsContent>
       </Tabs>
       </div>

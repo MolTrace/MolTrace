@@ -10,6 +10,8 @@ import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
 import { trackFileUploaded } from "@/src/lib/analytics/analytics-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -60,10 +62,11 @@ const ADDUCT_INFERENCE_ION_MODE_OPTIONS: { value: string; label: string }[] = [
 
 const LC_MS_UPLOAD_ACCEPT = ".mzML,.mzXML,.xml,.csv,.tsv,.txt"
 
-/** Matches SpectraCheck `tabTriggerClass`: outer `TabsTrigger` owns active primary highlight; tooltip wraps label span only. */
+/** Matches SpectraCheck `tabTriggerClass`: outer `TabsTrigger` owns active teal-coded highlight; tooltip wraps label span only. */
 const MS_EVIDENCE_TABS_TRIGGER_CLASS = cn(
   "shrink-0 whitespace-normal text-left text-xs sm:text-sm sm:text-center sm:whitespace-nowrap",
-  "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:font-semibold data-[state=active]:shadow-sm",
+  "font-mono",
+  "data-[state=active]:[background-color:var(--mt-teal)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm",
   "data-[state=inactive]:text-muted-foreground",
 )
 
@@ -248,13 +251,10 @@ function LcmsAdvGroupingDetailTables({ result }: { result: unknown }) {
       )}
 
       {(warnings.length > 0 || notes.length > 0) && (
-        <Card className="min-w-0 border-amber-500/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Warnings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+        <AlertCard variant="warning" title="Warnings">
+          <div className="space-y-2 text-sm">
             {warnings.map((w, i) => (
-              <p key={`w-${i}`} className="text-amber-900 dark:text-amber-100">
+              <p key={`w-${i}`} className="text-foreground">
                 {w}
               </p>
             ))}
@@ -263,8 +263,8 @@ function LcmsAdvGroupingDetailTables({ result }: { result: unknown }) {
                 {n}
               </p>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </AlertCard>
       )}
 
     </div>
@@ -360,18 +360,13 @@ function LcmsAdvConsensusDetailTables({ result }: { result: unknown }) {
       )}
 
       {contradictions.length > 0 && (
-        <Card className="min-w-0 border-amber-500/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Contradictions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
+        <AlertCard variant="error" title="Contradictions">
+          <div className="space-y-1 text-sm">
             {contradictions.map((c, i) => (
-              <p key={`cx-${i}`}>
-                {c}
-              </p>
+              <p key={`cx-${i}`}>{c}</p>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </AlertCard>
       )}
 
       {promoted.length > 0 && (
@@ -524,16 +519,13 @@ function LcmsAdvDereplicationDetailTables({ result }: { result: unknown }) {
       </Card>
 
       {warnings.length > 0 && (
-        <Card className="min-w-0 border-amber-500/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Warnings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
+        <AlertCard variant="warning" title="Warnings">
+          <div className="space-y-1 text-sm">
             {warnings.map((w, i) => (
               <p key={`dw-${i}`}>{w}</p>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </AlertCard>
       )}
     </div>
   )
@@ -574,18 +566,15 @@ function LcmsAdvBridgeDetailTables({ result }: { result: unknown }) {
       </div>
 
       {contradictions.length > 0 && (
-        <Card className="min-w-0 border-amber-500/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Contradictions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+        <AlertCard variant="error" title="Contradictions">
+          <div className="space-y-2 text-sm">
             {contradictions.map((m, i) => (
               <p key={`bc-${i}`} className="font-mono text-xs">
                 {String(m.smiles ?? "")} — {String(m.label ?? "")}
               </p>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </AlertCard>
       )}
 
       {bridgeHash && (
@@ -2487,23 +2476,27 @@ export function SpectraCheckMsEvidence({
 
   return (
     <div className="space-y-4">
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+      <ModuleCard
+        accent="teal"
+        eyebrow="MS · Interpretation"
+        title={
+          <span className="inline-flex items-center gap-2">
             MS evidence interpretation
             <InfoTooltip
               label="MS evidence"
               content="Mass spectrometry evidence modules; all outputs are decision-support and need expert review."
             />
-          </CardTitle>
-          <CardDescription>
+          </span>
+        }
+        description={
+          <>
             Outputs are decision-support only. Labels describe how experimental inputs relate to each row—they may{" "}
             <strong>support</strong> or <strong>contradict</strong> a candidate; ambiguous cases{" "}
             <strong>require review</strong>. Treat strong agreement as <strong>plausible evidence</strong>, not proof of
             identity or connectivity.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+          </>
+        }
+      />
 
       <Tabs defaultValue="hrms-exact" className="w-full min-w-0">
         <div className="min-w-0 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
@@ -2579,20 +2572,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="hrms-exact" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="MS · HRMS"
+              title={
+                <span className="inline-flex items-center gap-2">
                   HRMS exact-mass candidate match
                   <InfoTooltip
                     label="About HRMS candidate match"
                     content="Use high-resolution MS to constrain candidates by exact mass, adduct, ppm error, isotope hints, and DBE/IHD."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Match candidates by high-resolution exact mass, adduct form, ppm error tolerance, isotope pattern, and degree of unsaturation (DBE/IHD).
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Match candidates by high-resolution exact mass, adduct form, ppm error tolerance, isotope pattern, and degree of unsaturation (DBE/IHD)."
+              className="min-w-0"
+            >
                 <form onSubmit={runHrmsMatch} className="space-y-4">
                   <label className="block space-y-2">
                     <FieldLabelTip label="Observed m/z" tip="Monoisotopic or centroid m/z used as the experimental ion mass." />
@@ -2660,8 +2654,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={hrmsMatchError}
@@ -2688,20 +2681,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="formula-search" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="MS · Formula"
+              title={
+                <span className="inline-flex items-center gap-2">
                   Formula search beta
                   <InfoTooltip
                     label="About formula search"
                     content="Search bounded CHNOPSClBr formulas from exact mass. Use this as formula triage, not final identification."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Search candidate molecular formulas from observed exact mass within CHNOPSClBr composition limits. Use as a screening step, not final identification.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Search candidate molecular formulas from observed exact mass within CHNOPSClBr composition limits. Use as a screening step, not final identification."
+              className="min-w-0"
+            >
                 <form onSubmit={runFormulaSearch} className="space-y-4">
                   <label className="block space-y-2">
                     <FieldLabelTip label="Observed m/z" tip="Monoisotopic or centroid m/z used as the experimental ion mass." />
@@ -2745,8 +2739,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={formulaError}
@@ -2771,20 +2764,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="adduct" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="MS · Adduct"
+              title={
+                <span className="inline-flex items-center gap-2">
                   Adduct + isotope pattern inference
                   <InfoTooltip
                     label="About adduct + isotope inference"
                     content="Infer likely adducts, charge state, isotope clusters, carbon-count hints, halogen patterns, and formula candidates from processed MS1/HRMS peaks."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Infer adduct form, charge state, isotope cluster, and halogen signature from MS1 or HRMS peak data.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Infer adduct form, charge state, isotope cluster, and halogen signature from MS1 or HRMS peak data."
+              className="min-w-0"
+            >
                 <form onSubmit={runAdductInfer} className="space-y-4">
                   <label className="block space-y-2">
                     <FieldLabelTip label="Target precursor m/z" tip="Optional lock-on m/z for clustering around a chromatographic precursor." />
@@ -2901,8 +2895,7 @@ export function SpectraCheckMsEvidence({
                     </div>
                   )}
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={adductError}
@@ -2927,20 +2920,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="msms" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="MS · MS/MS"
+              title={
+                <span className="inline-flex items-center gap-2">
                   Processed MS/MS annotation
                   <InfoTooltip
                     label="About processed MS/MS annotation"
                     content="Annotate processed centroid MS/MS peaks using precursor m/z, adduct, candidate structures, fragment matches, and diagnostic neutral losses."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Annotate centroid MS/MS fragments with candidate-specific matches, neutral losses, and diagnostic ion series.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Annotate centroid MS/MS fragments with candidate-specific matches, neutral losses, and diagnostic ion series."
+              className="min-w-0"
+            >
                 <form onSubmit={runMsmsAnnotate} className="space-y-4">
                   <div className="space-y-2">
                     <span className="text-sm font-medium">Session MS/MS file (optional)</span>
@@ -3033,8 +3027,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={msmsError}
@@ -3059,20 +3052,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="frag-tree" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="MS · Fragmentation Tree"
+              title={
+                <span className="inline-flex items-center gap-2">
                   MS/MS fragmentation-tree reasoning
                   <InfoTooltip
                     label="About fragmentation-tree reasoning"
                     content="Build precursor-to-fragment and fragment-to-subfragment relationships using diagnostic neutral losses and candidate-specific plausibility."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Build a precursor-to-fragment tree using diagnostic neutral losses and candidate-specific bond-cleavage plausibility.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Build a precursor-to-fragment tree using diagnostic neutral losses and candidate-specific bond-cleavage plausibility."
+              className="min-w-0"
+            >
                 <form onSubmit={runFragTree} className="space-y-4">
                   <label className="block space-y-2">
                     <FieldLabelTip label="Precursor m/z" tip="Isolation or selected precursor m/z for MS/MS interpretation." />
@@ -3145,8 +3139,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={fragError}
@@ -3171,20 +3164,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-import" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS · Import"
+              title={
+                <span className="inline-flex items-center gap-2">
                   Raw LC-MS/MS mzML + processed peak import bridge
                   <InfoTooltip
                     label="About LC-MS import bridge"
                     content="Import mzML/mzXML or processed LC-MS/MS peak tables, compute source hashes, summarize scans, and extract MS1/MS2 peak lists for downstream analysis."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Import mzML/mzXML or a processed peak table. The file is parsed server-side; scan summaries and MS1/MS2 peak lists are extracted for downstream analysis.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Import mzML/mzXML or a processed peak table. The file is parsed server-side; scan summaries and MS1/MS2 peak lists are extracted for downstream analysis."
+              className="min-w-0"
+            >
                 <form onSubmit={runLcmsImport} className="space-y-4">
                   <div className="space-y-2">
                     <span className="text-sm font-medium">LC-MS/MS file</span>
@@ -3246,7 +3240,7 @@ export function SpectraCheckMsEvidence({
                       Start as job (lcms_import)
                     </Button>
                     {lcmsImportJobErr ? (
-                      <p className="text-sm text-destructive">{lcmsImportJobErr}</p>
+                      <p className="text-sm" style={{ color: "var(--mt-red)" }}>{lcmsImportJobErr}</p>
                     ) : null}
                   </div>
                   {lcmsImportJob.jobId ? (
@@ -3285,8 +3279,7 @@ export function SpectraCheckMsEvidence({
                     </div>
                   )}
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={lcmsImportError}
@@ -3313,20 +3306,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-features" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS · Features"
+              title={
+                <span className="inline-flex items-center gap-2">
                   LC-MS feature detection + EIC/XIC + peak purity
                   <InfoTooltip
                     label="About LC-MS feature detection"
                     content="Detect chromatographic features, extract EIC/XIC traces, estimate peak purity, and link nearby MS/MS scans."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Detect chromatographic features, extract EIC/XIC traces, estimate co-elution purity, and link proximal MS/MS scans.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Detect chromatographic features, extract EIC/XIC traces, estimate co-elution purity, and link proximal MS/MS scans."
+              className="min-w-0"
+            >
                 <form onSubmit={runLcmsFeatureDetect} className="space-y-4">
                   <div className="space-y-2">
                     <span className="text-sm font-medium">LC-MS/MS file</span>
@@ -3419,7 +3413,7 @@ export function SpectraCheckMsEvidence({
                       Start as job (lcms_feature_detection)
                     </Button>
                     {lcmsFeatureJobErr ? (
-                      <p className="text-sm text-destructive">{lcmsFeatureJobErr}</p>
+                      <p className="text-sm" style={{ color: "var(--mt-red)" }}>{lcmsFeatureJobErr}</p>
                     ) : null}
                   </div>
                   {lcmsFeatureJob.jobId ? (
@@ -3431,8 +3425,7 @@ export function SpectraCheckMsEvidence({
                     />
                   ) : null}
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={lcmsFeatureError}
@@ -3459,20 +3452,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-adv-group" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS · Grouping"
+              title={
+                <span className="inline-flex items-center gap-2">
                   Feature grouping + blank subtraction + RT alignment
                   <InfoTooltip
                     label="About LC-MS grouping"
                     content="Group sample, blank, QC, and reference LC-MS features; align retention time; subtract blank/background signals; and flag sample-enriched features."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Group and align features across sample, blank, QC, and reference runs; subtract background signals; flag sample-enriched peaks.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Group and align features across sample, blank, QC, and reference runs; subtract background signals; flag sample-enriched peaks."
+              className="min-w-0"
+            >
                 <form onSubmit={runLcmsAdvGroup} className="space-y-4">
                   <label className="block space-y-2">
                     <span className="text-sm font-medium">Sample peak table</span>
@@ -3553,8 +3547,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={lcmsGrpError}
@@ -3579,20 +3572,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-adv-consensus" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS · Consensus"
+              title={
+                <span className="inline-flex items-center gap-2">
                   LC-MS isotope/adduct consensus + feature-family confidence
                   <InfoTooltip
                     label="About feature-family consensus"
                     content="Score feature families using blank subtraction, peak purity, isotope envelope, adduct consistency, in-source loss, and MS/MS linkage."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Score feature families using blank subtraction, isotope envelope fit, adduct consistency, and MS/MS linkage evidence.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Score feature families using blank subtraction, isotope envelope fit, adduct consistency, and MS/MS linkage evidence."
+              className="min-w-0"
+            >
                 <form onSubmit={runLcmsAdvConsensus} className="space-y-4">
                   {lcmsGrpResult != null && (
                     <Button type="button" variant="outline" size="sm" onClick={fillConsensusTableFromGrouping}>
@@ -3678,8 +3672,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={lcmsConError}
@@ -3704,20 +3697,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-adv-derep" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS · Dereplication"
+              title={
+                <span className="inline-flex items-center gap-2">
                   LC-MS/MS library dereplication + candidate seed retrieval
                   <InfoTooltip
                     label="About LC-MS dereplication"
                     content="Rank supplied local or curated library candidates against precursor m/z, MS/MS similarity, optional RT/CCS, feature-family consensus, and library provenance."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Rank candidates against the spectral library using precursor m/z, MS/MS dot-product similarity, optional RT/CCS, and feature-family provenance. Comment lines (prefixed #) are retained in the audit trail.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Rank candidates against the spectral library using precursor m/z, MS/MS dot-product similarity, optional RT/CCS, and feature-family provenance. Comment lines (prefixed #) are retained in the audit trail."
+              className="min-w-0"
+            >
                 <form onSubmit={runLcmsAdvDereplication} className="space-y-4">
                   <label className="block space-y-2">
                     <span className="text-sm font-medium">Precursor m/z (optional, audit comment)</span>
@@ -3831,8 +3825,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={lcmsDerError}
@@ -3857,20 +3850,21 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-adv-bridge" className="mt-4 space-y-6">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <Card className="min-w-0">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS · Bridge"
+              title={
+                <span className="inline-flex items-center gap-2">
                   LC-MS consensus → unified confidence bridge
                   <InfoTooltip
                     label="About LC-MS consensus bridge"
                     content="Connect promoted LC-MS feature families to candidate confidence when theoretical adduct m/z matches a non-conflicting feature-family anchor."
                   />
-                </CardTitle>
-                <CardDescription>
-                  Link promoted LC-MS feature families to candidate confidence scoring when theoretical adduct masses match a consensus anchor. Run LC-MS consensus above to populate automatically.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </span>
+              }
+              description="Link promoted LC-MS feature families to candidate confidence scoring when theoretical adduct masses match a consensus anchor. Run LC-MS consensus above to populate automatically."
+              className="min-w-0"
+            >
                 <form onSubmit={runLcmsAdvBridge} className="space-y-4">
                   <label className="block space-y-2">
                     <span className="text-sm font-medium">Candidate structures</span>
@@ -3952,8 +3946,7 @@ export function SpectraCheckMsEvidence({
                     </TooltipContent>
                   </Tooltip>
                 </form>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <div className="min-w-0 space-y-6">
               <TabResultSection
                 error={lcmsBridgeError}

@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -24,13 +26,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  AlertTriangle,
   BookMarked,
   ClipboardCheck,
   Download,
   FileOutput,
   Globe,
-  Gavel,
   Lock,
   Shield,
   UserRound,
@@ -138,21 +138,15 @@ export function RegulatoryHubWorkspace() {
     <div className="mx-auto max-w-[1200px] space-y-8 pb-12">
       <header className="space-y-4 border-b pb-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="font-mono text-xs">
-                Regulatory Hub
-              </Badge>
-              <Badge
-                variant="secondary"
-                className="gap-1 border-dashed border-warning/60 bg-warning/10 text-warning-foreground"
-              >
-                <AlertTriangle className="h-3 w-3" />
-                Demo data — not linked to eCTD / vault
-              </Badge>
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight">Submission readiness workspace</h1>
-            <p className="max-w-3xl text-muted-foreground">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-cyan)" }}
+            >
+              MolTrace · Regulatory Hub
+            </p>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Submission readiness workspace</h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
               Track dossier context, jurisdictional assumptions, and evidence-backed requirements. AI-assisted text is
               shown only with explicit citations and human review states — never as final regulatory guidance in this
               shell.
@@ -164,147 +158,135 @@ export function RegulatoryHubWorkspace() {
           </Button>
         </div>
 
-        <Card className="border-primary/30 bg-primary/[0.04]">
-          <CardContent className="flex flex-wrap gap-3 py-4 text-sm leading-relaxed">
-            <Shield className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
-            <div className="min-w-0 space-y-1">
-              <p className="font-medium text-foreground">Citation &amp; review policy (UI shell)</p>
-              <p className="text-muted-foreground">
-                Any regulatory-style or AI-generated excerpt must display source placeholders or document IDs. Outputs
-                carry a <strong>human review state</strong> (e.g. pending, needs sources).{" "}
-                <span className="text-foreground">
-                  Uncited text cannot be presented here as final or regulator-ready guidance.
-                </span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <AlertCard
+          variant="warning"
+          title="Demo data"
+          description="Workspace is not linked to eCTD or vault. Values shown are illustrative and do not reflect real submission state."
+        />
+
+        <AlertCard
+          variant="info"
+          title="Citation & review policy"
+          description={
+            <>
+              Any regulatory-style or AI-generated excerpt must display source placeholders or document IDs. Outputs
+              carry a <strong className="text-foreground">human review state</strong> (e.g. pending, needs sources).{" "}
+              <span className="text-foreground">
+                Uncited text cannot be presented here as final or regulator-ready guidance.
+              </span>
+            </>
+          }
+        />
       </header>
 
       {/* Project / compound dossier */}
       <section aria-labelledby="dossier-heading">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <BookMarked className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <CardTitle id="dossier-heading" className="text-lg">
-                Project / compound dossier
-              </CardTitle>
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Regulatory · Dossier"
+          title={<span id="dossier-heading">Project / compound dossier</span>}
+          icon={BookMarked}
+          description="High-level identifiers — demo snapshot for layout only."
+        >
+          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-md border bg-muted/30 px-4 py-3">
+              <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Project</dt>
+              <dd className="mt-1 font-mono text-sm font-semibold">{DEMO_DOSSIER.project}</dd>
             </div>
-            <CardDescription>High-level identifiers — demo snapshot for layout only.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="rounded-md border bg-muted/30 px-4 py-3">
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Project</dt>
-                <dd className="mt-1 font-mono text-sm font-semibold">{DEMO_DOSSIER.project}</dd>
-              </div>
-              <div className="rounded-md border bg-muted/30 px-4 py-3">
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Compound</dt>
-                <dd className="mt-1 font-mono text-sm font-semibold">{DEMO_DOSSIER.compound}</dd>
-              </div>
-              <div className="rounded-md border bg-muted/30 px-4 py-3">
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Salt / form</dt>
-                <dd className="mt-1 text-sm">{DEMO_DOSSIER.salt_form}</dd>
-              </div>
-              <div className="rounded-md border bg-muted/30 px-4 py-3 sm:col-span-2 lg:col-span-2">
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Stage</dt>
-                <dd className="mt-1 text-sm">{DEMO_DOSSIER.development_stage}</dd>
-              </div>
-              <div className="rounded-md border bg-muted/30 px-4 py-3">
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Dossier version</dt>
-                <dd className="mt-1 font-mono text-sm">{DEMO_DOSSIER.dossier_version}</dd>
-              </div>
-              <div className="rounded-md border bg-muted/30 px-4 py-3">
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Snapshot date</dt>
-                <dd className="mt-1 font-mono text-sm">{DEMO_DOSSIER.last_updated}</dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
+            <div className="rounded-md border bg-muted/30 px-4 py-3">
+              <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Compound</dt>
+              <dd className="mt-1 font-mono text-sm font-semibold">{DEMO_DOSSIER.compound}</dd>
+            </div>
+            <div className="rounded-md border bg-muted/30 px-4 py-3">
+              <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Salt / form</dt>
+              <dd className="mt-1 text-sm">{DEMO_DOSSIER.salt_form}</dd>
+            </div>
+            <div className="rounded-md border bg-muted/30 px-4 py-3 sm:col-span-2 lg:col-span-2">
+              <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Stage</dt>
+              <dd className="mt-1 text-sm">{DEMO_DOSSIER.development_stage}</dd>
+            </div>
+            <div className="rounded-md border bg-muted/30 px-4 py-3">
+              <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Dossier version</dt>
+              <dd className="mt-1 font-mono text-sm">{DEMO_DOSSIER.dossier_version}</dd>
+            </div>
+            <div className="rounded-md border bg-muted/30 px-4 py-3">
+              <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Snapshot date</dt>
+              <dd className="mt-1 font-mono text-sm">{DEMO_DOSSIER.last_updated}</dd>
+            </div>
+          </dl>
+        </ModuleCard>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Jurisdiction */}
         <section className="lg:col-span-1" aria-labelledby="jurisdiction-heading">
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-muted-foreground" aria-hidden />
-                <CardTitle id="jurisdiction-heading" className="text-base">
-                  Jurisdiction
-                </CardTitle>
-              </div>
-              <CardDescription>Select target regulator context (demo — does not change backend rules).</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Label htmlFor="jurisdiction-select" className="text-xs text-muted-foreground">
-                Active jurisdiction (placeholder)
-              </Label>
-              <Select value={jurisdiction} onValueChange={setJurisdiction}>
-                <SelectTrigger id="jurisdiction-select" className="w-full">
-                  <SelectValue placeholder="Choose region" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DEMO_JURISDICTIONS.map((j) => (
-                    <SelectItem key={j.id} value={j.id}>
-                      {j.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {DEMO_JURISDICTIONS.find((j) => j.id === jurisdiction)?.hint}
-              </p>
-            </CardContent>
-          </Card>
+          <ModuleCard
+            accent="cyan"
+            eyebrow="Regulatory · Jurisdiction"
+            title={<span id="jurisdiction-heading">Jurisdiction</span>}
+            icon={Globe}
+            description="Select target regulator context (demo — does not change backend rules)."
+            className="h-full"
+          >
+            <Label htmlFor="jurisdiction-select" className="text-xs text-muted-foreground">
+              Active jurisdiction (placeholder)
+            </Label>
+            <Select value={jurisdiction} onValueChange={setJurisdiction}>
+              <SelectTrigger id="jurisdiction-select" className="w-full">
+                <SelectValue placeholder="Choose region" />
+              </SelectTrigger>
+              <SelectContent>
+                {DEMO_JURISDICTIONS.map((j) => (
+                  <SelectItem key={j.id} value={j.id}>
+                    {j.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {DEMO_JURISDICTIONS.find((j) => j.id === jurisdiction)?.hint}
+            </p>
+          </ModuleCard>
         </section>
 
         {/* Risk status */}
-        <section className="lg:col-span-2" aria-labelledby="risk-heading">
-          <Card className="h-full border-warning/40">
-            <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Gavel className="h-5 w-5 text-warning" aria-hidden />
-                <CardTitle id="risk-heading" className="text-base">
-                  Risk status
-                </CardTitle>
-                <Badge variant="outline" className="border-warning/60 bg-warning/10 text-warning-foreground">
-                  Demo assessment
-                </Badge>
-              </div>
-              <CardDescription>Illustrative readiness gaps — not a formal risk register.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm font-medium">{DEMO_RISK.summary}</span>
+        <section
+          className="lg:col-span-2"
+          aria-labelledby="risk-heading"
+          id="risk-heading-section"
+        >
+          <AlertCard
+            variant="warning"
+            title="Risk status · Demo assessment"
+            description={
+              <span className="flex flex-wrap items-center gap-3">
+                <span className="font-medium text-foreground">{DEMO_RISK.summary}</span>
                 <Badge variant="secondary">Level: {DEMO_RISK.level}</Badge>
-              </div>
-              <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
-                {DEMO_RISK.drivers.map((d) => (
-                  <li key={d}>{d}</li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+              </span>
+            }
+          >
+            <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Illustrative readiness gaps
+            </p>
+            <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
+              {DEMO_RISK.drivers.map((d) => (
+                <li key={d}>{d}</li>
+              ))}
+            </ul>
+          </AlertCard>
         </section>
       </div>
 
       {/* Requirement checklist */}
       <section aria-labelledby="requirements-heading">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <CardTitle id="requirements-heading" className="text-lg">
-                Requirement checklist
-              </CardTitle>
-            </div>
-            <CardDescription>
-              Framework-aligned items with linked evidence handles (demo). Checkboxes are visual only in this shell.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Regulatory · Requirements"
+          title={<span id="requirements-heading">Requirement checklist</span>}
+          icon={ClipboardCheck}
+          description="Framework-aligned items with linked evidence handles (demo). Checkboxes are visual only in this shell."
+        >
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -344,15 +326,15 @@ export function RegulatoryHubWorkspace() {
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
 
       {/* Cited evidence cards (AI excerpts with mandatory citations + review state) */}
       <section aria-labelledby="evidence-ai-heading" className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 id="evidence-ai-heading" className="text-lg font-semibold tracking-tight">
+            <h2 id="evidence-ai-heading" className="font-mono text-lg font-bold tracking-tight">
               Regulatory AI excerpts (citation-required)
             </h2>
             <p className="text-sm text-muted-foreground">
@@ -409,70 +391,56 @@ export function RegulatoryHubWorkspace() {
 
       {/* Reviewer notes */}
       <section aria-labelledby="notes-heading">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <CardTitle id="notes-heading" className="text-lg">
-                Reviewer notes
-              </CardTitle>
-            </div>
-            <CardDescription>
-              Local-only draft — no sync. Replace with authenticated review service when API exists.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Textarea
-              value={reviewerNotes}
-              onChange={(e) => setReviewerNotes(e.target.value)}
-              rows={5}
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">
-              Typed content is browser-local for demo purposes and will not persist after refresh.
-            </p>
-          </CardContent>
-        </Card>
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Regulatory · Notes"
+          title={<span id="notes-heading">Reviewer notes</span>}
+          icon={UserRound}
+          description="Local-only draft — no sync. Replace with authenticated review service when API exists."
+        >
+          <Textarea
+            value={reviewerNotes}
+            onChange={(e) => setReviewerNotes(e.target.value)}
+            rows={5}
+            className="font-mono text-sm"
+          />
+          <p className="text-xs text-muted-foreground">
+            Typed content is browser-local for demo purposes and will not persist after refresh.
+          </p>
+        </ModuleCard>
       </section>
 
       {/* Report export controls */}
       <section aria-labelledby="export-heading">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <FileOutput className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <CardTitle id="export-heading" className="text-lg">
-                Report export controls
-              </CardTitle>
-            </div>
-            <CardDescription>
-              Bundling requires validated artefacts and reviewer workflow — controls remain disabled without backend.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-3">
-              <Button disabled className="gap-2">
-                <Download className="h-4 w-4" />
-                Export briefing (PDF)
-              </Button>
-              <Button variant="outline" disabled className="gap-2">
-                <Download className="h-4 w-4" />
-                Export evidence index (JSON)
-              </Button>
-              <Button variant="outline" disabled className="gap-2">
-                <Download className="h-4 w-4" />
-                eCTD stub (disabled)
-              </Button>
-            </div>
-            <Separator />
-            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <Checkbox id="export-gate" disabled />
-              <Label htmlFor="export-gate" className="font-normal leading-snug">
-                I confirm cited sources are attached and human review is complete (demo checkbox — non-functional).
-              </Label>
-            </div>
-          </CardContent>
-        </Card>
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Regulatory · Export"
+          title={<span id="export-heading">Report export controls</span>}
+          icon={FileOutput}
+          description="Bundling requires validated artefacts and reviewer workflow — controls remain disabled without backend."
+        >
+          <div className="flex flex-wrap gap-3">
+            <Button disabled className="gap-2">
+              <Download className="h-4 w-4" />
+              Export briefing (PDF)
+            </Button>
+            <Button variant="outline" disabled className="gap-2">
+              <Download className="h-4 w-4" />
+              Export evidence index (JSON)
+            </Button>
+            <Button variant="outline" disabled className="gap-2">
+              <Download className="h-4 w-4" />
+              eCTD stub (disabled)
+            </Button>
+          </div>
+          <Separator />
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <Checkbox id="export-gate" disabled />
+            <Label htmlFor="export-gate" className="font-normal leading-snug">
+              I confirm cited sources are attached and human review is complete (demo checkbox — non-functional).
+            </Label>
+          </div>
+        </ModuleCard>
       </section>
 
       <Card className="border-dashed bg-muted/30">

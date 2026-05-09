@@ -6,6 +6,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -515,14 +517,13 @@ export function WorkflowRunLauncher({
   const noTemplate = selectedTemplate == null
 
   return (
-    <Card className="min-w-0 border-muted">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Workflow Run Launcher</CardTitle>
-        <CardDescription>
-          Create a workflow run, then start it manually. Runs are never started automatically.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <ModuleCard
+      accent="teal"
+      eyebrow="Workflow · Launcher"
+      title="Workflow Run Launcher"
+      description="Create a workflow run, then start it manually. Runs are never started automatically."
+      className="min-w-0"
+    >
         {noTemplate ? (
           <p className="text-sm text-muted-foreground">Select a workflow template above to configure inputs.</p>
         ) : (
@@ -550,19 +551,15 @@ export function WorkflowRunLauncher({
         )}
 
         {error ? (
-          <Alert variant="destructive">
-            <AlertTitle className="text-sm">Request failed</AlertTitle>
-            <AlertDescription className="text-xs">{error}</AlertDescription>
-          </Alert>
+          <AlertCard variant="error" title="Request failed" description={error} />
         ) : null}
 
         {phase === "started" && !error ? (
-          <Alert className="border-emerald-600/40 bg-emerald-50/50 dark:bg-emerald-950/20">
-            <AlertTitle className="text-sm">Workflow started</AlertTitle>
-            <AlertDescription className="text-xs text-muted-foreground">
-              Start request completed. Monitor jobs from Recent analysis jobs on the Overview tab when available.
-            </AlertDescription>
-          </Alert>
+          <AlertCard
+            variant="success"
+            title="Workflow started"
+            description="Start request completed. Monitor jobs from Recent analysis jobs on the Overview tab when available."
+          />
         ) : null}
 
         {createResponse != null && workflowRunId ? (
@@ -593,20 +590,20 @@ export function WorkflowRunLauncher({
             workflowTemplateSlug={selectedTemplate?.templateSlug ?? null}
           />
         ) : null}
-      </CardContent>
-      <CardFooter className="flex flex-wrap gap-2 border-t pt-4">
-        <Button type="button" disabled={noTemplate || createBusy} onClick={() => void handleCreateRun()}>
-          {createBusy ? "Creating…" : "Create Workflow Run"}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={!workflowRunId || startBusy || phase === "started"}
-          onClick={() => void handleStartRun()}
-        >
-          {startBusy ? "Starting…" : "Start Workflow"}
-        </Button>
-      </CardFooter>
-    </Card>
+
+        <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+          <Button type="button" disabled={noTemplate || createBusy} onClick={() => void handleCreateRun()}>
+            {createBusy ? "Creating…" : "Create Workflow Run"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!workflowRunId || startBusy || phase === "started"}
+            onClick={() => void handleStartRun()}
+          >
+            {startBusy ? "Starting…" : "Start Workflow"}
+          </Button>
+        </div>
+    </ModuleCard>
   )
 }

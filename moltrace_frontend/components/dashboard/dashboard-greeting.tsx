@@ -23,17 +23,26 @@ function nameFromEmail(email: string | null): string | null {
 type DashboardGreetingProps = {
   email: string | null
   tenantName?: string | null
+  eyebrow?: string
 }
 
-export function DashboardGreeting({ email, tenantName }: DashboardGreetingProps) {
+export function DashboardGreeting({ email, tenantName, eyebrow }: DashboardGreetingProps) {
   const greeting = timeOfDayGreeting(new Date())
   const name = nameFromEmail(email)
   const headline = name ? `${greeting}, ${name}` : greeting
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">{headline}</h1>
-      <p className="text-muted-foreground">
+    <div className="space-y-1">
+      {eyebrow ? (
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-teal)" }}
+        >
+          {eyebrow}
+        </p>
+      ) : null}
+      <h1 className="font-mono text-2xl font-bold tracking-tight">{headline}</h1>
+      <p className="text-sm text-muted-foreground">
         {tenantName
           ? `Here's what's happening across ${tenantName} today.`
           : "Here's what's happening across your workflows today."}

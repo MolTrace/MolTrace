@@ -18,9 +18,24 @@ export function ProgramsInterfaceWorkspace({
   return (
     <Tabs defaultValue="spectracheck" className="space-y-6">
       <TabsList>
-        <TabsTrigger value="spectracheck">SpectraCheck</TabsTrigger>
-        <TabsTrigger value="regulatory_hub">Regulatory Hub</TabsTrigger>
-        <TabsTrigger value="reaction_optimization">Reaction Optimization</TabsTrigger>
+        <TabsTrigger
+          value="spectracheck"
+          className="font-mono data-[state=active]:[background-color:var(--mt-teal)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+        >
+          SpectraCheck
+        </TabsTrigger>
+        <TabsTrigger
+          value="regulatory_hub"
+          className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+        >
+          Regulatory Hub
+        </TabsTrigger>
+        <TabsTrigger
+          value="reaction_optimization"
+          className="font-mono data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#EBF4F8] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+        >
+          Reaction Optimization
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="spectracheck" className="space-y-6">

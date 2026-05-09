@@ -6,6 +6,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import {
   Dialog,
   DialogContent,
@@ -222,32 +224,33 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
 
   return (
     <div className="space-y-4">
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Workflow · Templates"
+        title={
+          <span className="inline-flex items-center gap-2">
             Workflow Template Gallery
             <InfoTooltip content={GALLERY_TOOLTIP} label="About workflow templates" />
-          </CardTitle>
-          <CardDescription>
+          </span>
+        }
+        description={
+          <>
             Browse predefined analysis workflows. Select one, then configure and create a run in the{" "}
             <span className="font-medium text-foreground">Workflow Run Launcher</span> below.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+          </>
+        }
+      />
 
       {load.status === "loading" ? (
         <p className="text-sm text-muted-foreground">Loading workflow templates…</p>
       ) : null}
 
       {load.status === "error" ? (
-        <Alert className="border-muted bg-muted/40">
-          <AlertTitle className="text-sm">Workflow templates unavailable</AlertTitle>
-          <AlertDescription className="text-xs text-muted-foreground">
-            Workflow templates couldn&apos;t load ({load.message}). Check that the analysis service is
-            running and reachable through your proxy. No template data is shown below to avoid
-            misleading placeholders.
-          </AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="warning"
+          title="Workflow templates unavailable"
+          description={`Workflow templates couldn't load (${load.message}). Check that the analysis service is running and reachable through your proxy. No template data is shown below to avoid misleading placeholders.`}
+        />
       ) : null}
 
       {load.status === "ok" && load.templates.length === 0 ? (

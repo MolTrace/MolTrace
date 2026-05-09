@@ -50,6 +50,8 @@ import { ReportCompoundProvenanceDialog } from "@/components/reports/report-comp
 import { ReportsRegulatoryComplianceSection } from "@/components/reports/reports-regulatory-compliance-section"
 import { ReportsValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
 import { KpiCard } from "@/components/dashboard/kpi-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { AlertCard } from "@/components/dashboard/alert-card"
 import { StatusFilterPills } from "@/components/dashboard/status-filter-pills"
 
 const DEMO_STAT_CARDS = { ready: 12, generating: 3, month: 47 } as const
@@ -103,21 +105,33 @@ function bucketBadge(bucket: ReportFilterBucket) {
   switch (bucket) {
     case "approved":
       return (
-        <Badge variant="outline" className="gap-1 border-success/50 text-success">
+        <Badge
+          variant="outline"
+          className="gap-1"
+          style={{ borderColor: "var(--mt-green)", color: "var(--mt-green)" }}
+        >
           <CheckCircle2 className="h-3 w-3" />
           Release gate
         </Badge>
       )
     case "review_required":
       return (
-        <Badge variant="outline" className="gap-1 border-accent/50 text-accent">
+        <Badge
+          variant="outline"
+          className="gap-1"
+          style={{ borderColor: "var(--mt-amber)", color: "var(--mt-amber)" }}
+        >
           <Clock className="h-3 w-3" />
           Review required
         </Badge>
       )
     case "blocked":
       return (
-        <Badge variant="outline" className="gap-1 border-warning/50 text-warning">
+        <Badge
+          variant="outline"
+          className="gap-1"
+          style={{ borderColor: "var(--mt-amber)", color: "var(--mt-amber)" }}
+        >
           <AlertTriangle className="h-3 w-3" />
           Blocked
         </Badge>
@@ -255,14 +269,17 @@ export default function SavedReportsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Reports
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Reports</h1>
+          <p className="text-sm text-muted-foreground">
             Reports generated from your SpectraCheck sessions.
           </p>
-          {loadError ? (
-            <p className="mt-1 text-xs text-destructive">{loadError}</p>
-          ) : null}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="gap-2" disabled>
@@ -272,10 +289,15 @@ export default function SavedReportsWorkspace() {
         </div>
       </div>
 
+      {loadError ? (
+        <AlertCard variant="error" title="Reports failed to load" description={loadError} />
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <KpiCard
           title="Ready for Export"
           icon={CheckCircle2}
+          accent="cyan"
           severity={stats && stats.ready > 0 ? "success" : "neutral"}
           value={stats ? stats.ready : DEMO_STAT_CARDS.ready}
           sub={
@@ -289,6 +311,7 @@ export default function SavedReportsWorkspace() {
         <KpiCard
           title="Generating"
           icon={Clock}
+          accent="cyan"
           severity={stats && stats.generating > 0 ? "warning" : "neutral"}
           value={stats ? stats.generating : DEMO_STAT_CARDS.generating}
           sub={
@@ -300,6 +323,7 @@ export default function SavedReportsWorkspace() {
         <KpiCard
           title="This Month"
           icon={FileText}
+          accent="cyan"
           value={stats ? stats.total : DEMO_STAT_CARDS.month}
           sub={
             <p className="text-xs text-muted-foreground">
@@ -311,12 +335,12 @@ export default function SavedReportsWorkspace() {
 
       <ReportsValidationReadinessCard />
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Saved reports</CardTitle>
-            <CardDescription>Filter reports by their gate status.</CardDescription>
-          </div>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Reports · Saved"
+        title="Saved reports"
+        description="Filter reports by their gate status."
+      >
           <StatusFilterPills
             label="Filter reports by status"
             value={filter}
@@ -329,8 +353,6 @@ export default function SavedReportsWorkspace() {
               { value: "blocked", label: "Blocked", count: filterCounts.blocked },
             ]}
           />
-        </CardHeader>
-        <CardContent>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading sessions and reports…</p>
           ) : null}
@@ -504,8 +526,7 @@ export default function SavedReportsWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+      </ModuleCard>
 
       <ReportsRegulatoryComplianceSection live={showLiveTable} reportRows={rows} />
 

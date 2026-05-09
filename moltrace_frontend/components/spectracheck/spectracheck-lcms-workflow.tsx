@@ -9,6 +9,8 @@ import { LcmsWorkflowMetrics } from "@/components/spectracheck/spectracheck-lcms
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
@@ -482,32 +484,24 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
     const lines = w.filter((x): x is string => typeof x === "string")
     if (lines.length === 0) return null
     return (
-      <Card className="border-warning/40">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Warnings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="list-inside list-disc space-y-1 text-sm">
-            {lines.slice(0, 12).map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      <AlertCard variant="warning" title="Warnings">
+        <ul className="list-inside list-disc space-y-1 text-sm">
+          {lines.slice(0, 12).map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </AlertCard>
     )
   }
 
   return (
     <div className="space-y-4">
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">LC-MS workflow</CardTitle>
-          <CardDescription>
-            Progressive LC-MS processing: run steps in order when possible—later steps can reuse outputs from earlier
-            steps. Treat outputs as decision-support; confirm with experimental context.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Spectroscopy · LC-MS Workflow"
+        title="LC-MS workflow"
+        description="Progressive LC-MS processing: run steps in order when possible—later steps can reuse outputs from earlier steps. Treat outputs as decision-support; confirm with experimental context."
+      />
 
       <div className="flex flex-wrap gap-2">
         {STEPS.map((s, i) => (
@@ -543,21 +537,21 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
         </CollapsibleContent>
       </Collapsible>
 
-      <Card className="min-w-0 border-primary/20 shadow-sm">
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-xl">{current.title}</CardTitle>
-              <CardDescription className="mt-1">{current.endpoint}</CardDescription>
-            </div>
-            <Badge variant="outline" className="shrink-0">
-              Step {stepIndex + 1} / {STEPS.length}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <ModuleCard
+        accent="teal"
+        eyebrow={`LC-MS · Step ${stepIndex + 1}`}
+        title={current.title}
+        description={current.endpoint}
+        badge={
+          <Badge variant="outline" className="shrink-0">
+            Step {stepIndex + 1} / {STEPS.length}
+          </Badge>
+        }
+        className="min-w-0"
+      >
+        <div className="space-y-6">
           {activeErr && (
-            <div className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm text-warning">{activeErr}</div>
+            <AlertCard variant="error" title="Step failed" description={activeErr} />
           )}
 
           {current.key === "import" && (
@@ -731,11 +725,17 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
                 uploads.
               </p>
               {groupResult && isRecord(groupResult) && typeof groupResult.feature_table_text === "string" && groupResult.feature_table_text.trim() ? (
-                <div className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm">
+                <div
+                  className="rounded-md border px-3 py-2 text-sm"
+                  style={{ borderColor: "var(--mt-green)", background: "var(--mt-green-soft)" }}
+                >
                   Feature table from step 3 will be sent ({groupResult.feature_table_text.length} chars).
                 </div>
               ) : (
-                <div className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm">
+                <div
+                  className="rounded-md border px-3 py-2 text-sm"
+                  style={{ borderColor: "var(--mt-amber)", background: "var(--mt-amber-soft)" }}
+                >
                   Run step 3 first or upload a feature table / sample below.
                 </div>
               )}
@@ -870,8 +870,8 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
           ) : !activeBusy ? (
             <p className="text-sm text-muted-foreground">Run this step to see metrics and developer JSON.</p>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }
