@@ -842,6 +842,11 @@ DATA_MODE_HEADER = "X-MolTrace-Data-Mode"
 GENERATED_AT_HEADER = "X-MolTrace-Generated-At"
 UNAVAILABLE_WARNING = "Service temporarily unavailable"
 INTERNAL_ERROR_DETAIL = "Internal server error."
+PUBLIC_AUTH_REQUIRED_DETAIL = (
+    "Sign in to continue. If you already signed in, your session may have expired."
+)
+PUBLIC_ACCESS_DENIED_DETAIL = "You do not have access to perform this action."
+PUBLIC_REQUEST_FAILED_DETAIL = "Request could not be completed. Please try again."
 
 _ERROR_SECRET_KEY_RE = re.compile(
     r"(api[_-]?key|access[_-]?token|refresh[_-]?token|bearer|password|passwd|secret|credential|private[_-]?key|service[_-]?account)",
@@ -862,6 +867,15 @@ _ERROR_PATH_RE = re.compile(
     r"(?:/[A-Za-z0-9._ -]+)+)|[A-Za-z]:\\[^\s'\"<>]+)"
 )
 _ERROR_STACK_RE = re.compile(r"(?i)(traceback \(most recent call last\)|\n\s*file \"[^\"]+\")")
+_ERROR_INTERNAL_DETAIL_RE = re.compile(
+    r"(?i)(backend\s+requires\s+authentication|for\s+local\s+development|"
+    r"disable\s+backend\s+auth|disable_auth|disable_backend_auth|todo:|"
+    r"authorization\s*:\s*bearer|bearer\s*<\s*token\s*>|bearer\s+token|"
+    r"x-api-key|api[_\s-]?key|raw\s+prompt|system\s+prompt|developer\s+prompt|"
+    r"chain[_\s-]?of[_\s-]?thought|\bcot\b|reasoning[_\s-]?trace|"
+    r"credential\s*[:=]|secret\s*[:=]|password\s*[:=]|"
+    r"private[_\s-]?key|service[_\s-]?account)"
+)
 
 
 @dataclass(frozen=True)
@@ -1720,12 +1734,12 @@ async def get_optional_access_context(
     if x_api_key is not None:
         if state.api_key and hmac.compare_digest(x_api_key, state.api_key):
             return AccessContext(system_api_key=True)
-        raise HTTPException(status_code=401, detail="Invalid API key.")
+        raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
     token_value = bearer_token or access_token
     if token_value:
         user = get_user_by_token(state.session_factory, token_value)
         if user is None:
-            raise HTTPException(status_code=401, detail="Invalid or expired bearer token.")
+            raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
         return AccessContext(user=user, raw_token=token_value)
     return None
 
@@ -1734,7 +1748,7 @@ async def require_access_context(
     context: AccessContext | None = Depends(get_optional_access_context),
 ) -> AccessContext:
     if context is None:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+        raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
     return context
 
 
@@ -1742,9 +1756,7 @@ async def require_authenticated_user(
     context: AccessContext = Depends(require_access_context),
 ) -> UserPublic:
     if context.user is None:
-        raise HTTPException(
-            status_code=403, detail="A user bearer token is required for this endpoint."
-        )
+        raise HTTPException(status_code=403, detail=PUBLIC_ACCESS_DENIED_DETAIL)
     return context.user
 
 
@@ -1998,10 +2010,7 @@ def _ai_actor(context: AccessContext) -> ai_store.AIInferenceActor:
 
 def _ai_evidence_actor(context: AccessContext) -> ai_evidence_store.AIEvidenceActor:
     if context.user is None:
-        raise HTTPException(
-            status_code=403,
-            detail="A user bearer token is required to review AI evidence.",
-        )
+        raise HTTPException(status_code=403, detail=PUBLIC_ACCESS_DENIED_DETAIL)
     return ai_evidence_store.AIEvidenceActor(
         user_id=context.user.id,
         email=context.user.email,
@@ -2129,6 +2138,8 @@ def _redact_public_error_text(value: str) -> str:
     text = str(value)
     if _ERROR_STACK_RE.search(text):
         return INTERNAL_ERROR_DETAIL
+    if _ERROR_INTERNAL_DETAIL_RE.search(text):
+        return PUBLIC_REQUEST_FAILED_DETAIL
     text = _ERROR_SIGNED_URL_RE.sub("[redacted signed URL]", text)
     text = _ERROR_DB_URL_RE.sub("[redacted database URL]", text)
     text = _ERROR_BEARER_RE.sub("Bearer [redacted]", text)
@@ -2156,6 +2167,14 @@ def _sanitize_public_error_detail(value: Any) -> Any:
                 sanitized[key_str] = _sanitize_public_error_detail(item)
         return sanitized
     return _redact_public_error_text(str(value))
+
+
+def _safe_http_exception_detail(status_code: int, detail: Any) -> Any:
+    if status_code == status.HTTP_401_UNAUTHORIZED:
+        return PUBLIC_AUTH_REQUIRED_DETAIL
+    if status_code == status.HTTP_403_FORBIDDEN:
+        return PUBLIC_ACCESS_DENIED_DETAIL
+    return _sanitize_public_error_detail(detail)
 
 
 def _safe_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]:
@@ -2267,7 +2286,7 @@ async def require_admin(
     if context.system_api_key:
         return context
     if context.user is None or not context.user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required.")
+        raise HTTPException(status_code=403, detail=PUBLIC_ACCESS_DENIED_DETAIL)
     return context
 
 
@@ -20419,9 +20438,7 @@ def _audit_events_for_context(
     entity_id_value = entity_id if isinstance(entity_id, int) else None
     if not context.system_api_key and not (context.user and context.user.is_admin):
         if entity_type_value != "analysis" or entity_id_value is None:
-            raise HTTPException(
-                status_code=403, detail="Admin access required for unscoped audit events."
-            )
+            raise HTTPException(status_code=403, detail=PUBLIC_ACCESS_DENIED_DETAIL)
         if (
             get_analysis_by_id(
                 state.session_factory, analysis_id=entity_id_value, user_id=context.user_id
@@ -23508,7 +23525,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content = _stable_unavailable_payload(request)
             status_code = exc.status_code
         else:
-            content = {"detail": _sanitize_public_error_detail(exc.detail)}
+            content = {"detail": _safe_http_exception_detail(exc.status_code, exc.detail)}
             status_code = exc.status_code
         return JSONResponse(
             status_code=status_code,
