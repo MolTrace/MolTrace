@@ -74,7 +74,7 @@ describe("landing page auth forms", () => {
   it("shows a credential-focused message when sign-in fails", async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse(
-        { detail: "Sign in to continue. If you already signed in, your session may have expired." },
+        { detail: "Sign in to access live MolTrace data." },
         { status: 401, statusText: "Unauthorized" }
       )
     )

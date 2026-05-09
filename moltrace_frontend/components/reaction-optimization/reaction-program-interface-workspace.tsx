@@ -13,8 +13,18 @@ export function ReactionProgramInterfaceWorkspace() {
   return (
     <Tabs defaultValue={defaultTab} className="space-y-4">
       <TabsList>
-        <TabsTrigger value="reaction-overview">Reaction Optimization</TabsTrigger>
-        <TabsTrigger value="reaction-studio">Reaction Studio (program-level)</TabsTrigger>
+        <TabsTrigger
+          value="reaction-overview"
+          className="font-mono data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#EBF4F8] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+        >
+          Reaction Optimization
+        </TabsTrigger>
+        <TabsTrigger
+          value="reaction-studio"
+          className="font-mono data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#EBF4F8] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+        >
+          Reaction Studio (program-level)
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="reaction-overview">
         <ReactionOptimizationLanding />

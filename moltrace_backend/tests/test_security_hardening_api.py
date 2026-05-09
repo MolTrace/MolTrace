@@ -107,7 +107,7 @@ def test_auth_error_responses_use_public_safe_copy(tmp_path):
 
     assert auth_error.status_code == 401, auth_error.text
     assert auth_error.json()["detail"] == (
-        "Sign in to continue. If you already signed in, your session may have expired."
+        "Sign in to access live MolTrace data."
     )
     assert missing_auth.status_code == 401, missing_auth.text
     assert missing_auth.json()["detail"] == auth_error.json()["detail"]

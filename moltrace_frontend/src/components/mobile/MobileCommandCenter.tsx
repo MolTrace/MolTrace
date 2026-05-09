@@ -219,7 +219,6 @@ async function fetchMobileConnectorSummary(): Promise<ConnectorMobileSummary | n
 
 export function MobileCommandCenter() {
   const [loading, setLoading] = useState(true)
-  const [sourceEndpoint, setSourceEndpoint] = useState<string | null>(null)
   const [modules, setModules] = useState<ModuleSummary[]>([])
   const [connectorSummary, setConnectorSummary] = useState<ConnectorMobileSummary | null>(null)
   const [connectorSummaryLoading, setConnectorSummaryLoading] = useState(true)
@@ -232,10 +231,8 @@ export function MobileCommandCenter() {
         if (cancelled) return
         if (!data) {
           setModules([])
-          setSourceEndpoint(null)
           return
         }
-        setSourceEndpoint(data.sourceEndpoint)
         setModules(data.modules)
       })
       .finally(() => {

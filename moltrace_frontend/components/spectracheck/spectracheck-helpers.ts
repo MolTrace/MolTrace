@@ -11,7 +11,7 @@ export function extractFirstSmiles(candidatesText: string): string {
 }
 
 export function authErrorMessage(): string {
-  return "Sign in to continue. If you already signed in, your session may have expired."
+  return "Sign in to access live MolTrace data."
 }
 
 export function formatApiError(err: unknown, fallback: string): string {

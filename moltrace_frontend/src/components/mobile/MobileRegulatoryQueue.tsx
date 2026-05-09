@@ -131,7 +131,6 @@ export function MobileRegulatoryQueue() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [items, setItems] = useState<QueueItem[]>([])
-  const [sourceEndpoint, setSourceEndpoint] = useState<string | null>(null)
   const [online, setOnline] = useState(true)
   const [drafts, setDrafts] = useState<Record<string, MobileActionDraft>>({})
   const [busyId, setBusyId] = useState<number | null>(null)
@@ -161,7 +160,6 @@ export function MobileRegulatoryQueue() {
           const parsed = asArray(data).filter(isRecord).map(parseQueueRow).filter((r): r is QueueItem => r != null)
           if (cancelled) return
           setItems(parsed)
-          setSourceEndpoint(endpoint)
           loaded = true
           break
         } catch (e) {
@@ -172,7 +170,6 @@ export function MobileRegulatoryQueue() {
       }
       if (!loaded && !cancelled) {
         setItems([])
-        setSourceEndpoint(null)
       }
       if (!cancelled) setLoading(false)
     })()

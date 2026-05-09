@@ -2041,14 +2041,12 @@ function UsageProgramCard({
 }
 
 function UsageRoiPanel({
-  tenantId,
   usageSummary,
   roi,
   usageError,
   roiError,
   onReload,
 }: {
-  tenantId: string
   usageSummary: Row | null
   roi: Row | null
   usageError: string
@@ -2144,12 +2142,10 @@ function UsageRoiPanel({
 }
 
 function HealthScorePanel({
-  tenantId,
   healthScore,
   error,
   onReload,
 }: {
-  tenantId: string
   healthScore: Row | null
   error: string
   onReload: () => Promise<void>
@@ -3038,7 +3034,6 @@ export function TenantDetailWorkspace() {
 
         <TabsContent value="usage_roi" className="space-y-6">
           <UsageRoiPanel
-            tenantId={tenantId}
             usageSummary={usageSummary}
             roi={roi}
             usageError={sections.usageSummary.error}
@@ -3049,7 +3044,6 @@ export function TenantDetailWorkspace() {
 
         <TabsContent value="health_score">
           <HealthScorePanel
-            tenantId={tenantId}
             healthScore={healthScore}
             error={sections.healthScore.error}
             onReload={load}

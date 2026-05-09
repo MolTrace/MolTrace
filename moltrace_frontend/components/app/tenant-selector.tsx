@@ -49,7 +49,7 @@ export function TenantSelector() {
             <span className="truncate">{tenantDisplayName}</span>
             <span className="text-xs font-normal text-muted-foreground">
               {tenantStatus}
-              {error ? " · Local development tenant" : ""}
+              {error ? " · Tenant service unavailable" : ""}
             </span>
           </div>
         </DropdownMenuLabel>
