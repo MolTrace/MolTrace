@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -238,14 +240,14 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
 
   return (
     <div className="space-y-6">
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle>Raw FID Upload / Non-destructive Processing</CardTitle>
-          <CardDescription>
-            Upload a raw FID for non-destructive Fourier transform and apodization. Original data is preserved; processing parameters are adjustable.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Spectroscopy · Raw FID Upload"
+        title="Raw FID Upload / Non-destructive Processing"
+        description="Upload a raw FID for non-destructive Fourier transform and apodization. Original data is preserved; processing parameters are adjustable."
+        className="min-w-0"
+      >
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="raw-sample">Sample ID</Label>
@@ -389,13 +391,13 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
           ) : null}
 
           {previewError && (
-            <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">{previewError}</div>
+            <AlertCard variant="error" title="Preview failed" description={previewError} />
           )}
           {processError && (
-            <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">{processError}</div>
+            <AlertCard variant="error" title="Process failed" description={processError} />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {(previewLoading || processLoading) && (
         <Card>

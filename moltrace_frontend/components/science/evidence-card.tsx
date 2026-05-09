@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn, formatStableUtcDateTime } from "@/lib/utils"
+import { ConfidenceRing } from "@/components/science/confidence-ring"
 
 export type EvidenceModule = "spectracheck" | "regulatory" | "reactions" | "ai_services"
 
@@ -295,14 +296,30 @@ export function EvidenceCard({
         ) : null}
 
         <div className="rounded-md border bg-muted/20 px-3 py-2">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Estimated confidence
-              </p>
-              <p className="mt-1 font-mono text-xl font-semibold tabular-nums">
-                {confidence == null ? "Confidence unavailable." : `${confidence.toFixed(confidence % 1 === 0 ? 0 : 1)}%`}
-              </p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {confidence != null ? (
+                <ConfidenceRing
+                  value={confidence}
+                  size={56}
+                  ariaLabel={`Estimated confidence ${Math.round(confidence)} percent`}
+                />
+              ) : (
+                <div
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-dashed border-muted text-[10px] font-mono uppercase tracking-wider text-muted-foreground"
+                  aria-label="Confidence unavailable"
+                >
+                  N/A
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Estimated confidence
+                </p>
+                {confidence == null ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">Confidence unavailable.</p>
+                ) : null}
+              </div>
             </div>
             {confidence_label ? (
               <Badge variant="secondary" className="shrink-0 capitalize">

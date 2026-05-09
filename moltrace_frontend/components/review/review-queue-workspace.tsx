@@ -18,6 +18,7 @@ import {
 } from "@/src/lib/spectracheck/review-queue"
 import { AlertCircle, CheckCircle2, ClipboardCheck, Clock, ExternalLink, Loader2, PlayCircle, X } from "lucide-react"
 import { KpiCard } from "@/components/dashboard/kpi-card"
+import { AlertCard } from "@/components/dashboard/alert-card"
 import { StatusFilterPills } from "@/components/dashboard/status-filter-pills"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 
@@ -199,19 +200,32 @@ export default function ReviewQueueWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Review Queue</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Review
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Review Queue</h1>
+          <p className="text-sm text-muted-foreground">
             Tasks awaiting review across your SpectraCheck sessions.
           </p>
-          {loadErr ? <p className="mt-1 text-xs text-destructive">{loadErr}</p> : null}
-          {partialErr ? <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">{partialErr}</p> : null}
-          {patchErr ? <p className="mt-1 text-xs text-destructive">{patchErr}</p> : null}
         </div>
         <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void load()}>
           Refresh
         </Button>
       </div>
+
+      {loadErr ? (
+        <AlertCard variant="error" title="Failed to load review queue" description={loadErr} />
+      ) : null}
+      {partialErr ? (
+        <AlertCard variant="warning" title="Partial data loaded" description={partialErr} />
+      ) : null}
+      {patchErr ? (
+        <AlertCard variant="error" title="Action failed" description={patchErr} />
+      ) : null}
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -258,6 +272,7 @@ export default function ReviewQueueWorkspace() {
             <KpiCard
               title="Open"
               icon={AlertCircle}
+              accent="cyan"
               severity={grouped.open.length > 0 ? "warning" : "neutral"}
               value={grouped.open.length}
               sub={
@@ -269,6 +284,7 @@ export default function ReviewQueueWorkspace() {
             <KpiCard
               title="In progress"
               icon={Clock}
+              accent="cyan"
               value={grouped.in_progress.length}
               sub={
                 <p className="text-xs text-muted-foreground">
@@ -279,6 +295,7 @@ export default function ReviewQueueWorkspace() {
             <KpiCard
               title="Resolved"
               icon={CheckCircle2}
+              accent="cyan"
               severity={grouped.resolved.length > 0 ? "success" : "neutral"}
               value={grouped.resolved.length}
               sub={

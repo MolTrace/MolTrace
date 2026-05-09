@@ -36,6 +36,7 @@ import {
   type DashboardPriority,
 } from "@/components/dashboard/dashboard-priority-callout"
 import { KpiCard } from "@/components/dashboard/kpi-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { StatusFilterPills } from "@/components/dashboard/status-filter-pills"
 import { RegulatoryNotificationsCompactCard } from "@/components/regulatory-hub/regulatory-notifications-compact-card"
 import { MobileCommandCenter } from "@/src/components/mobile/MobileCommandCenter"
@@ -78,6 +79,26 @@ import {
 import { ValidationReadinessDashboardCards } from "@/components/validation/validation-readiness-summary"
 import type { RoiSnapshotData } from "@/src/lib/analytics/roi-dashboard-data"
 import type { DashboardActivityRow, DashboardJobRow } from "@/src/lib/dashboard/overview-metrics"
+
+const ACTIVITY_STRIPE_COLOR: Record<DashboardActivityRow["status"], string> = {
+  approved: "var(--mt-green)",
+  review: "var(--mt-amber)",
+  running: "var(--mt-cyan)",
+  contradiction: "var(--mt-red)",
+}
+
+function jobStripeColor(status: string): string | undefined {
+  const s = status.toLowerCase()
+  if (s === "running") return "var(--mt-cyan)"
+  if (s === "queued" || s === "pending") return "var(--mt-amber)"
+  if (s === "succeeded" || s === "completed" || s === "success") return "var(--mt-green)"
+  if (s === "failed" || s === "error") return "var(--mt-red)"
+  return undefined
+}
+
+function jobBadgeColor(status: string): string | undefined {
+  return jobStripeColor(status)
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -135,7 +156,7 @@ const DEMO_STATS = {
   active: 23,
   activeSub: (
     <p className="text-xs text-muted-foreground">
-      <span className="text-success">+4</span> from yesterday
+      <span style={{ color: "var(--mt-green)" }}>+4</span> from yesterday
     </p>
   ),
   review: 7,
@@ -145,7 +166,7 @@ const DEMO_STATS = {
   hours: 156,
   hoursSub: (
     <p className="text-xs text-muted-foreground">
-      <span className="text-success">+12%</span> this week
+      <span style={{ color: "var(--mt-green)" }}>+12%</span> this week
     </p>
   ),
   modelPct: 94.2,
@@ -976,7 +997,11 @@ export function DashboardV0() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <DashboardGreeting email={viewerEmail} tenantName={tenantDisplayName} />
+        <DashboardGreeting
+          email={viewerEmail}
+          tenantName={tenantDisplayName}
+          eyebrow="MolTrace · Dashboard"
+        />
         <BackendStatusIndicator />
       </div>
 
@@ -990,6 +1015,8 @@ export function DashboardV0() {
         title="Overview"
         description="Top metrics, validation readiness, and tenant onboarding."
         icon={LayoutDashboard}
+        accent="teal"
+        eyebrow="01 · Dashboard"
         defaultOpen
       >
       {/* Stats Grid */}
@@ -998,6 +1025,7 @@ export function DashboardV0() {
           title="Active Analyses"
           icon={Activity}
           href="/spectracheck"
+          accent="teal"
           value={live && metrics ? metrics.activeAnalyses : DEMO_STATS.active}
           sub={
             <>
@@ -1015,6 +1043,7 @@ export function DashboardV0() {
           title="Review Required"
           icon={AlertCircle}
           href="/review"
+          accent="cyan"
           severity={reviewRequiredCount > 0 ? "warning" : "neutral"}
           value={reviewRequiredCount}
           sub={
@@ -1033,6 +1062,7 @@ export function DashboardV0() {
           title="Reports Ready"
           icon={FileText}
           href="/reports"
+          accent="cyan"
           value={live && metrics ? metrics.reportsReady : DEMO_STATS.reports}
           sub={reportsSub}
         />
@@ -1041,6 +1071,7 @@ export function DashboardV0() {
           title="Hours Saved"
           icon={Clock}
           href="/roi"
+          accent="violet"
           value={hoursSavedDisplay}
           sub={
             roiLoading ? (
@@ -1060,6 +1091,7 @@ export function DashboardV0() {
           title="Model Confidence"
           icon={TrendingUp}
           href="/ml"
+          accent="teal"
           value={`${DEMO_STATS.modelPct}%`}
           sub={<Progress value={DEMO_STATS.modelPct} className="mt-2 h-1.5" />}
         />
@@ -1131,113 +1163,99 @@ export function DashboardV0() {
         title="Science"
         description="Methods, compounds, ML and AI summaries."
         icon={Microscope}
+        accent="teal"
+        eyebrow="02 · Spectroscopy"
       >
       {!mlLoading && mlRollup?.available ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-base">ML factory health</CardTitle>
-              <Cpu className="h-4 w-4 text-muted-foreground" aria-hidden />
-            </div>
-            <CardDescription>
-              Health and review status of the ML models powering your analyses.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {mlRollup.partial ? (
-              <p className="text-xs text-muted-foreground">
-                Some live data didn't load — values may be partial.
-              </p>
-            ) : null}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Active serving configs</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.activeModelCount)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Approved deployment candidates</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.approvedDeploymentCandidateCount)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Models / deployment review queue</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.modelsRequiringReviewHint)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Failed evaluations</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.failedEvaluationsCount)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Open deployment candidates</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.openDeploymentCandidatesCount)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Error-analysis warning signals</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.errorAnalysisWarningsHint)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Drift / dataset warning signals</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.driftWarningsHint)}</p>
-              </div>
-            </div>
-            <p>
-              <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" href="/ml">
-                Open ML Model Factory
-              </Link>
+        <ModuleCard
+          accent="teal"
+          eyebrow="Spectroscopy · ML"
+          title="ML factory health"
+          icon={Cpu}
+          description="Health and review status of the ML models powering your analyses."
+          href="/ml"
+          ctaLabel="Open ML Model Factory"
+        >
+          {mlRollup.partial ? (
+            <p className="text-xs text-muted-foreground">
+              Some live data didn't load — values may be partial.
             </p>
-          </CardContent>
-        </Card>
+          ) : null}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Active serving configs</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.activeModelCount)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Approved deployment candidates</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.approvedDeploymentCandidateCount)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Models / deployment review queue</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.modelsRequiringReviewHint)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Failed evaluations</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.failedEvaluationsCount)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Open deployment candidates</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.openDeploymentCandidatesCount)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Error-analysis warning signals</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.errorAnalysisWarningsHint)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Drift / dataset warning signals</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.driftWarningsHint)}</p>
+            </div>
+          </div>
+        </ModuleCard>
       ) : null}
 
       {!aiSummaryLoading && aiSummary?.available ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-base">AI inference summary</CardTitle>
-              <Cpu className="h-4 w-4 text-muted-foreground" aria-hidden />
-            </div>
-            <CardDescription>
-              Live AI predictions and the active-learning queue across your tenant.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {aiSummary.partial ? (
-              <p className="text-xs text-muted-foreground">
-                Some AI live data didn't load — values may be partial.
-              </p>
-            ) : null}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Active AI services</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.activeAiServices)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Predictions requiring review</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.predictionsRequiringReview)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Low-confidence predictions</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.lowConfidencePredictions)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">OOD predictions</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.oodPredictions)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Active-learning candidates</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.activeLearningCandidates)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Service failures</p>
-                <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.serviceFailures)}</p>
-              </div>
-            </div>
-            <p>
-              <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" href="/ai">
-                Open AI Services
-              </Link>
+        <ModuleCard
+          accent="teal"
+          eyebrow="Spectroscopy · AI"
+          title="AI inference summary"
+          icon={Cpu}
+          description="Live AI predictions and the active-learning queue across your tenant."
+          href="/ai"
+          ctaLabel="Open AI Services"
+        >
+          {aiSummary.partial ? (
+            <p className="text-xs text-muted-foreground">
+              Some AI live data didn't load — values may be partial.
             </p>
-          </CardContent>
-        </Card>
+          ) : null}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Active AI services</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.activeAiServices)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Predictions requiring review</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.predictionsRequiringReview)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Low-confidence predictions</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.lowConfidencePredictions)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">OOD predictions</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.oodPredictions)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Active-learning candidates</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.activeLearningCandidates)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Service failures</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.serviceFailures)}</p>
+            </div>
+          </div>
+        </ModuleCard>
       ) : null}
       {!aiSummaryLoading && aiSummary != null && !aiSummary.available ? (
         <p className="text-xs text-muted-foreground">AI inference summary unavailable for now.</p>
@@ -1365,91 +1383,75 @@ export function DashboardV0() {
         title="Regulatory"
         description="Dossiers, compliance, surveillance, and notifications."
         icon={ShieldCheck}
+        accent="cyan"
+        eyebrow="03 · Regulatory"
       >
       {!regulatoryLoading && regulatorySummary?.available ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-base">Regulatory Hub</CardTitle>
-              <FolderOpen className="h-4 w-4 text-muted-foreground" />
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Regulatory · Hub"
+          title="Regulatory Hub"
+          icon={FolderOpen}
+          description="Active dossiers and review workload across your tenant — not a legal or compliance certification."
+          href="/regulatory"
+          ctaLabel="Open Regulatory Hub"
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Active dossiers</p>
+              <p className="text-2xl font-bold tabular-nums">{regulatorySummary.activeDossiers}</p>
+              <p className="text-xs text-muted-foreground">Excludes archived.</p>
             </div>
-            <CardDescription>
-              Active dossiers and review workload across your tenant — not a legal or compliance
-              certification.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Active dossiers</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatorySummary.activeDossiers}</p>
-                <p className="text-xs text-muted-foreground">Excludes archived.</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Dossiers in review</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatorySummary.inReview}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Requirements needing evidence</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatorySummary.reqsNeedEvidence}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">High-risk dossiers</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatorySummary.highRisk}</p>
-                <p className="text-xs text-muted-foreground">Latest risk assessment high or critical.</p>
-              </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Dossiers in review</p>
+              <p className="text-2xl font-bold tabular-nums">{regulatorySummary.inReview}</p>
             </div>
-            <p>
-              <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" href="/regulatory">
-                Open Regulatory Hub
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-xs text-muted-foreground">Requirements needing evidence</p>
+              <p className="text-2xl font-bold tabular-nums">{regulatorySummary.reqsNeedEvidence}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">High-risk dossiers</p>
+              <p className="text-2xl font-bold tabular-nums">{regulatorySummary.highRisk}</p>
+              <p className="text-xs text-muted-foreground">Latest risk assessment high or critical.</p>
+            </div>
+          </div>
+        </ModuleCard>
       ) : null}
 
       {!regulatoryComplianceLoading && regulatoryCompliance?.available ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-base">Regulatory compliance</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Regulatory · Compliance"
+          title="Regulatory compliance"
+          icon={AlertTriangle}
+          description="Open compliance action items, blocked dossiers, and triage by category — workflow signals, not legal conclusions."
+          href="/regulatory"
+          ctaLabel="Open regulatory workspace"
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <p className="text-xs text-muted-foreground">Open action items</p>
+              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.openActionItems}</p>
             </div>
-            <CardDescription>
-              Open compliance action items, blocked dossiers, and triage by category — workflow
-              signals, not legal conclusions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <div>
-                <p className="text-xs text-muted-foreground">Open action items</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.openActionItems}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Critical action items</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.criticalActionItems}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Dossiers blocked</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.blockedDossiers}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">qNMR gaps (open items)</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.qNmrGaps}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Nitrosamine review items</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.nitrosamineReviewItems}</p>
-              </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Critical action items</p>
+              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.criticalActionItems}</p>
             </div>
-            <p>
-              <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" href="/regulatory">
-                Open regulatory workspace
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-xs text-muted-foreground">Dossiers blocked</p>
+              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.blockedDossiers}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">qNMR gaps (open items)</p>
+              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.qNmrGaps}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Nitrosamine review items</p>
+              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.nitrosamineReviewItems}</p>
+            </div>
+          </div>
+        </ModuleCard>
       ) : null}
 
       {!surveillanceLoading && regulatorySurveillanceSummary?.available ? (
@@ -1514,112 +1516,110 @@ export function DashboardV0() {
         title="Operations"
         description="System health, QC, workflows, jobs, and ROI."
         icon={Cpu}
+        accent="violet"
+        eyebrow="04 · Operations"
       >
       {/* Automation ROI — GET /analytics/roi */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Automation ROI</CardTitle>
-          <CardDescription>
-            Hours saved, tasks automated, reports generated, and workflows completed.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Hours saved</p>
-              <p className="text-2xl font-bold tabular-nums">{hoursSavedDisplay}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Tasks automated</p>
-              <p className="text-2xl font-bold tabular-nums">
-                {fmtRoiInt(roiSnapshot?.tasks_automated)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Reports generated</p>
-              <p className="text-2xl font-bold tabular-nums">
-                {fmtRoiInt(roiSnapshot?.reports_generated)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Workflows completed</p>
-              <p className="text-2xl font-bold tabular-nums">
-                {fmtRoiInt(roiSnapshot?.workflows_completed)}
-              </p>
-            </div>
+      <ModuleCard
+        accent="violet"
+        eyebrow="Operations · ROI"
+        title="Automation ROI"
+        description="Hours saved, tasks automated, reports generated, and workflows completed."
+        href="/roi"
+        ctaLabel="Open ROI dashboard"
+      >
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-xs text-muted-foreground">Hours saved</p>
+            <p className="text-2xl font-bold tabular-nums">{hoursSavedDisplay}</p>
           </div>
-          {roiLoading ? (
-            <p className="text-xs text-muted-foreground">Loading ROI snapshot…</p>
-          ) : null}
-          {!roiLoading && !roiLive ? (
-            <p className="text-xs text-muted-foreground">
-              Live ROI data couldn't load — hours match the summary card above; task and workflow counts unavailable.
+          <div>
+            <p className="text-xs text-muted-foreground">Tasks automated</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {fmtRoiInt(roiSnapshot?.tasks_automated)}
             </p>
-          ) : null}
-        </CardContent>
-      </Card>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Reports generated</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {fmtRoiInt(roiSnapshot?.reports_generated)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Workflows completed</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {fmtRoiInt(roiSnapshot?.workflows_completed)}
+            </p>
+          </div>
+        </div>
+        {roiLoading ? (
+          <p className="text-xs text-muted-foreground">Loading ROI snapshot…</p>
+        ) : null}
+        {!roiLoading && !roiLive ? (
+          <p className="text-xs text-muted-foreground">
+            Live ROI data couldn't load — hours match the summary card above; task and workflow counts unavailable.
+          </p>
+        ) : null}
+      </ModuleCard>
 
       {/* Operations summary — parallel GETs: /system/health, /system/jobs/summary, /security/summary, /model-health/drift-alerts; QC failures align with Quality Alerts */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Operations summary</CardTitle>
-          <CardDescription>
-            System health, running and failed jobs, security warnings, and drift alerts. QC failures
-            match the Quality Alerts card above.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <p className="text-xs text-muted-foreground">System health</p>
-              <p className="text-2xl font-bold tabular-nums capitalize">
-                {fmtOpsHealth(opsDisplay.systemHealthStatus)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Active jobs</p>
-              <p className="text-2xl font-bold tabular-nums">
-                {fmtOpsNum(opsDisplay.activeJobs)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Failed jobs</p>
-              <p className="text-2xl font-bold tabular-nums">
-                {fmtOpsNum(opsDisplay.failedJobs)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Security warnings</p>
-              <p className="text-2xl font-bold tabular-nums">
-                {fmtOpsNum(opsDisplay.securityWarnings)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Open drift alerts</p>
-              <p className="text-2xl font-bold tabular-nums">
-                {fmtOpsNum(opsDisplay.openDriftAlerts)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">QC failures</p>
-              <p className="text-2xl font-bold tabular-nums">{qcFailures}</p>
-            </div>
+      <ModuleCard
+        accent="violet"
+        eyebrow="Operations · Health"
+        title="Operations summary"
+        icon={Cpu}
+        description="System health, running and failed jobs, security warnings, and drift alerts. QC failures match the Quality Alerts card above."
+      >
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <p className="text-xs text-muted-foreground">System health</p>
+            <p className="text-2xl font-bold tabular-nums capitalize">
+              {fmtOpsHealth(opsDisplay.systemHealthStatus)}
+            </p>
           </div>
-          {opsLoading ? (
-            <p className="text-xs text-muted-foreground">Loading operations summary…</p>
-          ) : null}
-          {!opsLoading && opsUseDemo ? (
-            <p className="text-xs text-muted-foreground">
-              Live operations data couldn't load — showing example values (QC failures match the Quality Alerts card above).
+          <div>
+            <p className="text-xs text-muted-foreground">Active jobs</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {fmtOpsNum(opsDisplay.activeJobs)}
             </p>
-          ) : null}
-          {!opsLoading && opsRollup?.available && opsRollup.partial ? (
-            <p className="text-xs text-muted-foreground">
-              Some operations data didn't load — summary may be partial.
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Failed jobs</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {fmtOpsNum(opsDisplay.failedJobs)}
             </p>
-          ) : null}
-        </CardContent>
-      </Card>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Security warnings</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {fmtOpsNum(opsDisplay.securityWarnings)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Open drift alerts</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {fmtOpsNum(opsDisplay.openDriftAlerts)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">QC failures</p>
+            <p className="text-2xl font-bold tabular-nums">{qcFailures}</p>
+          </div>
+        </div>
+        {opsLoading ? (
+          <p className="text-xs text-muted-foreground">Loading operations summary…</p>
+        ) : null}
+        {!opsLoading && opsUseDemo ? (
+          <p className="text-xs text-muted-foreground">
+            Live operations data couldn't load — showing example values (QC failures match the Quality Alerts card above).
+          </p>
+        ) : null}
+        {!opsLoading && opsRollup?.available && opsRollup.partial ? (
+          <p className="text-xs text-muted-foreground">
+            Some operations data didn't load — summary may be partial.
+          </p>
+        ) : null}
+      </ModuleCard>
 
       <Card>
         <CardHeader className="pb-2">
@@ -1880,16 +1880,17 @@ export function DashboardV0() {
       </Card>
 
       {/* Recent jobs (live when GET /jobs succeeds) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent jobs</CardTitle>
-          <CardDescription>
-            {overview.jobsDataAvailable
-              ? "Latest analysis jobs and their progress."
-              : "Illustrative preview when job telemetry is unavailable."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="violet"
+        eyebrow="Operations · Jobs"
+        title="Recent jobs"
+        icon={Cpu}
+        description={
+          overview.jobsDataAvailable
+            ? "Latest analysis jobs and their progress."
+            : "Illustrative preview when job telemetry is unavailable."
+        }
+      >
           <StatusFilterPills
             label="Filter jobs by status"
             value={jobsFilter}
@@ -1923,39 +1924,49 @@ export function DashboardV0() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredJobRows.map((j) => (
-                    <TableRow key={j.id}>
-                      <TableCell className="max-w-[180px] truncate font-mono text-xs">{j.jobType}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[10px] font-normal">
-                          {j.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={j.progressPercent ?? 0} className="h-1.5 w-20" />
-                          <span className="font-mono text-xs text-muted-foreground">
-                            {j.progressPercent != null ? `${Math.round(j.progressPercent)}%` : "—"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[220px]">
-                        <div className="flex flex-col gap-0.5 text-xs">
-                          <span className="truncate font-mono">{j.sampleLabel}</span>
-                          <span className="truncate font-mono text-muted-foreground">{j.sessionLabel}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {formatJobTimeLabel(j.updatedAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredJobRows.map((j) => {
+                    const stripe = jobStripeColor(j.status)
+                    const badge = jobBadgeColor(j.status)
+                    return (
+                      <TableRow
+                        key={j.id}
+                        style={stripe ? { boxShadow: `inset 3px 0 0 0 ${stripe}` } : undefined}
+                      >
+                        <TableCell className="max-w-[180px] truncate font-mono text-xs">{j.jobType}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-normal"
+                            style={badge ? { borderColor: badge, color: badge } : undefined}
+                          >
+                            {j.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={j.progressPercent ?? 0} className="h-1.5 w-20" />
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {j.progressPercent != null ? `${Math.round(j.progressPercent)}%` : "—"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[220px]">
+                          <div className="flex flex-col gap-0.5 text-xs">
+                            <span className="truncate font-mono">{j.sampleLabel}</span>
+                            <span className="truncate font-mono text-muted-foreground">{j.sessionLabel}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                          {formatJobTimeLabel(j.updatedAt)}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+      </ModuleCard>
 
       </DashboardSection>
 
@@ -1963,16 +1974,16 @@ export function DashboardV0() {
         title="Recent Activity"
         description="Latest sessions and workflow runs."
         icon={Activity}
+        eyebrow="05 · Activity"
       >
       {/* Recent Activity Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>
-            Latest SpectraCheck sessions and workflow runs (newest first when workflow data is available).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Activity · Sessions"
+        title="Recent Activity"
+        icon={Activity}
+        description="Latest SpectraCheck sessions and workflow runs (newest first when workflow data is available)."
+      >
           <StatusFilterPills
             label="Filter activity by status"
             value={activityFilter}
@@ -2011,67 +2022,94 @@ export function DashboardV0() {
                     </TableCell>
                   </TableRow>
                 ) : null}
-                {filteredActivityRows.map((item: DashboardActivityRow) => (
-                  <TableRow key={item.id} className="hover:bg-muted/50">
-                    <TableCell className="font-mono text-sm">
-                      <Link
-                        href={`/spectracheck?sessionId=${encodeURIComponent(item.id)}`}
-                        className="hover:underline"
-                      >
-                        {item.id}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-sm">{item.sampleId}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{item.module}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {item.status === "approved" && (
-                        <Badge variant="outline" className="gap-1 border-success/50 text-success">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Approved
-                        </Badge>
-                      )}
-                      {item.status === "review" && (
-                        <Badge variant="outline" className="gap-1 border-accent/50 text-accent">
-                          <Eye className="h-3 w-3" />
-                          Review
-                        </Badge>
-                      )}
-                      {item.status === "running" && (
-                        <Badge variant="secondary" className="gap-1">
-                          <Activity className="h-3 w-3" />
-                          Running
-                        </Badge>
-                      )}
-                      {item.status === "contradiction" && (
-                        <Badge variant="outline" className="gap-1 border-warning/50 text-warning">
-                          <AlertTriangle className="h-3 w-3" />
-                          Contradiction
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Progress value={item.confidence} className="h-1.5 w-16" />
-                        <span className="font-mono text-sm">{item.confidence}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{item.reviewer}</TableCell>
-                    <TableCell>
-                      {item.reportStatus === "ready" ? (
-                        <Badge className="bg-success text-success-foreground">Ready</Badge>
-                      ) : (
-                        <Badge variant="secondary">Pending</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredActivityRows.map((item: DashboardActivityRow) => {
+                  const stripe = ACTIVITY_STRIPE_COLOR[item.status]
+                  return (
+                    <TableRow
+                      key={item.id}
+                      className="hover:bg-muted/50"
+                      style={{ boxShadow: `inset 3px 0 0 0 ${stripe}` }}
+                    >
+                      <TableCell className="font-mono text-sm">
+                        <Link
+                          href={`/spectracheck?sessionId=${encodeURIComponent(item.id)}`}
+                          className="hover:underline"
+                        >
+                          {item.id}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-sm">{item.sampleId}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{item.module}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {item.status === "approved" && (
+                          <Badge
+                            variant="outline"
+                            className="gap-1"
+                            style={{ borderColor: "var(--mt-green)", color: "var(--mt-green)" }}
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            Approved
+                          </Badge>
+                        )}
+                        {item.status === "review" && (
+                          <Badge
+                            variant="outline"
+                            className="gap-1"
+                            style={{ borderColor: "var(--mt-amber)", color: "var(--mt-amber)" }}
+                          >
+                            <Eye className="h-3 w-3" />
+                            Review
+                          </Badge>
+                        )}
+                        {item.status === "running" && (
+                          <Badge
+                            variant="outline"
+                            className="gap-1"
+                            style={{ borderColor: "var(--mt-cyan)", color: "var(--mt-cyan)" }}
+                          >
+                            <Activity className="h-3 w-3" />
+                            Running
+                          </Badge>
+                        )}
+                        {item.status === "contradiction" && (
+                          <Badge
+                            variant="outline"
+                            className="gap-1"
+                            style={{ borderColor: "var(--mt-red)", color: "var(--mt-red)" }}
+                          >
+                            <AlertTriangle className="h-3 w-3" />
+                            Contradiction
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress value={item.confidence} className="h-1.5 w-16" />
+                          <span className="font-mono text-sm">{item.confidence}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">{item.reviewer}</TableCell>
+                      <TableCell>
+                        {item.reportStatus === "ready" ? (
+                          <Badge
+                            variant="outline"
+                            style={{ borderColor: "var(--mt-green)", color: "var(--mt-green)" }}
+                          >
+                            Ready
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Pending</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+      </ModuleCard>
       </DashboardSection>
     </div>
   )

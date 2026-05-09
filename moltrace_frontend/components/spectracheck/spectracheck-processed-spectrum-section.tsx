@@ -27,6 +27,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -233,14 +235,14 @@ export function SpectraCheckProcessedSpectrumSection({
 
   return (
     <div className="space-y-6">
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle>Processed 1H / 13C Spectrum Upload</CardTitle>
-          <CardDescription>
-            Upload a processed 1H or 13C NMR spectrum for peak preview and quantitative chemical-shift analysis.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Spectroscopy · Processed Upload"
+        title="Processed 1H / 13C Spectrum Upload"
+        description="Upload a processed 1H or 13C NMR spectrum for peak preview and quantitative chemical-shift analysis."
+        className="min-w-0"
+      >
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="proc-sample">Sample ID</Label>
@@ -394,13 +396,13 @@ export function SpectraCheckProcessedSpectrumSection({
           ) : null}
 
           {previewError && (
-            <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">{previewError}</div>
+            <AlertCard variant="error" title="Preview failed" description={previewError} />
           )}
           {analyzeError && (
-            <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">{analyzeError}</div>
+            <AlertCard variant="error" title="Analyze failed" description={analyzeError} />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {(previewLoading || analyzeLoading) && (
         <Card>

@@ -160,7 +160,10 @@ export function ReportVisualEvidenceInlinePreviews({
               </TableHeader>
               <TableBody>
                 {msmsBundle.referencePeaks.map((p, i) => (
-                  <TableRow key={`ref-${i}`}>
+                  <TableRow
+                    key={`ref-${i}`}
+                    style={{ boxShadow: "inset 3px 0 0 0 var(--mt-cyan)" }}
+                  >
                     <TableCell className="text-xs">Reference</TableCell>
                     <TableCell className="font-mono text-xs">{p.mz.toFixed(4)}</TableCell>
                     <TableCell className="font-mono text-xs">{p.intensity}</TableCell>
@@ -168,7 +171,10 @@ export function ReportVisualEvidenceInlinePreviews({
                   </TableRow>
                 ))}
                 {msmsBundle.fragmentMatches.map((m, i) => (
-                  <TableRow key={`fm-${i}`}>
+                  <TableRow
+                    key={`fm-${i}`}
+                    style={{ boxShadow: "inset 3px 0 0 0 var(--mt-teal)" }}
+                  >
                     <TableCell className="text-xs">Match</TableCell>
                     <TableCell className="font-mono text-xs">
                       {typeof m.observed_mz === "number" && Number.isFinite(m.observed_mz)

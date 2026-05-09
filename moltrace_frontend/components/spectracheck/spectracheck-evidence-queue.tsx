@@ -28,6 +28,7 @@ import { useSpectraCheckEvidence } from "@/src/lib/spectracheck/useSpectraCheckE
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
@@ -542,15 +543,18 @@ export function SpectraCheckEvidenceQueuePanel({
   const dialogCanPostSession = Boolean(sid && dialogItem?.backendEvidenceId != null)
 
   return (
-    <Card className="min-w-0 shadow-sm">
-      <CardHeader className="space-y-1 pb-3">
-        <CardTitle className="flex items-start gap-2 text-base">
+    <ModuleCard
+      accent="teal"
+      eyebrow="Spectroscopy · Evidence Queue"
+      title={
+        <span className="inline-flex items-start gap-2">
           <span>Evidence Queue</span>
           <InfoTooltip content={EVIDENCE_QUEUE_TOOLTIP} label="About Evidence Queue" className="mt-0.5" />
-        </CardTitle>
-        <CardDescription className="text-xs">Registry of analysis results for Unified Evidence.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </span>
+      }
+      description="Registry of analysis results for Unified Evidence."
+      className="min-w-0"
+    >
         <StatsGrid
           total={stats.total}
           selected={stats.selected}
@@ -610,7 +614,6 @@ export function SpectraCheckEvidenceQueuePanel({
             ))}
           </ul>
         )}
-      </CardContent>
 
       <QualityOverrideDialog
         open={overrideItem != null}
@@ -642,7 +645,7 @@ export function SpectraCheckEvidenceQueuePanel({
               ) : null}
             </DialogDescription>
           </DialogHeader>
-          {sessionCommentsErr ? <p className="text-xs text-destructive">{sessionCommentsErr}</p> : null}
+          {sessionCommentsErr ? <p className="text-xs" style={{ color: "var(--mt-red)" }}>{sessionCommentsErr}</p> : null}
           {!sid ? (
             <p className="text-xs text-muted-foreground">
               No backend session is connected. Notes below can be stored locally in this browser only.
@@ -740,7 +743,7 @@ export function SpectraCheckEvidenceQueuePanel({
                 className="text-sm"
               />
             </div>
-            {evidenceCommentPostErr ? <p className="text-xs text-destructive">{evidenceCommentPostErr}</p> : null}
+            {evidenceCommentPostErr ? <p className="text-xs" style={{ color: "var(--mt-red)" }}>{evidenceCommentPostErr}</p> : null}
             <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
               {dialogCanPostSession ? (
                 <Button
@@ -822,7 +825,7 @@ export function SpectraCheckEvidenceQueuePanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </ModuleCard>
   )
 }
 

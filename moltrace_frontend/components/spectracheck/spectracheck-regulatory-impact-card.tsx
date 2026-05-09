@@ -1,10 +1,8 @@
 "use client"
 
-import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { ChevronDown } from "lucide-react"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { AlertCard } from "@/components/dashboard/alert-card"
 
 const TOOLTIP =
   "Converts SpectraCheck evidence such as impurity peaks, residual solvent flags, nitrosamine-like signals, qNMR outputs, QC warnings, and AI provenance into regulatory action items for review."
@@ -126,17 +126,19 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
   const hasSession = Boolean(sessionId?.trim())
 
   return (
-    <Card className="border-muted">
-      <CardHeader className="pb-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-base">Regulatory Impact</CardTitle>
+    <ModuleCard
+      accent="cyan"
+      eyebrow="Regulatory · Bridge"
+      title={
+        <span className="inline-flex items-center gap-2">
+          Regulatory Impact
           <InfoTooltip label="Regulatory impact" content={TOOLTIP} />
-        </div>
-        <CardDescription>
-          Bridge handoff to Regulatory Hub for review-required action items. Decision support only — not legal advice.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 text-sm">
+        </span>
+      }
+      description="Bridge handoff to Regulatory Hub for review-required action items. Decision support only — not legal advice."
+      href="/regulatory"
+      ctaLabel="Open Regulatory Hub"
+    >
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="bridge-session-id">SpectraCheck session ID</Label>
@@ -174,9 +176,6 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
           <Button type="button" onClick={() => void sendToRegulatoryHub()} disabled={sending || !hasSession}>
             {sending ? "Sending…" : "Send evidence to Regulatory Hub"}
           </Button>
-          <Button type="button" variant="outline" asChild>
-            <Link href="/regulatory">Open Regulatory Hub</Link>
-          </Button>
         </div>
 
         {!hasSession ? (
@@ -185,39 +184,39 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
           </p>
         ) : null}
         {loading ? <p className="text-xs text-muted-foreground">Loading regulatory bridge records…</p> : null}
-        {err ? <p className="text-xs text-destructive">{err}</p> : null}
+        {err ? <AlertCard variant="error" title="Bridge error" description={err} /> : null}
 
         <div className="grid gap-2 md:grid-cols-2">
           <div className="rounded-md border bg-muted/20 px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Extracted regulatory signals</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Extracted regulatory signals</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {extractedSignals.length ? extractedSignals.map((v) => readString(v) || JSON.stringify(v)).join(", ") : "—"}
             </p>
           </div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Created requirements</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Created requirements</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {createdRequirements.length ? createdRequirements.map((v) => readString(v) || JSON.stringify(v)).join(", ") : "—"}
             </p>
           </div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Created action items</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Created action items</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {createdActionItems.length ? createdActionItems.map((v) => readString(v) || JSON.stringify(v)).join(", ") : "—"}
             </p>
           </div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Human review required</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Human review required</p>
             <p className="mt-1 text-xs text-muted-foreground">{humanReviewRequired ? "true" : "false"}</p>
           </div>
           <div className="rounded-md border bg-muted/20 px-3 py-2 md:col-span-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Warnings</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Warnings</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {warnings.length ? warnings.map((v) => readString(v) || JSON.stringify(v)).join(" · ") : "—"}
             </p>
           </div>
           <div className="rounded-md border bg-muted/20 px-3 py-2 md:col-span-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Notes</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Notes</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {notes.length ? notes.map((v) => readString(v) || JSON.stringify(v)).join(" · ") : "—"}
             </p>
@@ -246,7 +245,6 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
             />
           </CollapsibleContent>
         </Collapsible>
-      </CardContent>
-    </Card>
+    </ModuleCard>
   )
 }

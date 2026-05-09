@@ -12,6 +12,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -140,14 +142,24 @@ function SummaryMetricCard({
   sub: React.ReactNode
 }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+    <Card
+      className="h-full overflow-hidden rounded-xl py-0"
+      style={{ borderTop: "3px solid var(--mt-cyan)" }}
+    >
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+        <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {title}
+        </CardTitle>
         {icon}
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold tabular-nums">{value}</div>
-        {sub}
+      <CardContent className="pb-5">
+        <div
+          className="font-mono text-3xl font-bold leading-none tabular-nums"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          {value}
+        </div>
+        {sub ? <div className="mt-2">{sub}</div> : null}
       </CardContent>
     </Card>
   )
@@ -521,26 +533,31 @@ export function RegulatoryIntelligenceLanding() {
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-8 pb-12">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Regulatory Hub</h1>
-        <p className="max-w-3xl text-muted-foreground">
+      <header className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          MolTrace · Regulatory Hub
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Hub</h1>
+        <p className="max-w-3xl text-sm text-muted-foreground">
           Review impurity, qNMR, nitrosamine, and jurisdictional action cards.
         </p>
       </header>
 
-      <Alert className="border-warning/40 bg-warning/10">
-        <AlertTitle className="text-sm">Qualified review required</AlertTitle>
-        <AlertDescription className="text-sm text-muted-foreground">
-          Regulatory outputs are decision support and require qualified review.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Qualified review required"
+        description="Regulatory outputs are decision support and require qualified review."
+      />
 
       {dossierListError ? (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Backend unavailable</AlertTitle>
-          <AlertDescription className="text-sm">{dossierListError}</AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="error"
+          title="Backend unavailable"
+          description={dossierListError}
+        />
       ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Summary">
@@ -595,7 +612,7 @@ export function RegulatoryIntelligenceLanding() {
       <section className="space-y-3" aria-labelledby="regulatory-action-cards-heading">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 id="regulatory-action-cards-heading" className="text-lg font-semibold tracking-tight">
+            <h2 id="regulatory-action-cards-heading" className="font-mono text-lg font-bold tracking-tight">
               Regulatory action cards
             </h2>
             <p className="text-sm text-muted-foreground">
@@ -637,7 +654,7 @@ export function RegulatoryIntelligenceLanding() {
 
       <section className="space-y-3" aria-labelledby="regulatory-evidence-queue-heading">
         <div>
-          <h2 id="regulatory-evidence-queue-heading" className="text-lg font-semibold tracking-tight">
+          <h2 id="regulatory-evidence-queue-heading" className="font-mono text-lg font-bold tracking-tight">
             Evidence queue
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -693,14 +710,12 @@ export function RegulatoryIntelligenceLanding() {
       </section>
 
       <section aria-labelledby="create-dossier-heading">
-        <Card>
-          <CardHeader>
-            <CardTitle id="create-dossier-heading" className="text-lg">
-              Create dossier
-            </CardTitle>
-            <CardDescription>Create a dossier; optional links are omitted when empty.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Regulatory · Create"
+          title={<span id="create-dossier-heading">Create dossier</span>}
+          description="Create a dossier; optional links are omitted when empty."
+        >
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="reg-create-title">title</Label>
@@ -839,16 +854,14 @@ export function RegulatoryIntelligenceLanding() {
               </div>
             </div>
             {createError ? (
-              <Alert variant="destructive">
-                <AlertTitle>Create failed</AlertTitle>
-                <AlertDescription className="text-sm">{createError}</AlertDescription>
-              </Alert>
+              <AlertCard variant="error" title="Create failed" description={createError} />
             ) : null}
             {createSucceeded ? (
-              <Alert>
-                <AlertTitle>Dossier created</AlertTitle>
-                <AlertDescription className="text-sm">The list below was refreshed from the server.</AlertDescription>
-              </Alert>
+              <AlertCard
+                variant="success"
+                title="Dossier created"
+                description="The list below was refreshed from the server."
+              />
             ) : null}
             <div className="flex flex-wrap gap-2">
               <Button className="gap-2" disabled={createBusy || loading} onClick={() => void submitCreate()}>
@@ -856,27 +869,24 @@ export function RegulatoryIntelligenceLanding() {
                 Create dossier
               </Button>
             </div>
-          </CardContent>
-        </Card>
+        </ModuleCard>
       </section>
 
       <section aria-labelledby="dossiers-table-heading" className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 id="dossiers-table-heading" className="text-lg font-semibold tracking-tight">
-              Dossiers
-            </h2>
-            <p className="text-sm text-muted-foreground">Current dossier list and evidence metrics.</p>
-          </div>
-          {enrichBusy ? (
-            <Badge variant="outline" className="gap-1 font-normal">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Loading evidence metrics
-            </Badge>
-          ) : null}
-        </div>
-        <Card>
-          <CardContent className="pt-6">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Regulatory · Dossiers"
+          title={<span id="dossiers-table-heading">Dossiers</span>}
+          description="Current dossier list and evidence metrics."
+          badge={
+            enrichBusy ? (
+              <Badge variant="outline" className="gap-1 font-normal">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading evidence metrics
+              </Badge>
+            ) : null
+          }
+        >
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading dossiers…</p>
             ) : dossierListError ? (
@@ -943,36 +953,63 @@ export function RegulatoryIntelligenceLanding() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </ModuleCard>
       </section>
 
-      <section className="flex flex-wrap gap-3" aria-label="Shortcuts">
-        <Button type="button" variant="secondary" asChild>
-          <Link href="/regulatory/sources">Open source library</Link>
-        </Button>
-        <Button type="button" variant="secondary" asChild>
-          <Link href="/regulatory/surveillance">Open surveillance dashboard</Link>
-        </Button>
-        <Button type="button" variant="secondary" asChild>
-          <Link href="/regulatory/rule-updates">Open rule update proposals</Link>
-        </Button>
-        <Button type="button" variant="secondary" asChild>
-          <Link href="/regulatory/action-queue">Open action queue</Link>
-        </Button>
-        <Button type="button" variant="secondary" onClick={scrollToReview}>
-          Open regulatory review
-        </Button>
+      <section className="space-y-3" aria-labelledby="related-workspaces-heading">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2
+              id="related-workspaces-heading"
+              className="font-mono text-lg font-bold tracking-tight"
+            >
+              Related regulatory workspaces
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Jump to surveillance, rule update proposals, or the action queue.
+            </p>
+          </div>
+          <Button type="button" variant="ghost" size="sm" onClick={scrollToReview}>
+            Jump to review queue ↓
+          </Button>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <ModuleCard
+            accent="cyan"
+            eyebrow="Regulatory · Surveillance"
+            title="Surveillance dashboard"
+            description="Track regulatory news, guidance changes, and source-document updates."
+            href="/regulatory/surveillance"
+            ctaLabel="Open surveillance"
+          />
+          <ModuleCard
+            accent="cyan"
+            eyebrow="Regulatory · Rule updates"
+            title="Rule update proposals"
+            description="Review proposed changes to internal rules sourced from regulatory updates."
+            href="/regulatory/rule-updates"
+            ctaLabel="Open proposals"
+          />
+          <ModuleCard
+            accent="cyan"
+            eyebrow="Regulatory · Action queue"
+            title="Action queue"
+            description="Compliance action items routed from spectroscopy and regulatory bridges."
+            href="/regulatory/action-queue"
+            ctaLabel="Open action queue"
+          />
+        </div>
       </section>
 
       <section id="regulatory-source-library" className="space-y-3 scroll-mt-8">
-        <h2 className="text-lg font-semibold tracking-tight">Source library</h2>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Source library</CardTitle>
-            <CardDescription>Catalog entries only — file contents are not shown here.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Regulatory · Sources"
+          title="Source library"
+          description="Catalog entries only — file contents are not shown here."
+          href="/regulatory/sources"
+          ctaLabel="Open source library"
+        >
             {dossierListError && !sources.length ? (
               <p className="text-sm text-muted-foreground">Unavailable while the dossier service is unreachable.</p>
             ) : sourcesUnavailable && !sources.length ? (
@@ -1003,12 +1040,11 @@ export function RegulatoryIntelligenceLanding() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </ModuleCard>
       </section>
 
       <section id="regulatory-review-queue" className="space-y-3 scroll-mt-8">
-        <h2 className="text-lg font-semibold tracking-tight">Regulatory review queue</h2>
+        <h2 className="font-mono text-lg font-bold tracking-tight">Regulatory review queue</h2>
         {loading ? (
           <EvidenceCard
             title="Regulatory review evidence"
@@ -1043,12 +1079,12 @@ export function RegulatoryIntelligenceLanding() {
             review_status="no active review items"
           />
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Dossiers with status in_review</CardTitle>
-              <CardDescription>Human review is required before relying on outputs for regulatory decisions.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <ModuleCard
+            accent="cyan"
+            eyebrow="Regulatory · Review"
+            title="Dossiers with status in_review"
+            description="Human review is required before relying on outputs for regulatory decisions."
+          >
               <div className="table-scroll">
                 <Table>
                   <TableHeader>
@@ -1087,8 +1123,7 @@ export function RegulatoryIntelligenceLanding() {
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
+          </ModuleCard>
         )}
       </section>
 

@@ -28,6 +28,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
@@ -210,6 +212,25 @@ const JURISDICTION_PRESET_LABELS = [
   "USP",
   "ICH",
 ] as const
+
+const dossierTabClass =
+  "font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+
+function requirementStatusColor(status: string | null | undefined): string | undefined {
+  switch ((status ?? "").toLowerCase()) {
+    case "satisfied":
+      return "var(--mt-green)"
+    case "in_progress":
+      return "var(--mt-cyan)"
+    case "evidence_needed":
+    case "review_needed":
+      return "var(--mt-amber)"
+    case "blocked":
+      return "var(--mt-red)"
+    default:
+      return undefined
+  }
+}
 
 function resolvePresetJurisdictionId(
   preset: (typeof JURISDICTION_PRESET_LABELS)[number],
@@ -2094,10 +2115,11 @@ export function RegulatoryDossierWorkspace() {
             Back
           </Link>
         </Button>
-        <Alert variant="destructive">
-          <AlertTitle>Invalid dossier</AlertTitle>
-          <AlertDescription>Use a numeric dossier id in the URL.</AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="error"
+          title="Invalid dossier"
+          description="Use a numeric dossier id in the URL."
+        />
       </div>
     )
   }
@@ -2114,7 +2136,13 @@ export function RegulatoryDossierWorkspace() {
       </div>
 
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Regulatory Dossier</h1>
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          MolTrace · Regulatory Dossier
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Dossier</h1>
         {dossier ? (
           <p className="text-sm text-muted-foreground">
             {readRecordString(dossier, "title") ?? `dossier_id ${dossierId}`}
@@ -2122,26 +2150,20 @@ export function RegulatoryDossierWorkspace() {
         ) : null}
       </header>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Important</AlertTitle>
-        <AlertDescription className="text-sm leading-relaxed">
-          Regulatory Intelligence provides cited decision support and requires qualified human review. It is not legal
-          advice or final regulatory approval.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Important"
+        description="Regulatory Intelligence provides cited decision support and requires qualified human review. It is not legal advice or final regulatory approval."
+      />
 
-      <Alert>
-        <AlertDescription className="text-sm leading-relaxed">
-          Draft regulatory intelligence. Requires qualified human review. Not legal advice or final regulatory determination.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="info"
+        title="Draft regulatory intelligence"
+        description="Requires qualified human review. Not legal advice or final regulatory determination."
+      />
 
       {loadErr ? (
-        <Alert variant="destructive">
-          <AlertTitle>Load error</AlertTitle>
-          <AlertDescription className="text-sm">{loadErr}</AlertDescription>
-        </Alert>
+        <AlertCard variant="error" title="Load error" description={loadErr} />
       ) : null}
 
       {loading ? (
@@ -2152,40 +2174,40 @@ export function RegulatoryDossierWorkspace() {
       ) : dossier ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
           <TabsList className="inline-flex h-auto min-h-9 w-full max-w-full flex-wrap justify-start gap-1 p-1">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="requirements">Requirements</TabsTrigger>
-            <TabsTrigger value="jurisdictional-map">Jurisdictional Map</TabsTrigger>
-            <TabsTrigger value="change-impact">Change Impact</TabsTrigger>
-            <TabsTrigger value="action-items">Action Items</TabsTrigger>
-            <TabsTrigger value="submission-package">Submission Package Builder</TabsTrigger>
-            <TabsTrigger value="json">Developer JSON</TabsTrigger>
+            <TabsTrigger value="overview" className={dossierTabClass}>Overview</TabsTrigger>
+            <TabsTrigger value="requirements" className={dossierTabClass}>Requirements</TabsTrigger>
+            <TabsTrigger value="jurisdictional-map" className={dossierTabClass}>Jurisdictional Map</TabsTrigger>
+            <TabsTrigger value="change-impact" className={dossierTabClass}>Change Impact</TabsTrigger>
+            <TabsTrigger value="action-items" className={dossierTabClass}>Action Items</TabsTrigger>
+            <TabsTrigger value="submission-package" className={dossierTabClass}>Submission Package Builder</TabsTrigger>
+            <TabsTrigger value="json" className={dossierTabClass}>Developer JSON</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="min-w-0 max-w-full space-y-4">
             {Number.isFinite(dossierId) ? <RegulatoryNotificationsCompactCard dossierId={dossierId} /> : null}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Overview</CardTitle>
-                <CardDescription>Dossier metadata — jurisdiction, intended use, status, and review state.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Overview"
+              title="Overview"
+              description="Dossier metadata — jurisdiction, intended use, status, and review state."
+            >
                 <dl className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">dossier title</dt>
+                    <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">dossier title</dt>
                     <dd className="mt-1 text-sm font-medium">{readRecordString(dossier, "title") ?? "—"}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">jurisdiction</dt>
+                    <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">jurisdiction</dt>
                     <dd className="mt-1 text-sm">{jurisdictionLabel}</dd>
                   </div>
                   <div className="sm:col-span-2">
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">intended use</dt>
+                    <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">intended use</dt>
                     <dd className="mt-1 text-sm text-muted-foreground">
                       {readRecordString(dossier, "intended_use") ?? "—"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">status</dt>
+                    <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">status</dt>
                     <dd className="mt-1">
                       <Badge variant="outline" className="capitalize">
                         {(readRecordString(dossier, "status") ?? "—").replace(/_/g, " ")}
@@ -2193,7 +2215,7 @@ export function RegulatoryDossierWorkspace() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">updated</dt>
+                    <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">updated</dt>
                     <dd className="mt-1 text-xs text-muted-foreground">
                       {formatWhen(readRecordString(dossier, "updated_at"))}
                     </dd>
@@ -2203,7 +2225,7 @@ export function RegulatoryDossierWorkspace() {
                 <Separator />
 
                 <div>
-                  <h3 className="text-sm font-medium">Linked records</h3>
+                  <h3 className="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Linked records</h3>
                   <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                     <li>
                       project_id:{" "}
@@ -2263,39 +2285,73 @@ export function RegulatoryDossierWorkspace() {
                 <Separator />
 
                 <div className="grid gap-4 md:grid-cols-3">
-                  <Card className="border-muted">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">requirements summary</CardTitle>
+                  <Card
+                    className="overflow-hidden rounded-xl border-muted py-0"
+                    style={{ borderTop: "3px solid var(--mt-cyan)" }}
+                  >
+                    <CardHeader className="pt-4 pb-2">
+                      <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                        Requirements summary
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground">
+                    <CardContent className="space-y-1 pb-4 text-sm text-muted-foreground">
                       <p>
-                        Total: <span className="font-mono text-foreground">{requirementsSummary.total}</span>
+                        Total:{" "}
+                        <span
+                          className="font-mono text-base font-bold"
+                          style={{ color: "var(--mt-cyan)" }}
+                        >
+                          {requirementsSummary.total}
+                        </span>
                       </p>
-                      <p className="mt-1">
-                        evidence_needed:{" "}
-                        <span className="font-mono text-foreground">{requirementsSummary.need}</span>
+                      <p>
+                        Evidence needed:{" "}
+                        <span
+                          className="font-mono text-base font-bold"
+                          style={{ color: "var(--mt-cyan)" }}
+                        >
+                          {requirementsSummary.need}
+                        </span>
                       </p>
                     </CardContent>
                   </Card>
-                  <Card className="border-muted">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">evidence gaps</CardTitle>
+                  <Card
+                    className="overflow-hidden rounded-xl border-muted py-0"
+                    style={{ borderTop: "3px solid var(--mt-amber)" }}
+                  >
+                    <CardHeader className="pt-4 pb-2">
+                      <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                        Evidence gaps
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground">
+                    <CardContent className="space-y-1 pb-4 text-sm text-muted-foreground">
                       <p>
-                        Count: <span className="font-mono text-foreground">{evidenceGapCount}</span>
+                        Count:{" "}
+                        <span
+                          className="font-mono text-base font-bold"
+                          style={{ color: "var(--mt-amber)" }}
+                        >
+                          {evidenceGapCount}
+                        </span>
                       </p>
-                      <p className="mt-1 text-xs">
+                      <p className="text-xs">
                         Uses missing_evidence_json from the latest risk assessment when present; otherwise requirements
                         in evidence_needed.
                       </p>
                     </CardContent>
                   </Card>
-                  <Card className="border-muted">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">review state</CardTitle>
+                  <Card
+                    className="overflow-hidden rounded-xl border-muted py-0"
+                    style={{ borderTop: "3px solid var(--mt-cyan)" }}
+                  >
+                    <CardHeader className="pt-4 pb-2">
+                      <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                        Review state
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground">{reviewStateLabel}</CardContent>
+                    <CardContent className="pb-4 text-sm text-muted-foreground">
+                      {reviewStateLabel}
+                    </CardContent>
                   </Card>
                 </div>
 
@@ -2321,10 +2377,11 @@ export function RegulatoryDossierWorkspace() {
                       Save status
                     </Button>
                   </div>
-                  {patchErr ? <p className="text-xs text-destructive">{patchErr}</p> : null}
+                  {patchErr ? (
+                    <AlertCard variant="error" title="Save failed" description={patchErr} />
+                  ) : null}
                 </div>
-              </CardContent>
-            </Card>
+            </ModuleCard>
             <RegulatoryDossierLinkedCompoundCard
               dossierId={dossierId}
               evidenceLinks={evidenceLinks}
@@ -2350,45 +2407,42 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="requirements" className="min-w-0 max-w-full space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Requirements Sections</CardTitle>
-                <CardDescription>
-                  Requirements parent section for evidence, compliance, impurity, solvent, nitrosamine, qNMR, and AI governance.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="max-w-md space-y-2">
-                  <Label>Requirements dropdown</Label>
-                  <Select value="requirements" onValueChange={setActiveTab}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select requirements section" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="requirements">Requirements</SelectItem>
-                      <SelectItem value="evidence">Evidence Links</SelectItem>
-                      <SelectItem value="compliance-rules">Compliance Rules</SelectItem>
-                      <SelectItem value="impurity-register">Impurity Risk Register</SelectItem>
-                      <SelectItem value="residual-solvents">Residual Solvent Watch</SelectItem>
-                      <SelectItem value="nitrosamine-watch">Nitrosamine Watch</SelectItem>
-                      <SelectItem value="qnmr-method-validation">qNMR / Method Validation</SelectItem>
-                      <SelectItem value="ai-governance">AI Governance</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <div className="flex flex-wrap items-center gap-2">
-                  <CardTitle className="text-lg">Requirements</CardTitle>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Sections"
+              title="Requirements Sections"
+              description="Requirements parent section for evidence, compliance, impurity, solvent, nitrosamine, qNMR, and AI governance."
+            >
+              <div className="max-w-md space-y-2">
+                <Label>Requirements dropdown</Label>
+                <Select value="requirements" onValueChange={setActiveTab}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select requirements section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="requirements">Requirements</SelectItem>
+                    <SelectItem value="evidence">Evidence Links</SelectItem>
+                    <SelectItem value="compliance-rules">Compliance Rules</SelectItem>
+                    <SelectItem value="impurity-register">Impurity Risk Register</SelectItem>
+                    <SelectItem value="residual-solvents">Residual Solvent Watch</SelectItem>
+                    <SelectItem value="nitrosamine-watch">Nitrosamine Watch</SelectItem>
+                    <SelectItem value="qnmr-method-validation">qNMR / Method Validation</SelectItem>
+                    <SelectItem value="ai-governance">AI Governance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </ModuleCard>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Requirements"
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Requirements
                   <InfoTooltip label="Requirements checklist" content={REQUIREMENTS_CHECKLIST_TOOLTIP} />
-                </div>
-                <CardDescription>
-                  Regulatory requirements checklist for this dossier — track completion status, add new requirements, and update individual items as evidence is gathered.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+                </span>
+              }
+              description="Regulatory requirements checklist for this dossier — track completion status, add new requirements, and update individual items as evidence is gathered."
+            >
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                   <h3 className="text-sm font-semibold">Add requirement</h3>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -2458,9 +2512,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
                   </div>
                   {reqAddErr ? (
-                    <Alert variant="destructive" className="mt-2">
-                      <AlertDescription className="text-sm">{reqAddErr}</AlertDescription>
-                    </Alert>
+                    <AlertCard variant="error" title="Add requirement failed" description={reqAddErr} />
                   ) : null}
                   <Button type="button" disabled={reqAddBusy} onClick={() => void addRequirement()}>
                     {reqAddBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -2471,9 +2523,7 @@ export function RegulatoryDossierWorkspace() {
                 <Separator />
 
                 {reqPatchErr ? (
-                  <Alert variant="destructive">
-                    <AlertDescription className="text-sm">{reqPatchErr}</AlertDescription>
-                  </Alert>
+                  <AlertCard variant="error" title="Update status failed" description={reqPatchErr} />
                 ) : null}
 
                 {requirements.length === 0 ? (
@@ -2499,16 +2549,25 @@ export function RegulatoryDossierWorkspace() {
                           const evCount = countIntListField(r, "evidence_link_ids_json")
                           const busy = id != null && reqPatchBusyKey === `id-${id}`
                           const draft = id != null ? statusDraftByReqId[id] : undefined
+                          const status = readRecordString(r, "status")
+                          const stripe = requirementStatusColor(status)
                           return (
-                            <TableRow key={id ?? readRecordString(r, "title")}>
+                            <TableRow
+                              key={id ?? readRecordString(r, "title")}
+                              style={stripe ? { boxShadow: `inset 3px 0 0 0 ${stripe}` } : undefined}
+                            >
                               <TableCell className="max-w-[220px] font-medium">
                                 {readRecordString(r, "title") ?? "—"}
                               </TableCell>
                               <TableCell className="text-xs">{readRecordString(r, "category") ?? "—"}</TableCell>
                               <TableCell className="text-xs">{readRecordString(r, "priority") ?? "—"}</TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="text-xs capitalize">
-                                  {(readRecordString(r, "status") ?? "—").replace(/_/g, " ")}
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs capitalize"
+                                  style={stripe ? { borderColor: stripe, color: stripe } : undefined}
+                                >
+                                  {(status ?? "—").replace(/_/g, " ")}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right font-mono text-xs tabular-nums">{citCount}</TableCell>
@@ -2561,8 +2620,7 @@ export function RegulatoryDossierWorkspace() {
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="evidence" className="min-w-0 max-w-full space-y-4">
@@ -3180,7 +3238,7 @@ export function RegulatoryDossierWorkspace() {
                       </div>
                       {assessWarnings.length ? (
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">warnings</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">warnings</p>
                           <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">
                             {assessWarnings.map((w, i) => (
                               <li key={`rw-${i}`}>{w}</li>
@@ -3190,7 +3248,7 @@ export function RegulatoryDossierWorkspace() {
                       ) : null}
                       {assessNotes.length ? (
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">notes</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">notes</p>
                           <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">
                             {assessNotes.map((n, i) => (
                               <li key={`rn-${i}`}>{n}</li>
@@ -3553,7 +3611,7 @@ export function RegulatoryDossierWorkspace() {
 
                         {metaRec && Object.keys(metaRec).length > 0 ? (
                           <div>
-                            <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">
+                            <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                               evidence source (metadata_json)
                             </p>
                             <ul className="space-y-1 font-mono text-[11px] text-muted-foreground">
@@ -3570,7 +3628,7 @@ export function RegulatoryDossierWorkspace() {
 
                         {rsj.length ? (
                           <div>
-                            <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">
+                            <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                               risk_signals_json (returned)
                             </p>
                             <pre className="max-h-40 overflow-auto rounded-md border bg-muted/30 p-2 text-[11px]">
@@ -3581,7 +3639,7 @@ export function RegulatoryDossierWorkspace() {
 
                         {warnList.length ? (
                           <div>
-                            <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">warnings</p>
+                            <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">warnings</p>
                             <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">
                               {warnList.map((w, i) => (
                                 <li key={`nw-${i}`}>{w}</li>
@@ -3953,7 +4011,7 @@ export function RegulatoryDossierWorkspace() {
                           </Badge>
                         </div>
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                             missing validation items (metadata_json.missing_metadata)
                           </p>
                           {(() => {
@@ -3976,7 +4034,7 @@ export function RegulatoryDossierWorkspace() {
                           })()}
                         </div>
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">warnings</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">warnings</p>
                           <ul className="list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
                             {regulatoryAssessmentWarnings(latestQnmrProfile).map((w, i) => (
                               <li key={`qw-${i}`}>{w}</li>
@@ -3984,7 +4042,7 @@ export function RegulatoryDossierWorkspace() {
                           </ul>
                         </div>
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">notes</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">notes</p>
                           <ul className="list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
                             {(Array.isArray(latestQnmrProfile.notes)
                               ? latestQnmrProfile.notes.filter((x): x is string => typeof x === "string")
@@ -3995,7 +4053,7 @@ export function RegulatoryDossierWorkspace() {
                           </ul>
                         </div>
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                             recommended actions (metadata_json.action_item_ids)
                           </p>
                           {(() => {
@@ -4012,7 +4070,7 @@ export function RegulatoryDossierWorkspace() {
                           })()}
                         </div>
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">citations_json</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">citations_json</p>
                           <pre className="max-h-32 overflow-auto rounded-md border bg-muted/30 p-2 text-[11px]">
                             {JSON.stringify(latestQnmrProfile.citations_json ?? [], null, 2)}
                           </pre>
@@ -4051,7 +4109,7 @@ export function RegulatoryDossierWorkspace() {
                           </Badge>
                         </div>
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                             missing validation items (metadata_json.missing_categories)
                           </p>
                           {(() => {
@@ -4074,7 +4132,7 @@ export function RegulatoryDossierWorkspace() {
                           })()}
                         </div>
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">warnings</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">warnings</p>
                           <ul className="list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
                             {readStringArray(latestMethodProfile, "warnings_json").map((w, i) => (
                               <li key={`mw-${i}`}>{w}</li>
@@ -4082,7 +4140,7 @@ export function RegulatoryDossierWorkspace() {
                           </ul>
                         </div>
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">notes</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">notes</p>
                           <ul className="list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
                             {readStringArray(latestMethodProfile, "notes_json").map((n, i) => (
                               <li key={`mn-${i}`}>{n}</li>
@@ -4326,13 +4384,13 @@ export function RegulatoryDossierWorkspace() {
                           <CardContent className="space-y-4 text-sm">
                             <dl className="grid gap-3 sm:grid-cols-2">
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   AI system
                                 </dt>
                                 <dd className="mt-1">{sys}</dd>
                               </div>
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   method / model version
                                 </dt>
                                 <dd className="mt-1 font-mono text-xs">
@@ -4340,7 +4398,7 @@ export function RegulatoryDossierWorkspace() {
                                 </dd>
                               </div>
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   workflow version
                                 </dt>
                                 <dd className="mt-1 font-mono text-xs">
@@ -4348,7 +4406,7 @@ export function RegulatoryDossierWorkspace() {
                                 </dd>
                               </div>
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   validation records
                                 </dt>
                                 <dd className="mt-1 font-mono text-xs">
@@ -4356,7 +4414,7 @@ export function RegulatoryDossierWorkspace() {
                                 </dd>
                               </div>
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   evidence_item_ids_json
                                 </dt>
                                 <dd className="mt-1 font-mono text-xs">
@@ -4364,19 +4422,19 @@ export function RegulatoryDossierWorkspace() {
                                 </dd>
                               </div>
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   human override state
                                 </dt>
                                 <dd className="mt-1 font-mono text-xs">{String(hOverride)}</dd>
                               </div>
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   human_review_required
                                 </dt>
                                 <dd className="mt-1 font-mono text-xs">{hReview}</dd>
                               </div>
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   governance status
                                 </dt>
                                 <dd className="mt-1">
@@ -4398,7 +4456,7 @@ export function RegulatoryDossierWorkspace() {
                               </p>
                             ) : null}
                             <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                 warnings
                               </p>
                               {warnList.length ? (
@@ -4412,7 +4470,7 @@ export function RegulatoryDossierWorkspace() {
                               )}
                             </div>
                             <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                 notes
                               </p>
                               {noteList.length ? (
@@ -4448,47 +4506,46 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="jurisdictional-map" className="min-w-0 max-w-full space-y-3">
-            <Card>
-              <CardHeader>
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="text-lg">Jurisdictional Map</CardTitle>
-                    <InfoTooltip label="Jurisdictional map" content={JURISDICTIONAL_MAP_TOOLTIP} />
-                  </div>
-                  <CardDescription>
-                    Maps this dossier's requirements and evidence to applicable jurisdictions and rule sets. Jurisdiction catalogue and source catalogue are available via{" "}
-                    <Link href="/regulatory/sources" className="underline-offset-4 hover:underline">
-                      Regulatory Sources
-                    </Link>
-                    .
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <Alert>
-                  <AlertDescription className="text-sm leading-relaxed text-muted-foreground">
-                    Outputs below come from the regulatory compliance API (rule sets, thresholds, and dossier metadata).
-                    This view does not assert jurisdiction-specific legal obligations.
-                  </AlertDescription>
-                </Alert>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Jurisdictions"
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Jurisdictional Map
+                  <InfoTooltip label="Jurisdictional map" content={JURISDICTIONAL_MAP_TOOLTIP} />
+                </span>
+              }
+              description={
+                <>
+                  Maps this dossier's requirements and evidence to applicable jurisdictions and rule sets. Jurisdiction catalogue and source catalogue are available via{" "}
+                  <Link href="/regulatory/sources" className="underline-offset-4 hover:underline">
+                    Regulatory Sources
+                  </Link>
+                  .
+                </>
+              }
+            >
+                <AlertCard
+                  variant="info"
+                  title="Compliance API outputs"
+                  description="Outputs below come from the regulatory compliance API (rule sets, thresholds, and dossier metadata). This view does not assert jurisdiction-specific legal obligations."
+                />
 
                 <dl className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                       dossier jurisdiction
                     </dt>
                     <dd className="mt-1 text-sm">{jurisdictionLabel}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">jurisdiction_id</dt>
+                    <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">jurisdiction_id</dt>
                     <dd className="mt-1 font-mono text-sm">{readRecordNumber(dossier, "jurisdiction_id") ?? "—"}</dd>
                   </div>
                 </dl>
 
                 {jmBuildErr ? (
-                  <Alert variant="destructive">
-                    <AlertDescription className="text-sm">{jmBuildErr}</AlertDescription>
-                  </Alert>
+                  <AlertCard variant="error" title="Build failed" description={jmBuildErr} />
                 ) : null}
 
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
@@ -4501,7 +4558,7 @@ export function RegulatoryDossierWorkspace() {
                   </p>
 
                   <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                       Jurisdiction presets
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
@@ -4530,7 +4587,7 @@ export function RegulatoryDossierWorkspace() {
                   </div>
 
                   <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                       Other / custom (all jurisdictions)
                     </p>
                     <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border bg-background/60 p-2">
@@ -4657,7 +4714,7 @@ export function RegulatoryDossierWorkspace() {
                           <CardContent className="space-y-4 text-sm">
                             <dl className="grid gap-3 sm:grid-cols-2">
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   jurisdiction
                                 </dt>
                                 <dd className="mt-1">
@@ -4668,7 +4725,7 @@ export function RegulatoryDossierWorkspace() {
                                 </dd>
                               </div>
                               <div>
-                                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   rule set
                                 </dt>
                                 <dd className="mt-1 text-sm">
@@ -4689,7 +4746,7 @@ export function RegulatoryDossierWorkspace() {
                             ) : null}
 
                             <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                 threshold summary
                               </p>
                               <div className="mt-2">
@@ -4698,7 +4755,7 @@ export function RegulatoryDossierWorkspace() {
                             </div>
 
                             <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                 requirement differences
                               </p>
                               <div className="mt-2">
@@ -4707,7 +4764,7 @@ export function RegulatoryDossierWorkspace() {
                             </div>
 
                             <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                 requirement_summary_json
                               </p>
                               <div className="mt-2">
@@ -4716,7 +4773,7 @@ export function RegulatoryDossierWorkspace() {
                             </div>
 
                             <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                 missing sources
                               </p>
                               {missingSourceNotes.length ? (
@@ -4731,7 +4788,7 @@ export function RegulatoryDossierWorkspace() {
                             </div>
 
                             <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                 warnings
                               </p>
                               {warnList.length ? (
@@ -4746,7 +4803,7 @@ export function RegulatoryDossierWorkspace() {
                             </div>
 
                             <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">notes</p>
+                              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">notes</p>
                               {noteList.length ? (
                                 <ul className="mt-1 list-inside list-disc text-xs leading-relaxed">
                                   {noteList.map((n, i) => (
@@ -4820,29 +4877,33 @@ export function RegulatoryDossierWorkspace() {
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
-              </CardContent>
-            </Card>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="change-impact" className="min-w-0 max-w-full space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Change Impact</CardTitle>
-                <CardDescription>Downstream impact of detected regulatory changes on this dossier's requirements, evidence links, rule sets, and action items.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Change Impact"
+              title="Change Impact"
+              description="Downstream impact of detected regulatory changes on this dossier's requirements, evidence links, rule sets, and action items."
+            >
                 {changeImpactErr ? (
-                  <Alert variant="destructive">
-                    <AlertDescription className="text-sm">{changeImpactErr}</AlertDescription>
-                  </Alert>
+                  <AlertCard variant="error" title="Change impact failed" description={changeImpactErr} />
                 ) : null}
 
                 {!changeImpactErr && changeImpact ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                       human_review_required
                     </span>
-                    <Badge variant={changeImpact.human_review_required ? "destructive" : "secondary"}>
+                    <Badge
+                      variant="outline"
+                      style={
+                        changeImpact.human_review_required
+                          ? { borderColor: "var(--mt-amber)", color: "var(--mt-amber)" }
+                          : { borderColor: "var(--mt-green)", color: "var(--mt-green)" }
+                      }
+                    >
                       {changeImpact.human_review_required ? "required" : "not flagged"}
                     </Badge>
                   </div>
@@ -4898,34 +4959,64 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-3">
-                      <Card className="border-muted">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">impacted requirements</CardTitle>
+                      <Card
+                        className="overflow-hidden rounded-xl border-muted py-0"
+                        style={{ borderTop: "3px solid var(--mt-cyan)" }}
+                      >
+                        <CardHeader className="pt-4 pb-2">
+                          <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Impacted requirements
+                          </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2 text-xs">
-                          <p className="tabular-nums text-foreground">{dossierMergedRequirementIds.length}</p>
+                        <CardContent className="space-y-1 pb-4 text-xs">
+                          <p
+                            className="font-mono text-2xl font-bold tabular-nums leading-none"
+                            style={{ color: "var(--mt-cyan)" }}
+                          >
+                            {dossierMergedRequirementIds.length}
+                          </p>
                           <p className="break-all font-mono text-[11px] text-muted-foreground">
                             {dossierMergedRequirementIds.length ? dossierMergedRequirementIds.join(", ") : "—"}
                           </p>
                         </CardContent>
                       </Card>
-                      <Card className="border-muted">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">impacted action items</CardTitle>
+                      <Card
+                        className="overflow-hidden rounded-xl border-muted py-0"
+                        style={{ borderTop: "3px solid var(--mt-amber)" }}
+                      >
+                        <CardHeader className="pt-4 pb-2">
+                          <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Impacted action items
+                          </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2 text-xs">
-                          <p className="tabular-nums text-foreground">{dossierMergedActionItemIds.length}</p>
+                        <CardContent className="space-y-1 pb-4 text-xs">
+                          <p
+                            className="font-mono text-2xl font-bold tabular-nums leading-none"
+                            style={{ color: "var(--mt-amber)" }}
+                          >
+                            {dossierMergedActionItemIds.length}
+                          </p>
                           <p className="break-all font-mono text-[11px] text-muted-foreground">
                             {dossierMergedActionItemIds.length ? dossierMergedActionItemIds.join(", ") : "—"}
                           </p>
                         </CardContent>
                       </Card>
-                      <Card className="border-muted">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">impacted rule sets</CardTitle>
+                      <Card
+                        className="overflow-hidden rounded-xl border-muted py-0"
+                        style={{ borderTop: "3px solid var(--mt-cyan)" }}
+                      >
+                        <CardHeader className="pt-4 pb-2">
+                          <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Impacted rule sets
+                          </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2 text-xs">
-                          <p className="tabular-nums text-foreground">{dossierMergedRuleSetIds.length}</p>
+                        <CardContent className="space-y-1 pb-4 text-xs">
+                          <p
+                            className="font-mono text-2xl font-bold tabular-nums leading-none"
+                            style={{ color: "var(--mt-cyan)" }}
+                          >
+                            {dossierMergedRuleSetIds.length}
+                          </p>
                           <p className="break-all font-mono text-[11px] text-muted-foreground">
                             {dossierMergedRuleSetIds.length ? dossierMergedRuleSetIds.join(", ") : "—"}
                           </p>
@@ -4934,7 +5025,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div className="space-y-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                         recommended actions
                       </p>
                       {dossierMergedRecommendedActions.length === 0 ? (
@@ -4961,45 +5052,40 @@ export function RegulatoryDossierWorkspace() {
                 {!changeImpactErr && changeImpact ? (
                   <DeveloperJsonPanel data={changeImpact} />
                 ) : null}
-              </CardContent>
-            </Card>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="action-items" className="min-w-0 max-w-full space-y-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Action Items Sections</CardTitle>
-                <CardDescription>
-                  Action Items parent section for cited Q&A, risk, review, and readiness.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="max-w-md space-y-2">
-                  <Label>Action Items dropdown</Label>
-                  <Select value="action-items" onValueChange={setActiveTab}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select action item section" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="action-items">Action Items</SelectItem>
-                      <SelectItem value="qa">Cited Q&amp;A</SelectItem>
-                      <SelectItem value="risk">Risk Assessment</SelectItem>
-                      <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="readiness">Readiness Report</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Action Sections"
+              title="Action Items Sections"
+              description="Action Items parent section for cited Q&A, risk, review, and readiness."
+            >
+              <div className="max-w-md space-y-2">
+                <Label>Action Items dropdown</Label>
+                <Select value="action-items" onValueChange={setActiveTab}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select action item section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="action-items">Action Items</SelectItem>
+                    <SelectItem value="qa">Cited Q&amp;A</SelectItem>
+                    <SelectItem value="risk">Risk Assessment</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
+                    <SelectItem value="readiness">Readiness Report</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </ModuleCard>
             {Number.isFinite(dossierId) ? (
               <RegulatoryActionQueueCard dossierId={dossierId} />
             ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Action Items</CardTitle>
-                  <CardDescription>Invalid dossier id.</CardDescription>
-                </CardHeader>
-              </Card>
+              <AlertCard
+                variant="error"
+                title="Invalid dossier"
+                description="Action Items unavailable — use a numeric dossier id in the URL."
+              />
             )}
             <ReactionOptimizationHandoffCard
               dossierId={dossierId}
@@ -5117,27 +5203,27 @@ export function RegulatoryDossierWorkspace() {
                   ) : null}
 
                   <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">question</p>
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">question</p>
                     <p className="mt-1 whitespace-pre-wrap">{readRecordString(queryResult, "question") ?? "—"}</p>
                   </div>
 
                   {isRecord(queryResult.answer) ? (
                     <div className="space-y-4 rounded-md border bg-muted/30 p-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-xs font-medium uppercase text-muted-foreground">answer</p>
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">answer</p>
                         <Badge variant="outline" className="text-xs capitalize">
                           human_review_required:{" "}
                           {String((queryResult.answer as Record<string, unknown>).human_review_required ?? "—")}
                         </Badge>
                       </div>
                       <div>
-                        <p className="text-xs font-medium uppercase text-muted-foreground">answer_text</p>
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">answer_text</p>
                         <p className="mt-1 whitespace-pre-wrap leading-relaxed">
                           {readRecordString(queryResult.answer as Record<string, unknown>, "answer_text") ?? "—"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium uppercase text-muted-foreground">confidence_label</p>
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">confidence_label</p>
                         <p className="mt-1 font-mono text-xs">
                           {readRecordString(queryResult.answer as Record<string, unknown>, "confidence_label") ?? "—"}
                         </p>
@@ -5173,7 +5259,7 @@ export function RegulatoryDossierWorkspace() {
                       ((queryResult.answer as Record<string, unknown>).citations as unknown[]).filter(isRecord).length >
                         0 ? (
                         <div>
-                          <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">citations</p>
+                          <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">citations</p>
                           <ul className="space-y-3">
                             {((queryResult.answer as Record<string, unknown>).citations as unknown[])
                               .filter(isRecord)
@@ -5206,7 +5292,7 @@ export function RegulatoryDossierWorkspace() {
                       )}
 
                       <div>
-                        <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">missing_sources_json</p>
+                        <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">missing_sources_json</p>
                         {Array.isArray((queryResult.answer as Record<string, unknown>).missing_sources_json) &&
                         ((queryResult.answer as Record<string, unknown>).missing_sources_json as unknown[]).length >
                           0 ? (
@@ -5225,7 +5311,7 @@ export function RegulatoryDossierWorkspace() {
                       </div>
 
                       <div>
-                        <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">warnings</p>
+                        <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">warnings</p>
                         {(() => {
                           const ans = queryResult.answer as Record<string, unknown>
                           const merged = [
@@ -5246,7 +5332,7 @@ export function RegulatoryDossierWorkspace() {
                       </div>
 
                       <div>
-                        <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">notes</p>
+                        <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">notes</p>
                         {(() => {
                           const ans = queryResult.answer as Record<string, unknown>
                           const merged = [
@@ -5324,7 +5410,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">risk factors</p>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">risk factors</p>
                       {dictListField(riskAssessment, "risk_factors_json").length ? (
                         <ul className="space-y-2 font-mono text-[11px] text-muted-foreground">
                           {dictListField(riskAssessment, "risk_factors_json").map((row, i) => (
@@ -5339,7 +5425,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">missing evidence</p>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">missing evidence</p>
                       {dictListField(riskAssessment, "missing_evidence_json").length ? (
                         <ul className="space-y-2 font-mono text-[11px] text-muted-foreground">
                           {dictListField(riskAssessment, "missing_evidence_json").map((row, i) => (
@@ -5354,7 +5440,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">contradictions</p>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">contradictions</p>
                       {dictListField(riskAssessment, "contradictions_json").length ? (
                         <ul className="space-y-2 font-mono text-[11px] text-muted-foreground">
                           {dictListField(riskAssessment, "contradictions_json").map((row, i) => (
@@ -5369,7 +5455,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">recommended actions</p>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">recommended actions</p>
                       {dictListField(riskAssessment, "recommended_actions_json").length ? (
                         <ul className="space-y-2 font-mono text-[11px] text-muted-foreground">
                           {dictListField(riskAssessment, "recommended_actions_json").map((row, i) => (
@@ -5384,7 +5470,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">citations</p>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">citations</p>
                       {Array.isArray(riskAssessment.citation_ids_json) &&
                       (riskAssessment.citation_ids_json as unknown[]).length > 0 ? (
                         <p className="font-mono text-xs text-muted-foreground">
@@ -5489,29 +5575,29 @@ export function RegulatoryDossierWorkspace() {
 
                 {latestReview ? (
                   <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3">
-                    <p className="text-xs font-medium uppercase text-muted-foreground">Latest review (from server)</p>
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Latest review (from server)</p>
                     <div>
-                      <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">decision</p>
+                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">decision</p>
                       <Badge variant={reviewDecisionBadgeVariant(readRecordString(latestReview, "decision"))}>
                         {readRecordString(latestReview, "decision") ?? "—"}
                       </Badge>
                     </div>
                     <div>
-                      <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">status</p>
+                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">status</p>
                       <Badge variant="outline">{readRecordString(dossier ?? {}, "status") ?? "—"}</Badge>
                     </div>
                     <div>
-                      <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">reviewer_name</p>
+                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">reviewer_name</p>
                       <p className="text-sm">{readRecordString(latestReview, "reviewer_name") ?? "—"}</p>
                     </div>
                     <div>
-                      <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">rationale</p>
+                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">rationale</p>
                       <p className="whitespace-pre-wrap text-sm text-muted-foreground">
                         {readRecordString(latestReview, "rationale") ?? "—"}
                       </p>
                     </div>
                     <div>
-                      <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">created_at</p>
+                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">created_at</p>
                       <p className="text-sm text-muted-foreground">
                         {formatWhen(readRecordString(latestReview, "created_at"))}
                       </p>
@@ -5524,7 +5610,7 @@ export function RegulatoryDossierWorkspace() {
                 {reviews.length > 0 ? (
                   <>
                     <Separator />
-                    <p className="text-xs font-medium uppercase text-muted-foreground">All review decisions</p>
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">All review decisions</p>
                     <div className="table-scroll">
                       <Table>
                         <TableHeader>
@@ -5598,7 +5684,7 @@ export function RegulatoryDossierWorkspace() {
                   <>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <p className="text-xs font-medium uppercase text-muted-foreground">dossier status</p>
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">dossier status</p>
                         <p className="mt-1 text-sm">
                           {isRecord(readinessReport.review_status_json)
                             ? readRecordString(readinessReport.review_status_json as Record<string, unknown>, "dossier_status") ?? "—"
@@ -5612,7 +5698,7 @@ export function RegulatoryDossierWorkspace() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium uppercase text-muted-foreground">report hash (if returned)</p>
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">report hash (if returned)</p>
                         <p className="mt-1 break-all font-mono text-xs">
                           {readReportHashFromMetadata(readinessReport) ?? "—"}
                         </p>
@@ -5620,7 +5706,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div>
-                      <p className="text-xs font-medium uppercase text-muted-foreground">readiness summary</p>
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">readiness summary</p>
                       {isRecord(readinessReport.summary_json) ? (
                         <dl className="mt-2 grid gap-2 rounded-md border bg-muted/30 p-3 text-xs sm:grid-cols-2">
                           {Object.entries(readinessReport.summary_json as Record<string, unknown>).map(([k, v]) => (
@@ -5644,11 +5730,11 @@ export function RegulatoryDossierWorkspace() {
                       return (
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div className="rounded-md border bg-card p-3">
-                            <p className="text-xs font-medium uppercase text-muted-foreground">requirements satisfied</p>
+                            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">requirements satisfied</p>
                             <p className="mt-1 text-2xl font-semibold tabular-nums">{sat}</p>
                           </div>
                           <div className="rounded-md border bg-card p-3">
-                            <p className="text-xs font-medium uppercase text-muted-foreground">requirements blocked</p>
+                            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">requirements blocked</p>
                             <p className="mt-1 text-2xl font-semibold tabular-nums">{blocked}</p>
                           </div>
                         </div>
@@ -5656,7 +5742,7 @@ export function RegulatoryDossierWorkspace() {
                     })()}
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">evidence gap</p>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">evidence gap</p>
                       {dictListField(readinessReport, "gaps_json").length ? (
                         <ul className="space-y-2 font-mono text-[11px] text-muted-foreground">
                           {dictListField(readinessReport, "gaps_json").map((row, i) => (
@@ -5671,7 +5757,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">citations</p>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">citations</p>
                       {Array.isArray(readinessReport.citation_ids_json) &&
                       (readinessReport.citation_ids_json as unknown[]).length > 0 ? (
                         <p className="font-mono text-xs text-muted-foreground">
@@ -5685,7 +5771,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">risk summary</p>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">risk summary</p>
                       {isRecord(readinessReport.risks_json) ? (
                         <pre className="max-h-64 overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] leading-relaxed">
                           {JSON.stringify(readinessReport.risks_json, null, 2)}
@@ -5696,7 +5782,7 @@ export function RegulatoryDossierWorkspace() {
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">review status</p>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">review status</p>
                       {isRecord(readinessReport.review_status_json) ? (
                         <dl className="grid gap-2 rounded-md border bg-muted/30 p-3 text-xs sm:grid-cols-2">
                           {Object.entries(readinessReport.review_status_json as Record<string, unknown>).map(([k, v]) => (
@@ -5717,7 +5803,7 @@ export function RegulatoryDossierWorkspace() {
                       const links = downloadLinksFromMetadata(readinessReport)
                       return (
                         <div>
-                          <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">downloads</p>
+                          <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">downloads</p>
                           {links.length ? (
                             <div className="flex flex-wrap gap-2">
                               {links.map((l) => (
@@ -5736,7 +5822,7 @@ export function RegulatoryDossierWorkspace() {
                     })()}
 
                     <div>
-                      <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">warnings</p>
+                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">warnings</p>
                       {(() => {
                         const merged = [
                           ...readStringArray(readinessReport, "warnings"),
@@ -5763,27 +5849,31 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="submission-package" className="min-w-0 max-w-full space-y-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Submission Package Builder</CardTitle>
-                <CardDescription>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Submission Package"
+              title="Submission Package Builder"
+              description={
+                <>
                   Assemble a draft regulatory submission package with source-backed artefacts. Package status is backend-driven — treat as{" "}
                   <span className="font-medium text-foreground">ready for review</span> only when the status field explicitly indicates it.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Alert>
-                  <AlertDescription className="text-xs text-muted-foreground">
-                    Build a <span className="font-medium text-foreground">draft package</span> with source-backed artifacts.
-                    Package status is backend-driven; treat outputs as <span className="font-medium text-foreground">ready for review</span> or{" "}
-                    <span className="font-medium text-foreground">exported package</span> only when status fields explicitly say so.
-                  </AlertDescription>
-                </Alert>
+                </>
+              }
+            >
+                <AlertCard
+                  variant="info"
+                  title="Draft package"
+                  description={
+                    <>
+                      Build a <span className="font-medium text-foreground">draft package</span> with source-backed artifacts.
+                      Package status is backend-driven; treat outputs as <span className="font-medium text-foreground">ready for review</span> or{" "}
+                      <span className="font-medium text-foreground">exported package</span> only when status fields explicitly say so.
+                    </>
+                  }
+                />
 
                 {submissionPackageErr ? (
-                  <Alert variant="destructive">
-                    <AlertDescription className="text-sm">{submissionPackageErr}</AlertDescription>
-                  </Alert>
+                  <AlertCard variant="error" title="Submission package failed" description={submissionPackageErr} />
                 ) : null}
 
                 <div className="grid gap-3 md:grid-cols-2">
@@ -5896,17 +5986,17 @@ export function RegulatoryDossierWorkspace() {
                     <div className="space-y-4 rounded-md border p-3">
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
-                          <p className="text-xs font-medium uppercase text-muted-foreground">status</p>
+                          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">status</p>
                           <p className="mt-1 text-sm">{packageStatus}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-medium uppercase text-muted-foreground">package SHA-256</p>
+                          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">package SHA-256</p>
                           <p className="mt-1 break-all font-mono text-xs">{packageSha ?? "—"}</p>
                         </div>
                       </div>
 
                       <div>
-                        <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">package manifest</p>
+                        <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">package manifest</p>
                         <pre className="max-h-72 overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] leading-relaxed">
                           {JSON.stringify(packageManifest, null, 2)}
                         </pre>
@@ -5914,13 +6004,13 @@ export function RegulatoryDossierWorkspace() {
 
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">included file IDs</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">included file IDs</p>
                           <p className="font-mono text-xs text-muted-foreground">
                             {fileIds.length ? fileIds.join(", ") : "—"}
                           </p>
                         </div>
                         <div>
-                          <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">included artifact IDs</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">included artifact IDs</p>
                           <p className="font-mono text-xs text-muted-foreground">
                             {artifactIds.length ? artifactIds.join(", ") : "—"}
                           </p>
@@ -5928,7 +6018,7 @@ export function RegulatoryDossierWorkspace() {
                       </div>
 
                       <div>
-                        <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">warnings</p>
+                        <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">warnings</p>
                         {warnings.length ? (
                           <ul className="list-inside list-disc text-xs text-muted-foreground">
                             {warnings.map((w, i) => (
@@ -5941,7 +6031,7 @@ export function RegulatoryDossierWorkspace() {
                       </div>
 
                       <div>
-                        <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">download/open package</p>
+                        <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">download/open package</p>
                         <div className="flex flex-wrap gap-2">
                           {directUrl ? (
                             <Button variant="outline" size="sm" asChild>
@@ -5972,20 +6062,18 @@ export function RegulatoryDossierWorkspace() {
                     </div>
                   )
                 })()}
-              </CardContent>
-            </Card>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="json" className="min-w-0 max-w-full space-y-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Developer JSON</CardTitle>
-                <CardDescription>Aggregated payloads from this workspace (no automatic refresh on tab change).</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DeveloperJsonPanel data={devPayload} />
-              </CardContent>
-            </Card>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Developer JSON"
+              title="Developer JSON"
+              description="Aggregated payloads from this workspace (no automatic refresh on tab change)."
+            >
+              <DeveloperJsonPanel data={devPayload} />
+            </ModuleCard>
           </TabsContent>
         </Tabs>
       ) : !loadErr ? (
