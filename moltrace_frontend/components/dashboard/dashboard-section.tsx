@@ -18,7 +18,7 @@ export function DashboardSection({
   title,
   description,
   icon: Icon,
-  defaultOpen = true,
+  defaultOpen = false,
   badge,
   children,
 }: DashboardSectionProps) {

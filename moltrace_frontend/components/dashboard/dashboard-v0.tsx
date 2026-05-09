@@ -990,6 +990,7 @@ export function DashboardV0() {
         title="Overview"
         description="Top metrics, validation readiness, and tenant onboarding."
         icon={LayoutDashboard}
+        defaultOpen
       >
       {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

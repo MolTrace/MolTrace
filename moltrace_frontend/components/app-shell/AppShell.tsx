@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <MoleculeLogoMark className="h-10 w-10 rounded-xl" />
             <span>
               <span className="block text-sm font-semibold tracking-wide">
-                <span className="text-white">Mol</span>
+                <span className="font-bold text-white">Mol</span>
                 <span className={moltraceTraceClassName}>Trace</span>
               </span>
               <span className="block text-xs text-slate-400">Scientific intelligence</span>
@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/" className="flex items-center gap-2 font-semibold">
                 <MoleculeLogoMark className="h-5 w-5 rounded-sm" />
                 <span>
-                  <span className="text-white">Mol</span>
+                  <span className="font-bold text-white">Mol</span>
                   <span className={moltraceTraceClassName}>Trace</span>
                 </span>
               </Link>

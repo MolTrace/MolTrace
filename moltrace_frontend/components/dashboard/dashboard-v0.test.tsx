@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { DashboardV0 } from "@/components/dashboard/dashboard-v0"
@@ -92,10 +93,13 @@ describe("DashboardV0 connector/ingestion fallback", () => {
   })
 
   it("shows subtle summary unavailable message and keeps dashboard content", async () => {
+    const user = userEvent.setup()
     render(<DashboardV0 />)
 
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument()
     expect(screen.getByText("Active Analyses")).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: /Expand Operations section/i }))
 
     await waitFor(() => {
       expect(screen.getByText("Connector and ingestion summary")).toBeInTheDocument()
