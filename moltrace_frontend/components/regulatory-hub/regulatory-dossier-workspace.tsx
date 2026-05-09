@@ -2166,7 +2166,7 @@ export function RegulatoryDossierWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Overview</CardTitle>
-                <CardDescription>GET /regulatory/dossiers/{"{dossier_id}"}</CardDescription>
+                <CardDescription>Dossier metadata — jurisdiction, intended use, status, and review state.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <dl className="grid gap-3 sm:grid-cols-2">
@@ -2302,7 +2302,7 @@ export function RegulatoryDossierWorkspace() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Update status (PATCH /regulatory/dossiers/{"{dossier_id}"})</Label>
+                  <Label className="text-sm font-medium">Update dossier status</Label>
                   <div className="flex flex-wrap items-center gap-2">
                     <Select value={statusDraft} onValueChange={setStatusDraft}>
                       <SelectTrigger className="w-[220px]">
@@ -2385,8 +2385,7 @@ export function RegulatoryDossierWorkspace() {
                   <InfoTooltip label="Requirements checklist" content={REQUIREMENTS_CHECKLIST_TOOLTIP} />
                 </div>
                 <CardDescription>
-                  GET /regulatory/dossiers/{"{dossier_id}"}/requirements · POST …/requirements · PATCH
-                  /regulatory/requirements/{"{requirement_id}"}
+                  Regulatory requirements checklist for this dossier — track completion status, add new requirements, and update individual items as evidence is gathered.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -2576,8 +2575,7 @@ export function RegulatoryDossierWorkspace() {
               <CardHeader>
                 <CardTitle className="text-lg">Evidence Links</CardTitle>
                 <CardDescription>
-                  POST /regulatory/dossiers/{"{dossier_id}"}/evidence-links · GET …/evidence-links — link analytical or
-                  reaction artefacts by id and short summary only; open related apps without copying raw payloads here.
+                  Link analytical or reaction artefacts to dossier requirements by ID and summary — open SpectraCheck or Reaction Studio for full evidence detail without copying raw payloads here.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -2790,8 +2788,7 @@ export function RegulatoryDossierWorkspace() {
                     <InfoTooltip label="Impurity risk register" content={IMPURITY_REGISTER_TOOLTIP} />
                   </div>
                   <CardDescription>
-                    GET /regulatory/dossiers/{"{dossier_id}"}/impurity-risk-register · POST …/impurity-risk-register · Run
-                    register assessment calls POST /regulatory/dossiers/{"{dossier_id}"}/batch-assessment.
+                    Identified impurity entries with assessed risk levels — add new impurities, run a batch regulatory assessment, and track review status against applicable limits.
                   </CardDescription>
                 </div>
                 <Button
@@ -3051,9 +3048,7 @@ export function RegulatoryDossierWorkspace() {
                     <InfoTooltip label="Residual solvent watch" content={RESIDUAL_SOLVENT_WATCH_TOOLTIP} />
                   </div>
                   <CardDescription>
-                    GET /regulatory/dossiers/{"{dossier_id}"}/residual-solvent-assessment · POST …/residual-solvent-assessment
-                    · Matching uses active regulatory rule sets for this dossier jurisdiction on the server;
-                    metadata_json.source_evidence and metadata_json.selected_rule_set_id are recorded with each run.
+                    ICH Q3C residual solvent assessment — detected solvents are matched against active regulatory rule sets for this dossier's jurisdiction. Rule set and source evidence are recorded with each run.
                   </CardDescription>
                 </div>
               </CardHeader>
@@ -3065,7 +3060,7 @@ export function RegulatoryDossierWorkspace() {
                 ) : null}
 
                 <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                  Active rule sets for this dossier jurisdiction (GET /regulatory/rule-sets?status=active):{" "}
+                  Active rule sets for this dossier jurisdiction:{" "}
                   {activeRuleSetsForDossier.length ? (
                     <span className="font-mono text-foreground">
                       {activeRuleSetsForDossier.map((r) => readRecordNumber(r, "id")).filter((x) => x != null).join(", ")}
@@ -3334,10 +3329,8 @@ export function RegulatoryDossierWorkspace() {
                     <InfoTooltip label="Nitrosamine watch" content={NITROSAMINE_WATCH_TOOLTIP} />
                   </div>
                   <CardDescription>
-                    GET /regulatory/dossiers/{"{dossier_id}"}/nitrosamine-watch · POST …/nitrosamine-watch · This view
-                    describes nitrosamine-related review triggers and possible nitrosamine risk signals; treat outputs as{" "}
-                    <span className="font-medium text-foreground">review required</span> unless qualified review states
-                    otherwise.
+                    Nitrosamine risk review — monitors for structural and process signals that may indicate nitrosamine impurity risk. Treat all outputs as{" "}
+                    <span className="font-medium text-foreground">review required</span> unless a qualified reviewer explicitly confirms or dismisses each signal.
                   </CardDescription>
                 </div>
               </CardHeader>
@@ -3683,13 +3676,7 @@ export function RegulatoryDossierWorkspace() {
                     <InfoTooltip label="qNMR / Method Validation" content={QNMR_METHOD_VALIDATION_TOOLTIP} />
                   </div>
                   <CardDescription>
-                    POST /regulatory/dossiers/{"{dossier_id}"}/qnmr-compliance · GET …/qnmr-compliance · POST
-                    /regulatory/dossiers/{"{dossier_id}"}/method-validation-profile · GET …/method-validation-profile.
-                    Status words reflect readiness for review (for example{" "}
-                    <span className="font-medium text-foreground">ready for review</span>,{" "}
-                    <span className="font-medium text-foreground">gaps identified</span>,{" "}
-                    <span className="font-medium text-foreground">not assessed</span>) — do not equate with “validated”
-                    unless the backend and a reviewer explicitly support that qualification.
+                    qNMR compliance readiness and method validation profile — readiness states are ready for review, gaps identified, or not assessed. Do not equate with validated unless both backend outputs and a qualified reviewer explicitly support that qualification.
                   </CardDescription>
                 </div>
               </CardHeader>
@@ -4147,8 +4134,7 @@ export function RegulatoryDossierWorkspace() {
                     <InfoTooltip label="AI Governance" content={AI_GOVERNANCE_RECORD_TOOLTIP} />
                   </div>
                   <CardDescription>
-                    POST /regulatory/dossiers/{"{dossier_id}"}/ai-governance-record · GET
-                    /regulatory/dossiers/{"{dossier_id}"}/ai-governance-record.
+                    AI governance record for this dossier — documents the AI system name, version, intended use, and human oversight requirements for regulatory traceability.
                   </CardDescription>
                 </div>
               </CardHeader>
@@ -4470,9 +4456,7 @@ export function RegulatoryDossierWorkspace() {
                     <InfoTooltip label="Jurisdictional map" content={JURISDICTIONAL_MAP_TOOLTIP} />
                   </div>
                   <CardDescription>
-                    POST /regulatory/dossiers/{"{dossier_id}"}/jurisdictional-map · GET
-                    /regulatory/dossiers/{"{dossier_id}"}/jurisdictional-map. Jurisdiction catalogue: GET
-                    /regulatory/jurisdictions. Source catalogue:{" "}
+                    Maps this dossier's requirements and evidence to applicable jurisdictions and rule sets. Jurisdiction catalogue and source catalogue are available via{" "}
                     <Link href="/regulatory/sources" className="underline-offset-4 hover:underline">
                       Regulatory Sources
                     </Link>
@@ -4806,7 +4790,7 @@ export function RegulatoryDossierWorkspace() {
 
                 <Collapsible className="rounded-lg border">
                   <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/40">
-                    Jurisdiction catalogue (GET /regulatory/jurisdictions)
+                    Jurisdiction catalogue
                     <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
                   </CollapsibleTrigger>
                   <CollapsibleContent className="border-t px-4 pb-4 pt-2">
@@ -4844,7 +4828,7 @@ export function RegulatoryDossierWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Change Impact</CardTitle>
-                <CardDescription>GET /regulatory/dossiers/{"{dossier_id}"}/change-impact</CardDescription>
+                <CardDescription>Downstream impact of detected regulatory changes on this dossier's requirements, evidence links, rule sets, and action items.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {changeImpactErr ? (
@@ -5044,8 +5028,7 @@ export function RegulatoryDossierWorkspace() {
               <CardHeader>
                 <CardTitle className="text-lg">Cited Q&amp;A</CardTitle>
                 <CardDescription>
-                  POST /regulatory/dossiers/{"{dossier_id}"}/query · GET /regulatory/queries/{"{query_id}"} — responses
-                  are produced only by the backend; nothing is synthesized in the browser.
+                  Cited regulatory Q&A — questions are answered by the backend using source-referenced guidance; responses are not synthesized in the browser. This is not legal advice.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -5304,8 +5287,7 @@ export function RegulatoryDossierWorkspace() {
                 <div>
                   <CardTitle className="text-lg">Risk Assessment</CardTitle>
                   <CardDescription>
-                    POST /regulatory/dossiers/{"{dossier_id}"}/risk-assessment · GET …/risk-assessment — source-supported
-                    signals only; output requires review and is not a substitute for qualified regulatory judgment.
+                    Source-supported risk signals for this dossier — highlights gaps and contradictions for internal readiness review. Output requires qualified regulatory judgment and is not a substitute for it.
                   </CardDescription>
                 </div>
                 <Button type="button" variant="outline" size="sm" disabled={riskRefreshBusy} onClick={() => void createRiskAssessment()}>
@@ -5432,7 +5414,7 @@ export function RegulatoryDossierWorkspace() {
               <CardHeader>
                 <CardTitle className="text-lg">Review</CardTitle>
                 <CardDescription>
-                  POST /regulatory/dossiers/{"{dossier_id}"}/review · GET /regulatory/dossiers/{"{dossier_id}"}/review
+                  Record an internal review decision on this dossier — approve, reject, or escalate — with reviewer attribution. Not legal advice or external regulatory approval.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -5588,10 +5570,8 @@ export function RegulatoryDossierWorkspace() {
                 <div>
                   <CardTitle className="text-lg">Readiness Report</CardTitle>
                   <CardDescription>
-                    POST /regulatory/dossiers/{"{dossier_id}"}/readiness-report · GET /regulatory/readiness-reports/
-                    {"{report_id}"} — readiness summary and evidence gap listings are draft; they{" "}
-                    <span className="font-medium text-foreground">require review</span> and are not compliance
-                    certificates.
+                    Generate a readiness report summarizing evidence coverage and identified gaps. Readiness summaries{" "}
+                    <span className="font-medium text-foreground">require review</span> and are not compliance certificates.
                   </CardDescription>
                 </div>
                 <Button type="button" variant="outline" size="sm" disabled={readinessBusy} onClick={() => void generateReadinessReport()}>
@@ -5787,9 +5767,8 @@ export function RegulatoryDossierWorkspace() {
               <CardHeader>
                 <CardTitle className="text-lg">Submission Package Builder</CardTitle>
                 <CardDescription>
-                  POST /regulatory/dossiers/{"{dossier_id}"}/submission-package · GET
-                  /regulatory/dossiers/{"{dossier_id}"}/submission-package · GET
-                  /regulatory/submission-packages/{"{package_id}"}
+                  Assemble a draft regulatory submission package with source-backed artefacts. Package status is backend-driven — treat as{" "}
+                  <span className="font-medium text-foreground">ready for review</span> only when the status field explicitly indicates it.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

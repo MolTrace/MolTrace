@@ -325,8 +325,7 @@ export function MlModelArtifactDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Evaluation runs</CardTitle>
               <CardDescription>
-                Filtered client-side to model_artifact_id {artifactIdNum}.{" "}
-                <code className="text-xs">GET /ml/evaluation-runs</code>
+                Evaluation runs filtered to this model artifact — status and dataset version for each completed or pending evaluation.
               </CardDescription>
             </CardHeader>
             <CardContent className="table-scroll min-w-0">
@@ -368,7 +367,7 @@ export function MlModelArtifactDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Model card</CardTitle>
               <CardDescription className="flex flex-wrap items-center gap-2">
-                <code className="text-xs">GET /ml/model-cards?model_artifact_id=…</code>
+                <span>Structured model card for this artifact — intended use, limitations, training data summary, and evaluation summary.</span>
                 <span className="inline-flex shrink-0">
                   <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
                 </span>
@@ -409,8 +408,7 @@ export function MlModelArtifactDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Deployment candidates</CardTitle>
               <CardDescription>
-                <code className="text-xs">GET /ml/deployment-candidates</code> — filtered to this artifact; open factory for full
-                deployment workflow.
+                Deployment candidate records for this artifact — open the ML factory dashboard for the full deployment workflow.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -465,7 +463,7 @@ export function MlModelArtifactDetail() {
                   <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
                 </CardTitle>
                 <CardDescription>
-                  <code className="text-xs">POST /ml/model-cards</code>
+                  Draft a structured model card capturing intended use, limitations, training data summary, and evaluation summary for governance review.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

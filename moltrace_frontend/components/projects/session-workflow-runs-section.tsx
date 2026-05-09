@@ -121,8 +121,7 @@ export function SessionWorkflowRunsSection({ sessionIds }: SessionWorkflowRunsSe
       <CardHeader>
         <CardTitle className="text-lg">Workflow runs</CardTitle>
         <CardDescription>
-          From <code className="text-xs">GET /spectracheck/sessions/{"{session_id}"}/workflow-runs</code> when the API
-          returns session ids.
+          Workflow runs across every analysis session in this project.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

@@ -322,8 +322,7 @@ export function RegulatoryDossierLinkedCompoundCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Linked Compound</CardTitle>
         <CardDescription>
-          POST /regulatory/dossiers/{"{dossier_id}"}/link-compound — registry provenance only; does not indicate dossier
-          approval or regulatory sign-off.
+          Registry provenance link — identifies which compound is associated with this dossier for traceability. Does not indicate dossier approval or regulatory sign-off.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -372,8 +371,7 @@ export function RegulatoryDossierLinkedCompoundCard({
         <div className="space-y-2 border-t pt-4">
           <h3 className="text-sm font-medium">Analytical evidence links (dossier index)</h3>
           <p className="text-xs text-muted-foreground">
-            Rows from GET /regulatory/dossiers/{"{dossier_id}"}/evidence-links with analytical-related evidence_type values
-            (summary only).
+            Analytical evidence links indexed against this dossier — evidence type, source, and summary. Open the Evidence Links tab for full detail.
           </p>
           {analyticalRows.length === 0 ? (
             <p className="text-xs text-muted-foreground">No matching evidence rows.</p>

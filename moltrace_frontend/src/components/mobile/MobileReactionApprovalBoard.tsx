@@ -239,8 +239,7 @@ export function MobileReactionApprovalBoard({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Mobile Reaction Approval Board</CardTitle>
         <CardDescription>
-          <code className="text-xs">GET /mobile/reactions/{"{reaction_project_id}"}/summary</code> for review support on
-          phone workflows.
+          Reaction project approval summary optimized for phone workflows — recommended conditions, safety flags, and human review decision panel.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

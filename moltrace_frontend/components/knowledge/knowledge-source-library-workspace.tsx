@@ -332,7 +332,7 @@ export function KnowledgeSourceLibraryWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Create source</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /knowledge/sources</code>
+            Register a new knowledge source — scientific literature, structured databases, or curated reference documents — for extraction and review.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -448,7 +448,7 @@ export function KnowledgeSourceLibraryWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Source table</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /knowledge/sources</code>
+            All knowledge sources — filterable by type, status, and reliability label.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -516,9 +516,7 @@ export function KnowledgeSourceLibraryWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Selected source</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /knowledge/sources/</code>
-              {"{source_id}"} ·<code className="text-xs"> PATCH /knowledge/sources/</code>
-              {"{source_id}"}
+              Detail and edit panel for the selected knowledge source — update status, reliability label, and source metadata.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -647,9 +645,7 @@ export function KnowledgeSourceLibraryWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Source files</CardTitle>
             <CardDescription>
-              <code className="text-xs">POST /knowledge/sources/</code>
-              {"{source_id}"}
-              <code className="text-xs">/files</code> ·<code className="text-xs"> GET …/files</code>
+              Upload and manage files attached to this knowledge source.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

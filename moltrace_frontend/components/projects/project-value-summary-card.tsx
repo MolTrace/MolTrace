@@ -45,7 +45,7 @@ export function ProjectValueSummaryCard({ projectId }: { projectId: string }) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Project Value Summary</CardTitle>
         <CardDescription>
-          <code className="text-xs">GET /analytics/projects/{"{project_id}"}/roi</code>
+          Project-level automation and value metrics aggregated across every session in this project.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">

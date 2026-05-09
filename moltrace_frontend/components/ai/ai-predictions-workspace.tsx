@@ -337,7 +337,7 @@ export function AiPredictionsWorkspace() {
         <CardHeader>
           <CardTitle>Predictions</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ai/predictions</code>
+            All inference results across services with their confidence and out-of-distribution flags.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -395,7 +395,7 @@ export function AiPredictionsWorkspace() {
         <CardHeader>
           <CardTitle>Prediction audit</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ai/prediction-audit</code>
+            Append-only log of every prediction with reviewer feedback and override decisions for compliance.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">

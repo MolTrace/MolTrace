@@ -682,8 +682,7 @@ export function RegulatoryActionQueueCard({
             <InfoTooltip label="Regulatory action queue" content={ACTION_QUEUE_TOOLTIP} />
           </div>
           <CardDescription>
-            GET /regulatory/action-items · PATCH /regulatory/action-items/{"{action_item_id}"} · POST
-            /regulatory/action-items.{" "}
+            Regulatory action items requiring review or follow-up — update status and add comments as items are resolved.{" "}
             <Link href="/regulatory/action-queue" className="underline-offset-4 hover:underline">
               Open full queue
             </Link>

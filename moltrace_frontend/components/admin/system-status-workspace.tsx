@@ -260,7 +260,7 @@ export function SystemStatusWorkspace() {
           {!loading && backendUnreachable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Backend unavailable — check connectivity and <code className="text-xs">/api/backend</code> proxy.
+              Backend unavailable — try again in a moment, or contact your platform administrator.
             </p>
           ) : null}
         </div>
@@ -277,7 +277,7 @@ export function SystemStatusWorkspace() {
         <Alert variant="destructive">
           <AlertTitle>Backend unavailable</AlertTitle>
           <AlertDescription className="text-xs">
-            System status endpoints could not be reached. Fix proxy or backend availability and refresh.
+            System status checks could not be reached. Refresh once the backend is back online.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -286,11 +286,11 @@ export function SystemStatusWorkspace() {
         <Alert variant="destructive">
           <AlertTitle>Partial load</AlertTitle>
           <AlertDescription className="space-y-1 text-xs">
-            {errHealth ? <p>GET /system/health: {errHealth}</p> : null}
-            {errStatus ? <p>GET /system/status: {errStatus}</p> : null}
-            {errVersion ? <p>GET /system/version: {errVersion}</p> : null}
-            {errDeps ? <p>GET /system/dependencies: {errDeps}</p> : null}
-            {errEnv ? <p>GET /system/environment-check: {errEnv}</p> : null}
+            {errHealth ? <p>Health probe: {errHealth}</p> : null}
+            {errStatus ? <p>Status check: {errStatus}</p> : null}
+            {errVersion ? <p>Version info: {errVersion}</p> : null}
+            {errDeps ? <p>Dependency status: {errDeps}</p> : null}
+            {errEnv ? <p>Environment check: {errEnv}</p> : null}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -302,8 +302,7 @@ export function SystemStatusWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Overall health</CardTitle>
             <CardDescription>
-              From <code className="text-xs">GET /system/health</code> and{" "}
-              <code className="text-xs">GET /system/status</code>.
+              Live health probe and overall service status from the backend.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -339,7 +338,7 @@ export function SystemStatusWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Backend version</CardTitle>
             <CardDescription>
-              From <code className="text-xs">GET /system/version</code> and embedded fields on health/status when present.
+              Backend service build, version, and Git commit identifier.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
@@ -387,8 +386,7 @@ export function SystemStatusWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Dependency checks</CardTitle>
             <CardDescription>
-              From <code className="text-xs">GET /system/dependencies</code> and{" "}
-              <code className="text-xs">checks</code> on <code className="text-xs">GET /system/health</code>.
+              Status of upstream services the platform depends on, plus liveness/readiness checks.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
@@ -438,7 +436,7 @@ export function SystemStatusWorkspace() {
                 {healthChecksRows.length > 0 ? (
                   <div className="overflow-x-auto rounded-md border">
                     <p className="border-b bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
-                      checks (GET /system/health)
+                      Health check probes
                     </p>
                     <Table>
                       <TableHeader>
@@ -485,7 +483,7 @@ export function SystemStatusWorkspace() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Database</CardTitle>
               <CardDescription className="text-xs">
-                <code className="text-xs">database_status</code> from <code className="text-xs">GET /system/status</code>
+                Connectivity and health of the primary database.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -510,7 +508,7 @@ export function SystemStatusWorkspace() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Storage</CardTitle>
               <CardDescription className="text-xs">
-                <code className="text-xs">storage_status</code> from <code className="text-xs">GET /system/status</code>
+                Object storage availability for files, artifacts, and reports.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -535,7 +533,7 @@ export function SystemStatusWorkspace() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Jobs / Workers</CardTitle>
               <CardDescription className="text-xs">
-                <code className="text-xs">job_queue_status</code>, <code className="text-xs">worker_status</code>
+                Background job queue depth and worker health.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
@@ -574,7 +572,7 @@ export function SystemStatusWorkspace() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">OpenAPI</CardTitle>
               <CardDescription className="text-xs">
-                <code className="text-xs">openapi_available</code> from <code className="text-xs">GET /system/status</code>
+                Whether the public API documentation is reachable.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -602,7 +600,7 @@ export function SystemStatusWorkspace() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Environment</CardTitle>
               <CardDescription className="text-xs">
-                From <code className="text-xs">GET /system/environment-check</code>
+                Required environment variable check for the active deployment.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
@@ -665,8 +663,7 @@ export function SystemStatusWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Recent warnings</CardTitle>
             <CardDescription>
-              Combined <code className="text-xs">warnings</code> and <code className="text-xs">notes</code> from health,
-              status, and environment-check payloads when present.
+              All non-fatal warnings and notes returned across health, status, and environment checks.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -689,7 +686,7 @@ export function SystemStatusWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Connector health</CardTitle>
             <CardDescription>
-              From <code className="text-xs">GET /connectors</code>. Credentials and secrets are never displayed.
+              Status of all configured external integrations. Credentials and secrets are never displayed here.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">

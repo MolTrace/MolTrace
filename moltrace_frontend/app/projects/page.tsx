@@ -166,8 +166,7 @@ export default function ProjectsIndexPage() {
               Backend unavailable
             </CardTitle>
             <CardDescription className="text-warning/90">
-              The projects API could not be reached. Check that the backend is running and the proxy at{" "}
-              <code className="text-xs">/api/backend</code> is configured.
+              We couldn&apos;t load your projects. Try refreshing in a moment, or contact your administrator if this keeps happening.
             </CardDescription>
           </CardHeader>
         </Card>

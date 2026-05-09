@@ -185,7 +185,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Version timeline</CardTitle>
-          <CardDescription>GET /regulatory/sources/{`{source_id}`}/versions</CardDescription>
+          <CardDescription>Version history for this regulatory source — each version captures the document state at a point in time for change tracking and comparison.</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="mb-3 text-sm">
@@ -247,7 +247,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Compare versions</CardTitle>
-          <CardDescription>GET /regulatory/sources/{`{source_id}`}/versions/{`{version_id}`} · POST …/versions/compare</CardDescription>
+          <CardDescription>Side-by-side text comparison between two versions of this regulatory source — select old and new versions to highlight additions, removals, and changes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">

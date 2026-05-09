@@ -218,7 +218,7 @@ export function MlOodAssessmentWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Create OOD assessment</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ml/ood-assessments</code>
+            Run an out-of-distribution applicability assessment on a model artifact — flags high-risk structural regions where predictions are less reliable.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -316,7 +316,7 @@ export function MlOodAssessmentWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Assessments</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/ood-assessments</code>
+            Out-of-distribution assessments logged for this tenant — OOD method, status, associated artifact, and dataset version.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

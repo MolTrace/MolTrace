@@ -177,8 +177,7 @@ export function BatchRegulatoryAssessmentPanel({
               <InfoTooltip label="Batch regulatory assessment" content={BATCH_REGULATORY_ASSESSMENT_TOOLTIP} />
             </div>
             <CardDescription>
-              POST /regulatory/dossiers/{"{dossier_id}"}/batch-assessment · GET
-              /regulatory/dossiers/{"{dossier_id}"}/batch-assessment
+              Run a batch regulatory assessment across all requirements and evidence links for this dossier — impurity thresholds, solvent limits, and jurisdiction-specific rule sets are evaluated in a single pass.
             </CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" disabled={runBusy} onClick={() => void run()}>

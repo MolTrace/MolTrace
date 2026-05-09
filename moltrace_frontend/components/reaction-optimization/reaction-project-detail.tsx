@@ -3822,7 +3822,7 @@ export function ReactionProjectDetail() {
                 <span className="font-semibold tabular-nums">{loading ? "…" : linkedSessionCount}</span>
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
-                Evidence rows counted via GET /reaction-experiments/{"{experiment_id}"}/evidence when linked.
+                Evidence records from linked SpectraCheck sessions are counted per experiment and shown in the Evidence Links tab.
               </p>
             </CardContent>
           </Card>
@@ -3836,7 +3836,7 @@ export function ReactionProjectDetail() {
                 Variables
                 <InfoTooltip content={VARIABLES_TOOLTIP} label="About reaction variables" />
               </CardTitle>
-              <CardDescription>GET /reaction-projects/{"{reaction_project_id}"}/variables</CardDescription>
+              <CardDescription>Reaction variables defining the experimental parameter space — temperature, solvent, catalyst loading, and other independently controlled inputs.</CardDescription>
             </CardHeader>
             <CardContent className="table-scroll">
               <Table>
@@ -3891,7 +3891,7 @@ export function ReactionProjectDetail() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">add variable</CardTitle>
-              <CardDescription>POST /reaction-projects/{"{reaction_project_id}"}/variables</CardDescription>
+              <CardDescription>Define a new reaction variable with its type, unit, and allowed-value constraints for use across all experiments in this project.</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="grid gap-4 md:grid-cols-2" onSubmit={(e) => void submitVariable(e)}>
@@ -3965,8 +3965,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">experiment matrix</CardTitle>
               <CardDescription>
-                GET /reaction-projects/{"{reaction_project_id}"}/experiments — condition columns follow reaction variables,
-                then any extra keys present in stored runs.
+                Reaction experiment matrix — each row records a unique condition set, outcome metrics, and the SpectraCheck session linked for analytical evidence.
               </CardDescription>
             </CardHeader>
             <CardContent className="table-scroll">
@@ -4065,9 +4064,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">SpectraCheck evidence summary</CardTitle>
               <CardDescription>
-                GET /reaction-experiments/{"{experiment_id}"}/evidence for experiments with linked_spectracheck_session_id.
-                Summary fields come from the response metadata when present; open SpectraCheck for full analytical
-                evidence.
+                Analytical evidence summary for experiments with linked SpectraCheck sessions — confidence status, QC outcome, and evidence record count. Open SpectraCheck for full spectral evidence.
               </CardDescription>
             </CardHeader>
             <CardContent className="table-scroll">
@@ -4144,7 +4141,7 @@ export function ReactionProjectDetail() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">add experiment</CardTitle>
-              <CardDescription>POST /reaction-projects/{"{reaction_project_id}"}/experiments</CardDescription>
+              <CardDescription>Register a new reaction experiment with its condition set, status, and optional outcome fields.</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-6" onSubmit={(e) => void submitExperiment(e)}>
@@ -4353,7 +4350,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={OBJECTIVE_PROFILE_TOOLTIP} label="About objective profile" />
               </CardTitle>
               <CardDescription>
-                GET/POST/PATCH /reaction-projects/{"{reaction_project_id}"}/objective-profile
+                Define the optimization objective — yield, selectivity, purity, or a composite target — including weighting and thresholds used by the optimization engine.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -4502,7 +4499,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={COST_AWARE_TOOLTIP} label="Cost-aware optimization" />
               </CardTitle>
               <CardDescription>
-                GET/POST/PATCH /reaction-projects/{"{reaction_project_id}"}/cost-profile
+                Reagent, solvent, and process cost parameters applied during optimization to penalize expensive condition combinations.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -4594,7 +4591,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={SAFETY_CONSTRAINTS_TOOLTIP} label="Safety constraints" />
               </CardTitle>
               <CardDescription>
-                GET/POST/PATCH /reaction-projects/{"{reaction_project_id}"}/safety-profile
+                Blocked reagents, hazard flags, and safety-constraint parameters applied to filter candidate conditions before scoring.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -4702,8 +4699,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={DESIGN_SPACE_TOOLTIP} label="About design space" />
               </CardTitle>
               <CardDescription>
-                GET/POST/PATCH /reaction-projects/{"{reaction_project_id}"}/design-space — rows follow GET …/variables when
-                present.
+                Experimental design space — variable bounds, fixed values, and categorical levels that constrain the optimization search region.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -4841,8 +4837,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">run optimization</CardTitle>
               <CardDescription>
-                POST /reaction-projects/{"{reaction_project_id}"}/optimization/run — heuristic suggestions only; each
-                recommended next experiment still requires human review.
+                Generate rule-based next-experiment suggestions from heuristic optimization. Each recommended condition set requires human review before scheduling.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -4888,8 +4883,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Bayesian Optimization Run</CardTitle>
               <CardDescription>
-                POST /reaction-projects/{"{reaction_project_id}"}/optimization/bo/run — model-based suggestions only; each
-                recommended next experiment still requires human review.
+                Generate model-based next-experiment suggestions via Bayesian optimization. Predicted scores are probabilistic — each recommendation requires human review before scheduling.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -4987,8 +4981,7 @@ export function ReactionProjectDetail() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">latest Bayesian optimization run</CardTitle>
                 <CardDescription>
-                  Fields from the POST /optimization/bo/run response: ids, algorithm, model, experiment count, status,
-                  warnings, notes, diagnostics.
+                  Bayesian optimization run summary — algorithm, model, input experiment count, status, diagnostics, and warnings from the most recent run.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -5198,9 +5191,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={BENCHMARK_TOOLTIP} label="About benchmarking" />
               </CardTitle>
               <CardDescription>
-                POST /reaction-projects/{"{reaction_project_id}"}/optimization/benchmark — GET …/optimization/benchmark-runs.
-                Benchmarking compares behavior on this project&apos;s data only; it does not establish universal algorithm
-                superiority.
+                Benchmark optimization algorithms against this project&apos;s historical experiment data. Results compare relative algorithm behavior on this dataset only — not universal superiority.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -5399,7 +5390,7 @@ export function ReactionProjectDetail() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">benchmark runs</CardTitle>
-              <CardDescription>GET /reaction-projects/{"{reaction_project_id}"}/optimization/benchmark-runs</CardDescription>
+              <CardDescription>Historical algorithm benchmark runs for this project, including algorithm, status, and benchmark name.</CardDescription>
             </CardHeader>
             <CardContent className="table-scroll">
               <Table>
@@ -5437,7 +5428,7 @@ export function ReactionProjectDetail() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">optimization runs</CardTitle>
-              <CardDescription>GET /reaction-projects/{"{reaction_project_id}"}/optimization/runs</CardDescription>
+              <CardDescription>Heuristic optimization run history — model type, input experiment count, and status for each run.</CardDescription>
             </CardHeader>
             <CardContent className="table-scroll">
               <Table>
@@ -5480,9 +5471,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Optimization Advisor</CardTitle>
               <CardDescription>
-                POST /reaction-projects/{"{reaction_project_id}"}/advisor/run — GET …/advisor/runs — GET
-                /reaction-advisor-runs/{"{advisor_run_id}"}. Decision-support only; recommended next experiments still
-                require human review on the Recommendations tab.
+                LLM-assisted advisor integrating BO suggestions, mechanistic hypotheses, and literature priors to flag next-experiment priorities. All recommendations require human review.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -5511,8 +5500,7 @@ export function ReactionProjectDetail() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      GET /reaction-projects/{"{reaction_project_id}"}/optimization/bo/runs — optional; omit to use the
-                      latest BO run when the backend resolves it.
+                      Optional — select a completed Bayesian optimization run to provide model-based context to the advisor. Omit to use the latest available run.
                     </p>
                   </div>
                 ) : null}
@@ -5541,7 +5529,7 @@ export function ReactionProjectDetail() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      GET /reaction-projects/{"{reaction_project_id}"}/recommendation-batches — optional batch context.
+                      Optional — link a recommendation batch to provide model-ranking context to the advisor.
                     </p>
                   </div>
                 ) : null}
@@ -5623,7 +5611,7 @@ export function ReactionProjectDetail() {
               {!loading && advisorRunsList.filter(isRecord).length > 0 ? (
                 <div className="table-scroll space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">
-                    GET /reaction-projects/{"{reaction_project_id}"}/advisor/runs
+                    Advisor run history for this project
                   </p>
                   <Table>
                     <TableHeader>
@@ -5784,8 +5772,7 @@ export function ReactionProjectDetail() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  After a successful POST /advisor/run, this panel shows advisor_mode, status, counts, warnings, notes,
-                  agreements, disagreements, and human_review_required from the response.
+                  After running the advisor, this panel shows the run summary: mode, status, agreed and disagreed conditions, warnings, and whether human review is required.
                 </p>
               )}
             </CardContent>
@@ -5798,8 +5785,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={MECHANISTIC_HYPOTHESES_TOOLTIP} label="About mechanistic hypotheses" />
               </CardTitle>
               <CardDescription>
-                GET/POST /reaction-projects/{"{reaction_project_id}"}/mechanistic-hypotheses — PATCH
-                /reaction-mechanistic-hypotheses/{"{hypothesis_id}"}. Indicative only, not proof of mechanism.
+                Mechanistic hypotheses linking observed experimental trends to proposed reaction mechanisms. Indicative only — not proof of mechanism.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -5986,8 +5972,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={LITERATURE_PRIORS_TOOLTIP} label="About reaction priors" />
               </CardTitle>
               <CardDescription>
-                GET/POST /reaction-projects/{"{reaction_project_id}"}/literature-priors — user-entered titles, summaries,
-                and optional citations only; the UI does not generate citations.
+                Literature references, prior knowledge summaries, and user-entered citations used as advisor context. Citations are not generated by the platform.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -6131,9 +6116,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={BO_ADVISOR_COMPARISON_TOOLTIP} label="About BO vs Advisor comparison" />
               </CardTitle>
               <CardDescription>
-                POST /reaction-projects/{"{reaction_project_id}"}/advisor/compare-bo-llm — GET
-                /reaction-projects/{"{reaction_project_id}"}/advisor/comparisons. Output flags where BO-supported and
-                advisor concern signals agree or disagree; final scheduling requires review.
+                Compare Bayesian optimization rankings with advisor concern signals to surface agreement and disagreement across candidates. Output is advisory — final experiment scheduling requires human review.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -6285,7 +6268,7 @@ export function ReactionProjectDetail() {
               {!loading && comparisons.filter(isRecord).length > 0 ? (
                 <div className="table-scroll space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">
-                    GET /reaction-projects/{"{reaction_project_id}"}/advisor/comparisons
+                    BO vs. advisor comparison history for this project
                   </p>
                   <Table>
                     <TableHeader>
@@ -6343,8 +6326,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Human Review</CardTitle>
               <CardDescription>
-                POST /reaction-advisor-runs/{"{advisor_run_id}"}/review records review decisions. Advisor output remains
-                decision-support only; accepted output does not autonomously schedule experiments.
+                Record a human review decision on an advisor run — approve, flag for revision, or reject. Advisor output is decision-support only and does not autonomously schedule experiments.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -6481,9 +6463,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Latest BO recommendation batch</CardTitle>
               <CardDescription>
-                GET /reaction-projects/{"{reaction_project_id}"}/recommendation-batches — GET
-                /reaction-recommendation-batches/{"{batch_id}"} — latest batch by updated_at when present. Model
-                uncertainty and estimated improvement are indicative only, not proof of performance.
+                Most recent Bayesian optimization recommendation batch — ranked candidates with predicted scores, model uncertainty, and estimated improvement. All values are probabilistic and require human review.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -6647,9 +6627,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">recommendations</CardTitle>
               <CardDescription>
-                GET /reaction-projects/{"{reaction_project_id}"}/recommendations — POST …/reaction-recommendations/
-                {"{recommendation_id}"}/approve and …/reject. Approve and reject require reviewer_name and review
-                comment (human approval).
+                Proposed next-experiment recommendations from the optimization engine — ranked by predicted improvement. Approve or reject each with a reviewer name and comment.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -6779,10 +6757,7 @@ export function ReactionProjectDetail() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Ready for next optimization cycle</CardTitle>
                 <CardDescription>
-                  POST /reaction-projects/{"{reaction_project_id}"}/optimization/bo/run and POST /reaction-projects/
-                  {"{reaction_project_id}"}/advisor/run use the persisted objective_profile, cost_profile, and safety_profile
-                  on the backend. Neither run triggers automatically after outcome confirmation; use the buttons only when you
-                  intend to continue planning.
+                  Confirmed outcomes are ready to seed the next optimization cycle. Bayesian optimization and advisor runs use the saved objective, cost, and safety profiles — neither triggers automatically after outcome confirmation.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -6861,10 +6836,7 @@ export function ReactionProjectDetail() {
                 />
               </div>
               <CardDescription>
-                GET /reaction-projects/{"{reaction_project_id}"}/recommendations — rows with approval status approved.
-                POST /reaction-recommendations/{"{recommendation_id}"}/convert-to-experiment requires rationale; optional
-                execution_batch_id from GET /reaction-projects/{"{reaction_project_id}"}/execution-batches. Recording a
-                planned experiment is not confirmation that laboratory work occurred.
+                Approved recommendations pending conversion to planned experiments. Conversion requires a rationale and optionally an execution batch assignment. Recording a planned experiment is not confirmation that laboratory work occurred.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -7002,8 +6974,7 @@ export function ReactionProjectDetail() {
                     {!loading && approvedRecommendationsQueue.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={12} className="text-muted-foreground">
-                          No approved recommendations from GET /reaction-projects/
-                          {"{reaction_project_id}"}/recommendations — approve on the Recommendations tab first.
+                          No approved recommendations yet — review and approve candidates on the Recommendations tab first.
                         </TableCell>
                       </TableRow>
                     ) : null}
@@ -7060,11 +7031,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Execution Batch Planner</CardTitle>
               <CardDescription>
-                POST /reaction-projects/{"{reaction_project_id}"}/execution-batches — GET /reaction-projects/
-                {"{reaction_project_id}"}/execution-batches — GET /reaction-execution-batches/
-                {"{batch_id}"} — PATCH /reaction-execution-batches/{"{batch_id}"} — POST /reaction-execution-batches/
-                {"{batch_id}"}/items — GET /reaction-execution-batches/{"{batch_id}"}/items. Records describe planning
-                and tracking; statuses do not imply automatic laboratory completion.
+                Plan and track lab execution batches — create batches, assign planned experiments as items, and update item status as lab work progresses. Statuses reflect recorded progress only and do not trigger any lab automation.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
@@ -7220,7 +7187,7 @@ export function ReactionProjectDetail() {
                 <div className="space-y-4">
                   <Separator />
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">GET /reaction-execution-batches/{"{batch_id}"}</p>
+                    <p className="text-sm font-medium">Batch detail</p>
                     {plannerPanelLoading ? (
                       <p className="text-xs text-muted-foreground">Loading batch detail…</p>
                     ) : isRecord(plannerBatchDetail) ? (
@@ -7264,8 +7231,7 @@ export function ReactionProjectDetail() {
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">
-                          Rows come from GET /reaction-projects/{"{reaction_project_id}"}/experiments — status planned
-                          required.
+                          Experiments with status planned can be added to this execution batch.
                         </p>
                       </div>
                       <div className="space-y-2">
@@ -7307,7 +7273,7 @@ export function ReactionProjectDetail() {
                   <Separator />
 
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">GET /reaction-execution-batches/{"{batch_id}"}/items</p>
+                    <p className="text-sm font-medium">Batch items</p>
                     <div className="table-scroll">
                       <Table>
                         <TableHeader>
@@ -7389,8 +7355,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Execution batches</CardTitle>
               <CardDescription>
-                GET /reaction-projects/{"{reaction_project_id}"}/recommendation-batches — batch records group model
-                recommendations; lab execution remains human-driven.
+                Recommendation batches grouping model-suggested experiments — batch records are informational; lab execution is always human-initiated.
               </CardDescription>
             </CardHeader>
             <CardContent className="table-scroll">
@@ -7442,10 +7407,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={EXECUTION_BOARD_TOOLTIP} label="Manual execution status" />
               </div>
               <CardDescription>
-                GET /reaction-execution-batches/{"{batch_id}"}/items (aggregated) — POST
-                /reaction-execution-items/{"{item_id}"}/mark-running, …/mark-completed, …/mark-failed — PATCH
-                /reaction-execution-items/{"{item_id}"}. Status changes are user-initiated; nothing here runs the
-                reaction autonomously.
+                Lab execution board — manually advance execution item status as reactions are run. Status transitions are user-initiated; no autonomous lab scheduling occurs here.
               </CardDescription>
             </CardHeader>
             <CardContent className="min-w-0 space-y-4">
@@ -7590,7 +7552,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Experiment execution board</CardTitle>
               <CardDescription>
-                GET /reaction-projects/{"{reaction_project_id}"}/experiments — status reflects recorded lab progress only.
+                Experiment status reflects manually recorded lab progress — yield, analytical link, and linked SpectraCheck session for each planned run.
               </CardDescription>
             </CardHeader>
             <CardContent className="table-scroll">
@@ -7661,9 +7623,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={ANALYTICAL_RESULTS_INTAKE_TOOLTIP} label="Analytical results context" />
               </div>
               <CardDescription>
-                POST /reaction-execution-items/{"{item_id}"}/analytical-results — GET
-                /reaction-execution-items/{"{item_id}"}/analytical-results. This panel links concise analytical metadata
-                and summary values to execution items; full SpectraCheck evidence remains in SpectraCheck.
+                Link concise analytical metadata and summary values to execution items. Full spectral evidence and QC records remain in SpectraCheck.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -7873,9 +7833,7 @@ export function ReactionProjectDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xs text-muted-foreground">
-                POST /reaction-execution-items/{"{item_id}"}/extract-outcome — GET /reaction-outcome-extraction-runs/
-                {"{extraction_run_id}"} — POST /reaction-execution-items/{"{item_id}"}/confirm-outcome. The proposed
-                outcome requires confirmation before it replaces the confirmed outcome on the linked experiment record.
+                Extract yield, conversion, and related outcome values from linked analytical data. Proposed outcomes require explicit confirmation before updating the experiment record.
               </p>
 
               <div className="space-y-4">
@@ -8238,18 +8196,12 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={OPTIMIZATION_CYCLE_TIMELINE_TOOLTIP} label="About optimization cycles" />
               </div>
               <CardDescription>
-                Recent rows from GET /reaction-projects/{"{reaction_project_id}"}/optimization/bo/runs, GET
-                /reaction-projects/{"{reaction_project_id}"}/optimization/runs, and GET
-                /reaction-projects/{"{reaction_project_id}"}/advisor/runs — ordering is informational, not an autonomous
-                loop.
+                Timeline of recent Bayesian optimization, heuristic, and advisor runs across all cycles — ordering is informational, not an autonomous loop.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xs text-muted-foreground">
-                POST /reaction-projects/{"{reaction_project_id}"}/optimization-cycles · GET /reaction-projects/
-                {"{reaction_project_id}"}/optimization-cycles · GET /reaction-optimization-cycles/{"{cycle_id}"} · POST
-                /reaction-optimization-cycles/{"{cycle_id}"}/decision — cycles capture linked summaries; run ordering below
-                is informational.
+                Create and track optimization cycles that link execution batches with their corresponding optimization runs and advisor decisions. Run ordering below is informational.
               </p>
 
               <form className="space-y-4" onSubmit={(e) => void createOptimizationCycleRecord(e)}>
@@ -8437,7 +8389,7 @@ export function ReactionProjectDetail() {
                                 <div className="space-y-4 text-sm">
                                   {optimizationCycleDetailLoadingId === cid ? (
                                     <p className="text-xs text-muted-foreground">
-                                      Loading GET /reaction-optimization-cycles/{"{cycle_id}"}…
+                                      Loading cycle detail…
                                     </p>
                                   ) : null}
                                   <div className="space-y-2">
@@ -8559,8 +8511,7 @@ export function ReactionProjectDetail() {
                     {!loading && optimizationCyclesList.filter(isRecord).length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={9} className="text-muted-foreground">
-                          No optimization cycles linked — create one via POST /reaction-projects/
-                          {"{reaction_project_id}"}/optimization-cycles.
+                          No optimization cycles recorded yet — create one using the form above.
                         </TableCell>
                       </TableRow>
                     ) : null}
@@ -8620,8 +8571,7 @@ export function ReactionProjectDetail() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Evidence Links</CardTitle>
               <CardDescription>
-                GET /reaction-experiments/{"{experiment_id}"}/evidence — summary only (metadata + counts); use Open for
-                full SpectraCheck evidence.
+                Analytical evidence summary for all experiments linked to a SpectraCheck session — metadata, record counts, and QC status. Use Open for full spectral evidence.
               </CardDescription>
             </CardHeader>
             <CardContent className="table-scroll">
@@ -8718,7 +8668,7 @@ export function ReactionProjectDetail() {
           <DialogHeader>
             <DialogTitle>Link SpectraCheck Session</DialogTitle>
             <DialogDescription>
-              POST /reaction-experiments/{"{experiment_id}"}/link-spectracheck-session
+              Link a SpectraCheck analysis session to this experiment to enable evidence tracking and cross-module analytical review.
               {linkDialogExperimentId != null ? (
                 <span className="mt-1 block font-mono text-xs">
                   experiment_id={linkDialogExperimentId}
@@ -8776,7 +8726,7 @@ export function ReactionProjectDetail() {
           <DialogHeader>
             <DialogTitle>Execution item (inspect)</DialogTitle>
             <DialogDescription className="text-xs">
-              GET /reaction-execution-batches/{"{batch_id}"}/items shape — advisory review only.
+              Execution item detail — for review only.
             </DialogDescription>
           </DialogHeader>
           <DeveloperJsonPanel data={plannerItemInspectPayload} />
@@ -8811,14 +8761,14 @@ export function ReactionProjectDetail() {
                 </DialogTitle>
                 <DialogDescription className="text-xs">
                   {boardDialog.kind === "run"
-                    ? `POST /reaction-execution-items/${boardDialog.itemId}/mark-running`
+                    ? "Mark this execution item as running — record operator name and start timestamp."
                     : boardDialog.kind === "done"
-                      ? `POST /reaction-execution-items/${boardDialog.itemId}/mark-completed`
+                      ? "Mark this execution item as completed — record completion notes and confirm outcome."
                       : boardDialog.kind === "fail"
-                        ? `POST /reaction-execution-items/${boardDialog.itemId}/mark-failed`
+                        ? "Mark this execution item as failed — record failure reason for deviation tracking."
                         : boardDialog.kind === "checklist"
-                          ? `PATCH /reaction-execution-items/${boardDialog.itemId}`
-                          : `PATCH /reaction-execution-items/${boardDialog.itemId}`}
+                          ? "Update the execution checklist for this item."
+                          : "Add a note to this execution item."}
                 </DialogDescription>
               </DialogHeader>
               <form className="space-y-4" onSubmit={(e) => void submitExecutionBoardDialog(e)}>

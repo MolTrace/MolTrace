@@ -241,7 +241,6 @@ export function AiCanaryDeploymentsWorkspace() {
         <Button type="button" variant="outline" size="sm" onClick={() => setReloadToken((x) => x + 1)} disabled={loading}>
           {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />} Refresh
         </Button>
-        <Badge variant="outline">/ai/canary-deployments</Badge>
       </div>
 
       {loadErr ? <p className="text-sm text-destructive">{loadErr}</p> : null}
@@ -249,7 +248,7 @@ export function AiCanaryDeploymentsWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle>Propose canary deployment</CardTitle>
-          <CardDescription><code className="text-xs">POST /ai/canary-deployments</code></CardDescription>
+          <CardDescription>Route a fraction of live traffic to a candidate model artifact before promoting to full production.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
@@ -285,7 +284,7 @@ export function AiCanaryDeploymentsWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle>Canary deployments</CardTitle>
-          <CardDescription><code className="text-xs">GET /ai/canary-deployments</code></CardDescription>
+          <CardDescription>All proposed, active, and retired canary rollouts with their candidate artifact and traffic share.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 overflow-x-auto">
           <Table>

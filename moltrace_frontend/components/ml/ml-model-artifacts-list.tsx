@@ -85,7 +85,7 @@ export function MlModelArtifactsList() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Artifacts</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/model-artifacts</code>
+            Model artifacts produced by completed training runs — name, task type, framework, and training dataset version.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">

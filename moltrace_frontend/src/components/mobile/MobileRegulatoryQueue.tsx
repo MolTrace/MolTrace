@@ -274,8 +274,7 @@ export function MobileRegulatoryQueue() {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Mobile Regulatory Action Queue</CardTitle>
         <CardDescription>
-          <code className="text-xs">{`GET ${sourceEndpoint ?? "/mobile/action-queue"}`}</code> with fallback to{" "}
-          <code className="text-xs">GET /regulatory/action-items</code>. Operational workflow support only; not legal advice.
+          Regulatory action items pending review on mobile — dossier updates, change alerts, and compliance decisions. Operational workflow support only; not legal advice.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

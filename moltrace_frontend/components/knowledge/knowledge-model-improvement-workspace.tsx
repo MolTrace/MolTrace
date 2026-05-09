@@ -246,9 +246,7 @@ export function KnowledgeModelImprovementWorkspace() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Model improvement queue</h1>
           <p className="text-sm text-muted-foreground">
-            Operational backlog for model iteration — status changes call{" "}
-            <code className="text-xs">PATCH /knowledge/model-improvement-queue/</code>
-            {"{item_id}"}.
+            Operational backlog for model iteration — prioritized cases flagged for retraining, data augmentation, or review.
           </p>
         </div>
 
@@ -265,8 +263,7 @@ export function KnowledgeModelImprovementWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Queue</CardTitle>
             <CardDescription>
-              <code className="text-xs">GET /knowledge/model-improvement-queue</code> · optional query{" "}
-              <code className="text-xs">status</code>
+              Improvement queue entries filterable by status — each item captures target module, source type, priority, linked record, and a human-readable summary.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -371,9 +368,9 @@ export function KnowledgeModelImprovementWorkspace() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">POST queue item</CardTitle>
+            <CardTitle className="text-base">Add queue item</CardTitle>
             <CardDescription>
-              <code className="text-xs">POST /knowledge/model-improvement-queue</code>
+              Add a new model improvement case to the queue — specify source type, target module, priority, linked record, and a summary of the issue.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">

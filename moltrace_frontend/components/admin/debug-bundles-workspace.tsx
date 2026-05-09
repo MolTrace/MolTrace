@@ -183,11 +183,7 @@ export function DebugBundlesWorkspace() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">New debug bundle</CardTitle>
             <CardDescription>
-              POST <code className="text-xs">/admin/debug-bundles</code> with <code className="text-xs">title</code>,{" "}
-              <code className="text-xs">scope</code>, <code className="text-xs">resource_id</code>,{" "}
-              <code className="text-xs">include_recent_audit_events</code>, <code className="text-xs">include_file_hashes</code>
-              , and <code className="text-xs">metadata_json</code>. Job and artifact sections are included in the
-              generated payload when the bundle is created successfully (no separate request flags in the current API).
+              Capture a snapshot of session, project, or sample state for support investigations. Includes job summaries and artifact metadata; recent audit events and file hashes are optional.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
@@ -234,7 +230,7 @@ export function DebugBundlesWorkspace() {
                   <Label htmlFor="sw-audit" className="text-sm font-medium">
                     include recent audit events
                   </Label>
-                  <p className="text-xs text-muted-foreground">include_recent_audit_events</p>
+                  <p className="text-xs text-muted-foreground">Append the most recent audit log entries scoped to the bundle.</p>
                 </div>
                 <Switch
                   id="sw-audit"
@@ -248,7 +244,7 @@ export function DebugBundlesWorkspace() {
                   <Label htmlFor="sw-hash" className="text-sm font-medium">
                     include file hashes
                   </Label>
-                  <p className="text-xs text-muted-foreground">include_file_hashes</p>
+                  <p className="text-xs text-muted-foreground">Capture SHA-256 hashes of every artifact for integrity verification.</p>
                 </div>
                 <Switch
                   id="sw-hash"
@@ -260,8 +256,7 @@ export function DebugBundlesWorkspace() {
               <div className="space-y-1 border-t pt-3 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground">Other bundle content</p>
                 <p>
-                  Job summaries and artifact metadata are produced server-side when the bundle is built successfully;
-                  they are not toggled separately on <code className="text-xs">DebugBundleCreate</code>.
+                  Job summaries and artifact metadata are always included; they aren&apos;t configurable per bundle.
                 </p>
               </div>
             </div>
@@ -277,7 +272,7 @@ export function DebugBundlesWorkspace() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Fetch bundle</CardTitle>
-            <CardDescription>GET <code className="text-xs">/admin/debug-bundles/{"{bundle_id}"}</code></CardDescription>
+            <CardDescription>Load a previously created debug bundle by its ID.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap items-end gap-2">
             <div className="space-y-2">
@@ -369,9 +364,7 @@ export function DebugBundlesWorkspace() {
                 </Button>
               ) : bundleId != null ? (
                 <p className="text-xs text-muted-foreground">
-                  Download uses GET <code className="text-xs">/admin/debug-bundles/{"{bundle_id}"}/download</code> when
-                  status is <code className="text-xs">created</code> and <code className="text-xs">bundle_sha256</code>{" "}
-                  is present.
+                  Download becomes available once the bundle finishes building and its checksum is recorded.
                 </p>
               ) : null}
             </CardContent>

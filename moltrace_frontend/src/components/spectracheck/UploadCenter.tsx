@@ -487,7 +487,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Import from Connector</CardTitle>
             <CardDescription>
-              POST <code className="text-xs">/integrations/spectracheck/import-file</code>. Imported files remain immutable.
+              Import a spectrometer file from an external integration. Imported files are locked and cannot be modified after transfer.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

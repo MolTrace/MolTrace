@@ -293,7 +293,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Change summary</CardTitle>
-          <CardDescription>GET /regulatory/changes/{`{change_id}`}</CardDescription>
+          <CardDescription>Regulatory change event details — type, severity, review status, and affected source.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p className="font-medium">{readRecordString(change, "title") ?? "—"}</p>
@@ -438,7 +438,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Rule update proposals</CardTitle>
-          <CardDescription>Filtered from GET /regulatory/rule-update-proposals for this change_event_id.</CardDescription>
+          <CardDescription>Rule update proposals linked to this regulatory change event — showing proposal type, status, and rationale.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           <div>
@@ -486,7 +486,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
             />
           </div>
           <CardDescription>
-            POST /regulatory/changes/{`{change_id}`}/impact-assessment · GET /regulatory/changes/{`{change_id}`}/impact-assessment
+            Assess the downstream impact of this regulatory change across affected dossiers, requirements, rule sets, action items, and AI governance records.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -662,7 +662,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Review decision</CardTitle>
-          <CardDescription>POST /regulatory/changes/{`{change_id}`}/review</CardDescription>
+          <CardDescription>Record a formal review decision on this regulatory change — approve, reject, or escalate — with reviewer attribution and comment.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">

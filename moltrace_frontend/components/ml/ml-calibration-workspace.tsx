@@ -206,7 +206,7 @@ export function MlCalibrationWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Create calibration assessment</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ml/calibration-assessments</code>
+            Log a calibration assessment for a model artifact — specify calibration method, metrics, and optional linked evaluation run.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -304,7 +304,7 @@ export function MlCalibrationWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Assessments</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/calibration-assessments</code>
+            Calibration assessments logged for this tenant — method, status, and linked artifact and evaluation run.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

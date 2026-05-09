@@ -460,7 +460,7 @@ export function MlModelFactoryDashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Built-in task table</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/tasks</code>
+            Registered ML tasks available for training — task type, status, and configuration for each supported prediction objective.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -512,7 +512,7 @@ export function MlModelFactoryDashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Recent training runs</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/training-runs</code>
+            Recent ML training runs — task, dataset version, status, and metric summaries across all completed and in-progress runs.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -564,7 +564,7 @@ export function MlModelFactoryDashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Recent evaluation runs</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/evaluation-runs</code>
+            Recent model evaluation runs — artifact, status, and metric summary for each completed or in-progress evaluation.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -612,7 +612,7 @@ export function MlModelFactoryDashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Deployment candidate preview</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/deployment-candidates</code>
+            Model artifacts nominated for production deployment — approval status, task key, and review state for each candidate.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">
@@ -664,7 +664,7 @@ export function MlModelFactoryDashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Model health preview</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/model-health</code> — scalar fields only; nested payloads are not expanded here.
+            Model health summary — scalar performance and drift indicators. Nested payloads are not expanded; approval and validation states always come from backend fields.
           </CardDescription>
         </CardHeader>
         <CardContent className="table-scroll min-w-0">

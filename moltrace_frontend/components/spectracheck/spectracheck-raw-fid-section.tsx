@@ -242,8 +242,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
         <CardHeader>
           <CardTitle>Raw FID Upload / Non-destructive Processing</CardTitle>
           <CardDescription>
-            POST <code className="text-xs">/nmr/raw-fid/preview</code> and{" "}
-            <code className="text-xs">/nmr/raw-fid/process</code> — multipart FormData.
+            Upload a raw FID for non-destructive Fourier transform and apodization. Original data is preserved; processing parameters are adjustable.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

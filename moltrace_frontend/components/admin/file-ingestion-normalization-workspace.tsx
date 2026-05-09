@@ -352,7 +352,7 @@ export function FileIngestionNormalizationWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Create ingestion run</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ingestion-runs</code>
+            Trigger a batch import of instrument or connector files into the platform.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -397,8 +397,7 @@ export function FileIngestionNormalizationWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Ingestion runs table</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ingestion-runs</code> and{" "}
-            <code className="text-xs">GET /ingestion-runs/{"{ingestion_run_id}"}</code>
+            All ingestion runs across tenants. Click a run to view its detail and per-file outcomes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -470,9 +469,7 @@ export function FileIngestionNormalizationWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Normalization action</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /files/{"{file_id}"}/normalize</code>,{" "}
-            <code className="text-xs">GET /files/{"{file_id}"}/normalization-runs</code>, and{" "}
-            <code className="text-xs">GET /normalization-runs/{"{normalization_run_id}"}</code>
+            Run normalization on an ingested file and review the history of normalization runs for that file.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

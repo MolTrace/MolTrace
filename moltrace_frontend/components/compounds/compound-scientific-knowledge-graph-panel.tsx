@@ -144,7 +144,7 @@ export function CompoundScientificKnowledgeGraphPanel({
   const load = useCallback(async () => {
     if (numericId == null) {
       setPayload(null)
-      setErr("compound_id must be a positive integer for GET /compound-registry/graph.")
+      setErr("A valid compound ID is required to load the knowledge graph.")
       setLoading(false)
       return
     }

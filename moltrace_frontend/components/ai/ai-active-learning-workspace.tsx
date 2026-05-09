@@ -263,16 +263,13 @@ export function AiActiveLearningWorkspace() {
           {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
           Refresh
         </Button>
-        <Badge variant="outline">/ai/predictions/{`{prediction_id}`}/feedback</Badge>
-        <Badge variant="outline">/ai/active-learning/candidates</Badge>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Prediction feedback</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ai/predictions/{`{prediction_id}`}/feedback</code> and{" "}
-            <code className="text-xs">POST /ai/predictions/{`{prediction_id}`}/review</code>
+            Submit reviewer feedback or a formal review decision (accept, reject, escalate) on a specific prediction.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -348,7 +345,7 @@ export function AiActiveLearningWorkspace() {
         <CardHeader>
           <CardTitle>Create active-learning candidate</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ai/active-learning/candidates</code>
+            Manually queue a prediction for human labeling — useful when a downstream reviewer flags a case the model missed.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -442,8 +439,7 @@ export function AiActiveLearningWorkspace() {
         <CardHeader>
           <CardTitle>Active Learning Queue</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ai/active-learning/candidates</code> and{" "}
-            <code className="text-xs">PATCH /ai/active-learning/candidates/{`{candidate_id}`}</code>
+            Predictions awaiting human review, with status changes (accept, reject, escalate) tracked inline.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">

@@ -261,7 +261,7 @@ export function RenewalValueReportSection() {
       const raw = await apiFetch<unknown>("/analytics/renewal-report", { method: "POST", body })
       const parsed = parseRenewalReportResponse(raw)
       if (!parsed) {
-        setError("Unexpected response from POST /analytics/renewal-report.")
+        setError("Unexpected response generating renewal report.")
         return
       }
       setReport(parsed)
@@ -281,7 +281,7 @@ export function RenewalValueReportSection() {
       const raw = await apiFetch<unknown>(`/analytics/renewal-report/${report.id}`, { method: "GET" })
       const parsed = parseRenewalReportResponse(raw)
       if (!parsed) {
-        setError("Unexpected response from GET /analytics/renewal-report/{report_id}.")
+        setError("Unexpected response loading renewal report.")
         return
       }
       setReport(parsed)
@@ -306,7 +306,7 @@ export function RenewalValueReportSection() {
           </span>
         </div>
         <CardDescription>
-          POST /analytics/renewal-report and GET /analytics/renewal-report/{"{report_id}"}. Admin-only; aggregates only.
+          Generates and refreshes a renewal value report — aggregated automation ROI, hours saved, and workflow metrics. Admin-only; aggregate data only, no individual records.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

@@ -390,8 +390,7 @@ export function MlDeploymentCandidatesWorkspace() {
         <AlertTriangle className="h-4 w-4" aria-hidden />
         <AlertTitle className="text-sm">Human gate</AlertTitle>
         <AlertDescription className="text-sm text-muted-foreground">
-          UI labels describe reviewer actions. Only responses from <code className="text-xs">/approve</code> and{" "}
-          <code className="text-xs">/reject</code> change deployment candidate status in the registry. Separate prediction service configuration is required before any model can serve traffic.
+          Approving or rejecting here only updates the registry status. A separate prediction-service deployment step is required before any model can serve real traffic.
         </AlertDescription>
       </Alert>
 
@@ -413,7 +412,7 @@ export function MlDeploymentCandidatesWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Create deployment candidate</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /ml/deployment-candidates</code> — status defaults to <code className="text-xs">proposed</code>.
+            Submit a model artifact and its approved model card for deployment review. New candidates start in &ldquo;proposed&rdquo; status.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -497,7 +496,7 @@ export function MlDeploymentCandidatesWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Candidates</CardTitle>
           <CardDescription>
-            <code className="text-xs">GET /ml/deployment-candidates</code> — select a row to review.
+            All proposed and reviewed deployment candidates. Click a row to review and record an approval or rejection.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -559,7 +558,7 @@ export function MlDeploymentCandidatesWorkspace() {
               <h3 className="text-sm font-medium">Selected candidate id {readRecordNumber(selected, "id") ?? "—"}</h3>
 
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">GET /ml/deployment-candidates/{selectedId}</span>
+                <span className="font-medium text-foreground">Deployment candidate {selectedId}</span>
                 {getSnapshotLoading ? (
                   <Loader2 className="ml-2 inline h-3 w-3 animate-spin" aria-hidden />
                 ) : getSnapshot ? (
@@ -660,9 +659,7 @@ export function MlDeploymentCandidatesWorkspace() {
               {selected && REVIEWABLE_STATUSES.includes(readRecordString(selected, "status") as (typeof REVIEWABLE_STATUSES)[number]) ? (
                 <div className="grid gap-6 border-t pt-4 lg:grid-cols-2">
                   <div className="space-y-3">
-                    <p className="text-sm font-medium">
-                      Approve <code className="text-xs">POST …/approve</code>
-                    </p>
+                    <p className="text-sm font-medium">Approve candidate</p>
                     <div className="space-y-2">
                       <Label htmlFor="an">reviewer_name</Label>
                       <Input id="an" value={approveName} onChange={(e) => setApproveName(e.target.value)} autoComplete="name" />
@@ -682,9 +679,6 @@ export function MlDeploymentCandidatesWorkspace() {
                           <SelectItem value="approved_for_production">approved_for_production</SelectItem>
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Request body field name is <code className="text-xs">status</code> per API.
-                      </p>
                     </div>
                     {approveErr ? <p className="text-sm text-destructive">{approveErr}</p> : null}
                     <Button
@@ -708,9 +702,7 @@ export function MlDeploymentCandidatesWorkspace() {
                   </div>
 
                   <div className="space-y-3">
-                    <p className="text-sm font-medium">
-                      Reject <code className="text-xs">POST …/reject</code>
-                    </p>
+                    <p className="text-sm font-medium">Reject candidate</p>
                     <div className="space-y-2">
                       <Label htmlFor="rn">reviewer_name</Label>
                       <Input id="rn" value={rejectName} onChange={(e) => setRejectName(e.target.value)} autoComplete="name" />
@@ -728,7 +720,7 @@ export function MlDeploymentCandidatesWorkspace() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  This candidate is not in <code className="text-xs">proposed</code> or <code className="text-xs">in_review</code>; approval and reject forms are hidden. Registry status is shown above.
+                  This candidate has already been reviewed. Approval and rejection forms are hidden; current status is shown above.
                 </p>
               )}
 

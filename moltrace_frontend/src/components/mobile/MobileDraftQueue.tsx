@@ -90,9 +90,7 @@ export function MobileDraftQueue() {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Draft Queue</CardTitle>
         <CardDescription>
-          <code className="text-xs">POST /mobile/action-drafts</code>, <code className="text-xs">GET /mobile/action-drafts</code>,{" "}
-          <code className="text-xs">PATCH /mobile/action-drafts/{"{draft_id}"}</code>,{" "}
-          <code className="text-xs">POST /mobile/sync</code>
+          Offline action drafts created on mobile — create, update, and sync pending decisions to the server. Drafts are not final until accepted by the server after sync.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

@@ -167,7 +167,7 @@ export function DeploymentSettingsWorkspace() {
           {!loading && allFailed ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Backend unavailable — check connectivity and <code className="text-xs">/api/backend</code> proxy.
+              Backend unavailable — try again in a moment, or contact your platform administrator.
             </p>
           ) : null}
         </div>
@@ -184,7 +184,7 @@ export function DeploymentSettingsWorkspace() {
         <Alert variant="destructive">
           <AlertTitle>Backend unavailable</AlertTitle>
           <AlertDescription className="text-xs">
-            Deployment endpoints could not be reached. Fix proxy or sign-in, then refresh.
+            Deployment data is not reachable. Verify you&apos;re signed in as an administrator and try again.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -193,9 +193,9 @@ export function DeploymentSettingsWorkspace() {
         <Alert variant="destructive">
           <AlertTitle>Partial load</AlertTitle>
           <AlertDescription className="space-y-1 text-xs">
-            {errEnv ? <p>GET /system/environment-check: {errEnv}</p> : null}
-            {errVersion ? <p>GET /system/version: {errVersion}</p> : null}
-            {errDeps ? <p>GET /system/dependencies: {errDeps}</p> : null}
+            {errEnv ? <p>Environment check: {errEnv}</p> : null}
+            {errVersion ? <p>Version info: {errVersion}</p> : null}
+            {errDeps ? <p>Dependency status: {errDeps}</p> : null}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -204,7 +204,7 @@ export function DeploymentSettingsWorkspace() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">environment</CardTitle>
-            <CardDescription>GET /system/environment-check · environment</CardDescription>
+            <CardDescription>Active deployment environment label.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
             {loading ? (
@@ -274,7 +274,7 @@ export function DeploymentSettingsWorkspace() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">backend version</CardTitle>
-            <CardDescription>GET /system/version · backend_version</CardDescription>
+            <CardDescription>Backend service build identifier.</CardDescription>
           </CardHeader>
           <CardContent className="font-mono text-xs">
             {loading ? "…" : version ? readStr(version, ["backend_version"]) || "—" : "—"}
@@ -480,7 +480,7 @@ export function DeploymentSettingsWorkspace() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Dependency checks</CardTitle>
-          <CardDescription>GET /system/dependencies</CardDescription>
+          <CardDescription>Health of every external service the platform connects to.</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -522,7 +522,7 @@ export function DeploymentSettingsWorkspace() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Version payload</CardTitle>
-          <CardDescription>GET /system/version</CardDescription>
+          <CardDescription>Full version metadata: API, build hash, branch, build time.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 font-mono text-xs">
           <p>

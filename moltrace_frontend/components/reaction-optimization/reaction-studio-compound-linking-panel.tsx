@@ -493,8 +493,7 @@ export function ReactionStudioCompoundLinkingPanel({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Product batch from completed experiment</CardTitle>
           <CardDescription>
-            POST /compound-registry/batches then POST /reaction-experiments/{"{experiment_id}"}/link-compound with batch
-            context.
+            Register a product batch in the compound registry and link it to the completed experiment with batch provenance context.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

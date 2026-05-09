@@ -237,8 +237,7 @@ export function SpectraCheckProcessedSpectrumSection({
         <CardHeader>
           <CardTitle>Processed 1H / 13C Spectrum Upload</CardTitle>
           <CardDescription>
-            POST <code className="text-xs">/nmr/processed/preview</code> and{" "}
-            <code className="text-xs">/nmr/processed/analyze</code> — multipart FormData (browser sets boundary).
+            Upload a processed 1H or 13C NMR spectrum for peak preview and quantitative chemical-shift analysis.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

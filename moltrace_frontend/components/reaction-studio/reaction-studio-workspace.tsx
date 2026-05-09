@@ -344,7 +344,7 @@ export function ReactionStudioWorkspace() {
                 ELN / LIMS Experiment Import
               </CardTitle>
               <CardDescription>
-                POST <code className="text-xs">/integrations/reactions/import-experiment-table</code>
+                Import an experiment table from a connected ELN or LIMS for reaction optimization.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -424,7 +424,7 @@ export function ReactionStudioWorkspace() {
                 Export approved experiments
               </CardTitle>
               <CardDescription>
-                POST <code className="text-xs">/integrations/reactions/export-approved-experiments</code>
+                Push approved experiment results back to an external ELN or LIMS.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

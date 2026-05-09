@@ -377,10 +377,7 @@ export function MappingTemplatesWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Mapping template form</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /mapping-templates</code>,{" "}
-            <code className="text-xs">GET /mapping-templates</code>,{" "}
-            <code className="text-xs">GET /mapping-templates/{"{template_id}"}</code>,{" "}
-            <code className="text-xs">PATCH /mapping-templates/{"{template_id}"}</code>
+            Define how raw connector or instrument fields map to MolTrace entities. Templates can be created, browsed, and updated.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -509,9 +506,7 @@ export function MappingTemplatesWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Create external record</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /external-records</code>,{" "}
-            <code className="text-xs">GET /external-records</code>,{" "}
-            <code className="text-xs">GET /external-records/{"{external_record_id}"}</code>
+            Register a record from an external system (LIMS, ELN, etc.) for cross-referencing within MolTrace.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -615,8 +610,7 @@ export function MappingTemplatesWorkspace() {
         <CardHeader>
           <CardTitle className="text-base">Create external link</CardTitle>
           <CardDescription>
-            <code className="text-xs">POST /external-object-links</code>,{" "}
-            <code className="text-xs">GET /external-object-links</code>
+            Link an external record to a MolTrace object (project, sample, compound, batch) for traceability.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

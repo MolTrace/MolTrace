@@ -935,7 +935,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Project overview</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">GET /validation-center/projects/{"{validation_project_id}"}</code>
+                  Summary of the selected validation project — scope, status, intended use, and regulated context.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -964,7 +964,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Create URS requirement</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">POST /validation-center/projects/{"{validation_project_id}"}/urs</code>
+                  Add a User Requirement Specification entry — specify requirement code, text, module, criticality, and GxP impact.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1025,7 +1025,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">URS</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">GET /validation-center/projects/{"{validation_project_id}"}/urs</code>
+                  URS entries for this validation project — requirement code, module, criticality, GxP impact, and approval status.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1401,7 +1401,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Selected protocol detail</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">GET /validation-center/test-protocols/{"{protocol_id}"}</code>
+                  Detail for the selected test protocol — protocol code, title, type, module, and status.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1426,7 +1426,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Create test case</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">POST /validation-center/test-protocols/{"{protocol_id}"}/test-cases</code>
+                  Add a test case to this protocol — specify code, title, preconditions, steps, expected results, and linked requirement and risk IDs.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1528,7 +1528,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Test Cases</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">GET /validation-center/test-protocols/{"{protocol_id}"}/test-cases</code>
+                  Test cases associated with the selected protocol — status, linked requirements, and linked risks.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1603,7 +1603,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Execute test case</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">POST /validation-center/test-cases/{"{test_case_id}"}/execute</code>
+                  Record a test execution result — executor, execution status, actual results, and evidence file or artifact IDs.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1672,7 +1672,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Test Executions</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">GET /validation-center/test-executions</code>
+                  Test execution records for this project — execution status, executor, timestamp, and linked deviation.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1743,7 +1743,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Selected execution detail</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">GET /validation-center/test-executions/{"{execution_id}"}</code>
+                  Detail for the selected test execution — execution status, executor, actual results, and linked deviation.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">

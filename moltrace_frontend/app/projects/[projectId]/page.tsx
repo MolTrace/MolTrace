@@ -176,7 +176,7 @@ export default function ProjectDetailPage() {
               Backend unavailable
             </CardTitle>
             <CardDescription className="text-warning/90">
-              Check that the backend is running and <code className="text-xs">/api/backend</code> proxies correctly.
+              We couldn&apos;t load this project. Try refreshing in a moment, or contact your administrator if this keeps happening.
             </CardDescription>
           </CardHeader>
         </Card>

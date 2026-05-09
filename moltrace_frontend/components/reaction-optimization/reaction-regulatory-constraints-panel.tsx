@@ -242,9 +242,7 @@ export function ReactionRegulatoryConstraintsPanel({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Regulatory Constraints</CardTitle>
           <CardDescription>
-            GET /reaction-projects/{"{reaction_project_id}"}/regulatory-constraints · POST
-            /reaction-projects/{"{reaction_project_id}"}/regulatory-constraints · PATCH
-            /reaction-regulatory-constraints/{"{constraint_id}"}
+            Regulatory constraints applied to candidate conditions during optimization — solvent class limits, banned reagents, and jurisdiction-specific boundaries.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -385,8 +383,7 @@ export function ReactionRegulatoryConstraintsPanel({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Compliance-Driven Objective</CardTitle>
           <CardDescription>
-            GET /reaction-projects/{"{reaction_project_id}"}/compliance-objective · POST
-            /reaction-projects/{"{reaction_project_id}"}/compliance-objective
+            Compliance-informed optimization objective — yield or selectivity targets adjusted for regulatory feasibility, with impurity penalty weighting.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

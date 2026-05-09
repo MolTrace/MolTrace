@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/toaster'
 import { OfflineBanner } from '@/src/components/pwa/OfflineBanner'
 import { InstallAppPrompt } from '@/src/components/pwa/InstallAppPrompt'
 import { PWAUpdateManager } from '@/src/components/pwa/PWAUpdateManager'
@@ -59,6 +60,7 @@ export default function RootLayout({
           <OfflineBanner />
           {children}
           <InstallAppPrompt />
+          <Toaster />
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

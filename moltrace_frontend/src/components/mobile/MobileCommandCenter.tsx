@@ -269,8 +269,7 @@ export function MobileCommandCenter() {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Mobile Command Center</CardTitle>
         <CardDescription>
-          <code className="text-xs">{`GET ${sourceEndpoint ?? "/mobile/command-center"}`}</code> with fallback to{" "}
-          <code className="text-xs">GET /cross-module/command-center</code>.
+          Cross-module status summary for mobile — active alerts, pending actions, and module health across SpectraCheck, Regulatory Hub, and Reaction Optimization.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
