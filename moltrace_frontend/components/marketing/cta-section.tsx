@@ -13,21 +13,20 @@ export function CTASection() {
               Ready to transform your analytical workflows?
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-lg text-background/80">
-              See how MolTrace can reduce your time-to-insight from days to minutes 
-              while maintaining the rigor your science demands.
+              See how MolTrace reduces your time-to-insight from days to minutes while maintaining the scientific rigor your work demands.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Button 
-                size="lg" 
-                variant="secondary" 
+              <Button
+                size="lg"
+                variant="secondary"
                 className="min-w-[180px] gap-2 bg-background text-foreground hover:bg-background/90"
               >
                 Request Demo
                 <ArrowRight className="h-4 w-4" />
               </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
+              <Button
+                size="lg"
+                variant="outline"
                 className="min-w-[180px] gap-2 border-background/30 text-background hover:bg-background/10"
                 asChild
               >
@@ -37,6 +36,9 @@ export function CTASection() {
                 </Link>
               </Button>
             </div>
+            <p className="mt-6 text-xs uppercase tracking-widest text-background/50">
+              No credit card required &middot; 14-day free trial &middot; SOC 2 Type II
+            </p>
           </div>
         </div>
       </div>
