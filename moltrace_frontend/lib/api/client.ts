@@ -14,6 +14,10 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/backend"
 export const AUTH_TOKEN_STORAGE_KEY = "moltrace.access_token"
 export const AUTH_USER_STORAGE_KEY = "moltrace.user"
 export const TENANT_ID_STORAGE_KEY = "moltrace.current_tenant_id"
+export const GENERIC_REQUEST_FAILURE_MESSAGE = "Request could not be completed. Please try again."
+
+const INTERNAL_ERROR_MESSAGE_PATTERN =
+  /(backend\s+requires\s+authentication|for\s+local\s+development|disable\s+backend\s+auth|disable_auth|disable_backend_auth|todo:|authorization\s*:\s*bearer|bearer\s*<\s*token\s*>|bearer\s+token|x-api-key|api[_\s-]?key|\b(?:get|post|put|patch|delete)\s+\/[a-z0-9]|\/api\/backend\/|raw\s+prompt|system\s+prompt|developer\s+prompt|chain[_\s-]?of[_\s-]?thought|\bcot\b|reasoning[_\s-]?trace|credential\s*[:=]|secret\s*[:=]|password\s*[:=]|private[_\s-]?key|service[_\s-]?account|traceback\s+\(most\s+recent\s+call\s+last\)|\bfile\s+"[^"]+")/i
 
 type ApiRequestInit = Omit<RequestInit, "body"> & {
   body?: unknown
@@ -55,10 +59,10 @@ function isBodyInit(body: unknown): body is BodyInit {
   return (
     typeof body === "string" ||
     isFormDataBody(body) ||
-    body instanceof Blob ||
-    body instanceof ArrayBuffer ||
-    body instanceof URLSearchParams ||
-    body instanceof ReadableStream
+    (typeof Blob !== "undefined" && body instanceof Blob) ||
+    (typeof ArrayBuffer !== "undefined" && body instanceof ArrayBuffer) ||
+    (typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams) ||
+    (typeof ReadableStream !== "undefined" && body instanceof ReadableStream)
   )
 }
 
@@ -84,6 +88,24 @@ function messageFromErrorData(data: unknown, fallback: string) {
   }
   if (typeof data === "string" && data.trim()) return data
   return fallback
+}
+
+function authFailureMessage(status: number) {
+  if (status === 403) return "You do not have access to perform this action."
+  return "Sign in to continue. If you already signed in, your session may have expired."
+}
+
+export function sanitizePublicApiErrorMessage(
+  message: string,
+  status?: number,
+  fallback = GENERIC_REQUEST_FAILURE_MESSAGE
+) {
+  if (status === 401 || status === 403) return authFailureMessage(status)
+
+  const candidate = message.trim()
+  if (!candidate) return fallback
+  if (INTERNAL_ERROR_MESSAGE_PATTERN.test(candidate)) return fallback
+  return candidate
 }
 
 export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
@@ -118,7 +140,9 @@ export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Prom
 
   if (!response.ok) {
     const data = await readResponseData(response)
-    throw new ApiError(response.status, data, messageFromErrorData(data, response.statusText))
+    const rawMessage = messageFromErrorData(data, response.statusText)
+    const message = sanitizePublicApiErrorMessage(rawMessage, response.status)
+    throw new ApiError(response.status, data, message)
   }
 
   if (response.status === 204) {

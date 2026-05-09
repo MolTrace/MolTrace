@@ -19,6 +19,11 @@ const hopByHopHeaders = new Set([
   "upgrade",
 ])
 
+function authFailureMessage(status: number) {
+  if (status === 403) return "You do not have access to perform this action."
+  return "Sign in to continue. If you already signed in, your session may have expired."
+}
+
 function backendBaseUrl() {
   return (
     process.env.API_BASE_URL ||
@@ -53,6 +58,15 @@ async function proxy(request: NextRequest, context: RouteContext) {
   const responseHeaders = new Headers(response.headers)
   responseHeaders.delete("content-encoding")
   responseHeaders.delete("content-length")
+
+  if (response.status === 401 || response.status === 403) {
+    responseHeaders.set("content-type", "application/json")
+    return new Response(JSON.stringify({ detail: authFailureMessage(response.status) }), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    })
+  }
 
   return new Response(response.body, {
     status: response.status,

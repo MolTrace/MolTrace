@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { ApiError, AUTH_TOKEN_STORAGE_KEY, apiFetch } from "@/src/lib/api/client"
+import {
+  ApiError,
+  AUTH_TOKEN_STORAGE_KEY,
+  GENERIC_REQUEST_FAILURE_MESSAGE,
+  apiFetch,
+  sanitizePublicApiErrorMessage,
+} from "@/src/lib/api/client"
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -62,6 +68,48 @@ describe("src api client", () => {
       name: "ApiError",
       status: 401,
       data: { detail: "Authentication required." },
+      message: "Sign in to continue. If you already signed in, your session may have expired.",
     } satisfies Partial<ApiError>)
+  })
+
+  it("redacts backend auth guidance from public error messages", async () => {
+    const leakyDetail = [
+      ["Backend", "requires", "authentication."].join(" "),
+      ["For", "local", "development,"].join(" "),
+      "disable backend auth temporarily.",
+      ["Authorization:", "Bearer", "<" + "token" + ">"].join(" "),
+    ].join(" ")
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(JSON.stringify({ detail: leakyDetail }), {
+          status: 401,
+          statusText: "Unauthorized",
+          headers: { "content-type": "application/json" },
+        })
+      })
+    )
+
+    await expect(apiFetch("/protected")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 401,
+      message: "Sign in to continue. If you already signed in, your session may have expired.",
+    } satisfies Partial<ApiError>)
+  })
+
+  it("redacts internal prompt and credential markers from non-auth messages", () => {
+    const leakyMessage = [
+      ["raw", "prompt"].join(" "),
+      "included",
+      "with",
+      ["api", "key"].join(" "),
+      "guidance.",
+    ].join(" ")
+
+    expect(sanitizePublicApiErrorMessage(leakyMessage, 500)).toBe(GENERIC_REQUEST_FAILURE_MESSAGE)
+    expect(sanitizePublicApiErrorMessage("POST /private-endpoint failed.", 400)).toBe(
+      GENERIC_REQUEST_FAILURE_MESSAGE
+    )
   })
 })

@@ -1,4 +1,4 @@
-import { ApiError } from "@/lib/api/client"
+import { ApiError, sanitizePublicApiErrorMessage } from "@/lib/api/client"
 
 /** First pipe-delimited SMILES-like token from candidate lines (e.g. `Ethanol | CCO | proposed`). */
 export function extractFirstSmiles(candidatesText: string): string {
@@ -11,11 +11,14 @@ export function extractFirstSmiles(candidatesText: string): string {
 }
 
 export function authErrorMessage(): string {
-  return "Backend requires authentication. For local development, disable backend auth temporarily or add login/token handling. TODO: Add login flow and attach Authorization: Bearer <token> when backend auth is enabled."
+  return "Sign in to continue. If you already signed in, your session may have expired."
 }
 
 export function formatApiError(err: unknown, fallback: string): string {
   if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return authErrorMessage()
   if (err instanceof ApiError && err.status === 404) return "Backend endpoint not available yet."
-  return err instanceof Error ? err.message : fallback
+  if (err instanceof Error) {
+    return sanitizePublicApiErrorMessage(err.message, err instanceof ApiError ? err.status : undefined)
+  }
+  return sanitizePublicApiErrorMessage(fallback)
 }
