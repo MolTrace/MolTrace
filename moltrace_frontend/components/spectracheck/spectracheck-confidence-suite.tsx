@@ -7,6 +7,9 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { ConfidenceRing } from "@/components/science/confidence-ring"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
@@ -387,8 +390,18 @@ function SpectraCheckConfidenceSuiteInner(
     <Tabs defaultValue="unified" className="w-full min-w-0">
       <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
         <TabsList className="inline-flex h-auto min-h-9 w-max flex-wrap justify-start gap-1">
-          <TabsTrigger value="unified">Unified Confidence</TabsTrigger>
-          <TabsTrigger value="report">Report Composer</TabsTrigger>
+          <TabsTrigger
+            value="unified"
+            className="font-mono data-[state=active]:[background-color:var(--mt-teal)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+          >
+            Unified Confidence
+          </TabsTrigger>
+          <TabsTrigger
+            value="report"
+            className="font-mono data-[state=active]:[background-color:var(--mt-teal)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+          >
+            Report Composer
+          </TabsTrigger>
         </TabsList>
       </div>
       <TabsContent value="unified" className="mt-4">
@@ -419,12 +432,14 @@ function UnifiedQueueSynthesisSection({ items }: { items: EvidenceItem[] }) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <Card className="min-w-0">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Selected evidence layer summary</CardTitle>
-          <CardDescription>Items checked for Unified Evidence in the Evidence Queue.</CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Unified · Selected"
+        title="Selected evidence layer summary"
+        description="Items checked for Unified Evidence in the Evidence Queue."
+        className="min-w-0"
+      >
+        <div className="text-sm">
           {items.length === 0 ? (
             <p className="text-muted-foreground">No queue items selected yet.</p>
           ) : (
@@ -459,15 +474,17 @@ function UnifiedQueueSynthesisSection({ items }: { items: EvidenceItem[] }) {
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card className="min-w-0">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Missing evidence layers</CardTitle>
-          <CardDescription>Expected layers not yet represented among selected queue items.</CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Unified · Missing"
+        title="Missing evidence layers"
+        description="Expected layers not yet represented among selected queue items."
+        className="min-w-0"
+      >
+        <div className="text-sm">
           {missingLayers.length === 0 ? (
             <p className="text-muted-foreground">All synthesis targets covered (or see Developer JSON for nuance).</p>
           ) : (
@@ -479,44 +496,40 @@ function UnifiedQueueSynthesisSection({ items }: { items: EvidenceItem[] }) {
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card className="min-w-0 border-destructive/20">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Contradiction summary</CardTitle>
-          <CardDescription>Aggregated from selected queue entries (pre-synthesis).</CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm">
-          {contradictionLines.length === 0 ? (
-            <p className="text-muted-foreground">None listed on selected items.</p>
-          ) : (
-            <ul className="list-inside list-disc space-y-1">
-              {contradictionLines.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <AlertCard
+        variant="error"
+        title="Contradiction summary"
+        description="Aggregated from selected queue entries (pre-synthesis)."
+      >
+        {contradictionLines.length === 0 ? (
+          <p className="text-sm text-muted-foreground">None listed on selected items.</p>
+        ) : (
+          <ul className="list-inside list-disc space-y-1 text-sm">
+            {contradictionLines.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        )}
+      </AlertCard>
 
-      <Card className="min-w-0 border-warning/30">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Warnings summary</CardTitle>
-          <CardDescription>Aggregated from selected queue entries (pre-synthesis).</CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm">
-          {warningLines.length === 0 ? (
-            <p className="text-muted-foreground">None listed on selected items.</p>
-          ) : (
-            <ul className="list-inside list-disc space-y-1">
-              {warningLines.map((w) => (
-                <li key={w}>{w}</li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <AlertCard
+        variant="warning"
+        title="Warnings summary"
+        description="Aggregated from selected queue entries (pre-synthesis)."
+      >
+        {warningLines.length === 0 ? (
+          <p className="text-sm text-muted-foreground">None listed on selected items.</p>
+        ) : (
+          <ul className="list-inside list-disc space-y-1 text-sm">
+            {warningLines.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        )}
+      </AlertCard>
     </div>
   )
 }
@@ -640,14 +653,12 @@ function UnifiedConfidenceTab({
   return (
     <div className="space-y-6">
       <SpectraCheckSavedSessionReviewAudit backendSessionId={backendSessionId} />
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Unified candidate confidence</CardTitle>
-          <CardDescription>
-            Compute a unified confidence score by integrating NMR, MS, and LC-MS evidence layers across all session candidates.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Spectroscopy · Unified Confidence"
+        title="Unified candidate confidence"
+        description="Compute a unified confidence score by integrating NMR, MS, and LC-MS evidence layers across all session candidates."
+      />
 
       <UnifiedQueueSynthesisSection items={selectedQueueItems} />
 
@@ -693,44 +704,35 @@ function UnifiedConfidenceTab({
       )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle>Run analysis</CardTitle>
-            <CardDescription>Candidates, 1H, and 13C default from Shared session inputs.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="teal"
+          eyebrow="Unified · Run"
+          title="Run analysis"
+          description="Candidates, 1H, and 13C default from Shared session inputs."
+          className="min-w-0"
+        >
             <form onSubmit={run} className="space-y-4">
               <AdvancedUnifiedFields state={adv} />
               <Button type="submit" disabled={busy || buildBusy} className="w-full sm:w-auto">
                 {busy ? "Running…" : "Run unified confidence"}
               </Button>
             </form>
-          </CardContent>
-        </Card>
+        </ModuleCard>
 
         <div className="min-w-0 space-y-4">
           {error && (
-            <Card className="border-warning/40 bg-warning/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base text-warning">
-                  <AlertTriangle className="h-4 w-4" />
-                  Request failed
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-warning">{error}</CardContent>
-            </Card>
+            <AlertCard variant="error" title="Request failed" description={error} />
           )}
           {(busy || buildBusy) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">{busy ? "Running unified confidence" : "Building unified evidence"}</CardTitle>
-                <CardDescription>
-                  {busy
-                    ? "Synthesizing unified candidate confidence from evidence layers…"
-                    : "Bundling evidence into a unified synthesis…"}
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            <AlertCard
+              variant="info"
+              title={busy ? "Running unified confidence" : "Building unified evidence"}
+              description={
+                busy
+                  ? "Synthesizing unified candidate confidence from evidence layers…"
+                  : "Bundling evidence into a unified synthesis…"
+              }
+            />
           )}
           {!busy && !buildBusy && result != null ? <UnifiedConfidencePanels data={result} /> : null}
           {!busy && !buildBusy && !result && !error && (
@@ -1248,24 +1250,20 @@ function ReportComposerTab({
   return (
     <div className="space-y-6">
       <SpectraCheckSavedSessionReviewAudit backendSessionId={backendSessionId} />
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Structure elucidation report composer</CardTitle>
-          <CardDescription>
-            Compose a structure-elucidation report from your evidence — with an optional HTML preview.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Spectroscopy · Report Composer"
+        title="Structure elucidation report composer"
+        description="Compose a structure-elucidation report from your evidence — with an optional HTML preview."
+      />
 
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Session context for compose</CardTitle>
-          <CardDescription>
-            Uses shared sample ID, stored Unified Evidence result, and evidence queue selections (provenance and hashes when
-            present).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 text-sm md:grid-cols-2">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Report · Session context"
+        title="Session context for compose"
+        description="Uses shared sample ID, stored Unified Evidence result, and evidence queue selections (provenance and hashes when present)."
+      >
+        <div className="grid gap-4 text-sm md:grid-cols-2">
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground">Sample ID</p>
             <p className="break-all font-mono text-xs">{sampleId.trim() || "—"}</p>
@@ -1313,19 +1311,22 @@ function ReportComposerTab({
               <p className="text-xs text-muted-foreground">None recorded on selected items.</p>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Scientific Method Provenance</CardTitle>
-          <CardDescription>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Report · Method Provenance"
+        title="Scientific Method Provenance"
+        description={
+          <>
             Fields from selected Evidence Queue items, linked workflow runs, session QC, unified confidence, and composer
             choices — serialized under <code className="text-xs">method_provenance</code> inside{" "}
             <code className="text-xs">provenance_metadata_json</code>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm">
           {methodProvenancePayload.warning_legacy_evidence_without_method_provenance ? (
             <Alert variant="default" className="border-amber-500/40 bg-amber-500/5">
               <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
@@ -1493,21 +1494,24 @@ function ReportComposerTab({
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Selected Visual Evidence</CardTitle>
-          <CardDescription>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Report · Visual Evidence"
+        title="Selected Visual Evidence"
+        description={
+          <>
             Queue rows selected for unified synthesis that carry visualizable payloads (kinds below). Compose sends{" "}
             <code className="text-xs">selected_visual_evidence</code> inside{" "}
             <code className="text-xs">provenance_metadata</code> — artifact references and plot-export placeholders only;
             raster or Plotly embeds are not included until export support is stable. Compact previews below are for this
             workspace only (orientation).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm">
           {selectedVisualEvidence.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               None — select evidence for unified synthesis and ensure items include spectrum, MS/MS, chromatogram,
@@ -1598,18 +1602,21 @@ function ReportComposerTab({
               </div>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">AI Prediction Provenance</CardTitle>
-          <CardDescription>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Report · AI Prediction"
+        title="AI Prediction Provenance"
+        description={
+          <>
             Controlled AI prediction metadata included in <code className="text-xs">provenance_metadata_json</code> when available.
             Predictions remain decision support and require review.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+          </>
+        }
+      >
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <span className="text-muted-foreground">prediction run ID</span>
             <p className="font-mono text-xs">{aiPredictionProvenance?.prediction_run_id ?? "—"}</p>
@@ -1666,19 +1673,22 @@ function ReportComposerTab({
                   : "false"}
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Workflow provenance</CardTitle>
-          <CardDescription>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Report · Workflow Provenance"
+        title="Workflow provenance"
+        description={
+          <>
             Included under <code className="text-xs">workflow_provenance</code> inside{" "}
             <code className="text-xs">provenance_metadata_json</code> on compose. Summaries require live workflow APIs —
             does not assert final approval or identification.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
+          </>
+        }
+      >
+        <div className="space-y-4 text-sm">
           {workflowProvBusy ? <p className="text-xs text-muted-foreground">Loading workflow trace…</p> : null}
           {workflowProvErr ? <p className="text-xs text-warning">{workflowProvErr}</p> : null}
           {workflowProvenanceMerged ? (
@@ -1790,19 +1800,22 @@ function ReportComposerTab({
           ) : (
             <p className="text-xs text-muted-foreground">Workflow provenance loads after the evidence queue snapshot.</p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Evidence quality &amp; session QC</CardTitle>
-          <CardDescription>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Report · Evidence Quality"
+        title="Evidence quality & session QC"
+        description={
+          <>
             QC and provenance context included under <code className="text-xs">qc_provenance_section</code> inside{" "}
             <code className="text-xs">provenance_metadata_json</code>. Language stays non-identifying unless human review
             signals support stronger statements.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
+          </>
+        }
+      >
+        <div className="space-y-4 text-sm">
           {qcProv ? (
             <>
               <div className="rounded-md border bg-muted/20 p-3">
@@ -1914,18 +1927,21 @@ function ReportComposerTab({
           ) : (
             <p className="text-xs text-muted-foreground">QC provenance block unavailable.</p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card className="border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Provenance</CardTitle>
-          <CardDescription>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Report · Session Provenance"
+        title="Provenance"
+        description={
+          <>
             Session files, jobs, and artifacts for this SpectraCheck session. Included in{" "}
             <code className="text-xs">provenance_metadata_json</code> on compose.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
+          </>
+        }
+      >
+        <div className="space-y-4 text-sm">
           {!backendSessionId?.trim() ? (
             <p className="text-xs text-muted-foreground">
               Connect a backend session to load file, job, and artifact provenance.
@@ -2057,8 +2073,8 @@ function ReportComposerTab({
               </ul>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       <details className="rounded-lg border bg-card p-4">
         <summary className="cursor-pointer text-sm font-medium">Compose request (developer JSON)</summary>
@@ -2068,12 +2084,13 @@ function ReportComposerTab({
       </details>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle>Compose settings</CardTitle>
-            <CardDescription>Metadata, provenance, and evidence layers (advanced).</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="teal"
+          eyebrow="Report · Compose"
+          title="Compose settings"
+          description="Metadata, provenance, and evidence layers (advanced)."
+          className="min-w-0"
+        >
             <form onSubmit={compose} className="space-y-4">
               <label className="block space-y-2">
                 <span className="text-sm font-medium">Report title</span>
@@ -2168,16 +2185,16 @@ function ReportComposerTab({
                 </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
+        </ModuleCard>
 
         <div className="min-w-0 space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Report form preview</CardTitle>
-              <CardDescription>Values that will be submitted with Compose report (same fields as the form).</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Report · Form Preview"
+            title="Report form preview"
+            description="Values that will be submitted with Compose report (same fields as the form)."
+          >
+            <div className="grid gap-2 text-sm sm:grid-cols-2">
               <div>
                 <span className="text-muted-foreground">Title</span>
                 <p className="font-medium">{reportTitle.trim() || "—"}</p>
@@ -2222,26 +2239,22 @@ function ReportComposerTab({
                     : "—"}
                 </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
           {error && (
-            <Card className="border-warning/40 bg-warning/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-warning">Request failed</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-warning">{error}</CardContent>
-            </Card>
+            <AlertCard variant="error" title="Request failed" description={error} />
           )}
 
           {result != null && isRecord(result) ? (
             <>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Report metadata</CardTitle>
-                  <CardDescription>Title, roles, and intent echoed from the composed report.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+              <ModuleCard
+                accent="teal"
+                eyebrow="Result · Metadata"
+                title="Report metadata"
+                description="Title, roles, and intent echoed from the composed report."
+              >
+                <div className="grid gap-2 text-sm sm:grid-cols-2">
                   <div>
                     <span className="text-muted-foreground">Title</span>
                     <p className="font-medium">{String(result.report_title ?? "—")}</p>
@@ -2262,15 +2275,16 @@ function ReportComposerTab({
                     <span className="text-muted-foreground">Review status</span>
                     <p>{String(result.review_status ?? "—")}</p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Report status</CardTitle>
-                  <CardDescription>Backend workflow labels for release.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
+              <ModuleCard
+                accent="teal"
+                eyebrow="Result · Status"
+                title="Report status"
+                description="Backend workflow labels for release."
+              >
+                <div className="flex flex-wrap gap-2">
                   {statusLabel && (
                     <Badge variant="secondary" className="text-sm">
                       {statusLabel}
@@ -2292,14 +2306,15 @@ function ReportComposerTab({
                       human_review_approved (verify release gate / review_status)
                     </Badge>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Provenance snapshot</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
+              <ModuleCard
+                accent="teal"
+                eyebrow="Result · Provenance"
+                title="Provenance snapshot"
+              >
+                <div className="space-y-2 text-sm">
                   <div>
                     <span className="text-muted-foreground">Report ID:</span>{" "}
                     <span className="font-mono">{String(result.report_id ?? "—")}</span>
@@ -2320,55 +2335,54 @@ function ReportComposerTab({
                         : "—"}
                     </span>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
 
               {composedReportNumericId != null && backendSessionId?.trim() ? (
-                <Card className="border-muted">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Report lock &amp; release</CardTitle>
-                    <CardDescription>
+                <ModuleCard
+                  accent="teal"
+                  eyebrow="Result · Lock & Release"
+                  title="Report lock & release"
+                  description={
+                    <>
                       Lock status comes from the report itself. Release follows the session&apos;s
                       approval record (status <em>approved &amp; confirmed</em>) unless an admin override
                       is recorded in the release dialog.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ReportLockControls
-                      reportId={composedReportNumericId}
-                      sessionIdStr={backendSessionId.trim()}
-                      sessionNumericId={backendSessionNumericForLock}
-                    />
-                  </CardContent>
-                </Card>
+                    </>
+                  }
+                >
+                  <ReportLockControls
+                    reportId={composedReportNumericId}
+                    sessionIdStr={backendSessionId.trim()}
+                    sessionNumericId={backendSessionNumericForLock}
+                  />
+                </ModuleCard>
               ) : null}
 
               {composedReportNumericId != null ? (
-                <Card className="border-muted">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Secure share</CardTitle>
-                    <CardDescription>
-                      Generate a scoped share link — permissions and expiry follow your tenant&apos;s policy.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <SecureShareDialog
-                      scope="report"
-                      lockScope
-                      lockTargetId
-                      defaultReportId={composedReportNumericId}
-                      trigger={<Button type="button" variant="outline" size="sm">Secure share</Button>}
-                    />
-                  </CardContent>
-                </Card>
+                <ModuleCard
+                  accent="teal"
+                  eyebrow="Result · Secure Share"
+                  title="Secure share"
+                  description="Generate a scoped share link — permissions and expiry follow your tenant's policy."
+                >
+                  <SecureShareDialog
+                    scope="report"
+                    lockScope
+                    lockTargetId
+                    defaultReportId={composedReportNumericId}
+                    trigger={<Button type="button" variant="outline" size="sm">Secure share</Button>}
+                  />
+                </ModuleCard>
               ) : null}
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Source files and processing history</CardTitle>
-                  <CardDescription>Values submitted with this compose request (line-oriented lists).</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2">
+              <ModuleCard
+                accent="teal"
+                eyebrow="Result · Source Files"
+                title="Source files and processing history"
+                description="Values submitted with this compose request (line-oriented lists)."
+              >
+                <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">Source files</p>
                     {sourceFilesText.trim() ? (
@@ -2403,15 +2417,16 @@ function ReportComposerTab({
                       <p className="mt-2 text-sm text-muted-foreground">—</p>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
 
               {Array.isArray(result.sections) && result.sections.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Report sections</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+                <ModuleCard
+                  accent="teal"
+                  eyebrow="Result · Sections"
+                  title="Report sections"
+                >
+                  <div className="space-y-4">
                     {result.sections.map((sec, i) => {
                       if (!isRecord(sec)) return null
                       const title = typeof sec.title === "string" ? sec.title : `Section ${i + 1}`
@@ -2429,8 +2444,8 @@ function ReportComposerTab({
                         </div>
                       )
                     })}
-                  </CardContent>
-                </Card>
+                  </div>
+                </ModuleCard>
               )}
 
               <div className="flex flex-wrap gap-2">
@@ -2444,9 +2459,20 @@ function ReportComposerTab({
 
               {(htmlPreview ||
                 (typeof result.html_report === "string" && result.html_report.length > 0)) && (
-                <Card className="min-w-0 overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">HTML preview</CardTitle>
+                <Card
+                  className="min-w-0 overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-teal)" }}
+                >
+                  <CardHeader className="gap-1 pt-5 pb-2">
+                    <span
+                      className="font-mono text-[9px] font-bold uppercase tracking-[0.2em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      Result · HTML Preview
+                    </span>
+                    <CardTitle className="font-mono text-base font-bold tracking-tight">
+                      HTML preview
+                    </CardTitle>
                     <CardDescription>Sandboxed iframe — content from composed report.</CardDescription>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -2658,78 +2684,122 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm">
-        <CheckCircle2 className="h-4 w-4 text-success" />
-        <span className="font-medium">Unified synthesis response</span>
-        <span className="text-muted-foreground">
-          Selected adduct: <code className="text-xs">{String(data.selected_adduct ?? "—")}</code>
-        </span>
-      </div>
+      <AlertCard
+        variant="success"
+        title="Unified synthesis response"
+        description={
+          <span>
+            Selected adduct: <code className="text-xs">{String(data.selected_adduct ?? "—")}</code>
+          </span>
+        }
+      />
 
-      <Card className="min-w-0">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Synthesis metrics</CardTitle>
-          <CardDescription>Summary fields returned by the unified confidence endpoint.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <p className="text-xs text-muted-foreground">Confidence score</p>
-            <p className="font-mono text-lg font-semibold">
-              {synthConfidence !== null ? synthConfidence.toFixed(3) : "—"}
+      <ModuleCard
+        accent="teal"
+        eyebrow="Unified · Metrics"
+        title="Synthesis metrics"
+        description="Summary fields returned by the unified confidence endpoint."
+        className="min-w-0"
+      >
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4 items-center">
+          <div className="flex items-center gap-3">
+            {synthConfidence !== null ? (
+              <ConfidenceRing
+                value={synthConfidence * 100}
+                size={56}
+                ariaLabel={`Confidence ${(synthConfidence * 100).toFixed(0)} percent`}
+              />
+            ) : (
+              <div className="font-mono text-lg font-semibold">—</div>
+            )}
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Confidence score
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Agreement count</p>
-            <p className="font-mono text-lg font-semibold">{agreementCount !== null ? agreementCount : "—"}</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Agreement count
+            </p>
+            <p
+              className="font-mono text-2xl font-bold tabular-nums"
+              style={{ color: "var(--mt-green)" }}
+            >
+              {agreementCount !== null ? agreementCount : "—"}
+            </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Contradiction count</p>
-            <p className="font-mono text-lg font-semibold">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Contradiction count
+            </p>
+            <p
+              className="font-mono text-2xl font-bold tabular-nums"
+              style={{ color: "var(--mt-red)" }}
+            >
               {contradictionCount !== null ? contradictionCount : globalCx.length > 0 ? globalCx.length : "—"}
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Evidence layers used</p>
-            <p className="text-lg font-semibold">{layersUsed.length > 0 ? layersUsed.length : "—"}</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Evidence layers used
+            </p>
+            <p
+              className="font-mono text-2xl font-bold tabular-nums"
+              style={{ color: "var(--mt-teal)" }}
+            >
+              {layersUsed.length > 0 ? layersUsed.length : "—"}
+            </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {best && (
-        <Card className="min-w-0 border-primary/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Best candidate</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Unified · Best Candidate"
+          title="Best candidate"
+          className="min-w-0"
+          badge={
+            typeof best.confidence_score === "number" ? (
+              <ConfidenceRing
+                value={best.confidence_score * 100}
+                size={48}
+                ariaLabel={`Best candidate confidence ${(best.confidence_score * 100).toFixed(0)} percent`}
+              />
+            ) : null
+          }
+        >
+          <div className="grid gap-2 text-sm sm:grid-cols-2">
             <div>
-              <span className="text-muted-foreground">Name</span>
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Name</span>
               <p className="font-medium">{String(best.name ?? "—")}</p>
             </div>
             <div>
-              <span className="text-muted-foreground">SMILES</span>
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">SMILES</span>
               <p className="break-all font-mono text-xs">{String(best.smiles ?? "—")}</p>
             </div>
             {typeof best.confidence_score === "number" && (
               <div>
-                <span className="text-muted-foreground">Confidence score</span>
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Confidence score</span>
                 <p className="font-mono">{best.confidence_score.toFixed(3)}</p>
               </div>
             )}
             {typeof best.confidence_band === "string" && best.confidence_band && (
               <div>
-                <span className="text-muted-foreground">Band</span>
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Band</span>
                 <p>{best.confidence_band}</p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       )}
 
-      <Card className="min-w-0">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Evidence layers used</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Unified · Layers"
+        title="Evidence layers used"
+        className="min-w-0"
+      >
+        <div className="flex flex-wrap gap-2">
           {layersUsed.length === 0 ? (
             <span className="text-sm text-muted-foreground">—</span>
           ) : (
@@ -2739,15 +2809,17 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
               </Badge>
             ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card className="min-w-0">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Candidate confidence</CardTitle>
-          <CardDescription>Ranked candidates from the synthesis response.</CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Unified · Ranked Candidates"
+        title="Candidate confidence"
+        description="Ranked candidates from the synthesis response."
+        className="min-w-0"
+      >
+        <div className="overflow-x-auto">
           {ranked.length === 0 ? (
             <p className="text-sm text-muted-foreground">No ranked rows.</p>
           ) : (
@@ -2782,49 +2854,41 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {missingSet.size > 0 && (
-        <Card className="border-warning/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Missing evidence (aggregated)</CardTitle>
-            <CardDescription>Layers not populated across candidates — strengthen inputs where applicable.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-inside list-disc space-y-1 text-sm">
-              {Array.from(missingSet).map((m) => (
-                <li key={m}>{m.replaceAll("_", " ")}</li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <AlertCard
+          variant="warning"
+          title="Missing evidence (aggregated)"
+          description="Layers not populated across candidates — strengthen inputs where applicable."
+        >
+          <ul className="list-inside list-disc space-y-1 text-sm">
+            {Array.from(missingSet).map((m) => (
+              <li key={m}>{m.replaceAll("_", " ")}</li>
+            ))}
+          </ul>
+        </AlertCard>
       )}
 
       {globalCx.length > 0 && (
-        <Card className="border-destructive/40 bg-destructive/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-destructive">
-              <AlertTriangle className="h-4 w-4" />
-              Contradictions (global)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              {globalCx.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <AlertCard variant="error" title="Contradictions (global)">
+          <ul className="space-y-2 text-sm">
+            {globalCx.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </AlertCard>
       )}
 
       {ranked.some((r) => Array.isArray(r.contradictions) && r.contradictions.length > 0) && (
-        <Card className="min-w-0">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Per-candidate contradictions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="amber"
+          eyebrow="Unified · Per-Candidate Contradictions"
+          title="Per-candidate contradictions"
+          className="min-w-0"
+        >
+          <div className="space-y-4">
             {ranked.map((row, i) => {
               const cx = Array.isArray(row.contradictions)
                 ? row.contradictions.filter((x): x is string => typeof x === "string")
@@ -2841,16 +2905,13 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
                 </div>
               )
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       )}
 
       {(ambiguity.length > 0 || warnings.length > 0 || notesList.length > 0) && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Ambiguity, warnings & notes</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+        <AlertCard variant="warning" title="Ambiguity, warnings & notes">
+          <div className="space-y-2 text-sm">
             {ambiguity.length > 0 && (
               <div>
                 <p className="font-medium">Ambiguity alerts</p>
@@ -2881,8 +2942,8 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
                 </ul>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </AlertCard>
       )}
 
       {bestLayers.length > 0 && (

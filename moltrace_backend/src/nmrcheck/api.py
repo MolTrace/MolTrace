@@ -842,9 +842,7 @@ DATA_MODE_HEADER = "X-MolTrace-Data-Mode"
 GENERATED_AT_HEADER = "X-MolTrace-Generated-At"
 UNAVAILABLE_WARNING = "Service temporarily unavailable"
 INTERNAL_ERROR_DETAIL = "Internal server error."
-PUBLIC_AUTH_REQUIRED_DETAIL = (
-    "Sign in to continue. If you already signed in, your session may have expired."
-)
+PUBLIC_AUTH_REQUIRED_DETAIL = "Sign in to access live MolTrace data."
 PUBLIC_ACCESS_DENIED_DETAIL = "You do not have access to perform this action."
 PUBLIC_REQUEST_FAILED_DETAIL = "Request could not be completed. Please try again."
 CORS_EXPOSE_HEADERS = (

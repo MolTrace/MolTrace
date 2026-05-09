@@ -40,6 +40,7 @@ const COPYRIGHT_YEAR = new Date().getUTCFullYear()
 type SocialLink =
   | { label: string; href: string; Icon: LucideIcon; kind: "fill"; solidColor: string }
   | { label: string; href: string; kind: "instagram" }
+  | { label: string; href: string; kind: "x" }
   | { label: string; href: string; Icon: LucideIcon; kind: "github" }
   | { label: string; href: string; Icon: LucideIcon; kind: "stroke" }
   | { label: string; href: string; Icon: LucideIcon; kind: "youtube" }
@@ -132,9 +133,12 @@ function SocialGlyph({ link }: { link: SocialLink }) {
       />
     )
   }
-  return (
-    <link.Icon className="h-5 w-5 shrink-0" fill={link.solidColor} stroke="none" strokeWidth={0} aria-hidden />
-  )
+  if (link.kind === "fill") {
+    return (
+      <link.Icon className="h-5 w-5 shrink-0" fill={link.solidColor} stroke="none" strokeWidth={0} aria-hidden />
+    )
+  }
+  return <link.Icon className="h-5 w-5 shrink-0" aria-hidden />
 }
 
 export function Footer() {

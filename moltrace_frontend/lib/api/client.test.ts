@@ -89,7 +89,7 @@ describe("apiFetch", () => {
       name: "ApiError",
       status: 401,
       data: { detail: "Authentication required." },
-      message: "Sign in to continue. If you already signed in, your session may have expired.",
+      message: "Sign in to access live MolTrace data.",
     } satisfies Partial<ApiError>)
   })
 
@@ -115,7 +115,7 @@ describe("apiFetch", () => {
     await expect(apiFetch("/protected")).rejects.toMatchObject({
       name: "ApiError",
       status: 401,
-      message: "Sign in to continue. If you already signed in, your session may have expired.",
+      message: "Sign in to access live MolTrace data.",
     } satisfies Partial<ApiError>)
   })
 

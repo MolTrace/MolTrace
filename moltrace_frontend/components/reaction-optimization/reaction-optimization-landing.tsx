@@ -11,6 +11,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -78,14 +80,24 @@ function SummaryMetricCard({
   sub: React.ReactNode
 }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+    <Card
+      className="h-full overflow-hidden rounded-xl py-0"
+      style={{ borderTop: "3px solid var(--mt-violet)" }}
+    >
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+        <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {title}
+        </CardTitle>
         {icon}
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold tabular-nums">{value}</div>
-        {sub}
+      <CardContent className="pb-5">
+        <div
+          className="font-mono text-3xl font-bold leading-none tabular-nums"
+          style={{ color: "var(--mt-violet)" }}
+        >
+          {value}
+        </div>
+        {sub ? <div className="mt-2">{sub}</div> : null}
       </CardContent>
     </Card>
   )
@@ -203,9 +215,15 @@ export function ReactionOptimizationLanding() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Reaction Optimization</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            MolTrace · Reaction Optimization
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Reaction Optimization</h1>
+          <p className="text-sm text-muted-foreground">
             Review next-best-experiment recommendations, constraints, and optimization history.
           </p>
         </div>
@@ -218,22 +236,18 @@ export function ReactionOptimizationLanding() {
       </div>
 
       {showListUnavailable ? (
-        <Alert variant="default" className="border-muted bg-muted/30">
-          <AlertTitle className="text-sm">Backend unavailable</AlertTitle>
-          <AlertDescription className="text-xs text-muted-foreground">{listError}</AlertDescription>
-        </Alert>
+        <AlertCard variant="warning" title="Backend unavailable" description={listError ?? ""} />
       ) : null}
 
-      <Alert className="border-warning/40 bg-warning/10">
-        <AlertTitle className="text-sm">Chemist approval required</AlertTitle>
-        <AlertDescription className="text-xs">
-          AI recommendations require chemist approval before execution.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Chemist approval required"
+        description="AI recommendations require chemist approval before execution."
+      />
 
       <section aria-labelledby="campaign-summary-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="campaign-summary-heading" className="text-lg font-semibold tracking-tight">
+          <h2 id="campaign-summary-heading" className="font-mono text-lg font-bold tracking-tight">
             Campaign summary
           </h2>
           <DataStateBadge state={reactionDataState} />
@@ -299,7 +313,7 @@ export function ReactionOptimizationLanding() {
       <ReactionValidationReadinessCard />
 
       <section aria-labelledby="recommendation-evidence-heading" className="space-y-3">
-        <h2 id="recommendation-evidence-heading" className="text-lg font-semibold tracking-tight">
+        <h2 id="recommendation-evidence-heading" className="font-mono text-lg font-bold tracking-tight">
           Recommendation evidence
         </h2>
         <EvidenceCard

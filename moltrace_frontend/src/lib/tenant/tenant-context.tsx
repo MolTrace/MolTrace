@@ -69,13 +69,16 @@ type TenantContextValue = {
 }
 
 const LOCAL_TENANT_ID = "local-development"
+const FALLBACK_TENANT_DISPLAY_NAME =
+  process.env.NODE_ENV === "production" ? "MolTrace workspace" : "Local development tenant"
+const FALLBACK_TENANT_STATUS = process.env.NODE_ENV === "production" ? "workspace" : "local"
 
 const LOCAL_TENANT: TenantRecord = {
   id: LOCAL_TENANT_ID,
   tenant_key: "local_development",
-  display_name: "Local development tenant",
+  display_name: FALLBACK_TENANT_DISPLAY_NAME,
   tenant_type: "sandbox",
-  status: "local",
+  status: FALLBACK_TENANT_STATUS,
 }
 
 const CORE_MODULES: Omit<TenantModuleAccess, "enabled">[] = [

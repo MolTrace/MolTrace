@@ -92,7 +92,7 @@ function messageFromErrorData(data: unknown, fallback: string) {
 
 function authFailureMessage(status: number) {
   if (status === 403) return "You do not have access to perform this action."
-  return "Sign in to continue. If you already signed in, your session may have expired."
+  return "Sign in to access live MolTrace data."
 }
 
 export function sanitizePublicApiErrorMessage(
