@@ -39,10 +39,19 @@ import {
 const FILE_KIND_OPTIONS = [
   "processed_nmr",
   "raw_fid",
+  "nmr2d_peak_table",
+  "dept_apt_peak_table",
   "ms_peak_table",
+  "msms_spectrum",
+  "ms_raw",
   "lcms_mzml",
   "lcms_mzxml",
+  "lcms_raw",
   "lcms_peak_table",
+  "spectrum_table",
+  "spectrum_jcamp",
+  "spectrum_vendor",
+  "spectrum_archive",
   "report",
   "other",
 ] as const
@@ -52,16 +61,28 @@ const SESSION_ROLE_OPTIONS = [
   "processed_13c",
   "raw_fid_1h",
   "raw_fid_13c",
+  "nmr2d",
+  "dept_apt",
   "ms1",
   "msms",
   "lcms",
+  "spectrum_reference",
   "report_source",
   "other",
 ] as const
 
 type FileKind = (typeof FILE_KIND_OPTIONS)[number]
 type SessionRole = (typeof SESSION_ROLE_OPTIONS)[number]
-type ConnectorTargetRoute = "processed_nmr" | "raw_fid" | "msms" | "lcms"
+type ConnectorTargetRoute =
+  | "processed_nmr"
+  | "raw_fid"
+  | "nmr2d"
+  | "dept_apt"
+  | "msms"
+  | "ms_raw"
+  | "lcms"
+  | "lcms_raw"
+  | "spectrum_file"
 
 type FileRecord = SessionFileRecord
 
@@ -538,8 +559,13 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
                 >
                   <option value="processed_nmr">processed_nmr</option>
                   <option value="raw_fid">raw_fid</option>
+                  <option value="nmr2d">nmr2d</option>
+                  <option value="dept_apt">dept_apt</option>
                   <option value="msms">msms</option>
+                  <option value="ms_raw">ms_raw</option>
                   <option value="lcms">lcms</option>
+                  <option value="lcms_raw">lcms_raw</option>
+                  <option value="spectrum_file">spectrum_file</option>
                 </select>
               </div>
               <div className="space-y-2">

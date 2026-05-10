@@ -371,3 +371,203 @@ Mirror the parent workspace's accent. Use a longer eyebrow path:
 | Topbar buttons | `components/app/app-topbar.tsx` |
 | Mobile bottom nav | `src/components/app-shell/MobileBottomNav.tsx` |
 | AppShell layout | `src/components/app-shell/ResponsiveAppShell.tsx` |
+
+---
+
+## 11. Adoption status
+
+As of 2026-05-10, the design system is applied end-to-end across the application.
+
+### Surface coverage
+
+| Tier | Description | Count |
+|---|---|---|
+| Page chrome (mono H1) | Workspaces with consistent `font-mono text-2xl font-bold tracking-tight` H1 | 75+ |
+| Module-coded eyebrows | Workspaces with `MOLTRACE · <SECTION>` mono caps eyebrow above the H1 | 30+ (high-traffic surfaces) |
+| ModuleCard primitive | Leaf workspaces using `<ModuleCard>` instead of plain `<Card>` | 64 |
+| Plain `<Card>` without `ModuleCard` | Leaf workspaces still using legacy `<Card>` chrome | **0** |
+| AlertCard primitive | `<AlertCard>` adoptions across the codebase | 60+ |
+
+### Workspaces with severity-coded KPI grids
+
+These workspaces use the inline manual KPI pattern (Card with `style={{ borderTop }}` stripe) with severity colors driven by KPI semantics (success → green, error → red, warning → amber, optimization → violet, neutral → module accent):
+
+- `components/validation/validation-dashboard-workspace.tsx` (6 KPIs)
+- `components/validation/validation-center-workspace.tsx` (8 KPIs)
+- `components/settings/connectors-center-workspace.tsx` (4 KPIs)
+- `components/admin/tenant-admin-workspace.tsx` (5 KPIs)
+- `components/admin/security-events-workspace.tsx` (2 KPIs)
+- `components/admin/audit-search-workspace.tsx` (2 KPIs)
+- `components/regulatory-hub/regulatory-change-detail-workspace.tsx` (6 KPIs)
+- `components/regulatory-hub/regulatory-surveillance-dashboard.tsx` (via `SummaryMetricCard` helper)
+- `components/knowledge/knowledge-datasets-dashboard.tsx` (4 leakage-risk KPIs)
+- `components/compounds/compound-registry-workspace.tsx` (4 KPIs)
+- `components/automation-roi/automation-roi-workspace.tsx` (6 KPIs)
+- `components/automation-roi/automation-roi-dashboard.tsx` (8 KPIs via `MetricCard` helper)
+- `components/ai/ai-model-monitoring-workspace.tsx` (6 KPIs)
+- `components/validation/validation-project-detail-workspace.tsx` (5 StatCards via upgraded helper)
+
+### Workspaces with cyan tab pill styling
+
+- `components/ai/ml-ai-interface-workspace.tsx` (2 tabs)
+- `components/validation/validation-project-detail-workspace.tsx` (11 tabs)
+
+### Workspaces still using legacy plain `Card` patterns
+
+**None.** All leaf workspaces have been converted to use `ModuleCard` or `AlertCard` primitives where applicable. Some files still import `Card`/`CardHeader`/`CardTitle`/`CardContent` for inner sub-cards inside a `ModuleCard` parent (intentional sub-card pattern for nested forms or result tiles).
+
+### Files with reusable card-helper components
+
+When a workspace has many similar cards, prefer refactoring at the helper level rather than wrapping each call site:
+
+| File | Helper | Wrapped at |
+|---|---|---|
+| `components/validation/validation-project-detail-workspace.tsx` | `StatCard` | helper level (drives 5 Overview stats + future tab stats) |
+| `components/ml/ml-model-card-detail.tsx` | `SummaryTable` | helper level (6 instances pick up `ModuleCard` automatically) |
+| `components/regulatory-hub/regulatory-surveillance-dashboard.tsx` | `SummaryMetricCard` | helper accepts `accent` prop, renders manual KPI pattern |
+| `components/automation-roi/automation-roi-dashboard.tsx` | `MetricCard` | helper accepts `severity` + `LucideIcon` props |
+| `components/admin/mobile-tenant-summary-workspace.tsx` | `ProgramOrderCard` (renamed from `ModuleOrderCard` to avoid collision with `ModuleCard` primitive) | helper level |
+| `components/admin/tenant-detail-workspace.tsx` | `StatCard`, `SectionCard`, `ProgramUsageCard` | helper level (3 helpers; wrap once, propagates) |
+
+### History
+
+- 2026-05-08 — Layered dashboard refactor begins (Layers 1-3)
+- 2026-05-08/09 — SpectraCheck (12 tabs), Reports, Review Queue, Regulatory Hub, Regulatory Dossier (7+11 tabs)
+- 2026-05-09 — Programs strip, Reaction Optimization (program + project, 11 tabs)
+- 2026-05-09 — ML Model Factory, AI Services, ML/AI Workspace, Knowledge Library Landing
+- 2026-05-09 — Validation Dashboard, Validation Center
+- 2026-05-09 — System Releases, Validation Project Detail, Inspection Package, 6 Validation Center sub-workspaces
+- 2026-05-09 — Validation Run Detail, all 6 Settings workspaces (introduced `slate` accent for admin/tenant ops)
+- 2026-05-10 — Cross-cutting polish: global mono H1 sweep (42 files) + 8 high-traffic eyebrow upgrades + AppShell sidebar/topbar/mobile-nav active-state language + this design system doc
+- 2026-05-10 — Lean leaf-workspace batch (20 files, ≤3 cards each)
+- 2026-05-10 — Heavy leaf-workspace batch (21 files, 5+ cards each — Regulatory + Knowledge + ML/AI detail + Admin + Compounds + Batches + ROI)
+
+---
+
+## 12. Parallel-agent batch workflow
+
+When reskinning many leaf surfaces at once, dispatch 3-4 general-purpose agents in parallel. Each agent batch should be:
+
+1. **Module-coherent.** Group files by module accent (teal / cyan / slate / violet) so an agent applies one consistent accent across its files.
+2. **Non-overlapping.** No two agents should touch the same file.
+3. **Self-contained.** Each agent's prompt must include:
+   - Reference to `docs/design-system.md` for the canonical pattern
+   - Reference to a clean reskinned file as a worked example (e.g. `components/validation/system-releases-workspace.tsx` for the lean pattern, `components/validation/validation-center-workspace.tsx` for the KPI grid pattern)
+   - The exact file list with card counts
+   - The module accent assignment
+   - The lean wrap pattern with both OLD and NEW JSX
+   - The verification step (`npx tsc --noEmit | grep error`)
+
+### Worktree → main checkout cp-mirror
+
+The harness sandbox blocks general-purpose agent writes to the main checkout under `/Users/ci/MolTrace/moltrace_frontend/`. Agents can only write to the worktree at `/Users/ci/MolTrace/.claude/worktrees/<worktree-name>/moltrace_frontend/`.
+
+This breaks live HMR on `localhost:3000` (which reads from the main checkout per the user's saved memory note).
+
+**Workflow:** After each agent reports complete, mirror its files from the worktree to the main checkout via `cp`:
+
+```bash
+for f in components/path/file-1.tsx components/path/file-2.tsx; do
+  cp "/Users/ci/MolTrace/.claude/worktrees/<worktree-name>/moltrace_frontend/$f" \
+     "/Users/ci/MolTrace/moltrace_frontend/$f"
+done
+```
+
+After all agents have reported, run `tsc --noEmit` from the main checkout to catch any import regressions across files (occasionally an agent removes too much from a Card import while still using inner sub-cards — fix by re-adding the missing identifiers to the import line).
+
+### Common agent regressions to watch for
+
+When verifying after a parallel batch, check:
+
+- **Removed `Card`/`CardHeader`/`CardTitle`/`CardContent` from imports while still using them on inner sub-cards.** Re-add only the identifiers actually still used.
+- **Local helper components named the same as design-system primitives.** E.g., a workspace's local `ModuleCard` or `StatCard` helper will collide with the imported primitive — rename the local helper.
+- **AlertCard `description` containing block-level JSX (`<ul>`, `<div>`, `<p>`).** Use `children` slot instead.
+- **Lost `CardContent` className during the wrap.** Verify the new inner `<div>` carries the original classes (typically `space-y-4`, `overflow-x-auto`, `table-scroll min-w-0`, etc.).
+
+---
+
+## 13. Visual regression baseline
+
+A Playwright-driven capture script lives at `tests/visual-baseline/capture.ts`
+that screenshots every reskinned surface listed in `tests/visual-baseline/routes.ts`
+at desktop viewport (1440×900). The output goes to
+`tests/visual-baseline/screenshots/` plus a JSON + Markdown report.
+
+### Files
+
+| Path | Purpose |
+|---|---|
+| `tests/visual-baseline/routes.ts` | URL list grouped by module accent |
+| `tests/visual-baseline/capture.ts` | Playwright capture script |
+| `tests/visual-baseline/screenshots/` | Output PNGs (one per route) |
+| `tests/visual-baseline/report.json` | Per-route capture status + timing |
+| `tests/visual-baseline/report.md` | Human-readable summary table |
+| `tests/visual-baseline/backend-contract.ts` | Frontend API-call scanner checked against backend OpenAPI |
+| `tests/visual-baseline/backend-contract-report.json` | Machine-readable frontend/backend route audit |
+| `tests/visual-baseline/backend-contract-report.md` | Human-readable frontend/backend route audit |
+
+### Usage
+
+```bash
+# Prereq: dev server running on http://localhost:3000
+pnpm visual:baseline
+
+# Prereq: backend running on http://localhost:8000
+pnpm visual:backend-contract
+```
+
+Tunables (env vars):
+
+| Var | Default | Purpose |
+|---|---|---|
+| `VISUAL_BASE_URL` | `http://localhost:3000` | Override target host |
+| `VISUAL_NAV_TIMEOUT_MS` | `60000` | Per-route timeout |
+| `VISUAL_SETTLE_MS` | `800` | Pause after navigation before screenshot (lets data fetches settle) |
+| `VISUAL_COOLDOWN_MS` | `400` | Pause between routes (eases dev-server compile pressure) |
+| `VISUAL_RETRY_COUNT` | `2` | Retry attempts on navigation failure |
+| `BACKEND_OPENAPI_URL` | `http://localhost:8000/openapi.json` | OpenAPI source for `pnpm visual:backend-contract` |
+| `BACKEND_CONTRACT_STRICT_UNRESOLVED` | unset | Set to `1` to fail on statically unresolved frontend API paths |
+
+### When to re-capture
+
+After any visual change that could affect layout, color, or chrome:
+- Adding a new color token or accent
+- Changing `ModuleCard` / `AlertCard` / `KpiCard` / `DashboardSection` shape
+- Adjusting `app/globals.css`, sidebar, topbar, or mobile-nav active-state styles
+- Adopting the design system on a new surface (also append to `routes.ts`)
+- Adding controls, uploads, actions, tables, tabs, or route surfaces that call
+  the backend; run `pnpm visual:backend-contract` and implement any missing
+  OpenAPI-backed route before shipping the frontend change.
+
+Diff the new screenshots against the prior baseline (e.g. with `git diff` if
+the screenshots are committed, or any image-diff tool) to spot regressions.
+
+### Adding a new route
+
+When a new surface is reskinned, append an entry to `ROUTES` in
+`tests/visual-baseline/routes.ts`:
+
+```ts
+{ name: "d0-new-thing", path: "/new-thing", accent: "teal" },
+```
+
+The `name` becomes the screenshot filename. Use a 2-character key prefix
+that orders the file alongside its module group (existing prefixes: 0x marketing,
+1x dashboard, 2x spectracheck, 3x compounds/batches, 4x reactions, 5x regulatory,
+6x validation, 7x ml, 8x ai, 9x knowledge, ax roi, bx settings, cx admin).
+
+### Dynamic routes
+
+Routes with path params (`[id]`, `[tenantId]`, etc.) are excluded from the
+baseline — they need seeded data to render reliably. To capture a specific
+dynamic route, add an entry with a real ID hardcoded in the path
+(e.g. `path: "/validation-center/projects/42"`) but be aware the screenshot
+will only be reproducible against the same backing data.
+
+### Dev server caveat
+
+Next.js dev mode compiles routes on-demand. The first visit to a cold route
+can take 15–30 seconds, which is why the script defaults to a 60s nav timeout
+and 2 retries. After the first run, the dev server has compiled all routes
+and subsequent runs complete in ~5–10 minutes. For deterministic captures,
+prefer running against a production build (`pnpm build && pnpm start`).

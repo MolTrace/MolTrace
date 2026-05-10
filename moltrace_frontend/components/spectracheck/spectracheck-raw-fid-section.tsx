@@ -8,6 +8,7 @@ import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTi
 import { buildAnalysisJobPayload } from "@/src/lib/spectracheck/buildAnalysisJobPayload"
 import type { SessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { normalizeSessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
+import { SPECTRACHECK_RAW_FID_ACCEPT, isRawFidArchiveFilename } from "@/src/lib/spectracheck/spectrum-file-formats"
 import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
 import { SpectrumViewer } from "@/components/science/SpectrumViewer"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
@@ -18,13 +19,34 @@ import { isMissingNmrEndpoint, RAW_FID_BACKEND_MSG } from "@/components/spectrac
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+import {
+  Activity,
+  AlertTriangle,
+  Archive,
+  BarChart3,
+  ChevronDown,
+  Eye,
+  FileText,
+  Hash,
+  Lock,
+  PlayCircle,
+  RotateCcw,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  Waves,
+  X,
+  Zap,
+} from "lucide-react"
 
 type Props = {
   sampleId: string
@@ -58,6 +80,37 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
   const [sessionRawFileIdChoice, setSessionRawFileIdChoice] = useState("")
   const [jobActionError, setJobActionError] = useState("")
 
+  // Drop-zone UI state — file mirrored into fileRef.files via DataTransfer.
+  const [dragOver, setDragOver] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  function attachFile(file: File) {
+    setSelectedFile(file)
+    setSelectedFileName(file.name)
+
+    if (fileRef.current && typeof DataTransfer !== "undefined") {
+      try {
+        const dt = new DataTransfer()
+        dt.items.add(file)
+        fileRef.current.files = dt.files
+      } catch {
+        // Some browsers/test environments do not allow assigning FileList.
+      }
+    }
+  }
+
+  function getSelectedFile() {
+    return fileRef.current?.files?.[0] ?? selectedFile
+  }
+
+  function clearSelectedFile() {
+    if (fileRef.current) fileRef.current.value = ""
+    setSelectedFile(null)
+    setSelectedFileName(null)
+  }
+
   const pushDev = useCallback(
     (key: string, value: unknown) => {
       registerDev?.(key, value)
@@ -66,12 +119,13 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
   )
 
   const rawSessionFileOptions = (ws?.sessionFiles ?? []).filter(
-    (f: SessionFileRecord) => f.file_kind === "raw_fid" || /\.(zip|tgz)$/i.test(f.filename),
+    (f: SessionFileRecord) =>
+      (f.file_kind === "raw_fid" || f.file_kind === "spectrum_archive") && isRawFidArchiveFilename(f.filename),
   )
 
   async function ensureRawFidInputFileId(): Promise<string | null> {
     if (sessionRawFileIdChoice.trim()) return sessionRawFileIdChoice.trim()
-    const file = fileRef.current?.files?.[0]
+    const file = getSelectedFile()
     if (!file) return null
     const fd = new FormData()
     fd.append("file", file)
@@ -95,7 +149,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     try {
       const fid = await ensureRawFidInputFileId()
       if (!fid) {
-        setJobActionError("Choose a session raw FID file or pick a local archive.")
+        setJobActionError("Choose a session raw FID archive or pick a local archive.")
         return
       }
       const jid = await analysisJob.createJob(
@@ -122,7 +176,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     try {
       const fid = await ensureRawFidInputFileId()
       if (!fid) {
-        setJobActionError("Choose a session raw FID file or pick a local archive.")
+        setJobActionError("Choose a session raw FID archive or pick a local archive.")
         return
       }
       const jid = await analysisJob.createJob(
@@ -161,9 +215,9 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
   }
 
   async function runPreview() {
-    const file = fileRef.current?.files?.[0]
+    const file = getSelectedFile()
     if (!file) {
-      setPreviewError("Choose a raw FID archive (.zip / .tar.gz).")
+      setPreviewError("Choose a raw FID archive (.zip / .tar.gz / .tgz).")
       return
     }
     setPreviewLoading(true)
@@ -183,9 +237,9 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
   }
 
   async function runProcess() {
-    const file = fileRef.current?.files?.[0]
+    const file = getSelectedFile()
     if (!file) {
-      setProcessError("Choose a raw FID archive (.zip / .tar.gz).")
+      setProcessError("Choose a raw FID archive (.zip / .tar.gz / .tgz).")
       return
     }
     setProcessLoading(true)
@@ -210,6 +264,8 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     setPreviewError("")
     setProcessError("")
     if (fileRef.current) fileRef.current.value = ""
+    setSelectedFile(null)
+    setSelectedFileName(null)
   }
 
   const displayPayload = processResult ?? previewResult
@@ -240,146 +296,415 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
 
   return (
     <div className="space-y-6">
+      {/* ── Step 1 — Setup & Upload ────────────────────────────────────── */}
       <ModuleCard
         accent="teal"
-        eyebrow="Spectroscopy · Raw FID Upload"
-        title="Raw FID Upload / Non-destructive Processing"
-        description="Upload a raw FID for non-destructive Fourier transform and apodization. Original data is preserved; processing parameters are adjustable."
+        eyebrow="Step 1 · Setup"
+        title="Configure & upload raw FID archive"
+        icon={Upload}
+        description="Set sample metadata, choose nucleus and vendor, then drop a raw FID archive (.zip / .tar.gz / .tgz). The original archive is preserved unchanged."
+        className="min-w-0"
+      >
+        <div className="space-y-5">
+          {/* Sample ID + Solvent */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="raw-sample" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Sample ID
+              </Label>
+              <Input
+                id="raw-sample"
+                value={sampleId}
+                onChange={(e) => onSampleIdChange(e.target.value)}
+                className="font-mono"
+              />
+              <p className="text-[11px] text-muted-foreground">Shared with SpectraCheck session.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="raw-solvent" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Solvent <span className="ml-1 text-[10px] font-normal text-muted-foreground/70">(read-only)</span>
+              </Label>
+              <Input id="raw-solvent" value={solvent} readOnly className="bg-muted/40 font-mono" />
+            </div>
+          </div>
+
+          {/* Nucleus + Vendor pill toggles */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Nucleus</Label>
+              <div className="inline-flex rounded-lg border border-input bg-background p-0.5">
+                {(["1H", "13C"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setNucleus(option)}
+                    className={cn(
+                      "rounded-md px-4 py-1.5 font-mono text-sm font-bold transition-colors",
+                      nucleus === option
+                        ? "shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    style={
+                      nucleus === option
+                        ? { backgroundColor: "var(--mt-teal)", color: "#04080F" }
+                        : undefined
+                    }
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vendor</Label>
+              <div className="inline-flex flex-wrap rounded-lg border border-input bg-background p-0.5">
+                {[
+                  { value: "auto", label: "Auto" },
+                  { value: "bruker", label: "Bruker" },
+                  { value: "agilent", label: "Agilent" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setVendor(option.value)}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-wide transition-colors",
+                      vendor === option.value
+                        ? "shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    style={
+                      vendor === option.value
+                        ? { backgroundColor: "var(--mt-teal)", color: "#04080F" }
+                        : undefined
+                    }
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Drop-zone file picker */}
+          <div className="space-y-1.5">
+            <Label htmlFor="raw-file" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Raw FID archive
+            </Label>
+            {/* Drop zone is a div + onClick (see processed section for rationale). */}
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Drop raw FID archive or press Enter to browse"
+              onClick={() => fileRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  fileRef.current?.click()
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOver(false)
+                const file = e.dataTransfer.files?.[0]
+                if (file) attachFile(file)
+              }}
+              className={cn(
+                "group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--mt-teal)] focus-visible:ring-offset-2",
+                dragOver
+                  ? "border-[color:var(--mt-teal)] bg-[color:var(--mt-teal-soft)]"
+                  : selectedFileName
+                  ? "border-[color:var(--mt-teal)]/40 bg-[color:var(--mt-teal-soft)]/40"
+                  : "border-input hover:border-[color:var(--mt-teal)]/60 hover:bg-muted/30"
+              )}
+            >
+              <Archive
+                className="mb-2 h-7 w-7"
+                style={{ color: dragOver || selectedFileName ? "var(--mt-teal)" : undefined }}
+                aria-hidden
+              />
+              <p className="font-mono text-sm font-bold tracking-tight">
+                {selectedFileName ? "Archive ready" : dragOver ? "Drop to attach" : "Drop raw FID archive or click to browse"}
+              </p>
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                ZIP · TAR.GZ · TGZ
+              </p>
+            </div>
+            {/* Native input — sr-only so shadcn classes don't override hidden sizing. */}
+            <input
+              id="raw-file"
+              ref={fileRef}
+              type="file"
+              accept={SPECTRACHECK_RAW_FID_ACCEPT}
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  setSelectedFile(file)
+                  setSelectedFileName(file.name)
+                } else {
+                  setSelectedFile(null)
+                  setSelectedFileName(null)
+                }
+              }}
+            />
+            {selectedFileName ? (
+              <div
+                className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+                style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <FileText className="h-4 w-4 shrink-0" style={{ color: "var(--mt-teal)" }} aria-hidden />
+                  <span className="truncate font-mono text-xs">{selectedFileName}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearSelectedFile}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Remove selected file"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Preserve-raw badge (replaces the disabled checkbox) */}
+          <div
+            className="flex items-center gap-2 rounded-md border px-3 py-2"
+            style={{ borderColor: "var(--mt-green)", backgroundColor: "var(--mt-green-soft)" }}
+          >
+            <Lock className="h-4 w-4 shrink-0" style={{ color: "var(--mt-green)" }} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mt-green)" }}>
+                Original FID preserved
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Processing always operates on a derived copy. <span className="font-mono">preserve_raw=true</span> is locked on.
+              </p>
+            </div>
+          </div>
+
+          {/* Advanced — collapsible */}
+          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-left transition-colors hover:bg-muted/30"
+              >
+                <span className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                    Advanced options
+                  </span>
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 text-muted-foreground transition-transform",
+                    advancedOpen && "rotate-180"
+                  )}
+                  aria-hidden
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="raw-session-file" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Reuse session raw FID
+                </Label>
+                <select
+                  id="raw-session-file"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 font-mono text-sm shadow-xs outline-none"
+                  value={sessionRawFileIdChoice}
+                  onChange={(e) => setSessionRawFileIdChoice(e.target.value)}
+                >
+                  <option value="">— none — use archive above</option>
+                  {rawSessionFileOptions.map((f) => (
+                    <option key={f.file_id} value={f.file_id}>
+                      {f.filename} ({f.file_kind})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-muted-foreground">
+                  Reuse a raw FID archive already attached to this session.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="raw-preset" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Processing preset
+                </Label>
+                <select
+                  id="raw-preset"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 font-mono text-sm shadow-xs outline-none"
+                  value={preset}
+                  onChange={(e) => setPreset(e.target.value as (typeof PRESETS)[number]["value"])}
+                >
+                  {PRESETS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-muted-foreground">
+                  Used when running <span className="font-mono">/process</span>. Preview ignores this.
+                </p>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </ModuleCard>
+
+      {/* ── Step 2 — Run ───────────────────────────────────────────────── */}
+      <ModuleCard
+        accent="teal"
+        eyebrow="Step 2 · Run"
+        title="Inspect or process"
+        icon={Zap}
+        description="Inspect archive metadata only, or process the FID through Fourier transform + apodization to generate a spectrum."
         className="min-w-0"
       >
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="raw-sample">Sample ID</Label>
-              <Input id="raw-sample" value={sampleId} onChange={(e) => onSampleIdChange(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="raw-solvent">Solvent</Label>
-              <Input id="raw-solvent" value={solvent} readOnly className="bg-muted/40" />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="raw-nucleus">Nucleus</Label>
-              <select
-                id="raw-nucleus"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-                value={nucleus}
-                onChange={(e) => setNucleus(e.target.value as "1H" | "13C")}
-              >
-                <option value="1H">1H</option>
-                <option value="13C">13C</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="raw-vendor">Vendor</Label>
-              <select
-                id="raw-vendor"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-                value={vendor}
-                onChange={(e) => setVendor(e.target.value)}
-              >
-                <option value="auto">Auto-detect</option>
-                <option value="bruker">Bruker</option>
-                <option value="agilent">Agilent / Varian</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="raw-file">Raw FID archive</Label>
-            <Input id="raw-file" ref={fileRef} type="file" accept=".zip,.tar.gz,.tgz,application/gzip,application/x-gzip" className="w-full min-w-0" />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="raw-session-file">Session raw FID (optional)</Label>
-            <select
-              id="raw-session-file"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-              value={sessionRawFileIdChoice}
-              onChange={(e) => setSessionRawFileIdChoice(e.target.value)}
-            >
-              <option value="">— none — use file input above</option>
-              {rawSessionFileOptions.map((f) => (
-                <option key={f.file_id} value={f.file_id}>
-                  {f.filename} ({f.file_kind})
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">Use a raw FID archive already attached to this session.</p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="raw-preset">Processing preset (process)</Label>
-            <select
-              id="raw-preset"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-              value={preset}
-              onChange={(e) => setPreset(e.target.value as (typeof PRESETS)[number]["value"])}
-            >
-              {PRESETS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-start gap-2 rounded-md border border-dashed p-3">
-            <Checkbox id="raw-preserve" checked disabled />
-            <div>
-              <Label htmlFor="raw-preserve" className="font-medium">
-                Preserve raw data as immutable source
-              </Label>
-              <p className="text-xs text-muted-foreground">Always sent as preserve_raw=true on process (recommended).</p>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          {/* Two prominent action tiles */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Inspect (preview) tile */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="inline-flex w-full sm:w-auto">
-                  <Button type="button" variant="secondary" className="w-full sm:w-auto" disabled={previewLoading} onClick={runPreview}>
-                    {previewLoading ? "Reading…" : "Preview raw metadata"}
-                  </Button>
-                </span>
+                <button
+                  type="button"
+                  disabled={previewLoading}
+                  onClick={runPreview}
+                  className={cn(
+                    "group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                    "hover:-translate-y-px hover:shadow-md",
+                    previewLoading
+                      ? "cursor-wait opacity-70"
+                      : "border-input hover:border-[color:var(--mt-teal)]/40"
+                  )}
+                  style={{
+                    borderTop: "3px solid var(--mt-teal)",
+                  }}
+                >
+                  <div className="flex w-full items-center justify-between">
+                    <span
+                      className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      <Eye className="h-3.5 w-3.5" aria-hidden />
+                      Inspect
+                    </span>
+                    <span className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      Metadata only
+                    </span>
+                  </div>
+                  <span className="font-mono text-base font-bold leading-tight">
+                    {previewLoading ? "Reading…" : "Preview metadata"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Read archive contents, vendor, file hash, and acquisition parameters without processing.
+                  </span>
+                </button>
               </TooltipTrigger>
               <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                Inspect raw FID archive metadata and file hash before processing.
+                POST /nmr/raw-fid/preview
               </TooltipContent>
             </Tooltip>
+
+            {/* Process tile (primary) */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="inline-flex w-full sm:w-auto">
-                  <Button type="button" className="w-full sm:w-auto" disabled={processLoading} onClick={runProcess}>
-                    {processLoading ? "Processing…" : "Process raw FID"}
-                  </Button>
-                </span>
+                <button
+                  type="button"
+                  disabled={processLoading}
+                  onClick={runProcess}
+                  className={cn(
+                    "group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                    "hover:-translate-y-px hover:shadow-md",
+                    processLoading
+                      ? "cursor-wait opacity-70"
+                      : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                  )}
+                  style={{
+                    borderTop: "3px solid var(--mt-teal)",
+                    backgroundColor: "var(--mt-teal-soft)",
+                  }}
+                >
+                  <div className="flex w-full items-center justify-between">
+                    <span
+                      className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                      Process
+                    </span>
+                    <span
+                      className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      Generates spectrum
+                    </span>
+                  </div>
+                  <span className="font-mono text-base font-bold leading-tight">
+                    {processLoading ? "Processing…" : "Process FID"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Fourier transform + apodization on a derived copy. Generates the displayable spectrum.
+                  </span>
+                </button>
               </TooltipTrigger>
               <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                Process a derived copy of the raw FID. The original raw file should remain unchanged.
+                POST /nmr/raw-fid/process
               </TooltipContent>
             </Tooltip>
-            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={clearAll}>
-              Clear raw FID
+          </div>
+
+          {/* Background job + clear row */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed bg-muted/20 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <PlayCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Background job
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 font-mono text-[11px]"
+                onClick={() => void startRawPreviewJob()}
+              >
+                Preview
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 font-mono text-[11px]"
+                onClick={() => void startRawProcessJob()}
+              >
+                Process
+              </Button>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 font-mono text-[11px] text-muted-foreground"
+              onClick={clearAll}
+            >
+              <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden />
+              Clear
             </Button>
           </div>
 
-          <div className="space-y-3 border-t pt-4">
-            <p className="text-xs font-medium text-muted-foreground">Analysis jobs (run in the background)</p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void startRawPreviewJob()}>
-                Start as job (preview)
-              </Button>
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void startRawProcessJob()}>
-                Start as job (process)
-              </Button>
-            </div>
-            {jobActionError ? (
-              <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">{jobActionError}</div>
-            ) : null}
-          </div>
+          {jobActionError ? (
+            <AlertCard variant="warning" title="Job error" description={jobActionError} />
+          ) : null}
 
           {analysisJob.jobId ? (
             <AnalysisJobTimeline
@@ -399,24 +724,181 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
         </div>
       </ModuleCard>
 
+      {/* ── Loading skeleton ─────────────────────────────────────────── */}
       {(previewLoading || processLoading) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{previewLoading ? "Preview…" : "Processing…"}</CardTitle>
-          </CardHeader>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardContent className="flex items-center gap-3 py-5">
+            <div
+              className="h-2 w-2 animate-pulse rounded-full"
+              style={{ backgroundColor: "var(--mt-teal)" }}
+              aria-hidden
+            />
+            <p className="font-mono text-sm font-bold tracking-tight">
+              {previewLoading ? "Reading raw FID metadata…" : "Processing raw FID…"}
+            </p>
+            <p className="text-xs text-muted-foreground">Waiting for API response</p>
+          </CardContent>
         </Card>
       )}
 
+      {/* ── Step 3 — Results ──────────────────────────────────────────── */}
       {displayPayload != null && !previewLoading && !processLoading && (
-        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
-          <div className="min-w-0 space-y-4">
-            <SpectrumViewer x={xy?.x ?? []} y={xy?.y ?? []} nucleus={nucleus} />
-            {!xy && (
-              <p className="text-sm text-muted-foreground">
-                No processed preview spectrum in this response — metadata shown alongside.
-              </p>
+        <ModuleCard
+          accent="teal"
+          eyebrow="Step 3 · Results"
+          title={processResult != null ? "Processed FID output" : "Raw archive metadata"}
+          icon={BarChart3}
+          description={
+            processResult != null
+              ? "Spectrum, processing parameters, and acquisition metadata from /nmr/raw-fid/process."
+              : "Archive metadata, vendor, and SHA-256 hash from /nmr/raw-fid/preview. Use Process to generate the spectrum."
+          }
+          className="min-w-0"
+        >
+          <div className="space-y-4">
+            {/* KPI tiles — only shown when meaningful values are returned */}
+            {(vendorDetected || sw != null || td != null || warnings.length > 0) && (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {vendorDetected && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-teal)" }}
+                  >
+                    <CardContent className="space-y-1 py-3">
+                      <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        <ShieldCheck className="h-3 w-3" aria-hidden />
+                        Vendor
+                      </p>
+                      <p
+                        className="font-mono text-base font-bold leading-tight uppercase tracking-wide"
+                        style={{ color: "var(--mt-teal)" }}
+                      >
+                        {vendorDetected}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {nucleusMeta && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-teal)" }}
+                  >
+                    <CardContent className="space-y-1 py-3">
+                      <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        <Waves className="h-3 w-3" aria-hidden />
+                        Nucleus
+                      </p>
+                      <p
+                        className="font-mono text-base font-bold leading-tight"
+                        style={{ color: "var(--mt-teal)" }}
+                      >
+                        {nucleusMeta}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {sw != null && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-teal)" }}
+                  >
+                    <CardContent className="space-y-1 py-3">
+                      <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        <Activity className="h-3 w-3" aria-hidden />
+                        Spectral width
+                      </p>
+                      <p
+                        className="font-mono text-base font-bold leading-tight tabular-nums"
+                        style={{ color: "var(--mt-teal)" }}
+                      >
+                        {String(sw)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {td != null && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-teal)" }}
+                  >
+                    <CardContent className="space-y-1 py-3">
+                      <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        <Hash className="h-3 w-3" aria-hidden />
+                        TD points
+                      </p>
+                      <p
+                        className="font-mono text-base font-bold leading-tight tabular-nums"
+                        style={{ color: "var(--mt-teal)" }}
+                      >
+                        {String(td)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {warnings.length > 0 && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-amber)" }}
+                  >
+                    <CardContent className="space-y-1 py-3">
+                      <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        <AlertTriangle className="h-3 w-3" aria-hidden />
+                        Warnings
+                      </p>
+                      <p
+                        className="font-mono text-base font-bold leading-tight tabular-nums"
+                        style={{ color: "var(--mt-amber)" }}
+                      >
+                        {warnings.length}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
-            <div className="flex flex-wrap gap-2">
+
+            {/* Spectrum — full page width */}
+            <div className="min-w-0">
+              {xy ? (
+                <SpectrumViewer x={xy.x} y={xy.y} nucleus={nucleus} />
+              ) : (
+                <AlertCard
+                  variant="warning"
+                  title="Raw spectrum not generated yet"
+                  description={
+                    processResult
+                      ? "Processing completed, but no display-ready spectrum points were returned. Review the response details below."
+                      : "Raw metadata preview checks the archive and hash only. Use Process raw FID to generate a derived spectrum plot."
+                  }
+                />
+              )}
+            </div>
+
+            {/* Use Unified Evidence — prominent CTA row right under the spectrum */}
+            <div
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+              style={{
+                borderTop: "3px solid var(--mt-teal)",
+                backgroundColor: "var(--mt-teal-soft)",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
+                <div>
+                  <p
+                    className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                    style={{ color: "var(--mt-teal)" }}
+                  >
+                    Use in unified evidence
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Add this {processResult != null ? "processed FID" : "metadata preview"} to the unified evidence stream.
+                  </p>
+                </div>
+              </div>
               <SpectraCheckUseUnifiedEvidenceButton
                 response={displayPayload}
                 meta={{
@@ -428,51 +910,81 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
                 }}
               />
             </div>
-            <DeveloperJsonPanel data={displayPayload} />
-          </div>
 
-          <div className="min-w-0 space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Acquisition &amp; processing</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {sha && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Raw file SHA-256</p>
-                    <p className="mt-1 break-all font-mono text-xs">{sha}</p>
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  {vendorDetected && <Badge variant="secondary">Vendor: {vendorDetected}</Badge>}
-                  {nucleusMeta && <Badge variant="outline">Nucleus: {nucleusMeta}</Badge>}
-                </div>
-                {sw != null && (
-                  <div className="flex justify-between gap-2 border-b pb-2">
-                    <span className="text-muted-foreground">Spectral width</span>
-                    <span className="font-mono">{String(sw)}</span>
-                  </div>
-                )}
-                {td != null && (
-                  <div className="flex justify-between gap-2 border-b pb-2">
-                    <span className="text-muted-foreground">Time-domain points</span>
-                    <span className="font-mono">{String(td)}</span>
-                  </div>
-                )}
-                {procParams != null && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Processing parameters</p>
+            {/* Identity / processing / metadata / warnings — 2-col grid below */}
+            <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+              {/* Identity card (SHA-256 + badges) */}
+              {(sha || vendorDetected || nucleusMeta) && (
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-teal)" }}
+                >
+                  <CardContent className="space-y-3 py-3">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Identity
+                    </p>
+                    {sha && (
+                      <div>
+                        <p className="text-[11px] font-medium text-muted-foreground">Raw file SHA-256</p>
+                        <p className="mt-1 break-all font-mono text-[10px]">{sha}</p>
+                      </div>
+                    )}
+                    {(vendorDetected || nucleusMeta) && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {vendorDetected && (
+                          <Badge
+                            variant="outline"
+                            className="font-mono text-[10px]"
+                            style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                          >
+                            Vendor · {vendorDetected}
+                          </Badge>
+                        )}
+                        {nucleusMeta && (
+                          <Badge
+                            variant="outline"
+                            className="font-mono text-[10px]"
+                            style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                          >
+                            Nucleus · {nucleusMeta}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Processing parameters */}
+              {procParams != null && (
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-teal)" }}
+                >
+                  <CardContent className="space-y-2 py-3">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Processing parameters
+                    </p>
                     <Textarea
                       readOnly
                       value={typeof procParams === "string" ? procParams : JSON.stringify(procParams, null, 2)}
-                      rows={8}
-                      className="font-mono text-xs"
+                      rows={6}
+                      className="font-mono text-[11px]"
                     />
-                  </div>
-                )}
-                {meta?.acquisition_metadata != null && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Acquisition metadata</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Acquisition metadata */}
+              {meta?.acquisition_metadata != null && (
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-teal)" }}
+                >
+                  <CardContent className="space-y-2 py-3">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Acquisition metadata
+                    </p>
                     <Textarea
                       readOnly
                       value={
@@ -480,25 +992,44 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
                           ? meta.acquisition_metadata
                           : JSON.stringify(meta.acquisition_metadata, null, 2)
                       }
-                      rows={6}
-                      className="font-mono text-xs"
+                      rows={5}
+                      className="font-mono text-[11px]"
                     />
-                  </div>
-                )}
-                {warnings.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-warning">Warnings</p>
-                    <ul className="mt-1 list-inside list-disc text-xs text-warning">
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Warnings card */}
+              {warnings.length > 0 && (
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-amber)" }}
+                >
+                  <CardContent className="space-y-2 py-3">
+                    <p
+                      className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-amber)" }}
+                    >
+                      <AlertTriangle className="h-3 w-3" aria-hidden />
+                      Warnings
+                    </p>
+                    <ul
+                      className="list-inside list-disc space-y-0.5 text-xs"
+                      style={{ color: "var(--mt-amber)" }}
+                    >
                       {warnings.map((w, i) => (
                         <li key={i}>{w}</li>
                       ))}
                     </ul>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Developer JSON — full width */}
+            <DeveloperJsonPanel data={displayPayload} />
           </div>
-        </div>
+        </ModuleCard>
       )}
     </div>
   )

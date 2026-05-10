@@ -6,7 +6,6 @@ import { apiFetch } from "@/lib/api/client"
 import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,7 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { ArrowLeft, Download, Library, Loader2, Quote, Search, Upload } from "lucide-react"
 
 const SOURCE_TYPES = [
   "guidance",
@@ -375,7 +376,13 @@ export function RegulatorySourceLibraryWorkspace() {
         </Button>
       </div>
 
-      <header className="space-y-2">
+      <header className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          MolTrace · Regulatory · Source Library
+        </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Source Library</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
           Register documents, list catalog entries, search indexed sources, and inspect citations returned by the
@@ -383,25 +390,22 @@ export function RegulatorySourceLibraryWorkspace() {
         </p>
       </header>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Important</AlertTitle>
-        <AlertDescription className="text-sm">
-          Citations and excerpts are shown exactly as returned by the backend. Do not treat search or excerpt text as
-          final regulatory authority without controlled sources and qualified review.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Important"
+        description="Citations and excerpts are shown exactly as returned by the backend. Do not treat search or excerpt text as final regulatory authority without controlled sources and qualified review."
+      />
 
       {/* 1. Upload */}
       <section aria-labelledby="upload-heading">
-        <Card>
-          <CardHeader>
-            <CardTitle id="upload-heading" className="text-lg">
-              Upload / source registration
-            </CardTitle>
-            <CardDescription>Upload a regulatory source document (guideline, monograph, FAQ) and register its metadata.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Upload"
+          title={<span id="upload-heading">Upload / source registration</span>}
+          icon={Upload}
+          description="Upload a regulatory source document (guideline, monograph, FAQ) and register its metadata."
+        >
+          <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
               The server rejects empty files. Choose a non-empty file, or skip registration until a file is available.
             </p>
@@ -483,33 +487,25 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
             </div>
-            {uploadErr ? (
-              <Alert variant="destructive">
-                <AlertDescription className="text-sm">{uploadErr}</AlertDescription>
-              </Alert>
-            ) : null}
-            {uploadOk ? (
-              <Alert>
-                <AlertDescription className="text-sm">{uploadOk}</AlertDescription>
-              </Alert>
-            ) : null}
+            {uploadErr ? <AlertCard variant="error" title="Upload error" description={uploadErr} /> : null}
+            {uploadOk ? <AlertCard variant="success" title="Registered" description={uploadOk} /> : null}
             <Button type="button" disabled={uploadBusy} onClick={() => void submitUpload()}>
               {uploadBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Register source
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
 
       <section aria-labelledby="connector-import-heading">
-        <Card>
-          <CardHeader>
-            <CardTitle id="connector-import-heading" className="text-lg">
-              Import source from connector
-            </CardTitle>
-            <CardDescription>Pull a regulatory document directly from a configured connector instead of manual upload.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Import"
+          title={<span id="connector-import-heading">Import source from connector</span>}
+          icon={Download}
+          description="Pull a regulatory document directly from a configured connector instead of manual upload."
+        >
+          <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="connector-import-connector">connector</Label>
@@ -581,11 +577,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
             </div>
-            {connectorImportErr ? (
-              <Alert variant="destructive">
-                <AlertDescription className="text-sm">{connectorImportErr}</AlertDescription>
-              </Alert>
-            ) : null}
+            {connectorImportErr ? <AlertCard variant="error" title="Import error" description={connectorImportErr} /> : null}
             <Button type="button" disabled={connectorImportBusy} onClick={() => void submitConnectorImport()}>
               {connectorImportBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Import regulatory source
@@ -623,26 +615,24 @@ export function RegulatorySourceLibraryWorkspace() {
                 </CardContent>
               </Card>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
 
       {/* 2. Table */}
       <section aria-labelledby="sources-table-heading" className="space-y-3">
-        <div>
-          <h2 id="sources-table-heading" className="text-lg font-semibold tracking-tight">
-            Source documents
-          </h2>
-          <p className="text-sm text-muted-foreground">All regulatory sources registered in the library.</p>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Catalog"
+          title={<span id="sources-table-heading">Source documents</span>}
+          icon={Library}
+          description="All regulatory sources registered in the library."
+        >
+          <div className="pt-2">
             {sourcesLoading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : sourcesErr ? (
-              <Alert variant="destructive">
-                <AlertDescription className="text-sm">{sourcesErr}</AlertDescription>
-              </Alert>
+              <AlertCard variant="error" title="Error" description={sourcesErr} />
             ) : sources.length === 0 ? (
               <p className="text-sm text-muted-foreground">No sources registered.</p>
             ) : (
@@ -713,20 +703,20 @@ export function RegulatorySourceLibraryWorkspace() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
 
       {/* 3. Search */}
       <section aria-labelledby="search-heading">
-        <Card>
-          <CardHeader>
-            <CardTitle id="search-heading" className="text-lg">
-              Source search
-            </CardTitle>
-            <CardDescription>Full-text search across all regulatory documents in the library.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Search"
+          title={<span id="search-heading">Source search</span>}
+          icon={Search}
+          description="Full-text search across all regulatory documents in the library."
+        >
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="src-search-q">query</Label>
               <Textarea id="src-search-q" rows={3} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
@@ -765,11 +755,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 </Select>
               </div>
             </div>
-            {searchErr ? (
-              <Alert variant="destructive">
-                <AlertDescription className="text-sm">{searchErr}</AlertDescription>
-              </Alert>
-            ) : null}
+            {searchErr ? <AlertCard variant="error" title="Search error" description={searchErr} /> : null}
             <Button type="button" disabled={searchBusy} onClick={() => void submitSearch()}>
               {searchBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Search
@@ -823,20 +809,20 @@ export function RegulatorySourceLibraryWorkspace() {
                 </div>
               </div>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
 
       {/* 4. Citation viewer */}
       <section aria-labelledby="citations-heading">
-        <Card>
-          <CardHeader>
-            <CardTitle id="citations-heading" className="text-lg">
-              Citation viewer
-            </CardTitle>
-            <CardDescription>Citations and excerpts that reference the selected source document.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Citations"
+          title={<span id="citations-heading">Citation viewer</span>}
+          icon={Quote}
+          description="Citations and excerpts that reference the selected source document."
+        >
+          <div className="space-y-4">
             {selectedSourceId == null ? (
               <p className="text-sm text-muted-foreground">Select a source with Open to load citations.</p>
             ) : (
@@ -846,9 +832,7 @@ export function RegulatorySourceLibraryWorkspace() {
                   <span className="font-mono text-xs">source_id {selectedSourceId}</span>
                 </p>
                 {citationsErr ? (
-                  <Alert variant="destructive">
-                    <AlertDescription className="text-sm">{citationsErr}</AlertDescription>
-                  </Alert>
+                  <AlertCard variant="error" title="Citation error" description={citationsErr} />
                 ) : citationsLoading ? (
                   <p className="text-sm text-muted-foreground">Loading citations…</p>
                 ) : citations.length === 0 ? (
@@ -860,8 +844,8 @@ export function RegulatorySourceLibraryWorkspace() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
     </div>
   )

@@ -95,13 +95,13 @@ def _rows_from_upload(filename: str, content: bytes) -> list[dict[str, Any]]:
         if not isinstance(payload, list):
             raise DeptAptParseError("JSON DEPT/APT upload must be a list of peak objects or an object with a peaks list.")
         return [row for row in payload if isinstance(row, dict)]
-    if suffix in {".csv", ".tsv", ""}:
+    if suffix in {".csv", ".tsv", ".txt", ".xy", ".asc", ".dat", ""}:
         delimiter = _sniff_delimiter(text, filename)
         reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
         if not reader.fieldnames:
             raise DeptAptParseError("DEPT/APT CSV/TSV must include a header row.")
         return list(reader)
-    raise DeptAptParseError("Unsupported DEPT/APT upload format. Use CSV, TSV, or JSON.")
+    raise DeptAptParseError("Unsupported DEPT/APT upload format. Use CSV, TSV, TXT, XY, ASC, DAT, or JSON.")
 
 
 def _normalize_explicit_carbon_type(value: Any) -> str | None:

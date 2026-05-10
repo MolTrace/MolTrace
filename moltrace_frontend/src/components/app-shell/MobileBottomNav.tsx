@@ -14,6 +14,7 @@ import {
   FolderOpen,
   HeartPulse,
   Home,
+  LayoutDashboard,
   Library,
   PackageCheck,
   Scale,
@@ -39,7 +40,8 @@ type MoreNavItem = {
 }
 
 const primaryNavItems: PrimaryNavItem[] = [
-  { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/", label: "Landing", icon: Home },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/spectracheck", label: "SpectraCheck", icon: SpectraCheckLogoIcon },
   { href: "/regulatory", label: "Regulatory", icon: Scale },
   { href: "/reactions", label: "Reactions", icon: FlaskConical },
@@ -82,9 +84,9 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label="Mobile bottom navigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90"
     >
-      <div className="mx-auto grid max-w-screen-sm grid-cols-5 gap-1 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+      <div className="mx-auto grid max-w-screen-sm grid-cols-6 gap-1 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
         {primaryNavItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (

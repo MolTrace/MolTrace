@@ -7,10 +7,8 @@ import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -20,7 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { ArrowLeft, FileText, GitBranch, GitCompare, Loader2 } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -167,37 +167,41 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
         </Button>
       </div>
 
-      <header className="space-y-2">
+      <header className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          MolTrace · Regulatory · Source Version Timeline
+        </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Source Version Timeline</h1>
         <p className="text-sm text-muted-foreground">
           Source text changed, potential impact, and requires review indicators are shown from API comparison output.
         </p>
       </header>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" aria-hidden />
-        <AlertTitle>Requires review</AlertTitle>
-        <AlertDescription className="text-sm text-muted-foreground">
-          Source text changed output is decision support and potential impact triage only. Qualified human review is required.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Requires review"
+        description="Source text changed output is decision support and potential impact triage only. Qualified human review is required."
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Version timeline</CardTitle>
-          <CardDescription>Version history for this regulatory source — each version captures the document state at a point in time for change tracking and comparison.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-3 text-sm">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Timeline"
+        title="Version timeline"
+        icon={GitBranch}
+        description="Version history for this regulatory source — each version captures the document state at a point in time for change tracking and comparison."
+      >
+        <div className="space-y-3">
+          <p className="text-sm">
             <span className="font-medium">{sourceTitle}</span>{" "}
             <span className="font-mono text-xs text-muted-foreground">source_id {sourceId}</span>
           </p>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading versions…</p>
           ) : loadErr ? (
-            <Alert variant="destructive">
-              <AlertDescription className="text-sm">{loadErr}</AlertDescription>
-            </Alert>
+            <AlertCard variant="error" title="Error" description={loadErr} />
           ) : versions.length === 0 ? (
             <p className="text-sm text-muted-foreground">No versions available.</p>
           ) : (
@@ -241,15 +245,17 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Compare versions</CardTitle>
-          <CardDescription>Side-by-side text comparison between two versions of this regulatory source — select old and new versions to highlight additions, removals, and changes.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Compare"
+        title="Compare versions"
+        icon={GitCompare}
+        description="Side-by-side text comparison between two versions of this regulatory source — select old and new versions to highlight additions, removals, and changes."
+      >
+        <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>old version</Label>
@@ -294,51 +300,43 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
               </Select>
             </div>
           </div>
-          {compareErr ? (
-            <Alert variant="destructive">
-              <AlertDescription className="text-sm">{compareErr}</AlertDescription>
-            </Alert>
-          ) : null}
+          {compareErr ? <AlertCard variant="error" title="Compare error" description={compareErr} /> : null}
           <Button type="button" disabled={compareBusy} onClick={() => void runCompare()}>
             {compareBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Compare
           </Button>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Card className="border-muted">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Old version details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 text-xs">
+            <ModuleCard accent="cyan" eyebrow="Old" title="Old version details" icon={FileText}>
+              <div className="space-y-1 text-xs">
                 <p>version label: {readRecordString(oldDetail, "version_label") ?? "—"}</p>
                 <p>source date: {formatWhen(readRecordString(oldDetail, "source_date") ?? undefined)}</p>
                 <p>retrieved date: {formatWhen(readRecordString(oldDetail, "retrieved_at") ?? undefined)}</p>
                 <p className="font-mono break-all">SHA-256/content hash: {readRecordString(oldDetail, "sha256") ?? readRecordString(oldDetail, "content_hash") ?? "—"}</p>
                 <p>status: {readRecordString(oldDetail, "status") ?? "—"}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-muted">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">New version details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 text-xs">
+              </div>
+            </ModuleCard>
+            <ModuleCard accent="cyan" eyebrow="New" title="New version details" icon={FileText}>
+              <div className="space-y-1 text-xs">
                 <p>version label: {readRecordString(newDetail, "version_label") ?? "—"}</p>
                 <p>source date: {formatWhen(readRecordString(newDetail, "source_date") ?? undefined)}</p>
                 <p>retrieved date: {formatWhen(readRecordString(newDetail, "retrieved_at") ?? undefined)}</p>
                 <p className="font-mono break-all">SHA-256/content hash: {readRecordString(newDetail, "sha256") ?? readRecordString(newDetail, "content_hash") ?? "—"}</p>
                 <p>status: {readRecordString(newDetail, "status") ?? "—"}</p>
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Diff viewer</CardTitle>
-          <CardDescription>Source text changed · Potential impact · Requires review</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Diff"
+        title="Diff viewer"
+        icon={FileText}
+        description="Source text changed · Potential impact · Requires review"
+      >
+        <div className="space-y-4">
           {!compareResult ? (
             <p className="text-sm text-muted-foreground">Run compare to view diff summary.</p>
           ) : (
@@ -390,8 +388,8 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
               <DeveloperJsonPanel data={compareResult} />
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

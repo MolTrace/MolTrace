@@ -3,12 +3,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  CreditCard,
+  FileText,
+  ListOrdered,
+  PlusCircle,
+  ToggleRight,
+} from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -297,43 +304,51 @@ export function FeatureFlagsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-slate)" }}
+          >
+            MolTrace · Admin · Feature Flags
+          </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Feature Flags</h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Manage subscription plans and feature flags without changing MolTrace’s core product sequence.
           </p>
         </div>
         <BackendStatusIndicator />
       </div>
 
-      <Alert className="border-warning/40 bg-warning/10">
-        <AlertDescription className="text-xs text-warning">
-          Entitlements enable or disable features; they do not change MolTrace’s core product sequence.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Entitlements scope"
+        description="Entitlements enable or disable features; they do not change MolTrace’s core product sequence."
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Entitlements display order</CardTitle>
-          <CardDescription>Program display order is fixed for tenant entitlement and feature flag views.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Order"
+        title="Entitlements display order"
+        icon={ListOrdered}
+        description="Program display order is fixed for tenant entitlement and feature flag views."
+      >
+        <div className="space-y-2 text-sm">
           {PROGRAM_ORDER.map((item, index) => (
             <div key={item.label} className="rounded-md border bg-muted/20 px-3 py-2">
               {index + 1}. {item.label}
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Feature flags</CardTitle>
-          <CardDescription>
-            All registered feature flags with their default values and tenant overrides.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Flags"
+        title="Feature flags"
+        icon={ToggleRight}
+        description="All registered feature flags with their default values and tenant overrides."
+      >
+        <div className="space-y-3">
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           {loading ? <p className="text-sm text-muted-foreground">Loading feature flags...</p> : null}
           <div className="overflow-x-auto rounded-md border">
@@ -416,17 +431,17 @@ export function FeatureFlagsWorkspace() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Feature flag detail</CardTitle>
-          <CardDescription>
-            Definition, current value, and override history for the selected flag.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Detail"
+        title="Feature flag detail"
+        icon={FileText}
+        description="Definition, current value, and override history for the selected flag."
+      >
+        <div className="space-y-3">
           {selectedFlagDetailError ? <p className="text-xs text-destructive">{selectedFlagDetailError}</p> : null}
           {selectedFlagDetail ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -458,17 +473,17 @@ export function FeatureFlagsWorkspace() {
           ) : (
             <p className="text-sm text-muted-foreground">Select Load detail from a feature flag row.</p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create feature flag</CardTitle>
-          <CardDescription>
-            Register a new feature flag with its key, default value, and tenant scope.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Form"
+        title="Create feature flag"
+        icon={PlusCircle}
+        description="Register a new feature flag with its key, default value, and tenant scope."
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="feature-flag-key">flag key</Label>
@@ -542,17 +557,17 @@ export function FeatureFlagsWorkspace() {
               Refresh feature flags
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Subscription plans</CardTitle>
-          <CardDescription>
-            All subscription plan tiers with their feature entitlements.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Plans"
+        title="Subscription plans"
+        icon={CreditCard}
+        description="All subscription plan tiers with their feature entitlements."
+      >
+        <div className="space-y-3">
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
@@ -597,17 +612,17 @@ export function FeatureFlagsWorkspace() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create subscription plan</CardTitle>
-          <CardDescription>
-            Register a new subscription tier with the entitlements and quotas it grants.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Form"
+        title="Create subscription plan"
+        icon={PlusCircle}
+        description="Register a new subscription tier with the entitlements and quotas it grants."
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="subscription-plan-key">plan key</Label>
@@ -663,8 +678,8 @@ export function FeatureFlagsWorkspace() {
               Refresh subscription plans
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

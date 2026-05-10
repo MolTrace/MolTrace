@@ -7,10 +7,8 @@ import { apiFetch } from "@/lib/api/client"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -30,7 +28,18 @@ import {
 } from "@/components/ui/table"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Database,
+  ListChecks,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  Target,
+} from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -182,7 +191,7 @@ export function MlModelCardDetail() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
           <div className="mb-1">
             <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
               <Link href="/ml/models" className="inline-flex items-center gap-1 text-muted-foreground">
@@ -191,6 +200,12 @@ export function MlModelCardDetail() {
               </Link>
             </Button>
           </div>
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · ML Model Factory · Model Card
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-mono text-2xl font-bold tracking-tight">Model card</h1>
             <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
@@ -213,41 +228,44 @@ export function MlModelCardDetail() {
       </div>
 
       {err ? (
-        <Alert variant="destructive">
-          <AlertTitle>GET /ml/model-cards/{"{model_card_id}"}</AlertTitle>
-          <AlertDescription>{err}</AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="error"
+          title={`GET /ml/model-cards/{model_card_id}`}
+          description={err}
+        />
       ) : null}
 
       {card ? (
         <>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">approval_status</CardTitle>
-              <CardDescription>
-                Shown from the API only — do not treat models as cleared for production outside this workflow.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="outline" className="text-sm">
-                {readRecordString(card, "approval_status") ?? "—"}
-              </Badge>
-            </CardContent>
-          </Card>
+          <ModuleCard
+            accent="teal"
+            eyebrow="Validation"
+            title="approval_status"
+            icon={ShieldCheck}
+            description="Shown from the API only — do not treat models as cleared for production outside this workflow."
+          >
+            <Badge variant="outline" className="text-sm">
+              {readRecordString(card, "approval_status") ?? "—"}
+            </Badge>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">intended_use</CardTitle>
-            </CardHeader>
-            <CardContent className="whitespace-pre-wrap text-sm">{readRecordString(card, "intended_use") ?? "—"}</CardContent>
-          </Card>
+          <ModuleCard
+            accent="teal"
+            eyebrow="Intended Use"
+            title="intended_use"
+            icon={Target}
+          >
+            <div className="whitespace-pre-wrap text-sm">{readRecordString(card, "intended_use") ?? "—"}</div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">limitations</CardTitle>
-            </CardHeader>
-            <CardContent className="whitespace-pre-wrap text-sm">{readRecordString(card, "limitations") ?? "—"}</CardContent>
-          </Card>
+          <ModuleCard
+            accent="teal"
+            eyebrow="Limitations"
+            title="limitations"
+            icon={AlertTriangle}
+          >
+            <div className="whitespace-pre-wrap text-sm">{readRecordString(card, "limitations") ?? "—"}</div>
+          </ModuleCard>
 
           <SummaryTable title="training_data_summary_json" rows={objectRows(card["training_data_summary_json"])} />
           <SummaryTable title="evaluation_summary_json" rows={objectRows(card["evaluation_summary_json"])} />
@@ -258,17 +276,19 @@ export function MlModelCardDetail() {
 
           <DeveloperJsonPanel data={card} />
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex flex-wrap items-center gap-2">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Distribution"
+            title={
+              <span className="flex flex-wrap items-center gap-2">
                 Create / update model card
                 <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
-              </CardTitle>
-              <CardDescription>
-                Update the model card — revise intended use, limitations, training data summary, and evaluation summary for governance review.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </span>
+            }
+            icon={ListChecks}
+            description="Update the model card — revise intended use, limitations, training data summary, and evaluation summary for governance review."
+          >
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="iu2">intended_use</Label>
                 <Textarea id="iu2" value={intendedUse} onChange={(e) => setIntendedUse(e.target.value)} rows={5} />
@@ -304,8 +324,8 @@ export function MlModelCardDetail() {
                 {saveBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
                 Update model card
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </>
       ) : !loading && !err ? (
         <p className="text-sm text-muted-foreground">No card loaded.</p>
@@ -316,11 +336,8 @@ export function MlModelCardDetail() {
 
 function SummaryTable({ title, rows }: { title: string; rows: { key: string; value: string }[] }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="table-scroll min-w-0">
+    <ModuleCard accent="teal" eyebrow="Summary" title={title} icon={Database}>
+      <div className="table-scroll min-w-0">
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">—</p>
         ) : (
@@ -341,8 +358,8 @@ function SummaryTable({ title, rows }: { title: string; rows: { key: string; val
             </TableBody>
           </Table>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </ModuleCard>
   )
 }
 

@@ -16,6 +16,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import type { EvidenceLayerType } from "@/src/lib/spectracheck/evidence-types"
+import {
+  SPECTRACHECK_MS_SPECTRUM_ACCEPT,
+  SPECTRACHECK_TEXT_SPECTRUM_ACCEPT,
+} from "@/src/lib/spectracheck/spectrum-file-formats"
 
 const STEP_UNIFIED_META: Record<string, { layer: EvidenceLayerType; endpoint: string; title: string }> = {
   import: {
@@ -557,7 +561,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
             <form onSubmit={runImport} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="lcms-import-file">LC-MS/MS file</Label>
-                <Input id="lcms-import-file" ref={importRef} type="file" required />
+                <Input id="lcms-import-file" ref={importRef} type="file" accept={SPECTRACHECK_MS_SPECTRUM_ACCEPT} required />
               </div>
               <label className="block space-y-2">
                 <span className="text-sm font-medium">Source format</span>
@@ -605,7 +609,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
               {!useChainForDetect && (
                 <div className="space-y-2">
                   <Label>Raw / peak-list file</Label>
-                  <Input ref={detectRef} type="file" />
+                  <Input ref={detectRef} type="file" accept={SPECTRACHECK_MS_SPECTRUM_ACCEPT} />
                 </div>
               )}
               <label className="block space-y-2">
@@ -658,12 +662,12 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
               {!useChainForGroupSample && (
                 <div className="space-y-2">
                   <Label>Sample run file</Label>
-                  <Input ref={groupSampleRef} type="file" required />
+                  <Input ref={groupSampleRef} type="file" accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT} required />
                 </div>
               )}
               <div className="space-y-2">
                 <Label>Blank run file (optional)</Label>
-                <Input ref={groupBlankRef} type="file" />
+                <Input ref={groupBlankRef} type="file" accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT} />
               </div>
               <label className="block space-y-2">
                 <span className="text-sm font-medium">Source format</span>
@@ -740,15 +744,15 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
               )}
               <div className="space-y-2">
                 <Label>Feature table file (optional override)</Label>
-                <Input ref={consensusFeatureRef} type="file" />
+                <Input ref={consensusFeatureRef} type="file" accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT} />
               </div>
               <div className="space-y-2">
                 <Label>Sample file (optional)</Label>
-                <Input ref={consensusSampleRef} type="file" />
+                <Input ref={consensusSampleRef} type="file" accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT} />
               </div>
               <div className="space-y-2">
                 <Label>Blank file (optional)</Label>
-                <Input ref={consensusBlankRef} type="file" />
+                <Input ref={consensusBlankRef} type="file" accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT} />
               </div>
               <label className="block space-y-2">
                 <span className="text-sm font-medium">Source format</span>
@@ -791,7 +795,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
               <form onSubmit={runDereplication} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Library / feature file</Label>
-                  <Input ref={derepRef} type="file" />
+                  <Input ref={derepRef} type="file" accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT} />
                 </div>
                 <Button type="submit" disabled={dereplicationBusy}>
                   {dereplicationBusy ? "Running…" : "Run library dereplication"}

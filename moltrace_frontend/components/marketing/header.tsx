@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { moltraceTraceClassName } from "@/components/branding/moltrace-wordmark"
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { Menu, ChevronDown } from "lucide-react"
 import { useState } from "react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
@@ -34,6 +35,7 @@ const dropdowns: Record<string, { label: string; sub: string }[]> = {
 export function Header() {
   const [open, setOpen] = useState(false)
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
+  const isMobile = useIsMobile()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 md:backdrop-blur md:supports-[backdrop-filter]:bg-background/60">
@@ -47,7 +49,7 @@ export function Header() {
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className={`${isMobile ? "hidden" : "flex"} items-center gap-1`}>
             {navItems.map((item) => {
               const hasDropdown = item.label in dropdowns
               if (!hasDropdown) {
@@ -104,7 +106,7 @@ export function Header() {
 
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <div className="hidden items-center gap-2 sm:flex">
+          <div className={`${isMobile ? "hidden" : "flex"} items-center gap-2`}>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/sign-in">Sign In</Link>
             </Button>
@@ -116,58 +118,60 @@ export function Header() {
             </Button>
           </div>
 
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[300px]">
-              <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-              <nav className="flex flex-col gap-4 pt-8">
-                {navItems.map((item) => {
-                  const hasDropdown = item.label in dropdowns
-                  return (
-                    <div key={item.label}>
-                      <Link
-                        href={item.href}
-                        onClick={() => setOpen(false)}
-                        className="text-lg text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        {item.label}
-                      </Link>
-                      {hasDropdown && (
-                        <div className="ml-3 mt-2 flex flex-col gap-1.5 border-l pl-3">
-                          {dropdowns[item.label].map((sub) => (
-                            <a
-                              key={sub.label}
-                              href="#"
-                              onClick={() => setOpen(false)}
-                              className="text-sm text-muted-foreground hover:text-foreground"
-                            >
-                              {sub.label}
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-                <div className="mt-4 flex flex-col gap-2">
-                  <Button variant="outline" asChild>
-                    <Link href="/sign-in">Sign In</Link>
-                  </Button>
-                  <Button variant="secondary" asChild>
-                    <Link href="/sign-up">Sign Up</Link>
-                  </Button>
-                  <Button asChild>
-                    <Link href="#demo">Request Demo</Link>
-                  </Button>
-                </div>
-              </nav>
-            </SheetContent>
-          </Sheet>
+          {isMobile ? (
+            <Sheet open={open} onOpenChange={setOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px]">
+                <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                <nav className="flex flex-col gap-4 pt-8">
+                  {navItems.map((item) => {
+                    const hasDropdown = item.label in dropdowns
+                    return (
+                      <div key={item.label}>
+                        <Link
+                          href={item.href}
+                          onClick={() => setOpen(false)}
+                          className="text-lg text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          {item.label}
+                        </Link>
+                        {hasDropdown && (
+                          <div className="ml-3 mt-2 flex flex-col gap-1.5 border-l pl-3">
+                            {dropdowns[item.label].map((sub) => (
+                              <a
+                                key={sub.label}
+                                href="#"
+                                onClick={() => setOpen(false)}
+                                className="text-sm text-muted-foreground hover:text-foreground"
+                              >
+                                {sub.label}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <div className="mt-4 flex flex-col gap-2">
+                    <Button variant="outline" asChild>
+                      <Link href="/sign-in">Sign In</Link>
+                    </Button>
+                    <Button variant="secondary" asChild>
+                      <Link href="/sign-up">Sign Up</Link>
+                    </Button>
+                    <Button asChild>
+                      <Link href="#demo">Request Demo</Link>
+                    </Button>
+                  </div>
+                </nav>
+              </SheetContent>
+            </Sheet>
+          ) : null}
         </div>
       </div>
     </header>

@@ -18,6 +18,8 @@ describe("spectracheck page", () => {
 
     view.unmount()
     render(<SpectraCheckWorkspace defaultTab="tab-predicted" />)
-    expect(screen.getByRole("button", { name: "Run SpectraCheck Analysis" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: /Run 1H \/ 13C evidence match/i }),
+    ).toBeInTheDocument()
   })
 })

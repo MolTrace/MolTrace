@@ -63,6 +63,7 @@ import {
   sessionCommentMatchesArtifact,
   SESSION_COMMENT_TYPES,
 } from "@/src/lib/spectracheck/spectracheck-session-comments"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 function readStr(v: unknown): string | null {
   if (typeof v === "string") return v
@@ -414,25 +415,14 @@ export function ArtifactViewerModal({
   const [artifactCommentDraft, setArtifactCommentDraft] = useState("")
   const [artifactCommentPostBusy, setArtifactCommentPostBusy] = useState(false)
   const [artifactCommentPostErr, setArtifactCommentPostErr] = useState("")
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
   const [viewportHeight, setViewportHeight] = useState(720)
 
   useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      setIsMobile(false)
-      return
-    }
-    const mq = window.matchMedia("(max-width: 640px)")
-    const apply = () => setIsMobile(mq.matches)
-    apply()
-    mq.addEventListener("change", apply)
     const onResize = () => setViewportHeight(window.innerHeight)
     onResize()
     window.addEventListener("resize", onResize)
-    return () => {
-      mq.removeEventListener("change", apply)
-      window.removeEventListener("resize", onResize)
-    }
+    return () => window.removeEventListener("resize", onResize)
   }, [])
 
   const loadArtifactComments = useCallback(async () => {

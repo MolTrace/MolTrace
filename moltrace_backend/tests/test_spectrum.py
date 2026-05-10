@@ -81,9 +81,23 @@ def test_parse_trace_csv_infers_peaks() -> None:
     assert len(preview.inferred_peaks) >= 1
 
 
+def test_parse_text_spectrum_pair_exports() -> None:
+    content = b"4.0 0\n3.8 1\n3.6 5\n3.4 1\n3.2 0\n"
+    preview = parse_processed_spectrum(filename="trace.xy", content=content)
+    assert preview.source_mode == "trace"
+    assert preview.point_count == 5
+
+
+def test_parse_jcamp_extension_alias() -> None:
+    content = b"##TITLE=demo\n4.0 0 3.8 1 3.6 5 3.4 1 3.2 0\n"
+    preview = parse_processed_spectrum(filename="trace.jcamp", content=content)
+    assert preview.source_mode == "trace"
+    assert preview.point_count == 5
+
+
 def test_parse_processed_spectrum_rejects_unsupported_file_formats() -> None:
     try:
-        parse_processed_spectrum(filename="trace.txt", content=b"ppm,intensity\n1,2\n")
+        parse_processed_spectrum(filename="trace.raw", content=b"\x00\x01vendor-binary")
     except SpectrumParseError as exc:
         assert "Unsupported processed spectrum format" in str(exc)
     else:

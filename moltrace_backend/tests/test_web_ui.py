@@ -12,9 +12,10 @@ def test_spectrum_preview_template_exposes_hover_gain_control_and_toolbar_below_
     assert 'id="analysisInputMethod"' in html
     assert 'onchange="setAnalysisInputMethod(this.value)"' in html
     assert 'Paste processed ¹H NMR text' in html
-    assert 'Upload processed spectrum (.csv, .tsv, .jdx, .dx)' in html
+    assert 'Upload processed spectrum (.csv, .tsv, .txt, .jcamp, .jdx, .dx, .xy, .asc, .dat)' in html
     assert 'Upload raw FID archive - Bruker or Varian/Agilent 1D .zip/.tar.gz/.tgz' in html
-    assert 'Spectrum file (.csv, .tsv, .jdx, .dx)' in html
+    assert 'Spectrum file (.csv, .tsv, .txt, .jcamp, .jdx, .dx, .xy, .asc, .dat)' in html
+    assert 'accept=".mzml,.mzxml,.mzdata,.imzml,.mgf,.cdf,.netcdf,.raw,.wiff,.wiff2,.d,.yep,.baf,.tdf,.tsf,.xml,.csv,.tsv,.txt,.json,.jcamp,.jdx,.dx,.xy,.asc,.dat"' in html
     assert 'Raw FID Upload' in html
     assert 'Immutable raw FID workflow' in html
     assert 'Original raw FID archive is never modified.' in html
@@ -48,7 +49,7 @@ def test_spectrum_preview_template_exposes_hover_gain_control_and_toolbar_below_
     assert 'onclick="applyRawFidBaselineCorrection()"' not in html
     assert 'Reference-assisted matching' in html
     assert 'formData.append("reference_nmr_text", referenceNmrText);' in html
-    assert 'Upload a processed spectrum as CSV, TSV, JDX, or DX.' in html
+    assert 'Upload a processed spectrum as CSV, TSV, TXT, JCAMP, JDX, DX, XY, ASC, or DAT.' in html
     assert 'The raw archive is hashed and kept immutable.' in html
     assert 'methodTabProcessed' not in html
     assert 'method-tab' not in html

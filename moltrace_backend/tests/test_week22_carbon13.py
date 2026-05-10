@@ -158,6 +158,18 @@ def test_processed_13c_aromatic_region_resolves_on_curved_baseline() -> None:
     assert preview.metadata["display_mode"] == "real"
 
 
+def test_carbon13_processed_spectrum_accepts_text_pair_exports() -> None:
+    preview = parse_carbon13_processed_spectrum(
+        "carbon13.xy",
+        b"170 1\n140 10\n130 6\n120 2\n",
+        solvent="CDCl3",
+        infer_peaks=False,
+    )
+
+    assert preview.source_mode == "processed_trace"
+    assert preview.metadata["point_count"] == 4
+
+
 def test_context_guided_13c_peak_refinement_uses_smiles_and_proton_text() -> None:
     preview = parse_carbon13_table(
         "noisy_ethanol_13c.csv",

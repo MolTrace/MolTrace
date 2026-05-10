@@ -283,13 +283,17 @@ def _modality_from_file(row: ManagedFileRecordORM, *, override: str | None = Non
     metadata = _json_dict(row.metadata_json)
     nucleus = str(metadata.get("nucleus") or metadata.get("detected_nucleus") or "").upper()
     searchable = f"{row.original_filename} {row.filename} {nucleus}".lower()
-    if row.file_kind == "raw_fid":
+    if row.file_kind in {"raw_fid", "spectrum_archive", "spectrum_vendor"}:
         return "raw_fid_nmr"
-    if row.file_kind == "processed_nmr":
+    if row.file_kind in {"processed_nmr", "spectrum_table", "spectrum_jcamp"}:
         return "nmr_13c_processed" if "13c" in searchable or "13 c" in searchable else "nmr_1h_processed"
+    if row.file_kind == "nmr2d_peak_table":
+        return "nmr_2d"
+    if row.file_kind == "dept_apt_peak_table":
+        return "dept_apt"
     if row.file_kind == "lcms_peak_table":
         return "lcms_feature_table"
-    if row.file_kind in {"lcms_mzml", "lcms_mzxml"}:
+    if row.file_kind in {"lcms_mzml", "lcms_mzxml", "lcms_raw", "ms_raw", "msms_spectrum"}:
         return "lcms_ms1"
     if row.file_kind == "report":
         return "report"
@@ -322,6 +326,10 @@ def _modality_from_evidence_layer(layer: str, *, override: str | None = None) ->
         return "nmr_1h_processed"
     if normalized in {"carbon13", "nmr_13c_processed"}:
         return "nmr_13c_processed"
+    if normalized in {"nmr_2d", "nmr2d"}:
+        return "nmr_2d"
+    if normalized in {"dept_apt", "dept", "apt"}:
+        return "dept_apt"
     if "hrms" in normalized or "exact_mass" in normalized:
         return "hrms"
     if "fragmentation" in normalized or "msms" in normalized:
@@ -593,7 +601,7 @@ def _build_file_assessment(
             findings.append(_finding(severity="warning", code="acquisition_metadata_missing", title="Acquisition metadata missing", message="QC could not find acquisition parameters in provenance metadata."))
         actions.append("Review raw archive inventory and acquisition metadata before using derived spectra.")
         return (modality, metrics, findings, warnings, notes, actions, {"source": "managed_file"}, not_assessed)
-    if row.file_kind == "processed_nmr":
+    if row.file_kind in {"processed_nmr", "spectrum_table", "spectrum_jcamp"}:
         path = _file_path(row, storage_root)
         if not path.exists():
             findings.append(_finding(severity="error", code="stored_file_missing", title="Stored file unavailable", message="Managed file record exists but local file bytes are unavailable."))

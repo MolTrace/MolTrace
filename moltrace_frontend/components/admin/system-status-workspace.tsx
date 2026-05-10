@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,11 +12,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
-import { ChevronDown, ServerOff } from "lucide-react"
+import {
+  Bell,
+  BookOpen,
+  Cable,
+  ChevronDown,
+  Database,
+  HardDrive,
+  Heart,
+  ListChecks,
+  ServerOff,
+  Settings2,
+  Tag,
+  Workflow,
+} from "lucide-react"
 
 const SYSTEM_STATUS_TOOLTIP =
   "System Status checks whether the backend, database, storage, job queue, and environment configuration are ready for scientific workflows."
@@ -249,12 +262,18 @@ export function SystemStatusWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-slate)" }}
+          >
+            MolTrace · Admin · System Status
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-mono text-2xl font-bold tracking-tight">System Status</h1>
             <InfoTooltip content={SYSTEM_STATUS_TOOLTIP} label="About System Status" />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Operational visibility for backend health, dependencies, and environment checks.
           </p>
           {!loading && backendUnreachable ? (
@@ -274,38 +293,36 @@ export function SystemStatusWorkspace() {
       </div>
 
       {backendUnreachable ? (
-        <Alert variant="destructive">
-          <AlertTitle>Backend unavailable</AlertTitle>
-          <AlertDescription className="text-xs">
-            System status checks could not be reached. Refresh once the backend is back online.
-          </AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="error"
+          title="Backend unavailable"
+          description="System status checks could not be reached. Refresh once the backend is back online."
+        />
       ) : null}
 
       {!backendUnreachable && (errHealth || errStatus || errVersion || errDeps || errEnv) ? (
-        <Alert variant="destructive">
-          <AlertTitle>Partial load</AlertTitle>
-          <AlertDescription className="space-y-1 text-xs">
+        <AlertCard variant="error" title="Partial load">
+          <div className="space-y-1 text-xs text-foreground/90">
             {errHealth ? <p>Health probe: {errHealth}</p> : null}
             {errStatus ? <p>Status check: {errStatus}</p> : null}
             {errVersion ? <p>Version info: {errVersion}</p> : null}
             {errDeps ? <p>Dependency status: {errDeps}</p> : null}
             {errEnv ? <p>Environment check: {errEnv}</p> : null}
-          </AlertDescription>
-        </Alert>
+          </div>
+        </AlertCard>
       ) : null}
 
       {/* 1. Overall system health */}
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Overall system health</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Overall health</CardTitle>
-            <CardDescription>
-              Live health probe and overall service status from the backend.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Health"
+          title="Overall health"
+          icon={Heart}
+          description="Live health probe and overall service status from the backend."
+        >
+          <div className="space-y-3 text-sm">
             {loading ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : errHealth && errStatus ? (
@@ -327,21 +344,21 @@ export function SystemStatusWorkspace() {
                 ) : null}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       {/* 2. Backend version */}
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Backend version</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Backend version</CardTitle>
-            <CardDescription>
-              Backend service build, version, and Git commit identifier.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Version"
+          title="Backend version"
+          icon={Tag}
+          description="Backend service build, version, and Git commit identifier."
+        >
+          <div className="space-y-2 text-sm">
             {loading ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : errVersion && !health && !status ? (
@@ -375,21 +392,21 @@ export function SystemStatusWorkspace() {
                 </div>
               </dl>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       {/* 3. Dependency checks */}
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Dependency checks</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Dependency checks</CardTitle>
-            <CardDescription>
-              Status of upstream services the platform depends on, plus liveness/readiness checks.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Dependencies"
+          title="Dependency checks"
+          icon={ListChecks}
+          description="Status of upstream services the platform depends on, plus liveness/readiness checks."
+        >
+          <div className="space-y-4 text-sm">
             {loading ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : (
@@ -471,22 +488,22 @@ export function SystemStatusWorkspace() {
                 ) : null}
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       {/* 4–6 Grid: Database, Storage, Jobs/Workers + OpenAPI + Environment */}
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Database, storage, jobs, OpenAPI, environment</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Database</CardTitle>
-              <CardDescription className="text-xs">
-                Connectivity and health of the primary database.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <ModuleCard
+            accent="slate"
+            eyebrow="Database"
+            title="Database"
+            icon={Database}
+            description="Connectivity and health of the primary database."
+          >
+            <div>
               {loading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : errStatus ? (
@@ -501,17 +518,17 @@ export function SystemStatusWorkspace() {
               ) : (
                 <p className="text-xs text-muted-foreground">—</p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Storage</CardTitle>
-              <CardDescription className="text-xs">
-                Object storage availability for files, artifacts, and reports.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <ModuleCard
+            accent="slate"
+            eyebrow="Storage"
+            title="Storage"
+            icon={HardDrive}
+            description="Object storage availability for files, artifacts, and reports."
+          >
+            <div>
               {loading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : errStatus ? (
@@ -526,17 +543,17 @@ export function SystemStatusWorkspace() {
               ) : (
                 <p className="text-xs text-muted-foreground">—</p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Jobs / Workers</CardTitle>
-              <CardDescription className="text-xs">
-                Background job queue depth and worker health.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-xs">
+          <ModuleCard
+            accent="slate"
+            eyebrow="Workers"
+            title="Jobs / Workers"
+            icon={Workflow}
+            description="Background job queue depth and worker health."
+          >
+            <div className="space-y-2 text-xs">
               {loading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : errStatus ? (
@@ -565,17 +582,17 @@ export function SystemStatusWorkspace() {
               ) : (
                 <p className="text-muted-foreground">—</p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">OpenAPI</CardTitle>
-              <CardDescription className="text-xs">
-                Whether the public API documentation is reachable.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <ModuleCard
+            accent="slate"
+            eyebrow="API Docs"
+            title="OpenAPI"
+            icon={BookOpen}
+            description="Whether the public API documentation is reachable."
+          >
+            <div>
               {loading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : errStatus ? (
@@ -593,17 +610,18 @@ export function SystemStatusWorkspace() {
                   degraded
                 </Badge>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card className="sm:col-span-2 lg:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Environment</CardTitle>
-              <CardDescription className="text-xs">
-                Required environment variable check for the active deployment.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-xs">
+          <ModuleCard
+            accent="slate"
+            eyebrow="Environment"
+            title="Environment"
+            icon={Settings2}
+            description="Required environment variable check for the active deployment."
+            className="sm:col-span-2 lg:col-span-2"
+          >
+            <div className="space-y-2 text-xs">
               {loading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : errEnv ? (
@@ -642,8 +660,8 @@ export function SystemStatusWorkspace() {
               ) : (
                 <p className="text-muted-foreground">—</p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </div>
       </div>
 
@@ -659,14 +677,14 @@ export function SystemStatusWorkspace() {
       {/* 8. Recent warnings */}
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Recent warnings</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Recent warnings</CardTitle>
-            <CardDescription>
-              All non-fatal warnings and notes returned across health, status, and environment checks.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="slate"
+          eyebrow="Warnings"
+          title="Recent warnings"
+          icon={Bell}
+          description="All non-fatal warnings and notes returned across health, status, and environment checks."
+        >
+          <div>
             {mergedWarnings.length === 0 ? (
               <p className="text-sm text-muted-foreground">No warnings merged from loaded payloads.</p>
             ) : (
@@ -676,20 +694,20 @@ export function SystemStatusWorkspace() {
                 ))}
               </ul>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Connector health</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Connector health</CardTitle>
-            <CardDescription>
-              Status of all configured external integrations. Credentials and secrets are never displayed here.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Connectors"
+          title="Connector health"
+          icon={Cable}
+          description="Status of all configured external integrations. Credentials and secrets are never displayed here."
+        >
+          <div className="space-y-3 text-sm">
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
                 <p className="text-xs text-muted-foreground">Active connectors</p>
@@ -715,8 +733,8 @@ export function SystemStatusWorkspace() {
             {!connectorHealthLoading && connectorHealthError && connectorHealthBackendUnavailable ? (
               <p className="text-xs text-muted-foreground">Details: {connectorHealthError}</p>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       {/* 9. Developer JSON */}

@@ -11,10 +11,10 @@ import { CompoundScientificKnowledgeGraphPanel } from "@/components/compounds/co
 import { CompoundDetailKnowledgeLinksCard } from "@/components/knowledge/knowledge-links-integration"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
@@ -27,6 +27,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Atom,
+  Boxes,
+  Code2,
+  Layers,
+  Link2,
+  Network,
+  Tags,
+} from "lucide-react"
 
 const STRUCTURE_TOOLTIP =
   "Original structures are preserved exactly as entered. Canonical structures are derived metadata and do not replace the original."
@@ -326,10 +335,11 @@ export function CompoundDetailWorkspace() {
   if (!compoundId) {
     return (
       <div className="space-y-4 p-4">
-        <Alert variant="destructive">
-          <AlertTitle>Missing compound</AlertTitle>
-          <AlertDescription>compound id is required in the URL.</AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="error"
+          title="Missing compound"
+          description="compound id is required in the URL."
+        />
       </div>
     )
   }
@@ -337,14 +347,20 @@ export function CompoundDetailWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
               <Link href="/compounds">← Compounds</Link>
             </Button>
           </div>
-          <h1 className="mt-2 font-mono text-2xl font-bold tracking-tight">Compound Detail</h1>
-          <p className="text-muted-foreground">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · Compounds · Detail
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Compound Detail</h1>
+          <p className="text-sm text-muted-foreground">
             Registry id <span className="font-mono text-xs">{compoundId}</span>
           </p>
           {loadErr ? <p className="mt-1 text-xs text-destructive">{loadErr}</p> : null}
@@ -388,12 +404,14 @@ export function CompoundDetailWorkspace() {
               compoundId={compoundId}
               searchHint={pickStr(compound, ["preferred_name", "preferredName", "name"])}
             />
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Overview</CardTitle>
-                <CardDescription>Core registry fields for this compound.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+            <ModuleCard
+              accent="teal"
+              eyebrow="Overview"
+              title="Overview"
+              icon={Atom}
+              description="Core registry fields for this compound."
+            >
+              <div className="space-y-6">
                 <div className="grid gap-6 sm:grid-cols-2">
                   <dl className="space-y-3 text-sm">
                     <div>
@@ -459,17 +477,19 @@ export function CompoundDetailWorkspace() {
                     <p className="mt-1 break-all rounded-md border bg-muted/30 p-2 font-mono text-xs">{derivedCanonical}</p>
                   </div>
                 ) : null}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="structures" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Structures</CardTitle>
-                <CardDescription>Structure records for this compound.</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <ModuleCard
+              accent="teal"
+              eyebrow="Structures"
+              title="Structures"
+              icon={Layers}
+              description="Structure records for this compound."
+            >
+              <div>
                 {structures.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No structure records returned.</p>
                 ) : (
@@ -506,16 +526,18 @@ export function CompoundDetailWorkspace() {
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="aliases" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Add alias</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <ModuleCard
+              accent="teal"
+              eyebrow="Form"
+              title="Add alias"
+              icon={Tags}
+            >
+              <div>
                 <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={submitAlias}>
                   <div className="flex-1 space-y-2">
                     <Label htmlFor="cd-alias">alias</Label>
@@ -526,19 +548,20 @@ export function CompoundDetailWorkspace() {
                   </Button>
                 </form>
                 {aliasErr ? (
-                  <Alert variant="destructive" className="mt-3">
-                    <AlertTitle className="text-sm">Alias</AlertTitle>
-                    <AlertDescription className="text-xs">{aliasErr}</AlertDescription>
-                  </Alert>
+                  <div className="mt-3">
+                    <AlertCard variant="error" title="Alias" description={aliasErr} />
+                  </div>
                 ) : null}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Aliases</CardTitle>
-                <CardDescription>Registered aliases for this compound.</CardDescription>
-              </CardHeader>
-              <CardContent>
+              </div>
+            </ModuleCard>
+            <ModuleCard
+              accent="teal"
+              eyebrow="Catalog"
+              title="Aliases"
+              icon={Tags}
+              description="Registered aliases for this compound."
+            >
+              <div>
                 {aliases.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No aliases returned.</p>
                 ) : (
@@ -565,25 +588,32 @@ export function CompoundDetailWorkspace() {
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="batches" className="space-y-4">
-            <Card>
-              <CardContent className="pt-6">
+            <ModuleCard
+              accent="teal"
+              eyebrow="Batches"
+              title="Batches & Aliquots"
+              icon={Boxes}
+            >
+              <div className="pt-2">
                 <CompoundBatchesAliquotsPanel compoundId={compoundId} />
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="evidence" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Evidence Links</CardTitle>
-                <CardDescription>Linked modules and artifacts for this compound.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+            <ModuleCard
+              accent="teal"
+              eyebrow="Lineage"
+              title="Evidence Links"
+              icon={Link2}
+              description="Linked modules and artifacts for this compound."
+            >
+              <div className="space-y-6">
                 {evidenceLinks.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No evidence links returned.</p>
                 ) : (
@@ -638,16 +668,18 @@ export function CompoundDetailWorkspace() {
                     )}
                   </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="relationships" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Add relationship</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <ModuleCard
+              accent="teal"
+              eyebrow="Form"
+              title="Add relationship"
+              icon={Network}
+            >
+              <div>
                 <form className="grid gap-4 sm:grid-cols-2" onSubmit={submitRelationship}>
                   <div className="space-y-2">
                     <Label htmlFor="cd-rel-target">related compound id</Label>
@@ -664,19 +696,20 @@ export function CompoundDetailWorkspace() {
                   </div>
                 </form>
                 {relErr ? (
-                  <Alert variant="destructive" className="mt-3">
-                    <AlertTitle className="text-sm">Relationship</AlertTitle>
-                    <AlertDescription className="text-xs">{relErr}</AlertDescription>
-                  </Alert>
+                  <div className="mt-3">
+                    <AlertCard variant="error" title="Relationship" description={relErr} />
+                  </div>
                 ) : null}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Relationships</CardTitle>
-                <CardDescription>Related compounds.</CardDescription>
-              </CardHeader>
-              <CardContent>
+              </div>
+            </ModuleCard>
+            <ModuleCard
+              accent="teal"
+              eyebrow="Lineage"
+              title="Relationships"
+              icon={Network}
+              description="Related compounds."
+            >
+              <div>
                 {relationships.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No relationships returned.</p>
                 ) : (
@@ -726,20 +759,20 @@ export function CompoundDetailWorkspace() {
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="graph" className="space-y-4">
             {compoundId ? <CompoundScientificKnowledgeGraphPanel compoundId={compoundId} /> : null}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Knowledge Graph (this page)</CardTitle>
-                <CardDescription>
-                  Network of relationships and evidence links derived from data already loaded for this compound. For the complete graph across all linked compounds, open the Knowledge Graph view.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+            <ModuleCard
+              accent="teal"
+              eyebrow="Lineage"
+              title="Knowledge Graph (this page)"
+              icon={Network}
+              description="Network of relationships and evidence links derived from data already loaded for this compound. For the complete graph across all linked compounds, open the Knowledge Graph view."
+            >
+              <div>
                 {graphData.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No graph edges from loaded relationships or evidence links.</p>
                 ) : (
@@ -764,29 +797,32 @@ export function CompoundDetailWorkspace() {
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="developer" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Developer JSON</CardTitle>
-                <CardDescription>Raw payloads for debugging.</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <ModuleCard
+              accent="teal"
+              eyebrow="Detail"
+              title="Developer JSON"
+              icon={Code2}
+              description="Raw payloads for debugging."
+            >
+              <div>
                 <DeveloperJsonPanel data={devPayload} />
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
         </Tabs>
       ) : null}
 
       {!loading && !compound && !loadErr ? (
-        <Alert>
-          <AlertTitle>No compound record</AlertTitle>
-          <AlertDescription className="text-sm">Nothing returned for this id.</AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="info"
+          title="No compound record"
+          description="Nothing returned for this id."
+        />
       ) : null}
     </div>
   )

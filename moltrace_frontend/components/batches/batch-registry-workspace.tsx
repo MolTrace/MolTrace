@@ -5,10 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -38,7 +38,7 @@ import {
   pickStr,
   readBatchId,
 } from "@/components/batches/batch-registry-utils"
-import { Package } from "lucide-react"
+import { Boxes, FileText, FlaskConical, Package, Plus } from "lucide-react"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { BatchRegulatoryAssessmentPanel } from "@/components/regulatory-hub/batch-regulatory-assessment-panel"
 import { trackAliquotCreated, trackBatchCreated } from "@/src/lib/analytics/analytics-client"
@@ -335,13 +335,19 @@ export function BatchRegistryWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · Batch / Lot Registry
+          </p>
           <div className="flex items-center gap-2">
-            <Package className="h-6 w-6 text-muted-foreground" aria-hidden />
+            <Package className="h-6 w-6" style={{ color: "var(--mt-teal)" }} aria-hidden />
             <h1 className="font-mono text-2xl font-bold tracking-tight">Batch / Lot Registry</h1>
             <InfoTooltip content={BATCH_ALIQUOT_TOOLTIP} label="About batches and aliquots" />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Register material lots, link them to compounds and evidence, and track aliquots.
           </p>
           {listErr ? <p className="mt-1 text-xs text-destructive">{listErr}</p> : null}
@@ -349,12 +355,14 @@ export function BatchRegistryWorkspace() {
         <BackendStatusIndicator />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create batch</CardTitle>
-          <CardDescription>Register a new compound batch with synthesis route, purity, mass, and source provenance for compound registry traceability.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Form"
+        title="Create batch"
+        icon={Plus}
+        description="Register a new compound batch with synthesis route, purity, mass, and source provenance for compound registry traceability."
+      >
+        <div>
           <form className="space-y-4" onSubmit={handleCreateBatch}>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2 md:col-span-2 lg:col-span-3">
@@ -434,29 +442,28 @@ export function BatchRegistryWorkspace() {
               </div>
             </div>
             {createErr ? (
-              <Alert variant="destructive">
-                <AlertTitle className="text-sm">Create batch</AlertTitle>
-                <AlertDescription className="text-xs">{createErr}</AlertDescription>
-              </Alert>
+              <AlertCard variant="error" title="Create batch" description={createErr} />
             ) : null}
             <Button type="submit" disabled={createBusy}>
               {createBusy ? "Creating…" : "Create batch"}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle className="text-base">Batches</CardTitle>
-            <CardDescription>All registered compound batches — synthesis route, purity, mass, status, and compound provenance across the compound registry.</CardDescription>
-          </div>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Registry"
+        title="Batches"
+        icon={Boxes}
+        description="All registered compound batches — synthesis route, purity, mass, status, and compound provenance across the compound registry."
+        badge={
           <Button type="button" variant="outline" size="sm" onClick={() => void loadBatches()}>
             Refresh
           </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        }
+      >
+        <div className="space-y-4">
           {loading ? <p className="text-sm text-muted-foreground">Loading batches…</p> : null}
           {!loading && batches.length === 0 ? (
             <p className="text-sm text-muted-foreground">No batches returned.</p>
@@ -536,19 +543,21 @@ export function BatchRegistryWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Aliquots</CardTitle>
-          <CardDescription>
-            {selectedBatchId
-              ? `GET /compound-registry/batches/${selectedBatchId}/aliquots`
-              : "Select a batch in the table above."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Samples"
+        title="Aliquots"
+        icon={FlaskConical}
+        description={
+          selectedBatchId
+            ? `GET /compound-registry/batches/${selectedBatchId}/aliquots`
+            : "Select a batch in the table above."
+        }
+      >
+        <div className="space-y-4">
           {!selectedBatchId ? (
             <p className="text-sm text-muted-foreground">Choose a batch to list and add aliquots.</p>
           ) : (
@@ -585,10 +594,7 @@ export function BatchRegistryWorkspace() {
                 </div>
               </form>
               {alCreateErr ? (
-                <Alert variant="destructive">
-                  <AlertTitle className="text-sm">Aliquot</AlertTitle>
-                  <AlertDescription className="text-xs">{alCreateErr}</AlertDescription>
-                </Alert>
+                <AlertCard variant="error" title="Aliquot" description={alCreateErr} />
               ) : null}
               {aliquotsLoading ? <p className="text-sm text-muted-foreground">Loading aliquots…</p> : null}
               {aliquotsErr ? <p className="text-xs text-destructive">{aliquotsErr}</p> : null}
@@ -630,19 +636,23 @@ export function BatchRegistryWorkspace() {
               ) : null}
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Dossier scope for batch assessment</CardTitle>
-          <CardDescription>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Detail"
+        title="Dossier scope for batch assessment"
+        icon={FileText}
+        description={
+          <span>
             Enter a regulatory dossier id. If the selected batch row includes regulatory_dossier_id, it is filled
             automatically. The panel below calls POST/GET /regulatory/dossiers/{"{dossier_id}"}/batch-assessment and includes
             batch_id / compound_id from the selected batch when available.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </span>
+        }
+      >
+        <div className="space-y-4">
           <div className="max-w-sm space-y-2">
             <Label htmlFor="br-badid">dossier_id</Label>
             <Input
@@ -670,8 +680,8 @@ export function BatchRegistryWorkspace() {
               available.
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       <p className="text-xs text-muted-foreground">
         <Link href="/compounds" className="underline underline-offset-4">

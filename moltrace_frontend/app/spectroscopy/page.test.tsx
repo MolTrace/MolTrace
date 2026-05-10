@@ -9,8 +9,10 @@ vi.mock("next/navigation", () => ({
 }))
 
 describe("SpectraCheck page", () => {
-  it("renders Run SpectraCheck Analysis button", () => {
+  it("renders 1H/13C evidence match action tile", () => {
     render(<SpectraCheckWorkspace defaultTab="tab-predicted" />)
-    expect(screen.getByRole("button", { name: "Run SpectraCheck Analysis" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: /Run 1H \/ 13C evidence match/i }),
+    ).toBeInTheDocument()
   })
 })

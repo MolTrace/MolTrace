@@ -33,8 +33,10 @@ from .parser import parse_reference_nmr_text
 from .spectrum import _baseline_correct as _baseline_correct_trace
 from .spectrum import _apply_solvent_mask as _apply_trace_solvent_mask
 from .spectrum import _build_preserved_spectrum_state
+from .spectrum import _build_preview_spectrum_state
 from .spectrum import _downsample_points
 from .spectrum import _prepare_trace_display_points
+from .spectrum import _preview_baseline_flatness_qa
 
 _FLOAT_RE = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
 _RANGE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)")
@@ -60,6 +62,10 @@ def _detect_text_extension(filename: str) -> str:
     if "." not in name:
         return ""
     return name.rsplit(".", 1)[-1]
+
+
+_TEXT_SPECTRUM_EXTENSIONS = {"csv", "tsv", "txt", "xy", "asc", "dat"}
+_JCAMP_SPECTRUM_EXTENSIONS = {"jcamp", "jdx", "dx"}
 
 
 def _is_plausible_carbon13_upload_shift(value: float) -> bool:
@@ -231,14 +237,14 @@ def parse_carbon13_table(filename: str, content: bytes, *, solvent: str | None =
         if not isinstance(parsed, list):
             raise Carbon13ParseError("JSON carbon-13 upload must be a list of peak objects or an object with a 'peaks' list.")
         rows = [row for row in parsed if isinstance(row, dict)]
-    elif ext in {"csv", "tsv"}:
+    elif ext in _TEXT_SPECTRUM_EXTENSIONS:
         delimiter = _sniff_delimiter(text, filename)
         reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
         if not reader.fieldnames:
-            raise Carbon13ParseError("Carbon-13 CSV/TSV must include a header row.")
+            raise Carbon13ParseError("Carbon-13 delimited text table must include a header row.")
         rows = list(reader)
     else:
-        raise Carbon13ParseError("Unsupported ¹³C upload format. Use CSV, TSV, or JSON.")
+        raise Carbon13ParseError("Unsupported ¹³C upload format. Use CSV, TSV, TXT, XY, ASC, DAT, or JSON.")
 
     peaks: list[Carbon13Peak] = []
     original_points: list[tuple[float, float]] = []
@@ -287,6 +293,24 @@ def _extract_numeric_pairs_from_delimited(text: str, delimiter: str) -> list[tup
             continue
         x = _safe_float(row[0])
         y = _safe_float(row[1])
+        if x is None or y is None:
+            continue
+        if _is_plausible_carbon13_upload_shift(x) and math.isfinite(y):
+            points.append((x, y))
+    return points
+
+
+def _extract_numeric_pairs_from_text(text: str) -> list[tuple[float, float]]:
+    points: list[tuple[float, float]] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith(("#", "//", "$$")):
+            continue
+        values = _FLOAT_RE.findall(line)
+        if len(values) < 2:
+            continue
+        x = _safe_float(values[0])
+        y = _safe_float(values[1])
         if x is None or y is None:
             continue
         if _is_plausible_carbon13_upload_shift(x) and math.isfinite(y):
@@ -448,6 +472,7 @@ def parse_carbon13_processed_spectrum(
     max_preview_points: int = 1200,
     processed_baseline_correction: str = "none",
     processed_baseline_order: int = 3,
+    infer_peaks: bool = True,
 ) -> Carbon13UploadPreview:
     text = content.decode("utf-8", errors="replace").lstrip("\ufeff")
     ext = _detect_text_extension(filename)
@@ -456,7 +481,7 @@ def parse_carbon13_processed_spectrum(
 
     if ext == "json":
         return parse_carbon13_table(filename, content, solvent=solvent)
-    if ext in {"csv", "tsv"}:
+    if ext in _TEXT_SPECTRUM_EXTENSIONS:
         delimiter = _sniff_delimiter(text, filename)
         reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
         rows = list(reader) if reader.fieldnames else []
@@ -479,11 +504,15 @@ def parse_carbon13_processed_spectrum(
                     points.append((x, y))
         else:
             points = _extract_numeric_pairs_from_delimited(text, delimiter=delimiter)
-    elif ext in {"jdx", "dx"}:
+            if not points:
+                points = _extract_numeric_pairs_from_text(text)
+        if not points:
+            points = _extract_numeric_pairs_from_text(text)
+    elif ext in _JCAMP_SPECTRUM_EXTENSIONS:
         points = _parse_carbon13_jcamp_text(text)
         warnings.append("JCAMP-DX support is limited to simple XY-style ¹³C exports.")
     else:
-        raise Carbon13ParseError("Unsupported ¹³C spectrum format. Use CSV, TSV, JSON, JDX, or DX.")
+        raise Carbon13ParseError("Unsupported ¹³C spectrum format. Use CSV, TSV, TXT, XY, ASC, DAT, JSON, JCAMP, JDX, or DX.")
 
     if not points:
         return parse_carbon13_table(filename, content, solvent=solvent)
@@ -576,6 +605,71 @@ def parse_carbon13_processed_spectrum(
             ],
         }
         warnings.extend(note for note in magnifier.warnings if note not in warnings)
+    if not infer_peaks:
+        preview_points = _downsample_points(points, limit=preview_limit)
+        warnings.append("Display preview generated without ¹³C peak inference; use Analyze to run peak detection and evidence scoring.")
+        return Carbon13UploadPreview(
+            filename=filename,
+            source_mode="processed_trace",
+            observed_signal_count=0,
+            peaks=[],
+            warnings=warnings,
+            metadata={
+                "solvent": solvent,
+                "format": ext,
+                "point_count": len(points),
+                "peak_sensitivity": 0.12 if peak_sensitivity is None else peak_sensitivity,
+                "peak_inference": "skipped_for_display_preview",
+                "peak_inference_skipped": True,
+                "mask_solvent_regions": mask_solvent_regions,
+                "preview_points": [point.model_dump(mode="json") for point in preview_points],
+                "display_preprocessing": display_meta,
+                "processed_baseline_correction": processed_baseline_metadata,
+                "baseline_flatness_qa": _preview_baseline_flatness_qa(
+                    preview_points,
+                    mode=processed_baseline_metadata.get("method") or "processed_13c",
+                ),
+                "evidence_trace_mode": (
+                    "uploaded_intensity_baseline_corrected"
+                    if processed_baseline_metadata.get("correction_applied")
+                    else "uploaded_intensity"
+                ),
+                "display_mode": normalized_display_mode,
+                "display_gain": viewer_gain,
+                "baseline_lock_visual_only": True,
+                "display": {
+                    "mode": normalized_display_mode,
+                    "gain": viewer_gain,
+                    "vertical_gain": viewer_gain,
+                    "baseline_lock_visual_only": True,
+                    "main_trace": "original_evidence_intensity",
+                    "weak_peak_magnifier": normalized_display_mode == "magnifier",
+                    "downsampling": {
+                        "method": "min_max_bucket_extrema_preserving",
+                        "point_limit": preview_limit,
+                    },
+                },
+                "preview_downsampling": {
+                    "method": "min_max_bucket_extrema_preserving",
+                    "point_limit": preview_limit,
+                    "source_point_count": len(points),
+                },
+                "preview_fast_path": True,
+                "original_spectrum_state": _build_preview_spectrum_state(
+                    points,
+                    preview_points,
+                    source="uploaded_carbon13_trace",
+                    processing_stage="as_uploaded",
+                ),
+                **(
+                    {
+                        "raw_preview_points": [point.model_dump(mode="json") for point in preview_points]
+                    }
+                    if debug_preview
+                    else {}
+                ),
+            },
+        )
     peaks = _infer_carbon13_trace_peaks(
         inference_points,
         solvent=solvent,
@@ -599,6 +693,8 @@ def parse_carbon13_processed_spectrum(
             "format": ext,
             "point_count": len(points),
             "peak_sensitivity": 0.12 if peak_sensitivity is None else peak_sensitivity,
+            "peak_inference": "enabled",
+            "peak_inference_skipped": False,
             "mask_solvent_regions": mask_solvent_regions,
             "preview_points": [
                 point.model_dump(mode="json")
