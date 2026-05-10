@@ -376,7 +376,7 @@ export function RegulatorySourceLibraryWorkspace() {
       </div>
 
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Regulatory Source Library</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Source Library</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
           Register documents, list catalog entries, search indexed sources, and inspect citations returned by the
           service only.

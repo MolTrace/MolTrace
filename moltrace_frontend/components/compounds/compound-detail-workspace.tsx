@@ -343,7 +343,7 @@ export function CompoundDetailWorkspace() {
               <Link href="/compounds">← Compounds</Link>
             </Button>
           </div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">Compound Detail</h1>
+          <h1 className="mt-2 font-mono text-2xl font-bold tracking-tight">Compound Detail</h1>
           <p className="text-muted-foreground">
             Registry id <span className="font-mono text-xs">{compoundId}</span>
           </p>

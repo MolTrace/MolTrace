@@ -237,7 +237,7 @@ export function AuditSearchWorkspace() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Audit Search</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Audit Search</h1>
             <InfoTooltip content={AUDIT_SEARCH_TOOLTIP} label="About Audit Search" />
           </div>
           <p className="text-muted-foreground">

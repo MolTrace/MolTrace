@@ -10,7 +10,7 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import {
   Table,
   TableBody,
@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Bell, Loader2 } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -102,7 +102,7 @@ export function RegulatoryNotificationsWorkspace() {
       </div>
 
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Regulatory Notifications</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Notifications</h1>
         <p className="text-sm text-muted-foreground">
           Operational signals from your tenant API — not final legal determinations.
         </p>
@@ -117,14 +117,14 @@ export function RegulatoryNotificationsWorkspace() {
         </AlertDescription>
       </Alert>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Notifications</CardTitle>
-          <CardDescription>
-            Regulatory workflow signals — change alerts, dossier updates, and review triggers. Mark notifications as read after review.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Signals"
+        title="Notifications"
+        icon={Bell}
+        description="Regulatory workflow signals — change alerts, dossier updates, and review triggers. Mark notifications as read after review."
+      >
+        <div className="space-y-4">
           {patchErr ? (
             <Alert variant="destructive">
               <AlertDescription className="text-sm">{patchErr}</AlertDescription>
@@ -251,8 +251,8 @@ export function RegulatoryNotificationsWorkspace() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

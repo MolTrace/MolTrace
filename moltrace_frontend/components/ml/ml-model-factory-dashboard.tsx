@@ -4,10 +4,11 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { readRecordNumber } from "@/components/projects/project-workspace-utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import {
   Table,
   TableBody,
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import {
-  AlertTriangle,
   BarChart3,
   Bug,
   Cpu,
@@ -243,38 +243,40 @@ export function MlModelFactoryDashboard() {
   const healthScalars = useMemo(() => healthPreviewRows(modelHealth), [modelHealth])
   const partialErr =
     errTasks || errTraining || errEval || errDeploy || errHealth ? (
-      <Alert variant="destructive">
-        <AlertTitle>Partial load</AlertTitle>
-        <AlertDescription className="space-y-1 text-xs">
+      <AlertCard variant="error" title="Partial load">
+        <div className="space-y-1 text-xs">
           {errTasks ? <p>GET /ml/tasks: {errTasks}</p> : null}
           {errTraining ? <p>GET /ml/training-runs: {errTraining}</p> : null}
           {errEval ? <p>GET /ml/evaluation-runs: {errEval}</p> : null}
           {errDeploy ? <p>GET /ml/deployment-candidates: {errDeploy}</p> : null}
           {errHealth ? <p>GET /ml/model-health: {errHealth}</p> : null}
-        </AlertDescription>
-      </Alert>
+        </div>
+      </AlertCard>
     ) : null
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">ML Model Factory</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · ML Model Factory
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">ML Model Factory</h1>
+          <p className="text-sm text-muted-foreground">
             Train, evaluate, document, and review controlled ML/AI models from approved dataset versions.
           </p>
         </div>
         <BackendStatusIndicator />
       </div>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" aria-hidden />
-        <AlertTitle className="text-sm">Warning</AlertTitle>
-        <AlertDescription className="text-sm text-muted-foreground">
-          Models trained in MolTrace require dataset-version tracking, evaluation, model cards, and human approval
-          before use.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Warning"
+        description="Models trained in MolTrace require dataset-version tracking, evaluation, model cards, and human approval before use."
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -321,13 +323,16 @@ export function MlModelFactoryDashboard() {
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Summary cards</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">ML tasks</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">ML tasks</CardTitle>
               <Cpu className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errTasks ? null : tasks.length, Boolean(errTasks))}
               </div>
               {statSub({
@@ -338,13 +343,16 @@ export function MlModelFactoryDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Training runs</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Training runs</CardTitle>
               <PlayCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errTraining ? null : trainingRuns.length, Boolean(errTraining))}
               </div>
               {statSub({
@@ -355,13 +363,16 @@ export function MlModelFactoryDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Evaluation runs</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Evaluation runs</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errEval ? null : evaluationRuns.length, Boolean(errEval))}
               </div>
               {statSub({
@@ -372,13 +383,16 @@ export function MlModelFactoryDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Model artifacts</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Model artifacts</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errHealth ? null : artifactCount, Boolean(errHealth))}
               </div>
               {statSub({
@@ -389,13 +403,16 @@ export function MlModelFactoryDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Deployment candidates</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Deployment candidates</CardTitle>
               <Rocket className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errDeploy ? null : deploymentCandidates.length, Boolean(errDeploy))}
               </div>
               {statSub({
@@ -406,13 +423,16 @@ export function MlModelFactoryDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Models requiring review</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Models requiring review</CardTitle>
               <Eye className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(
                   errHealth && errDeploy ? null : reviewPendingCount,
                   Boolean(errHealth) && Boolean(errDeploy),
@@ -430,13 +450,16 @@ export function MlModelFactoryDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Open error-analysis items</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Open error-analysis items</CardTitle>
               <Bug className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(
                   errHealth && errTasks ? null : errorAnalysisOpen,
                   Boolean(errHealth) && Boolean(errTasks),
@@ -456,14 +479,13 @@ export function MlModelFactoryDashboard() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Built-in task table</CardTitle>
-          <CardDescription>
-            Registered ML tasks available for training — task type, status, and configuration for each supported prediction objective.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="ML · Tasks"
+        title="Built-in task table"
+        description="Registered ML tasks available for training — task type, status, and configuration for each supported prediction objective."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errTasks ? (
@@ -505,17 +527,16 @@ export function MlModelFactoryDashboard() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Recent training runs</CardTitle>
-          <CardDescription>
-            Recent ML training runs — task, dataset version, status, and metric summaries across all completed and in-progress runs.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="ML · Training Runs"
+        title="Recent training runs"
+        description="Recent ML training runs — task, dataset version, status, and metric summaries across all completed and in-progress runs."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errTraining ? (
@@ -557,17 +578,16 @@ export function MlModelFactoryDashboard() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Recent evaluation runs</CardTitle>
-          <CardDescription>
-            Recent model evaluation runs — artifact, status, and metric summary for each completed or in-progress evaluation.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="ML · Evaluation Runs"
+        title="Recent evaluation runs"
+        description="Recent model evaluation runs — artifact, status, and metric summary for each completed or in-progress evaluation."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errEval ? (
@@ -605,17 +625,16 @@ export function MlModelFactoryDashboard() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Deployment candidate preview</CardTitle>
-          <CardDescription>
-            Model artifacts nominated for production deployment — approval status, task key, and review state for each candidate.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="ML · Deployment Candidates"
+        title="Deployment candidate preview"
+        description="Model artifacts nominated for production deployment — approval status, task key, and review state for each candidate."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errDeploy ? (
@@ -657,17 +676,16 @@ export function MlModelFactoryDashboard() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Model health preview</CardTitle>
-          <CardDescription>
-            Model health summary — scalar performance and drift indicators. Nested payloads are not expanded; approval and validation states always come from backend fields.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="ML · Model Health"
+        title="Model health preview"
+        description="Model health summary — scalar performance and drift indicators. Nested payloads are not expanded; approval and validation states always come from backend fields."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errHealth ? (
@@ -695,8 +713,8 @@ export function MlModelFactoryDashboard() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       <p className="text-xs text-muted-foreground">
         Factory lists reflect operational signals from your tenant API. Release decisions follow your governance process;

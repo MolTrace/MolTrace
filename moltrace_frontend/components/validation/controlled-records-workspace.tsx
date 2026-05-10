@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -19,6 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { FileCheck2, FileText, Plus } from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -336,40 +337,40 @@ export function ControlledRecordsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Controlled Records</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Controlled Records
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Controlled Records</h1>
+          <p className="text-sm text-muted-foreground">
             Create, version, lock, archive, and review controlled records for validation readiness workflows.
           </p>
         </div>
         <BackendStatusIndicator />
       </div>
 
-      <Alert className="border-warning/40 bg-warning/10">
-        <AlertDescription className="text-xs text-warning">
-          Locked controlled records cannot be edited directly. Create a new version for changes.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Locked records require a new version"
+        description="Locked controlled records cannot be edited directly. Create a new version for changes."
+      />
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+      {error ? <AlertCard variant="error" title="Error" description={error} /> : null}
 
-      {message ? (
-        <Alert>
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {message ? <AlertCard variant="success" title="Recorded" description={message} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Create controlled record</CardTitle>
-            <CardDescription>Register a new controlled document with title, type, version, and responsible owner for GxP audit trail compliance.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Create"
+          title="Create controlled record"
+          icon={Plus}
+          description="Register a new controlled document with title, type, version, and responsible owner for GxP audit trail compliance."
+        >
+          <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1 sm:col-span-2">
                 <Label htmlFor="controlled-record-title">title</Label>
@@ -434,15 +435,17 @@ export function ControlledRecordsWorkspace() {
             <Button type="button" onClick={createControlledRecord} disabled={createBusy}>
               {createBusy ? "Creating..." : "Create controlled record"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Selected controlled record</CardTitle>
-            <CardDescription>Selected controlled record details — version, status, owner, and full audit history.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Detail"
+          title="Selected controlled record"
+          icon={FileText}
+          description="Selected controlled record details — version, status, owner, and full audit history."
+        >
+          <div className="space-y-5">
             {detailRecord ? (
               <>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -576,21 +579,23 @@ export function ControlledRecordsWorkspace() {
                 {detailLoading ? "Loading controlled record..." : "Select a controlled record to view actions."}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-base">Controlled records</CardTitle>
-            <CardDescription>All controlled documents across this environment — SOPs, validation plans, analytical methods, and other GxP-controlled records.</CardDescription>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Records"
+        title="Controlled records"
+        icon={FileCheck2}
+        description="All controlled documents across this environment — SOPs, validation plans, analytical methods, and other GxP-controlled records."
+      >
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadRecords()} disabled={loading}>
+              Refresh
+            </Button>
           </div>
-          <Button type="button" variant="outline" onClick={() => void loadRecords()} disabled={loading}>
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -643,8 +648,8 @@ export function ControlledRecordsWorkspace() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

@@ -9,7 +9,7 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { countMetricKeysForAnalytics, trackMlErrorAnalysisCreated } from "@/src/lib/analytics/analytics-client"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, Layers, ListChecks, Loader2, Plus, RefreshCw } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -194,7 +194,7 @@ export function MlErrorAnalysisWorkspace() {
               ML Model Factory
             </Link>
           </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">Error analysis</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Error analysis</h1>
           <p className="text-muted-foreground">
             Slice-level error summaries; representative_errors_json stores compact entries — not full raw records.
           </p>
@@ -216,14 +216,14 @@ export function MlErrorAnalysisWorkspace() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Slice types (reference)</CardTitle>
-          <CardDescription>
-            <code className="text-xs">slice_type</code> values align with backend literals.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Reference"
+        title="Slice types (reference)"
+        icon={Layers}
+        description={<><code className="text-xs">slice_type</code> values align with backend literals.</>}
+      >
+        <div>
           <div className="flex flex-wrap gap-2">
             {SLICE_TYPES.map((t) => (
               <Badge key={t} variant="secondary" className="font-mono text-xs">
@@ -231,17 +231,17 @@ export function MlErrorAnalysisWorkspace() {
               </Badge>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Create error analysis slice</CardTitle>
-          <CardDescription>
-            Define an error analysis slice on an evaluation run — specify slice type, severity, sample count, per-slice metrics, and representative failure cases.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Create"
+        title="Create error analysis slice"
+        icon={Plus}
+        description="Define an error analysis slice on an evaluation run — specify slice type, severity, sample count, per-slice metrics, and representative failure cases."
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label>evaluation_run_id</Label>
             <Select value={evalRunId || undefined} onValueChange={setEvalRunId}>
@@ -323,17 +323,17 @@ export function MlErrorAnalysisWorkspace() {
             {submitBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Submit error analysis slice
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Slices</CardTitle>
-          <CardDescription>
-            Error analysis slices logged for this tenant — slice type, severity, sample count, and linked evaluation run.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Records"
+        title="Slices"
+        icon={ListChecks}
+        description="Error analysis slices logged for this tenant — slice type, severity, sample count, and linked evaluation run."
+      >
+        <div className="space-y-4">
           <div className="table-scroll min-w-0">
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
@@ -432,8 +432,8 @@ export function MlErrorAnalysisWorkspace() {
               ) : null}
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

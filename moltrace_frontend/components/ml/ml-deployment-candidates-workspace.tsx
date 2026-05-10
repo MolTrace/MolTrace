@@ -9,7 +9,7 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -33,7 +33,7 @@ import {
   trackMlDeploymentCandidateCreated,
   trackMlDeploymentCandidateRejected,
 } from "@/src/lib/analytics/analytics-client"
-import { AlertTriangle, ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { AlertTriangle, ArrowLeft, ListChecks, Loader2, Plus, RefreshCw } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -378,8 +378,14 @@ export function MlDeploymentCandidatesWorkspace() {
               ML Model Factory
             </Link>
           </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">Deployment candidate review</h1>
-          <p className="text-muted-foreground">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · ML Deployment Candidates
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Deployment candidate review</h1>
+          <p className="text-sm text-muted-foreground">
             Create deployment candidates, then record human approval or rejection. Registry status updates only through the approve and reject endpoints—nothing here activates production routing.
           </p>
         </div>
@@ -408,14 +414,14 @@ export function MlDeploymentCandidatesWorkspace() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Create deployment candidate</CardTitle>
-          <CardDescription>
-            Submit a model artifact and its approved model card for deployment review. New candidates start in &ldquo;proposed&rdquo; status.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Create"
+        title="Create deployment candidate"
+        icon={Plus}
+        description="Submit a model artifact and its approved model card for deployment review. New candidates start in &ldquo;proposed&rdquo; status."
+      >
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>model_artifact_id</Label>
@@ -489,17 +495,17 @@ export function MlDeploymentCandidatesWorkspace() {
             {createBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Create candidate
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Candidates</CardTitle>
-          <CardDescription>
-            All proposed and reviewed deployment candidates. Click a row to review and record an approval or rejection.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Records"
+        title="Candidates"
+        icon={ListChecks}
+        description="All proposed and reviewed deployment candidates. Click a row to review and record an approval or rejection."
+      >
+        <div className="space-y-4">
           <div className="table-scroll min-w-0">
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
@@ -729,8 +735,8 @@ export function MlDeploymentCandidatesWorkspace() {
           ) : (
             <p className="text-sm text-muted-foreground">Select a candidate to inspect gates and reviewer fields.</p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

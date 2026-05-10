@@ -9,7 +9,7 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { countMetricKeysForAnalytics, trackMlCalibrationAssessmentCreated } from "@/src/lib/analytics/analytics-client"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, ListChecks, Loader2, Plus, RefreshCw } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -180,8 +180,14 @@ export function MlCalibrationWorkspace() {
               ML Model Factory
             </Link>
           </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">Calibration assessments</h1>
-          <p className="text-muted-foreground">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · ML Calibration
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Calibration assessments</h1>
+          <p className="text-sm text-muted-foreground">
             Assess probabilistic calibration using registry methods; metrics and status come from the API.
           </p>
         </div>
@@ -202,14 +208,14 @@ export function MlCalibrationWorkspace() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Create calibration assessment</CardTitle>
-          <CardDescription>
-            Log a calibration assessment for a model artifact — specify calibration method, metrics, and optional linked evaluation run.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Create"
+        title="Create calibration assessment"
+        icon={Plus}
+        description="Log a calibration assessment for a model artifact — specify calibration method, metrics, and optional linked evaluation run."
+      >
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>model_artifact_id</Label>
@@ -297,17 +303,17 @@ export function MlCalibrationWorkspace() {
             {submitBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Submit calibration assessment
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Assessments</CardTitle>
-          <CardDescription>
-            Calibration assessments logged for this tenant — method, status, and linked artifact and evaluation run.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Records"
+        title="Assessments"
+        icon={ListChecks}
+        description="Calibration assessments logged for this tenant — method, status, and linked artifact and evaluation run."
+      >
+        <div className="space-y-4">
           <div className="table-scroll min-w-0">
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
@@ -389,8 +395,8 @@ export function MlCalibrationWorkspace() {
               ) : null}
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

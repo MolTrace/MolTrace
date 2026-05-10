@@ -168,7 +168,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
       </div>
 
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Source Version Timeline</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Source Version Timeline</h1>
         <p className="text-sm text-muted-foreground">
           Source text changed, potential impact, and requires review indicators are shown from API comparison output.
         </p>

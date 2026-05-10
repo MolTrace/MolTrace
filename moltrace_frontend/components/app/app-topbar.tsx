@@ -72,12 +72,18 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
           <Button
             variant="outline"
             size="sm"
-            className="hidden gap-2 sm:flex"
+            className="hidden gap-2 font-mono text-xs font-semibold uppercase tracking-[0.06em] sm:flex"
             onClick={onToggleEvidenceQueue}
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
             <span>AI Queue</span>
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5">3</Badge>
+            <Badge
+              variant="secondary"
+              className="ml-1 h-5 px-1.5 font-mono"
+              style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal)" }}
+            >
+              3
+            </Badge>
           </Button>
           <Button
             variant="ghost"
@@ -85,7 +91,7 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
             className="sm:hidden"
             onClick={onToggleEvidenceQueue}
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
           </Button>
 
           <TenantSelector />
@@ -96,7 +102,10 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-4 w-4" />
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-medium text-accent-foreground">
+                <span
+                  className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full font-mono text-[10px] font-bold"
+                  style={{ backgroundColor: "var(--mt-amber)", color: "#04080F" }}
+                >
                   2
                 </span>
               </Button>

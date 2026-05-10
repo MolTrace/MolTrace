@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { fetchSpectraCheckSessionsList } from "@/src/lib/spectracheck/spectracheck-backend-session"
@@ -335,14 +335,19 @@ export default function ReviewQueueWorkspace() {
                     const taskId = readStr(row, ["id", "task_id"])
                     const busyBase = `${et.sessionId}:${taskId}`
                     return (
-                      <Card key={`${et.sessionId}-${taskId}`} className="border-muted shadow-sm">
-                        <CardHeader className="space-y-1 pb-2">
-                          <CardTitle className="text-base leading-snug">{title}</CardTitle>
-                          <CardDescription className="text-xs">
+                      <ModuleCard
+                        key={`${et.sessionId}-${taskId}`}
+                        accent="cyan"
+                        eyebrow="Task"
+                        title={title}
+                        icon={ClipboardCheck}
+                        description={
+                          <>
                             Sample <span className="font-mono text-[11px]">{et.sessionSampleLabel}</span>
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3 text-sm">
+                          </>
+                        }
+                      >
+                        <div className="space-y-3 text-sm">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <Badge variant={priorityVariant(priority)} className="font-normal capitalize">
                               {priority}
@@ -445,8 +450,8 @@ export default function ReviewQueueWorkspace() {
                               </Link>
                             </Button>
                           </div>
-                        </CardContent>
-                      </Card>
+                        </div>
+                      </ModuleCard>
                     )
                   })
                 )}

@@ -17,7 +17,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -37,7 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Layers, ListChecks, Loader2, Plus } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -244,7 +244,7 @@ export function KnowledgeModelImprovementWorkspace() {
         </div>
 
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Model improvement queue</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Model improvement queue</h1>
           <p className="text-sm text-muted-foreground">
             Operational backlog for model iteration — prioritized cases flagged for retraining, data augmentation, or review.
           </p>
@@ -259,14 +259,14 @@ export function KnowledgeModelImprovementWorkspace() {
           </AlertDescription>
         </Alert>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Queue</CardTitle>
-            <CardDescription>
-              Improvement queue entries filterable by status — each item captures target module, source type, priority, linked record, and a human-readable summary.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Backlog"
+          title="Queue"
+          icon={ListChecks}
+          description="Improvement queue entries filterable by status — each item captures target module, source type, priority, linked record, and a human-readable summary."
+        >
+          <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
                 <Label>status filter</Label>
@@ -363,17 +363,17 @@ export function KnowledgeModelImprovementWorkspace() {
                 {rows.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No rows returned.</p> : null}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Add queue item</CardTitle>
-            <CardDescription>
-              Add a new model improvement case to the queue — specify source type, target module, priority, linked record, and a summary of the issue.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Create"
+          title="Add queue item"
+          icon={Plus}
+          description="Add a new model improvement case to the queue — specify source type, target module, priority, linked record, and a summary of the issue."
+        >
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
               <Label>source_type</Label>
               <Select value={createSourceType} onValueChange={setCreateSourceType}>
@@ -457,21 +457,25 @@ export function KnowledgeModelImprovementWorkspace() {
               {createErr ? <span className="text-sm text-destructive">{createErr}</span> : null}
               {createOk ? <span className="text-sm text-muted-foreground">{createOk}</span> : null}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {selected && selId != null ? (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Edit"
+            title={
+              <span>
                 Item{" "}
                 <code className="font-mono text-xs">
                   PATCH /knowledge/model-improvement-queue/{selId}
                 </code>
-              </CardTitle>
-              <CardDescription>Quick actions set status via PATCH; full edit below.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </span>
+            }
+            icon={Layers}
+            description="Quick actions set status via PATCH; full edit below."
+          >
+            <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -558,8 +562,8 @@ export function KnowledgeModelImprovementWorkspace() {
               </Button>
 
               <DeveloperJsonPanel data={selected} />
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         ) : null}
       </div>
     </TooltipProvider>

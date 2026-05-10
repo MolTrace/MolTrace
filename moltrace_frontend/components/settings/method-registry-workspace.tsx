@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,10 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { ServerOff } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { Activity, BarChart3, Cpu, FlaskConical, Gauge, ServerOff } from "lucide-react"
 
 const TOOLTIP =
   "The method registry records the exact scientific methods, model versions, scoring profiles, and thresholds used to produce evidence and reports."
@@ -176,12 +176,18 @@ export function MethodRegistryWorkspace() {
   return (
     <TooltipProvider delayDuration={300}>
       <div className="space-y-6">
-        <div>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-slate)" }}
+          >
+            MolTrace · Settings · Method Registry
+          </p>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Method Registry</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Method Registry</h1>
             <InfoTooltip content={TOOLTIP} label="About method registry" />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Read-only view of registered methods, models, scoring, thresholds, and drift signals from the backend.
           </p>
         </div>
@@ -193,24 +199,25 @@ export function MethodRegistryWorkspace() {
         </div>
 
         {errMethods || errModels || errScoring || errThresholds ? (
-          <Alert variant="destructive">
-            <AlertTitle>Some data could not be loaded</AlertTitle>
-            <AlertDescription className="space-y-1 text-xs">
+          <AlertCard variant="error" title="Some data could not be loaded">
+            <div className="space-y-1 text-xs text-foreground/90">
               {errMethods ? <p>Method registry: {errMethods}</p> : null}
               {errModels ? <p>Model versions: {errModels}</p> : null}
               {errScoring ? <p>Scoring profiles: {errScoring}</p> : null}
               {errThresholds ? <p>Threshold profiles: {errThresholds}</p> : null}
-            </AlertDescription>
-          </Alert>
+            </div>
+          </AlertCard>
         ) : null}
 
         {/* 1. Method registry table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Method registry table</CardTitle>
-            <CardDescription>Methods registered for SpectraCheck and reporting workflows.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="slate"
+          eyebrow="Methods"
+          title="Method registry"
+          icon={FlaskConical}
+          description="Methods registered for SpectraCheck and reporting workflows."
+        >
+          <div>
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : (
@@ -277,16 +284,18 @@ export function MethodRegistryWorkspace() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {/* 2. Model versions table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Model versions table</CardTitle>
-            <CardDescription>Deployed model artifacts and validation references.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="slate"
+          eyebrow="Models"
+          title="Model versions"
+          icon={Cpu}
+          description="Deployed model artifacts and validation references."
+        >
+          <div>
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : (
@@ -333,16 +342,18 @@ export function MethodRegistryWorkspace() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {/* 3. Scoring profiles table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Scoring profiles table</CardTitle>
-            <CardDescription>Named scoring configurations linked to methods where applicable.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="slate"
+          eyebrow="Scoring"
+          title="Scoring profiles"
+          icon={BarChart3}
+          description="Named scoring configurations linked to methods where applicable."
+        >
+          <div>
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : (
@@ -385,16 +396,18 @@ export function MethodRegistryWorkspace() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {/* 4. Threshold profiles table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Threshold profiles table</CardTitle>
-            <CardDescription>QC and gating thresholds by category.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="slate"
+          eyebrow="Thresholds"
+          title="Threshold profiles"
+          icon={Gauge}
+          description="QC and gating thresholds by category."
+        >
+          <div>
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : (
@@ -437,16 +450,18 @@ export function MethodRegistryWorkspace() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {/* 5. Drift alerts summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Drift alerts summary</CardTitle>
-            <CardDescription>Model health drift signals from the monitoring service.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Drift"
+          title="Drift alerts summary"
+          icon={Activity}
+          description="Model health drift signals from the monitoring service."
+        >
+          <div className="space-y-3">
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : errDrift ? (
@@ -496,8 +511,8 @@ export function MethodRegistryWorkspace() {
                 ) : null}
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
     </TooltipProvider>
   )

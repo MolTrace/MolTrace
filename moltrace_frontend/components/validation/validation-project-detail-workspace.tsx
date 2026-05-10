@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,8 +21,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, ServerOff } from "lucide-react"
+import { ArrowLeft, Layers3, ServerOff, ShieldCheck } from "lucide-react"
 import { ValidationTraceabilityMatrixPanel } from "@/components/validation/validation-traceability-matrix-panel"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 
 type Row = Record<string, unknown>
 
@@ -182,13 +183,42 @@ function Field({ label, value }: { label: string; value: unknown }) {
   )
 }
 
-function StatCard({ title, value }: { title: string; value: string | number }) {
+type StatAccent = "cyan" | "amber" | "red" | "green" | "violet"
+
+const STAT_ACCENT_VAR: Record<StatAccent, string> = {
+  cyan: "var(--mt-cyan)",
+  amber: "var(--mt-amber)",
+  red: "var(--mt-red)",
+  green: "var(--mt-green)",
+  violet: "var(--mt-violet)",
+}
+
+function StatCard({
+  title,
+  value,
+  accent = "cyan",
+}: {
+  title: string
+  value: string | number
+  accent?: StatAccent
+}) {
+  const color = STAT_ACCENT_VAR[accent]
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+    <Card
+      className="overflow-hidden rounded-xl py-0"
+      style={{ borderTop: `3px solid ${color}` }}
+    >
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+        <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="text-2xl font-semibold">{value}</CardContent>
+      <CardContent className="pb-5">
+        <div
+          className="font-mono text-3xl font-bold tabular-nums leading-none"
+          style={{ color }}
+        >
+          {value}
+        </div>
+      </CardContent>
     </Card>
   )
 }
@@ -887,11 +917,17 @@ export function ValidationProjectDetailWorkspace() {
               Back
             </Link>
           </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Validation Project
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">
             {readFirst(project, ["title", "name"]) || "Validation project"}
           </h1>
           <p className="font-mono text-xs text-muted-foreground break-all">{validationProjectId || "-"}</p>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Validation readiness details. Status labels are shown as returned by the API.
           </p>
         </div>
@@ -900,63 +936,62 @@ export function ValidationProjectDetailWorkspace() {
 
       {loading ? <p className="text-sm text-muted-foreground">Loading validation project...</p> : null}
       {!loading && error ? (
-        <Alert variant="destructive">
-          <ServerOff className="h-4 w-4" />
-          <AlertDescription className="text-xs">{error}</AlertDescription>
-        </Alert>
+        <AlertCard variant="error" icon={ServerOff} title="Could not load project" description={error} />
       ) : null}
 
       {!loading && !error ? (
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="flex h-auto flex-wrap justify-start">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="urs">URS</TabsTrigger>
-            <TabsTrigger value="functional_specs">Functional Specs</TabsTrigger>
-            <TabsTrigger value="risk_assessment">Risk Assessment</TabsTrigger>
-            <TabsTrigger value="test_protocols">Test Protocols</TabsTrigger>
-            <TabsTrigger value="test_executions">Test Executions</TabsTrigger>
-            <TabsTrigger value="traceability">Traceability</TabsTrigger>
-            <TabsTrigger value="esignatures">e-Signatures</TabsTrigger>
-            <TabsTrigger value="deviations_capa">Deviations / CAPA</TabsTrigger>
-            <TabsTrigger value="inspection_package">Inspection Package</TabsTrigger>
-            <TabsTrigger value="developer_json">Developer JSON</TabsTrigger>
+            <TabsTrigger value="overview" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Overview</TabsTrigger>
+            <TabsTrigger value="urs" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">URS</TabsTrigger>
+            <TabsTrigger value="functional_specs" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Functional Specs</TabsTrigger>
+            <TabsTrigger value="risk_assessment" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Risk Assessment</TabsTrigger>
+            <TabsTrigger value="test_protocols" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Test Protocols</TabsTrigger>
+            <TabsTrigger value="test_executions" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Test Executions</TabsTrigger>
+            <TabsTrigger value="traceability" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Traceability</TabsTrigger>
+            <TabsTrigger value="esignatures" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">e-Signatures</TabsTrigger>
+            <TabsTrigger value="deviations_capa" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Deviations / CAPA</TabsTrigger>
+            <TabsTrigger value="inspection_package" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Inspection Package</TabsTrigger>
+            <TabsTrigger value="developer_json" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Developer JSON</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              <StatCard title="Coverage summary" value={summary.coverage} />
-              <StatCard title="Open risks" value={summary.openRisks} />
-              <StatCard title="Failed tests" value={summary.failedTests} />
-              <StatCard title="Signatures" value={summary.signatures} />
-              <StatCard title="Controlled records" value={summary.controlledRecords} />
+              <StatCard title="Coverage summary" value={summary.coverage} accent="cyan" />
+              <StatCard title="Open risks" value={summary.openRisks} accent="amber" />
+              <StatCard title="Failed tests" value={summary.failedTests} accent="red" />
+              <StatCard title="Signatures" value={summary.signatures} accent="green" />
+              <StatCard title="Controlled records" value={summary.controlledRecords} accent="cyan" />
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Project overview</CardTitle>
-                <CardDescription>
-                  Summary of the selected validation project — scope, status, intended use, and regulated context.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-2">
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Overview"
+              title="Project overview"
+              icon={ShieldCheck}
+              description="Summary of the selected validation project — scope, status, intended use, and regulated context."
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="validation scope" value={readFirst(project, ["scope"])} />
                 <Field label="status" value={readFirst(project, ["status"])} />
                 <Field label="intended use" value={readFirst(project, ["intended_use"])} />
                 <Field label="regulated context" value={readFirst(project, ["regulated_context"])} />
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Module order</CardTitle>
-                <CardDescription>Global product order for validation readiness views.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Module Order"
+              title="Module order"
+              icon={Layers3}
+              description="Global product order for validation readiness views."
+            >
+              <div className="space-y-2 text-sm">
                 <div className="rounded-md border bg-muted/20 px-3 py-2">
                   SpectraCheck {" -> "} Regulatory Hub {" -> "} Reaction Optimization
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="urs" className="space-y-4">
@@ -1656,11 +1691,11 @@ export function ValidationProjectDetailWorkspace() {
                   </div>
                 </div>
                 {executionStatus === "fail" ? (
-                  <Alert className="border-warning/40 bg-warning/10">
-                    <AlertDescription className="text-xs text-warning">
-                      Failed execution path visible: create or link a deviation record before closure.
-                    </AlertDescription>
-                  </Alert>
+                  <AlertCard
+                    variant="warning"
+                    title="Failure path"
+                    description="Failed execution path visible: create or link a deviation record before closure."
+                  />
                 ) : null}
                 <Button type="button" disabled={executionBusy || !selectedTestCaseId} onClick={() => void executeTestCase()}>
                   {executionBusy ? "Executing..." : "Execute test case"}

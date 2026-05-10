@@ -9,7 +9,7 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { countMetricKeysForAnalytics, trackMlOodAssessmentCreated } from "@/src/lib/analytics/analytics-client"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, Loader2, Plus, RefreshCw, ShieldAlert } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -192,7 +192,7 @@ export function MlOodAssessmentWorkspace() {
               ML Model Factory
             </Link>
           </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">Out-of-domain assessments</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Out-of-domain assessments</h1>
           <p className="text-muted-foreground">
             Assess distribution shift using declared methods; high-risk regions are summarized — not raw confidential inputs.
           </p>
@@ -214,14 +214,14 @@ export function MlOodAssessmentWorkspace() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Create OOD assessment</CardTitle>
-          <CardDescription>
-            Run an out-of-distribution applicability assessment on a model artifact — flags high-risk structural regions where predictions are less reliable.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Create"
+        title="Create OOD assessment"
+        icon={Plus}
+        description="Run an out-of-distribution applicability assessment on a model artifact — flags high-risk structural regions where predictions are less reliable."
+      >
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>model_artifact_id</Label>
@@ -309,17 +309,17 @@ export function MlOodAssessmentWorkspace() {
             {submitBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Submit OOD assessment
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Assessments</CardTitle>
-          <CardDescription>
-            Out-of-distribution assessments logged for this tenant — OOD method, status, associated artifact, and dataset version.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Records"
+        title="Assessments"
+        icon={ShieldAlert}
+        description="Out-of-distribution assessments logged for this tenant — OOD method, status, associated artifact, and dataset version."
+      >
+        <div className="space-y-4">
           <div className="table-scroll min-w-0">
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
@@ -440,8 +440,8 @@ export function MlOodAssessmentWorkspace() {
               ) : null}
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

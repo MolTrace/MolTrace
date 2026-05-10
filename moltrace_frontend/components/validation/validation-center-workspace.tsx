@@ -4,9 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -18,6 +17,21 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import {
+  AlertCircle,
+  AlertTriangle,
+  ClipboardCheck,
+  ClipboardList,
+  FileCheck2,
+  FlaskConical,
+  Layers3,
+  ListChecks,
+  Plus,
+  Wrench,
+  XCircle,
+} from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -187,9 +201,15 @@ export function ValidationCenterWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Validation Center</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Validation Center
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Validation Center</h1>
+          <p className="text-sm text-muted-foreground">
             Build validation projects, risk assessments, traceability matrices, test evidence, e-signatures, controlled
             records, and inspection-ready packages.
           </p>
@@ -197,85 +217,181 @@ export function ValidationCenterWorkspace() {
         <BackendStatusIndicator />
       </div>
 
-      <Alert className="border-warning/40 bg-warning/10">
-        <AlertDescription className="text-xs text-warning">
-          Validation Center supports internal validation readiness and evidence packaging. It does not represent FDA approval,
-          Annex 11 certification, or legal compliance by itself.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Internal readiness only"
+        description="Validation Center supports internal validation readiness and evidence packaging. It does not represent FDA approval, Annex 11 certification, or legal compliance by itself."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Validation projects</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-cyan)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Validation projects</CardTitle>
+            <FlaskConical className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.validationProjects}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-cyan)" }}
+            >
+              {summary.validationProjects}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Requirements</CardTitle>
+
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-cyan)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Requirements</CardTitle>
+            <ListChecks className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.requirements}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-cyan)" }}
+            >
+              {summary.requirements}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Open risks</CardTitle>
+
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-amber)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Open risks</CardTitle>
+            <AlertTriangle className="h-4 w-4" style={{ color: "var(--mt-amber)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.openRisks}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-amber)" }}
+            >
+              {summary.openRisks}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Test cases</CardTitle>
+
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-cyan)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Test cases</CardTitle>
+            <ClipboardCheck className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.testCases}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-cyan)" }}
+            >
+              {summary.testCases}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Failed tests</CardTitle>
+
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-red)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Failed tests</CardTitle>
+            <XCircle className="h-4 w-4" style={{ color: "var(--mt-red)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.failedTests}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-red)" }}
+            >
+              {summary.failedTests}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Controlled records</CardTitle>
+
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-cyan)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Controlled records</CardTitle>
+            <FileCheck2 className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.controlledRecords}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-cyan)" }}
+            >
+              {summary.controlledRecords}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Open deviations</CardTitle>
+
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-amber)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Open deviations</CardTitle>
+            <AlertCircle className="h-4 w-4" style={{ color: "var(--mt-amber)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.openDeviations}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-amber)" }}
+            >
+              {summary.openDeviations}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">CAPA items</CardTitle>
+
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-violet)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">CAPA items</CardTitle>
+            <Wrench className="h-4 w-4" style={{ color: "var(--mt-violet)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.capaItems}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              {summary.capaItems}
+            </div>
+          </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Module readiness</CardTitle>
-          <CardDescription>Global module order and readiness coverage.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Module Order"
+        title="Module readiness"
+        icon={Layers3}
+        description="Global module order and readiness coverage."
+      >
+        <div className="space-y-2 text-sm">
           <div className="rounded-md border bg-muted/20 px-3 py-2">1. SpectraCheck</div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">2. Regulatory Hub</div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">3. Reaction Optimization</div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">4. Cross-module/system</div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Validation projects table</CardTitle>
-          <CardDescription>
-            All validation projects for this tenant — title, scope, validation type, status, owner, and QA reviewer.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Projects"
+        title="Validation projects"
+        icon={ClipboardList}
+        description="All validation projects for this tenant — title, scope, validation type, status, owner, and QA reviewer."
+      >
+        <div className="space-y-3">
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           {loading ? <p className="text-sm text-muted-foreground">Loading validation projects…</p> : null}
           {!loading ? (
@@ -327,17 +443,17 @@ export function ValidationCenterWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create validation project card</CardTitle>
-          <CardDescription>
-            Create a new validation project — specify title, scope, validation type, owner, and QA reviewer to open the project workspace.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Create"
+        title="Create validation project"
+        icon={Plus}
+        description="Create a new validation project — specify title, scope, validation type, owner, and QA reviewer to open the project workspace."
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="validation-center-title">title</Label>
@@ -398,8 +514,8 @@ export function ValidationCenterWorkspace() {
               Refresh projects
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

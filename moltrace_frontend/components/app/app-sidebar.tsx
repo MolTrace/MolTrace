@@ -98,15 +98,27 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
       <Link
         href={item.href}
         className={cn(
-          "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold tracking-tight transition-all duration-200",
+          "group/navlink relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold tracking-tight transition-all duration-200",
           isActive
             ? "bg-secondary text-foreground shadow-sm"
             : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground hover:shadow-sm",
           collapsed && "justify-center px-2",
           nested && !collapsed && "ml-2 border-l border-border pl-3"
         )}
+        style={
+          isActive
+            ? {
+                boxShadow: collapsed
+                  ? `inset 2px 0 0 0 var(--mt-teal)`
+                  : `inset 3px 0 0 0 var(--mt-teal)`,
+              }
+            : undefined
+        }
       >
-        <item.icon className="h-4 w-4 shrink-0" />
+        <item.icon
+          className="h-4 w-4 shrink-0"
+          style={isActive ? { color: "var(--mt-teal)" } : undefined}
+        />
         {!collapsed && <span>{item.name}</span>}
       </Link>
     )
@@ -161,6 +173,11 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 overflow-y-auto p-2">
+          {!collapsed ? (
+            <p className="px-3 pt-1 pb-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+              Workspace
+            </p>
+          ) : null}
           {navigation.map((item) => (
             <NavLink key={item.name} item={item} />
           ))}
@@ -168,6 +185,11 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
 
         {/* Team — above Admin */}
         <div className="border-t border-border/70 p-2">
+          {!collapsed ? (
+            <p className="px-3 pt-1 pb-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+              Team
+            </p>
+          ) : null}
           {teamNav.map((item) => (
             <NavLink key={item.name} item={item} />
           ))}
@@ -175,11 +197,21 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
 
         {/* Admin — collapsible, above Settings */}
         <div className="border-t border-border/70 p-2">
+          {!collapsed ? (
+            <p className="px-3 pt-1 pb-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+              Admin
+            </p>
+          ) : null}
           <NavLink item={{ name: "Admin", href: "/admin/system", icon: SlidersHorizontal }} />
         </div>
 
         {/* Bottom Navigation */}
         <div className="border-t border-border/70 p-2">
+          {!collapsed ? (
+            <p className="px-3 pt-1 pb-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+              Settings
+            </p>
+          ) : null}
           {bottomNav.map((item) => (
             <NavLink key={item.name} item={item} />
           ))}

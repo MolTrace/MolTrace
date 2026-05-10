@@ -10,7 +10,7 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -28,7 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { KNOWLEDGE_EXTRACTION_TYPES } from "@/components/knowledge/knowledge-constants"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { Activity, AlertTriangle, ArrowLeft, FileText, Loader2, PlayCircle } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -226,8 +226,14 @@ export function KnowledgeExtractionsWorkspace() {
         </Button>
       </div>
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Knowledge extractions</h1>
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-teal)" }}
+        >
+          MolTrace · Knowledge Extractions
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Knowledge extractions</h1>
         <p className="text-sm text-muted-foreground">
           Run typed extractions against uploaded files. Outputs require human review before reuse.
         </p>
@@ -241,14 +247,14 @@ export function KnowledgeExtractionsWorkspace() {
         </AlertDescription>
       </Alert>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Run extraction</CardTitle>
-          <CardDescription>
-            Trigger an extraction pipeline run on a source document to parse and classify knowledge claims for review queue intake.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Run"
+        title="Run extraction"
+        icon={PlayCircle}
+        description="Trigger an extraction pipeline run on a source document to parse and classify knowledge claims for review queue intake."
+      >
+        <div className="space-y-4">
           {runErr ? (
             <Alert variant="destructive">
               <AlertDescription className="text-sm">{runErr}</AlertDescription>
@@ -343,17 +349,17 @@ export function KnowledgeExtractionsWorkspace() {
             {runBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Run extraction
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Extraction runs</CardTitle>
-          <CardDescription>
-            History of extraction pipeline runs — status, extracted claim count, and completion timestamp for each source document processed.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="History"
+        title="Extraction runs"
+        icon={Activity}
+        description="History of extraction pipeline runs — status, extracted claim count, and completion timestamp for each source document processed."
+      >
+        <div className="table-scroll min-w-0">
           <div className="mb-3">
             <Button type="button" variant="outline" size="sm" disabled={runsLoading} onClick={() => void loadRuns()}>
               {runsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
@@ -419,18 +425,18 @@ export function KnowledgeExtractionsWorkspace() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {selectedRunId != null ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Extraction run detail</CardTitle>
-            <CardDescription>
-              Full detail for the selected extraction run — extracted claims, warnings, and processing metadata.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Detail"
+          title="Extraction run detail"
+          icon={FileText}
+          description="Full detail for the selected extraction run — extracted claims, warnings, and processing metadata."
+        >
+          <div className="space-y-4">
             {detailLoading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : detailErr ? (
@@ -467,8 +473,8 @@ export function KnowledgeExtractionsWorkspace() {
             ) : (
               <p className="text-sm text-muted-foreground">No detail.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       ) : null}
     </div>
   )

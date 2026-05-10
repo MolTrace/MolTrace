@@ -10,6 +10,7 @@ import {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
   window.localStorage.clear()
 })
 
@@ -17,6 +18,16 @@ describe("apiFetch", () => {
   it("builds proxy paths", () => {
     expect(buildApiPath("/openapi.json")).toBe("/api/backend/openapi.json")
     expect(buildApiPath("openapi.json")).toBe("/api/backend/openapi.json")
+  })
+
+  it("keeps browser requests on the Next proxy even if a backend URL is configured", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://moltrace-backend.onrender.com")
+    vi.resetModules()
+
+    const client = await import("@/lib/api/client")
+
+    expect(client.API_BASE).toBe("/api/backend")
+    expect(client.buildApiPath("/nmr/processed/preview")).toBe("/api/backend/nmr/processed/preview")
   })
 
   it("uses /api/backend as the frontend base path", async () => {
@@ -131,6 +142,12 @@ describe("apiFetch", () => {
     expect(sanitizePublicApiErrorMessage(leakyMessage, 500)).toBe(GENERIC_REQUEST_FAILURE_MESSAGE)
     expect(sanitizePublicApiErrorMessage("POST /private-endpoint failed.", 400)).toBe(
       GENERIC_REQUEST_FAILURE_MESSAGE
+    )
+  })
+
+  it("replaces raw network fetch failures with user-friendly copy", () => {
+    expect(sanitizePublicApiErrorMessage("Failed to fetch")).toBe(
+      "Backend connection failed. Please retry in a moment."
     )
   })
 })

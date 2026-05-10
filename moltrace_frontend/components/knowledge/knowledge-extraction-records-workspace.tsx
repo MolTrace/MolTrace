@@ -16,7 +16,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertTriangle, ArrowLeft, ClipboardCheck, Database, ListChecks, Loader2 } from "lucide-react"
 
 export type KnowledgeRecordKind = "reaction" | "analytical" | "regulatory"
 
@@ -343,7 +343,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{pageHeading(recordKind)}</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">{pageHeading(recordKind)}</h1>
         <p className="text-sm text-muted-foreground">
           Review machine-extracted fields before accepting them for downstream use. Extracted values are not validated as
           correct until review completes.
@@ -359,18 +359,20 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
         </AlertDescription>
       </Alert>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Load records by extraction run</CardTitle>
-          <CardDescription>
-            <code className="text-xs">
-              GET /knowledge/extractions/
-              {"{run_id}"}/
-              {recordKind === "reaction" ? "reactions" : recordKind === "analytical" ? "analytical" : "regulatory"}
-            </code>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-3">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Load"
+        title="Load records by extraction run"
+        icon={Database}
+        description={
+          <code className="text-xs">
+            GET /knowledge/extractions/
+            {"{run_id}"}/
+            {recordKind === "reaction" ? "reactions" : recordKind === "analytical" ? "analytical" : "regulatory"}
+          </code>
+        }
+      >
+        <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-2">
             <Label htmlFor="k-run-id">run_id</Label>
             <Input
@@ -386,8 +388,8 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Load
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {loadErr ? (
         <Alert variant="destructive">
@@ -395,11 +397,13 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Records</CardTitle>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Records"
+        title="Records"
+        icon={ListChecks}
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : rows.length === 0 ? (
@@ -509,16 +513,18 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {selected ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Record detail & review</CardTitle>
-            <CardDescription>Read-only extracted fields; approval requires reviewer identity and comment.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Detail"
+          title="Record detail & review"
+          icon={ClipboardCheck}
+          description="Read-only extracted fields; approval requires reviewer identity and comment."
+        >
+          <div className="space-y-4">
             {citationMissing ? (
               <Alert variant="destructive">
                 <AlertTitle className="text-sm">Citation missing</AlertTitle>
@@ -896,8 +902,8 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
             </div>
 
             <DeveloperJsonPanel data={selected} />
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       ) : null}
     </div>
   )

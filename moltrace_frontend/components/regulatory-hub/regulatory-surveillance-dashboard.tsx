@@ -270,9 +270,15 @@ export function RegulatorySurveillanceDashboard() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Regulatory Surveillance</h1>
-        <p className="mt-1 text-muted-foreground">
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          MolTrace · Regulatory Surveillance
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Surveillance</h1>
+        <p className="text-sm text-muted-foreground">
           Track regulatory source versions, detect changes, and assess impact on dossiers, rules, action items, and reports.
         </p>
       </div>

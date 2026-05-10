@@ -199,9 +199,15 @@ export function TenantAdminWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tenant Admin</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-slate)" }}
+          >
+            MolTrace · Admin · Tenants
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Tenant Admin</h1>
+          <p className="text-sm text-muted-foreground">
             Manage customer tenants, environments, entitlements, pilot programs, onboarding, validation profiles, and
             procurement evidence.
           </p>

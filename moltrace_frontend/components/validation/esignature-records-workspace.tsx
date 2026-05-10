@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -19,6 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { FileText, PenTool, Signature } from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -221,36 +222,40 @@ export function ESignatureRecordsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">e-Signatures</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · e-Signatures
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">e-Signatures</h1>
+          <p className="text-sm text-muted-foreground">
             Create and review e-signature records with server timestamps, target references, reasons, and signature hashes.
           </p>
         </div>
         <BackendStatusIndicator />
       </div>
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+      {error ? <AlertCard variant="error" title="Error" description={error} /> : null}
 
       {createdRecord ? (
-        <Alert>
-          <AlertDescription>
-            e-signature record created. Server timestamp: {formatDate(createdRecord.signed_at)}.
-          </AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="success"
+          title="Signature recorded"
+          description={`e-signature record created. Server timestamp: ${formatDate(createdRecord.signed_at)}.`}
+        />
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Create e-signature record</CardTitle>
-            <CardDescription>reason and signature meaning are required.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Sign"
+          title="Create e-signature record"
+          icon={PenTool}
+          description="Reason and signature meaning are required."
+        >
+          <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="signature-signer-name">signer name</Label>
@@ -314,15 +319,17 @@ export function ESignatureRecordsWorkspace() {
             <Button type="button" onClick={createSignatureRecord} disabled={createBusy}>
               {createBusy ? "Creating..." : "Create e-signature record"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Read-only record</CardTitle>
-            <CardDescription>Signature record is read-only after creation.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Detail"
+          title="Read-only record"
+          icon={FileText}
+          description="Signature record is read-only after creation."
+        >
+          <div className="space-y-3">
             {detailRecord ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -359,21 +366,23 @@ export function ESignatureRecordsWorkspace() {
                 {detailLoading ? "Loading e-signature record..." : "Select an e-signature record to view details."}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-base">e-Signature records</CardTitle>
-            <CardDescription>Electronic signature records for GxP-critical actions — approval events, reviewer sign-offs, and controlled-record authorizations.</CardDescription>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Records"
+        title="e-Signature records"
+        icon={Signature}
+        description="Electronic signature records for GxP-critical actions — approval events, reviewer sign-offs, and controlled-record authorizations."
+      >
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadRecords()} disabled={loading}>
+              Refresh
+            </Button>
           </div>
-          <Button type="button" variant="outline" onClick={() => void loadRecords()} disabled={loading}>
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -422,8 +431,8 @@ export function ESignatureRecordsWorkspace() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

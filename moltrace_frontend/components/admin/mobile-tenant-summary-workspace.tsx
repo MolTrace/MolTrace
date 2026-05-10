@@ -348,7 +348,7 @@ export function MobileTenantSummaryWorkspace() {
           Mobile review
         </Badge>
         <div className="min-w-0">
-          <h1 className="break-words text-2xl font-semibold tracking-tight">Tenant Summary</h1>
+          <h1 className="break-words font-mono text-2xl font-bold tracking-tight">Tenant Summary</h1>
           <p className="mt-1 break-words text-sm text-muted-foreground">
             Review tenant onboarding, customer success health, and procurement package status.
           </p>

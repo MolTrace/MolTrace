@@ -11,7 +11,8 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { ClipboardList, ListChecks, Play } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -207,7 +208,13 @@ export function AiPredictionsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Prediction Playground</h1>
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-teal)" }}
+        >
+          MolTrace · AI Predictions
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Prediction Playground</h1>
         <p className="text-sm text-muted-foreground">
           Submit controlled prediction requests and review prediction audit history.
         </p>
@@ -231,12 +238,14 @@ export function AiPredictionsWorkspace() {
         <Badge variant="outline">GET /ai/prediction-audit</Badge>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Run prediction</CardTitle>
-          <CardDescription>Use IDs and summaries only. Do not include raw scientific payloads.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Run"
+        title="Run prediction"
+        icon={Play}
+        description="Use IDs and summaries only. Do not include raw scientific payloads."
+      >
+        <div className="space-y-4">
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-emerald-700">{formOk}</p> : null}
 
@@ -330,17 +339,17 @@ export function AiPredictionsWorkspace() {
             {submitBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             Run prediction
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Predictions</CardTitle>
-          <CardDescription>
-            All inference results across services with their confidence and out-of-distribution flags.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
+      <ModuleCard
+        accent="teal"
+        eyebrow="History"
+        title="Predictions"
+        icon={ListChecks}
+        description="All inference results across services with their confidence and out-of-distribution flags."
+      >
+        <div className="overflow-x-auto">
           {loadErrPredictions ? <p className="mb-3 text-sm text-destructive">{loadErrPredictions}</p> : null}
           <Table>
             <TableHeader>
@@ -388,17 +397,17 @@ export function AiPredictionsWorkspace() {
               ) : null}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Prediction audit</CardTitle>
-          <CardDescription>
-            Append-only log of every prediction with reviewer feedback and override decisions for compliance.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Audit"
+        title="Prediction audit"
+        icon={ClipboardList}
+        description="Append-only log of every prediction with reviewer feedback and override decisions for compliance."
+      >
+        <div className="overflow-x-auto">
           {loadErrAudit ? <p className="mb-3 text-sm text-destructive">{loadErrAudit}</p> : null}
           <Table>
             <TableHeader>
@@ -436,8 +445,8 @@ export function AiPredictionsWorkspace() {
               ) : null}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

@@ -10,7 +10,8 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { GitCompare, ListChecks } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -142,7 +143,7 @@ export function AiShadowEvaluationsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Shadow Evaluations</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Shadow Evaluations</h1>
         <p className="text-sm text-muted-foreground">Run side-by-side candidate checks and review results before deployment decisions.</p>
       </div>
       <Alert className="border-amber-500/30 bg-amber-500/10">
@@ -156,12 +157,14 @@ export function AiShadowEvaluationsWorkspace() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Run shadow evaluation</CardTitle>
-          <CardDescription>Compare a candidate model against the production model on the same dataset, without serving traffic.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Run"
+        title="Run shadow evaluation"
+        icon={GitCompare}
+        description="Compare a candidate model against the production model on the same dataset, without serving traffic."
+      >
+        <div className="space-y-4">
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-emerald-700">{formOk}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
@@ -174,15 +177,17 @@ export function AiShadowEvaluationsWorkspace() {
             {submitBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             Run
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Shadow runs</CardTitle>
-          <CardDescription>All offline candidate-vs-production comparisons with their status and timing.</CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Runs"
+        title="Shadow runs"
+        icon={ListChecks}
+        description="All offline candidate-vs-production comparisons with their status and timing."
+      >
+        <div className="overflow-x-auto">
           {loadErr ? <p className="mb-3 text-sm text-destructive">{loadErr}</p> : null}
           <Table>
             <TableHeader><TableRow><TableHead>shadow run</TableHead><TableHead>service key</TableHead><TableHead>status</TableHead><TableHead>created</TableHead><TableHead>detail</TableHead></TableRow></TableHeader>
@@ -210,8 +215,8 @@ export function AiShadowEvaluationsWorkspace() {
               <p><span className="font-medium">summary:</span> {readRecordString(selected, "summary") ?? "-"}</p>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

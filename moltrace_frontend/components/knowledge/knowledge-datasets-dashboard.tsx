@@ -538,7 +538,7 @@ export function KnowledgeDatasetsDashboard() {
         </div>
 
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dataset candidate dashboard</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Dataset candidate dashboard</h1>
           <p className="text-sm text-muted-foreground">
             Governance-focused listing: identifiers and review metadata only. Do not treat aggregates as validation of
             underlying chemistry or confidential content.

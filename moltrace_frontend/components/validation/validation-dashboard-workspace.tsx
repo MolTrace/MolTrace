@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ApiError, apiFetch } from "@/lib/api/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,7 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import {
   Activity,
@@ -400,17 +401,17 @@ export function ValidationDashboardWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Validation Dashboard</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Validation
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Validation Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
             Validation runs, benchmarks, model health, drift, and method comparisons from the backend.
           </p>
-          {!loading && showGlobalUnavailable ? (
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
-              <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Validation services unavailable — try again in a moment, or contact your platform administrator.
-            </p>
-          ) : null}
           {!loading && errRuns && !showGlobalUnavailable ? (
             <p className="mt-1 text-xs text-muted-foreground">
               Validation runs list unavailable — refresh or verify the backend.
@@ -420,6 +421,15 @@ export function ValidationDashboardWorkspace() {
         <BackendStatusIndicator />
       </div>
 
+      {!loading && showGlobalUnavailable ? (
+        <AlertCard
+          variant="error"
+          icon={ServerOff}
+          title="Validation services unavailable"
+          description="Try again in a moment, or contact your platform administrator."
+        />
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void reload()}>
           {loading ? "Loading…" : "Refresh"}
@@ -427,29 +437,34 @@ export function ValidationDashboardWorkspace() {
       </div>
 
       {hasPartialErrors ? (
-        <Alert variant="destructive">
-          <AlertTitle>Partial load</AlertTitle>
-          <AlertDescription className="space-y-1 text-xs">
+        <AlertCard variant="error" title="Partial load">
+          <div className="space-y-1 text-xs text-foreground/90">
             {errRuns ? <p>Validation runs: {errRuns}</p> : null}
             {errBenchmarks ? <p>Benchmark datasets: {errBenchmarks}</p> : null}
             {errHealth ? <p>Model health: {errHealth}</p> : null}
             {errDrift ? <p>Drift alerts: {errDrift}</p> : null}
             {errComparisons ? <p>Method comparisons: {errComparisons}</p> : null}
-          </AlertDescription>
-        </Alert>
+          </div>
+        </AlertCard>
       ) : null}
 
       {/* 1. Validation run summary cards */}
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Validation run summary cards</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Validation runs</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-cyan)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Validation runs</CardTitle>
+              <Activity className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-cyan)" }}
+              >
                 {statMainText(errRuns ? null : runStats.total, Boolean(errRuns))}
               </div>
               {statSubline({
@@ -461,13 +476,19 @@ export function ValidationDashboardWorkspace() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Passed</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-green)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Passed</CardTitle>
+              <CheckCircle2 className="h-4 w-4" style={{ color: "var(--mt-green)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-green)" }}
+              >
                 {statMainText(errRuns ? null : runStats.passed, Boolean(errRuns))}
               </div>
               {statSubline({
@@ -479,13 +500,19 @@ export function ValidationDashboardWorkspace() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Failed / requires review</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-red)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Failed / requires review</CardTitle>
+              <AlertTriangle className="h-4 w-4" style={{ color: "var(--mt-red)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-red)" }}
+              >
                 {statMainText(errRuns ? null : runStats.failedReview, Boolean(errRuns))}
               </div>
               {statSubline({
@@ -497,13 +524,19 @@ export function ValidationDashboardWorkspace() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Open drift alerts</CardTitle>
-              <Layers className="h-4 w-4 text-muted-foreground" />
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-amber)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Open drift alerts</CardTitle>
+              <Layers className="h-4 w-4" style={{ color: "var(--mt-amber)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-amber)" }}
+              >
                 {statMainText(openDriftCount, Boolean(errDrift))}
               </div>
               {statSubline({
@@ -515,13 +548,19 @@ export function ValidationDashboardWorkspace() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Active methods</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-cyan)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Active methods</CardTitle>
+              <BarChart3 className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-cyan)" }}
+              >
                 {statMainText(errHealth ? null : healthCounts.active, Boolean(errHealth))}
               </div>
               {statSubline({
@@ -538,13 +577,19 @@ export function ValidationDashboardWorkspace() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Experimental methods</CardTitle>
-              <FlaskConical className="h-4 w-4 text-muted-foreground" />
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-violet)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Experimental methods</CardTitle>
+              <FlaskConical className="h-4 w-4" style={{ color: "var(--mt-violet)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-violet)" }}
+              >
                 {statMainText(errHealth ? null : healthCounts.experimental, Boolean(errHealth))}
               </div>
               {statSubline({
@@ -559,12 +604,14 @@ export function ValidationDashboardWorkspace() {
       </div>
 
       {/* 2. Recent validation runs table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent validation runs table</CardTitle>
-          <CardDescription>Latest validation runs reported by the backend.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Runs"
+        title="Recent validation runs"
+        icon={Activity}
+        description="Latest validation runs reported by the backend."
+      >
+        <div>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errRuns ? (
@@ -640,16 +687,18 @@ export function ValidationDashboardWorkspace() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 3. Benchmark datasets table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Benchmark datasets table</CardTitle>
-          <CardDescription>Benchmark datasets exposed by the API.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Benchmarks"
+        title="Benchmark datasets"
+        icon={BarChart3}
+        description="Benchmark datasets exposed by the API."
+      >
+        <div>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errBenchmarks ? (
@@ -699,16 +748,18 @@ export function ValidationDashboardWorkspace() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 4. Drift alerts panel */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Drift alerts panel</CardTitle>
-          <CardDescription>Model health drift signals.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="amber"
+        eyebrow="Drift"
+        title="Drift alerts"
+        icon={AlertTriangle}
+        description="Model health drift signals — outstanding alerts where current values diverge from approved baselines."
+      >
+        <div>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errDrift ? (
@@ -816,16 +867,18 @@ export function ValidationDashboardWorkspace() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 5. Method comparison summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Method comparison summary</CardTitle>
-          <CardDescription>Analytical method comparison records — matched method pairs and their performance deltas across reference and candidate procedures.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Method Comparison"
+        title="Method comparison summary"
+        icon={FlaskConical}
+        description="Analytical method comparison records — matched method pairs and their performance deltas across reference and candidate procedures."
+      >
+        <div>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errComparisons ? (
@@ -867,8 +920,8 @@ export function ValidationDashboardWorkspace() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
     </div>
   )

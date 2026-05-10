@@ -188,12 +188,14 @@
   --mt-amber: #E8A030;
   --mt-red: #E84040;
   --mt-green: #22C55E;
+  --mt-slate: #64748B;
   --mt-teal-soft: rgba(0, 223, 160, 0.10);
   --mt-cyan-soft: rgba(0, 184, 217, 0.10);
   --mt-violet-soft: rgba(107, 63, 224, 0.10);
   --mt-amber-soft: rgba(232, 160, 48, 0.10);
   --mt-red-soft: rgba(232, 64, 64, 0.10);
   --mt-green-soft: rgba(34, 197, 94, 0.10);
+  --mt-slate-soft: rgba(100, 116, 139, 0.10);
 }
 
 /* Scientific grid background */

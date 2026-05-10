@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, API_BASE, apiFetch } from "@/lib/api/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { Activity, AlertTriangle, FileCog, ListChecks, Settings2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { ServerOff } from "lucide-react"
@@ -156,20 +158,20 @@ export function DeploymentSettingsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-slate)" }}
+          >
+            MolTrace · Settings · Deployment
+          </p>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Deployment Settings</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Deployment Settings</h1>
             <InfoTooltip content={DEPLOYMENT_SETTINGS_TOOLTIP} label="About Deployment Settings" />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Environment and dependency snapshot from the backend (admin-capable routes).
           </p>
-          {!loading && allFailed ? (
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
-              <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Backend unavailable — try again in a moment, or contact your platform administrator.
-            </p>
-          ) : null}
         </div>
         <BackendStatusIndicator />
       </div>
@@ -180,30 +182,32 @@ export function DeploymentSettingsWorkspace() {
         </Button>
       </div>
 
-      {allFailed ? (
-        <Alert variant="destructive">
-          <AlertTitle>Backend unavailable</AlertTitle>
-          <AlertDescription className="text-xs">
-            Deployment data is not reachable. Verify you&apos;re signed in as an administrator and try again.
-          </AlertDescription>
-        </Alert>
+      {!loading && allFailed ? (
+        <AlertCard
+          variant="error"
+          icon={ServerOff}
+          title="Backend unavailable"
+          description="Deployment data is not reachable. Verify you're signed in as an administrator and try again."
+        />
       ) : null}
 
       {!allFailed && hasPartialErr ? (
-        <Alert variant="destructive">
-          <AlertTitle>Partial load</AlertTitle>
-          <AlertDescription className="space-y-1 text-xs">
+        <AlertCard variant="error" title="Partial load">
+          <div className="space-y-1 text-xs text-foreground/90">
             {errEnv ? <p>Environment check: {errEnv}</p> : null}
             {errVersion ? <p>Version info: {errVersion}</p> : null}
             {errDeps ? <p>Dependency status: {errDeps}</p> : null}
-          </AlertDescription>
-        </Alert>
+          </div>
+        </AlertCard>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">environment</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">environment</CardTitle>
             <CardDescription>Active deployment environment label.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
@@ -217,9 +221,12 @@ export function DeploymentSettingsWorkspace() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">frontend URL</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">frontend URL</CardTitle>
             <CardDescription>Browser origin</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
@@ -227,9 +234,12 @@ export function DeploymentSettingsWorkspace() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">backend status</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">backend status</CardTitle>
             <CardDescription>openapi.json reachability</CardDescription>
           </CardHeader>
           <CardContent>
@@ -237,17 +247,23 @@ export function DeploymentSettingsWorkspace() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">API base URL</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">API base URL</CardTitle>
             <CardDescription>Next.js API proxy base</CardDescription>
           </CardHeader>
           <CardContent className="break-all font-mono text-xs">{API_BASE}</CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">OpenAPI availability</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">OpenAPI availability</CardTitle>
             <CardDescription>dependency name openapi</CardDescription>
           </CardHeader>
           <CardContent>
@@ -271,9 +287,12 @@ export function DeploymentSettingsWorkspace() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">backend version</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">backend version</CardTitle>
             <CardDescription>Backend service build identifier.</CardDescription>
           </CardHeader>
           <CardContent className="font-mono text-xs">
@@ -281,9 +300,12 @@ export function DeploymentSettingsWorkspace() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">frontend build</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">frontend build</CardTitle>
             <CardDescription>NEXT_PUBLIC_APP_BUILD or NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA</CardDescription>
           </CardHeader>
           <CardContent className="font-mono text-xs">
@@ -291,9 +313,12 @@ export function DeploymentSettingsWorkspace() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">database status</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">database status</CardTitle>
             <CardDescription>dependency name database</CardDescription>
           </CardHeader>
           <CardContent>
@@ -312,9 +337,12 @@ export function DeploymentSettingsWorkspace() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">storage backend</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">storage backend</CardTitle>
             <CardDescription>dependency name storage</CardDescription>
           </CardHeader>
           <CardContent>
@@ -333,9 +361,12 @@ export function DeploymentSettingsWorkspace() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">job backend</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">job backend</CardTitle>
             <CardDescription>dependency name job_queue</CardDescription>
           </CardHeader>
           <CardContent>
@@ -351,9 +382,12 @@ export function DeploymentSettingsWorkspace() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">worker status</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="gap-1 pt-5 pb-2">
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">worker status</CardTitle>
             <CardDescription>dependency name worker</CardDescription>
           </CardHeader>
           <CardContent>
@@ -373,14 +407,14 @@ export function DeploymentSettingsWorkspace() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">required variables</CardTitle>
-          <CardDescription>
-            required_variables_present · missing_variables — secret values are never returned by the API.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Variables"
+        title="Required variables"
+        icon={ListChecks}
+        description="required_variables_present · missing_variables — secret values are never returned by the API."
+      >
+        <div className="space-y-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-muted-foreground">required_variables_present</span>
             {loading ? (
@@ -405,15 +439,17 @@ export function DeploymentSettingsWorkspace() {
               </ul>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">unsafe config warnings</CardTitle>
-          <CardDescription>unsafe_variables — configuration keys flagged as unsafe for production.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent={unsafeVars.length > 0 ? "amber" : "slate"}
+        eyebrow="Warnings"
+        title="Unsafe config warnings"
+        icon={AlertTriangle}
+        description="unsafe_variables — configuration keys flagged as unsafe for production."
+      >
+        <div>
           {unsafeVars.length === 0 ? (
             <p className="text-sm text-muted-foreground">None listed.</p>
           ) : (
@@ -423,35 +459,34 @@ export function DeploymentSettingsWorkspace() {
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {envCheck && Array.isArray(envCheck.warnings) && envCheck.warnings.length > 0 ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">warnings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-inside list-disc text-xs">
-              {(envCheck.warnings as unknown[])
-                .filter((x): x is string => typeof x === "string")
-                .map((w, i) => (
-                  <li key={`${i}-${w.slice(0, 20)}`}>{w}</li>
-                ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <ModuleCard
+          accent="amber"
+          eyebrow="Warnings"
+          title="Warnings"
+          icon={AlertTriangle}
+        >
+          <ul className="list-inside list-disc text-xs">
+            {(envCheck.warnings as unknown[])
+              .filter((x): x is string => typeof x === "string")
+              .map((w, i) => (
+                <li key={`${i}-${w.slice(0, 20)}`}>{w}</li>
+              ))}
+          </ul>
+        </ModuleCard>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">public_variables</CardTitle>
-          <CardDescription>
-            Non-secret fields returned under public_variables. Values may be truncated; SECRET_LIKE_VARIABLES_PRESENT lists
-            names only.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="slate"
+        eyebrow="Public Vars"
+        title="public_variables"
+        icon={Settings2}
+        description="Non-secret fields returned under public_variables. Values may be truncated; SECRET_LIKE_VARIABLES_PRESENT lists names only."
+      >
+        <div>
           {!publicVars ? (
             <p className="text-sm text-muted-foreground">—</p>
           ) : (
@@ -474,15 +509,17 @@ export function DeploymentSettingsWorkspace() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Dependency checks</CardTitle>
-          <CardDescription>Health of every external service the platform connects to.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="slate"
+        eyebrow="Dependencies"
+        title="Dependency checks"
+        icon={Activity}
+        description="Health of every external service the platform connects to."
+      >
+        <div>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : deps.length === 0 ? (
@@ -516,15 +553,17 @@ export function DeploymentSettingsWorkspace() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Version payload</CardTitle>
-          <CardDescription>Full version metadata: API, build hash, branch, build time.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 font-mono text-xs">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Version"
+        title="Version payload"
+        icon={FileCog}
+        description="Full version metadata: API, build hash, branch, build time."
+      >
+        <div className="space-y-2 font-mono text-xs">
           <p>
             <span className="text-muted-foreground">api_version </span>
             {version ? readStr(version, ["api_version"]) || "—" : "—"}
@@ -537,8 +576,8 @@ export function DeploymentSettingsWorkspace() {
             <span className="text-muted-foreground">timestamp </span>
             {version ? readStr(version, ["timestamp"]) || "—" : "—"}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

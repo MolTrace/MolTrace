@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { trackConnectorCreated, trackConnectorHealthCheckRun } from "@/src/lib/analytics/analytics-client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -15,6 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { Activity, AlertTriangle, HeartPulse, Plug, Plus, RefreshCw, XCircle } from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -219,48 +222,98 @@ export function ConnectorsCenterWorkspace() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Connector Center</h1>
-        <p className="text-muted-foreground">
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-slate)" }}
+        >
+          MolTrace · Settings · Connector Center
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Connector Center</h1>
+        <p className="text-sm text-muted-foreground">
           Connect instruments, storage, ELN, LIMS, SDMS, regulatory document systems, and webhooks to MolTrace.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">active connectors</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Active connectors</CardTitle>
+            <Plug className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.activeConnectors}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-slate)" }}
+            >
+              {summary.activeConnectors}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">connectors with warnings</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-amber)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Connectors with warnings</CardTitle>
+            <AlertTriangle className="h-4 w-4" style={{ color: "var(--mt-amber)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.connectorsWithWarnings}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-amber)" }}
+            >
+              {summary.connectorsWithWarnings}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">recent ingestion runs</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Recent ingestion runs</CardTitle>
+            <Activity className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.recentIngestionRuns}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-slate)" }}
+            >
+              {summary.recentIngestionRuns}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">failed sync jobs</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-red)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Failed sync jobs</CardTitle>
+            <XCircle className="h-4 w-4" style={{ color: "var(--mt-red)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.failedSyncJobs}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-red)" }}
+            >
+              {summary.failedSyncJobs}
+            </div>
+          </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Connector table</CardTitle>
-          <CardDescription>
-            All configured external integrations with their type, status, and last health check.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Connectors"
+        title="Connector table"
+        icon={Plug}
+        description="All configured external integrations with their type, status, and last health check."
+      >
+        <div className="space-y-3">
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           {loading ? <p className="text-sm text-muted-foreground">Loading connectors…</p> : null}
           {!loading ? (
@@ -310,17 +363,17 @@ export function ConnectorsCenterWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create connector card</CardTitle>
-          <CardDescription>
-            Register a new connector to LIMS, ELN, vendor instruments, or other external systems.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Create"
+        title="Create connector"
+        icon={Plus}
+        description="Register a new connector to LIMS, ELN, vendor instruments, or other external systems."
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="connector-key">connector key</Label>
@@ -379,26 +432,29 @@ export function ConnectorsCenterWorkspace() {
           <Button type="button" disabled={createBusy} onClick={() => void createConnector()}>
             {createBusy ? "Creating…" : "Create connector"}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Health check panel</CardTitle>
-          <CardDescription>
-            Trigger an on-demand connectivity test and review the most recent health check results for the selected connector.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-            Connector credentials are stored as secret references only. Secrets are never displayed.
-          </p>
+      <ModuleCard
+        accent="slate"
+        eyebrow="Health"
+        title="Health check panel"
+        icon={HeartPulse}
+        description="Trigger an on-demand connectivity test and review the most recent health check results for the selected connector."
+      >
+        <div className="space-y-3">
+          <AlertCard
+            variant="warning"
+            title="Credentials are secret-references only"
+            description="Connector credentials are stored as secret references only. Secrets are never displayed."
+          />
           {healthError ? <p className="text-xs text-destructive">{healthError}</p> : null}
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled={!selectedConnectorId || healthLoading} onClick={() => void runHealthCheck()}>
               {healthLoading ? "Running…" : "Run health check"}
             </Button>
             <Button type="button" variant="outline" disabled={!selectedConnectorId || healthLoading} onClick={() => void loadHealthChecks(selectedConnectorId)}>
+              <RefreshCw className="mr-1 h-3.5 w-3.5" aria-hidden />
               Refresh checks
             </Button>
           </div>
@@ -434,8 +490,8 @@ export function ConnectorsCenterWorkspace() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

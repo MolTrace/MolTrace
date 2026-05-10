@@ -10,8 +10,18 @@ export function MlAiInterfaceWorkspace() {
     <div className="space-y-6">
       <Tabs defaultValue="ai_services" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="ai_services">AI Services</TabsTrigger>
-          <TabsTrigger value="knowledge_library">Knowledge Library</TabsTrigger>
+          <TabsTrigger
+            value="ai_services"
+            className="font-mono data-[state=active]:[background-color:var(--mt-teal)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+          >
+            AI Services
+          </TabsTrigger>
+          <TabsTrigger
+            value="knowledge_library"
+            className="font-mono data-[state=active]:[background-color:var(--mt-teal)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+          >
+            Knowledge Library
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="ai_services">
           <AiServicesDashboard />
