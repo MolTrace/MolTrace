@@ -1,0 +1,581 @@
+{
+  "capturedAt": "2026-05-10T10:28:10.813Z",
+  "baseUrl": "http://localhost:3000",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "totalRoutes": 71,
+  "okCount": 71,
+  "errorCount": 0,
+  "results": [
+    {
+      "name": "00-root",
+      "path": "/",
+      "accent": "mixed",
+      "status": "ok",
+      "durationMs": 20233,
+      "screenshotPath": "screenshots/00-root.png"
+    },
+    {
+      "name": "01-sign-in",
+      "path": "/sign-in",
+      "accent": "mixed",
+      "status": "ok",
+      "durationMs": 5378,
+      "screenshotPath": "screenshots/01-sign-in.png"
+    },
+    {
+      "name": "02-sign-up",
+      "path": "/sign-up",
+      "accent": "mixed",
+      "status": "ok",
+      "durationMs": 3239,
+      "screenshotPath": "screenshots/02-sign-up.png"
+    },
+    {
+      "name": "10-dashboard",
+      "path": "/dashboard",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 1287,
+      "screenshotPath": "screenshots/10-dashboard.png"
+    },
+    {
+      "name": "11-projects",
+      "path": "/projects",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 17306,
+      "screenshotPath": "screenshots/11-projects.png"
+    },
+    {
+      "name": "12-actions",
+      "path": "/actions",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 2881,
+      "screenshotPath": "screenshots/12-actions.png"
+    },
+    {
+      "name": "13-reports",
+      "path": "/reports",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 2450,
+      "screenshotPath": "screenshots/13-reports.png"
+    },
+    {
+      "name": "14-review-queue",
+      "path": "/review",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 2237,
+      "screenshotPath": "screenshots/14-review-queue.png"
+    },
+    {
+      "name": "15-platform",
+      "path": "/platform",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 29749,
+      "screenshotPath": "screenshots/15-platform.png"
+    },
+    {
+      "name": "20-spectracheck",
+      "path": "/spectracheck",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 17666,
+      "screenshotPath": "screenshots/20-spectracheck.png"
+    },
+    {
+      "name": "21-spectroscopy",
+      "path": "/spectroscopy",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 10905,
+      "screenshotPath": "screenshots/21-spectroscopy.png"
+    },
+    {
+      "name": "30-compounds",
+      "path": "/compounds",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 28203,
+      "screenshotPath": "screenshots/30-compounds.png"
+    },
+    {
+      "name": "31-batches",
+      "path": "/batches",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 14240,
+      "screenshotPath": "screenshots/31-batches.png"
+    },
+    {
+      "name": "40-reactions",
+      "path": "/reactions",
+      "accent": "violet",
+      "status": "ok",
+      "durationMs": 2788,
+      "screenshotPath": "screenshots/40-reactions.png"
+    },
+    {
+      "name": "41-reactions-studio",
+      "path": "/reactions/studio",
+      "accent": "violet",
+      "status": "ok",
+      "durationMs": 2472,
+      "screenshotPath": "screenshots/41-reactions-studio.png"
+    },
+    {
+      "name": "50-regulatory",
+      "path": "/regulatory",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2254,
+      "screenshotPath": "screenshots/50-regulatory.png"
+    },
+    {
+      "name": "51-regulatory-action-queue",
+      "path": "/regulatory/action-queue",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2313,
+      "screenshotPath": "screenshots/51-regulatory-action-queue.png"
+    },
+    {
+      "name": "52-regulatory-notifications",
+      "path": "/regulatory/notifications",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2211,
+      "screenshotPath": "screenshots/52-regulatory-notifications.png"
+    },
+    {
+      "name": "53-regulatory-rule-updates",
+      "path": "/regulatory/rule-updates",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2373,
+      "screenshotPath": "screenshots/53-regulatory-rule-updates.png"
+    },
+    {
+      "name": "54-regulatory-sources",
+      "path": "/regulatory/sources",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2929,
+      "screenshotPath": "screenshots/54-regulatory-sources.png"
+    },
+    {
+      "name": "55-regulatory-surveillance",
+      "path": "/regulatory/surveillance",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 3578,
+      "screenshotPath": "screenshots/55-regulatory-surveillance.png"
+    },
+    {
+      "name": "60-validation",
+      "path": "/validation",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2828,
+      "screenshotPath": "screenshots/60-validation.png"
+    },
+    {
+      "name": "61-validation-center",
+      "path": "/validation-center",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2794,
+      "screenshotPath": "screenshots/61-validation-center.png"
+    },
+    {
+      "name": "62-validation-center-projects",
+      "path": "/validation-center/projects",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2497,
+      "screenshotPath": "screenshots/62-validation-center-projects.png"
+    },
+    {
+      "name": "63-validation-center-releases",
+      "path": "/validation-center/releases",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2835,
+      "screenshotPath": "screenshots/63-validation-center-releases.png"
+    },
+    {
+      "name": "64-validation-center-traceability",
+      "path": "/validation-center/traceability",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 2660,
+      "screenshotPath": "screenshots/64-validation-center-traceability.png"
+    },
+    {
+      "name": "65-validation-center-data-integrity",
+      "path": "/validation-center/data-integrity",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 3000,
+      "screenshotPath": "screenshots/65-validation-center-data-integrity.png"
+    },
+    {
+      "name": "66-validation-center-deviations",
+      "path": "/validation-center/deviations",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 3328,
+      "screenshotPath": "screenshots/66-validation-center-deviations.png"
+    },
+    {
+      "name": "67-validation-center-capa",
+      "path": "/validation-center/capa",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 5280,
+      "screenshotPath": "screenshots/67-validation-center-capa.png"
+    },
+    {
+      "name": "68-validation-center-esignatures",
+      "path": "/validation-center/esignatures",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 3950,
+      "screenshotPath": "screenshots/68-validation-center-esignatures.png"
+    },
+    {
+      "name": "69-validation-center-controlled-records",
+      "path": "/validation-center/controlled-records",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 3288,
+      "screenshotPath": "screenshots/69-validation-center-controlled-records.png"
+    },
+    {
+      "name": "6a-validation-center-inspection-package",
+      "path": "/validation-center/inspection-package",
+      "accent": "cyan",
+      "status": "ok",
+      "durationMs": 3314,
+      "screenshotPath": "screenshots/6a-validation-center-inspection-package.png"
+    },
+    {
+      "name": "70-ml",
+      "path": "/ml",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 4253,
+      "screenshotPath": "screenshots/70-ml.png"
+    },
+    {
+      "name": "71-ml-calibration",
+      "path": "/ml/calibration",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 6407,
+      "screenshotPath": "screenshots/71-ml-calibration.png"
+    },
+    {
+      "name": "72-ml-deployment-candidates",
+      "path": "/ml/deployment-candidates",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 31730,
+      "screenshotPath": "screenshots/72-ml-deployment-candidates.png"
+    },
+    {
+      "name": "73-ml-error-analysis",
+      "path": "/ml/error-analysis",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 8577,
+      "screenshotPath": "screenshots/73-ml-error-analysis.png"
+    },
+    {
+      "name": "74-ml-evaluations",
+      "path": "/ml/evaluations",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 57199,
+      "screenshotPath": "screenshots/74-ml-evaluations.png"
+    },
+    {
+      "name": "75-ml-models",
+      "path": "/ml/models",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 6902,
+      "screenshotPath": "screenshots/75-ml-models.png"
+    },
+    {
+      "name": "76-ml-ood",
+      "path": "/ml/ood",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 4013,
+      "screenshotPath": "screenshots/76-ml-ood.png"
+    },
+    {
+      "name": "77-ml-training",
+      "path": "/ml/training",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 3091,
+      "screenshotPath": "screenshots/77-ml-training.png"
+    },
+    {
+      "name": "80-ai",
+      "path": "/ai",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 2706,
+      "screenshotPath": "screenshots/80-ai.png"
+    },
+    {
+      "name": "81-ai-active-learning",
+      "path": "/ai/active-learning",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 2633,
+      "screenshotPath": "screenshots/81-ai-active-learning.png"
+    },
+    {
+      "name": "82-ai-canary",
+      "path": "/ai/canary",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 2614,
+      "screenshotPath": "screenshots/82-ai-canary.png"
+    },
+    {
+      "name": "83-ai-monitoring",
+      "path": "/ai/monitoring",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 2969,
+      "screenshotPath": "screenshots/83-ai-monitoring.png"
+    },
+    {
+      "name": "84-ai-predictions",
+      "path": "/ai/predictions",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 22097,
+      "screenshotPath": "screenshots/84-ai-predictions.png"
+    },
+    {
+      "name": "85-ai-services",
+      "path": "/ai/services",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 42412,
+      "screenshotPath": "screenshots/85-ai-services.png"
+    },
+    {
+      "name": "86-ai-shadow-evaluations",
+      "path": "/ai/shadow-evaluations",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 4145,
+      "screenshotPath": "screenshots/86-ai-shadow-evaluations.png"
+    },
+    {
+      "name": "90-knowledge",
+      "path": "/knowledge",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 3864,
+      "screenshotPath": "screenshots/90-knowledge.png"
+    },
+    {
+      "name": "91-knowledge-analytical",
+      "path": "/knowledge/analytical",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 5654,
+      "screenshotPath": "screenshots/91-knowledge-analytical.png"
+    },
+    {
+      "name": "92-knowledge-datasets",
+      "path": "/knowledge/datasets",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 25610,
+      "screenshotPath": "screenshots/92-knowledge-datasets.png"
+    },
+    {
+      "name": "93-knowledge-extractions",
+      "path": "/knowledge/extractions",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 66562,
+      "screenshotPath": "screenshots/93-knowledge-extractions.png"
+    },
+    {
+      "name": "94-knowledge-model-improvement",
+      "path": "/knowledge/model-improvement",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 19166,
+      "screenshotPath": "screenshots/94-knowledge-model-improvement.png"
+    },
+    {
+      "name": "95-knowledge-reactions",
+      "path": "/knowledge/reactions",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 12616,
+      "screenshotPath": "screenshots/95-knowledge-reactions.png"
+    },
+    {
+      "name": "96-knowledge-regulatory",
+      "path": "/knowledge/regulatory",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 3888,
+      "screenshotPath": "screenshots/96-knowledge-regulatory.png"
+    },
+    {
+      "name": "97-knowledge-review",
+      "path": "/knowledge/review",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 4984,
+      "screenshotPath": "screenshots/97-knowledge-review.png"
+    },
+    {
+      "name": "98-knowledge-sources",
+      "path": "/knowledge/sources",
+      "accent": "teal",
+      "status": "ok",
+      "durationMs": 14936,
+      "screenshotPath": "screenshots/98-knowledge-sources.png"
+    },
+    {
+      "name": "a0-roi",
+      "path": "/roi",
+      "accent": "violet",
+      "status": "ok",
+      "durationMs": 35848,
+      "screenshotPath": "screenshots/a0-roi.png"
+    },
+    {
+      "name": "b0-settings-methods",
+      "path": "/settings/methods",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 17208,
+      "screenshotPath": "screenshots/b0-settings-methods.png"
+    },
+    {
+      "name": "b1-settings-connectors",
+      "path": "/settings/connectors",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 78134,
+      "screenshotPath": "screenshots/b1-settings-connectors.png"
+    },
+    {
+      "name": "b2-settings-instrument-watch",
+      "path": "/settings/instrument-watch",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 54851,
+      "screenshotPath": "screenshots/b2-settings-instrument-watch.png"
+    },
+    {
+      "name": "b3-settings-mapping-templates",
+      "path": "/settings/mapping-templates",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 45687,
+      "screenshotPath": "screenshots/b3-settings-mapping-templates.png"
+    },
+    {
+      "name": "b4-settings-team",
+      "path": "/settings/team",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 43176,
+      "screenshotPath": "screenshots/b4-settings-team.png"
+    },
+    {
+      "name": "b5-settings-deployment",
+      "path": "/settings/deployment",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 30894,
+      "screenshotPath": "screenshots/b5-settings-deployment.png"
+    },
+    {
+      "name": "c0-admin-system",
+      "path": "/admin/system",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 23160,
+      "screenshotPath": "screenshots/c0-admin-system.png"
+    },
+    {
+      "name": "c1-admin-security",
+      "path": "/admin/security",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 9698,
+      "screenshotPath": "screenshots/c1-admin-security.png"
+    },
+    {
+      "name": "c2-admin-audit",
+      "path": "/admin/audit",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 4764,
+      "screenshotPath": "screenshots/c2-admin-audit.png"
+    },
+    {
+      "name": "c3-admin-debug",
+      "path": "/admin/debug",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 6003,
+      "screenshotPath": "screenshots/c3-admin-debug.png"
+    },
+    {
+      "name": "c4-admin-feature-flags",
+      "path": "/admin/feature-flags",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 4343,
+      "screenshotPath": "screenshots/c4-admin-feature-flags.png"
+    },
+    {
+      "name": "c5-admin-ingestion",
+      "path": "/admin/ingestion",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 4062,
+      "screenshotPath": "screenshots/c5-admin-ingestion.png"
+    },
+    {
+      "name": "c6-admin-tenants",
+      "path": "/admin/tenants",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 6470,
+      "screenshotPath": "screenshots/c6-admin-tenants.png"
+    },
+    {
+      "name": "c7-admin-tenant-summary",
+      "path": "/admin/tenant-summary",
+      "accent": "slate",
+      "status": "ok",
+      "durationMs": 94078,
+      "screenshotPath": "screenshots/c7-admin-tenant-summary.png"
+    }
+  ]
+}

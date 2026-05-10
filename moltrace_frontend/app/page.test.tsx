@@ -8,12 +8,12 @@ vi.mock("next/navigation", () => ({
 }))
 
 describe("home page", () => {
-  it("renders the v0 MolTrace landing page", () => {
+  it("renders the MolTrace marketing landing page", () => {
     render(<HomePage />)
     expect(
       screen.getByRole("heading", {
-        name: "AI-native spectroscopy, regulatory intelligence and reaction optimization.",
-      })
+        name: /Unified Intelligence Platform for Chemical and Pharmaceutical R&D/i,
+      }),
     ).toBeInTheDocument()
     expect(screen.getAllByText("Request Demo")[0]).toBeInTheDocument()
   })

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,11 +15,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
-import { ChevronDown, ServerOff } from "lucide-react"
+import {
+  AlertTriangle,
+  ChevronDown,
+  Filter,
+  Layers,
+  ListChecks,
+  Shield,
+  ShieldAlert,
+  ServerOff,
+} from "lucide-react"
 
 const SECURITY_EVENTS_TOOLTIP =
   "Security events record authentication, permission, sharing, admin, and suspicious activity signals."
@@ -220,12 +230,18 @@ export function SecurityEventsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-slate)" }}
+          >
+            MolTrace · Admin · Security Events
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-mono text-2xl font-bold tracking-tight">Security Events</h1>
             <InfoTooltip content={SECURITY_EVENTS_TOOLTIP} label="About Security Events" />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Administrative view of security signals returned by the backend.
           </p>
           {!loading && backendUnreachable ? (
@@ -245,56 +261,75 @@ export function SecurityEventsWorkspace() {
       </div>
 
       {backendUnreachable ? (
-        <Alert variant="destructive">
-          <AlertTitle>Backend unavailable</AlertTitle>
-          <AlertDescription className="text-xs">
-            Security event services are not reachable. Verify you&apos;re signed in as an administrator and try again.
-          </AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="error"
+          title="Backend unavailable"
+          description="Security event services are not reachable. Verify you're signed in as an administrator and try again."
+        />
       ) : null}
 
       {!backendUnreachable && (errSummary || errEvents) ? (
-        <Alert variant="destructive">
-          <AlertTitle>Partial load</AlertTitle>
-          <AlertDescription className="space-y-1 text-xs">
+        <AlertCard variant="error" title="Partial load">
+          <div className="space-y-1 text-xs text-foreground/90">
             {errSummary ? <p>Summary: {errSummary}</p> : null}
             {errEvents ? <p>Events list: {errEvents}</p> : null}
-          </AlertDescription>
-        </Alert>
+          </div>
+        </AlertCard>
       ) : null}
 
       {/* 1. Security summary cards */}
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Security summary cards</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total events</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-slate)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Total events
+              </CardTitle>
+              <Shield className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-slate)" }}
+              >
                 {loading ? "…" : totalEvents != null ? String(totalEvents) : "—"}
               </div>
-              <p className="text-xs text-muted-foreground">Total security events recorded.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Total security events recorded.</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Open warnings</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-amber)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Open warnings
+              </CardTitle>
+              <AlertTriangle className="h-4 w-4" style={{ color: "var(--mt-amber)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-amber)" }}
+              >
                 {loading ? "…" : openWarnings != null ? String(openWarnings) : "—"}
               </div>
-              <p className="text-xs text-muted-foreground">Unresolved warnings awaiting review.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Unresolved warnings awaiting review.</p>
             </CardContent>
           </Card>
-          <Card className="sm:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Counts by severity</CardTitle>
-              <CardDescription className="text-xs">counts_by_severity</CardDescription>
-            </CardHeader>
-            <CardContent className="text-xs">
+          <ModuleCard
+            accent="slate"
+            eyebrow="Severity"
+            title="Counts by severity"
+            icon={ShieldAlert}
+            description="counts_by_severity"
+            className="sm:col-span-2"
+          >
+            <div className="text-xs">
               {loading ? (
                 <p className="text-muted-foreground">Loading…</p>
               ) : summary && isRecord(summary.counts_by_severity as Record<string, unknown>) ? (
@@ -310,14 +345,17 @@ export function SecurityEventsWorkspace() {
               ) : (
                 <p className="text-muted-foreground">—</p>
               )}
-            </CardContent>
-          </Card>
-          <Card className="sm:col-span-2 lg:col-span-4">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Counts by event type</CardTitle>
-              <CardDescription className="text-xs">counts_by_type</CardDescription>
-            </CardHeader>
-            <CardContent className="text-xs">
+            </div>
+          </ModuleCard>
+          <ModuleCard
+            accent="slate"
+            eyebrow="Type"
+            title="Counts by event type"
+            icon={Layers}
+            description="counts_by_type"
+            className="sm:col-span-2 lg:col-span-4"
+          >
+            <div className="text-xs">
               {loading ? (
                 <p className="text-muted-foreground">Loading…</p>
               ) : summary && isRecord(summary.counts_by_type as Record<string, unknown>) ? (
@@ -333,22 +371,22 @@ export function SecurityEventsWorkspace() {
               ) : (
                 <p className="text-muted-foreground">—</p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </div>
       </div>
 
       {/* 2. Event filters */}
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Event filters</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Filters</CardTitle>
-            <CardDescription>
-              Severity, event type, actor email, and limit are applied server-side. Date range and resource type narrow the loaded rows in your browser.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Filters"
+          title="Filters"
+          icon={Filter}
+          description="Severity, event type, actor email, and limit are applied server-side. Date range and resource type narrow the loaded rows in your browser."
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="sev-filter">severity</Label>
               <Input
@@ -413,21 +451,21 @@ export function SecurityEventsWorkspace() {
                 Apply server filters
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       {/* 3. Security events table */}
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Security events table</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Events</CardTitle>
-            <CardDescription>
-              Security events matching the filters above, with the most recent shown first.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="slate"
+          eyebrow="Events"
+          title="Events"
+          icon={ListChecks}
+          description="Security events matching the filters above, with the most recent shown first."
+        >
+          <div>
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : errEvents && eventsRaw.length === 0 ? (
@@ -508,8 +546,8 @@ export function SecurityEventsWorkspace() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       {/* 4. Developer JSON */}

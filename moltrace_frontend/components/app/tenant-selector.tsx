@@ -11,9 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { useTenant } from "@/src/lib/tenant/tenant-context"
 
 export function TenantSelector() {
+  const isMobile = useIsMobile()
   const {
     currentTenantId,
     tenantDisplayName,
@@ -34,10 +36,9 @@ export function TenantSelector() {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="min-w-0 gap-2">
           <Building2 className="h-4 w-4 shrink-0" />
-          <span className="hidden max-w-36 truncate lg:inline">{tenantDisplayName}</span>
-          <span className="max-w-24 truncate lg:hidden">Tenant</span>
+          <span className="max-w-36 truncate">{isMobile ? "Tenant" : tenantDisplayName}</span>
           {lockedCount > 0 ? (
-            <Badge variant="outline" className="hidden h-5 px-1.5 text-[10px] sm:inline-flex">
+            <Badge variant="outline" className={isMobile ? "hidden" : "inline-flex h-5 px-1.5 text-[10px]"}>
               {lockedCount} locked
             </Badge>
           ) : null}

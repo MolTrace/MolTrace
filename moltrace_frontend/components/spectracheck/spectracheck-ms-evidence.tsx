@@ -30,6 +30,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { cn } from "@/lib/utils"
 import { TabResultSection } from "@/components/spectracheck/spectracheck-result-panels"
+import {
+  SPECTRACHECK_MS_SPECTRUM_ACCEPT,
+  SPECTRACHECK_TEXT_SPECTRUM_ACCEPT,
+  isMsSpectrumFilename,
+} from "@/src/lib/spectracheck/spectrum-file-formats"
 
 const DEFAULT_MS1_PEAKS = "m/z,intensity\n47.04914,100\n48.05249,2.3\n69.03109,24\n"
 
@@ -60,7 +65,7 @@ const ADDUCT_INFERENCE_ION_MODE_OPTIONS: { value: string; label: string }[] = [
   { value: "negative", label: "negative" },
 ]
 
-const LC_MS_UPLOAD_ACCEPT = ".mzML,.mzXML,.xml,.csv,.tsv,.txt"
+const LC_MS_UPLOAD_ACCEPT = SPECTRACHECK_MS_SPECTRUM_ACCEPT
 
 /** Matches SpectraCheck `tabTriggerClass`: outer `TabsTrigger` owns active teal-coded highlight; tooltip wraps label span only. */
 const MS_EVIDENCE_TABS_TRIGGER_CLASS = cn(
@@ -1900,13 +1905,16 @@ export function SpectraCheckMsEvidence({
   const lcmsSessionLikeFiles = (ws?.sessionFiles ?? []).filter(
     (f) =>
       f.file_kind.startsWith("lcms") ||
-      /\.(mzml|mzxml|xml|csv|tsv|txt)$/i.test(f.filename),
+      isMsSpectrumFilename(f.filename),
   )
 
   function inferLcmsUploadKind(file: File): string {
     const n = file.name.toLowerCase()
     if (n.endsWith(".mzml")) return "lcms_mzml"
     if (n.endsWith(".mzxml")) return "lcms_mzxml"
+    if (/\.(mzdata|imzml|mgf|cdf|netcdf|raw|wiff2?|d|yep|baf|tdf|tsf|xml)$/i.test(n)) {
+      return "lcms_raw"
+    }
     return "lcms_peak_table"
   }
 
@@ -2945,7 +2953,13 @@ export function SpectraCheckMsEvidence({
                     >
                       <option value="">— none —</option>
                       {(ws?.sessionFiles ?? [])
-                        .filter((f) => f.file_kind === "ms_peak_table" || f.file_kind === "other")
+                        .filter(
+                          (f) =>
+                            f.file_kind === "ms_peak_table" ||
+                            f.file_kind === "msms_spectrum" ||
+                            isMsSpectrumFilename(f.filename) ||
+                            f.file_kind === "other",
+                        )
                         .map((f) => (
                           <option key={f.file_id} value={f.file_id}>
                             {f.filename} ({f.file_kind})
@@ -3482,7 +3496,7 @@ export function SpectraCheckMsEvidence({
                     <input
                       ref={lcmsGrpSampleFileRef}
                       type="file"
-                      accept=".csv,.tsv,.txt"
+                      accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
                       className={cn(
                         "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
                         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
@@ -3503,7 +3517,7 @@ export function SpectraCheckMsEvidence({
                     <input
                       ref={lcmsGrpBlankFileRef}
                       type="file"
-                      accept=".csv,.tsv,.txt"
+                      accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
                       className={cn(
                         "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
                         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
@@ -3607,7 +3621,7 @@ export function SpectraCheckMsEvidence({
                     <input
                       ref={lcmsConFeatFileRef}
                       type="file"
-                      accept=".csv,.tsv,.txt"
+                      accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
                       className={cn(
                         "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
                         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
@@ -3750,7 +3764,7 @@ export function SpectraCheckMsEvidence({
                     <input
                       ref={lcmsDerLibraryFileRef}
                       type="file"
-                      accept=".csv,.tsv,.txt,.json"
+                      accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
                       className={cn(
                         "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
                         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",

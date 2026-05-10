@@ -22,7 +22,7 @@ TRACE_TSV = b"""ppm\tintensity
 1.20\t5
 1.10\t0
 """
-CARBON13_CSV = b"""ppm,intensity
+CARBON13_CSV = b"""ppm,signal
 77.0,12
 58.2,200
 18.1,140
@@ -111,6 +111,8 @@ def test_nmr_processed_tsv_preview_returns_flat_arrays(tmp_path) -> None:
     assert payload["point_count"] == 6
     assert payload["x"]
     assert payload["y"]
+    assert payload["metadata"]["peak_inference"] == "skipped_for_display_preview"
+    assert not any("inferred heuristically" in warning for warning in payload["warnings"])
 
 
 def test_nmr_processed_analyze_returns_peaks(tmp_path) -> None:
@@ -136,6 +138,7 @@ def test_nmr_processed_analyze_returns_peaks(tmp_path) -> None:
     assert payload["peak_count"] == 3
     assert payload["peaks"][0]["shift_ppm"] == 3.65
     assert payload["analysis_score"] is not None
+    assert payload["metadata"]["peak_inference"] == "enabled"
     assert any("Human review" in item for item in payload["evidence_summary"])
 
 
@@ -230,6 +233,8 @@ def test_nmr_processed_accepts_1h_and_13c_nucleus_values(tmp_path) -> None:
     assert carbon.status_code == 200, carbon.text
     assert proton.json()["nucleus"] == "1H"
     assert carbon.json()["nucleus"] == "13C"
+    assert proton.json()["metadata"]["peak_inference"] == "skipped_for_display_preview"
+    assert carbon.json()["metadata"]["peak_inference"] == "skipped_for_display_preview"
 
 
 def test_nmr_processed_invalid_nucleus_is_rejected(tmp_path) -> None:

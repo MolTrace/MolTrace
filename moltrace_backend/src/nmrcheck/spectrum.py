@@ -92,11 +92,12 @@ def _safe_float(value: str | None) -> float | None:
 def _downsample_points(points: list[tuple[float, float]], limit: int = 700) -> list[SpectrumPoint]:
     if not points:
         return []
-    clean = [
-        (float(x), float(y), idx)
-        for idx, (x, y) in enumerate(points)
-        if math.isfinite(float(x)) and math.isfinite(float(y))
-    ]
+    clean: list[tuple[float, float, int]] = []
+    for idx, (x_raw, y_raw) in enumerate(points):
+        x = float(x_raw)
+        y = float(y_raw)
+        if math.isfinite(x) and math.isfinite(y):
+            clean.append((x, y, idx))
     if len(clean) <= limit:
         return [SpectrumPoint(shift_ppm=x, intensity=y) for x, y, _ in clean]
     safe_limit = max(3, int(limit))
@@ -109,11 +110,17 @@ def _downsample_points(points: list[tuple[float, float]], limit: int = 700) -> l
     for bucket_idx in range(bucket_count):
         start = 1 + int(math.floor(bucket_idx * bucket_size))
         end = 1 + int(math.floor((bucket_idx + 1) * bucket_size))
-        bucket = clean[start : max(start + 1, min(end, len(clean) - 1))]
-        if not bucket:
+        stop = max(start + 1, min(end, len(clean) - 1))
+        if start >= stop:
             continue
-        min_point = min(bucket, key=lambda item: item[1])
-        max_point = max(bucket, key=lambda item: item[1])
+        min_point = clean[start]
+        max_point = clean[start]
+        for clean_idx in range(start + 1, stop):
+            item = clean[clean_idx]
+            if item[1] < min_point[1]:
+                min_point = item
+            if item[1] > max_point[1]:
+                max_point = item
         selected[min_point[2]] = min_point
         selected[max_point[2]] = max_point
     ordered = [selected[idx] for idx in sorted(selected)]
@@ -172,6 +179,57 @@ def _build_preserved_spectrum_state(
     }
 
 
+def _build_preview_spectrum_state(
+    points: list[tuple[float, float]],
+    preview_points: list[SpectrumPoint],
+    *,
+    source: str,
+    processing_stage: str = "as_uploaded",
+    normalized_for_preview: bool = False,
+) -> dict[str, Any]:
+    preview_pairs = [
+        (float(point.shift_ppm), float(point.intensity))
+        for point in preview_points
+        if math.isfinite(float(point.shift_ppm)) and math.isfinite(float(point.intensity))
+    ]
+    preview_values = [y for _, y in preview_pairs]
+    if preview_values:
+        baseline = median(preview_values)
+        intensity_min = min(preview_values)
+        intensity_max = max(preview_values)
+    else:
+        baseline = 0.0
+        intensity_min = 0.0
+        intensity_max = 0.0
+    return {
+        "preserved": True,
+        "source": source,
+        "processing_stage": processing_stage,
+        "point_count": len(points),
+        "baseline": round(float(baseline), 8),
+        "intensity_min": round(float(intensity_min), 8),
+        "intensity_max": round(float(intensity_max), 8),
+        "normalized_for_preview": normalized_for_preview,
+        "summary_source": "downsampled_preview",
+        "preview_points": [point.model_dump(mode="json") for point in preview_points],
+    }
+
+
+def _preview_baseline_flatness_qa(
+    preview_points: list[SpectrumPoint],
+    *,
+    mode: str,
+) -> dict[str, Any]:
+    preview_pairs = [
+        (float(point.shift_ppm), float(point.intensity))
+        for point in preview_points
+        if math.isfinite(float(point.shift_ppm)) and math.isfinite(float(point.intensity))
+    ]
+    qa = evaluate_baseline_flatness(preview_pairs, mode=mode).as_dict()
+    qa["scope"] = "downsampled_preview"
+    return qa
+
+
 def _strip_bom(text: str) -> str:
     return text.lstrip("\ufeff")
 
@@ -181,6 +239,10 @@ def _detect_text_extension(filename: str) -> str:
     if "." not in name:
         return ""
     return name.rsplit(".", 1)[-1]
+
+
+_TEXT_SPECTRUM_EXTENSIONS = {"csv", "tsv", "txt", "xy", "asc", "dat"}
+_JCAMP_SPECTRUM_EXTENSIONS = {"jcamp", "jdx", "dx"}
 
 
 def _parse_peak_table(rows: list[dict[str, str]]) -> list[Peak]:
@@ -225,6 +287,23 @@ def _extract_numeric_pairs_from_delimited(text: str, delimiter: str) -> list[tup
     return points
 
 
+def _extract_numeric_pairs_from_text(text: str) -> list[tuple[float, float]]:
+    points: list[tuple[float, float]] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith(("#", "//", "$$")):
+            continue
+        values = _FLOAT_RE.findall(line)
+        if len(values) < 2:
+            continue
+        x = _safe_float(values[0])
+        y = _safe_float(values[1])
+        if x is None or y is None:
+            continue
+        points.append((x, y))
+    return points
+
+
 def _sniff_delimiter(text: str, filename: str) -> str:
     ext = _detect_text_extension(filename)
     if ext == "tsv":
@@ -240,31 +319,46 @@ def _sniff_delimiter(text: str, filename: str) -> str:
 def _parse_csv_or_tsv(filename: str, text: str) -> tuple[str, list[Peak], list[tuple[float, float]], list[str]]:
     warnings: list[str] = []
     delimiter = _sniff_delimiter(text, filename)
-    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
-    if reader.fieldnames:
-        lowered = {str(name).strip().lower() for name in reader.fieldnames if name}
+    raw_reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+    try:
+        fieldnames = next(raw_reader)
+    except StopIteration:
+        fieldnames = []
+    if fieldnames:
+        normalized_fields = [str(name).strip().lower() for name in fieldnames]
+        lowered = {name for name in normalized_fields if name}
         shift_keys = {"shift_ppm", "ppm", "shift", "delta"}
         integration_keys = {"integration_h", "integration", "integral", "h", "area"}
         if (shift_keys & lowered) and (integration_keys & lowered):
+            reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
             peaks = _parse_peak_table(list(reader))
             warnings.append("Peak table detected; uploaded rows were used directly as peak assignments.")
             return ("peak_table", peaks, [(p.shift_ppm, p.integration_h) for p in peaks], warnings)
 
-        points: list[tuple[float, float]] = []
-        for row in csv.DictReader(io.StringIO(text), delimiter=delimiter):
-            normalized = {str(k).strip().lower(): v for k, v in row.items() if k}
-            x = _safe_float(normalized.get("ppm") or normalized.get("shift") or normalized.get("shift_ppm") or normalized.get("delta") or normalized.get("x"))
-            y = _safe_float(normalized.get("intensity") or normalized.get("signal") or normalized.get("y") or normalized.get("amplitude") or normalized.get("absorbance") or normalized.get("response"))
-            if x is None or y is None:
-                continue
-            points.append((x, y))
-        if points:
-            warnings.append("Spectrum trace detected; peaks and integrations were inferred heuristically from intensity data.")
-            return ("trace", [], points, warnings)
+        x_keys = {"ppm", "shift", "shift_ppm", "delta", "x"}
+        y_keys = {"intensity", "signal", "y", "amplitude", "absorbance", "response"}
+        x_index = next((idx for idx, name in enumerate(normalized_fields) if name in x_keys), None)
+        y_index = next((idx for idx, name in enumerate(normalized_fields) if name in y_keys), None)
+        if x_index is not None and y_index is not None:
+            max_index = max(x_index, y_index)
+            points: list[tuple[float, float]] = []
+            for row in raw_reader:
+                if len(row) <= max_index:
+                    continue
+                x = _safe_float(row[x_index])
+                y = _safe_float(row[y_index])
+                if x is None or y is None:
+                    continue
+                points.append((x, y))
+            if points:
+                warnings.append("Spectrum trace detected; peaks and integrations were inferred heuristically from intensity data.")
+                return ("trace", [], points, warnings)
 
     points = _extract_numeric_pairs_from_delimited(text, delimiter=delimiter)
     if not points:
-        raise SpectrumParseError("Could not parse numeric spectrum data from the uploaded CSV/TSV file.")
+        points = _extract_numeric_pairs_from_text(text)
+    if not points:
+        raise SpectrumParseError("Could not parse numeric spectrum data from the uploaded text spectrum file.")
     warnings.append("Spectrum trace detected; peaks and integrations were inferred heuristically from intensity data.")
     return ("trace", [], points, warnings)
 
@@ -1363,15 +1457,16 @@ def parse_processed_spectrum(
     max_preview_points: int = 1200,
     processed_baseline_correction: str = "none",
     processed_baseline_order: int = 3,
+    infer_peaks: bool = True,
 ) -> SpectrumPreviewReport:
     ext = _detect_text_extension(filename)
     text = _strip_bom(content.decode("utf-8", errors="replace"))
     warnings: list[str] = []
 
-    if ext in {"csv", "tsv"}:
+    if ext in _TEXT_SPECTRUM_EXTENSIONS:
         source_mode, peaks, points, parse_warnings = _parse_csv_or_tsv(filename, text)
         warnings.extend(parse_warnings)
-    elif ext in {"jdx", "dx"}:
+    elif ext in _JCAMP_SPECTRUM_EXTENSIONS:
         points = _parse_jcamp_text(text)
         peaks = []
         source_mode = "trace"
@@ -1380,7 +1475,7 @@ def parse_processed_spectrum(
         )
     else:
         raise SpectrumParseError(
-            "Unsupported processed spectrum format. Upload CSV, TSV, JDX, or DX for this phase."
+            "Unsupported processed spectrum format. Upload CSV, TSV, TXT, XY, ASC, DAT, JCAMP, JDX, or DX for this phase."
         )
 
     original_points = points[:]
@@ -1465,12 +1560,98 @@ def parse_processed_spectrum(
         },
         "display_solvent_masked": False,
     }
-    original_spectrum_state = _build_preserved_spectrum_state(
-        original_points,
-        source="uploaded_peak_table" if source_mode == "peak_table" else "uploaded_trace",
-        processing_stage="as_uploaded",
-        point_limit=preview_limit,
-    )
+
+    if not infer_peaks:
+        preview_points = _downsample_points(points, limit=preview_limit)
+        warnings = [
+            warning
+            for warning in warnings
+            if warning != "Spectrum trace detected; peaks and integrations were inferred heuristically from intensity data."
+        ]
+        warnings.append("Display preview generated without peak inference; use Analyze to run peak detection and evidence scoring.")
+        if solvent:
+            warnings.append(f"The uploaded spectrum will be interpreted using the supplied solvent context: {solvent}.")
+        if frequency_mhz is not None:
+            warnings.append(f"Instrument frequency provided: {frequency_mhz:g} MHz.")
+        if reference_ppm is not None:
+            warnings.append(f"Reference calibration provided: {reference_ppm:g} ppm.")
+        return SpectrumPreviewReport(
+            filename=filename,
+            format_detected=ext or "unknown",
+            source_mode=source_mode,
+            point_count=len(points),
+            preview_points=preview_points,
+            inferred_peaks=[],
+            inferred_nmr_text="",
+            reference_nmr_text_normalized=None,
+            reference_peaks=[],
+            comparison=None,
+            warnings=warnings,
+            metadata={
+                "solvent": solvent,
+                "frequency_mhz": frequency_mhz,
+                "reference_ppm": reference_ppm,
+                "reference_peak_count": 0,
+                "reference_total_h": 0.0,
+                "reference_coverage_count": 0,
+                "reference_guided_text_used": False,
+                "raw_extracted_nmr_text": "",
+                "peak_sensitivity": sensitivity,
+                "peak_sensitivity_percent": round(sensitivity * 100),
+                "peak_inference": "skipped_for_display_preview",
+                "peak_inference_skipped": True,
+                "detection_gain": round(detection_gain, 3),
+                "target_total_h": expected_total_h,
+                "target_non_labile_h": expected_non_labile_h,
+                "target_visible_h": target_total_h,
+                "mask_solvent_regions": mask_solvent_regions,
+                "processed_baseline_correction": processed_baseline_metadata,
+                "baseline_flatness_qa": _preview_baseline_flatness_qa(
+                    preview_points,
+                    mode=processed_baseline_metadata.get("method") or "processed",
+                ),
+                "impurity_candidates": [],
+                "display_preprocessing": display_meta,
+                "evidence_trace_mode": (
+                    "uploaded_intensity_baseline_corrected"
+                    if processed_baseline_metadata.get("correction_applied")
+                    else "uploaded_intensity"
+                ),
+                "display_mode": normalized_display_mode,
+                "display_gain": viewer_gain,
+                "baseline_lock_visual_only": True,
+                "display": {
+                    "mode": normalized_display_mode,
+                    "gain": viewer_gain,
+                    "vertical_gain": viewer_gain,
+                    "baseline_lock_visual_only": True,
+                    "main_trace": "original_evidence_intensity",
+                    "weak_peak_magnifier": False,
+                    "downsampling": {
+                        "method": "min_max_bucket_extrema_preserving",
+                        "point_limit": preview_limit,
+                    },
+                },
+                "preview_downsampling": {
+                    "method": "min_max_bucket_extrema_preserving",
+                    "point_limit": preview_limit,
+                    "source_point_count": len(points),
+                },
+                "preview_fast_path": True,
+                "original_spectrum_state": _build_preview_spectrum_state(
+                    points,
+                    preview_points,
+                    source="uploaded_peak_table" if source_mode == "peak_table" else "uploaded_trace",
+                    processing_stage="as_uploaded",
+                ),
+                **(
+                    {"raw_preview_points": [point.model_dump(mode="json") for point in preview_points]}
+                    if debug_preview
+                    else {}
+                ),
+                **peak_meta,
+            },
+        )
 
     if reference_nmr_text and reference_nmr_text.strip():
         try:
@@ -1651,6 +1832,13 @@ def parse_processed_spectrum(
                     "Reference assignment text was normalized to the structure/solvent visible-proton target because trace peak picking was too sparse to preserve coupling details."
                 )
 
+    original_spectrum_state = _build_preserved_spectrum_state(
+        original_points,
+        source="uploaded_peak_table" if source_mode == "peak_table" else "uploaded_trace",
+        processing_stage="as_uploaded",
+        point_limit=preview_limit,
+    )
+
     return SpectrumPreviewReport(
         filename=filename,
         format_detected=ext or "unknown",
@@ -1674,6 +1862,8 @@ def parse_processed_spectrum(
             "raw_extracted_nmr_text": raw_inferred_nmr_text,
             "peak_sensitivity": sensitivity,
             "peak_sensitivity_percent": round(sensitivity * 100),
+            "peak_inference": "enabled",
+            "peak_inference_skipped": False,
             "detection_gain": round(detection_gain, 3),
             "target_total_h": expected_total_h,
             "target_non_labile_h": expected_non_labile_h,

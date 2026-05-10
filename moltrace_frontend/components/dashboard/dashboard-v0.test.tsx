@@ -6,6 +6,29 @@ import { DashboardV0 } from "@/components/dashboard/dashboard-v0"
 
 const mockApiFetch = vi.fn<(path: string) => Promise<unknown>>()
 
+function installDesktopMode() {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 500 })
+  Object.defineProperty(window.navigator, "platform", { configurable: true, value: "Win32" })
+  Object.defineProperty(window.navigator, "userAgent", {
+    configurable: true,
+    value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  })
+  Object.defineProperty(window.navigator, "maxTouchPoints", { configurable: true, value: 0 })
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn((query: string) => ({
+      matches: query.includes("max-width"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
+
 vi.mock("next/link", () => ({
   default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }))
@@ -90,6 +113,7 @@ describe("DashboardV0 connector/ingestion fallback", () => {
   beforeEach(() => {
     mockApiFetch.mockReset()
     mockApiFetch.mockRejectedValue(new Error("backend unavailable"))
+    installDesktopMode()
   })
 
   it("shows subtle summary unavailable message and keeps dashboard content", async () => {
@@ -107,5 +131,11 @@ describe("DashboardV0 connector/ingestion fallback", () => {
         screen.getByText("Connector and ingestion summary unavailable for now.")
       ).toBeInTheDocument()
     })
+  })
+
+  it("does not render the mobile command center in desktop mode", () => {
+    render(<DashboardV0 />)
+
+    expect(screen.queryByText("Mobile Command Center")).not.toBeInTheDocument()
   })
 })

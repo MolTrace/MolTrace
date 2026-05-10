@@ -6,11 +6,17 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import { FeedbackButton } from "@/src/components/analytics/FeedbackButton"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertTriangle } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import {
+  Activity,
+  ArrowRight,
+  Gauge,
+  MessageSquare,
+  Sparkles,
+} from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -99,6 +105,12 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · AI Services · Prediction
+          </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Prediction Detail</h1>
           <p className="text-sm text-muted-foreground">Prediction output requires review before scientific or regulatory use.</p>
         </div>
@@ -109,65 +121,70 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
 
       {loading ? <p className="text-sm text-muted-foreground">Loading prediction detail...</p> : null}
       {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Load error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <AlertCard variant="error" title="Load error" description={error} />
       ) : null}
 
       {prediction ? (
         <>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>service key</CardDescription>
-                <CardTitle className="text-base">{readRecordString(prediction, "service_key") ?? "-"}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>model artifact ID</CardDescription>
-                <CardTitle className="text-base">{readRecordString(prediction, "model_artifact_id") ?? "-"}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>deployment candidate ID</CardDescription>
-                <CardTitle className="text-base">{readRecordString(prediction, "deployment_candidate_id") ?? "-"}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>status</CardDescription>
-                <CardTitle className="text-base">
+            <ModuleCard
+              accent="teal"
+              eyebrow="Overview"
+              title={readRecordString(prediction, "service_key") ?? "-"}
+              icon={Activity}
+              description="service key"
+            />
+            <ModuleCard
+              accent="teal"
+              eyebrow="Inputs"
+              title={readRecordString(prediction, "model_artifact_id") ?? "-"}
+              icon={ArrowRight}
+              description="model artifact ID"
+            />
+            <ModuleCard
+              accent="teal"
+              eyebrow="Inputs"
+              title={readRecordString(prediction, "deployment_candidate_id") ?? "-"}
+              icon={ArrowRight}
+              description="deployment candidate ID"
+            />
+            <ModuleCard
+              accent="teal"
+              eyebrow="Output"
+              title={
+                <span className="flex items-center gap-2">
                   <Badge variant="outline">{readRecordString(prediction, "status") ?? "-"}</Badge>
-                </CardTitle>
-              </CardHeader>
-            </Card>
+                </span>
+              }
+              icon={Sparkles}
+              description="status"
+            />
           </div>
 
           {confidence != null && confidence < 0.5 ? (
-            <Alert className="border-amber-500/30 bg-amber-500/10">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertTitle>low confidence</AlertTitle>
-              <AlertDescription>This prediction has low confidence and requires review.</AlertDescription>
-            </Alert>
+            <AlertCard
+              variant="warning"
+              title="low confidence"
+              description="This prediction has low confidence and requires review."
+            />
           ) : null}
 
           {isOod === true ? (
-            <Alert className="border-amber-500/30 bg-amber-500/10">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertTitle>out-of-domain warning</AlertTitle>
-              <AlertDescription>This prediction indicates out-of-domain warning and requires review.</AlertDescription>
-            </Alert>
+            <AlertCard
+              variant="warning"
+              title="out-of-domain warning"
+              description="This prediction indicates out-of-domain warning and requires review."
+            />
           ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Prediction result</CardTitle>
-              <CardDescription>Review summary values before any downstream decision.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Confidence"
+            title="Prediction result"
+            icon={Gauge}
+            description="Review summary values before any downstream decision."
+          >
+            <div className="space-y-2 text-sm">
               <p>
                 <span className="font-medium">prediction result:</span> {summarizeValue(prediction.prediction_result ?? prediction.result)}
               </p>
@@ -194,22 +211,22 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
                 <span className="font-medium">human review required:</span>{" "}
                 {humanReviewRequired == null ? "requires review" : humanReviewRequired ? "requires review" : "not flagged"}
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Feedback form</CardTitle>
-              <CardDescription>Submit workflow feedback without scientific payloads.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FeedbackButton
-                module="ai-predictions-detail"
-                projectId={readRecordNumber(prediction, "project_id") ?? null}
-                sessionId={readRecordNumber(prediction, "session_id") ?? null}
-              />
-            </CardContent>
-          </Card>
+          <ModuleCard
+            accent="teal"
+            eyebrow="Feedback"
+            title="Feedback form"
+            icon={MessageSquare}
+            description="Submit workflow feedback without scientific payloads."
+          >
+            <FeedbackButton
+              module="ai-predictions-detail"
+              projectId={readRecordNumber(prediction, "project_id") ?? null}
+              sessionId={readRecordNumber(prediction, "session_id") ?? null}
+            />
+          </ModuleCard>
 
           <DeveloperJsonPanel data={prediction} />
         </>

@@ -35,9 +35,23 @@ export type AIEvidenceReviewResponse = {
   reviewer_display_name?: string | null
 }
 
+function asAiEvidenceItems(payload: unknown): AIEvidenceItem[] {
+  if (Array.isArray(payload)) return payload as AIEvidenceItem[]
+  if (!payload || typeof payload !== "object") return []
+
+  const record = payload as Record<string, unknown>
+  for (const key of ["items", "results", "rows", "data", "evidence_items"]) {
+    const value = record[key]
+    if (Array.isArray(value)) return value as AIEvidenceItem[]
+  }
+
+  return []
+}
+
 export async function fetchAiEvidenceQueue(limit = 100): Promise<AIEvidenceItem[]> {
   const params = new URLSearchParams({ limit: String(limit) })
-  return apiFetch<AIEvidenceItem[]>(`/ai/evidence-queue?${params.toString()}`, { method: "GET" })
+  const payload = await apiFetch<unknown>(`/ai/evidence-queue?${params.toString()}`, { method: "GET" })
+  return asAiEvidenceItems(payload)
 }
 
 export async function reviewAiEvidenceItem(

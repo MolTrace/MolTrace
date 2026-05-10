@@ -11,10 +11,9 @@ import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -27,7 +26,21 @@ import {
 } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import {
+  ArrowLeft,
+  ClipboardList,
+  FileSearch,
+  FileText,
+  GitBranch,
+  Layers3,
+  ListChecks,
+  Loader2,
+  Network,
+  ScrollText,
+  Tag,
+} from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -267,35 +280,37 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
         </Button>
       </div>
 
-      <header className="space-y-2">
+      <header className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          MolTrace · Regulatory · Change Detail
+        </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Change Detail</h1>
         <p className="text-sm text-muted-foreground">
           source change detected signals, possible impact triage, and requires qualified review workflow.
         </p>
       </header>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" aria-hidden />
-        <AlertTitle>Requires qualified review</AlertTitle>
-        <AlertDescription className="text-sm text-muted-foreground">
-          This page shows source change detected and possible impact summaries from backend records. It is not legal advice.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Requires qualified review"
+        description="This page shows source change detected and possible impact summaries from backend records. It is not legal advice."
+      />
 
       {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
-      {loadErr ? (
-        <Alert variant="destructive">
-          <AlertDescription className="text-sm">{loadErr}</AlertDescription>
-        </Alert>
-      ) : null}
+      {loadErr ? <AlertCard variant="error" title="Error" description={loadErr} /> : null}
 
       {/* 1. Change summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Change summary</CardTitle>
-          <CardDescription>Regulatory change event details — type, severity, review status, and affected source.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Summary"
+        title="Change summary"
+        icon={FileText}
+        description="Regulatory change event details — type, severity, review status, and affected source."
+      >
+        <div className="space-y-2 text-sm">
           <p className="font-medium">{readRecordString(change, "title") ?? "—"}</p>
           <p className="text-muted-foreground">{readRecordString(change, "summary") ?? "—"}</p>
           <div className="flex flex-wrap gap-2 text-xs">
@@ -308,21 +323,20 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
           <p className="text-xs text-muted-foreground">
             created_at {formatWhen(readRecordString(change, "created_at") ?? undefined)}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 2. Source versions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Source versions</CardTitle>
-          <CardDescription>Version links captured on the change event.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <Card className="border-muted">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Old version</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 text-xs">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Versions"
+        title="Source versions"
+        icon={GitBranch}
+        description="Version links captured on the change event."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <ModuleCard accent="cyan" eyebrow="Old" title="Old version" icon={FileText}>
+            <div className="space-y-1 text-xs">
               <p className="font-mono">old_version_id {readRecordNumber(change, "old_version_id") ?? "—"}</p>
               <p>version label: {readRecordString(oldVersion, "version_label") ?? "—"}</p>
               <p>source date: {formatWhen(readRecordString(oldVersion, "source_date") ?? undefined)}</p>
@@ -332,13 +346,10 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                 {readRecordString(oldVersion, "sha256") ?? readRecordString(oldVersion, "content_hash") ?? "—"}
               </p>
               <p>status: {readRecordString(oldVersion, "status") ?? "—"}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-muted">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">New version</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 text-xs">
+            </div>
+          </ModuleCard>
+          <ModuleCard accent="cyan" eyebrow="New" title="New version" icon={FileText}>
+            <div className="space-y-1 text-xs">
               <p className="font-mono">new_version_id {readRecordNumber(change, "new_version_id") ?? "—"}</p>
               <p>version label: {readRecordString(newVersion, "version_label") ?? "—"}</p>
               <p>source date: {formatWhen(readRecordString(newVersion, "source_date") ?? undefined)}</p>
@@ -348,29 +359,32 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                 {readRecordString(newVersion, "sha256") ?? readRecordString(newVersion, "content_hash") ?? "—"}
               </p>
               <p>status: {readRecordString(newVersion, "status") ?? "—"}</p>
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
+            </div>
+          </ModuleCard>
+        </div>
+      </ModuleCard>
 
       {/* 3. Diff excerpts */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Diff excerpts</CardTitle>
-          <CardDescription>Structured diff rows from the change payload.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Diff"
+        title="Diff excerpts"
+        icon={ScrollText}
+        description="Structured diff rows from the change payload."
+      >
+        <div className="space-y-3">
           {diffs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No diff excerpts returned.</p>
           ) : (
             diffs.map((row, idx) => (
-              <Card key={readRecordNumber(row, "id") ?? idx} className="border-muted">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">
-                    diff_type {readRecordString(row, "diff_type") ?? "—"} · id {readRecordNumber(row, "id") ?? "—"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2">
+              <ModuleCard
+                key={readRecordNumber(row, "id") ?? idx}
+                accent="cyan"
+                eyebrow="Diff"
+                title={`diff_type ${readRecordString(row, "diff_type") ?? "—"} · id ${readRecordNumber(row, "id") ?? "—"}`}
+                icon={ScrollText}
+              >
+                <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">before excerpt</p>
                     <blockquote className="mt-1 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm leading-relaxed">
@@ -387,19 +401,21 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">diff summary</p>
                     <p className="mt-1 text-sm">{readRecordString(row, "diff_summary") ?? "—"}</p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
             ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 4. Affected topics */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Affected topics</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Topics"
+        title="Affected topics"
+        icon={Tag}
+      >
+        <div>
           {topicList.length === 0 ? (
             <p className="text-sm text-muted-foreground">No affected topics returned.</p>
           ) : (
@@ -411,15 +427,17 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 5. Affected dossiers */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Affected dossiers</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Dossiers"
+        title="Affected dossiers"
+        icon={Layers3}
+      >
+        <div>
           {affectedDossiers.length === 0 ? (
             <p className="text-sm text-muted-foreground">No affected dossiers returned.</p>
           ) : (
@@ -431,16 +449,18 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 6. Rule update proposals */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Rule update proposals</CardTitle>
-          <CardDescription>Rule update proposals linked to this regulatory change event — showing proposal type, status, and rationale.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Proposals"
+        title="Rule update proposals"
+        icon={ClipboardList}
+        description="Rule update proposals linked to this regulatory change event — showing proposal type, status, and rationale."
+      >
+        <div className="space-y-2">
           <div>
             <Button type="button" variant="outline" size="sm" asChild>
               <Link href={`/regulatory/rule-updates?change_id=${changeId}`}>Open rule update proposals</Link>
@@ -472,34 +492,28 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
               </Card>
             ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 7. Impact assessment */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-lg">Change Impact Assessment</CardTitle>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Impact"
+        title={
+          <span className="flex items-center gap-2">
+            Change Impact Assessment
             <InfoTooltip
               label="Change Impact Assessment"
               content="Impact assessment maps a regulatory source change to affected dossiers, requirements, rule sets, action items, AI governance records, and reports."
             />
-          </div>
-          <CardDescription>
-            Assess the downstream impact of this regulatory change across affected dossiers, requirements, rule sets, action items, and AI governance records.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {impactErr ? (
-            <Alert variant="destructive">
-              <AlertDescription className="text-sm">{impactErr}</AlertDescription>
-            </Alert>
-          ) : null}
-          {impactOk ? (
-            <Alert>
-              <AlertDescription className="text-sm">{impactOk}</AlertDescription>
-            </Alert>
-          ) : null}
+          </span>
+        }
+        icon={Network}
+        description="Assess the downstream impact of this regulatory change across affected dossiers, requirements, rule sets, action items, and AI governance records."
+      >
+        <div className="space-y-4">
+          {impactErr ? <AlertCard variant="error" title="Impact error" description={impactErr} /> : null}
+          {impactOk ? <AlertCard variant="success" title="Recorded" description={impactOk} /> : null}
           <Button type="button" disabled={impactBusy} onClick={() => void runImpactAssessment()}>
             {impactBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Run impact assessment
@@ -510,39 +524,57 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <Card className="border-muted">
-                  <CardContent className="pt-4 text-sm">
-                    <p className="text-xs text-muted-foreground">impacted dossiers</p>
-                    <p className="text-2xl font-bold tabular-nums">{impactedDossierIds.length}</p>
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-cyan)" }}
+                >
+                  <CardContent className="space-y-1 pt-5 pb-5 text-sm">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted dossiers</p>
+                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan)" }}>{impactedDossierIds.length}</p>
                   </CardContent>
                 </Card>
-                <Card className="border-muted">
-                  <CardContent className="pt-4 text-sm">
-                    <p className="text-xs text-muted-foreground">impacted requirements</p>
-                    <p className="text-2xl font-bold tabular-nums">{impactedRequirementIds.length}</p>
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-cyan)" }}
+                >
+                  <CardContent className="space-y-1 pt-5 pb-5 text-sm">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted requirements</p>
+                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan)" }}>{impactedRequirementIds.length}</p>
                   </CardContent>
                 </Card>
-                <Card className="border-muted">
-                  <CardContent className="pt-4 text-sm">
-                    <p className="text-xs text-muted-foreground">impacted action items</p>
-                    <p className="text-2xl font-bold tabular-nums">{impactedActionItemIds.length}</p>
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-amber)" }}
+                >
+                  <CardContent className="space-y-1 pt-5 pb-5 text-sm">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted action items</p>
+                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-amber)" }}>{impactedActionItemIds.length}</p>
                   </CardContent>
                 </Card>
-                <Card className="border-muted">
-                  <CardContent className="pt-4 text-sm">
-                    <p className="text-xs text-muted-foreground">impacted rule sets</p>
-                    <p className="text-2xl font-bold tabular-nums">{impactedRuleSetIds.length}</p>
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-cyan)" }}
+                >
+                  <CardContent className="space-y-1 pt-5 pb-5 text-sm">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted rule sets</p>
+                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan)" }}>{impactedRuleSetIds.length}</p>
                   </CardContent>
                 </Card>
-                <Card className="border-muted">
-                  <CardContent className="pt-4 text-sm">
-                    <p className="text-xs text-muted-foreground">impacted AI governance records</p>
-                    <p className="text-2xl font-bold tabular-nums">{impactedAiGovIds.length}</p>
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-violet)" }}
+                >
+                  <CardContent className="space-y-1 pt-5 pb-5 text-sm">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted AI governance records</p>
+                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-violet)" }}>{impactedAiGovIds.length}</p>
                   </CardContent>
                 </Card>
-                <Card className="border-muted">
-                  <CardContent className="pt-4 text-sm">
-                    <p className="text-xs text-muted-foreground">human review required</p>
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: `3px solid ${latestImpact.human_review_required ? "var(--mt-red)" : "var(--mt-cyan)"}` }}
+                >
+                  <CardContent className="space-y-1 pt-5 pb-5 text-sm">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">human review required</p>
                     <Badge variant={latestImpact.human_review_required ? "destructive" : "secondary"}>
                       {latestImpact.human_review_required ? "required" : "not flagged"}
                     </Badge>
@@ -655,16 +687,18 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
               <DeveloperJsonPanel data={latestImpact} />
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 8. Review decision */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Review decision</CardTitle>
-          <CardDescription>Record a formal review decision on this regulatory change — approve, reject, or escalate — with reviewer attribution and comment.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Review"
+        title="Review decision"
+        icon={ListChecks}
+        description="Record a formal review decision on this regulatory change — approve, reject, or escalate — with reviewer attribution and comment."
+      >
+        <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="chg-reviewer">reviewer name</Label>
@@ -699,33 +733,27 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
               onChange={(e) => setReviewRationale(e.target.value)}
             />
           </div>
-          {reviewErr ? (
-            <Alert variant="destructive">
-              <AlertDescription className="text-sm">{reviewErr}</AlertDescription>
-            </Alert>
-          ) : null}
-          {reviewOk ? (
-            <Alert>
-              <AlertDescription className="text-sm">{reviewOk}</AlertDescription>
-            </Alert>
-          ) : null}
+          {reviewErr ? <AlertCard variant="error" title="Review error" description={reviewErr} /> : null}
+          {reviewOk ? <AlertCard variant="success" title="Recorded" description={reviewOk} /> : null}
           <Button type="button" disabled={reviewBusy} onClick={() => void saveReview()}>
             {reviewBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Save change review
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {/* 9. Developer JSON collapsed */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Developer JSON</CardTitle>
-          <CardDescription>Collapsed raw payloads for debugging and audit.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Audit"
+        title="Developer JSON"
+        icon={FileSearch}
+        description="Collapsed raw payloads for debugging and audit."
+      >
+        <div className="space-y-3">
           <DeveloperJsonPanel data={{ change, source_versions: { old: oldVersion, new: newVersion }, impactRows, proposalRows }} />
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

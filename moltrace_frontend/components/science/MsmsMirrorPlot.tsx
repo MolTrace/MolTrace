@@ -9,6 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Download, Eye, EyeOff, Layers, RotateCcw } from "lucide-react"
 
@@ -136,25 +137,14 @@ export function MsmsMirrorPlot({
   const [showMatchedLabels, setShowMatchedLabels] = useState(true)
   const [showReference, setShowReference] = useState(true)
   const graphDivRef = useRef<HTMLElement | null>(null)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
   const [viewportHeight, setViewportHeight] = useState(720)
 
   useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      setIsMobile(false)
-      return
-    }
-    const mq = window.matchMedia("(max-width: 640px)")
-    const apply = () => setIsMobile(mq.matches)
-    apply()
-    mq.addEventListener("change", apply)
     const onResize = () => setViewportHeight(window.innerHeight)
     onResize()
     window.addEventListener("resize", onResize)
-    return () => {
-      mq.removeEventListener("change", apply)
-      window.removeEventListener("resize", onResize)
-    }
+    return () => window.removeEventListener("resize", onResize)
   }, [])
 
   useEffect(() => {

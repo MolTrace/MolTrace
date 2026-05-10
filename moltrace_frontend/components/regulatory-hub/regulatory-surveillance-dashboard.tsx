@@ -10,10 +10,9 @@ import { apiFetch } from "@/lib/api/client"
 import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -31,7 +30,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Loader2, Eye, FolderOpen, Bell, AlertTriangle, ClipboardList, Activity } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import type { LucideIcon } from "lucide-react"
+import { Loader2, Eye, FolderOpen, Bell, AlertTriangle, ClipboardList, Activity, Plus } from "lucide-react"
 
 const SURVEILLANCE_WARNING =
   "Regulatory surveillance provides change detection and draft impact assessment. Qualified human review is required."
@@ -93,24 +95,34 @@ function readIntList(row: Record<string, unknown>, key: string): number[] {
 
 function SummaryMetricCard({
   title,
-  icon,
+  icon: Icon,
   value,
   sub,
+  accent,
 }: {
   title: string
-  icon: React.ReactNode
+  icon: LucideIcon
   value: string
   sub: React.ReactNode
+  accent: string
 }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {icon}
+    <Card
+      className="overflow-hidden rounded-xl py-0"
+      style={{ borderTop: `3px solid ${accent}` }}
+    >
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+        <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-4 w-4" style={{ color: accent }} aria-hidden />
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold tabular-nums">{value}</div>
-        {sub}
+      <CardContent className="pb-5">
+        <div
+          className="font-mono text-3xl font-bold tabular-nums leading-none"
+          style={{ color: accent }}
+        >
+          {value}
+        </div>
+        <div className="mt-2">{sub}</div>
       </CardContent>
     </Card>
   )
@@ -270,61 +282,52 @@ export function RegulatorySurveillanceDashboard() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <p
-          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-cyan)" }}
-        >
-          MolTrace · Regulatory Surveillance
-        </p>
-        <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Surveillance</h1>
-        <p className="text-sm text-muted-foreground">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Regulatory Surveillance</h1>
+        <p className="mt-1 text-muted-foreground">
           Track regulatory source versions, detect changes, and assess impact on dossiers, rules, action items, and reports.
         </p>
       </div>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" aria-hidden />
-        <AlertTitle className="text-sm">Not legal advice</AlertTitle>
-        <AlertDescription className="text-sm text-muted-foreground">{SURVEILLANCE_WARNING}</AlertDescription>
-      </Alert>
+      <AlertCard variant="warning" title="Not legal advice" description={SURVEILLANCE_WARNING} />
 
-      {loadErr ? (
-        <Alert variant="destructive">
-          <AlertDescription className="text-sm">{loadErr}</AlertDescription>
-        </Alert>
-      ) : null}
+      {loadErr ? <AlertCard variant="error" title="Error" description={loadErr} /> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <SummaryMetricCard
           title="Watched sources"
-          icon={<Eye className="h-4 w-4 text-muted-foreground" />}
+          icon={Eye}
           value={loading ? "—" : String(summary.watched)}
           sub={<p className="text-xs text-muted-foreground">Regulatory sources under active surveillance</p>}
+          accent="var(--mt-cyan)"
         />
         <SummaryMetricCard
           title="Changes detected"
-          icon={<Activity className="h-4 w-4 text-muted-foreground" />}
+          icon={Activity}
           value={loading ? "—" : String(summary.changesDetected)}
           sub={<p className="text-xs text-muted-foreground">Excludes change_type no_change</p>}
+          accent="var(--mt-cyan)"
         />
         <SummaryMetricCard
           title="High-impact changes"
-          icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
+          icon={AlertTriangle}
           value={loading ? "—" : String(summary.highImpact)}
           sub={<p className="text-xs text-muted-foreground">severity high or critical</p>}
+          accent="var(--mt-amber)"
         />
         <SummaryMetricCard
           title="Rule update proposals"
-          icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
+          icon={ClipboardList}
           value={loading ? "—" : String(summary.proposals)}
           sub={<p className="text-xs text-muted-foreground">status proposed</p>}
+          accent="var(--mt-violet)"
         />
         <SummaryMetricCard
           title="Dossiers affected"
-          icon={<FolderOpen className="h-4 w-4 text-muted-foreground" />}
+          icon={FolderOpen}
           value={loading ? "—" : String(summary.dossiersAffected)}
           sub={<p className="text-xs text-muted-foreground">Union of affected_dossier_ids_json</p>}
+          accent="var(--mt-cyan)"
         />
       </div>
 
@@ -340,12 +343,14 @@ export function RegulatorySurveillanceDashboard() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Source watchlist</CardTitle>
-          <CardDescription>Regulatory guidance documents and agency publications under active automated surveillance.</CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Watchlist"
+        title="Source watchlist"
+        icon={Eye}
+        description="Regulatory guidance documents and agency publications under active automated surveillance."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -433,20 +438,18 @@ export function RegulatorySurveillanceDashboard() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Add source watcher</CardTitle>
-          <CardDescription>Register a new regulatory source for automated surveillance — agency guidance, pharmacopoeial standards, or jurisdiction-specific publications.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {createErr ? (
-            <Alert variant="destructive">
-              <AlertDescription className="text-sm">{createErr}</AlertDescription>
-            </Alert>
-          ) : null}
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Create"
+        title="Add source watcher"
+        icon={Plus}
+        description="Register a new regulatory source for automated surveillance — agency guidance, pharmacopoeial standards, or jurisdiction-specific publications."
+      >
+        <div className="space-y-4">
+          {createErr ? <AlertCard variant="error" title="Create error" description={createErr} /> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="rw-title">title</Label>
@@ -534,15 +537,17 @@ export function RegulatorySurveillanceDashboard() {
             {createBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Add watched source
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Recent changes</CardTitle>
-          <CardDescription>Recently detected regulatory changes across all watched sources — sorted by severity and detection date.</CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Changes"
+        title="Recent changes"
+        icon={Activity}
+        description="Recently detected regulatory changes across all watched sources — sorted by severity and detection date."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
@@ -597,18 +602,17 @@ export function RegulatorySurveillanceDashboard() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <Bell className="h-4 w-4 text-muted-foreground" aria-hidden />
-            <CardTitle className="text-lg">Notifications</CardTitle>
-          </div>
-          <CardDescription>Workflow signals for detected regulatory changes — not legal conclusions. Review each notification and act through the appropriate dossier workflow.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Alerts"
+        title="Notifications"
+        icon={Bell}
+        description="Workflow signals for detected regulatory changes — not legal conclusions. Review each notification and act through the appropriate dossier workflow."
+      >
+        <div className="space-y-3">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : notifications.length === 0 ? (
@@ -647,8 +651,8 @@ export function RegulatorySurveillanceDashboard() {
               })}
             </ul>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       <p className="text-xs text-muted-foreground">
         Surveillance outputs are operational signals from your tenant API — not legal conclusions or agency positions.

@@ -6,10 +6,8 @@ import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -32,7 +30,9 @@ import {
   KNOWLEDGE_SOURCE_STATUS,
   KNOWLEDGE_SOURCE_TYPES,
 } from "@/components/knowledge/knowledge-constants"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { ArrowLeft, FileText, Library, Loader2, Paperclip, Plus } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -312,7 +312,13 @@ export function KnowledgeSourceLibraryWorkspace() {
         </Button>
       </div>
 
-      <div>
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-teal)" }}
+        >
+          MolTrace · Knowledge · Sources
+        </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Knowledge sources</h1>
         <p className="text-sm text-muted-foreground">
           Register bibliographic metadata and upload files for extraction. Operational signals from your tenant API —
@@ -320,32 +326,22 @@ export function KnowledgeSourceLibraryWorkspace() {
         </p>
       </div>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" aria-hidden />
-        <AlertTitle className="text-sm">Human review</AlertTitle>
-        <AlertDescription className="text-sm text-muted-foreground">
-          Parsed content and hashes support traceability; reviewers must confirm citations and provenance before reuse.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Human review"
+        description="Parsed content and hashes support traceability; reviewers must confirm citations and provenance before reuse."
+      />
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Create source</CardTitle>
-          <CardDescription>
-            Register a new knowledge source — scientific literature, structured databases, or curated reference documents — for extraction and review.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {createErr ? (
-            <Alert variant="destructive">
-              <AlertDescription className="text-sm">{createErr}</AlertDescription>
-            </Alert>
-          ) : null}
-          {createOk ? (
-            <Alert>
-              <AlertDescription className="text-sm">{createOk}</AlertDescription>
-            </Alert>
-          ) : null}
+      <ModuleCard
+        accent="teal"
+        eyebrow="Create"
+        title="Create source"
+        icon={Plus}
+        description="Register a new knowledge source — scientific literature, structured databases, or curated reference documents — for extraction and review."
+      >
+        <div className="space-y-4">
+          {createErr ? <AlertCard variant="error" title="Create error" description={createErr} /> : null}
+          {createOk ? <AlertCard variant="success" title="Recorded" description={createOk} /> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="ks-title">title</Label>
@@ -441,17 +437,17 @@ export function KnowledgeSourceLibraryWorkspace() {
             {createBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Create source
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Source table</CardTitle>
-          <CardDescription>
-            All knowledge sources — filterable by type, status, and reliability label.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Catalog"
+        title="Source table"
+        icon={Library}
+        description="All knowledge sources — filterable by type, status, and reliability label."
+      >
+        <div className="table-scroll min-w-0">
           {listLoading ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -508,18 +504,18 @@ export function KnowledgeSourceLibraryWorkspace() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {selectedId != null ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Selected source</CardTitle>
-            <CardDescription>
-              Detail and edit panel for the selected knowledge source — update status, reliability label, and source metadata.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Detail"
+          title="Selected source"
+          icon={FileText}
+          description="Detail and edit panel for the selected knowledge source — update status, reliability label, and source metadata."
+        >
+          <div className="space-y-4">
             {detailLoading ? (
               <p className="text-sm text-muted-foreground">Loading detail…</p>
             ) : detailErr ? (
@@ -527,28 +523,17 @@ export function KnowledgeSourceLibraryWorkspace() {
             ) : detail ? (
               <>
                 {sourceWarnings.length > 0 ? (
-                  <Alert variant="destructive">
-                    <AlertTitle className="text-sm">warnings</AlertTitle>
-                    <AlertDescription>
-                      <ul className="list-inside list-disc text-sm">
-                        {sourceWarnings.map((w, i) => (
-                          <li key={`${i}-${w.slice(0, 80)}`}>{w}</li>
-                        ))}
-                      </ul>
-                    </AlertDescription>
-                  </Alert>
+                  <AlertCard variant="error" title="warnings">
+                    <ul className="list-inside list-disc text-sm">
+                      {sourceWarnings.map((w, i) => (
+                        <li key={`${i}-${w.slice(0, 80)}`}>{w}</li>
+                      ))}
+                    </ul>
+                  </AlertCard>
                 ) : null}
 
-                {patchErr ? (
-                  <Alert variant="destructive">
-                    <AlertDescription className="text-sm">{patchErr}</AlertDescription>
-                  </Alert>
-                ) : null}
-                {patchOk ? (
-                  <Alert>
-                    <AlertDescription className="text-sm">{patchOk}</AlertDescription>
-                  </Alert>
-                ) : null}
+                {patchErr ? <AlertCard variant="error" title="Patch error" description={patchErr} /> : null}
+                {patchOk ? <AlertCard variant="success" title="Recorded" description={patchOk} /> : null}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
@@ -636,29 +621,21 @@ export function KnowledgeSourceLibraryWorkspace() {
             ) : (
               <p className="text-sm text-muted-foreground">No detail loaded.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       ) : null}
 
       {selectedId != null ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Source files</CardTitle>
-            <CardDescription>
-              Upload and manage files attached to this knowledge source.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {uploadErr ? (
-              <Alert variant="destructive">
-                <AlertDescription className="text-sm">{uploadErr}</AlertDescription>
-              </Alert>
-            ) : null}
-            {uploadOk ? (
-              <Alert>
-                <AlertDescription className="text-sm">{uploadOk}</AlertDescription>
-              </Alert>
-            ) : null}
+        <ModuleCard
+          accent="teal"
+          eyebrow="Files"
+          title="Source files"
+          icon={Paperclip}
+          description="Upload and manage files attached to this knowledge source."
+        >
+          <div className="space-y-4">
+            {uploadErr ? <AlertCard variant="error" title="Upload error" description={uploadErr} /> : null}
+            {uploadOk ? <AlertCard variant="success" title="Recorded" description={uploadOk} /> : null}
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
                 <Label htmlFor="ks-file">file</Label>
@@ -721,8 +698,8 @@ export function KnowledgeSourceLibraryWorkspace() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       ) : null}
     </div>
   )

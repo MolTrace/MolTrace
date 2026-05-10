@@ -464,7 +464,7 @@ def index() -> str:
                     <label for="analysisInputMethod">Input method</label>
                     <select id="analysisInputMethod" onchange="setAnalysisInputMethod(this.value)">
                       <option value="paste">Paste processed ¹H NMR text</option>
-                      <option value="processed">Upload processed spectrum (.csv, .tsv, .jdx, .dx)</option>
+                      <option value="processed">Upload processed spectrum (.csv, .tsv, .txt, .jcamp, .jdx, .dx, .xy, .asc, .dat)</option>
                       <option value="fid">Upload raw FID archive - Bruker or Varian/Agilent 1D .zip/.tar.gz/.tgz</option>
                     </select>
                     <div id="analysisInputMethodHint" class="small muted" style="margin-top:.5rem;">Paste parseable ¹H NMR text with shifts, multiplicities, and integrations.</div>
@@ -672,7 +672,7 @@ def index() -> str:
                       <div class="grid2">
                         <div class="field">
                           <label for="carbon13SpectrumFile">Processed ¹³C spectrum or peak table</label>
-                          <input id="carbon13SpectrumFile" type="file" accept=".csv,.tsv,.jdx,.dx,.json" />
+                          <input id="carbon13SpectrumFile" type="file" accept=".csv,.tsv,.txt,.json,.jcamp,.jdx,.dx,.xy,.asc,.dat" />
                         </div>
                         <div class="field">
                           <label for="carbon13PeakSensitivity">¹³C peak sensitivity</label>
@@ -844,8 +844,8 @@ def index() -> str:
                       <div class="panel" style="margin:0;">
                         <h4 style="margin:.1rem 0 .45rem;">A. DEPT / APT carbon-type evidence</h4>
                         <div class="field">
-                          <label for="deptAptFile">DEPT/APT peak table CSV / TSV / JSON</label>
-                          <input id="deptAptFile" type="file" accept=".csv,.tsv,.json" />
+                          <label for="deptAptFile">DEPT/APT peak table CSV / TSV / TXT / JSON</label>
+                          <input id="deptAptFile" type="file" accept=".csv,.tsv,.txt,.json,.xy,.asc,.dat" />
                         </div>
                         <div class="grid2">
                           <div class="field">
@@ -875,8 +875,8 @@ def index() -> str:
                       <div class="panel" style="margin:0;">
                         <h4 style="margin:.1rem 0 .45rem;">B. 2D correlation evidence</h4>
                         <div class="field">
-                          <label for="nmr2dFile">2D peak table CSV / TSV / JSON</label>
-                          <input id="nmr2dFile" type="file" accept=".csv,.tsv,.json" />
+                          <label for="nmr2dFile">2D peak table CSV / TSV / TXT / JSON</label>
+                          <input id="nmr2dFile" type="file" accept=".csv,.tsv,.txt,.json,.jcamp,.jdx,.dx,.xy,.asc,.dat" />
                         </div>
                         <div class="grid2">
                           <div class="field">
@@ -973,8 +973,8 @@ def index() -> str:
                     </div>
                     <div class="grid2">
                       <div class="field">
-                        <label for="similarityReference2DFile">Reference 2D peak table CSV / TSV / JSON</label>
-                        <input id="similarityReference2DFile" type="file" accept=".csv,.tsv,.json" />
+                        <label for="similarityReference2DFile">Reference 2D peak table CSV / TSV / TXT / JSON</label>
+                        <input id="similarityReference2DFile" type="file" accept=".csv,.tsv,.txt,.json,.jcamp,.jdx,.dx,.xy,.asc,.dat" />
                         <div class="small muted">Observed 2D file uses the current 2D upload above; reference 2D is optional.</div>
                       </div>
                       <div class="field">
@@ -1606,8 +1606,8 @@ Unified NMR/MS confidence generated</textarea>
                       <div class="panel" style="margin:0;">
                         <h4 style="margin:.1rem 0 .45rem;">A. Import source</h4>
                         <div class="field">
-                          <label for="lcmsImportFile">Optional LC-MS/MS file</label>
-                          <input id="lcmsImportFile" type="file" accept=".mzml,.mzxml,.xml,.csv,.tsv,.txt,.raw,.d,.wiff" />
+                          <label for="lcmsImportFile">Optional LC-MS/MS spectrum file</label>
+                          <input id="lcmsImportFile" type="file" accept=".mzml,.mzxml,.mzdata,.imzml,.mgf,.cdf,.netcdf,.raw,.wiff,.wiff2,.d,.yep,.baf,.tdf,.tsf,.xml,.csv,.tsv,.txt,.json,.jcamp,.jdx,.dx,.xy,.asc,.dat" />
                           <div class="small muted">File upload is used when selected. Otherwise the text box below is imported.</div>
                         </div>
                         <div class="grid2">
@@ -1624,7 +1624,7 @@ Unified NMR/MS confidence generated</textarea>
                           </div>
                         </div>
                         <div class="field">
-                          <label for="lcmsImportText">mzML/mzXML text or processed peak table</label>
+                          <label for="lcmsImportText">mzML/mzXML text, vendor export, or processed peak table</label>
                           <textarea id="lcmsImportText" rows="8">scan_id,ms_level,rt_min,mz,intensity,precursor_mz
 ms1_001,1,0.50,47.04914,100,
 ms1_001,1,0.50,48.05249,2.3,
@@ -1677,9 +1677,9 @@ ms2_001,2,0.51,31.01839,25,47.04914</textarea>
                       <div class="panel" style="margin:0;">
                         <h4 style="margin:.1rem 0 .45rem;">A. Feature source</h4>
                         <div class="field">
-                          <label for="lcmsFeatureFile">Optional LC-MS/MS file</label>
-                          <input id="lcmsFeatureFile" type="file" accept=".mzml,.mzxml,.xml,.csv,.tsv,.txt,.raw,.d,.wiff" />
-                          <div class="small muted">Use the same mzML/mzXML or processed LC-MS peak table accepted by the import bridge.</div>
+                          <label for="lcmsFeatureFile">Optional LC-MS/MS spectrum file</label>
+                          <input id="lcmsFeatureFile" type="file" accept=".mzml,.mzxml,.mzdata,.imzml,.mgf,.cdf,.netcdf,.raw,.wiff,.wiff2,.d,.yep,.baf,.tdf,.tsf,.xml,.csv,.tsv,.txt,.json,.jcamp,.jdx,.dx,.xy,.asc,.dat" />
+                          <div class="small muted">Use the same LC-MS/MS spectrum or processed LC-MS peak table accepted by the import bridge.</div>
                         </div>
                         <div class="grid2">
                           <div class="field"><label for="lcmsFeatureFilename">Filename / source label</label><input id="lcmsFeatureFilename" placeholder="sample_001.mzML" /></div>
@@ -1889,8 +1889,8 @@ b_ms1_004,1,0.32,47.04914,3,</textarea>
                     <h3 style="margin:0 0 .45rem;">Processed spectrum upload</h3>
                     <div class="grid2">
                       <div class="field">
-                        <label for="spectrumFile">Spectrum file (.csv, .tsv, .jdx, .dx)</label>
-                        <input id="spectrumFile" type="file" accept=".csv,.tsv,.jdx,.dx" />
+                        <label for="spectrumFile">Spectrum file (.csv, .tsv, .txt, .jcamp, .jdx, .dx, .xy, .asc, .dat)</label>
+                        <input id="spectrumFile" type="file" accept=".csv,.tsv,.txt,.jcamp,.jdx,.dx,.xy,.asc,.dat" />
                       </div>
                       <div class="field">
                         <label for="frequencyMHz">Frequency (MHz)</label>
@@ -2304,7 +2304,7 @@ b_ms1_004,1,0.32,47.04914,3,</textarea>
           const hint = el("analysisInputMethodHint");
           if (hint) {
             hint.textContent = next === "processed"
-              ? "Upload a processed spectrum as CSV, TSV, JDX, or DX."
+              ? "Upload a processed spectrum as CSV, TSV, TXT, JCAMP, JDX, DX, XY, ASC, or DAT."
               : (next === "fid"
                 ? "Upload a Bruker 1D archive containing fid and acqus, or a Varian/Agilent archive containing fid and procpar. The raw archive is hashed and kept immutable."
                 : "Paste parseable ¹H NMR text with shifts, multiplicities, and integrations.");

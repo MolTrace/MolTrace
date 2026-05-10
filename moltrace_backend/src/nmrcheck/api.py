@@ -5474,6 +5474,7 @@ async def nmr_processed_preview_route(
                 mask_solvent_regions=False,
                 display_mode="real",
                 vertical_gain=1.0,
+                infer_peaks=False,
             )
             x_values, y_values = _xy_from_spectrum_points(preview.preview_points)
             metadata = {
@@ -5494,6 +5495,7 @@ async def nmr_processed_preview_route(
                 mask_solvent_regions=False,
                 display_mode="real",
                 vertical_gain=1.0,
+                infer_peaks=False,
             )
             x_values, y_values = _carbon13_preview_points(carbon_preview)
             metadata = {

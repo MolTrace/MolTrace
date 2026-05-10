@@ -1,0 +1,152 @@
+{
+  "capturedAt": "2026-05-10T14:01:46.121Z",
+  "openapiUrl": "http://localhost:8000/openapi.json",
+  "scannedFiles": 504,
+  "visualBaselineRoutes": 71,
+  "staticAppRoutes": 81,
+  "staticRoutesNotInBaseline": [
+    "/api-test",
+    "/dashboard/projects",
+    "/dashboard/reactions",
+    "/dashboard/regulatory",
+    "/dashboard/reports",
+    "/dashboard/roi",
+    "/dashboard/settings",
+    "/dashboard/spectroscopy",
+    "/mobile",
+    "/offline"
+  ],
+  "backendOperations": 781,
+  "frontendApiCalls": 669,
+  "missingCount": 0,
+  "unresolvedCount": 18,
+  "missing": [],
+  "unresolved": [
+    {
+      "file": "components/admin/mobile-tenant-summary-workspace.tsx",
+      "line": 162,
+      "column": 18,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "components/admin/system-status-workspace.tsx",
+      "line": 125,
+      "column": 28,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "components/admin/tenant-detail-workspace.tsx",
+      "line": 2795,
+      "column": 33,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "components/compounds/compound-detail-workspace.tsx",
+      "line": 213,
+      "column": 9,
+      "source": "apiFetch",
+      "reason": "Resolved path is not a backend-relative path: {param}"
+    },
+    {
+      "file": "components/compounds/compound-detail-workspace.tsx",
+      "line": 214,
+      "column": 9,
+      "source": "apiFetch",
+      "reason": "Resolved path is not a backend-relative path: {param}/structures"
+    },
+    {
+      "file": "components/compounds/compound-detail-workspace.tsx",
+      "line": 215,
+      "column": 9,
+      "source": "apiFetch",
+      "reason": "Resolved path is not a backend-relative path: {param}/aliases"
+    },
+    {
+      "file": "components/compounds/compound-detail-workspace.tsx",
+      "line": 216,
+      "column": 9,
+      "source": "apiFetch",
+      "reason": "Resolved path is not a backend-relative path: {param}/relationships"
+    },
+    {
+      "file": "components/compounds/compound-detail-workspace.tsx",
+      "line": 217,
+      "column": 9,
+      "source": "apiFetch",
+      "reason": "Resolved path is not a backend-relative path: {param}/evidence-links"
+    },
+    {
+      "file": "components/compounds/compound-detail-workspace.tsx",
+      "line": 267,
+      "column": 13,
+      "source": "apiFetch",
+      "reason": "Resolved path is not a backend-relative path: {param}/aliases"
+    },
+    {
+      "file": "components/compounds/compound-detail-workspace.tsx",
+      "line": 294,
+      "column": 13,
+      "source": "apiFetch",
+      "reason": "Resolved path is not a backend-relative path: {param}/relationships"
+    },
+    {
+      "file": "components/knowledge/knowledge-extraction-records-workspace.tsx",
+      "line": 135,
+      "column": 25,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "components/ml/ml-model-factory-dashboard.tsx",
+      "line": 188,
+      "column": 28,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "components/ml/ml-training-run-launcher.tsx",
+      "line": 146,
+      "column": 28,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "components/settings/method-registry-workspace.tsx",
+      "line": 143,
+      "column": 28,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "components/validation/validation-dashboard-workspace.tsx",
+      "line": 241,
+      "column": 28,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "src/components/mobile/MobileCommandCenter.tsx",
+      "line": 156,
+      "column": 25,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "src/components/mobile/MobileRegulatoryQueue.tsx",
+      "line": 159,
+      "column": 30,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    },
+    {
+      "file": "src/lib/dashboard/dashboard-cross-module-command-center.ts",
+      "line": 114,
+      "column": 19,
+      "source": "apiFetch",
+      "reason": "Could not statically resolve backend path expression."
+    }
+  ]
+}

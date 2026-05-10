@@ -6,10 +6,11 @@ import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -27,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Boxes, Link2, ListFilter, Microscope } from "lucide-react"
+import { Boxes, Database, Link2, ListFilter, Microscope, Plus, Search } from "lucide-react"
 import { trackCompoundCreated } from "@/src/lib/analytics/analytics-client"
 
 const COMPOUND_TYPES = [
@@ -292,64 +293,70 @@ export function CompoundRegistryWorkspace() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Boxes className="h-4 w-4 text-muted-foreground" />
-              Compounds
-            </CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Compounds</CardTitle>
+            <Boxes className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">{summary.compounds}</div>
-            <p className="text-xs text-muted-foreground">Listed compounds</p>
+          <CardContent className="pb-5">
+            <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{summary.compounds}</div>
+            <p className="mt-2 text-xs text-muted-foreground">Listed compounds</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <ListFilter className="h-4 w-4 text-muted-foreground" />
-              Active batches
-            </CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Active batches</CardTitle>
+            <ListFilter className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
+          <CardContent className="pb-5">
+            <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
               {summary.activeBatches == null ? "—" : summary.activeBatches}
             </div>
-            <p className="text-xs text-muted-foreground">When per-row batch counts are present</p>
+            <p className="mt-2 text-xs text-muted-foreground">When per-row batch counts are present</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Link2 className="h-4 w-4 text-muted-foreground" />
-              Evidence-linked compounds
-            </CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-green)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Evidence-linked compounds</CardTitle>
+            <Link2 className="h-4 w-4" style={{ color: "var(--mt-green)" }} aria-hidden />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">{summary.evidenceLinked}</div>
-            <p className="text-xs text-muted-foreground">Linked evidence indicators</p>
+          <CardContent className="pb-5">
+            <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-green)" }}>{summary.evidenceLinked}</div>
+            <p className="mt-2 text-xs text-muted-foreground">Linked evidence indicators</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Microscope className="h-4 w-4 text-muted-foreground" />
-              Compounds needing review
-            </CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-amber)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Compounds needing review</CardTitle>
+            <Microscope className="h-4 w-4" style={{ color: "var(--mt-amber)" }} aria-hidden />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">{summary.needingReview}</div>
-            <p className="text-xs text-muted-foreground">Status-based when returned</p>
+          <CardContent className="pb-5">
+            <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-amber)" }}>{summary.needingReview}</div>
+            <p className="mt-2 text-xs text-muted-foreground">Status-based when returned</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create compound</CardTitle>
-          <CardDescription>Add a compound record to the registry.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Form"
+        title="Create compound"
+        icon={Plus}
+        description="Add a compound record to the registry."
+      >
+        <div>
           <form className="space-y-4" onSubmit={handleCreate}>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
@@ -441,10 +448,7 @@ export function CompoundRegistryWorkspace() {
               </div>
             </div>
             {createErr ? (
-              <Alert variant="destructive">
-                <AlertTitle className="text-sm">Could not create</AlertTitle>
-                <AlertDescription className="text-xs">{createErr}</AlertDescription>
-              </Alert>
+              <AlertCard variant="error" title="Could not create" description={createErr} />
             ) : null}
             {createOk ? (
               <p className="text-sm text-muted-foreground">Compound created.</p>
@@ -453,22 +457,24 @@ export function CompoundRegistryWorkspace() {
               {createBusy ? "Creating…" : "Create compound"}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle className="text-base">Search</CardTitle>
-            <CardDescription>Filter the registry by identifiers and mass range.</CardDescription>
-          </div>
-          {searchActive ? (
+      <ModuleCard
+        accent="teal"
+        eyebrow="Catalog"
+        title="Search"
+        icon={Search}
+        description="Filter the registry by identifiers and mass range."
+        badge={
+          searchActive ? (
             <Button type="button" variant="outline" size="sm" onClick={clearSearch}>
               Clear search
             </Button>
-          ) : null}
-        </CardHeader>
-        <CardContent className="space-y-4">
+          ) : undefined
+        }
+      >
+        <div className="space-y-4">
           <form className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" onSubmit={handleSearch}>
             <div className="space-y-2">
               <Label htmlFor="cr-sf-name">name/alias</Label>
@@ -513,20 +519,19 @@ export function CompoundRegistryWorkspace() {
             </div>
           </form>
           {searchErr ? (
-            <Alert variant="destructive">
-              <AlertTitle className="text-sm">Search error</AlertTitle>
-              <AlertDescription className="text-xs">{searchErr}</AlertDescription>
-            </Alert>
+            <AlertCard variant="error" title="Search error" description={searchErr} />
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{searchActive ? "Search results" : "Compounds"}</CardTitle>
-          <CardDescription>List from the registry, or results after search.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="teal"
+        eyebrow="Registry"
+        title={searchActive ? "Search results" : "Compounds"}
+        icon={Database}
+        description="List from the registry, or results after search."
+      >
+        <div>
           {loading ? <p className="text-sm text-muted-foreground">Loading compounds…</p> : null}
           {!loading && rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">No compounds returned.</p>
@@ -592,8 +597,8 @@ export function CompoundRegistryWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
     </div>
   )

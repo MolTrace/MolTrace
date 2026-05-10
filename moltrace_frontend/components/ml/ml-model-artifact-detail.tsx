@@ -7,10 +7,8 @@ import { apiFetch } from "@/lib/api/client"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -30,8 +28,20 @@ import {
 } from "@/components/ui/table"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { trackMlModelCardCreated } from "@/src/lib/analytics/analytics-client"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BarChart3,
+  Boxes,
+  Cpu,
+  FileText,
+  Loader2,
+  Plus,
+  RefreshCw,
+} from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -247,7 +257,7 @@ export function MlModelArtifactDetail() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
               <Link href="/ml/models" className="inline-flex items-center gap-1 text-muted-foreground">
@@ -256,6 +266,12 @@ export function MlModelArtifactDetail() {
               </Link>
             </Button>
           </div>
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · ML Model Factory · Artifact
+          </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Model artifact</h1>
           <p className="font-mono text-sm text-muted-foreground">id {artifactIdNum}</p>
         </div>
@@ -270,10 +286,11 @@ export function MlModelArtifactDetail() {
       </div>
 
       {errArtifact ? (
-        <Alert variant="destructive">
-          <AlertTitle>GET /ml/model-artifacts/{"{model_artifact_id}"}</AlertTitle>
-          <AlertDescription>{errArtifact}</AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="error"
+          title={`GET /ml/model-artifacts/{model_artifact_id}`}
+          description={errArtifact}
+        />
       ) : null}
 
       {!artifact && !errArtifact && !loading ? (
@@ -282,12 +299,14 @@ export function MlModelArtifactDetail() {
 
       {artifact ? (
         <>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Summary</CardTitle>
-              <CardDescription>Operational fields from the API — release claims follow approval_status on model cards.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-2">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Overview"
+            title="Summary"
+            icon={Cpu}
+            description="Operational fields from the API — release claims follow approval_status on model cards."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">model_name / model_version</p>
                 <p className="text-sm font-medium">
@@ -318,17 +337,17 @@ export function MlModelArtifactDetail() {
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">status</p>
                 <Badge variant="secondary">{readRecordString(artifact, "status") ?? "—"}</Badge>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Evaluation runs</CardTitle>
-              <CardDescription>
-                Evaluation runs filtered to this model artifact — status and dataset version for each completed or pending evaluation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="table-scroll min-w-0">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Metrics"
+            title="Evaluation runs"
+            icon={BarChart3}
+            description="Evaluation runs filtered to this model artifact — status and dataset version for each completed or pending evaluation."
+          >
+            <div className="table-scroll min-w-0">
               {errEval ? (
                 <p className="text-sm text-destructive">{errEval}</p>
               ) : evalRuns.length === 0 ? (
@@ -360,20 +379,22 @@ export function MlModelArtifactDetail() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Model card</CardTitle>
-              <CardDescription className="flex flex-wrap items-center gap-2">
-                <span>Structured model card for this artifact — intended use, limitations, training data summary, and evaluation summary.</span>
-                <span className="inline-flex shrink-0">
-                  <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
-                </span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Card"
+            title={
+              <span className="flex items-center gap-2">
+                Model card
+                <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
+              </span>
+            }
+            icon={FileText}
+            description="Structured model card for this artifact — intended use, limitations, training data summary, and evaluation summary."
+          >
+            <div className="space-y-3">
               {errCards ? <p className="text-sm text-destructive">{errCards}</p> : null}
               {cards.length > 0 ? (
                 <ul className="space-y-2 text-sm">
@@ -401,17 +422,17 @@ export function MlModelArtifactDetail() {
               ) : (
                 <p className="text-sm text-muted-foreground">No model cards for this artifact.</p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Deployment candidates</CardTitle>
-              <CardDescription>
-                Deployment candidate records for this artifact — open the ML factory dashboard for the full deployment workflow.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Lineage"
+            title="Deployment candidates"
+            icon={Boxes}
+            description="Deployment candidate records for this artifact — open the ML factory dashboard for the full deployment workflow."
+          >
+            <div className="space-y-3">
               {errDeploy ? <p className="text-sm text-destructive">{errDeploy}</p> : null}
               {deployments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No deployment candidates for this artifact.</p>
@@ -432,41 +453,43 @@ export function MlModelArtifactDetail() {
                   })}
                 </ul>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Warnings</CardTitle>
-              <CardDescription>From artifact metadata_json when present.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {metaWarnings.length ? (
-                <ul className="list-inside list-disc text-sm text-muted-foreground">
-                  {metaWarnings.map((w, i) => (
-                    <li key={`w-${i}`}>{w}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">—</p>
-              )}
-            </CardContent>
-          </Card>
+          <ModuleCard
+            accent="teal"
+            eyebrow="Audit"
+            title="Warnings"
+            icon={AlertTriangle}
+            description="From artifact metadata_json when present."
+          >
+            {metaWarnings.length ? (
+              <ul className="list-inside list-disc text-sm text-muted-foreground">
+                {metaWarnings.map((w, i) => (
+                  <li key={`w-${i}`}>{w}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">—</p>
+            )}
+          </ModuleCard>
 
           <DeveloperJsonPanel data={artifact} />
 
           {cards.length === 0 ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
+            <ModuleCard
+              accent="teal"
+              eyebrow="Files"
+              title={
+                <span className="flex items-center gap-2">
                   Create model card
                   <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
-                </CardTitle>
-                <CardDescription>
-                  Draft a structured model card capturing intended use, limitations, training data summary, and evaluation summary for governance review.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+                </span>
+              }
+              icon={Plus}
+              description="Draft a structured model card capturing intended use, limitations, training data summary, and evaluation summary for governance review."
+            >
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="iu">intended_use</Label>
                   <Textarea id="iu" value={intendedUse} onChange={(e) => setIntendedUse(e.target.value)} rows={4} />
@@ -502,8 +525,8 @@ export function MlModelArtifactDetail() {
                   {createBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
                   Create model card
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           ) : (
             <p className="text-xs text-muted-foreground">
               Update fields on the{" "}

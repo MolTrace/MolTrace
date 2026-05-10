@@ -6,6 +6,7 @@ import { AiModulePredictionAugmentation } from "@/components/ai/ai-module-predic
 import { ReactionProgramInterfaceWorkspace } from "@/components/reaction-optimization/reaction-program-interface-workspace"
 import { RegulatoryIntelligenceLanding } from "@/components/regulatory-hub/regulatory-intelligence-landing"
 import { SpectraCheckWorkspace } from "@/components/spectracheck/spectracheck-workspace"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { MobileSpectraCheckReview } from "@/src/components/mobile/MobileSpectraCheckReview"
 
 export function ProgramsInterfaceWorkspace({
@@ -15,6 +16,8 @@ export function ProgramsInterfaceWorkspace({
   desktopMode?: boolean
   sessionId?: string | null
 }) {
+  const isMobile = useIsMobile()
+
   return (
     <Tabs defaultValue="spectracheck" className="space-y-6">
       <TabsList>
@@ -39,12 +42,10 @@ export function ProgramsInterfaceWorkspace({
       </TabsList>
 
       <TabsContent value="spectracheck" className="space-y-6">
-        {!desktopMode ? (
-          <div className="lg:hidden">
-            <MobileSpectraCheckReview sessionId={sessionId} />
-          </div>
+        {!desktopMode && isMobile ? (
+          <MobileSpectraCheckReview sessionId={sessionId} />
         ) : null}
-        <div className={desktopMode ? "" : "hidden lg:block"}>
+        <div className={desktopMode || !isMobile ? "" : "hidden"}>
           <SpectraCheckWorkspace />
         </div>
         <AiModulePredictionAugmentation

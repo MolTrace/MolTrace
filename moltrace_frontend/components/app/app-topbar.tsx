@@ -21,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { TenantSelector } from "@/components/app/tenant-selector"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
   Search,
   Bell,
@@ -42,57 +43,62 @@ interface AppTopbarProps {
 export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
   const [commandOpen, setCommandOpen] = useState(false)
   const router = useRouter()
+  const isMobile = useIsMobile()
 
   return (
     <>
       <header className="flex h-14 items-center justify-between border-b bg-background px-4">
         <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            className="hidden w-64 justify-start gap-2 text-muted-foreground sm:flex"
-            onClick={() => setCommandOpen(true)}
-          >
-            <Search className="h-4 w-4" />
-            <span className="flex-1 text-left">Search projects...</span>
-            <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-              <span className="text-xs">⌘</span>K
-            </kbd>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="sm:hidden"
-            onClick={() => setCommandOpen(true)}
-          >
-            <Search className="h-4 w-4" />
-          </Button>
+          {isMobile ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setCommandOpen(true)}
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-64 justify-start gap-2 text-muted-foreground"
+              onClick={() => setCommandOpen(true)}
+            >
+              <Search className="h-4 w-4" />
+              <span className="flex-1 text-left">Search projects...</span>
+              <kbd className="pointer-events-none flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden gap-2 font-mono text-xs font-semibold uppercase tracking-[0.06em] sm:flex"
-            onClick={onToggleEvidenceQueue}
-          >
-            <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
-            <span>AI Queue</span>
-            <Badge
-              variant="secondary"
-              className="ml-1 h-5 px-1.5 font-mono"
-              style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal)" }}
+          {isMobile ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleEvidenceQueue}
             >
-              3
-            </Badge>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="sm:hidden"
-            onClick={onToggleEvidenceQueue}
-          >
-            <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
-          </Button>
+              <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 font-mono text-xs font-semibold uppercase tracking-[0.06em]"
+              onClick={onToggleEvidenceQueue}
+            >
+              <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
+              <span>AI Queue</span>
+              <Badge
+                variant="secondary"
+                className="ml-1 h-5 px-1.5 font-mono"
+                style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal)" }}
+              >
+                3
+              </Badge>
+            </Button>
+          )}
 
           <TenantSelector />
 

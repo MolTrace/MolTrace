@@ -12,6 +12,31 @@ function coerceNumArray(v: unknown): number[] | null {
 
 export function extractSpectrumXY(payload: unknown): { x: number[]; y: number[] } | null {
   if (!isRecord(payload)) return null
+  const seen = new WeakSet<Record<string, unknown>>()
+
+  const tryPointRows = (rows: unknown) => {
+    if (!Array.isArray(rows)) return null
+    const x: number[] = []
+    const y: number[] = []
+    for (const row of rows) {
+      if (Array.isArray(row) && row.length >= 2) {
+        const xv = Number(row[0])
+        const yv = Number(row[1])
+        if (!Number.isFinite(xv) || !Number.isFinite(yv)) return null
+        x.push(xv)
+        y.push(yv)
+        continue
+      }
+      if (!isRecord(row)) return null
+      const xv = Number(row.shift_ppm ?? row.ppm ?? row.shift ?? row.delta ?? row.x)
+      const yv = Number(row.intensity ?? row.signal ?? row.y ?? row.amplitude ?? row.height ?? row.area)
+      if (!Number.isFinite(xv) || !Number.isFinite(yv)) return null
+      x.push(xv)
+      y.push(yv)
+    }
+    return x.length > 0 && x.length === y.length ? { x, y } : null
+  }
+
   const tryPair = (r: Record<string, unknown>) => {
     const xk = ["x", "ppm", "ppm_values", "chemical_shifts", "shifts"] as const
     const yk = ["y", "intensity", "intensities", "i", "absorption"] as const
@@ -26,25 +51,47 @@ export function extractSpectrumXY(payload: unknown): { x: number[]; y: number[] 
         if (yArr && yArr.length === xArr.length) return { x: xArr, y: yArr }
       }
     }
+    const rowKeys = ["preview_points", "points", "data", "trace"] as const
+    for (const key of rowKeys) {
+      if (!(key in r)) continue
+      const rows = tryPointRows(r[key])
+      if (rows) return rows
+    }
     return null
   }
 
-  const direct = tryPair(payload)
-  if (direct) return direct
+  const scan = (r: Record<string, unknown>, depth = 0): { x: number[]; y: number[] } | null => {
+    if (seen.has(r) || depth > 4) return null
+    seen.add(r)
 
-  if ("spectrum" in payload && isRecord(payload.spectrum)) {
-    const s = tryPair(payload.spectrum)
-    if (s) return s
+    const direct = tryPair(r)
+    if (direct) return direct
+
+    const nestedKeys = [
+      "spectrum",
+      "processed_spectrum",
+      "plot",
+      "preview",
+      "processed_preview",
+      "fid_preview",
+      "raw_preview",
+      "result",
+      "payload",
+      "response",
+      "metadata",
+      "original_spectrum_state",
+    ] as const
+
+    for (const key of nestedKeys) {
+      if (!(key in r) || !isRecord(r[key])) continue
+      const nested = scan(r[key], depth + 1)
+      if (nested) return nested
+    }
+
+    return null
   }
-  if ("processed_spectrum" in payload && isRecord(payload.processed_spectrum)) {
-    const s = tryPair(payload.processed_spectrum)
-    if (s) return s
-  }
-  if ("plot" in payload && isRecord(payload.plot)) {
-    const s = tryPair(payload.plot)
-    if (s) return s
-  }
-  return null
+
+  return scan(payload)
 }
 
 export function extractPeaksFromPayload(payload: unknown): SpectrumPeakAnnotation[] {

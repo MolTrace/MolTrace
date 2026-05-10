@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,11 +14,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
-import { ChevronDown, ServerOff } from "lucide-react"
+import {
+  ChevronDown,
+  Database,
+  Filter,
+  Search,
+  ScrollText,
+  ServerOff,
+} from "lucide-react"
 
 const AUDIT_SEARCH_TOOLTIP =
   "Audit search helps reconstruct who did what, when, and why across projects, sessions, evidence, reviews, reports, and admin actions."
@@ -235,12 +243,18 @@ export function AuditSearchWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-slate)" }}
+          >
+            MolTrace · Admin · Audit Search
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-mono text-2xl font-bold tracking-tight">Audit Search</h1>
             <InfoTooltip content={AUDIT_SEARCH_TOOLTIP} label="About Audit Search" />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Search the global audit log across all entities, actors, and events for compliance and forensics.
           </p>
           {!loading && backendUnreachable ? (
@@ -260,40 +274,58 @@ export function AuditSearchWorkspace() {
       </div>
 
       {backendUnreachable ? (
-        <Alert variant="destructive">
-          <AlertTitle>Backend unavailable</AlertTitle>
-          <AlertDescription className="text-xs">
-            Audit search is not reachable. Verify you&apos;re signed in as an administrator and try again.
-          </AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="error"
+          title="Backend unavailable"
+          description="Audit search is not reachable. Verify you're signed in as an administrator and try again."
+        />
       ) : null}
 
       {!backendUnreachable && err ? (
-        <Alert variant="destructive">
-          <AlertTitle>Request failed</AlertTitle>
-          <AlertDescription className="text-xs">{err}</AlertDescription>
-        </Alert>
+        <AlertCard variant="error" title="Request failed" description={err} />
       ) : null}
 
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Search summary</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Rows from API</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-slate)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Rows from API
+              </CardTitle>
+              <Database className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold tabular-nums">{loading ? "…" : String(rowsRaw.length)}</p>
-              <p className="text-xs text-muted-foreground">Before client date filter</p>
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-slate)" }}
+              >
+                {loading ? "…" : String(rowsRaw.length)}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Before client date filter</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Rows shown</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-slate)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Rows shown
+              </CardTitle>
+              <Filter className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
             </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold tabular-nums">{loading ? "…" : String(rowsDisplayed.length)}</p>
-              <p className="text-xs text-muted-foreground">After date range filter</p>
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: "var(--mt-slate)" }}
+              >
+                {loading ? "…" : String(rowsDisplayed.length)}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">After date range filter</p>
             </CardContent>
           </Card>
         </div>
@@ -301,14 +333,14 @@ export function AuditSearchWorkspace() {
 
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Filters</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Filters</CardTitle>
-            <CardDescription>
-              Narrow audit results by event type, entity, actor email, or free-text search. MolTrace and SpectraCheck projects use distinct entity types — pick whichever matches your investigation. The date range is applied locally after results load.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Search"
+          title="Filters"
+          icon={Search}
+          description="Narrow audit results by event type, entity, actor email, or free-text search. MolTrace and SpectraCheck projects use distinct entity types — pick whichever matches your investigation. The date range is applied locally after results load."
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="moltrace-project">project ID (MolTrace workspace)</Label>
               <Input
@@ -403,18 +435,20 @@ export function AuditSearchWorkspace() {
                 Apply search
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Audit events</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Audit events table</CardTitle>
-            <CardDescription>Rows after optional date-range refinement.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="slate"
+          eyebrow="Audit"
+          title="Audit events table"
+          icon={ScrollText}
+          description="Rows after optional date-range refinement."
+        >
+          <div>
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : (
@@ -477,8 +511,8 @@ export function AuditSearchWorkspace() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       <div>

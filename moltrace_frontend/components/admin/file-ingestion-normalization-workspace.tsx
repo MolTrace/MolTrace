@@ -7,9 +7,9 @@ import {
   trackIngestionRunCompleted,
   trackIngestionRunStarted,
 } from "@/src/lib/analytics/analytics-client"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,6 +21,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  ClipboardList,
+  Database,
+  FileSearch,
+  PlayCircle,
+  Workflow,
+} from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -340,22 +347,28 @@ export function FileIngestionNormalizationWorkspace() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-slate)" }}
+        >
+          MolTrace · Admin · File Ingestion
+        </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">File Ingestion + Normalization Dashboard</h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Track imported files, view normalized artifact outputs, and review derived output metadata. Imported data
           requires review.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create ingestion run</CardTitle>
-          <CardDescription>
-            Trigger a batch import of instrument or connector files into the platform.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Ingestion"
+        title="Create ingestion run"
+        icon={PlayCircle}
+        description="Trigger a batch import of instrument or connector files into the platform."
+      >
+        <div className="space-y-4">
           {ingestionError ? <p className="text-xs text-destructive">{ingestionError}</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
@@ -390,17 +403,17 @@ export function FileIngestionNormalizationWorkspace() {
           <Button type="button" disabled={createIngestionBusy} onClick={() => void createIngestionRun()}>
             {createIngestionBusy ? "Creating…" : "Create ingestion run"}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Ingestion runs table</CardTitle>
-          <CardDescription>
-            All ingestion runs across tenants. Click a run to view its detail and per-file outcomes.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Pipelines"
+        title="Ingestion runs table"
+        icon={Database}
+        description="All ingestion runs across tenants. Click a run to view its detail and per-file outcomes."
+      >
+        <div className="space-y-3">
           {loadingRuns ? <p className="text-sm text-muted-foreground">Loading ingestion runs…</p> : null}
           {!loadingRuns ? (
             <div className="overflow-x-auto rounded-md border">
@@ -462,17 +475,17 @@ export function FileIngestionNormalizationWorkspace() {
             </div>
           ) : null}
           {ingestionDetailError ? <p className="text-xs text-destructive">{ingestionDetailError}</p> : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Normalization action</CardTitle>
-          <CardDescription>
-            Run normalization on an ingested file and review the history of normalization runs for that file.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Normalize"
+        title="Normalization action"
+        icon={Workflow}
+        description="Run normalization on an ingested file and review the history of normalization runs for that file."
+      >
+        <div className="space-y-4">
           {normalizationError ? <p className="text-xs text-destructive">{normalizationError}</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
@@ -513,15 +526,17 @@ export function FileIngestionNormalizationWorkspace() {
               {loadingNormalizationRuns ? "Loading…" : "Refresh normalization runs"}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Normalization runs table</CardTitle>
-          <CardDescription>Normalization history for selected file ID.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="History"
+        title="Normalization runs table"
+        icon={ClipboardList}
+        description="Normalization history for selected file ID."
+      >
+        <div className="space-y-3">
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
@@ -576,15 +591,17 @@ export function FileIngestionNormalizationWorkspace() {
             </Table>
           </div>
           {normalizationDetailError ? <p className="text-xs text-destructive">{normalizationDetailError}</p> : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Selected run detail</CardTitle>
-          <CardDescription>Imported records and normalized artifact metadata require review.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-xs">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Detail"
+        title="Selected run detail"
+        icon={FileSearch}
+        description="Imported records and normalized artifact metadata require review."
+      >
+        <div className="space-y-3 text-xs">
           <div className="rounded-md border p-3">
             <p>
               <span className="font-semibold">ingestion run:</span> {selectedIngestionRun?.ingestion_run_id ?? "—"}
@@ -608,8 +625,8 @@ export function FileIngestionNormalizationWorkspace() {
             <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
             <pre className="mt-3 max-h-[24rem] overflow-auto text-[10px]">{JSON.stringify(developerJson, null, 2)}</pre>
           </details>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

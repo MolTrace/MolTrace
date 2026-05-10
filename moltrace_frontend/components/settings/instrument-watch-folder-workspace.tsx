@@ -48,8 +48,13 @@ const TARGET_PROGRAM_OPTIONS = ["spectracheck", "regulatory_hub", "reaction_opti
 const TARGET_ROUTE_OPTIONS = [
   "processed_nmr",
   "raw_fid",
+  "nmr2d",
+  "dept_apt",
   "msms",
+  "ms_raw",
   "lcms",
+  "lcms_raw",
+  "spectrum_file",
   "regulatory_source",
   "reaction_outcome",
   "other",

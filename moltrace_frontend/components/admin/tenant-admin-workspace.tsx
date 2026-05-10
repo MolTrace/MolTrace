@@ -4,12 +4,22 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  AlertTriangle,
+  Building2,
+  CheckCircle2,
+  Hourglass,
+  Rocket,
+  Table as TableIcon,
+  UserPlus,
+} from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -215,53 +225,118 @@ export function TenantAdminWorkspace() {
         <BackendStatusIndicator />
       </div>
 
-      <Alert className="border-warning/40 bg-warning/10">
-        <AlertDescription className="text-xs text-warning">
-          Tenant summaries must never display raw scientific data, connector credentials, or secrets.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Tenant data hygiene"
+        description="Tenant summaries must never display raw scientific data, connector credentials, or secrets."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">active tenants</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Active tenants
+            </CardTitle>
+            <Building2 className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.activeTenants}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-slate)" }}
+            >
+              {summary.activeTenants}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">pilots active</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-violet)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Pilots active
+            </CardTitle>
+            <Rocket className="h-4 w-4" style={{ color: "var(--mt-violet)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.pilotsActive}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              {summary.pilotsActive}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">tenants onboarding</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-slate)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Tenants onboarding
+            </CardTitle>
+            <Hourglass className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.tenantsOnboarding}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-slate)" }}
+            >
+              {summary.tenantsOnboarding}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">tenants at risk</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-amber)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Tenants at risk
+            </CardTitle>
+            <AlertTriangle className="h-4 w-4" style={{ color: "var(--mt-amber)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.tenantsAtRisk}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-amber)" }}
+            >
+              {summary.tenantsAtRisk}
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">go-live ready</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-green)" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Go-live ready
+            </CardTitle>
+            <CheckCircle2 className="h-4 w-4" style={{ color: "var(--mt-green)" }} aria-hidden />
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summary.goLiveReady}</CardContent>
+          <CardContent className="pb-5">
+            <div
+              className="font-mono text-3xl font-bold tabular-nums leading-none"
+              style={{ color: "var(--mt-green)" }}
+            >
+              {summary.goLiveReady}
+            </div>
+          </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tenant table</CardTitle>
-          <CardDescription>
-            All registered tenants with their organization, plan, and lifecycle status.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Tenants"
+        title="Tenant table"
+        icon={TableIcon}
+        description="All registered tenants with their organization, plan, and lifecycle status."
+      >
+        <div className="space-y-3">
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           {loading ? <p className="text-sm text-muted-foreground">Loading tenants…</p> : null}
           {!loading ? (
@@ -308,17 +383,17 @@ export function TenantAdminWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create tenant card</CardTitle>
-          <CardDescription>
-            Provision a new tenant organization with its initial plan and admin contact.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Form"
+        title="Create tenant card"
+        icon={UserPlus}
+        description="Provision a new tenant organization with its initial plan and admin contact."
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="tenant-admin-tenant-key">tenant key</Label>
@@ -380,8 +455,8 @@ export function TenantAdminWorkspace() {
               Refresh tenants
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

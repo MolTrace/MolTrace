@@ -197,7 +197,7 @@ export function AIEvidenceQueue({ onClose }: AIEvidenceQueueProps) {
   const reviewActionLabel = reviewDialog?.status === "approved" ? "Approve" : "Reject"
 
   return (
-    <aside className="fixed right-0 top-14 hidden h-[calc(100vh-3.5rem)] w-80 border-l bg-background lg:block">
+    <aside className="fixed right-0 top-14 h-[calc(100vh-3.5rem)] w-80 border-l bg-background">
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">

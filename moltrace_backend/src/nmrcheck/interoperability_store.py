@@ -593,8 +593,13 @@ def _file_kind_for_route(target_route: str) -> str:
     return {
         "processed_nmr": "processed_nmr",
         "raw_fid": "raw_fid",
+        "nmr2d": "nmr2d_peak_table",
+        "dept_apt": "dept_apt_peak_table",
         "msms": "ms_peak_table",
+        "ms_raw": "ms_raw",
         "lcms": "lcms_peak_table",
+        "lcms_raw": "lcms_raw",
+        "spectrum_file": "spectrum_vendor",
         "regulatory_source": "report",
         "reaction_outcome": "other",
     }.get(target_route, "other")

@@ -2,11 +2,22 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { AlertCircle, ArrowRight, CheckCircle2, LockKeyhole, PackageCheck } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  AlertCircle,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  ClipboardList,
+  Heart,
+  ListOrdered,
+  LockKeyhole,
+  PackageCheck,
+  Smartphone,
+} from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { apiFetch } from "@/lib/api/client"
 import { useTenant, type TenantModuleAccess } from "@/src/lib/tenant/tenant-context"
 
@@ -198,14 +209,16 @@ function MobileMetric({
   )
 }
 
-function ModuleOrderCard({ moduleAccess }: { moduleAccess: TenantModuleAccess[] }) {
+function ProgramOrderCard({ moduleAccess }: { moduleAccess: TenantModuleAccess[] }) {
   return (
-    <Card className="overflow-hidden">
-      <CardHeader>
-        <CardTitle className="text-base">Program Order</CardTitle>
-        <CardDescription>Locked modules stay visible in MolTrace's core sequence.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
+    <ModuleCard
+      accent="slate"
+      eyebrow="Programs"
+      title="Program Order"
+      icon={ListOrdered}
+      description="Locked modules stay visible in MolTrace's core sequence."
+    >
+      <div className="space-y-2">
         {moduleAccess.map((module, index) => (
           <div key={module.key} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-3">
             <div className="min-w-0">
@@ -217,8 +230,8 @@ function ModuleOrderCard({ moduleAccess }: { moduleAccess: TenantModuleAccess[] 
             </Badge>
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </ModuleCard>
   )
 }
 
@@ -343,46 +356,57 @@ export function MobileTenantSummaryWorkspace() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-0 pb-8 sm:px-2">
-      <div className="min-w-0 space-y-2">
-        <Badge variant="outline" className="w-fit">
-          Mobile review
-        </Badge>
-        <div className="min-w-0">
+      <div className="min-w-0 space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-slate)" }}
+        >
+          MolTrace · Admin · Mobile Tenant Summary
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="break-words font-mono text-2xl font-bold tracking-tight">Tenant Summary</h1>
-          <p className="mt-1 break-words text-sm text-muted-foreground">
-            Review tenant onboarding, customer success health, and procurement package status.
-          </p>
+          <Badge variant="outline" className="w-fit">
+            Mobile review
+          </Badge>
         </div>
+        <p className="mt-1 break-words text-sm text-muted-foreground">
+          Review tenant onboarding, customer success health, and procurement package status.
+        </p>
       </div>
 
-      <Alert>
-        <LockKeyhole className="h-4 w-4" />
-        <AlertDescription>
-          Mobile tenant views are for review and triage. Do not enter raw secrets, connector credentials, or raw
-          scientific data.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="info"
+        title="Mobile review only"
+        description="Mobile tenant views are for review and triage. Do not enter raw secrets, connector credentials, or raw scientific data."
+        icon={LockKeyhole}
+      />
 
       {!isAdmin ? (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>Non-admin users can review the current tenant only.</AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="info"
+          title="Limited tenant scope"
+          description="Non-admin users can review the current tenant only."
+          icon={AlertCircle}
+        />
       ) : null}
 
       {error ? (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="error"
+          title="Tenant summary error"
+          description={error}
+          icon={AlertCircle}
+        />
       ) : null}
 
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle className="break-words text-lg">{tenantDisplayName}</CardTitle>
-          <CardDescription>Customer deployment snapshot</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Tenant"
+        title={tenantDisplayName}
+        icon={Building2}
+        description="Customer deployment snapshot"
+      >
+        <div className="space-y-3">
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <MobileMetric label="Tenant status" value={normalizeLabel(summary.tenantStatus)} status={summary.tenantStatus} />
             <MobileMetric label="Pilot status" value={normalizeLabel(summary.pilotStatus)} status={summary.pilotStatus} />
@@ -399,17 +423,20 @@ export function MobileTenantSummaryWorkspace() {
             <MobileMetric label="Next task" value={busy ? "Loading" : summary.nextTask} />
             <MobileMetric label="Primary contact" value={busy ? "Loading" : summary.primaryContact} />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <ModuleOrderCard moduleAccess={moduleAccess} />
+      <ProgramOrderCard moduleAccess={moduleAccess} />
 
-      <Card id="onboarding" className="scroll-mt-24 overflow-hidden">
-        <CardHeader>
-          <CardTitle className="text-base">Onboarding</CardTitle>
-          <CardDescription>Review blockers and the next customer task.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <div id="onboarding" className="scroll-mt-24">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Onboarding"
+          title="Onboarding"
+          icon={ClipboardList}
+          description="Review blockers and the next customer task."
+        >
+          <div className="space-y-3">
           <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-3">
             <div className="min-w-0">
               <p className="text-xs font-medium text-muted-foreground">Onboarding status</p>
@@ -435,92 +462,103 @@ export function MobileTenantSummaryWorkspace() {
               <span className="min-w-0 break-words">No onboarding blockers returned.</span>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card id="health-score" className="scroll-mt-24 overflow-hidden">
-        <CardHeader>
-          <CardTitle className="text-base">Health Score</CardTitle>
-          <CardDescription>Review customer success status and recommended actions.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-3">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">Status</p>
-              <p className="break-words text-sm font-semibold">{normalizeLabel(summary.healthStatus)}</p>
-            </div>
-            <Badge variant={statusVariant(summary.healthStatus)} className="shrink-0 capitalize">
-              {normalizeLabel(summary.healthStatus)}
-            </Badge>
           </div>
+        </ModuleCard>
+      </div>
 
-          {summary.recommendedActions.length > 0 ? (
-            <div className="space-y-2">
-              {summary.recommendedActions.map((action) => (
-                <div key={action} className="flex min-w-0 items-start gap-2 rounded-md border p-3 text-sm">
-                  <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 break-words">{action}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-md border p-3 text-sm text-muted-foreground">No recommended actions returned.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card id="procurement-packages" className="scroll-mt-24 overflow-hidden">
-        <CardHeader>
-          <CardTitle className="text-base">Procurement Packages</CardTitle>
-          <CardDescription>Review safe package summaries without raw data or secrets.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {summary.procurementPackages.length > 0 ? (
-            summary.procurementPackages.map((item) => (
-              <div key={item.id || item.title} className="min-w-0 rounded-md border p-3">
-                <div className="flex min-w-0 items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="break-words text-sm font-semibold">{item.title}</p>
-                    <p className="mt-1 break-words text-xs text-muted-foreground">{normalizeLabel(item.packageType)}</p>
-                  </div>
-                  <Badge variant={statusVariant(item.status)} className="shrink-0 capitalize">
-                    {normalizeLabel(item.status)}
-                  </Badge>
-                </div>
-                <p className="mt-2 break-words text-xs text-muted-foreground">
-                  SHA-256: {item.sha256 ? shortHash(item.sha256) : "Not available"}
-                </p>
+      <div id="health-score" className="scroll-mt-24">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Health"
+          title="Health Score"
+          icon={Heart}
+          description="Review customer success status and recommended actions."
+        >
+          <div className="space-y-3">
+            <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">Status</p>
+                <p className="break-words text-sm font-semibold">{normalizeLabel(summary.healthStatus)}</p>
               </div>
-            ))
-          ) : (
-            <div className="flex min-w-0 items-start gap-2 rounded-md border p-3 text-sm text-muted-foreground">
-              <PackageCheck className="mt-0.5 h-4 w-4 shrink-0" />
-              <span className="min-w-0 break-words">No procurement packages returned.</span>
+              <Badge variant={statusVariant(summary.healthStatus)} className="shrink-0 capitalize">
+                {normalizeLabel(summary.healthStatus)}
+              </Badge>
             </div>
-          )}
 
-          {currentTenantId && currentTenantId !== LOCAL_TENANT_ID ? (
-            <Button asChild variant="outline" className="w-full">
-              <Link href={`/admin/tenants/${encodeURIComponent(currentTenantId)}`}>Open full tenant record</Link>
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
+            {summary.recommendedActions.length > 0 ? (
+              <div className="space-y-2">
+                {summary.recommendedActions.map((action) => (
+                  <div key={action} className="flex min-w-0 items-start gap-2 rounded-md border p-3 text-sm">
+                    <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 break-words">{action}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-md border p-3 text-sm text-muted-foreground">No recommended actions returned.</p>
+            )}
+          </div>
+        </ModuleCard>
+      </div>
+
+      <div id="procurement-packages" className="scroll-mt-24">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Procurement"
+          title="Procurement Packages"
+          icon={PackageCheck}
+          description="Review safe package summaries without raw data or secrets."
+        >
+          <div className="space-y-3">
+            {summary.procurementPackages.length > 0 ? (
+              summary.procurementPackages.map((item) => (
+                <div key={item.id || item.title} className="min-w-0 rounded-md border p-3">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-semibold">{item.title}</p>
+                      <p className="mt-1 break-words text-xs text-muted-foreground">{normalizeLabel(item.packageType)}</p>
+                    </div>
+                    <Badge variant={statusVariant(item.status)} className="shrink-0 capitalize">
+                      {normalizeLabel(item.status)}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 break-words text-xs text-muted-foreground">
+                    SHA-256: {item.sha256 ? shortHash(item.sha256) : "Not available"}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="flex min-w-0 items-start gap-2 rounded-md border p-3 text-sm text-muted-foreground">
+                <PackageCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                <span className="min-w-0 break-words">No procurement packages returned.</span>
+              </div>
+            )}
+
+            {currentTenantId && currentTenantId !== LOCAL_TENANT_ID ? (
+              <Button asChild variant="outline" className="w-full">
+                <Link href={`/admin/tenants/${encodeURIComponent(currentTenantId)}`}>Open full tenant record</Link>
+              </Button>
+            ) : null}
+          </div>
+        </ModuleCard>
+      </div>
 
       {summary.warnings.length > 0 ? (
-        <Card className="overflow-hidden">
-          <CardHeader>
-            <CardTitle className="text-base">Status Notes</CardTitle>
-            <CardDescription>Some tenant signals were unavailable.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Notes"
+          title="Status Notes"
+          icon={Smartphone}
+          description="Some tenant signals were unavailable."
+        >
+          <div className="space-y-2">
             {summary.warnings.map((warning) => (
               <p key={warning} className="break-words rounded-md border p-3 text-sm text-muted-foreground">
                 {warning}
               </p>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       ) : null}
     </div>
   )

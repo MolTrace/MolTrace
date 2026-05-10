@@ -42,6 +42,7 @@ import { RegulatoryNotificationsCompactCard } from "@/components/regulatory-hub/
 import { MobileCommandCenter } from "@/src/components/mobile/MobileCommandCenter"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { useOverviewData } from "@/components/app/overview-data-context"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { useTenant } from "@/src/lib/tenant/tenant-context"
 import {
   fetchDashboardQcAlertsAggregate,
@@ -302,6 +303,7 @@ const DEMO_RECENT_JOBS: DashboardJobRow[] = [
 
 export function DashboardV0() {
   const overview = useOverviewData()
+  const isMobile = useIsMobile()
   const tenantContext = useTenant()
   const {
     currentTenantId,
@@ -1007,9 +1009,9 @@ export function DashboardV0() {
 
       <DashboardPriorityCallout priorities={priorities} />
 
-      <div className="lg:hidden">
+      {isMobile ? (
         <MobileCommandCenter />
-      </div>
+      ) : null}
 
       <DashboardSection
         title="Overview"

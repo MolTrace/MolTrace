@@ -16,7 +16,6 @@ import {
   LEAKAGE_RISK_LABELS,
 } from "@/components/knowledge/knowledge-constants"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -39,7 +38,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { AlertTriangle, ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import {
+  ArrowLeft,
+  BarChart3,
+  Database,
+  GitBranch,
+  Loader2,
+  RefreshCw,
+  ShieldAlert,
+} from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -537,7 +546,13 @@ export function KnowledgeDatasetsDashboard() {
           </div>
         </div>
 
-        <div>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · Knowledge · Dataset Candidates
+          </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Dataset candidate dashboard</h1>
           <p className="text-sm text-muted-foreground">
             Governance-focused listing: identifiers and review metadata only. Do not treat aggregates as validation of
@@ -545,24 +560,21 @@ export function KnowledgeDatasetsDashboard() {
           </p>
         </div>
 
-        <Alert>
-          <AlertTriangle className="h-4 w-4" aria-hidden />
-          <AlertTitle className="text-sm">Review before ML use</AlertTitle>
-          <AlertDescription className="text-sm text-muted-foreground">
-            Dataset candidates reference reviewed records; approval workflows and leakage checks must complete before
-            training or benchmarking.
-          </AlertDescription>
-        </Alert>
+        <AlertCard
+          variant="warning"
+          title="Review before ML use"
+          description="Dataset candidates reference reviewed records; approval workflows and leakage checks must complete before training or benchmarking."
+        />
 
         {/* 1. Training */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">1. Training dataset candidates</CardTitle>
-            <CardDescription>
-              Curated knowledge claims nominated for ML model training — identifiers, record type, review metadata, and curation status.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Training"
+          title="1. Training dataset candidates"
+          icon={Database}
+          description="Curated knowledge claims nominated for ML model training — identifiers, record type, review metadata, and curation status."
+        >
+          <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
                 <Label>status filter</Label>
@@ -761,18 +773,18 @@ export function KnowledgeDatasetsDashboard() {
                 </CardContent>
               </Card>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {/* 2. Benchmark */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">2. Benchmark dataset candidates</CardTitle>
-            <CardDescription>
-              Knowledge claims nominated for ML benchmark evaluation — includes leakage risk label and split recommendation. Citation IDs are not modeled on benchmark candidates and display as blank.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Benchmark"
+          title="2. Benchmark dataset candidates"
+          icon={Database}
+          description="Knowledge claims nominated for ML benchmark evaluation — includes leakage risk label and split recommendation. Citation IDs are not modeled on benchmark candidates and display as blank."
+        >
+          <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
                 <Label>status filter</Label>
@@ -998,18 +1010,18 @@ export function KnowledgeDatasetsDashboard() {
                 </CardContent>
               </Card>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {/* 3. Dataset versions */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">3. Dataset versions</CardTitle>
-            <CardDescription>
-              Versioned snapshots of training and benchmark splits — each version locks candidate IDs into train, validation, test, and holdout partitions for reproducible model training.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Versions"
+          title="3. Dataset versions"
+          icon={GitBranch}
+          description="Versioned snapshots of training and benchmark splits — each version locks candidate IDs into train, validation, test, and holdout partitions for reproducible model training."
+        >
+          <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
                 <Label>status filter</Label>
@@ -1272,31 +1284,49 @@ export function KnowledgeDatasetsDashboard() {
                 </CardContent>
               </Card>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {/* 4. Leakage */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">4. Leakage risk warnings</CardTitle>
-            <CardDescription>
-              Aggregated from benchmark <code className="text-xs">leakage_risk_label</code> and dataset version{" "}
-              <code className="text-xs">leakage_warnings_json</code> (summaries only).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Leakage"
+          title="4. Leakage risk warnings"
+          icon={ShieldAlert}
+          description="Aggregated from benchmark leakage_risk_label and dataset version leakage_warnings_json (summaries only)."
+        >
+          <div className="space-y-4">
             <div className="flex flex-wrap gap-3">
-              {(["low", "medium", "high", "unknown"] as const).map((k) => (
-                <Card key={k} className="min-w-[120px] flex-1">
-                  <CardHeader className="py-3 pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">leakage_risk_label · {k}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="text-2xl font-semibold tabular-nums">{leakageAnalytics.counts[k] ?? 0}</div>
-                    <p className="text-xs text-muted-foreground">benchmark rows</p>
-                  </CardContent>
-                </Card>
-              ))}
+              {(["low", "medium", "high", "unknown"] as const).map((k) => {
+                const stripe =
+                  k === "high"
+                    ? "var(--mt-red)"
+                    : k === "medium"
+                      ? "var(--mt-amber)"
+                      : k === "low"
+                        ? "var(--mt-green)"
+                        : "var(--mt-teal)"
+                return (
+                  <Card
+                    key={k}
+                    className="min-w-[140px] flex-1 overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: `3px solid ${stripe}` }}
+                  >
+                    <CardContent className="space-y-1 pt-5 pb-5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        leakage_risk_label · {k}
+                      </p>
+                      <div
+                        className="font-mono text-3xl font-bold tabular-nums leading-none"
+                        style={{ color: stripe }}
+                      >
+                        {leakageAnalytics.counts[k] ?? 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground">benchmark rows</p>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
             {leakageAnalytics.warnings.length === 0 ? (
               <p className="text-sm text-muted-foreground">No leakage_warnings_json entries on loaded dataset versions.</p>
@@ -1309,19 +1339,18 @@ export function KnowledgeDatasetsDashboard() {
                 ))}
               </ul>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {/* 5. Quality */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">5. Quality flags</CardTitle>
-            <CardDescription>
-              Counts from training and benchmark <code className="text-xs">quality_flags_json</code> (flag strings
-              only).
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="teal"
+          eyebrow="Quality"
+          title="5. Quality flags"
+          icon={BarChart3}
+          description="Counts from training and benchmark quality_flags_json (flag strings only)."
+        >
+          <div>
             {qualityFlagAnalytics.length === 0 ? (
               <p className="text-sm text-muted-foreground">No quality flags on loaded candidates.</p>
             ) : (
@@ -1342,8 +1371,8 @@ export function KnowledgeDatasetsDashboard() {
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
     </TooltipProvider>
   )

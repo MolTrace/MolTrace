@@ -7,6 +7,7 @@ import { trackFileUploaded } from "@/src/lib/analytics/analytics-client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
 import { buildAnalysisJobPayload } from "@/src/lib/spectracheck/buildAnalysisJobPayload"
 import { normalizeSessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
+import { SPECTRACHECK_PROCESSED_NMR_SPECTRUM_ACCEPT } from "@/src/lib/spectracheck/spectrum-file-formats"
 import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
 import { SpectrumViewer, type SpectrumPeakAnnotation } from "@/components/science/SpectrumViewer"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
@@ -26,13 +27,30 @@ import {
 } from "@/components/spectracheck/spectracheck-nmr-endpoint-messages"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+import {
+  AlertTriangle,
+  BarChart3,
+  ChevronDown,
+  Eye,
+  FileText,
+  Hash,
+  PlayCircle,
+  RotateCcw,
+  Settings2,
+  Sparkles,
+  Upload,
+  X,
+  Zap,
+} from "lucide-react"
 
 type Props = {
   sampleId: string
@@ -67,6 +85,37 @@ export function SpectraCheckProcessedSpectrumSection({
   const [previewLoading, setPreviewLoading] = useState(false)
   const [analyzeLoading, setAnalyzeLoading] = useState(false)
 
+  // Drop-zone UI state — file is mirrored into fileRef.files via DataTransfer.
+  const [dragOver, setDragOver] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  function attachFile(file: File) {
+    setSelectedFile(file)
+    setSelectedFileName(file.name)
+
+    if (fileRef.current && typeof DataTransfer !== "undefined") {
+      try {
+        const dt = new DataTransfer()
+        dt.items.add(file)
+        fileRef.current.files = dt.files
+      } catch {
+        // Some browsers/test environments do not allow assigning FileList.
+      }
+    }
+  }
+
+  function getSelectedFile() {
+    return fileRef.current?.files?.[0] ?? selectedFile
+  }
+
+  function clearSelectedFile() {
+    if (fileRef.current) fileRef.current.value = ""
+    setSelectedFile(null)
+    setSelectedFileName(null)
+  }
+
   const pushDev = useCallback(
     (key: string, value: unknown) => {
       registerDev?.(key, value)
@@ -76,7 +125,7 @@ export function SpectraCheckProcessedSpectrumSection({
 
   async function ensureProcessedInputFileId(): Promise<string | null> {
     if (sessionFileIdChoice.trim()) return sessionFileIdChoice.trim()
-    const file = fileRef.current?.files?.[0]
+    const file = getSelectedFile()
     if (!file) return null
     const fd = new FormData()
     fd.append("file", file)
@@ -166,7 +215,7 @@ export function SpectraCheckProcessedSpectrumSection({
   }
 
   async function runPreview() {
-    const file = fileRef.current?.files?.[0]
+    const file = getSelectedFile()
     if (!file) {
       setPreviewError("Choose a processed spectrum file.")
       return
@@ -188,7 +237,7 @@ export function SpectraCheckProcessedSpectrumSection({
   }
 
   async function runAnalyze() {
-    const file = fileRef.current?.files?.[0]
+    const file = getSelectedFile()
     if (!file) {
       setAnalyzeError("Choose a processed spectrum file.")
       return
@@ -217,6 +266,8 @@ export function SpectraCheckProcessedSpectrumSection({
     setPreviewError("")
     setAnalyzeError("")
     if (fileRef.current) fileRef.current.value = ""
+    setSelectedFile(null)
+    setSelectedFileName(null)
   }
 
   const displayPayload = analyzeResult ?? previewResult
@@ -235,156 +286,401 @@ export function SpectraCheckProcessedSpectrumSection({
 
   return (
     <div className="space-y-6">
+      {/* ── Step 1 — Setup & Upload ────────────────────────────────────── */}
       <ModuleCard
         accent="teal"
-        eyebrow="Spectroscopy · Processed Upload"
-        title="Processed 1H / 13C Spectrum Upload"
-        description="Upload a processed 1H or 13C NMR spectrum for peak preview and quantitative chemical-shift analysis."
+        eyebrow="Step 1 · Setup"
+        title="Configure & upload spectrum"
+        icon={Upload}
+        description="Set sample metadata, choose nucleus, and drop a processed 1H or 13C NMR spectrum file."
         className="min-w-0"
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* Sample ID + Solvent */}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="proc-sample">Sample ID</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="proc-sample" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Sample ID
+              </Label>
               <Input
                 id="proc-sample"
                 value={sampleId}
                 onChange={(e) => onSampleIdChange(e.target.value)}
+                className="font-mono"
               />
-              <p className="text-xs text-muted-foreground">Uses SpectraCheck shared session sample ID.</p>
+              <p className="text-[11px] text-muted-foreground">Shared with SpectraCheck session.</p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="proc-solvent">Solvent</Label>
-              <Input id="proc-solvent" value={solvent} readOnly className="bg-muted/40" />
+            <div className="space-y-1.5">
+              <Label htmlFor="proc-solvent" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Solvent <span className="ml-1 text-[10px] font-normal text-muted-foreground/70">(read-only)</span>
+              </Label>
+              <Input id="proc-solvent" value={solvent} readOnly className="bg-muted/40 font-mono" />
             </div>
           </div>
 
+          {/* Nucleus pill toggle + spectrometer frequency */}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="proc-nucleus">Nucleus</Label>
-              <select
-                id="proc-nucleus"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-                value={nucleus}
-                onChange={(e) => setNucleus(e.target.value as "1H" | "13C")}
-              >
-                <option value="1H">1H</option>
-                <option value="13C">13C</option>
-              </select>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Nucleus</Label>
+              <div className="inline-flex rounded-lg border border-input bg-background p-0.5">
+                {(["1H", "13C"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setNucleus(option)}
+                    className={cn(
+                      "rounded-md px-4 py-1.5 font-mono text-sm font-bold transition-colors",
+                      nucleus === option
+                        ? "shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    style={
+                      nucleus === option
+                        ? { backgroundColor: "var(--mt-teal)", color: "#04080F" }
+                        : undefined
+                    }
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="proc-mhz">Spectrometer frequency (MHz)</Label>
-              <Input
-                id="proc-mhz"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
-                min={0}
-                value={spectrometerMhz}
-                onChange={(e) => setSpectrometerMhz(e.target.value)}
-              />
+            <div className="space-y-1.5">
+              <Label htmlFor="proc-mhz" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Spectrometer frequency
+              </Label>
+              <div className="flex items-stretch overflow-hidden rounded-md border border-input">
+                <Input
+                  id="proc-mhz"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  min={0}
+                  value={spectrometerMhz}
+                  onChange={(e) => setSpectrometerMhz(e.target.value)}
+                  className="rounded-none border-0 font-mono"
+                />
+                <span className="flex items-center bg-muted/60 px-3 font-mono text-xs text-muted-foreground">MHz</span>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="proc-file">Processed spectrum file</Label>
-            <Input
+          {/* Drop-zone file picker */}
+          <div className="space-y-1.5">
+            <Label htmlFor="proc-file" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Processed spectrum file
+            </Label>
+            {/*
+              Drop zone is a div + onClick (not a <label>). Reasons:
+              - Two <label htmlFor="proc-file"> elements (one above + one wrapping)
+                make file-picker activation unreliable across browsers.
+              - shadcn <Input> applies h-9 w-full classes that override sr-only.
+              We use an explicit fileRef.current?.click() and a plain native input.
+            */}
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Drop processed spectrum file or press Enter to browse"
+              onClick={() => fileRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  fileRef.current?.click()
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOver(false)
+                const file = e.dataTransfer.files?.[0]
+                if (file) attachFile(file)
+              }}
+              className={cn(
+                "group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--mt-teal)] focus-visible:ring-offset-2",
+                dragOver
+                  ? "border-[color:var(--mt-teal)] bg-[color:var(--mt-teal-soft)]"
+                  : selectedFileName
+                  ? "border-[color:var(--mt-teal)]/40 bg-[color:var(--mt-teal-soft)]/40"
+                  : "border-input hover:border-[color:var(--mt-teal)]/60 hover:bg-muted/30"
+              )}
+            >
+              <Upload
+                className="mb-2 h-7 w-7"
+                style={{ color: dragOver || selectedFileName ? "var(--mt-teal)" : undefined }}
+                aria-hidden
+              />
+              <p className="font-mono text-sm font-bold tracking-tight">
+                {selectedFileName ? "File ready" : dragOver ? "Drop to attach" : "Drop spectrum file or click to browse"}
+              </p>
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                CSV · TSV · TXT · JCAMP-DX · vendor exports
+              </p>
+            </div>
+            {/* Native input — sr-only so shadcn classes don't override the hidden sizing. */}
+            <input
               id="proc-file"
               ref={fileRef}
               type="file"
-              accept=".csv,.tsv,.txt,.jcamp,.jdx,.dx"
-              className="w-full min-w-0"
+              accept={SPECTRACHECK_PROCESSED_NMR_SPECTRUM_ACCEPT}
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  setSelectedFile(file)
+                  setSelectedFileName(file.name)
+                } else {
+                  setSelectedFile(null)
+                  setSelectedFileName(null)
+                }
+              }}
             />
+            {selectedFileName ? (
+              <div
+                className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+                style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <FileText className="h-4 w-4 shrink-0" style={{ color: "var(--mt-teal)" }} aria-hidden />
+                  <span className="truncate font-mono text-xs">{selectedFileName}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearSelectedFile}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Remove selected file"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </div>
+            ) : null}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="proc-session-file">Session file (optional)</Label>
-            <select
-              id="proc-session-file"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-              value={sessionFileIdChoice}
-              onChange={(e) => setSessionFileIdChoice(e.target.value)}
+          {/* Advanced — collapsible */}
+          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-left transition-colors hover:bg-muted/30"
+              >
+                <span className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                    Advanced options
+                  </span>
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 text-muted-foreground transition-transform",
+                    advancedOpen && "rotate-180"
+                  )}
+                  aria-hidden
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="proc-session-file" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Reuse session file
+                </Label>
+                <select
+                  id="proc-session-file"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 font-mono text-sm shadow-xs outline-none"
+                  value={sessionFileIdChoice}
+                  onChange={(e) => setSessionFileIdChoice(e.target.value)}
+                >
+                  <option value="">— none — use file above</option>
+                  {(ws?.sessionFiles ?? []).map((f) => (
+                    <option key={f.file_id} value={f.file_id}>
+                      {f.filename} ({f.file_kind})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-muted-foreground">
+                  Reuse a file already uploaded to <code className="text-[10px]">/files/upload</code> and attached to this session.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="proc-nmr-text" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  NMR text reference
+                </Label>
+                <Textarea
+                  id="proc-nmr-text"
+                  value={nmrTextOptional}
+                  onChange={(e) => setNmrTextOptional(e.target.value)}
+                  rows={3}
+                  placeholder="Optional — forwarded as nmr_text when non-empty"
+                  className="min-h-0 w-full min-w-0 font-mono text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="proc-cand" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Candidate list (analyze)
+                </Label>
+                <Textarea
+                  id="proc-cand"
+                  value={candidatesOptional}
+                  onChange={(e) => setCandidatesOptional(e.target.value)}
+                  rows={4}
+                  placeholder="Leave empty to use shared candidate structures from the session card above"
+                  className="min-h-0 w-full min-w-0 font-mono text-xs"
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </ModuleCard>
+
+      {/* ── Step 2 — Run ───────────────────────────────────────────────── */}
+      <ModuleCard
+        accent="teal"
+        eyebrow="Step 2 · Run"
+        title="Preview or analyze"
+        icon={Zap}
+        description="Preview the spectrum to inspect peaks, or run full evidence analysis against candidate structures."
+        className="min-w-0"
+      >
+        <div className="space-y-4">
+          {/* Two prominent action tiles */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Preview tile */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  disabled={previewLoading}
+                  onClick={runPreview}
+                  className={cn(
+                    "group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                    "hover:-translate-y-px hover:shadow-md",
+                    previewLoading
+                      ? "cursor-wait opacity-70"
+                      : "border-input hover:border-[color:var(--mt-teal)]/40"
+                  )}
+                  style={{
+                    borderTop: "3px solid var(--mt-teal)",
+                  }}
+                >
+                  <div className="flex w-full items-center justify-between">
+                    <span
+                      className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      <Eye className="h-3.5 w-3.5" aria-hidden />
+                      Preview
+                    </span>
+                    <span className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      Quick look
+                    </span>
+                  </div>
+                  <span className="font-mono text-base font-bold leading-tight">
+                    {previewLoading ? "Previewing…" : "Inspect spectrum"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Show peaks, intensities, and shape before running evidence matching.
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                POST /nmr/processed/preview
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Analyze tile (primary) */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  disabled={analyzeLoading}
+                  onClick={runAnalyze}
+                  className={cn(
+                    "group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                    "hover:-translate-y-px hover:shadow-md",
+                    analyzeLoading
+                      ? "cursor-wait opacity-70"
+                      : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                  )}
+                  style={{
+                    borderTop: "3px solid var(--mt-teal)",
+                    backgroundColor: "var(--mt-teal-soft)",
+                  }}
+                >
+                  <div className="flex w-full items-center justify-between">
+                    <span
+                      className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                      Analyze
+                    </span>
+                    <span
+                      className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      Recommended
+                    </span>
+                  </div>
+                  <span className="font-mono text-base font-bold leading-tight">
+                    {analyzeLoading ? "Analyzing…" : "Run evidence match"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Detect peaks and match against candidate structures with scoring.
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                POST /nmr/processed/analyze
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Background job + clear row */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed bg-muted/20 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <PlayCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Background job
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 font-mono text-[11px]"
+                onClick={() => void startProcessedPreviewJob()}
+              >
+                Preview
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 font-mono text-[11px]"
+                onClick={() => void startProcessedAnalyzeJob()}
+              >
+                Analyze
+              </Button>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 font-mono text-[11px] text-muted-foreground"
+              onClick={clearAll}
             >
-              <option value="">— none — use file input above</option>
-              {(ws?.sessionFiles ?? []).map((f) => (
-                <option key={f.file_id} value={f.file_id}>
-                  {f.filename} ({f.file_kind})
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Reuse a file already uploaded to <code className="text-xs">/files/upload</code> and attached to this session.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="proc-nmr-text">Optional NMR text reference</Label>
-            <Textarea
-              id="proc-nmr-text"
-              value={nmrTextOptional}
-              onChange={(e) => setNmrTextOptional(e.target.value)}
-              rows={3}
-              placeholder="Optional — forwarded as nmr_text when non-empty"
-              className="min-h-0 w-full min-w-0"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="proc-cand">Optional candidate list (analyze)</Label>
-            <Textarea
-              id="proc-cand"
-              value={candidatesOptional}
-              onChange={(e) => setCandidatesOptional(e.target.value)}
-              rows={4}
-              placeholder="Leave empty to use shared candidate structures from the session card above"
-              className="min-h-0 w-full min-w-0"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex w-full sm:w-auto">
-                  <Button type="button" variant="secondary" className="w-full sm:w-auto" disabled={previewLoading} onClick={runPreview}>
-                    {previewLoading ? "Previewing…" : "Preview processed spectrum"}
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                Preview uploaded processed spectrum data before running evidence analysis.
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex w-full sm:w-auto">
-                  <Button type="button" className="w-full sm:w-auto" disabled={analyzeLoading} onClick={runAnalyze}>
-                    {analyzeLoading ? "Analyzing…" : "Analyze processed spectrum"}
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                Run backend peak detection and evidence matching on the uploaded processed spectrum.
-              </TooltipContent>
-            </Tooltip>
-            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={clearAll}>
-              Clear processed spectrum
+              <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden />
+              Clear
             </Button>
           </div>
 
-          <div className="space-y-3 border-t pt-4">
-            <p className="text-xs font-medium text-muted-foreground">Analysis jobs (run in the background)</p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void startProcessedPreviewJob()}>
-                Start as job (preview)
-              </Button>
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void startProcessedAnalyzeJob()}>
-                Start as job (analyze)
-              </Button>
-            </div>
-            {jobActionError ? (
-              <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">{jobActionError}</div>
-            ) : null}
-          </div>
+          {jobActionError ? (
+            <AlertCard variant="warning" title="Job error" description={jobActionError} />
+          ) : null}
 
           {analysisJob.jobId ? (
             <AnalysisJobTimeline
@@ -404,26 +700,160 @@ export function SpectraCheckProcessedSpectrumSection({
         </div>
       </ModuleCard>
 
+      {/* ── Loading skeleton ─────────────────────────────────────────── */}
       {(previewLoading || analyzeLoading) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{previewLoading ? "Preview…" : "Analyze…"}</CardTitle>
-            <CardDescription>Waiting for API response</CardDescription>
-          </CardHeader>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardContent className="flex items-center gap-3 py-5">
+            <div
+              className="h-2 w-2 animate-pulse rounded-full"
+              style={{ backgroundColor: "var(--mt-teal)" }}
+              aria-hidden
+            />
+            <p className="font-mono text-sm font-bold tracking-tight">
+              {previewLoading ? "Previewing spectrum…" : "Analyzing spectrum…"}
+            </p>
+            <p className="text-xs text-muted-foreground">Waiting for API response</p>
+          </CardContent>
         </Card>
       )}
 
+      {/* ── Step 3 — Results ──────────────────────────────────────────── */}
       {displayPayload != null && !previewLoading && !analyzeLoading && (
-        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
-          <div className="min-w-0 space-y-4">
-            <SpectrumViewer
-              x={xy?.x ?? []}
-              y={xy?.y ?? []}
-              peaks={peaks}
-              overlays={overlays}
-              nucleus={nucleus}
-            />
-            <div className="flex flex-wrap gap-2">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Step 3 · Results"
+          title={analyzeResult != null ? "Analysis output" : "Preview output"}
+          icon={BarChart3}
+          description={
+            analyzeResult != null
+              ? "Spectrum, picked peaks, and matching score from /nmr/processed/analyze."
+              : "Spectrum and picked peaks from /nmr/processed/preview."
+          }
+          className="min-w-0"
+        >
+          <div className="space-y-4">
+            {/* KPI tiles */}
+            {(peakCount != null || score != null || warnings.length > 0) && (
+              <div className="grid gap-3 sm:grid-cols-3">
+                {peakCount != null && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-teal)" }}
+                  >
+                    <CardContent className="space-y-1 py-3">
+                      <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        <Hash className="h-3 w-3" aria-hidden />
+                        Peak count
+                      </p>
+                      <p
+                        className="font-mono text-2xl font-bold leading-none tabular-nums"
+                        style={{ color: "var(--mt-teal)" }}
+                      >
+                        {peakCount}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {score != null && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{
+                      borderTop: `3px solid ${
+                        score >= 0.8
+                          ? "var(--mt-green)"
+                          : score >= 0.5
+                          ? "var(--mt-amber)"
+                          : "var(--mt-red)"
+                      }`,
+                    }}
+                  >
+                    <CardContent className="space-y-1 py-3">
+                      <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        <Sparkles className="h-3 w-3" aria-hidden />
+                        Analysis score
+                      </p>
+                      <p
+                        className="font-mono text-2xl font-bold leading-none tabular-nums"
+                        style={{
+                          color:
+                            score >= 0.8
+                              ? "var(--mt-green)"
+                              : score >= 0.5
+                              ? "var(--mt-amber)"
+                              : "var(--mt-red)",
+                        }}
+                      >
+                        {score.toFixed(2)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {warnings.length > 0 && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-amber)" }}
+                  >
+                    <CardContent className="space-y-1 py-3">
+                      <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        <AlertTriangle className="h-3 w-3" aria-hidden />
+                        Warnings
+                      </p>
+                      <p
+                        className="font-mono text-2xl font-bold leading-none tabular-nums"
+                        style={{ color: "var(--mt-amber)" }}
+                      >
+                        {warnings.length}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* Spectrum — full page width */}
+            <div className="min-w-0">
+              {xy ? (
+                <SpectrumViewer
+                  x={xy.x}
+                  y={xy.y}
+                  peaks={peaks}
+                  overlays={overlays}
+                  nucleus={nucleus}
+                />
+              ) : (
+                <AlertCard
+                  variant="warning"
+                  title="Spectrum preview unavailable"
+                  description="The preview completed, but no display-ready spectrum points were returned. Try Analyze or inspect the response details below."
+                />
+              )}
+            </div>
+
+            {/* Use Unified Evidence — prominent CTA row right under the spectrum */}
+            <div
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+              style={{
+                borderTop: "3px solid var(--mt-teal)",
+                backgroundColor: "var(--mt-teal-soft)",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
+                <div>
+                  <p
+                    className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                    style={{ color: "var(--mt-teal)" }}
+                  >
+                    Use in unified evidence
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Add this {analyzeResult != null ? "analysis" : "preview"} to the unified evidence stream.
+                  </p>
+                </div>
+              </div>
               <SpectraCheckUseUnifiedEvidenceButton
                 response={displayPayload}
                 meta={{
@@ -435,84 +865,102 @@ export function SpectraCheckProcessedSpectrumSection({
                 }}
               />
             </div>
+
+            {/* Details + Picked peaks — 2-col below the spectrum */}
+            <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+              {/* Notes / details */}
+              {(notes || warnings.length > 0 || (!peakCount && !score)) && (
+                <Card
+                  className="overflow-hidden rounded-xl py-0"
+                  style={{ borderTop: "3px solid var(--mt-teal)" }}
+                >
+                  <CardContent className="space-y-3 py-3 text-sm">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Details
+                    </p>
+                    {notes && (
+                      <div>
+                        <p className="text-[11px] font-medium text-muted-foreground">Notes</p>
+                        <p className="mt-1 leading-snug">{notes}</p>
+                      </div>
+                    )}
+                    {warnings.length > 0 && (
+                      <div>
+                        <p
+                          className="text-[11px] font-medium"
+                          style={{ color: "var(--mt-amber)" }}
+                        >
+                          Solvent / impurity warnings
+                        </p>
+                        <ul
+                          className="mt-1 list-inside list-disc space-y-0.5 text-xs"
+                          style={{ color: "var(--mt-amber)" }}
+                        >
+                          {warnings.map((w, i) => (
+                            <li key={i}>{w}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {!peakCount && !score && !notes && warnings.length === 0 && (
+                      <p className="text-muted-foreground">
+                        No structured summary keys detected — see developer JSON below.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Picked peaks */}
+              <Card
+                className="overflow-hidden rounded-xl py-0"
+                style={{ borderTop: "3px solid var(--mt-teal)" }}
+              >
+                <CardContent className="space-y-2 py-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Picked peaks
+                    </p>
+                    {peaks.length > 0 && (
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {peaks.length > 200 ? `${peaks.length} (showing 200)` : peaks.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="overflow-x-auto">
+                    {peaks.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No peaks in response payload.</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-[10px] uppercase tracking-wide">δ (ppm)</TableHead>
+                            <TableHead className="text-[10px] uppercase tracking-wide">Intensity</TableHead>
+                            <TableHead className="text-[10px] uppercase tracking-wide">Label</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {peaks.slice(0, 200).map((p, i) => (
+                            <TableRow key={i}>
+                              <TableCell className="font-mono text-xs">{p.ppm.toFixed(4)}</TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {p.intensity != null ? p.intensity.toExponential(3) : "—"}
+                              </TableCell>
+                              <TableCell className="text-xs">{p.label ?? "—"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Developer JSON — full width at the bottom */}
             <DeveloperJsonPanel data={displayPayload} />
           </div>
-
-          <div className="min-w-0 space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {peakCount != null && (
-                  <div className="flex justify-between gap-2 border-b pb-2">
-                    <span className="text-muted-foreground">Peak count</span>
-                    <span className="font-mono font-medium">{peakCount}</span>
-                  </div>
-                )}
-                {score != null && (
-                  <div className="flex justify-between gap-2 border-b pb-2">
-                    <span className="text-muted-foreground">Analysis score</span>
-                    <span className="font-mono font-medium">{score.toFixed(2)}</span>
-                  </div>
-                )}
-                {notes && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Notes</p>
-                    <p className="mt-1 leading-snug">{notes}</p>
-                  </div>
-                )}
-                {warnings.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-warning">Solvent / impurity warnings</p>
-                    <ul className="mt-1 list-inside list-disc text-xs text-warning">
-                      {warnings.map((w, i) => (
-                        <li key={i}>{w}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {!peakCount && !score && !notes && warnings.length === 0 && (
-                  <p className="text-muted-foreground">No structured summary keys detected — see developer JSON.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="min-w-0">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Picked peaks</CardTitle>
-                <CardDescription>Populated when the API returns a peak table</CardDescription>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                {peaks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No peaks in response payload.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>δ (ppm)</TableHead>
-                        <TableHead>Intensity</TableHead>
-                        <TableHead>Label</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {peaks.slice(0, 200).map((p, i) => (
-                        <TableRow key={i}>
-                          <TableCell className="font-mono">{p.ppm.toFixed(4)}</TableCell>
-                          <TableCell className="font-mono">{p.intensity != null ? p.intensity.toExponential(3) : "—"}</TableCell>
-                          <TableCell>{p.label ?? "—"}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-                {peaks.length > 200 && (
-                  <p className="mt-2 text-xs text-muted-foreground">Showing first 200 peaks.</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        </ModuleCard>
       )}
     </div>
   )
