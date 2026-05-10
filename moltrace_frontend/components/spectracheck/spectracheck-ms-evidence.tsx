@@ -35,6 +35,15 @@ import {
   SPECTRACHECK_TEXT_SPECTRUM_ACCEPT,
   isMsSpectrumFilename,
 } from "@/src/lib/spectracheck/spectrum-file-formats"
+import {
+  Atom,
+  BarChart3,
+  Eye,
+  Network,
+  Settings2,
+  Sparkles,
+  Zap,
+} from "lucide-react"
 
 const DEFAULT_MS1_PEAKS = "m/z,intensity\n47.04914,100\n48.05249,2.3\n69.03109,24\n"
 
@@ -2578,1409 +2587,2106 @@ export function SpectraCheckMsEvidence({
           </TabsList>
         </div>
 
-        <TabsContent value="hrms-exact" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <ModuleCard
-              accent="teal"
-              eyebrow="MS · HRMS"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  HRMS exact-mass candidate match
-                  <InfoTooltip
-                    label="About HRMS candidate match"
-                    content="Use high-resolution MS to constrain candidates by exact mass, adduct, ppm error, isotope hints, and DBE/IHD."
-                  />
-                </span>
-              }
-              description="Match candidates by high-resolution exact mass, adduct form, ppm error tolerance, isotope pattern, and degree of unsaturation (DBE/IHD)."
-              className="min-w-0"
-            >
-                <form onSubmit={runHrmsMatch} className="space-y-4">
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="Observed m/z" tip="Monoisotopic or centroid m/z used as the experimental ion mass." />
-                    <Input value={hrmsObservedMz} onChange={(e) => setHrmsObservedMz(e.target.value)} required />
-                  </label>
-                  <div className="space-y-2">
-                    <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
-                    <Select value={hrmsAdduct} onValueChange={setHrmsAdduct}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Adduct" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {HRMS_ADDUCT_OPTIONS.map((a) => (
-                          <SelectItem key={a} value={a}>
-                            {a}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
-                    <Input value={hrmsPpmTol} onChange={(e) => setHrmsPpmTol(e.target.value)} />
-                  </label>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Ion mode</span>
-                    <Select value={hrmsIonMode} onValueChange={setHrmsIonMode}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ION_MODE_OPTIONS.map((o) => (
-                          <SelectItem key={o.label} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Observed M+1 % (optional)</span>
-                    <Input value={hrmsM1} onChange={(e) => setHrmsM1(e.target.value)} />
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Observed M+2 % (optional)</span>
-                    <Input value={hrmsM2} onChange={(e) => setHrmsM2(e.target.value)} />
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Candidate structures</span>
-                    <Textarea
-                      value={hrmsCandidatesText}
-                      onChange={(e) => setHrmsCandidatesText(e.target.value)}
-                      rows={6}
-                      placeholder="Pipe-separated name | SMILES | role lines — synced from Shared session inputs when they change."
-                    />
-                  </label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={hrmsMatchLoading} className="w-full sm:w-auto">
-                        {hrmsMatchLoading ? "Running…" : "Match candidates by HRMS"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Submit HRMS candidate match with current m/z, adduct, and ppm window.
-                    </TooltipContent>
-                  </Tooltip>
-                </form>
-            </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={hrmsMatchError}
-                loading={hrmsMatchLoading}
-                loadingTitle="Running HRMS candidate match"
-                loadingHint="Matching candidates against HRMS data…"
-                emptyHint="Enter observed m/z and candidate structures, then run."
-                result={hrmsMatchResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "hrms_exact_mass",
-                  sourceTab: "MS Evidence",
-                  title: "HRMS candidate match",
-                  endpoint: "/ms/hrms/candidates/match/evidence",
-                  sampleId: sampleId.trim() || undefined,
-                }}
+        <TabsContent value="hrms-exact" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              MS · HRMS Exact Mass
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              HRMS exact-mass candidate match
+              <InfoTooltip
+                label="About HRMS candidate match"
+                content="Use high-resolution MS to constrain candidates by exact mass, adduct, ppm error, isotope hints, and DBE/IHD."
               />
-              {!hrmsMatchLoading && hrmsMatchResult != null && (
-                <HrmsMatchDetailTables result={hrmsMatchResult} />
-              )}
-            </div>
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Constrain candidates by exact mass, adduct, ppm error, isotope pattern, and DBE/IHD.
+            </p>
           </div>
-        </TabsContent>
 
-        <TabsContent value="formula-search" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+          <form onSubmit={runHrmsMatch} className="space-y-12">
+            {/* Step 1 — Setup */}
             <ModuleCard
               accent="teal"
-              eyebrow="MS · Formula"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  Formula search beta
-                  <InfoTooltip
-                    label="About formula search"
-                    content="Search bounded CHNOPSClBr formulas from exact mass. Use this as formula triage, not final identification."
-                  />
-                </span>
-              }
-              description="Search candidate molecular formulas from observed exact mass within CHNOPSClBr composition limits. Use as a screening step, not final identification."
+              eyebrow="HRMS · Step 1 · Setup"
+              title="Configure HRMS inputs"
+              icon={Atom}
+              description="Provide observed m/z + adduct + ppm window. Optional isotope hints and candidate list refine the match."
               className="min-w-0"
             >
-                <form onSubmit={runFormulaSearch} className="space-y-4">
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="Observed m/z" tip="Monoisotopic or centroid m/z used as the experimental ion mass." />
-                    <Input value={formulaObservedMz} onChange={(e) => setFormulaObservedMz(e.target.value)} required />
-                  </label>
-                  <div className="space-y-2">
-                    <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
-                    <Select value={formulaAdduct} onValueChange={setFormulaAdduct}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Adduct" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {HRMS_ADDUCT_OPTIONS.map((a) => (
-                          <SelectItem key={a} value={a}>
-                            {a}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
-                    <Input value={formulaPpmTol} onChange={(e) => setFormulaPpmTol(e.target.value)} />
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Max C</span>
-                    <Input value={formulaMaxC} onChange={(e) => setFormulaMaxC(e.target.value)} />
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Max results</span>
-                    <Input value={formulaMaxResults} onChange={(e) => setFormulaMaxResults(e.target.value)} />
-                  </label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={formulaLoading} className="w-full sm:w-auto">
-                        {formulaLoading ? "Searching…" : "Search formulas"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Run bounded HRMS formula enumeration from observed mass and adduct.
-                    </TooltipContent>
-                  </Tooltip>
-                </form>
+              <div className="space-y-4">
+                <label className="block space-y-2">
+                  <FieldLabelTip label="Observed m/z" tip="Monoisotopic or centroid m/z used as the experimental ion mass." />
+                  <Input value={hrmsObservedMz} onChange={(e) => setHrmsObservedMz(e.target.value)} required />
+                </label>
+                <div className="space-y-2">
+                  <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
+                  <Select value={hrmsAdduct} onValueChange={setHrmsAdduct}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Adduct" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HRMS_ADDUCT_OPTIONS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {a}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="block space-y-2">
+                  <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
+                  <Input value={hrmsPpmTol} onChange={(e) => setHrmsPpmTol(e.target.value)} />
+                </label>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Ion mode</span>
+                  <Select value={hrmsIonMode} onValueChange={setHrmsIonMode}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ION_MODE_OPTIONS.map((o) => (
+                        <SelectItem key={o.label} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Observed M+1 % (optional)</span>
+                  <Input value={hrmsM1} onChange={(e) => setHrmsM1(e.target.value)} />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Observed M+2 % (optional)</span>
+                  <Input value={hrmsM2} onChange={(e) => setHrmsM2(e.target.value)} />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Candidate structures</span>
+                  <Textarea
+                    value={hrmsCandidatesText}
+                    onChange={(e) => setHrmsCandidatesText(e.target.value)}
+                    rows={6}
+                    placeholder="Pipe-separated name | SMILES | role lines — synced from Shared session inputs when they change."
+                  />
+                </label>
+              </div>
             </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={formulaError}
-                loading={formulaLoading}
-                loadingTitle="Searching formulas by HRMS"
-                loadingHint="Searching molecular formulas for the target mass…"
-                emptyHint="Set observed m/z, adduct, and tolerances, then search."
-                result={formulaResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "formula_search",
-                  sourceTab: "MS Evidence",
-                  title: "Formula search",
-                  endpoint: "/ms/hrms/formulas/search",
-                  sampleId: sampleId.trim() || undefined,
-                }}
-              />
-              {!formulaLoading && formulaResult != null && <FormulaSearchDetailTables result={formulaResult} />}
-            </div>
-          </div>
-        </TabsContent>
 
-        <TabsContent value="adduct" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+            {/* Step 2 — Run */}
             <ModuleCard
               accent="teal"
-              eyebrow="MS · Adduct"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  Adduct + isotope pattern inference
-                  <InfoTooltip
-                    label="About adduct + isotope inference"
-                    content="Infer likely adducts, charge state, isotope clusters, carbon-count hints, halogen patterns, and formula candidates from processed MS1/HRMS peaks."
-                  />
-                </span>
-              }
-              description="Infer adduct form, charge state, isotope cluster, and halogen signature from MS1 or HRMS peak data."
+              eyebrow="HRMS · Step 2 · Run"
+              title="Match candidates by HRMS"
+              icon={Zap}
+              description="Submit HRMS candidate match with current m/z, adduct, and ppm window."
               className="min-w-0"
             >
-                <form onSubmit={runAdductInfer} className="space-y-4">
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="Target precursor m/z" tip="Optional lock-on m/z for clustering around a chromatographic precursor." />
-                    <Input
-                      value={adductTargetMz}
-                      onChange={(e) => setAdductTargetMz(e.target.value)}
-                      placeholder="Optional"
-                      inputMode="decimal"
-                    />
-                  </label>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Ion mode</span>
-                    <Select value={adductIonMode} onValueChange={setAdductIonMode}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Ion mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ADDUCT_INFERENCE_ION_MODE_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">m/z tolerance Da</span>
-                      <Input value={adductMzTolDa} onChange={(e) => setAdductMzTolDa(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
-                      <Input value={adductPpmTol} onChange={(e) => setAdductPpmTol(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Isotope spacing tolerance Da</span>
-                      <Input value={adductIsoTolDa} onChange={(e) => setAdductIsoTolDa(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Max charge state</span>
-                      <Input value={adductMaxCharge} onChange={(e) => setAdductMaxCharge(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Min relative intensity %</span>
-                      <Input value={adductMinRelInt} onChange={(e) => setAdductMinRelInt(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Max MS1 peaks</span>
-                      <Input value={adductMaxPeaks} onChange={(e) => setAdductMaxPeaks(e.target.value)} />
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="adduct-formula-search"
-                      checked={adductFormulaSearch}
-                      onCheckedChange={(v) => setAdductFormulaSearch(v === true)}
-                    />
-                    <Label htmlFor="adduct-formula-search" className="inline-flex items-center gap-1 text-sm font-normal">
-                      Formula search
-                      <InfoTooltip
-                        label="Formula search"
-                        content="Optional bounded formula enumeration from MS1 peaks alongside adduct scoring."
-                        className="size-4"
-                      />
-                    </Label>
-                  </div>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Max C</span>
-                    <Input value={adductMaxC} onChange={(e) => setAdductMaxC(e.target.value)} />
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Formula candidates per adduct</span>
-                    <Input value={adductFormulaPerAdduct} onChange={(e) => setAdductFormulaPerAdduct(e.target.value)} />
-                  </label>
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="Processed MS1/HRMS peak list" tip="Centroid MS1 peaks for clustering adducts and isotopes." />
-                    <Textarea
-                      value={ms1PeakList}
-                      onChange={(e) => setMs1PeakList(e.target.value)}
-                      rows={6}
-                      required
-                      placeholder={"m/z,intensity\n47.04914,100\n48.05249,2.3\n69.03109,24"}
-                    />
-                  </label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={adductLoading} className="w-full sm:w-auto">
-                        {adductLoading ? "Running…" : "Infer adducts + isotopes"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Infer adduct hypotheses and isotope clusters from the MS1 peak list.
-                    </TooltipContent>
-                  </Tooltip>
-                  {adductResult != null && (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          !isRecord(adductResult) || !isRecord(adductResult.best_adduct_candidate)
-                        }
-                        onClick={applyBestAdductFromInference}
-                      >
-                        Use best adduct
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" onClick={copyAdductInferenceToHrms}>
-                        Copy to HRMS
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" onClick={copyAdductInferenceToMsms}>
-                        Copy to MS/MS
-                      </Button>
-                    </div>
-                  )}
-                </form>
-            </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={adductError}
-                loading={adductLoading}
-                loadingTitle="Inferring adducts and isotope clusters"
-                loadingHint="Inferring adducts and charge states…"
-                emptyHint="Paste a peak list and run."
-                result={adductResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "adduct_isotope",
-                  sourceTab: "MS Evidence",
-                  title: "Adduct + isotope inference",
-                  endpoint: "/ms/adducts/infer/evidence",
-                  sampleId: sampleId.trim() || undefined,
-                }}
-              />
-              {!adductLoading && adductResult != null && <AdductInferenceDetailTables result={adductResult} />}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="msms" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <ModuleCard
-              accent="teal"
-              eyebrow="MS · MS/MS"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  Processed MS/MS annotation
-                  <InfoTooltip
-                    label="About processed MS/MS annotation"
-                    content="Annotate processed centroid MS/MS peaks using precursor m/z, adduct, candidate structures, fragment matches, and diagnostic neutral losses."
-                  />
-                </span>
-              }
-              description="Annotate centroid MS/MS fragments with candidate-specific matches, neutral losses, and diagnostic ion series."
-              className="min-w-0"
-            >
-                <form onSubmit={runMsmsAnnotate} className="space-y-4">
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Session MS/MS file (optional)</span>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-                      value={msmsSessionFileId}
-                      onChange={(e) => setMsmsSessionFileId(e.target.value)}
-                    >
-                      <option value="">— none —</option>
-                      {(ws?.sessionFiles ?? [])
-                        .filter(
-                          (f) =>
-                            f.file_kind === "ms_peak_table" ||
-                            f.file_kind === "msms_spectrum" ||
-                            isMsSpectrumFilename(f.filename) ||
-                            f.file_kind === "other",
-                        )
-                        .map((f) => (
-                          <option key={f.file_id} value={f.file_id}>
-                            {f.filename} ({f.file_kind})
-                          </option>
-                        ))}
-                    </select>
-                    {msmsSessionFileId ? (
-                      <p className="break-all font-mono text-xs text-muted-foreground">file_id: {msmsSessionFileId}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Traceability only — paste peak list below or use LC-MS tabs for file-based jobs.
-                      </p>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="submit"
+                    aria-label="Match candidates by HRMS"
+                    disabled={hrmsMatchLoading}
+                    className={cn(
+                      "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                      "hover:-translate-y-px hover:shadow-md",
+                      hrmsMatchLoading
+                        ? "cursor-wait opacity-70"
+                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
                     )}
-                  </div>
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="Precursor m/z" tip="Isolation or selected precursor m/z for MS/MS interpretation." />
-                    <Input value={msmsPrecursorMz} onChange={(e) => setMsmsPrecursorMz(e.target.value)} required />
-                  </label>
-                  <div className="space-y-2">
-                    <FieldLabelTip label="Precursor adduct" tip="Ionizing adduct assumed for the MS/MS precursor ion." />
-                    <Select value={msmsAdduct} onValueChange={setMsmsAdduct}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Adduct" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {HRMS_ADDUCT_OPTIONS.map((a) => (
-                          <SelectItem key={a} value={a}>
-                            {a}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">m/z tolerance Da</span>
-                      <Input value={msmsMzTolDa} onChange={(e) => setMsmsMzTolDa(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
-                      <Input value={msmsPpmTol} onChange={(e) => setMsmsPpmTol(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Minimum relative intensity %</span>
-                      <Input value={msmsMinRelInt} onChange={(e) => setMsmsMinRelInt(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Max peaks</span>
-                      <Input value={msmsMaxPeaks} onChange={(e) => setMsmsMaxPeaks(e.target.value)} />
-                    </label>
-                  </div>
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="Processed MS/MS peak list" tip="Centroid fragment ions as m/z and intensity rows." />
-                    <Textarea
-                      value={msmsPeakList}
-                      onChange={(e) => setMsmsPeakList(e.target.value)}
-                      rows={6}
-                      required
-                      placeholder={"m/z,intensity\n47.04914,10\n29.03858,100\n31.01839,25"}
-                    />
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Candidate structures</span>
-                    <Textarea
-                      value={msmsCandidatesText}
-                      onChange={(e) => setMsmsCandidatesText(e.target.value)}
-                      rows={5}
-                      placeholder="Pipe-separated name | SMILES | role — synced from shared session when it changes."
-                    />
-                  </label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={msmsLoading} className="w-full sm:w-auto">
-                        {msmsLoading ? "Running…" : "Annotate MS/MS"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Annotate MS/MS peaks and neutral losses vs. optional candidates.
-                    </TooltipContent>
-                  </Tooltip>
-                </form>
-            </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={msmsError}
-                loading={msmsLoading}
-                loadingTitle="Annotating processed MS/MS"
-                loadingHint="Annotating MS/MS fragments…"
-                emptyHint="Provide precursor m/z and daughter-ion peak list."
-                result={msmsResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "msms_annotation",
-                  sourceTab: "MS Evidence",
-                  title: "MS/MS annotation",
-                  endpoint: "/ms/msms/annotate/evidence",
-                  sampleId: sampleId.trim() || undefined,
-                }}
-              />
-              {!msmsLoading && msmsResult != null && <MsmsAnnotationDetailTables result={msmsResult} />}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="frag-tree" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <ModuleCard
-              accent="teal"
-              eyebrow="MS · Fragmentation Tree"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  MS/MS fragmentation-tree reasoning
-                  <InfoTooltip
-                    label="About fragmentation-tree reasoning"
-                    content="Build precursor-to-fragment and fragment-to-subfragment relationships using diagnostic neutral losses and candidate-specific plausibility."
-                  />
-                </span>
-              }
-              description="Build a precursor-to-fragment tree using diagnostic neutral losses and candidate-specific bond-cleavage plausibility."
-              className="min-w-0"
-            >
-                <form onSubmit={runFragTree} className="space-y-4">
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="Precursor m/z" tip="Isolation or selected precursor m/z for MS/MS interpretation." />
-                    <Input value={fragPrecursorMz} onChange={(e) => setFragPrecursorMz(e.target.value)} required />
-                  </label>
-                  <div className="space-y-2">
-                    <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
-                    <Select value={fragAdduct} onValueChange={setFragAdduct}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Adduct" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {HRMS_ADDUCT_OPTIONS.map((a) => (
-                          <SelectItem key={a} value={a}>
-                            {a}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">m/z tolerance Da</span>
-                      <Input value={fragMzTolDa} onChange={(e) => setFragMzTolDa(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
-                      <Input value={fragPpmTol} onChange={(e) => setFragPpmTol(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Minimum relative intensity %</span>
-                      <Input value={fragMinRelInt} onChange={(e) => setFragMinRelInt(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Max peaks</span>
-                      <Input value={fragMaxPeaks} onChange={(e) => setFragMaxPeaks(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Max tree depth</span>
-                      <Input value={fragMaxDepth} onChange={(e) => setFragMaxDepth(e.target.value)} />
-                    </label>
-                  </div>
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="Processed MS/MS peak list" tip="Centroid fragment ions as m/z and intensity rows." />
-                    <Textarea
-                      value={fragPeakList}
-                      onChange={(e) => setFragPeakList(e.target.value)}
-                      rows={6}
-                      required
-                      placeholder={"m/z,intensity\n47.04914,10\n29.03858,100\n31.01839,25"}
-                    />
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Candidate structures</span>
-                    <Textarea
-                      value={fragCandidatesText}
-                      onChange={(e) => setFragCandidatesText(e.target.value)}
-                      rows={5}
-                      placeholder="Pipe-separated name | SMILES | role — synced from shared session when it changes."
-                    />
-                  </label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={fragLoading} className="w-full sm:w-auto">
-                        {fragLoading ? "Running…" : "Build fragmentation tree"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Build fragmentation-tree evidence from the peak list and tolerances.
-                    </TooltipContent>
-                  </Tooltip>
-                </form>
-            </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={fragError}
-                loading={fragLoading}
-                loadingTitle="Building fragmentation-tree evidence"
-                loadingHint="Building MS/MS fragmentation tree…"
-                emptyHint="Provide precursor and MS/MS peak list; optionally include shared candidates."
-                result={fragResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "fragmentation_tree",
-                  sourceTab: "MS Evidence",
-                  title: "Fragmentation tree",
-                  endpoint: "/ms/msms/fragmentation-tree/evidence",
-                  sampleId: sampleId.trim() || undefined,
-                }}
-              />
-              {!fragLoading && fragResult != null && <FragmentationTreeDetailTables result={fragResult} />}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="lcms-import" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <ModuleCard
-              accent="teal"
-              eyebrow="LC-MS · Import"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  Raw LC-MS/MS mzML + processed peak import bridge
-                  <InfoTooltip
-                    label="About LC-MS import bridge"
-                    content="Import mzML/mzXML or processed LC-MS/MS peak tables, compute source hashes, summarize scans, and extract MS1/MS2 peak lists for downstream analysis."
-                  />
-                </span>
-              }
-              description="Import mzML/mzXML or a processed peak table. The file is parsed server-side; scan summaries and MS1/MS2 peak lists are extracted for downstream analysis."
-              className="min-w-0"
-            >
-                <form onSubmit={runLcmsImport} className="space-y-4">
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">LC-MS/MS file</span>
-                    <input
-                      ref={lcmsImportFileRef}
-                      type="file"
-                      accept={LC_MS_UPLOAD_ACCEPT}
-                      className={cn(
-                        "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
-                        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Session LC-MS file (optional)</span>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-                      value={lcmsImportSessionFileId}
-                      onChange={(e) => setLcmsImportSessionFileId(e.target.value)}
-                    >
-                      <option value="">— none — use file input above</option>
-                      {lcmsSessionLikeFiles.map((f) => (
-                        <option key={f.file_id} value={f.file_id}>
-                          {f.filename} ({f.file_kind})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Source label</span>
-                    <Input
-                      value={lcmsImportSourceLabel}
-                      onChange={(e) => setLcmsImportSourceLabel(e.target.value)}
-                      placeholder="Optional — sent as sample_id when set; otherwise session sample ID is used"
-                    />
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Preferred MS/MS precursor m/z (optional)</span>
-                    <Input
-                      value={lcmsImportPrecursorMz}
-                      onChange={(e) => setLcmsImportPrecursorMz(e.target.value)}
-                      placeholder="Selects MS/MS extraction when supported"
-                      inputMode="decimal"
-                    />
-                  </label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={lcmsImportLoading} className="w-full sm:w-auto">
-                        {lcmsImportLoading ? "Importing…" : "Import LC-MS/MS"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Upload LC-MS data for server-side parsing and peak extraction.
-                    </TooltipContent>
-                  </Tooltip>
-                  <div className="space-y-2 border-t pt-4">
-                    <p className="text-xs font-medium text-muted-foreground">Long-running analysis job</p>
-                    <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void startLcmsImportJob()}>
-                      Start as job (lcms_import)
-                    </Button>
-                    {lcmsImportJobErr ? (
-                      <p className="text-sm" style={{ color: "var(--mt-red)" }}>{lcmsImportJobErr}</p>
-                    ) : null}
-                  </div>
-                  {lcmsImportJob.jobId ? (
-                    <AnalysisJobTimeline
-                      job={lcmsImportJob}
-                      variant="compact"
-                      evidenceLayer="lcms_import"
-                      sourceTab="MS Evidence"
-                    />
-                  ) : null}
-                  {lcmsImportResult != null && (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <Button type="button" variant="outline" size="sm" onClick={copyLcmsImportToMsWorkflows}>
-                        Copy to MS workflows
-                      </Button>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="inline-block">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={!reportHashCopyEnabled}
-                              onClick={copyImportHashForReport}
-                            >
-                              Copy hash to report
-                            </Button>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {reportHashCopyEnabled
-                            ? "Append this run’s SHA-256 to the connected report capture."
-                            : "Connect a report workflow (lcmsReportReady + handler) to enable copying the hash into reporting."}
-                        </TooltipContent>
-                      </Tooltip>
+                    style={{
+                      borderTop: "3px solid var(--mt-teal)",
+                      backgroundColor: "var(--mt-teal-soft)",
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                        Match
+                      </span>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        Recommended
+                      </span>
                     </div>
-                  )}
-                </form>
+                    <span className="font-mono text-base font-bold leading-tight">
+                      {hrmsMatchLoading ? "Matching candidates…" : "Match candidates by HRMS"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Submit HRMS candidate match with current m/z, adduct, and ppm window.
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                  POST /ms/hrms/candidates/match/evidence
+                </TooltipContent>
+              </Tooltip>
             </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={lcmsImportError}
-                loading={lcmsImportLoading}
-                loadingTitle="Importing LC-MS/MS source"
-                loadingHint="Importing LC-MS data through the ingest bridge…"
-                emptyHint="Upload a raw or processed LC-MS file to extract peaks."
-                result={lcmsImportResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "lcms_import",
-                  sourceTab: "MS Evidence",
-                  title: "LC-MS import bridge",
-                  endpoint: "/ms/lcms/import/bridge/upload",
-                  sampleId: sampleId.trim() || undefined,
-                }}
-              />
-              {!lcmsImportLoading && lcmsImportResult != null && (
-                <LcmsImportBridgeDetailTables result={lcmsImportResult} />
-              )}
-            </div>
-          </div>
-        </TabsContent>
+          </form>
 
-        <TabsContent value="lcms-features" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+          {/* Step 3 — Results */}
+          {(hrmsMatchResult != null || hrmsMatchLoading || hrmsMatchError) && (
             <ModuleCard
               accent="teal"
-              eyebrow="LC-MS · Features"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  LC-MS feature detection + EIC/XIC + peak purity
-                  <InfoTooltip
-                    label="About LC-MS feature detection"
-                    content="Detect chromatographic features, extract EIC/XIC traces, estimate peak purity, and link nearby MS/MS scans."
-                  />
-                </span>
-              }
-              description="Detect chromatographic features, extract EIC/XIC traces, estimate co-elution purity, and link proximal MS/MS scans."
+              eyebrow="HRMS · Step 3 · Results"
+              title="HRMS candidate match output"
+              icon={BarChart3}
+              description="Per-candidate exact-mass evidence + detail tables from /ms/hrms/candidates/match/evidence."
               className="min-w-0"
             >
-                <form onSubmit={runLcmsFeatureDetect} className="space-y-4">
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">LC-MS/MS file</span>
-                    <input
-                      ref={lcmsFeatureFileRef}
-                      type="file"
-                      accept={LC_MS_UPLOAD_ACCEPT}
-                      className={cn(
-                        "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
-                        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Session LC-MS file (optional)</span>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-                      value={lcmsFeatureSessionFileId}
-                      onChange={(e) => setLcmsFeatureSessionFileId(e.target.value)}
-                    >
-                      <option value="">— none — use file input above</option>
-                      {lcmsSessionLikeFiles.map((f) => (
-                        <option key={f.file_id} value={f.file_id}>
-                          {f.filename} ({f.file_kind})
-                        </option>
+              <div className="space-y-6">
+                <TabResultSection
+                  error={hrmsMatchError}
+                  loading={hrmsMatchLoading}
+                  loadingTitle="Running HRMS candidate match"
+                  loadingHint="Matching candidates against HRMS data…"
+                  emptyHint="Enter observed m/z and candidate structures, then run."
+                  result={hrmsMatchResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "hrms_exact_mass",
+                    sourceTab: "MS Evidence",
+                    title: "HRMS candidate match",
+                    endpoint: "/ms/hrms/candidates/match/evidence",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!hrmsMatchLoading && hrmsMatchResult != null && (
+                  <HrmsMatchDetailTables result={hrmsMatchResult} />
+                )}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="formula-search" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              MS · Formula Search
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              <span>Formula search beta</span>
+              <InfoTooltip
+                label="About formula search"
+                content="Search bounded CHNOPSClBr formulas from exact mass. Use this as formula triage, not final identification."
+              />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Enumerate plausible CHNOPSClBr formulas from observed exact mass — formula triage, not final ID.
+            </p>
+          </div>
+
+          <form onSubmit={runFormulaSearch} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="Formula · Step 1 · Setup"
+              title="Configure mass + composition bounds"
+              icon={Atom}
+              description="Mass + adduct + ppm window, plus composition cap (Max C) and a result-cap to keep enumeration bounded."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <label className="block space-y-2">
+                  <FieldLabelTip label="Observed m/z" tip="Monoisotopic or centroid m/z used as the experimental ion mass." />
+                  <Input value={formulaObservedMz} onChange={(e) => setFormulaObservedMz(e.target.value)} required />
+                </label>
+                <div className="space-y-2">
+                  <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
+                  <Select value={formulaAdduct} onValueChange={setFormulaAdduct}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Adduct" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HRMS_ADDUCT_OPTIONS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {a}
+                        </SelectItem>
                       ))}
-                    </select>
-                  </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="block space-y-2">
+                  <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
+                  <Input value={formulaPpmTol} onChange={(e) => setFormulaPpmTol(e.target.value)} />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Max C</span>
+                  <Input value={formulaMaxC} onChange={(e) => setFormulaMaxC(e.target.value)} />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Max results</span>
+                  <Input value={formulaMaxResults} onChange={(e) => setFormulaMaxResults(e.target.value)} />
+                </label>
+              </div>
+            </ModuleCard>
+
+            {/* Step 2 — Run */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="Formula · Step 2 · Run"
+              title="Search molecular formulas"
+              icon={Zap}
+              description="Run bounded HRMS formula enumeration from observed mass and adduct."
+              className="min-w-0"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="submit"
+                    aria-label="Search formulas"
+                    disabled={formulaLoading}
+                    className={cn(
+                      "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                      "hover:-translate-y-px hover:shadow-md",
+                      formulaLoading
+                        ? "cursor-wait opacity-70"
+                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                    )}
+                    style={{
+                      borderTop: "3px solid var(--mt-teal)",
+                      backgroundColor: "var(--mt-teal-soft)",
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                        Search
+                      </span>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        Triage
+                      </span>
+                    </div>
+                    <span className="font-mono text-base font-bold leading-tight">
+                      {formulaLoading ? "Searching formulas…" : "Search formulas"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Bounded CHNOPSClBr formula enumeration from observed mass and adduct.
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                  POST /ms/hrms/formulas/search
+                </TooltipContent>
+              </Tooltip>
+            </ModuleCard>
+          </form>
+
+          {/* Step 3 — Results */}
+          {(formulaResult != null || formulaLoading || formulaError) && (
+            <ModuleCard
+              accent="teal"
+              eyebrow="Formula · Step 3 · Results"
+              title="Formula search output"
+              icon={BarChart3}
+              description="Candidate formulas + detail tables from /ms/hrms/formulas/search."
+              className="min-w-0"
+            >
+              <div className="space-y-6">
+                <TabResultSection
+                  error={formulaError}
+                  loading={formulaLoading}
+                  loadingTitle="Searching formulas by HRMS"
+                  loadingHint="Searching molecular formulas for the target mass…"
+                  emptyHint="Set observed m/z, adduct, and tolerances, then search."
+                  result={formulaResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "formula_search",
+                    sourceTab: "MS Evidence",
+                    title: "Formula search",
+                    endpoint: "/ms/hrms/formulas/search",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!formulaLoading && formulaResult != null && <FormulaSearchDetailTables result={formulaResult} />}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="adduct" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              MS · Adduct + Isotope
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              Adduct + isotope pattern inference
+              <InfoTooltip
+                label="About adduct + isotope inference"
+                content="Infer likely adducts, charge state, isotope clusters, carbon-count hints, halogen patterns, and formula candidates from processed MS1/HRMS peaks."
+              />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Infer adduct form, charge state, isotope cluster, and halogen signature from MS1 or HRMS peak data.
+            </p>
+          </div>
+
+          <form onSubmit={runAdductInfer} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="Adduct · Step 1 · Setup"
+              title="Tolerances & MS1 peak list"
+              icon={Atom}
+              description="Set ion mode, mass / isotope tolerances, charge bounds — then paste the centroid MS1 peak list."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <label className="block space-y-2">
+                  <FieldLabelTip label="Target precursor m/z" tip="Optional lock-on m/z for clustering around a chromatographic precursor." />
+                  <Input
+                    value={adductTargetMz}
+                    onChange={(e) => setAdductTargetMz(e.target.value)}
+                    placeholder="Optional"
+                    inputMode="decimal"
+                  />
+                </label>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Ion mode</span>
+                  <Select value={adductIonMode} onValueChange={setAdductIonMode}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Ion mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ADDUCT_INFERENCE_ION_MODE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium">Target m/z values</span>
-                    <Textarea
-                      value={lcmsFeatTargetMz}
-                      onChange={(e) => setLcmsFeatTargetMz(e.target.value)}
-                      rows={4}
-                      placeholder="One m/z per line or comma-separated"
-                    />
+                    <span className="text-sm font-medium">m/z tolerance Da</span>
+                    <Input value={adductMzTolDa} onChange={(e) => setAdductMzTolDa(e.target.value)} />
                   </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">m/z tolerance Da</span>
-                      <Input value={lcmsFeatMzTol} onChange={(e) => setLcmsFeatMzTol(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
-                      <Input value={lcmsFeatPpmTol} onChange={(e) => setLcmsFeatPpmTol(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Minimum relative feature height</span>
-                      <Input value={lcmsFeatMinRelH} onChange={(e) => setLcmsFeatMinRelH(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Minimum scans per feature</span>
-                      <Input value={lcmsFeatMinScans} onChange={(e) => setLcmsFeatMinScans(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Smoothing window</span>
-                      <Input value={lcmsFeatSmooth} onChange={(e) => setLcmsFeatSmooth(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Purity RT window</span>
-                      <Input value={lcmsFeatPurityWin} onChange={(e) => setLcmsFeatPurityWin(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Top coeluting ions</span>
-                      <Input value={lcmsFeatTopCo} onChange={(e) => setLcmsFeatTopCo(e.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Maximum features</span>
-                      <Input value={lcmsFeatMaxFeat} onChange={(e) => setLcmsFeatMaxFeat(e.target.value)} />
-                    </label>
-                  </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={lcmsFeatureLoading} className="w-full sm:w-auto">
-                        {lcmsFeatureLoading ? "Running…" : "Detect features + XICs"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Run chromatographic feature detection and XIC extraction on the uploaded file.
-                    </TooltipContent>
-                  </Tooltip>
-                  <div className="space-y-2 border-t pt-4">
-                    <p className="text-xs font-medium text-muted-foreground">Long-running analysis job</p>
+                  <label className="block space-y-2">
+                    <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
+                    <Input value={adductPpmTol} onChange={(e) => setAdductPpmTol(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Isotope spacing tolerance Da</span>
+                    <Input value={adductIsoTolDa} onChange={(e) => setAdductIsoTolDa(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Max charge state</span>
+                    <Input value={adductMaxCharge} onChange={(e) => setAdductMaxCharge(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Min relative intensity %</span>
+                    <Input value={adductMinRelInt} onChange={(e) => setAdductMinRelInt(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Max MS1 peaks</span>
+                    <Input value={adductMaxPeaks} onChange={(e) => setAdductMaxPeaks(e.target.value)} />
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="adduct-formula-search"
+                    checked={adductFormulaSearch}
+                    onCheckedChange={(v) => setAdductFormulaSearch(v === true)}
+                  />
+                  <Label htmlFor="adduct-formula-search" className="inline-flex items-center gap-1 text-sm font-normal">
+                    Formula search
+                    <InfoTooltip
+                      label="Formula search"
+                      content="Optional bounded formula enumeration from MS1 peaks alongside adduct scoring."
+                      className="size-4"
+                    />
+                  </Label>
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Max C</span>
+                  <Input value={adductMaxC} onChange={(e) => setAdductMaxC(e.target.value)} />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Formula candidates per adduct</span>
+                  <Input value={adductFormulaPerAdduct} onChange={(e) => setAdductFormulaPerAdduct(e.target.value)} />
+                </label>
+                <label className="block space-y-2">
+                  <FieldLabelTip label="Processed MS1/HRMS peak list" tip="Centroid MS1 peaks for clustering adducts and isotopes." />
+                  <Textarea
+                    value={ms1PeakList}
+                    onChange={(e) => setMs1PeakList(e.target.value)}
+                    rows={6}
+                    required
+                    placeholder={"m/z,intensity\n47.04914,100\n48.05249,2.3\n69.03109,24"}
+                  />
+                </label>
+              </div>
+            </ModuleCard>
+
+            {/* Step 2 — Run */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="Adduct · Step 2 · Run"
+              title="Infer adducts + isotopes"
+              icon={Zap}
+              description="Cluster MS1 peaks by adduct & isotope spacing, score charge state and halogen signature."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="submit"
+                      aria-label="Infer adducts + isotopes"
+                      disabled={adductLoading}
+                      className={cn(
+                        "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                        "hover:-translate-y-px hover:shadow-md",
+                        adductLoading
+                          ? "cursor-wait opacity-70"
+                          : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                      )}
+                      style={{
+                        borderTop: "3px solid var(--mt-teal)",
+                        backgroundColor: "var(--mt-teal-soft)",
+                      }}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                          Infer
+                        </span>
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                          Recommended
+                        </span>
+                      </div>
+                      <span className="font-mono text-base font-bold leading-tight">
+                        {adductLoading ? "Inferring adducts…" : "Infer adducts + isotopes"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Infer adduct hypotheses and isotope clusters from the MS1 peak list.
+                      </span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                    POST /ms/adducts/infer/evidence
+                  </TooltipContent>
+                </Tooltip>
+                {adductResult != null && (
+                  <div className="flex flex-wrap gap-2 pt-2">
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full sm:w-auto"
-                      onClick={() => void startLcmsFeatureDetectionJob()}
+                      size="sm"
+                      disabled={!isRecord(adductResult) || !isRecord(adductResult.best_adduct_candidate)}
+                      onClick={applyBestAdductFromInference}
                     >
-                      Start as job (lcms_feature_detection)
+                      Use best adduct
                     </Button>
-                    {lcmsFeatureJobErr ? (
-                      <p className="text-sm" style={{ color: "var(--mt-red)" }}>{lcmsFeatureJobErr}</p>
-                    ) : null}
+                    <Button type="button" variant="outline" size="sm" onClick={copyAdductInferenceToHrms}>
+                      Copy to HRMS
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={copyAdductInferenceToMsms}>
+                      Copy to MS/MS
+                    </Button>
                   </div>
-                  {lcmsFeatureJob.jobId ? (
-                    <AnalysisJobTimeline
-                      job={lcmsFeatureJob}
-                      variant="compact"
-                      evidenceLayer="lcms_feature_detection"
-                      sourceTab="MS Evidence"
-                    />
+                )}
+              </div>
+            </ModuleCard>
+          </form>
+
+          {/* Step 3 — Results */}
+          {(adductResult != null || adductLoading || adductError) && (
+            <ModuleCard
+              accent="teal"
+              eyebrow="Adduct · Step 3 · Results"
+              title="Adduct + isotope inference output"
+              icon={BarChart3}
+              description="Per-adduct hypotheses, charge state, halogen signature, and detail tables from /ms/adducts/infer/evidence."
+              className="min-w-0"
+            >
+              <div className="space-y-6">
+                <TabResultSection
+                  error={adductError}
+                  loading={adductLoading}
+                  loadingTitle="Inferring adducts and isotope clusters"
+                  loadingHint="Inferring adducts and charge states…"
+                  emptyHint="Paste a peak list and run."
+                  result={adductResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "adduct_isotope",
+                    sourceTab: "MS Evidence",
+                    title: "Adduct + isotope inference",
+                    endpoint: "/ms/adducts/infer/evidence",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!adductLoading && adductResult != null && <AdductInferenceDetailTables result={adductResult} />}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="msms" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              MS · Processed MS/MS
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              Processed MS/MS annotation
+              <InfoTooltip
+                label="About processed MS/MS annotation"
+                content="Annotate processed centroid MS/MS peaks using precursor m/z, adduct, candidate structures, fragment matches, and diagnostic neutral losses."
+              />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Annotate centroid MS/MS fragments with candidate-specific matches, neutral losses, and diagnostic ion series.
+            </p>
+          </div>
+
+          <form onSubmit={runMsmsAnnotate} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="MS/MS · Step 1 · Setup"
+              title="Precursor + tolerances + peak list"
+              icon={Atom}
+              description="Choose precursor m/z, adduct, mass tolerances, then paste the centroid MS/MS peak list and (optional) candidate structures."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Session MS/MS file (optional)</span>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+                    value={msmsSessionFileId}
+                    onChange={(e) => setMsmsSessionFileId(e.target.value)}
+                  >
+                    <option value="">— none —</option>
+                    {(ws?.sessionFiles ?? [])
+                      .filter(
+                        (f) =>
+                          f.file_kind === "ms_peak_table" ||
+                          f.file_kind === "msms_spectrum" ||
+                          isMsSpectrumFilename(f.filename) ||
+                          f.file_kind === "other",
+                      )
+                      .map((f) => (
+                        <option key={f.file_id} value={f.file_id}>
+                          {f.filename} ({f.file_kind})
+                        </option>
+                      ))}
+                  </select>
+                  {msmsSessionFileId ? (
+                    <p className="break-all font-mono text-xs text-muted-foreground">file_id: {msmsSessionFileId}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Traceability only — paste peak list below or use LC-MS tabs for file-based jobs.
+                    </p>
+                  )}
+                </div>
+                <label className="block space-y-2">
+                  <FieldLabelTip label="Precursor m/z" tip="Isolation or selected precursor m/z for MS/MS interpretation." />
+                  <Input value={msmsPrecursorMz} onChange={(e) => setMsmsPrecursorMz(e.target.value)} required />
+                </label>
+                <div className="space-y-2">
+                  <FieldLabelTip label="Precursor adduct" tip="Ionizing adduct assumed for the MS/MS precursor ion." />
+                  <Select value={msmsAdduct} onValueChange={setMsmsAdduct}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Adduct" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HRMS_ADDUCT_OPTIONS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {a}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">m/z tolerance Da</span>
+                    <Input value={msmsMzTolDa} onChange={(e) => setMsmsMzTolDa(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
+                    <Input value={msmsPpmTol} onChange={(e) => setMsmsPpmTol(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Minimum relative intensity %</span>
+                    <Input value={msmsMinRelInt} onChange={(e) => setMsmsMinRelInt(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Max peaks</span>
+                    <Input value={msmsMaxPeaks} onChange={(e) => setMsmsMaxPeaks(e.target.value)} />
+                  </label>
+                </div>
+                <label className="block space-y-2">
+                  <FieldLabelTip label="Processed MS/MS peak list" tip="Centroid fragment ions as m/z and intensity rows." />
+                  <Textarea
+                    value={msmsPeakList}
+                    onChange={(e) => setMsmsPeakList(e.target.value)}
+                    rows={6}
+                    required
+                    placeholder={"m/z,intensity\n47.04914,10\n29.03858,100\n31.01839,25"}
+                  />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Candidate structures</span>
+                  <Textarea
+                    value={msmsCandidatesText}
+                    onChange={(e) => setMsmsCandidatesText(e.target.value)}
+                    rows={5}
+                    placeholder="Pipe-separated name | SMILES | role — synced from shared session when it changes."
+                  />
+                </label>
+              </div>
+            </ModuleCard>
+
+            {/* Step 2 — Run */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="MS/MS · Step 2 · Run"
+              title="Annotate MS/MS peaks"
+              icon={Zap}
+              description="Annotate MS/MS peaks and neutral losses vs. optional candidates."
+              className="min-w-0"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="submit"
+                    aria-label="Annotate MS/MS"
+                    disabled={msmsLoading}
+                    className={cn(
+                      "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                      "hover:-translate-y-px hover:shadow-md",
+                      msmsLoading
+                        ? "cursor-wait opacity-70"
+                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                    )}
+                    style={{
+                      borderTop: "3px solid var(--mt-teal)",
+                      backgroundColor: "var(--mt-teal-soft)",
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                        Annotate
+                      </span>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        Recommended
+                      </span>
+                    </div>
+                    <span className="font-mono text-base font-bold leading-tight">
+                      {msmsLoading ? "Annotating MS/MS…" : "Annotate MS/MS"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Match centroid fragments to candidates with diagnostic neutral losses.
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                  POST /ms/msms/annotate/evidence
+                </TooltipContent>
+              </Tooltip>
+            </ModuleCard>
+          </form>
+
+          {/* Step 3 — Results */}
+          {(msmsResult != null || msmsLoading || msmsError) && (
+            <ModuleCard
+              accent="teal"
+              eyebrow="MS/MS · Step 3 · Results"
+              title="MS/MS annotation output"
+              icon={BarChart3}
+              description="Per-fragment annotations + detail tables from /ms/msms/annotate/evidence."
+              className="min-w-0"
+            >
+              <div className="space-y-6">
+                <TabResultSection
+                  error={msmsError}
+                  loading={msmsLoading}
+                  loadingTitle="Annotating processed MS/MS"
+                  loadingHint="Annotating MS/MS fragments…"
+                  emptyHint="Provide precursor m/z and daughter-ion peak list."
+                  result={msmsResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "msms_annotation",
+                    sourceTab: "MS Evidence",
+                    title: "MS/MS annotation",
+                    endpoint: "/ms/msms/annotate/evidence",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!msmsLoading && msmsResult != null && <MsmsAnnotationDetailTables result={msmsResult} />}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="frag-tree" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              MS · Fragmentation Tree
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              MS/MS fragmentation-tree reasoning
+              <InfoTooltip
+                label="About fragmentation-tree reasoning"
+                content="Build precursor-to-fragment and fragment-to-subfragment relationships using diagnostic neutral losses and candidate-specific plausibility."
+              />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Build a precursor-to-fragment tree using diagnostic neutral losses and candidate-specific bond-cleavage plausibility.
+            </p>
+          </div>
+
+          <form onSubmit={runFragTree} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="Frag Tree · Step 1 · Setup"
+              title="Tree depth + precursor + MS/MS peaks"
+              icon={Network}
+              description="Provide precursor m/z, adduct, mass tolerances, and tree depth — then paste the centroid MS/MS peak list and candidates."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <label className="block space-y-2">
+                  <FieldLabelTip label="Precursor m/z" tip="Isolation or selected precursor m/z for MS/MS interpretation." />
+                  <Input value={fragPrecursorMz} onChange={(e) => setFragPrecursorMz(e.target.value)} required />
+                </label>
+                <div className="space-y-2">
+                  <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
+                  <Select value={fragAdduct} onValueChange={setFragAdduct}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Adduct" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HRMS_ADDUCT_OPTIONS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {a}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">m/z tolerance Da</span>
+                    <Input value={fragMzTolDa} onChange={(e) => setFragMzTolDa(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
+                    <Input value={fragPpmTol} onChange={(e) => setFragPpmTol(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Minimum relative intensity %</span>
+                    <Input value={fragMinRelInt} onChange={(e) => setFragMinRelInt(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Max peaks</span>
+                    <Input value={fragMaxPeaks} onChange={(e) => setFragMaxPeaks(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Max tree depth</span>
+                    <Input value={fragMaxDepth} onChange={(e) => setFragMaxDepth(e.target.value)} />
+                  </label>
+                </div>
+                <label className="block space-y-2">
+                  <FieldLabelTip label="Processed MS/MS peak list" tip="Centroid fragment ions as m/z and intensity rows." />
+                  <Textarea
+                    value={fragPeakList}
+                    onChange={(e) => setFragPeakList(e.target.value)}
+                    rows={6}
+                    required
+                    placeholder={"m/z,intensity\n47.04914,10\n29.03858,100\n31.01839,25"}
+                  />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Candidate structures</span>
+                  <Textarea
+                    value={fragCandidatesText}
+                    onChange={(e) => setFragCandidatesText(e.target.value)}
+                    rows={5}
+                    placeholder="Pipe-separated name | SMILES | role — synced from shared session when it changes."
+                  />
+                </label>
+              </div>
+            </ModuleCard>
+
+            {/* Step 2 — Run */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="Frag Tree · Step 2 · Run"
+              title="Build fragmentation tree"
+              icon={Zap}
+              description="Build fragmentation-tree evidence from the peak list and tolerances."
+              className="min-w-0"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="submit"
+                    aria-label="Build fragmentation tree"
+                    disabled={fragLoading}
+                    className={cn(
+                      "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                      "hover:-translate-y-px hover:shadow-md",
+                      fragLoading
+                        ? "cursor-wait opacity-70"
+                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                    )}
+                    style={{
+                      borderTop: "3px solid var(--mt-teal)",
+                      backgroundColor: "var(--mt-teal-soft)",
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                        Build
+                      </span>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        Recommended
+                      </span>
+                    </div>
+                    <span className="font-mono text-base font-bold leading-tight">
+                      {fragLoading ? "Building tree…" : "Build fragmentation tree"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Build fragmentation-tree evidence with neutral losses and candidate plausibility.
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                  POST /ms/msms/fragmentation-tree/evidence
+                </TooltipContent>
+              </Tooltip>
+            </ModuleCard>
+          </form>
+
+          {/* Step 3 — Results */}
+          {(fragResult != null || fragLoading || fragError) && (
+            <ModuleCard
+              accent="teal"
+              eyebrow="Frag Tree · Step 3 · Results"
+              title="Fragmentation tree output"
+              icon={BarChart3}
+              description="Tree node detail + diagnostic-loss tables from /ms/msms/fragmentation-tree/evidence."
+              className="min-w-0"
+            >
+              <div className="space-y-6">
+                <TabResultSection
+                  error={fragError}
+                  loading={fragLoading}
+                  loadingTitle="Building fragmentation-tree evidence"
+                  loadingHint="Building MS/MS fragmentation tree…"
+                  emptyHint="Provide precursor and MS/MS peak list; optionally include shared candidates."
+                  result={fragResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "fragmentation_tree",
+                    sourceTab: "MS Evidence",
+                    title: "Fragmentation tree",
+                    endpoint: "/ms/msms/fragmentation-tree/evidence",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!fragLoading && fragResult != null && <FragmentationTreeDetailTables result={fragResult} />}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lcms-import" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              LC-MS · Import Bridge
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              Raw LC-MS/MS mzML + processed peak import bridge
+              <InfoTooltip
+                label="About LC-MS import bridge"
+                content="Import mzML/mzXML or processed LC-MS/MS peak tables, compute source hashes, summarize scans, and extract MS1/MS2 peak lists for downstream analysis."
+              />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Import mzML/mzXML or a processed peak table — server parses scans, computes hashes, and extracts MS1/MS2 peak lists.
+            </p>
+          </div>
+
+          <form onSubmit={runLcmsImport} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Import · Step 1 · Setup"
+              title="File source + labels"
+              icon={Atom}
+              description="Choose a local file or session-attached LC-MS file. Optional source label and preferred precursor m/z guide the extraction."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">LC-MS/MS file</span>
+                  <input
+                    ref={lcmsImportFileRef}
+                    type="file"
+                    accept={LC_MS_UPLOAD_ACCEPT}
+                    className={cn(
+                      "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+                      "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    )}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Session LC-MS file (optional)</span>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+                    value={lcmsImportSessionFileId}
+                    onChange={(e) => setLcmsImportSessionFileId(e.target.value)}
+                  >
+                    <option value="">— none — use file input above</option>
+                    {lcmsSessionLikeFiles.map((f) => (
+                      <option key={f.file_id} value={f.file_id}>
+                        {f.filename} ({f.file_kind})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Source label</span>
+                  <Input
+                    value={lcmsImportSourceLabel}
+                    onChange={(e) => setLcmsImportSourceLabel(e.target.value)}
+                    placeholder="Optional — sent as sample_id when set; otherwise session sample ID is used"
+                  />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Preferred MS/MS precursor m/z (optional)</span>
+                  <Input
+                    value={lcmsImportPrecursorMz}
+                    onChange={(e) => setLcmsImportPrecursorMz(e.target.value)}
+                    placeholder="Selects MS/MS extraction when supported"
+                    inputMode="decimal"
+                  />
+                </label>
+              </div>
+            </ModuleCard>
+
+            {/* Step 2 — Run */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Import · Step 2 · Run"
+              title="Import LC-MS/MS"
+              icon={Zap}
+              description="Upload LC-MS data for server-side parsing and peak extraction. Use the long-running job if the file is large."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="submit"
+                      aria-label="Import LC-MS/MS"
+                      disabled={lcmsImportLoading}
+                      className={cn(
+                        "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                        "hover:-translate-y-px hover:shadow-md",
+                        lcmsImportLoading
+                          ? "cursor-wait opacity-70"
+                          : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                      )}
+                      style={{
+                        borderTop: "3px solid var(--mt-teal)",
+                        backgroundColor: "var(--mt-teal-soft)",
+                      }}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                          Import
+                        </span>
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                          Recommended
+                        </span>
+                      </div>
+                      <span className="font-mono text-base font-bold leading-tight">
+                        {lcmsImportLoading ? "Importing LC-MS/MS…" : "Import LC-MS/MS"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Server-side parse: source hashes, scan summary, MS1/MS2 peak lists.
+                      </span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                    POST /ms/lcms/import/bridge/upload
+                  </TooltipContent>
+                </Tooltip>
+                <div className="space-y-2 border-t pt-4">
+                  <p className="text-xs font-medium text-muted-foreground">Long-running analysis job</p>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void startLcmsImportJob()}>
+                    Start as job (lcms_import)
+                  </Button>
+                  {lcmsImportJobErr ? (
+                    <p className="text-sm" style={{ color: "var(--mt-red)" }}>{lcmsImportJobErr}</p>
                   ) : null}
-                </form>
-            </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={lcmsFeatureError}
-                loading={lcmsFeatureLoading}
-                loadingTitle="Detecting LC-MS features"
-                loadingHint="Detecting LC-MS features…"
-                emptyHint="Upload a file and target m/z list to detect features."
-                result={lcmsFeatureResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "lcms_feature_detection",
-                  sourceTab: "MS Evidence",
-                  title: "LC-MS feature detection",
-                  endpoint: "/ms/lcms/features/detect/upload",
-                  sampleId: sampleId.trim() || undefined,
-                }}
-              />
-              {!lcmsFeatureLoading && lcmsFeatureResult != null && (
-                <LcmsFeatureDetectionDetailTables result={lcmsFeatureResult} />
-              )}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="lcms-adv-group" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <ModuleCard
-              accent="teal"
-              eyebrow="LC-MS · Grouping"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  Feature grouping + blank subtraction + RT alignment
-                  <InfoTooltip
-                    label="About LC-MS grouping"
-                    content="Group sample, blank, QC, and reference LC-MS features; align retention time; subtract blank/background signals; and flag sample-enriched features."
+                </div>
+                {lcmsImportJob.jobId ? (
+                  <AnalysisJobTimeline
+                    job={lcmsImportJob}
+                    variant="compact"
+                    evidenceLayer="lcms_import"
+                    sourceTab="MS Evidence"
                   />
-                </span>
-              }
-              description="Group and align features across sample, blank, QC, and reference runs; subtract background signals; flag sample-enriched peaks."
-              className="min-w-0"
-            >
-                <form onSubmit={runLcmsAdvGroup} className="space-y-4">
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Sample peak table</span>
-                    <Textarea
-                      value={lcmsGrpSampleText}
-                      onChange={(e) => setLcmsGrpSampleText(e.target.value)}
-                      rows={5}
-                      placeholder="Feature or peak list text (required if no sample file)"
-                    />
-                  </label>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Sample file (optional)</span>
-                    <input
-                      ref={lcmsGrpSampleFileRef}
-                      type="file"
-                      accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
-                      className={cn(
-                        "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
-                        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                      )}
-                    />
-                  </div>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Blank peak table (optional)</span>
-                    <Textarea
-                      value={lcmsGrpBlankText}
-                      onChange={(e) => setLcmsGrpBlankText(e.target.value)}
-                      rows={4}
-                      placeholder="Blank run feature list"
-                    />
-                  </label>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Blank file (optional)</span>
-                    <input
-                      ref={lcmsGrpBlankFileRef}
-                      type="file"
-                      accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
-                      className={cn(
-                        "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
-                        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                      )}
-                    />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-2">
-                      <FieldLabelTip label="RT tolerance (min)" tip="Retention-time window for aligning and clustering ions across runs." />
-                      <Input value={lcmsGrpRtTol} onChange={(e) => setLcmsGrpRtTol(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">m/z tolerance (Da)</span>
-                      <Input value={lcmsGrpMzTol} onChange={(e) => setLcmsGrpMzTol(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
-                      <Input value={lcmsGrpPpmTol} onChange={(e) => setLcmsGrpPpmTol(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Blank-like threshold</span>
-                      <Input value={lcmsGrpBlankRatio} onChange={(e) => setLcmsGrpBlankRatio(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Possible-background threshold</span>
-                      <Input value={lcmsGrpPossBg} onChange={(e) => setLcmsGrpPossBg(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <FieldLabelTip label="Blank subtraction factor" tip="Scalar applied to blank-feature areas before subtracting from sample areas." />
-                      <Input value={lcmsGrpBlankFact} onChange={(e) => setLcmsGrpBlankFact(e.target.value)} inputMode="decimal" />
-                    </label>
-                  </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={lcmsGrpLoading} className="w-full sm:w-auto">
-                        {lcmsGrpLoading ? "Running…" : "Group features"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Group ions across runs with blank subtraction and RT alignment.
-                    </TooltipContent>
-                  </Tooltip>
-                </form>
-            </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={lcmsGrpError}
-                loading={lcmsGrpLoading}
-                loadingTitle="Grouping LC-MS features"
-                loadingHint="Grouping LC-MS features and aligning retention times…"
-                emptyHint="Paste sample (and optional blank) peak tables, then run."
-                result={lcmsGrpResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "lcms_feature_grouping",
-                  sourceTab: "MS Evidence",
-                  title: "LC-MS feature grouping",
-                  endpoint: "/ms/lcms/features/group/evidence",
-                  sampleId: sampleId.trim() || undefined,
-                }}
-              />
-              {!lcmsGrpLoading && lcmsGrpResult != null && <LcmsAdvGroupingDetailTables result={lcmsGrpResult} />}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="lcms-adv-consensus" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-            <ModuleCard
-              accent="teal"
-              eyebrow="LC-MS · Consensus"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  LC-MS isotope/adduct consensus + feature-family confidence
-                  <InfoTooltip
-                    label="About feature-family consensus"
-                    content="Score feature families using blank subtraction, peak purity, isotope envelope, adduct consistency, in-source loss, and MS/MS linkage."
-                  />
-                </span>
-              }
-              description="Score feature families using blank subtraction, isotope envelope fit, adduct consistency, and MS/MS linkage evidence."
-              className="min-w-0"
-            >
-                <form onSubmit={runLcmsAdvConsensus} className="space-y-4">
-                  {lcmsGrpResult != null && (
-                    <Button type="button" variant="outline" size="sm" onClick={fillConsensusTableFromGrouping}>
-                      Use grouping result table
+                ) : null}
+                {lcmsImportResult != null && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button type="button" variant="outline" size="sm" onClick={copyLcmsImportToMsWorkflows}>
+                      Copy to MS workflows
                     </Button>
-                  )}
-                  <label className="block space-y-2">
-                    <FieldLabelTip label="Grouped feature table" tip="Feature-group rows from detection or grouping for family-level consensus scoring." />
-                    <Textarea
-                      value={lcmsConFeatTable}
-                      onChange={(e) => setLcmsConFeatTable(e.target.value)}
-                      rows={6}
-                      placeholder="Paste feature_table_text from grouping or detection exports"
-                    />
-                  </label>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Feature table file (optional)</span>
-                    <input
-                      ref={lcmsConFeatFileRef}
-                      type="file"
-                      accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
-                      className={cn(
-                        "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
-                        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                      )}
-                    />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-block">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={!reportHashCopyEnabled}
+                            onClick={copyImportHashForReport}
+                          >
+                            Copy hash to report
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {reportHashCopyEnabled
+                          ? "Append this run’s SHA-256 to the connected report capture."
+                          : "Connect a report workflow (lcmsReportReady + handler) to enable copying the hash into reporting."}
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Formula (optional)</span>
-                    <Input value={lcmsConFormula} onChange={(e) => setLcmsConFormula(e.target.value)} placeholder="e.g. C8H10N4O2" />
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Promotion threshold</span>
-                    <Input value={lcmsConPromote} onChange={(e) => setLcmsConPromote(e.target.value)} inputMode="decimal" />
-                  </label>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Expected anchor adduct</span>
-                    <Select value={lcmsConExpectedAdduct} onValueChange={setLcmsConExpectedAdduct}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {HRMS_ADDUCT_OPTIONS.map((a) => (
-                          <SelectItem key={a} value={a}>
-                            {a}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2">
-                      <Checkbox id="lcms-con-iso" checked={lcmsConIso} onCheckedChange={(v) => setLcmsConIso(v === true)} />
-                      <Label htmlFor="lcms-con-iso" className="text-sm font-normal">
-                        Isotope scoring
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="lcms-con-add"
-                        checked={lcmsConAdductScore}
-                        onCheckedChange={(v) => setLcmsConAdductScore(v === true)}
-                      />
-                      <Label htmlFor="lcms-con-add" className="text-sm font-normal">
-                        Adduct scoring
-                      </Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox id="lcms-con-loss" checked={lcmsConLoss} onCheckedChange={(v) => setLcmsConLoss(v === true)} />
-                      <Label htmlFor="lcms-con-loss" className="text-sm font-normal">
-                        In-source-loss scoring
-                      </Label>
-                    </div>
-                  </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={lcmsConLoading} className="w-full sm:w-auto">
-                        {lcmsConLoading ? "Running…" : "Score feature-family consensus"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Score feature-family consistency (isotope, adduct, in-source loss toggles).
-                    </TooltipContent>
-                  </Tooltip>
-                </form>
+                )}
+              </div>
             </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={lcmsConError}
-                loading={lcmsConLoading}
-                loadingTitle="Scoring LC-MS feature-family consensus"
-                loadingHint="Building feature-family consensus across runs…"
-                emptyHint="Paste a grouped feature table (or load from grouping), then run."
-                result={lcmsConResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "lcms_feature_family_consensus",
-                  sourceTab: "MS Evidence",
-                  title: "LC-MS feature-family consensus",
-                  endpoint: "/ms/lcms/features/consensus/evidence",
-                  sampleId: sampleId.trim() || undefined,
-                }}
-              />
-              {!lcmsConLoading && lcmsConResult != null && <LcmsAdvConsensusDetailTables result={lcmsConResult} />}
-            </div>
-          </div>
-        </TabsContent>
+          </form>
 
-        <TabsContent value="lcms-adv-derep" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+          {/* Step 3 — Results */}
+          {(lcmsImportResult != null || lcmsImportLoading || lcmsImportError) && (
             <ModuleCard
               accent="teal"
-              eyebrow="LC-MS · Dereplication"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  LC-MS/MS library dereplication + candidate seed retrieval
-                  <InfoTooltip
-                    label="About LC-MS dereplication"
-                    content="Rank supplied local or curated library candidates against precursor m/z, MS/MS similarity, optional RT/CCS, feature-family consensus, and library provenance."
-                  />
-                </span>
-              }
-              description="Rank candidates against the spectral library using precursor m/z, MS/MS dot-product similarity, optional RT/CCS, and feature-family provenance. Comment lines (prefixed #) are retained in the audit trail."
+              eyebrow="LC-MS Import · Step 3 · Results"
+              title="LC-MS import bridge output"
+              icon={BarChart3}
+              description="Source hashes, scan summary, MS1/MS2 peak lists from /ms/lcms/import/bridge/upload."
               className="min-w-0"
             >
-                <form onSubmit={runLcmsAdvDereplication} className="space-y-4">
+              <div className="space-y-6">
+                <TabResultSection
+                  error={lcmsImportError}
+                  loading={lcmsImportLoading}
+                  loadingTitle="Importing LC-MS/MS source"
+                  loadingHint="Importing LC-MS data through the ingest bridge…"
+                  emptyHint="Upload a raw or processed LC-MS file to extract peaks."
+                  result={lcmsImportResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "lcms_import",
+                    sourceTab: "MS Evidence",
+                    title: "LC-MS import bridge",
+                    endpoint: "/ms/lcms/import/bridge/upload",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!lcmsImportLoading && lcmsImportResult != null && (
+                  <LcmsImportBridgeDetailTables result={lcmsImportResult} />
+                )}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lcms-features" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              LC-MS · Features
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              LC-MS feature detection + EIC/XIC + peak purity
+              <InfoTooltip
+                label="About LC-MS feature detection"
+                content="Detect chromatographic features, extract EIC/XIC traces, estimate peak purity, and link nearby MS/MS scans."
+              />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Detect chromatographic features, extract EIC/XIC traces, estimate co-elution purity, and link proximal MS/MS scans.
+            </p>
+          </div>
+
+          <form onSubmit={runLcmsFeatureDetect} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Features · Step 1 · Setup"
+              title="File source + targets + tolerances"
+              icon={Atom}
+              description="Choose a file, list target m/z values, and tune detection / purity / smoothing knobs."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">LC-MS/MS file</span>
+                  <input
+                    ref={lcmsFeatureFileRef}
+                    type="file"
+                    accept={LC_MS_UPLOAD_ACCEPT}
+                    className={cn(
+                      "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+                      "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    )}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Session LC-MS file (optional)</span>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+                    value={lcmsFeatureSessionFileId}
+                    onChange={(e) => setLcmsFeatureSessionFileId(e.target.value)}
+                  >
+                    <option value="">— none — use file input above</option>
+                    {lcmsSessionLikeFiles.map((f) => (
+                      <option key={f.file_id} value={f.file_id}>
+                        {f.filename} ({f.file_kind})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Target m/z values</span>
+                  <Textarea
+                    value={lcmsFeatTargetMz}
+                    onChange={(e) => setLcmsFeatTargetMz(e.target.value)}
+                    rows={4}
+                    placeholder="One m/z per line or comma-separated"
+                  />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium">Precursor m/z (optional, audit comment)</span>
-                    <Input value={lcmsDerPrecursorMz} onChange={(e) => setLcmsDerPrecursorMz(e.target.value)} inputMode="decimal" />
+                    <span className="text-sm font-medium">m/z tolerance Da</span>
+                    <Input value={lcmsFeatMzTol} onChange={(e) => setLcmsFeatMzTol(e.target.value)} />
                   </label>
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium">MS/MS peak list (optional, audit comments)</span>
-                    <Textarea
-                      value={lcmsDerMsmsPeaks}
-                      onChange={(e) => setLcmsDerMsmsPeaks(e.target.value)}
-                      rows={4}
-                      placeholder="m/z,intensity rows — stored as # msms … comment lines"
-                    />
+                    <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
+                    <Input value={lcmsFeatPpmTol} onChange={(e) => setLcmsFeatPpmTol(e.target.value)} />
                   </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Optional RT (min)</span>
-                      <Input value={lcmsDerRt} onChange={(e) => setLcmsDerRt(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Optional CCS</span>
-                      <Input value={lcmsDerCcs} onChange={(e) => setLcmsDerCcs(e.target.value)} inputMode="decimal" />
-                    </label>
-                  </div>
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium">Library candidates</span>
-                    <Textarea
-                      value={lcmsDerCandidatesText}
-                      onChange={(e) => setLcmsDerCandidatesText(e.target.value)}
-                      rows={5}
-                      placeholder="Pipe-separated name | SMILES | role — synced from session candidates when updated"
-                    />
+                    <span className="text-sm font-medium">Minimum relative feature height</span>
+                    <Input value={lcmsFeatMinRelH} onChange={(e) => setLcmsFeatMinRelH(e.target.value)} />
                   </label>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Library file (optional)</span>
-                    <input
-                      ref={lcmsDerLibraryFileRef}
-                      type="file"
-                      accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Minimum scans per feature</span>
+                    <Input value={lcmsFeatMinScans} onChange={(e) => setLcmsFeatMinScans(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Smoothing window</span>
+                    <Input value={lcmsFeatSmooth} onChange={(e) => setLcmsFeatSmooth(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Purity RT window</span>
+                    <Input value={lcmsFeatPurityWin} onChange={(e) => setLcmsFeatPurityWin(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Top coeluting ions</span>
+                    <Input value={lcmsFeatTopCo} onChange={(e) => setLcmsFeatTopCo(e.target.value)} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Maximum features</span>
+                    <Input value={lcmsFeatMaxFeat} onChange={(e) => setLcmsFeatMaxFeat(e.target.value)} />
+                  </label>
+                </div>
+              </div>
+            </ModuleCard>
+
+            {/* Step 2 — Run */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Features · Step 2 · Run"
+              title="Detect features + XICs"
+              icon={Zap}
+              description="Run chromatographic feature detection and XIC extraction on the uploaded file."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="submit"
+                      aria-label="Detect features + XICs"
+                      disabled={lcmsFeatureLoading}
                       className={cn(
-                        "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
-                        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                        "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                        "hover:-translate-y-px hover:shadow-md",
+                        lcmsFeatureLoading
+                          ? "cursor-wait opacity-70"
+                          : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
                       )}
-                    />
-                  </div>
+                      style={{
+                        borderTop: "3px solid var(--mt-teal)",
+                        backgroundColor: "var(--mt-teal-soft)",
+                      }}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                          Detect
+                        </span>
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                          Recommended
+                        </span>
+                      </div>
+                      <span className="font-mono text-base font-bold leading-tight">
+                        {lcmsFeatureLoading ? "Detecting features…" : "Detect features + XICs"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Chromatographic features + EIC/XIC + purity + linked MS/MS context.
+                      </span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                    POST /ms/lcms/features/detect/upload
+                  </TooltipContent>
+                </Tooltip>
+                <div className="space-y-2 border-t pt-4">
+                  <p className="text-xs font-medium text-muted-foreground">Long-running analysis job</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    onClick={() => void startLcmsFeatureDetectionJob()}
+                  >
+                    Start as job (lcms_feature_detection)
+                  </Button>
+                  {lcmsFeatureJobErr ? (
+                    <p className="text-sm" style={{ color: "var(--mt-red)" }}>{lcmsFeatureJobErr}</p>
+                  ) : null}
+                </div>
+                {lcmsFeatureJob.jobId ? (
+                  <AnalysisJobTimeline
+                    job={lcmsFeatureJob}
+                    variant="compact"
+                    evidenceLayer="lcms_feature_detection"
+                    sourceTab="MS Evidence"
+                  />
+                ) : null}
+              </div>
+            </ModuleCard>
+          </form>
+
+          {/* Step 3 — Results */}
+          {(lcmsFeatureResult != null || lcmsFeatureLoading || lcmsFeatureError) && (
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Features · Step 3 · Results"
+              title="LC-MS feature detection output"
+              icon={BarChart3}
+              description="Per-feature evidence + EIC/XIC + purity + detail tables from /ms/lcms/features/detect/upload."
+              className="min-w-0"
+            >
+              <div className="space-y-6">
+                <TabResultSection
+                  error={lcmsFeatureError}
+                  loading={lcmsFeatureLoading}
+                  loadingTitle="Detecting LC-MS features"
+                  loadingHint="Detecting LC-MS features…"
+                  emptyHint="Upload a file and target m/z list to detect features."
+                  result={lcmsFeatureResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "lcms_feature_detection",
+                    sourceTab: "MS Evidence",
+                    title: "LC-MS feature detection",
+                    endpoint: "/ms/lcms/features/detect/upload",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!lcmsFeatureLoading && lcmsFeatureResult != null && (
+                  <LcmsFeatureDetectionDetailTables result={lcmsFeatureResult} />
+                )}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lcms-adv-group" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              LC-MS · Grouping
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              Feature grouping + blank subtraction + RT alignment
+              <InfoTooltip
+                label="About LC-MS grouping"
+                content="Group sample, blank, QC, and reference LC-MS features; align retention time; subtract blank/background signals; and flag sample-enriched features."
+              />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Group features across sample / blank / QC / reference runs, align RT, subtract background, and flag sample-enriched peaks.
+            </p>
+          </div>
+
+          <form onSubmit={runLcmsAdvGroup} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Grouping · Step 1 · Setup"
+              title="Sample + blank tables + tolerances"
+              icon={Atom}
+              description="Paste sample peak table (and optional blank), set RT/m/z tolerances and blank-subtraction thresholds."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Sample peak table</span>
+                  <Textarea
+                    value={lcmsGrpSampleText}
+                    onChange={(e) => setLcmsGrpSampleText(e.target.value)}
+                    rows={5}
+                    placeholder="Feature or peak list text (required if no sample file)"
+                  />
+                </label>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Sample file (optional)</span>
+                  <input
+                    ref={lcmsGrpSampleFileRef}
+                    type="file"
+                    accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
+                    className={cn(
+                      "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+                      "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    )}
+                  />
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Blank peak table (optional)</span>
+                  <Textarea
+                    value={lcmsGrpBlankText}
+                    onChange={(e) => setLcmsGrpBlankText(e.target.value)}
+                    rows={4}
+                    placeholder="Blank run feature list"
+                  />
+                </label>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Blank file (optional)</span>
+                  <input
+                    ref={lcmsGrpBlankFileRef}
+                    type="file"
+                    accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
+                    className={cn(
+                      "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+                      "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    )}
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium">LC-MS family table (optional)</span>
-                    <Textarea
-                      value={lcmsDerFamilyTable}
-                      onChange={(e) => setLcmsDerFamilyTable(e.target.value)}
-                      rows={4}
-                      placeholder="family_id, anchor_mz, … from consensus export"
-                    />
+                    <FieldLabelTip label="RT tolerance (min)" tip="Retention-time window for aligning and clustering ions across runs." />
+                    <Input value={lcmsGrpRtTol} onChange={(e) => setLcmsGrpRtTol(e.target.value)} inputMode="decimal" />
                   </label>
-                  {lcmsConResult != null && (
-                    <Button type="button" variant="outline" size="sm" onClick={fillDerepFamilyTableFromConsensus}>
-                      Use consensus family table
-                    </Button>
-                  )}
-                  <div className="space-y-2">
-                    <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
-                    <Select value={lcmsDerAdduct} onValueChange={setLcmsDerAdduct}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {HRMS_ADDUCT_OPTIONS.map((a) => (
-                          <SelectItem key={a} value={a}>
-                            {a}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">m/z tolerance (Da)</span>
-                      <Input value={lcmsDerMzTol} onChange={(e) => setLcmsDerMzTol(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
-                      <Input value={lcmsDerPpmTol} onChange={(e) => setLcmsDerPpmTol(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Min family consensus score</span>
-                      <Input value={lcmsDerMinFam} onChange={(e) => setLcmsDerMinFam(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Selected family ID (optional)</span>
-                      <Input value={lcmsDerSelectedFamilyId} onChange={(e) => setLcmsDerSelectedFamilyId(e.target.value)} />
-                    </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">m/z tolerance (Da)</span>
+                    <Input value={lcmsGrpMzTol} onChange={(e) => setLcmsGrpMzTol(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
+                    <Input value={lcmsGrpPpmTol} onChange={(e) => setLcmsGrpPpmTol(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Blank-like threshold</span>
+                    <Input value={lcmsGrpBlankRatio} onChange={(e) => setLcmsGrpBlankRatio(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Possible-background threshold</span>
+                    <Input value={lcmsGrpPossBg} onChange={(e) => setLcmsGrpPossBg(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <FieldLabelTip label="Blank subtraction factor" tip="Scalar applied to blank-feature areas before subtracting from sample areas." />
+                    <Input value={lcmsGrpBlankFact} onChange={(e) => setLcmsGrpBlankFact(e.target.value)} inputMode="decimal" />
+                  </label>
+                </div>
+              </div>
+            </ModuleCard>
+
+            {/* Step 2 — Run */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Grouping · Step 2 · Run"
+              title="Group features"
+              icon={Zap}
+              description="Group ions across runs with blank subtraction and RT alignment."
+              className="min-w-0"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="submit"
+                    aria-label="Group features"
+                    disabled={lcmsGrpLoading}
+                    className={cn(
+                      "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                      "hover:-translate-y-px hover:shadow-md",
+                      lcmsGrpLoading
+                        ? "cursor-wait opacity-70"
+                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                    )}
+                    style={{
+                      borderTop: "3px solid var(--mt-teal)",
+                      backgroundColor: "var(--mt-teal-soft)",
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                        Group
+                      </span>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        Recommended
+                      </span>
+                    </div>
+                    <span className="font-mono text-base font-bold leading-tight">
+                      {lcmsGrpLoading ? "Grouping features…" : "Group features"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      RT alignment + blank subtraction + sample-enrichment flagging.
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                  POST /ms/lcms/features/group/evidence
+                </TooltipContent>
+              </Tooltip>
+            </ModuleCard>
+          </form>
+
+          {/* Step 3 — Results */}
+          {(lcmsGrpResult != null || lcmsGrpLoading || lcmsGrpError) && (
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Grouping · Step 3 · Results"
+              title="LC-MS grouping output"
+              icon={BarChart3}
+              description="Per-group evidence + detail tables from /ms/lcms/features/group/evidence."
+              className="min-w-0"
+            >
+              <div className="space-y-6">
+                <TabResultSection
+                  error={lcmsGrpError}
+                  loading={lcmsGrpLoading}
+                  loadingTitle="Grouping LC-MS features"
+                  loadingHint="Grouping LC-MS features and aligning retention times…"
+                  emptyHint="Paste sample (and optional blank) peak tables, then run."
+                  result={lcmsGrpResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "lcms_feature_grouping",
+                    sourceTab: "MS Evidence",
+                    title: "LC-MS feature grouping",
+                    endpoint: "/ms/lcms/features/group/evidence",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!lcmsGrpLoading && lcmsGrpResult != null && <LcmsAdvGroupingDetailTables result={lcmsGrpResult} />}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lcms-adv-consensus" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              LC-MS · Consensus
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              LC-MS isotope/adduct consensus + feature-family confidence
+              <InfoTooltip
+                label="About feature-family consensus"
+                content="Score feature families using blank subtraction, peak purity, isotope envelope, adduct consistency, in-source loss, and MS/MS linkage."
+              />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Score feature families using blank subtraction, isotope envelope, adduct consistency, in-source loss, and MS/MS linkage.
+            </p>
+          </div>
+
+          <form onSubmit={runLcmsAdvConsensus} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Consensus · Step 1 · Setup"
+              title="Grouped feature table + scoring toggles"
+              icon={Network}
+              description="Paste (or load from grouping) the grouped feature table and toggle isotope / adduct / in-source loss scoring."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                {lcmsGrpResult != null && (
+                  <Button type="button" variant="outline" size="sm" onClick={fillConsensusTableFromGrouping}>
+                    Use grouping result table
+                  </Button>
+                )}
+                <label className="block space-y-2">
+                  <FieldLabelTip label="Grouped feature table" tip="Feature-group rows from detection or grouping for family-level consensus scoring." />
+                  <Textarea
+                    value={lcmsConFeatTable}
+                    onChange={(e) => setLcmsConFeatTable(e.target.value)}
+                    rows={6}
+                    placeholder="Paste feature_table_text from grouping or detection exports"
+                  />
+                </label>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Feature table file (optional)</span>
+                  <input
+                    ref={lcmsConFeatFileRef}
+                    type="file"
+                    accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
+                    className={cn(
+                      "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+                      "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    )}
+                  />
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Formula (optional)</span>
+                  <Input value={lcmsConFormula} onChange={(e) => setLcmsConFormula(e.target.value)} placeholder="e.g. C8H10N4O2" />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Promotion threshold</span>
+                  <Input value={lcmsConPromote} onChange={(e) => setLcmsConPromote(e.target.value)} inputMode="decimal" />
+                </label>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Expected anchor adduct</span>
+                  <Select value={lcmsConExpectedAdduct} onValueChange={setLcmsConExpectedAdduct}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HRMS_ADDUCT_OPTIONS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {a}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="lcms-con-iso" checked={lcmsConIso} onCheckedChange={(v) => setLcmsConIso(v === true)} />
+                    <Label htmlFor="lcms-con-iso" className="text-sm font-normal">
+                      Isotope scoring
+                    </Label>
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      id="lcms-der-req"
-                      checked={lcmsDerReqPromoted}
-                      onCheckedChange={(v) => setLcmsDerReqPromoted(v === true)}
+                      id="lcms-con-add"
+                      checked={lcmsConAdductScore}
+                      onCheckedChange={(v) => setLcmsConAdductScore(v === true)}
                     />
-                    <Label htmlFor="lcms-der-req" className="text-sm font-normal">
-                      Use feature-family consensus (require_promoted_family)
+                    <Label htmlFor="lcms-con-add" className="text-sm font-normal">
+                      Adduct scoring
                     </Label>
                   </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={lcmsDerLoading} className="w-full sm:w-auto">
-                        {lcmsDerLoading ? "Running…" : "Run dereplication"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Rank library candidates against LC-MS family evidence and tolerances.
-                    </TooltipContent>
-                  </Tooltip>
-                </form>
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="lcms-con-loss" checked={lcmsConLoss} onCheckedChange={(v) => setLcmsConLoss(v === true)} />
+                    <Label htmlFor="lcms-con-loss" className="text-sm font-normal">
+                      In-source-loss scoring
+                    </Label>
+                  </div>
+                </div>
+              </div>
             </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={lcmsDerError}
-                loading={lcmsDerLoading}
-                loadingTitle="Running LC-MS dereplication"
-                loadingHint="Running library dereplication…"
-                emptyHint="Provide candidates and/or family table evidence to rank library entries."
-                result={lcmsDerResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "lcms_dereplication",
-                  sourceTab: "MS Evidence",
-                  title: "LC-MS library dereplication",
-                  endpoint: "/ms/lcms/dereplication/evidence",
-                  sampleId: sampleId.trim() || undefined,
-                }}
-              />
-              {!lcmsDerLoading && lcmsDerResult != null && <LcmsAdvDereplicationDetailTables result={lcmsDerResult} />}
-            </div>
-          </div>
-        </TabsContent>
 
-        <TabsContent value="lcms-adv-bridge" className="mt-4 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+            {/* Step 2 — Run */}
             <ModuleCard
               accent="teal"
-              eyebrow="LC-MS · Bridge"
-              title={
-                <span className="inline-flex items-center gap-2">
-                  LC-MS consensus → unified confidence bridge
-                  <InfoTooltip
-                    label="About LC-MS consensus bridge"
-                    content="Connect promoted LC-MS feature families to candidate confidence when theoretical adduct m/z matches a non-conflicting feature-family anchor."
-                  />
-                </span>
-              }
-              description="Link promoted LC-MS feature families to candidate confidence scoring when theoretical adduct masses match a consensus anchor. Run LC-MS consensus above to populate automatically."
+              eyebrow="LC-MS Consensus · Step 2 · Run"
+              title="Score feature-family consensus"
+              icon={Zap}
+              description="Score feature-family consistency with the active toggles (isotope / adduct / in-source loss)."
               className="min-w-0"
             >
-                <form onSubmit={runLcmsAdvBridge} className="space-y-4">
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium">Candidate structures</span>
-                    <Textarea
-                      value={lcmsBridgeCandidatesText}
-                      onChange={(e) => setLcmsBridgeCandidatesText(e.target.value)}
-                      rows={6}
-                      placeholder="name | SMILES | role"
-                    />
-                  </label>
-                  <div className="space-y-2">
-                    <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
-                    <Select value={lcmsBridgeAdduct} onValueChange={setLcmsBridgeAdduct}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {HRMS_ADDUCT_OPTIONS.map((a) => (
-                          <SelectItem key={a} value={a}>
-                            {a}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block space-y-2">
-                      <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
-                      <Input value={lcmsBridgePpm} onChange={(e) => setLcmsBridgePpm(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">m/z tolerance (Da)</span>
-                      <Input value={lcmsBridgeMzDa} onChange={(e) => setLcmsBridgeMzDa(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Bridge threshold (min_family_consensus_score)</span>
-                      <Input value={lcmsBridgeMinFam} onChange={(e) => setLcmsBridgeMinFam(e.target.value)} inputMode="decimal" />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium">Selected family ID (optional)</span>
-                      <Input value={lcmsBridgeSelectedFamilyId} onChange={(e) => setLcmsBridgeSelectedFamilyId(e.target.value)} />
-                    </label>
-                  </div>
-                  <label className="block space-y-2">
-                    <FieldLabelTip
-                      label="Consensus family table"
-                      tip="Exportable family rows (or full consensus result from the prior step) for mass alignment."
-                    />
-                    <Textarea
-                      value={lcmsBridgeFamilyTable}
-                      onChange={(e) => setLcmsBridgeFamilyTable(e.target.value)}
-                      rows={5}
-                      placeholder="Week 38 family_table_text CSV — optional if consensus was run in-panel"
-                    />
-                  </label>
-                  {lcmsConResult != null && (
-                    <Button type="button" variant="outline" size="sm" onClick={fillBridgeTableFromConsensus}>
-                      Fill from last consensus run
-                    </Button>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="lcms-br-req"
-                      checked={lcmsBridgeReqPromoted}
-                      onCheckedChange={(v) => setLcmsBridgeReqPromoted(v === true)}
-                    />
-                    <Label htmlFor="lcms-br-req" className="text-sm font-normal">
-                      Require promoted families (require_promoted_family)
-                    </Label>
-                  </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="submit" disabled={lcmsBridgeLoading} className="w-full sm:w-auto">
-                        {lcmsBridgeLoading ? "Running…" : "Bridge LC-MS evidence to candidate confidence"}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Map candidate theoretical m/z to promoted LC-MS feature-family anchors.
-                    </TooltipContent>
-                  </Tooltip>
-                </form>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="submit"
+                    aria-label="Score feature-family consensus"
+                    disabled={lcmsConLoading}
+                    className={cn(
+                      "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                      "hover:-translate-y-px hover:shadow-md",
+                      lcmsConLoading
+                        ? "cursor-wait opacity-70"
+                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                    )}
+                    style={{
+                      borderTop: "3px solid var(--mt-teal)",
+                      backgroundColor: "var(--mt-teal-soft)",
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                        Score
+                      </span>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        Recommended
+                      </span>
+                    </div>
+                    <span className="font-mono text-base font-bold leading-tight">
+                      {lcmsConLoading ? "Scoring consensus…" : "Score feature-family consensus"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Per-family confidence using your isotope / adduct / loss toggles.
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                  POST /ms/lcms/features/consensus/evidence
+                </TooltipContent>
+              </Tooltip>
             </ModuleCard>
-            <div className="min-w-0 space-y-6">
-              <TabResultSection
-                error={lcmsBridgeError}
-                loading={lcmsBridgeLoading}
-                loadingTitle="Bridging LC-MS consensus to candidates"
-                loadingHint="Bridging LC-MS consensus into unified confidence…"
-                emptyHint="Enter candidates and supply consensus evidence (table or prior consensus run)."
-                result={lcmsBridgeResult}
-                summaryTone="ms"
-                unifiedEvidence={{
-                  layer: "lcms_confidence_bridge",
-                  sourceTab: "MS Evidence",
-                  title: "LC-MS consensus bridge",
-                  endpoint: "/confidence/candidates/lcms-consensus-bridge",
-                  sampleId: sampleId.trim() || undefined,
-                }}
+          </form>
+
+          {/* Step 3 — Results */}
+          {(lcmsConResult != null || lcmsConLoading || lcmsConError) && (
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Consensus · Step 3 · Results"
+              title="Feature-family consensus output"
+              icon={BarChart3}
+              description="Per-family confidence + detail tables from /ms/lcms/features/consensus/evidence."
+              className="min-w-0"
+            >
+              <div className="space-y-6">
+                <TabResultSection
+                  error={lcmsConError}
+                  loading={lcmsConLoading}
+                  loadingTitle="Scoring LC-MS feature-family consensus"
+                  loadingHint="Building feature-family consensus across runs…"
+                  emptyHint="Paste a grouped feature table (or load from grouping), then run."
+                  result={lcmsConResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "lcms_feature_family_consensus",
+                    sourceTab: "MS Evidence",
+                    title: "LC-MS feature-family consensus",
+                    endpoint: "/ms/lcms/features/consensus/evidence",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!lcmsConLoading && lcmsConResult != null && <LcmsAdvConsensusDetailTables result={lcmsConResult} />}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lcms-adv-derep" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              LC-MS · Dereplication
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              LC-MS/MS library dereplication + candidate seed retrieval
+              <InfoTooltip
+                label="About LC-MS dereplication"
+                content="Rank supplied local or curated library candidates against precursor m/z, MS/MS similarity, optional RT/CCS, feature-family consensus, and library provenance."
               />
-              {!lcmsBridgeLoading && lcmsBridgeResult != null && <LcmsAdvBridgeDetailTables result={lcmsBridgeResult} />}
-            </div>
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Rank candidates against the spectral library using precursor m/z, MS/MS dot-product, optional RT/CCS, and feature-family provenance.
+            </p>
           </div>
+
+          <form onSubmit={runLcmsAdvDereplication} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Derep · Step 1 · Setup"
+              title="Library candidates + family table + tolerances"
+              icon={Atom}
+              description="Provide library candidates (or load from session), optional family table (load from consensus), and ranking knobs."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Precursor m/z (optional, audit comment)</span>
+                  <Input value={lcmsDerPrecursorMz} onChange={(e) => setLcmsDerPrecursorMz(e.target.value)} inputMode="decimal" />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">MS/MS peak list (optional, audit comments)</span>
+                  <Textarea
+                    value={lcmsDerMsmsPeaks}
+                    onChange={(e) => setLcmsDerMsmsPeaks(e.target.value)}
+                    rows={4}
+                    placeholder="m/z,intensity rows — stored as # msms … comment lines"
+                  />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Optional RT (min)</span>
+                    <Input value={lcmsDerRt} onChange={(e) => setLcmsDerRt(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Optional CCS</span>
+                    <Input value={lcmsDerCcs} onChange={(e) => setLcmsDerCcs(e.target.value)} inputMode="decimal" />
+                  </label>
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Library candidates</span>
+                  <Textarea
+                    value={lcmsDerCandidatesText}
+                    onChange={(e) => setLcmsDerCandidatesText(e.target.value)}
+                    rows={5}
+                    placeholder="Pipe-separated name | SMILES | role — synced from session candidates when updated"
+                  />
+                </label>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Library file (optional)</span>
+                  <input
+                    ref={lcmsDerLibraryFileRef}
+                    type="file"
+                    accept={SPECTRACHECK_TEXT_SPECTRUM_ACCEPT}
+                    className={cn(
+                      "file:text-foreground border-input flex h-9 w-full min-w-0 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+                      "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    )}
+                  />
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">LC-MS family table (optional)</span>
+                  <Textarea
+                    value={lcmsDerFamilyTable}
+                    onChange={(e) => setLcmsDerFamilyTable(e.target.value)}
+                    rows={4}
+                    placeholder="family_id, anchor_mz, … from consensus export"
+                  />
+                </label>
+                {lcmsConResult != null && (
+                  <Button type="button" variant="outline" size="sm" onClick={fillDerepFamilyTableFromConsensus}>
+                    Use consensus family table
+                  </Button>
+                )}
+                <div className="space-y-2">
+                  <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
+                  <Select value={lcmsDerAdduct} onValueChange={setLcmsDerAdduct}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HRMS_ADDUCT_OPTIONS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {a}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">m/z tolerance (Da)</span>
+                    <Input value={lcmsDerMzTol} onChange={(e) => setLcmsDerMzTol(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
+                    <Input value={lcmsDerPpmTol} onChange={(e) => setLcmsDerPpmTol(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Min family consensus score</span>
+                    <Input value={lcmsDerMinFam} onChange={(e) => setLcmsDerMinFam(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Selected family ID (optional)</span>
+                    <Input value={lcmsDerSelectedFamilyId} onChange={(e) => setLcmsDerSelectedFamilyId(e.target.value)} />
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="lcms-der-req"
+                    checked={lcmsDerReqPromoted}
+                    onCheckedChange={(v) => setLcmsDerReqPromoted(v === true)}
+                  />
+                  <Label htmlFor="lcms-der-req" className="text-sm font-normal">
+                    Use feature-family consensus (require_promoted_family)
+                  </Label>
+                </div>
+              </div>
+            </ModuleCard>
+
+            {/* Step 2 — Run */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Derep · Step 2 · Run"
+              title="Run dereplication"
+              icon={Zap}
+              description="Rank library candidates against LC-MS family evidence and tolerances."
+              className="min-w-0"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="submit"
+                    aria-label="Run dereplication"
+                    disabled={lcmsDerLoading}
+                    className={cn(
+                      "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                      "hover:-translate-y-px hover:shadow-md",
+                      lcmsDerLoading
+                        ? "cursor-wait opacity-70"
+                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                    )}
+                    style={{
+                      borderTop: "3px solid var(--mt-teal)",
+                      backgroundColor: "var(--mt-teal-soft)",
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                        Dereplicate
+                      </span>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        Recommended
+                      </span>
+                    </div>
+                    <span className="font-mono text-base font-bold leading-tight">
+                      {lcmsDerLoading ? "Running dereplication…" : "Run dereplication"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Rank candidates by precursor m/z + MS/MS dot-product + RT/CCS + family provenance.
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                  POST /ms/lcms/dereplication/evidence
+                </TooltipContent>
+              </Tooltip>
+            </ModuleCard>
+          </form>
+
+          {/* Step 3 — Results */}
+          {(lcmsDerResult != null || lcmsDerLoading || lcmsDerError) && (
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Derep · Step 3 · Results"
+              title="LC-MS dereplication output"
+              icon={BarChart3}
+              description="Per-candidate ranks + detail tables from /ms/lcms/dereplication/evidence."
+              className="min-w-0"
+            >
+              <div className="space-y-6">
+                <TabResultSection
+                  error={lcmsDerError}
+                  loading={lcmsDerLoading}
+                  loadingTitle="Running LC-MS dereplication"
+                  loadingHint="Running library dereplication…"
+                  emptyHint="Provide candidates and/or family table evidence to rank library entries."
+                  result={lcmsDerResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "lcms_dereplication",
+                    sourceTab: "MS Evidence",
+                    title: "LC-MS library dereplication",
+                    endpoint: "/ms/lcms/dereplication/evidence",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!lcmsDerLoading && lcmsDerResult != null && <LcmsAdvDereplicationDetailTables result={lcmsDerResult} />}
+              </div>
+            </ModuleCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lcms-adv-bridge" className="mt-4 space-y-12">
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+              LC-MS · Confidence Bridge
+            </p>
+            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+              LC-MS consensus → unified confidence bridge
+              <InfoTooltip
+                label="About LC-MS consensus bridge"
+                content="Connect promoted LC-MS feature families to candidate confidence when theoretical adduct m/z matches a non-conflicting feature-family anchor."
+              />
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Link promoted LC-MS feature families to candidate confidence when theoretical adduct masses match a consensus anchor.
+            </p>
+          </div>
+
+          <form onSubmit={runLcmsAdvBridge} className="space-y-12">
+            {/* Step 1 — Setup */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Bridge · Step 1 · Setup"
+              title="Candidates + consensus family table"
+              icon={Network}
+              description="Provide candidates, adduct, tolerances, and a consensus family table (or load from the last consensus run)."
+              className="min-w-0"
+            >
+              <div className="space-y-4">
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Candidate structures</span>
+                  <Textarea
+                    value={lcmsBridgeCandidatesText}
+                    onChange={(e) => setLcmsBridgeCandidatesText(e.target.value)}
+                    rows={6}
+                    placeholder="name | SMILES | role"
+                  />
+                </label>
+                <div className="space-y-2">
+                  <FieldLabelTip label="Adduct" tip="Ionizing adduct for theoretical neutral mass and fragment annotation." />
+                  <Select value={lcmsBridgeAdduct} onValueChange={setLcmsBridgeAdduct}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HRMS_ADDUCT_OPTIONS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {a}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block space-y-2">
+                    <FieldLabelTip label="ppm tolerance" tip="Mass accuracy window in parts per million vs. theoretical m/z." />
+                    <Input value={lcmsBridgePpm} onChange={(e) => setLcmsBridgePpm(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">m/z tolerance (Da)</span>
+                    <Input value={lcmsBridgeMzDa} onChange={(e) => setLcmsBridgeMzDa(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Bridge threshold (min_family_consensus_score)</span>
+                    <Input value={lcmsBridgeMinFam} onChange={(e) => setLcmsBridgeMinFam(e.target.value)} inputMode="decimal" />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Selected family ID (optional)</span>
+                    <Input value={lcmsBridgeSelectedFamilyId} onChange={(e) => setLcmsBridgeSelectedFamilyId(e.target.value)} />
+                  </label>
+                </div>
+                <label className="block space-y-2">
+                  <FieldLabelTip
+                    label="Consensus family table"
+                    tip="Exportable family rows (or full consensus result from the prior step) for mass alignment."
+                  />
+                  <Textarea
+                    value={lcmsBridgeFamilyTable}
+                    onChange={(e) => setLcmsBridgeFamilyTable(e.target.value)}
+                    rows={5}
+                    placeholder="Week 38 family_table_text CSV — optional if consensus was run in-panel"
+                  />
+                </label>
+                {lcmsConResult != null && (
+                  <Button type="button" variant="outline" size="sm" onClick={fillBridgeTableFromConsensus}>
+                    Fill from last consensus run
+                  </Button>
+                )}
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="lcms-br-req"
+                    checked={lcmsBridgeReqPromoted}
+                    onCheckedChange={(v) => setLcmsBridgeReqPromoted(v === true)}
+                  />
+                  <Label htmlFor="lcms-br-req" className="text-sm font-normal">
+                    Require promoted families (require_promoted_family)
+                  </Label>
+                </div>
+              </div>
+            </ModuleCard>
+
+            {/* Step 2 — Run */}
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Bridge · Step 2 · Run"
+              title="Bridge LC-MS evidence to candidate confidence"
+              icon={Zap}
+              description="Map candidate theoretical m/z to promoted LC-MS feature-family anchors."
+              className="min-w-0"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="submit"
+                    aria-label="Bridge LC-MS evidence to candidate confidence"
+                    disabled={lcmsBridgeLoading}
+                    className={cn(
+                      "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+                      "hover:-translate-y-px hover:shadow-md",
+                      lcmsBridgeLoading
+                        ? "cursor-wait opacity-70"
+                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                    )}
+                    style={{
+                      borderTop: "3px solid var(--mt-teal)",
+                      backgroundColor: "var(--mt-teal-soft)",
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                        Bridge
+                      </span>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        Recommended
+                      </span>
+                    </div>
+                    <span className="font-mono text-base font-bold leading-tight">
+                      {lcmsBridgeLoading ? "Bridging consensus…" : "Bridge LC-MS evidence to candidate confidence"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Promote LC-MS feature-family anchors into the unified confidence package.
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4} className="max-w-xs text-xs">
+                  POST /confidence/candidates/lcms-consensus-bridge
+                </TooltipContent>
+              </Tooltip>
+            </ModuleCard>
+          </form>
+
+          {/* Step 3 — Results */}
+          {(lcmsBridgeResult != null || lcmsBridgeLoading || lcmsBridgeError) && (
+            <ModuleCard
+              accent="teal"
+              eyebrow="LC-MS Bridge · Step 3 · Results"
+              title="LC-MS confidence bridge output"
+              icon={BarChart3}
+              description="Per-candidate consensus anchors + detail tables from /confidence/candidates/lcms-consensus-bridge."
+              className="min-w-0"
+            >
+              <div className="space-y-6">
+                <TabResultSection
+                  error={lcmsBridgeError}
+                  loading={lcmsBridgeLoading}
+                  loadingTitle="Bridging LC-MS consensus to candidates"
+                  loadingHint="Bridging LC-MS consensus into unified confidence…"
+                  emptyHint="Enter candidates and supply consensus evidence (table or prior consensus run)."
+                  result={lcmsBridgeResult}
+                  summaryTone="ms"
+                  unifiedEvidence={{
+                    layer: "lcms_confidence_bridge",
+                    sourceTab: "MS Evidence",
+                    title: "LC-MS consensus bridge",
+                    endpoint: "/confidence/candidates/lcms-consensus-bridge",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+                {!lcmsBridgeLoading && lcmsBridgeResult != null && <LcmsAdvBridgeDetailTables result={lcmsBridgeResult} />}
+              </div>
+            </ModuleCard>
+          )}
         </TabsContent>
       </Tabs>
     </div>
