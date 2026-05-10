@@ -6,6 +6,8 @@ import { trackOutboundSyncJobCreated } from "@/src/lib/analytics/analytics-clien
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -201,20 +203,17 @@ export function ReactionStudioWorkspace() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-8 pb-12">
-      <header className="space-y-3 border-b pb-6">
+      <header className="space-y-4 border-b pb-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="font-mono text-xs">
-                Reaction Studio (program-level)
-              </Badge>
-              <Badge variant="secondary" className="gap-1 border-dashed border-warning/60 bg-warning/10 text-warning-foreground">
-                <AlertTriangle className="h-3 w-3" />
-                Demo data — not live analysis
-              </Badge>
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight">Optimization workspace</h1>
-            <p className="max-w-3xl text-muted-foreground">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              MolTrace · Reaction Studio (program-level)
+            </p>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Optimization workspace</h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
               Shell UI for reaction schemes, condition matrices, outcomes, and decision-support cards. Backend wiring is
               intentionally omitted until endpoints are available.
             </p>
@@ -224,48 +223,44 @@ export function ReactionStudioWorkspace() {
             Sync experiments (disabled)
           </Button>
         </div>
+        <AlertCard
+          variant="warning"
+          title="Demo data"
+          description="This workspace shows demo content only — no live analysis is executed and outputs are not validated."
+        />
       </header>
 
       {/* Reaction scheme */}
       <section aria-labelledby="scheme-heading">
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <FlaskConical className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <CardTitle id="scheme-heading" className="text-lg">
-                Reaction scheme
-              </CardTitle>
-            </div>
-            <CardDescription>
-              Structure drawing / SMARTS canvas placeholder — attach structure editor or ELN link when integrated.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="scientific-grid-subtle flex min-h-[200px] flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
-              <Beaker className="mb-3 h-10 w-10 text-muted-foreground/70" aria-hidden />
-              <p className="text-sm font-medium text-foreground">Scheme preview area</p>
-              <p className="mt-2 max-w-md text-xs text-muted-foreground">
-                Demo layout only. Import molfile / CXSMILES or render from route params when chemistry services exist.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <ModuleCard
+          accent="violet"
+          eyebrow="Studio · Scheme"
+          title={<span id="scheme-heading">Reaction scheme</span>}
+          icon={FlaskConical}
+          description="Structure drawing / SMARTS canvas placeholder — attach structure editor or ELN link when integrated."
+        >
+          <div className="scientific-grid-subtle flex min-h-[200px] flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
+            <Beaker className="mb-3 h-10 w-10 text-muted-foreground/70" aria-hidden />
+            <p className="text-sm font-medium text-foreground">Scheme preview area</p>
+            <p className="mt-2 max-w-md text-xs text-muted-foreground">
+              Demo layout only. Import molfile / CXSMILES or render from route params when chemistry services exist.
+            </p>
+          </div>
+        </ModuleCard>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Condition matrix */}
         <section aria-labelledby="conditions-heading">
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Grid3X3 className="h-5 w-5 text-muted-foreground" aria-hidden />
-                <CardTitle id="conditions-heading" className="text-lg">
-                  Condition matrix
-                </CardTitle>
-              </div>
-              <CardDescription>Factor settings per experimental run (demo rows).</CardDescription>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Studio · Conditions"
+            title={<span id="conditions-heading">Condition matrix</span>}
+            icon={Grid3X3}
+            description="Factor settings per experimental run (demo rows)."
+            className="h-full"
+          >
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -290,23 +285,21 @@ export function ReactionStudioWorkspace() {
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </section>
 
         {/* Yield / selectivity / impurity */}
         <section aria-labelledby="outcomes-heading">
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-muted-foreground" aria-hidden />
-                <CardTitle id="outcomes-heading" className="text-lg">
-                  Yield, selectivity &amp; impurities
-                </CardTitle>
-              </div>
-              <CardDescription>Measured outcomes table — values are fictional for UI staging.</CardDescription>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Studio · Outcomes"
+            title={<span id="outcomes-heading">Yield, selectivity & impurities</span>}
+            icon={Target}
+            description="Measured outcomes table — values are fictional for UI staging."
+            className="h-full"
+          >
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -331,23 +324,20 @@ export function ReactionStudioWorkspace() {
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </section>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="connector-import-heading">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle id="connector-import-heading" className="text-lg">
-                ELN / LIMS Experiment Import
-              </CardTitle>
-              <CardDescription>
-                Import an experiment table from a connected ELN or LIMS for reaction optimization.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Studio · Import"
+            title={<span id="connector-import-heading">ELN / LIMS Experiment Import</span>}
+            description="Import an experiment table from a connected ELN or LIMS for reaction optimization."
+          >
+            <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="rxn-import-connector">connector</Label>
@@ -386,7 +376,9 @@ export function ReactionStudioWorkspace() {
                   <Label htmlFor="rxn-import-review-required">review required</Label>
                 </div>
               </div>
-              {importError ? <p className="text-xs text-destructive">{importError}</p> : null}
+              {importError ? (
+                <AlertCard variant="error" title="Import failed" description={importError} />
+              ) : null}
               <Button type="button" onClick={() => void importExperimentTable()} disabled={importBusy}>
                 {importBusy ? "Importing…" : "Import experiments"}
               </Button>
@@ -413,21 +405,18 @@ export function ReactionStudioWorkspace() {
                   </details>
                 </div>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </section>
 
         <section aria-labelledby="connector-export-heading">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle id="connector-export-heading" className="text-lg">
-                Export approved experiments
-              </CardTitle>
-              <CardDescription>
-                Push approved experiment results back to an external ELN or LIMS.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Studio · Export"
+            title={<span id="connector-export-heading">Export approved experiments</span>}
+            description="Push approved experiment results back to an external ELN or LIMS."
+          >
+            <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="rxn-export-connector">connector</Label>
@@ -459,7 +448,9 @@ export function ReactionStudioWorkspace() {
                   />
                 </div>
               </div>
-              {exportError ? <p className="text-xs text-destructive">{exportError}</p> : null}
+              {exportError ? (
+                <AlertCard variant="error" title="Export failed" description={exportError} />
+              ) : null}
               <Button type="button" onClick={() => void exportApprovedExperiments()} disabled={exportBusy}>
                 {exportBusy ? "Exporting…" : "Export approved experiments"}
               </Button>
@@ -479,8 +470,8 @@ export function ReactionStudioWorkspace() {
                   </details>
                 </div>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </section>
       </div>
 
@@ -504,15 +495,14 @@ export function ReactionStudioWorkspace() {
         />
 
         {/* Uncertainty */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <LineChart className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <CardTitle className="text-base">Uncertainty</CardTitle>
-            </div>
-            <CardDescription>{DEMO_UNCERTAINTY.epistemic_note}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="violet"
+          eyebrow="Studio · Uncertainty"
+          title="Uncertainty"
+          icon={LineChart}
+          description={DEMO_UNCERTAINTY.epistemic_note}
+        >
+          <div className="space-y-4">
             <div>
               <p className="text-xs text-muted-foreground">Yield (demo 95% interval)</p>
               <p className="font-mono text-lg tabular-nums">
@@ -528,19 +518,19 @@ export function ReactionStudioWorkspace() {
             <div className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               Calibration curves and posterior stacks will render here after model API integration.
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
         {/* Next-best experiment */}
-        <Card className="md:col-span-2 xl:col-span-1">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <CardTitle className="text-base">Next-best experiment</CardTitle>
-            </div>
-            <CardDescription>{DEMO_NEXT_EXPERIMENT.rationale}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <ModuleCard
+          accent="violet"
+          eyebrow="Studio · Next Experiment"
+          title="Next-best experiment"
+          icon={Target}
+          description={DEMO_NEXT_EXPERIMENT.rationale}
+          className="md:col-span-2 xl:col-span-1"
+        >
+          <div className="space-y-3">
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <dt className="text-muted-foreground">Solvent</dt>
               <dd className="font-medium">{DEMO_NEXT_EXPERIMENT.solvent}</dd>
@@ -555,26 +545,19 @@ export function ReactionStudioWorkspace() {
             <Button variant="outline" size="sm" className="w-full" disabled>
               Queue in ELN (requires backend)
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       {/* Response surface placeholder */}
       <section aria-labelledby="surface-heading">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <LineChart className="h-5 w-5 text-muted-foreground" aria-hidden />
-              <CardTitle id="surface-heading" className="text-lg">
-                Response surface
-              </CardTitle>
-            </div>
-            <CardDescription>
-              Contour / surface visualization placeholder — wire to DOE engine or plotting library when data pipelines
-              exist.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ModuleCard
+          accent="violet"
+          eyebrow="Studio · Response Surface"
+          title={<span id="surface-heading">Response surface</span>}
+          icon={LineChart}
+          description="Contour / surface visualization placeholder — wire to DOE engine or plotting library when data pipelines exist."
+        >
             <div className="scientific-grid relative flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg border bg-muted/20">
               <div className="absolute inset-0 bg-gradient-to-br from-chart-2/10 via-transparent to-chart-4/10" aria-hidden />
               <div className="relative z-[1] max-w-lg px-6 text-center">
@@ -588,28 +571,19 @@ export function ReactionStudioWorkspace() {
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </ModuleCard>
       </section>
 
       {/* Human approval gate */}
       <section aria-labelledby="approval-heading">
-        <Card className="border-primary/25 bg-primary/[0.03]">
-          <CardHeader className="pb-3">
-            <div className="flex flex-wrap items-start gap-3">
-              <Shield className="mt-0.5 h-6 w-6 shrink-0 text-primary" aria-hidden />
-              <div className="space-y-1">
-                <CardTitle id="approval-heading" className="text-lg">
-                  Human approval gate
-                </CardTitle>
-                <CardDescription>
-                  Experimental decisions require qualified review. This gate will attach signatures and audit trails when
-                  the workflow API is connected.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="violet"
+          eyebrow="Studio · Approval Gate"
+          title={<span id="approval-heading">Human approval gate</span>}
+          icon={Shield}
+          description="Experimental decisions require qualified review. This gate will attach signatures and audit trails when the workflow API is connected."
+        >
+          <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-4 rounded-md border bg-background/80 px-4 py-3">
               <Checkbox id="demo-ack" disabled />
               <Label htmlFor="demo-ack" className="text-sm leading-snug text-muted-foreground">
@@ -625,13 +599,20 @@ export function ReactionStudioWorkspace() {
                 Request revision
               </Button>
             </div>
-            <p className="flex items-start gap-2 text-xs text-muted-foreground">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+            <p
+              className="flex items-start gap-2 text-xs text-muted-foreground"
+              style={{ color: "var(--mt-amber)" }}
+            >
+              <AlertTriangle
+                className="mt-0.5 h-4 w-4 shrink-0"
+                style={{ color: "var(--mt-amber)" }}
+                aria-hidden
+              />
               Buttons stay disabled until approval endpoints and identity checks exist — avoids implying signed-off
               experiments from static UI.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
 
       {/* Footer strip */}

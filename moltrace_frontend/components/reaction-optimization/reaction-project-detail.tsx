@@ -13,6 +13,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+
+const reactionProjectTabClass =
+  "font-mono text-xs sm:text-sm data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#EBF4F8] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -3631,26 +3636,30 @@ export function ReactionProjectDetail() {
               reaction_project_id={reactionProjectId}
             </Badge>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Reaction Studio (project-level)</h1>
-          <p className="text-muted-foreground">{loading ? "Loading…" : projectName}</p>
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            MolTrace · Reaction Studio (project-level)
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Reaction Studio (project-level)</h1>
+          <p className="text-sm text-muted-foreground">{loading ? "Loading…" : projectName}</p>
         </div>
         <div className="flex items-center gap-2">
-          <FlaskConical className="h-5 w-5 text-muted-foreground" aria-hidden />
+          <FlaskConical className="h-5 w-5" style={{ color: "var(--mt-violet)" }} aria-hidden />
         </div>
       </div>
 
       {error ? (
-        <Alert variant="destructive">
-          <AlertTitle className="text-sm">Backend unavailable</AlertTitle>
-          <AlertDescription className="text-xs">{error}</AlertDescription>
-        </Alert>
+        <AlertCard variant="error" title="Backend unavailable" description={error} />
       ) : null}
 
       {msg ? (
-        <Alert variant={msg.tone === "ok" ? "default" : "destructive"}>
-          <AlertTitle className="text-sm">{msg.tone === "ok" ? "Update" : "Error"}</AlertTitle>
-          <AlertDescription className="text-xs">{msg.text}</AlertDescription>
-        </Alert>
+        <AlertCard
+          variant={msg.tone === "ok" ? "success" : "error"}
+          title={msg.tone === "ok" ? "Update" : "Error"}
+          description={msg.text}
+        />
       ) : null}
 
       <ReactionStudioKnowledgeLinksCard reactionProjectId={reactionProjectId} />
@@ -3658,25 +3667,25 @@ export function ReactionProjectDetail() {
       <Tabs defaultValue="overview" className="w-full min-w-0">
         <div className="min-w-0 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
           <TabsList className="inline-flex h-auto min-h-9 w-max max-w-full flex-nowrap justify-start gap-1">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm">
+            <TabsTrigger value="overview" className={reactionProjectTabClass}>
               Overview
             </TabsTrigger>
-            <TabsTrigger value="variables" className="text-xs sm:text-sm">
+            <TabsTrigger value="variables" className={reactionProjectTabClass}>
               Variables
             </TabsTrigger>
-            <TabsTrigger value="experiments" className="text-xs sm:text-sm">
+            <TabsTrigger value="experiments" className={reactionProjectTabClass}>
               Experiments
             </TabsTrigger>
-            <TabsTrigger value="objective" className="text-xs sm:text-sm">
+            <TabsTrigger value="objective" className={reactionProjectTabClass}>
               Objective
             </TabsTrigger>
-            <TabsTrigger value="cost-safety" className="text-xs sm:text-sm">
+            <TabsTrigger value="cost-safety" className={reactionProjectTabClass}>
               {"Cost & Safety"}
             </TabsTrigger>
-            <TabsTrigger value="optimization" className="text-xs sm:text-sm">
+            <TabsTrigger value="optimization" className={reactionProjectTabClass}>
               Optimization
             </TabsTrigger>
-            <TabsTrigger value="advisor" className="text-xs sm:text-sm">
+            <TabsTrigger value="advisor" className={reactionProjectTabClass}>
               <span className="inline-flex items-center gap-1">
                 Advisor
                 <span
@@ -3704,10 +3713,10 @@ export function ReactionProjectDetail() {
                 </span>
               </span>
             </TabsTrigger>
-            <TabsTrigger value="recommendations" className="text-xs sm:text-sm">
+            <TabsTrigger value="recommendations" className={reactionProjectTabClass}>
               Recommendations
             </TabsTrigger>
-            <TabsTrigger value="execution" className="text-xs sm:text-sm">
+            <TabsTrigger value="execution" className={reactionProjectTabClass}>
               <span className="inline-flex items-center gap-1">
                 Execution
                 <span
@@ -3735,10 +3744,10 @@ export function ReactionProjectDetail() {
                 </span>
               </span>
             </TabsTrigger>
-            <TabsTrigger value="evidence" className="text-xs sm:text-sm">
+            <TabsTrigger value="evidence" className={reactionProjectTabClass}>
               Evidence Links
             </TabsTrigger>
-            <TabsTrigger value="developer" className="text-xs sm:text-sm">
+            <TabsTrigger value="developer" className={reactionProjectTabClass}>
               Developer JSON
             </TabsTrigger>
           </TabsList>
@@ -3746,29 +3755,54 @@ export function ReactionProjectDetail() {
 
         <TabsContent value="overview" className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">objective</CardTitle>
+            <Card
+              className="overflow-hidden rounded-xl py-0"
+              style={{ borderTop: "3px solid var(--mt-violet)" }}
+            >
+              <CardHeader className="pt-4 pb-2">
+                <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Objective
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="font-mono text-sm">{objective ?? "—"}</p>
+              <CardContent className="pb-4">
+                <p
+                  className="font-mono text-base font-bold"
+                  style={{ color: "var(--mt-violet)" }}
+                >
+                  {objective ?? "—"}
+                </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">status</CardTitle>
+            <Card
+              className="overflow-hidden rounded-xl py-0"
+              style={{ borderTop: "3px solid var(--mt-violet)" }}
+            >
+              <CardHeader className="pt-4 pb-2">
+                <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Status
+                </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pb-4">
                 <Badge variant="outline">{status ?? "—"}</Badge>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">experiment count</CardTitle>
+            <Card
+              className="overflow-hidden rounded-xl py-0"
+              style={{ borderTop: "3px solid var(--mt-violet)" }}
+            >
+              <CardHeader className="pt-4 pb-2">
+                <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Experiment count
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tabular-nums">{loading ? "…" : experimentCount}</p>
-                <p className="text-xs text-muted-foreground">From GET …/experiments</p>
+              <CardContent className="pb-4">
+                <p
+                  className="font-mono text-3xl font-bold tabular-nums leading-none"
+                  style={{ color: "var(--mt-violet)" }}
+                >
+                  {loading ? "…" : experimentCount}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">From GET …/experiments</p>
               </CardContent>
             </Card>
           </div>
@@ -3778,20 +3812,22 @@ export function ReactionProjectDetail() {
             variableRecords={variableRecords}
             variableNamesOrdered={variableNamesOrdered}
           />
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">best observed outcome</CardTitle>
-              <CardDescription>Aggregate view only — not a guarantee of future performance.</CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Overview · Best Outcome"
+            title="best observed outcome"
+            description="Aggregate view only — not a guarantee of future performance."
+          >
+            <p className="text-sm text-muted-foreground">
               {loading ? "…" : bestOutcomeLabel(objective, experimentsRec)}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">latest recommendation</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
+            </p>
+          </ModuleCard>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Overview · Latest Recommendation"
+            title="latest recommendation"
+          >
+            <div className="space-y-2 text-sm">
               {loading ? (
                 <p className="text-muted-foreground">…</p>
               ) : latestRec ? (
@@ -3809,14 +3845,15 @@ export function ReactionProjectDetail() {
               ) : (
                 <p className="text-muted-foreground">No recommendations returned.</p>
               )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">linked SpectraCheck evidence</CardTitle>
-              <CardDescription>Experiments with linked_spectracheck_session_id and evidence record counts.</CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm">
+            </div>
+          </ModuleCard>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Overview · Linked Evidence"
+            title="linked SpectraCheck evidence"
+            description="Experiments with linked_spectracheck_session_id and evidence record counts."
+          >
+            <div className="text-sm">
               <p>
                 <span className="text-muted-foreground">Linked sessions (experiments): </span>
                 <span className="font-semibold tabular-nums">{loading ? "…" : linkedSessionCount}</span>
@@ -3824,21 +3861,24 @@ export function ReactionProjectDetail() {
               <p className="mt-2 text-xs text-muted-foreground">
                 Evidence records from linked SpectraCheck sessions are counted per experiment and shown in the Evidence Links tab.
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
           <ReactionStudioCompoundLinkSummary loading={loading} project={project} experiments={experimentsRec} />
         </TabsContent>
 
         <TabsContent value="variables" className="mt-4 space-y-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Variables"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Variables
                 <InfoTooltip content={VARIABLES_TOOLTIP} label="About reaction variables" />
-              </CardTitle>
-              <CardDescription>Reaction variables defining the experimental parameter space — temperature, solvent, catalyst loading, and other independently controlled inputs.</CardDescription>
-            </CardHeader>
-            <CardContent className="table-scroll">
+              </span>
+            }
+            description="Reaction variables defining the experimental parameter space — temperature, solvent, catalyst loading, and other independently controlled inputs."
+          >
+            <div className="table-scroll">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -3885,15 +3925,15 @@ export function ReactionProjectDetail() {
                   )}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">add variable</CardTitle>
-              <CardDescription>Define a new reaction variable with its type, unit, and allowed-value constraints for use across all experiments in this project.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Add Variable"
+            title="add variable"
+            description="Define a new reaction variable with its type, unit, and allowed-value constraints for use across all experiments in this project."
+          >
               <form className="grid gap-4 md:grid-cols-2" onSubmit={(e) => void submitVariable(e)}>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="rv-name">variable name</Label>
@@ -3956,19 +3996,17 @@ export function ReactionProjectDetail() {
                   </Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
+          </ModuleCard>
         </TabsContent>
 
         <TabsContent value="experiments" className="mt-4 space-y-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">experiment matrix</CardTitle>
-              <CardDescription>
-                Reaction experiment matrix — each row records a unique condition set, outcome metrics, and the SpectraCheck session linked for analytical evidence.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="table-scroll">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Experiment Matrix"
+            title="experiment matrix"
+            description="Reaction experiment matrix — each row records a unique condition set, outcome metrics, and the SpectraCheck session linked for analytical evidence."
+          >
+            <div className="table-scroll">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -4057,17 +4095,16 @@ export function ReactionProjectDetail() {
                   ) : null}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">SpectraCheck evidence summary</CardTitle>
-              <CardDescription>
-                Analytical evidence summary for experiments with linked SpectraCheck sessions — confidence status, QC outcome, and evidence record count. Open SpectraCheck for full spectral evidence.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="table-scroll">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Evidence Summary"
+            title="SpectraCheck evidence summary"
+            description="Analytical evidence summary for experiments with linked SpectraCheck sessions — confidence status, QC outcome, and evidence record count. Open SpectraCheck for full spectral evidence."
+          >
+            <div className="table-scroll">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -4135,15 +4172,15 @@ export function ReactionProjectDetail() {
                   ) : null}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">add experiment</CardTitle>
-              <CardDescription>Register a new reaction experiment with its condition set, status, and optional outcome fields.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Add Experiment"
+            title="add experiment"
+            description="Register a new reaction experiment with its condition set, status, and optional outcome fields."
+          >
               <form className="space-y-6" onSubmit={(e) => void submitExperiment(e)}>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
@@ -4338,22 +4375,21 @@ export function ReactionProjectDetail() {
                   {busy === "experiment" ? "Saving…" : "Add experiment"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
+          </ModuleCard>
         </TabsContent>
 
         <TabsContent value="objective" className="mt-4 space-y-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Objective"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Objective profile
                 <InfoTooltip content={OBJECTIVE_PROFILE_TOOLTIP} label="About objective profile" />
-              </CardTitle>
-              <CardDescription>
-                Define the optimization objective — yield, selectivity, purity, or a composite target — including weighting and thresholds used by the optimization engine.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </span>
+            }
+            description="Define the optimization objective — yield, selectivity, purity, or a composite target — including weighting and thresholds used by the optimization engine."
+          >
               <form className="space-y-6" onSubmit={(e) => void saveObjectiveProfile(e)}>
                 <div className="space-y-2">
                   <Label htmlFor="obj-type">objective type</Label>
@@ -4482,8 +4518,7 @@ export function ReactionProjectDetail() {
                   {busy === "objective-profile" ? "Saving…" : "Save objective profile"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
+          </ModuleCard>
           <ReactionRegulatoryConstraintsPanel
             reactionProjectId={reactionProjectId}
             onPayloadChange={setRegulatoryPayloadForOptimization}
@@ -4492,17 +4527,17 @@ export function ReactionProjectDetail() {
         </TabsContent>
 
         <TabsContent value="cost-safety" className="mt-4 space-y-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Cost"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Cost profile
                 <InfoTooltip content={COST_AWARE_TOOLTIP} label="Cost-aware optimization" />
-              </CardTitle>
-              <CardDescription>
-                Reagent, solvent, and process cost parameters applied during optimization to penalize expensive condition combinations.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </span>
+            }
+            description="Reagent, solvent, and process cost parameters applied during optimization to penalize expensive condition combinations."
+          >
               <form className="space-y-6" onSubmit={(e) => void saveCostProfile(e)}>
                 <div className="space-y-2">
                   <Label htmlFor="cp-reagent-costs">reagent_costs_json</Label>
@@ -4581,20 +4616,19 @@ export function ReactionProjectDetail() {
                   {busy === "cost-profile" ? "Saving…" : "Save cost profile"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Safety"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Safety profile
                 <InfoTooltip content={SAFETY_CONSTRAINTS_TOOLTIP} label="Safety constraints" />
-              </CardTitle>
-              <CardDescription>
-                Blocked reagents, hazard flags, and safety-constraint parameters applied to filter candidate conditions before scoring.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </span>
+            }
+            description="Blocked reagents, hazard flags, and safety-constraint parameters applied to filter candidate conditions before scoring."
+          >
               <form className="space-y-6" onSubmit={(e) => void saveSafetyProfile(e)}>
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -4689,20 +4723,20 @@ export function ReactionProjectDetail() {
                   {busy === "safety-profile" ? "Saving…" : "Save safety profile"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Design Space"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Design space
                 <InfoTooltip content={DESIGN_SPACE_TOOLTIP} label="About design space" />
-              </CardTitle>
-              <CardDescription>
-                Experimental design space — variable bounds, fixed values, and categorical levels that constrain the optimization search region.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </span>
+            }
+            description="Experimental design space — variable bounds, fixed values, and categorical levels that constrain the optimization search region."
+          >
+            <div className="space-y-6">
               <div className="table-scroll">
                 <Table>
                   <TableHeader>
@@ -4806,8 +4840,8 @@ export function ReactionProjectDetail() {
                   {busy === "design-space" ? "Saving…" : "Save design space"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </TabsContent>
 
         <TabsContent value="optimization" className="mt-4 space-y-4">
@@ -4833,14 +4867,13 @@ export function ReactionProjectDetail() {
             variableRecords={variableRecords}
             variableNamesOrdered={variableNamesOrdered}
           />
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">run optimization</CardTitle>
-              <CardDescription>
-                Generate rule-based next-experiment suggestions from heuristic optimization. Each recommended condition set requires human review before scheduling.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Optimization · Run"
+            title="run optimization"
+            description="Generate rule-based next-experiment suggestions from heuristic optimization. Each recommended condition set requires human review before scheduling."
+          >
+            <div className="space-y-3">
               <div className="flex flex-wrap gap-2 text-sm">
                 <Badge variant="outline" className="font-mono text-xs">
                   model_type: rule_based
@@ -4876,17 +4909,16 @@ export function ReactionProjectDetail() {
               >
                 {busy === "optimization" ? "Running…" : "Run optimization"}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Bayesian Optimization Run</CardTitle>
-              <CardDescription>
-                Generate model-based next-experiment suggestions via Bayesian optimization. Predicted scores are probabilistic — each recommendation requires human review before scheduling.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Optimization · Bayesian Run"
+            title="Bayesian Optimization Run"
+            description="Generate model-based next-experiment suggestions via Bayesian optimization. Predicted scores are probabilistic — each recommendation requires human review before scheduling."
+          >
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="bo-alg">algorithm</Label>
                 <Select value={boAlgorithm} onValueChange={setBoAlgorithm}>
@@ -4973,18 +5005,17 @@ export function ReactionProjectDetail() {
               >
                 {busy === "bo-optimization" ? "Running…" : "Run optimization"}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
           {lastBoRun != null ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">latest Bayesian optimization run</CardTitle>
-                <CardDescription>
-                  Bayesian optimization run summary — algorithm, model, input experiment count, status, diagnostics, and warnings from the most recent run.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <ModuleCard
+              accent="violet"
+              eyebrow="Optimization · Latest BO Run"
+              title="latest Bayesian optimization run"
+              description="Bayesian optimization run summary — algorithm, model, input experiment count, status, diagnostics, and warnings from the most recent run."
+            >
+              <div className="space-y-4">
                 {isRecord(lastBoRun) ? (
                   <>
                     {String(lastBoRun.status ?? "").toLowerCase() === "insufficient_data" ? (
@@ -5081,8 +5112,8 @@ export function ReactionProjectDetail() {
                     <DeveloperJsonPanel data={lastBoRun} />
                   </CollapsibleContent>
                 </Collapsible>
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           ) : (
             <p className="text-sm text-muted-foreground">
               After you run Bayesian optimization, this panel shows BO run ID, algorithm, model_type, status, warnings,
@@ -5091,15 +5122,13 @@ export function ReactionProjectDetail() {
           )}
 
           {lastOptimizationRun != null ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">latest optimization run</CardTitle>
-                <CardDescription>
-                  Fields from the POST response: status, model, experiment count, metrics_json, recommendations_json,
-                  warnings, and notes.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <ModuleCard
+              accent="violet"
+              eyebrow="Optimization · Latest Run"
+              title="latest optimization run"
+              description="Fields from the POST response: status, model, experiment count, metrics_json, recommendations_json, warnings, and notes."
+            >
+              <div className="space-y-4">
                 {isRecord(lastOptimizationRun) ? (
                   <>
                     <div className="flex flex-wrap gap-2 text-sm">
@@ -5175,8 +5204,8 @@ export function ReactionProjectDetail() {
                   <p className="text-sm text-muted-foreground">Run response could not be parsed as an object.</p>
                 )}
                 <DeveloperJsonPanel data={lastOptimizationRun} />
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           ) : (
             <p className="text-sm text-muted-foreground">
               After you run optimization, this panel shows run status, metrics_json, and recommendations_json counts from
@@ -5184,17 +5213,18 @@ export function ReactionProjectDetail() {
             </p>
           )}
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Optimization · Benchmark"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Optimization Benchmark / Replay
                 <InfoTooltip content={BENCHMARK_TOOLTIP} label="About benchmarking" />
-              </CardTitle>
-              <CardDescription>
-                Benchmark optimization algorithms against this project&apos;s historical experiment data. Results compare relative algorithm behavior on this dataset only — not universal superiority.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </span>
+            }
+            description="Benchmark optimization algorithms against this project's historical experiment data. Results compare relative algorithm behavior on this dataset only — not universal superiority."
+          >
+            <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="bench-name">benchmark_name</Label>
@@ -5384,15 +5414,16 @@ export function ReactionProjectDetail() {
                   experiment count, trajectory, warnings, and notes.
                 </p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">benchmark runs</CardTitle>
-              <CardDescription>Historical algorithm benchmark runs for this project, including algorithm, status, and benchmark name.</CardDescription>
-            </CardHeader>
-            <CardContent className="table-scroll">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Optimization · Benchmark Runs"
+            title="benchmark runs"
+            description="Historical algorithm benchmark runs for this project, including algorithm, status, and benchmark name."
+          >
+            <div className="table-scroll">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -5422,15 +5453,16 @@ export function ReactionProjectDetail() {
                   ) : null}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">optimization runs</CardTitle>
-              <CardDescription>Heuristic optimization run history — model type, input experiment count, and status for each run.</CardDescription>
-            </CardHeader>
-            <CardContent className="table-scroll">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Optimization · Run History"
+            title="optimization runs"
+            description="Heuristic optimization run history — model type, input experiment count, and status for each run."
+          >
+            <div className="table-scroll">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -5462,19 +5494,18 @@ export function ReactionProjectDetail() {
                   ) : null}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </TabsContent>
 
         <TabsContent value="advisor" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Optimization Advisor</CardTitle>
-              <CardDescription>
-                LLM-assisted advisor integrating BO suggestions, mechanistic hypotheses, and literature priors to flag next-experiment priorities. All recommendations require human review.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Advisor · Run"
+            title="Optimization Advisor"
+            description="LLM-assisted advisor integrating BO suggestions, mechanistic hypotheses, and literature priors to flag next-experiment priorities. All recommendations require human review."
+          >
+            <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 {boRuns.filter(isRecord).length > 0 ? (
                   <div className="space-y-2 md:col-span-2">
@@ -5775,20 +5806,21 @@ export function ReactionProjectDetail() {
                   After running the advisor, this panel shows the run summary: mode, status, agreed and disagreed conditions, warnings, and whether human review is required.
                 </p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Advisor · Mechanistic Hypotheses"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Mechanistic hypotheses
                 <InfoTooltip content={MECHANISTIC_HYPOTHESES_TOOLTIP} label="About mechanistic hypotheses" />
-              </CardTitle>
-              <CardDescription>
-                Mechanistic hypotheses linking observed experimental trends to proposed reaction mechanisms. Indicative only — not proof of mechanism.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </span>
+            }
+            description="Mechanistic hypotheses linking observed experimental trends to proposed reaction mechanisms. Indicative only — not proof of mechanism."
+          >
+            <div className="space-y-6">
               <form className="space-y-4" onSubmit={(e) => void createMechanisticHypothesis(e)}>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
@@ -5962,20 +5994,21 @@ export function ReactionProjectDetail() {
                   <p className="text-sm text-muted-foreground">No mechanistic hypotheses yet.</p>
                 ) : null}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Advisor · Literature Priors"
+            title={
+              <span className="inline-flex items-center gap-2">
                 Reaction priors and literature notes
                 <InfoTooltip content={LITERATURE_PRIORS_TOOLTIP} label="About reaction priors" />
-              </CardTitle>
-              <CardDescription>
-                Literature references, prior knowledge summaries, and user-entered citations used as advisor context. Citations are not generated by the platform.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </span>
+            }
+            description="Literature references, prior knowledge summaries, and user-entered citations used as advisor context. Citations are not generated by the platform."
+          >
+            <div className="space-y-6">
               <form className="space-y-4" onSubmit={(e) => void createLiteraturePrior(e)}>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
@@ -6106,20 +6139,21 @@ export function ReactionProjectDetail() {
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Advisor · BO Comparison"
+            title={
+              <span className="inline-flex items-center gap-2">
                 BO vs Advisor comparison
                 <InfoTooltip content={BO_ADVISOR_COMPARISON_TOOLTIP} label="About BO vs Advisor comparison" />
-              </CardTitle>
-              <CardDescription>
-                Compare Bayesian optimization rankings with advisor concern signals to surface agreement and disagreement across candidates. Output is advisory — final experiment scheduling requires human review.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </span>
+            }
+            description="Compare Bayesian optimization rankings with advisor concern signals to surface agreement and disagreement across candidates. Output is advisory — final experiment scheduling requires human review."
+          >
+            <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="cmp-bo-run">bo_run_id</Label>
@@ -6298,38 +6332,34 @@ export function ReactionProjectDetail() {
                   </Table>
                 </div>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Condition Critique</CardTitle>
-              <CardDescription>
-                Condition-level critique from the advisor when available — lab-dependent interpretation still required.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {lastAdvisorRun != null &&
-              isRecord(lastAdvisorRun) &&
-              Array.isArray(lastAdvisorRun.critiques) &&
-              lastAdvisorRun.critiques.length > 0 ? (
-                <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-3 text-[10px] leading-snug">
-                  {jsonPreview(lastAdvisorRun.critiques, 8000)}
-                </pre>
-              ) : (
-                <p className="text-sm text-muted-foreground">No condition critique returned yet.</p>
-              )}
-            </CardContent>
-          </Card>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Advisor · Condition Critique"
+            title="Condition Critique"
+            description="Condition-level critique from the advisor when available — lab-dependent interpretation still required."
+          >
+            {lastAdvisorRun != null &&
+            isRecord(lastAdvisorRun) &&
+            Array.isArray(lastAdvisorRun.critiques) &&
+            lastAdvisorRun.critiques.length > 0 ? (
+              <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-3 text-[10px] leading-snug">
+                {jsonPreview(lastAdvisorRun.critiques, 8000)}
+              </pre>
+            ) : (
+              <p className="text-sm text-muted-foreground">No condition critique returned yet.</p>
+            )}
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Human Review</CardTitle>
-              <CardDescription>
-                Record a human review decision on an advisor run — approve, flag for revision, or reject. Advisor output is decision-support only and does not autonomously schedule experiments.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Advisor · Human Review"
+            title="Human Review"
+            description="Record a human review decision on an advisor run — approve, flag for revision, or reject. Advisor output is decision-support only and does not autonomously schedule experiments."
+          >
+            <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="advisor-review-run">advisor_run_id</Label>
@@ -6430,21 +6460,24 @@ export function ReactionProjectDetail() {
                   </div>
                 )
               })()}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </TabsContent>
 
         <TabsContent value="recommendations" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Reviewer</CardTitle>
-              <CardDescription>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Recommendations · Reviewer"
+            title="Reviewer"
+            description={
+              <>
                 POST …/reaction-recommendations/{"{recommendation_id}"}/approve and …/reject require reviewer_name and
                 reviewer_comment (human approval). Outputs are decision-support; each recommended next experiment
                 requires human review.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
+              </>
+            }
+          >
+            <div className="space-y-2">
               <Label htmlFor="rec-reviewer-name">reviewer_name</Label>
               <Input
                 id="rec-reviewer-name"
@@ -6456,17 +6489,16 @@ export function ReactionProjectDetail() {
               <p className="text-xs text-muted-foreground">
                 Shared across approve/reject on this tab. Each row needs a reviewer_comment before approval or rejection.
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Latest BO recommendation batch</CardTitle>
-              <CardDescription>
-                Most recent Bayesian optimization recommendation batch — ranked candidates with predicted scores, model uncertainty, and estimated improvement. All values are probabilistic and require human review.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Recommendations · Latest BO Batch"
+            title="Latest BO recommendation batch"
+            description="Most recent Bayesian optimization recommendation batch — ranked candidates with predicted scores, model uncertainty, and estimated improvement. All values are probabilistic and require human review."
+          >
+            <div className="space-y-4">
               {!loading && latestBatchRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No recommendation batches loaded — run Bayesian optimization or wait for batch data from the backend.
@@ -6620,17 +6652,16 @@ export function ReactionProjectDetail() {
                   </Table>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">recommendations</CardTitle>
-              <CardDescription>
-                Proposed next-experiment recommendations from the optimization engine — ranked by predicted improvement. Approve or reject each with a reviewer name and comment.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Recommendations · List"
+            title="recommendations"
+            description="Proposed next-experiment recommendations from the optimization engine — ranked by predicted improvement. Approve or reject each with a reviewer name and comment."
+          >
+            <div className="space-y-6">
               {sortedRecs.map((r) => {
                 const id = readNum(r.id)
                 if (id == null) return null
@@ -6739,28 +6770,25 @@ export function ReactionProjectDetail() {
               {!loading && sortedRecs.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No recommendations.</p>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </TabsContent>
 
         <TabsContent value="execution" className="mt-4 min-w-0 max-w-full space-y-4">
-          <Alert>
-            <AlertTitle className="text-sm">Human confirmation</AlertTitle>
-            <AlertDescription className="text-xs">
-              This tab summarizes execution-related project data. It does not autonomously run reactions, schedule lab
-              work, or approve recommendations.
-            </AlertDescription>
-          </Alert>
+          <AlertCard
+            variant="info"
+            title="Human confirmation"
+            description="This tab summarizes execution-related project data. It does not autonomously run reactions, schedule lab work, or approve recommendations."
+          />
 
           {confirmedReactionOutcomesCount > 0 ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Ready for next optimization cycle</CardTitle>
-                <CardDescription>
-                  Confirmed outcomes are ready to seed the next optimization cycle. Bayesian optimization and advisor runs use the saved objective, cost, and safety profiles — neither triggers automatically after outcome confirmation.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <ModuleCard
+              accent="violet"
+              eyebrow="Execution · Cycle Ready"
+              title="Ready for next optimization cycle"
+              description="Confirmed outcomes are ready to seed the next optimization cycle. Bayesian optimization and advisor runs use the saved objective, cost, and safety profiles — neither triggers automatically after outcome confirmation."
+            >
+              <div className="space-y-4">
                 <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
                   <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
                     <div className="flex flex-wrap justify-between gap-2 border-b border-border/60 pb-2 sm:flex-col sm:justify-start sm:border-0 sm:pb-0">
@@ -6822,24 +6850,25 @@ export function ReactionProjectDetail() {
                     {busy === "advisor-run" ? "Running…" : "Run Advisor critique"}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           ) : null}
 
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base">Approved recommendations queue</CardTitle>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Execution · Approved Queue"
+            title={
+              <span className="inline-flex items-center gap-2">
+                Approved recommendations queue
                 <InfoTooltip
                   content={APPROVED_RECOMMENDATIONS_CONVERT_TOOLTIP}
                   label="Approved recommendation conversion note"
                 />
-              </div>
-              <CardDescription>
-                Approved recommendations pending conversion to planned experiments. Conversion requires a rationale and optionally an execution batch assignment. Recording a planned experiment is not confirmation that laboratory work occurred.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </span>
+            }
+            description="Approved recommendations pending conversion to planned experiments. Conversion requires a rationale and optionally an execution batch assignment. Recording a planned experiment is not confirmation that laboratory work occurred."
+          >
+            <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="conv-rec-rationale">rationale</Label>
@@ -7024,17 +7053,16 @@ export function ReactionProjectDetail() {
                   </Table>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Execution Batch Planner</CardTitle>
-              <CardDescription>
-                Plan and track lab execution batches — create batches, assign planned experiments as items, and update item status as lab work progresses. Statuses reflect recorded progress only and do not trigger any lab automation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Execution · Batch Planner"
+            title="Execution Batch Planner"
+            description="Plan and track lab execution batches — create batches, assign planned experiments as items, and update item status as lab work progresses. Statuses reflect recorded progress only and do not trigger any lab automation."
+          >
+            <div className="space-y-8">
               <form className="space-y-4" onSubmit={(e) => void createExecutionBatchPlanner(e)}>
                 <p className="text-sm font-medium">Create execution batch</p>
                 <div className="grid gap-4 md:grid-cols-2">
@@ -7348,17 +7376,16 @@ export function ReactionProjectDetail() {
                   </div>
                 </div>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Execution batches</CardTitle>
-              <CardDescription>
-                Recommendation batches grouping model-suggested experiments — batch records are informational; lab execution is always human-initiated.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="table-scroll">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Execution · Batches"
+            title="Execution batches"
+            description="Recommendation batches grouping model-suggested experiments — batch records are informational; lab execution is always human-initiated."
+          >
+            <div className="table-scroll">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -7397,20 +7424,22 @@ export function ReactionProjectDetail() {
                   ) : null}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base">Experiment Execution Board</CardTitle>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Execution · Board"
+            title={
+              <span className="inline-flex items-center gap-2">
+                Experiment Execution Board
                 <InfoTooltip content={EXECUTION_BOARD_TOOLTIP} label="Manual execution status" />
-              </div>
-              <CardDescription>
-                Lab execution board — manually advance execution item status as reactions are run. Status transitions are user-initiated; no autonomous lab scheduling occurs here.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="min-w-0 space-y-4">
+              </span>
+            }
+            description="Lab execution board — manually advance execution item status as reactions are run. Status transitions are user-initiated; no autonomous lab scheduling occurs here."
+            className="min-w-0"
+          >
+            <div className="space-y-4">
               {!loading && executionBoardItemRecords.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No execution items loaded — create batches and items in Execution Batch Planner (or via approved
@@ -7545,17 +7574,16 @@ export function ReactionProjectDetail() {
                   </Card>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Experiment execution board</CardTitle>
-              <CardDescription>
-                Experiment status reflects manually recorded lab progress — yield, analytical link, and linked SpectraCheck session for each planned run.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="table-scroll">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Execution · Status Table"
+            title="Experiment execution board"
+            description="Experiment status reflects manually recorded lab progress — yield, analytical link, and linked SpectraCheck session for each planned run."
+          >
+            <div className="table-scroll">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -7613,20 +7641,21 @@ export function ReactionProjectDetail() {
                   ) : null}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base">Analytical results intake</CardTitle>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Execution · Analytical Intake"
+            title={
+              <span className="inline-flex items-center gap-2">
+                Analytical results intake
                 <InfoTooltip content={ANALYTICAL_RESULTS_INTAKE_TOOLTIP} label="Analytical results context" />
-              </div>
-              <CardDescription>
-                Link concise analytical metadata and summary values to execution items. Full spectral evidence and QC records remain in SpectraCheck.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </span>
+            }
+            description="Link concise analytical metadata and summary values to execution items. Full spectral evidence and QC records remain in SpectraCheck."
+          >
+            <div className="space-y-6">
               <form className="space-y-4" onSubmit={(e) => void addAnalyticalResultToExecutionItem(e)}>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
@@ -7820,18 +7849,16 @@ export function ReactionProjectDetail() {
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Outcome extraction</CardTitle>
-              <CardDescription>
-                Yield, conversion, and related fields are recorded on POST/PATCH experiments as outcome_json (see
-                Experiments tab). The UI does not autonomously import numerical outcomes from spectral files.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Execution · Outcome Extraction"
+            title="Outcome extraction"
+            description="Yield, conversion, and related fields are recorded on POST/PATCH experiments as outcome_json (see Experiments tab). The UI does not autonomously import numerical outcomes from spectral files."
+          >
+            <div className="space-y-4">
               <p className="text-xs text-muted-foreground">
                 Extract yield, conversion, and related outcome values from linked analytical data. Proposed outcomes require explicit confirmation before updating the experiment record.
               </p>
@@ -8186,20 +8213,21 @@ export function ReactionProjectDetail() {
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base">Optimization cycle timeline</CardTitle>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Execution · Cycle Timeline"
+            title={
+              <span className="inline-flex items-center gap-2">
+                Optimization cycle timeline
                 <InfoTooltip content={OPTIMIZATION_CYCLE_TIMELINE_TOOLTIP} label="About optimization cycles" />
-              </div>
-              <CardDescription>
-                Timeline of recent Bayesian optimization, heuristic, and advisor runs across all cycles — ordering is informational, not an autonomous loop.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </span>
+            }
+            description="Timeline of recent Bayesian optimization, heuristic, and advisor runs across all cycles — ordering is informational, not an autonomous loop."
+          >
+            <div className="space-y-4">
               <p className="text-xs text-muted-foreground">
                 Create and track optimization cycles that link execution batches with their corresponding optimization runs and advisor decisions. Run ordering below is informational.
               </p>
@@ -8538,26 +8566,25 @@ export function ReactionProjectDetail() {
                   </ul>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Developer JSON</CardTitle>
-              <CardDescription>Aggregated execution-oriented snapshot for debugging (same API fields as elsewhere).</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Collapsible className="rounded-md border border-border">
-                <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-                  Developer JSON
-                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="border-t border-border px-3 py-3">
-                  <DeveloperJsonPanel data={executionDevPayload} />
-                </CollapsibleContent>
-              </Collapsible>
-            </CardContent>
-          </Card>
+          <ModuleCard
+            accent="violet"
+            eyebrow="Execution · Developer JSON"
+            title="Developer JSON"
+            description="Aggregated execution-oriented snapshot for debugging (same API fields as elsewhere)."
+          >
+            <Collapsible className="rounded-md border border-border">
+              <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
+                Developer JSON
+                <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="border-t border-border px-3 py-3">
+                <DeveloperJsonPanel data={executionDevPayload} />
+              </CollapsibleContent>
+            </Collapsible>
+          </ModuleCard>
         </TabsContent>
 
         <TabsContent value="evidence" className="mt-4 space-y-4">
@@ -8567,14 +8594,13 @@ export function ReactionProjectDetail() {
             experiments={experimentsRec}
             onRefresh={reload}
           />
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Evidence Links</CardTitle>
-              <CardDescription>
-                Analytical evidence summary for all experiments linked to a SpectraCheck session — metadata, record counts, and QC status. Use Open for full spectral evidence.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="table-scroll">
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Evidence Links"
+            title="Evidence Links"
+            description="Analytical evidence summary for all experiments linked to a SpectraCheck session — metadata, record counts, and QC status. Use Open for full spectral evidence."
+          >
+            <div className="table-scroll">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -8649,12 +8675,19 @@ export function ReactionProjectDetail() {
                   ) : null}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </TabsContent>
 
         <TabsContent value="developer" className="mt-4">
-          <DeveloperJsonPanel data={devPayload} />
+          <ModuleCard
+            accent="violet"
+            eyebrow="Reaction · Developer JSON"
+            title="Developer JSON"
+            description="Aggregated payloads from this reaction project workspace (debugging only)."
+          >
+            <DeveloperJsonPanel data={devPayload} />
+          </ModuleCard>
         </TabsContent>
       </Tabs>
 

@@ -352,24 +352,22 @@ export function ReactionOptimizationLanding() {
         />
       </section>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Create reaction project</CardTitle>
-          <CardDescription>Create a project record for optimization review.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="violet"
+        eyebrow="Reaction · Create"
+        title="Create reaction project"
+        description="Create a project record for optimization review."
+      >
           <form className="space-y-4" onSubmit={(ev) => void handleCreate(ev)}>
             {createError ? (
-              <Alert variant="destructive">
-                <AlertTitle className="text-sm">Create failed</AlertTitle>
-                <AlertDescription className="text-xs">{createError}</AlertDescription>
-              </Alert>
+              <AlertCard variant="error" title="Create failed" description={createError} />
             ) : null}
             {createOk ? (
-              <Alert>
-                <AlertTitle className="text-sm">Project created</AlertTitle>
-                <AlertDescription className="text-xs">Reloaded project list from the server.</AlertDescription>
-              </Alert>
+              <AlertCard
+                variant="success"
+                title="Project created"
+                description="Reloaded project list from the server."
+              />
             ) : null}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
@@ -440,21 +438,20 @@ export function ReactionOptimizationLanding() {
               {createBusy ? "Creating…" : "Create reaction project"}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base">Reaction projects</CardTitle>
-            <Badge variant="secondary" className="font-normal">
-              Project list
-            </Badge>
-          </div>
-          <CardDescription>Columns include linked experiment and recommendation counts when project details respond.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="table-scroll">
+      <ModuleCard
+        accent="violet"
+        eyebrow="Reaction · Projects"
+        title="Reaction projects"
+        description="Columns include linked experiment and recommendation counts when project details respond."
+        badge={
+          <Badge variant="secondary" className="font-normal">
+            Project list
+          </Badge>
+        }
+      >
+        <div className="table-scroll">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -515,8 +512,7 @@ export function ReactionOptimizationLanding() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+      </ModuleCard>
 
     </div>
   )

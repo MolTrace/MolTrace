@@ -2629,14 +2629,13 @@ export function RegulatoryDossierWorkspace() {
                 Back to Requirements
               </Button>
             </div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Evidence Links</CardTitle>
-                <CardDescription>
-                  Link analytical or reaction artefacts to dossier requirements by ID and summary — open SpectraCheck or Reaction Studio for full evidence detail without copying raw payloads here.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Evidence Links"
+              title="Evidence Links"
+              description="Link analytical or reaction artefacts to dossier requirements by ID and summary — open SpectraCheck or Reaction Studio for full evidence detail without copying raw payloads here."
+            >
+              <div className="space-y-6">
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                   <h3 className="text-sm font-semibold">Link evidence</h3>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -2789,8 +2788,8 @@ export function RegulatoryDossierWorkspace() {
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="compliance-rules" className="min-w-0 max-w-full space-y-3">
@@ -2799,16 +2798,18 @@ export function RegulatoryDossierWorkspace() {
                 Back to Requirements
               </Button>
             </div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Compliance Rules</CardTitle>
-                <CardDescription>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Compliance Rules"
+              title="Compliance Rules"
+              description={
+                <>
                   Counts of requirement rows on this dossier by <span className="font-mono">category</span> (GET
                   /regulatory/dossiers/{"{dossier_id}"}/requirements). For editing rows, use the Requirements tab.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="table-scroll">
+                </>
+              }
+            >
+              <div className="table-scroll">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2828,8 +2829,7 @@ export function RegulatoryDossierWorkspace() {
                     </TableBody>
                   </Table>
                 </div>
-              </CardContent>
-            </Card>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="impurity-register" className="min-w-0 max-w-full space-y-3">
@@ -2838,17 +2838,17 @@ export function RegulatoryDossierWorkspace() {
                 Back to Requirements
               </Button>
             </div>
-            <Card>
-              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="text-lg">Impurity Risk Register</CardTitle>
-                    <InfoTooltip label="Impurity risk register" content={IMPURITY_REGISTER_TOOLTIP} />
-                  </div>
-                  <CardDescription>
-                    Identified impurity entries with assessed risk levels — add new impurities, run a batch regulatory assessment, and track review status against applicable limits.
-                  </CardDescription>
-                </div>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Impurity Register"
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Impurity Risk Register
+                  <InfoTooltip label="Impurity risk register" content={IMPURITY_REGISTER_TOOLTIP} />
+                </span>
+              }
+              description="Identified impurity entries with assessed risk levels — add new impurities, run a batch regulatory assessment, and track review status against applicable limits."
+              badge={
                 <Button
                   type="button"
                   variant="outline"
@@ -2859,19 +2859,22 @@ export function RegulatoryDossierWorkspace() {
                   {impAssessBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   Run register assessment
                 </Button>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <Alert>
-                  <AlertDescription className="text-xs leading-relaxed text-muted-foreground">
-                    Impurity name and structural_assignment are workspace labels; they do not assert confirmed identity
-                    unless supported by linked evidence (<span className="font-mono">evidence_link_id</span>) and qualified
-                    review.
-                  </AlertDescription>
-                </Alert>
+              }
+            >
+              <div className="space-y-6">
+                <AlertCard
+                  variant="info"
+                  title="Workspace labels"
+                  description={
+                    <>
+                      Impurity name and structural_assignment are workspace labels; they do not assert confirmed identity
+                      unless supported by linked evidence (<span className="font-mono">evidence_link_id</span>) and qualified
+                      review.
+                    </>
+                  }
+                />
                 {impAssessErr ? (
-                  <Alert variant="destructive">
-                    <AlertDescription className="text-sm">{impAssessErr}</AlertDescription>
-                  </Alert>
+                  <AlertCard variant="error" title="Assessment failed" description={impAssessErr} />
                 ) : null}
 
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
@@ -3082,8 +3085,8 @@ export function RegulatoryDossierWorkspace() {
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
             <ReactionOptimizationHandoffCard
               dossierId={dossierId}
               reactionProjectId={dossierReactionProjectId}
@@ -3098,23 +3101,20 @@ export function RegulatoryDossierWorkspace() {
                 Back to Requirements
               </Button>
             </div>
-            <Card>
-              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="text-lg">Residual Solvent Watch</CardTitle>
-                    <InfoTooltip label="Residual solvent watch" content={RESIDUAL_SOLVENT_WATCH_TOOLTIP} />
-                  </div>
-                  <CardDescription>
-                    ICH Q3C residual solvent assessment — detected solvents are matched against active regulatory rule sets for this dossier's jurisdiction. Rule set and source evidence are recorded with each run.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Residual Solvents"
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Residual Solvent Watch
+                  <InfoTooltip label="Residual solvent watch" content={RESIDUAL_SOLVENT_WATCH_TOOLTIP} />
+                </span>
+              }
+              description="ICH Q3C residual solvent assessment — detected solvents are matched against active regulatory rule sets for this dossier's jurisdiction. Rule set and source evidence are recorded with each run."
+            >
+              <div className="space-y-6">
                 {residualSolventMissingRuleHint ? (
-                  <Alert>
-                    <AlertDescription className="text-sm leading-relaxed">{RESIDUAL_RULE_NOT_CONFIGURED_MSG}</AlertDescription>
-                  </Alert>
+                  <AlertCard variant="info" title="Rule set not configured" description={RESIDUAL_RULE_NOT_CONFIGURED_MSG} />
                 ) : null}
 
                 <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -3369,8 +3369,8 @@ export function RegulatoryDossierWorkspace() {
                     </div>
                   )
                 })()}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="nitrosamine-watch" className="min-w-0 max-w-full space-y-3">
@@ -3379,28 +3379,35 @@ export function RegulatoryDossierWorkspace() {
                 Back to Requirements
               </Button>
             </div>
-            <Card>
-              <CardHeader>
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="text-lg">Nitrosamine Watch</CardTitle>
-                    <InfoTooltip label="Nitrosamine watch" content={NITROSAMINE_WATCH_TOOLTIP} />
-                  </div>
-                  <CardDescription>
-                    Nitrosamine risk review — monitors for structural and process signals that may indicate nitrosamine impurity risk. Treat all outputs as{" "}
-                    <span className="font-medium text-foreground">review required</span> unless a qualified reviewer explicitly confirms or dismisses each signal.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <Alert>
-                  <AlertDescription className="text-sm leading-relaxed text-muted-foreground">
-                    Signals here are nitrosamine-related review triggers only. They indicate possible nitrosamine risk for
-                    triage, not a confirmed structural finding. Do not treat results as confirmed nitrosamine unless the
-                    backend response explicitly marks confirmation (see <span className="font-mono">nitrosamine_confirmed</span>
-                    ).
-                  </AlertDescription>
-                </Alert>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Nitrosamine Watch"
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Nitrosamine Watch
+                  <InfoTooltip label="Nitrosamine watch" content={NITROSAMINE_WATCH_TOOLTIP} />
+                </span>
+              }
+              description={
+                <>
+                  Nitrosamine risk review — monitors for structural and process signals that may indicate nitrosamine impurity risk. Treat all outputs as{" "}
+                  <span className="font-medium text-foreground">review required</span> unless a qualified reviewer explicitly confirms or dismisses each signal.
+                </>
+              }
+            >
+              <div className="space-y-6">
+                <AlertCard
+                  variant="info"
+                  title="Triage signals only"
+                  description={
+                    <>
+                      Signals here are nitrosamine-related review triggers only. They indicate possible nitrosamine risk for
+                      triage, not a confirmed structural finding. Do not treat results as confirmed nitrosamine unless the
+                      backend response explicitly marks confirmation (see <span className="font-mono">nitrosamine_confirmed</span>
+                      ).
+                    </>
+                  }
+                />
 
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                   <h3 className="text-sm font-semibold">Run nitrosamine watch</h3>
