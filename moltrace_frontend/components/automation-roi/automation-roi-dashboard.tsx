@@ -125,7 +125,7 @@ export default function AutomationRoiDashboard() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Automation ROI</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Automation ROI</h1>
           <p className="text-muted-foreground">
             Operational value from automation definitions and usage events. Aggregates exclude raw scientific payloads.
           </p>

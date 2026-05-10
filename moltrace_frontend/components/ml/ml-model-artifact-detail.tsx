@@ -256,7 +256,7 @@ export function MlModelArtifactDetail() {
               </Link>
             </Button>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Model artifact</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Model artifact</h1>
           <p className="font-mono text-sm text-muted-foreground">id {artifactIdNum}</p>
         </div>
         <BackendStatusIndicator />

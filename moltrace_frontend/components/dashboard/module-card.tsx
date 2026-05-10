@@ -6,13 +6,14 @@ import { ArrowRight, type LucideIcon } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
-export type ModuleCardAccent = "teal" | "cyan" | "violet" | "amber"
+export type ModuleCardAccent = "teal" | "cyan" | "violet" | "amber" | "slate"
 
 const ACCENT_VAR: Record<ModuleCardAccent, string> = {
   teal: "var(--mt-teal)",
   cyan: "var(--mt-cyan)",
   violet: "var(--mt-violet)",
   amber: "var(--mt-amber)",
+  slate: "var(--mt-slate)",
 }
 
 type ModuleCardProps = {

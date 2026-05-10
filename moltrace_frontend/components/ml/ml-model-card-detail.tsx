@@ -192,7 +192,7 @@ export function MlModelCardDetail() {
             </Button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Model card</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Model card</h1>
             <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
           </div>
           <p className="font-mono text-sm text-muted-foreground">id {cardIdNum}</p>

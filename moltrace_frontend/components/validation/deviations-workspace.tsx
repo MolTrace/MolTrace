@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -19,6 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { AlertOctagon, FileText, Plus } from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -289,34 +290,34 @@ export function DeviationsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Deviations</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Deviations
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Deviations</h1>
+          <p className="text-sm text-muted-foreground">
             Create, update, and review deviation records with linked validation test/source context.
           </p>
         </div>
         <BackendStatusIndicator />
       </div>
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+      {error ? <AlertCard variant="error" title="Error" description={error} /> : null}
 
-      {message ? (
-        <Alert>
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {message ? <AlertCard variant="success" title="Recorded" description={message} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Create deviation</CardTitle>
-            <CardDescription>Log a process or procedural deviation with description, category, severity, and responsible owner for GxP traceability.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Create"
+          title="Create deviation"
+          icon={Plus}
+          description="Log a process or procedural deviation with description, category, severity, and responsible owner for GxP traceability."
+        >
+          <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="deviation-code">deviation code</Label>
@@ -415,15 +416,17 @@ export function DeviationsWorkspace() {
             <Button type="button" onClick={createDeviation} disabled={createBusy}>
               {createBusy ? "Creating..." : "Create deviation"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Selected deviation</CardTitle>
-            <CardDescription>Selected deviation details — update status, root cause, CAPA linkage, and resolution notes.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Detail"
+          title="Selected deviation"
+          icon={FileText}
+          description="Selected deviation details — update status, root cause, CAPA linkage, and resolution notes."
+        >
+          <div className="space-y-5">
             {detailDeviation ? (
               <>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -531,21 +534,23 @@ export function DeviationsWorkspace() {
                 {loading ? "Loading deviations..." : "Select a deviation to view update controls."}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-base">Deviation table</CardTitle>
-            <CardDescription>All deviation records — filter by category, severity, and status to manage the open deviation backlog.</CardDescription>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Backlog"
+        title="Deviation table"
+        icon={AlertOctagon}
+        description="All deviation records — filter by category, severity, and status to manage the open deviation backlog."
+      >
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadDeviations()} disabled={loading}>
+              Refresh
+            </Button>
           </div>
-          <Button type="button" variant="outline" onClick={() => void loadDeviations()} disabled={loading}>
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -600,8 +605,8 @@ export function DeviationsWorkspace() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

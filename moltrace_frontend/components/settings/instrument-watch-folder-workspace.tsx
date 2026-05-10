@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { trackWatchFolderScanRun } from "@/src/lib/analytics/analytics-client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { Eye, FolderSearch, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -316,21 +317,27 @@ export function InstrumentWatchFolderWorkspace() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Instrument Watch Folder</h1>
-        <p className="text-muted-foreground">
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-slate)" }}
+        >
+          MolTrace · Settings · Instrument Watch Folder
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Instrument Watch Folder</h1>
+        <p className="text-sm text-muted-foreground">
           Configure watch folders for connector-driven ingestion into SpectraCheck, Regulatory Hub, and Reaction Optimization.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create watch folder</CardTitle>
-          <CardDescription>
-            Configure a new directory for the platform to monitor for new instrument files.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Create"
+        title="Create watch folder"
+        icon={Plus}
+        description="Configure a new directory for the platform to monitor for new instrument files."
+      >
+        <div className="space-y-4">
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
@@ -418,17 +425,17 @@ export function InstrumentWatchFolderWorkspace() {
           <Button type="button" disabled={createBusy} onClick={() => void createWatchFolder()}>
             {createBusy ? "Creating…" : "Create watch folder"}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Watch folder list</CardTitle>
-          <CardDescription>
-            All configured watch folders with their connector, scan cadence, and last activity.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Folders"
+        title="Watch folder list"
+        icon={FolderSearch}
+        description="All configured watch folders with their connector, scan cadence, and last activity."
+      >
+        <div className="space-y-3">
           {loading ? <p className="text-sm text-muted-foreground">Loading watch folders…</p> : null}
           {!loading ? (
             <div className="overflow-x-auto rounded-md border">
@@ -482,17 +489,17 @@ export function InstrumentWatchFolderWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Watch folder detail</CardTitle>
-          <CardDescription>
-            View, edit, or trigger an on-demand scan of the selected watch folder.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Detail"
+        title="Watch folder detail"
+        icon={Eye}
+        description="View, edit, or trigger an on-demand scan of the selected watch folder."
+      >
+        <div className="space-y-3">
           {detailsError ? <p className="text-xs text-destructive">{detailsError}</p> : null}
           {detailsLoading ? <p className="text-sm text-muted-foreground">Loading watch folder detail…</p> : null}
           {!selectedWatchFolderId ? (
@@ -539,8 +546,8 @@ export function InstrumentWatchFolderWorkspace() {
               </details>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

@@ -15,7 +15,7 @@ export function AuthPageLayout({ children, title, description }: AuthPageLayoutP
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-12 sm:py-16">
         <div className="w-full max-w-md space-y-6">
           <div className="space-y-2 text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">{title}</h1>
             {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
           </div>
           {children}

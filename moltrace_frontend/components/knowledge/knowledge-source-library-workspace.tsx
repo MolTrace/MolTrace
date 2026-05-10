@@ -313,7 +313,7 @@ export function KnowledgeSourceLibraryWorkspace() {
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Knowledge sources</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Knowledge sources</h1>
         <p className="text-sm text-muted-foreground">
           Register bibliographic metadata and upload files for extraction. Operational signals from your tenant API —
           not legal or publication advice.

@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch, buildApiPath, readStoredAuthToken } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,6 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { Archive, FileText, PackageOpen } from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -298,34 +299,34 @@ export function InspectionPackageWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Inspection Readiness Package</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Inspection Package
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Inspection Readiness Package</h1>
+          <p className="text-sm text-muted-foreground">
             Create and review inspection-ready packages with manifests, package hashes, included records, and warnings.
           </p>
         </div>
         <BackendStatusIndicator />
       </div>
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+      {error ? <AlertCard variant="error" title="Error" description={error} /> : null}
 
-      {message ? (
-        <Alert>
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {message ? <AlertCard variant="success" title="Recorded" description={message} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Create inspection package</CardTitle>
-            <CardDescription>Assemble an inspection-ready package — bundles controlled records, deviation reports, CAPA evidence, and validation artefacts for regulatory inspection readiness.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Create"
+          title="Create inspection package"
+          icon={PackageOpen}
+          description="Assemble an inspection-ready package — bundles controlled records, deviation reports, CAPA evidence, and validation artefacts for regulatory inspection readiness."
+        >
+          <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1 sm:col-span-2">
                 <Label htmlFor="inspection-package-title">title</Label>
@@ -408,15 +409,17 @@ export function InspectionPackageWorkspace() {
             <Button type="button" onClick={createPackage} disabled={createBusy}>
               {createBusy ? "Creating..." : "Create inspection package"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Package detail</CardTitle>
-            <CardDescription>Selected package detail — included artefacts, status, and export readiness for this inspection package.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Detail"
+          title="Package detail"
+          icon={FileText}
+          description="Selected package detail — included artefacts, status, and export readiness for this inspection package."
+        >
+          <div className="space-y-5">
             {detailPackage ? (
               <>
                 <div className="grid gap-3 sm:grid-cols-4">
@@ -498,21 +501,23 @@ export function InspectionPackageWorkspace() {
                 {detailLoading ? "Loading inspection package..." : "Select an inspection package to view its manifest."}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-base">Inspection packages</CardTitle>
-            <CardDescription>All inspection packages — status, included artefacts, and export history for managing inspection readiness across programs.</CardDescription>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Packages"
+        title="Inspection packages"
+        icon={Archive}
+        description="All inspection packages — status, included artefacts, and export history for managing inspection readiness across programs."
+      >
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadPackages()} disabled={loading}>
+              Refresh
+            </Button>
           </div>
-          <Button type="button" variant="outline" onClick={() => void loadPackages()} disabled={loading}>
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -570,8 +575,8 @@ export function InspectionPackageWorkspace() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

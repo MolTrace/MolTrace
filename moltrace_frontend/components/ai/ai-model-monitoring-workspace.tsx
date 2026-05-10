@@ -5,7 +5,9 @@ import { ApiError, apiFetch } from "@/lib/api/client"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { Activity, ListChecks } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -160,7 +162,7 @@ export function AiModelMonitoringWorkspace() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Model Monitoring</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Model Monitoring</h1>
         <p className="text-sm text-muted-foreground">Read monitoring rollups and log monitoring events.</p>
       </div>
 
@@ -182,20 +184,44 @@ export function AiModelMonitoringWorkspace() {
       {loadErr ? <p className="text-sm text-destructive">{loadErr}</p> : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <Card><CardHeader className="pb-2"><CardDescription>prediction volume</CardDescription><CardTitle className="text-2xl">{predictionVolume}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription>low-confidence count</CardDescription><CardTitle className="text-2xl">{lowConfidenceCount}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription>OOD count</CardDescription><CardTitle className="text-2xl">{oodCount}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription>fallback used count</CardDescription><CardTitle className="text-2xl">{fallbackUsedCount}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription>human rejection count</CardDescription><CardTitle className="text-2xl">{humanRejectionCount}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription>service failure count</CardDescription><CardTitle className="text-2xl">{serviceFailureCount}</CardTitle></CardHeader></Card>
+        {[
+          { label: "prediction volume", value: predictionVolume, color: "var(--mt-teal)" },
+          { label: "low-confidence count", value: lowConfidenceCount, color: "var(--mt-amber)" },
+          { label: "OOD count", value: oodCount, color: "var(--mt-amber)" },
+          { label: "fallback used count", value: fallbackUsedCount, color: "var(--mt-violet)" },
+          { label: "human rejection count", value: humanRejectionCount, color: "var(--mt-amber)" },
+          { label: "service failure count", value: serviceFailureCount, color: "var(--mt-red)" },
+        ].map((kpi) => (
+          <Card
+            key={kpi.label}
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: `3px solid ${kpi.color}` }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {kpi.label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-5">
+              <div
+                className="font-mono text-3xl font-bold tabular-nums leading-none"
+                style={{ color: kpi.color }}
+              >
+                {kpi.value}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Log monitoring event</CardTitle>
-          <CardDescription>Record a drift, latency, failure, or audit event for a deployed AI service.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Event"
+        title="Log monitoring event"
+        icon={Activity}
+        description="Record a drift, latency, failure, or audit event for a deployed AI service."
+      >
+        <div className="space-y-4">
           {postErr ? <p className="text-sm text-destructive">{postErr}</p> : null}
           {postOk ? <p className="text-sm text-emerald-700">{postOk}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
@@ -208,15 +234,17 @@ export function AiModelMonitoringWorkspace() {
             {postBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             Submit event
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Monitoring events</CardTitle>
-          <CardDescription>Recent operational events across all monitored AI services, ordered by timestamp.</CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Events"
+        title="Monitoring events"
+        icon={ListChecks}
+        description="Recent operational events across all monitored AI services, ordered by timestamp."
+      >
+        <div className="overflow-x-auto">
           {eventsErr ? <p className="mb-3 text-sm text-destructive">{eventsErr}</p> : null}
           <Table>
             <TableHeader><TableRow><TableHead>event</TableHead><TableHead>service key</TableHead><TableHead>status</TableHead><TableHead>timestamp</TableHead></TableRow></TableHeader>
@@ -232,8 +260,8 @@ export function AiModelMonitoringWorkspace() {
               {events.length === 0 ? <TableRow><TableCell colSpan={4} className="text-muted-foreground">No monitoring events returned.</TableCell></TableRow> : null}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

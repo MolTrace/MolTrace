@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { ApiError, apiFetch } from "@/lib/api/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,7 +17,9 @@ import {
 } from "@/components/ui/table"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { ChevronDown, ArrowLeft, ServerOff } from "lucide-react"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { Activity, AlertTriangle, BarChart3, ChevronDown, ArrowLeft, Database, FileText, Info, ServerOff, StickyNote } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -204,9 +206,15 @@ export function ValidationRunDetailWorkspace() {
               </Link>
             </Button>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Validation run</h1>
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Validation Run
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Validation run</h1>
           <p className="font-mono text-xs text-muted-foreground break-all">{validationRunId || "—"}</p>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Read-only details from the validation run response. Terminology reflects API labels only.
           </p>
         </div>
@@ -216,21 +224,22 @@ export function ValidationRunDetailWorkspace() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : error ? (
-        <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-          <ServerOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <div>
-            <p className="font-medium">Backend unavailable or run not found</p>
-            <p className="mt-1 text-xs opacity-90">{error}</p>
-          </div>
-        </div>
+        <AlertCard
+          variant="error"
+          icon={ServerOff}
+          title="Backend unavailable or run not found"
+          description={error}
+        />
       ) : run ? (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Validation result</CardTitle>
-              <CardDescription>Status and identifiers as returned by the API.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
+          <ModuleCard
+            accent="cyan"
+            eyebrow="Result"
+            title="Validation result"
+            icon={Activity}
+            description="Status and identifiers as returned by the API."
+          >
+            <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">Run status</span>
                 <Badge variant="outline" className="font-normal">
@@ -240,46 +249,48 @@ export function ValidationRunDetailWorkspace() {
               {showReviewNote ? (
                 <p className="text-sm text-muted-foreground">Requires review (per run status label).</p>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Benchmark result</CardTitle>
-              <CardDescription>Benchmark dataset reference from the run payload.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs font-medium text-muted-foreground">Method</dt>
-                  <dd className="text-sm">{methodLabel || "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-muted-foreground">Model version</dt>
-                  <dd className="text-sm">{modelVersion || "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-muted-foreground">Scoring profile</dt>
-                  <dd className="text-sm break-words">{scoringProfile || "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-muted-foreground">Threshold profile</dt>
-                  <dd className="text-sm break-words">{thresholdProfile || "—"}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs font-medium text-muted-foreground">Benchmark dataset</dt>
-                  <dd className="text-sm break-words">{benchmarkDataset || "—"}</dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
+          <ModuleCard
+            accent="cyan"
+            eyebrow="Benchmark"
+            title="Benchmark result"
+            icon={Database}
+            description="Benchmark dataset reference from the run payload."
+          >
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">Method</dt>
+                <dd className="text-sm">{methodLabel || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">Model version</dt>
+                <dd className="text-sm">{modelVersion || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">Scoring profile</dt>
+                <dd className="text-sm break-words">{scoringProfile || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">Threshold profile</dt>
+                <dd className="text-sm break-words">{thresholdProfile || "—"}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-medium text-muted-foreground">Benchmark dataset</dt>
+                <dd className="text-sm break-words">{benchmarkDataset || "—"}</dd>
+              </div>
+            </dl>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Metrics</CardTitle>
-              <CardDescription>Per-metric rows from the run payload.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <ModuleCard
+            accent="cyan"
+            eyebrow="Metrics"
+            title="Metrics"
+            icon={BarChart3}
+            description="Per-metric rows from the run payload."
+          >
+            <div>
               {metrics.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No metrics rows in this response.</p>
               ) : (
@@ -329,14 +340,16 @@ export function ValidationRunDetailWorkspace() {
                   </Table>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Warnings</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <ModuleCard
+            accent={warningsList.length > 0 ? "amber" : "cyan"}
+            eyebrow="Warnings"
+            title="Warnings"
+            icon={AlertTriangle}
+          >
+            <div>
               {warningsList.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No warnings in this response.</p>
               ) : (
@@ -346,23 +359,15 @@ export function ValidationRunDetailWorkspace() {
                   ))}
                 </ul>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="whitespace-pre-wrap text-sm text-muted-foreground">{notesDisplay}</p>
-            </CardContent>
-          </Card>
+          <ModuleCard accent="cyan" eyebrow="Notes" title="Notes" icon={StickyNote}>
+            <p className="whitespace-pre-wrap text-sm text-muted-foreground">{notesDisplay}</p>
+          </ModuleCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Metadata</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <ModuleCard accent="cyan" eyebrow="Metadata" title="Metadata" icon={Info}>
+            <div>
               {metadataRaw == null || (isRecord(metadataRaw) && Object.keys(metadataRaw).length === 0) ? (
                 <p className="text-sm text-muted-foreground">No metadata object in this response.</p>
               ) : (
@@ -370,22 +375,28 @@ export function ValidationRunDetailWorkspace() {
                   {JSON.stringify(metadataRaw, null, 2)}
                 </pre>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
 
-          <Card className="overflow-hidden">
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-cyan)" }}
+          >
             <Collapsible open={devOpen} onOpenChange={setDevOpen}>
               <CollapsibleTrigger asChild>
                 <button
                   type="button"
                   className="flex w-full items-center justify-between px-6 py-4 text-left hover:bg-muted/50"
                 >
-                  <span className="text-base font-semibold leading-none">Developer JSON</span>
+                  <span className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
+                    <span className="font-mono text-base font-bold leading-none tracking-tight">Developer JSON</span>
+                  </span>
                   <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", devOpen && "rotate-180")} />
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <CardContent className="pt-0">
+                <CardContent className="pt-0 pb-5">
                   <pre className="max-h-[480px] overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-[10px] leading-relaxed">
                     {rawPayload != null ? JSON.stringify(rawPayload, null, 2) : ""}
                   </pre>

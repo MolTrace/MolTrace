@@ -48,12 +48,20 @@ async function proxy(request: NextRequest, context: RouteContext) {
   const method = request.method.toUpperCase()
   const hasBody = method !== "GET" && method !== "HEAD"
 
-  const response = await fetch(target, {
-    method,
-    headers,
-    body: hasBody ? await request.arrayBuffer() : undefined,
-    cache: "no-store",
-  })
+  let response: Response
+  try {
+    response = await fetch(target, {
+      method,
+      headers,
+      body: hasBody ? await request.arrayBuffer() : undefined,
+      cache: "no-store",
+    })
+  } catch {
+    return NextResponse.json(
+      { detail: "Backend connection failed. Please retry in a moment." },
+      { status: 503 }
+    )
+  }
 
   const responseHeaders = new Headers(response.headers)
   responseHeaders.delete("content-encoding")

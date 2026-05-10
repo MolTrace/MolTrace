@@ -16,7 +16,7 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertTriangle, ArrowLeft, ClipboardCheck, ListChecks, Loader2, Plus } from "lucide-react"
 
 const PROPOSAL_TYPES = [
   "create_rule",
@@ -308,7 +308,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
       </div>
 
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Rule Update Proposals</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Rule Update Proposals</h1>
         <p className="text-sm text-muted-foreground">
           Proposed rule updates require reviewer rationale and do not automatically alter source documents.
         </p>
@@ -328,12 +328,14 @@ export function RegulatoryRuleUpdatesWorkspace() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Create proposal</CardTitle>
-          <CardDescription>Propose a rule set or guidance update in response to a detected regulatory change — includes proposal type, rationale, and affected rule set.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Create"
+        title="Create proposal"
+        icon={Plus}
+        description="Propose a rule set or guidance update in response to a detected regulatory change — includes proposal type, rationale, and affected rule set."
+      >
+        <div className="space-y-4">
           {createErr ? (
             <Alert variant="destructive">
               <AlertDescription className="text-sm">{createErr}</AlertDescription>
@@ -428,15 +430,17 @@ export function RegulatoryRuleUpdatesWorkspace() {
             {createBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Create rule update proposal
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Proposal table</CardTitle>
-          <CardDescription>All rule update proposals across regulatory changes — filter by status, proposal type, or source change to manage the review queue.</CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Records"
+        title="Proposal table"
+        icon={ListChecks}
+        description="All rule update proposals across regulatory changes — filter by status, proposal type, or source change to manage the review queue."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : proposals.length === 0 ? (
@@ -502,17 +506,17 @@ export function RegulatoryRuleUpdatesWorkspace() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Proposal detail & review</CardTitle>
-          <CardDescription>
-            Review a rule update proposal in detail and record a formal approval or rejection decision with reviewer attribution.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Detail"
+        title="Proposal detail & review"
+        icon={ClipboardCheck}
+        description="Review a rule update proposal in detail and record a formal approval or rejection decision with reviewer attribution."
+      >
+        <div className="space-y-4">
           {selectedProposalErr ? (
             <Alert variant="destructive">
               <AlertDescription className="text-sm">{selectedProposalErr}</AlertDescription>
@@ -583,8 +587,8 @@ export function RegulatoryRuleUpdatesWorkspace() {
               <DeveloperJsonPanel data={selectedProposal} />
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

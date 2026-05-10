@@ -338,7 +338,7 @@ export function BatchRegistryWorkspace() {
         <div>
           <div className="flex items-center gap-2">
             <Package className="h-6 w-6 text-muted-foreground" aria-hidden />
-            <h1 className="text-2xl font-semibold tracking-tight">Batch / Lot Registry</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Batch / Lot Registry</h1>
             <InfoTooltip content={BATCH_ALIQUOT_TOOLTIP} label="About batches and aliquots" />
           </div>
           <p className="text-muted-foreground">

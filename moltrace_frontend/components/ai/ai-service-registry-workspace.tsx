@@ -6,7 +6,8 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { Plus, Server } from "lucide-react"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -278,7 +279,7 @@ export function AiServiceRegistryWorkspace() {
     <div className="space-y-6">
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">AI Service Registry</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">AI Service Registry</h1>
           <InfoTooltip
             label="About AI Service Registry"
             content="AI services route product requests to approved model artifacts and preserve prediction provenance."
@@ -310,12 +311,14 @@ export function AiServiceRegistryWorkspace() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Service table</CardTitle>
-          <CardDescription>All registered AI/ML services. Click a row to load full configuration and edit.</CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Services"
+        title="Service table"
+        icon={Server}
+        description="All registered AI/ML services. Click a row to load full configuration and edit."
+      >
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -359,17 +362,17 @@ export function AiServiceRegistryWorkspace() {
               ) : null}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Create / update service</CardTitle>
-          <CardDescription>
-            Register a new AI/ML service or update its active and fallback model artifacts, target module, and lifecycle status.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Create"
+        title="Create / update service"
+        icon={Plus}
+        description="Register a new AI/ML service or update its active and fallback model artifacts, target module, and lifecycle status."
+      >
+        <div className="space-y-4">
           {detailErr ? (
             <Alert variant="destructive">
               <AlertTitle>Service detail error</AlertTitle>
@@ -494,8 +497,8 @@ export function AiServiceRegistryWorkspace() {
               Update selected service
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

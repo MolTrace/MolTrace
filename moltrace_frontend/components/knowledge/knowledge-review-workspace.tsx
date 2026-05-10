@@ -10,7 +10,7 @@ import { KNOWLEDGE_TASK_STATUSES } from "@/components/knowledge/knowledge-consta
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertTriangle, ArrowLeft, ClipboardCheck, Filter, ListChecks, Loader2 } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -165,7 +165,7 @@ export function KnowledgeReviewWorkspace() {
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Knowledge review tasks</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Knowledge review tasks</h1>
         <p className="text-sm text-muted-foreground">
           Workflow queue for extracted records. Status changes require reviewer identity and rationale.
         </p>
@@ -179,14 +179,14 @@ export function KnowledgeReviewWorkspace() {
         </AlertDescription>
       </Alert>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Filters</CardTitle>
-          <CardDescription>
-            Filter review tasks by status and record type to focus on the most relevant claims in the curation queue.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Filters"
+        title="Filters"
+        icon={Filter}
+        description="Filter review tasks by status and record type to focus on the most relevant claims in the curation queue."
+      >
+        <div className="flex flex-wrap items-end gap-4">
           <div className="space-y-2">
             <Label>status</Label>
             <Select value={filterStatus || "__all__"} onValueChange={(v) => setFilterStatus(v === "__all__" ? "" : v)}>
@@ -226,14 +226,16 @@ export function KnowledgeReviewWorkspace() {
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Apply
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Review tasks</CardTitle>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Records"
+        title="Review tasks"
+        icon={ListChecks}
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : listErr ? (
@@ -300,18 +302,18 @@ export function KnowledgeReviewWorkspace() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       {selected ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Update task</CardTitle>
-            <CardDescription>
-              Record an expert review decision on this extracted knowledge claim — approve, reject, or flag for further review.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="teal"
+          eyebrow="Action"
+          title="Update task"
+          icon={ClipboardCheck}
+          description="Record an expert review decision on this extracted knowledge claim — approve, reject, or flag for further review."
+        >
+          <div className="space-y-4">
             {patchErr ? (
               <Alert variant="destructive">
                 <AlertDescription className="text-sm">{patchErr}</AlertDescription>
@@ -357,8 +359,8 @@ export function KnowledgeReviewWorkspace() {
               Save task update
             </Button>
             <DeveloperJsonPanel data={selected} />
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       ) : null}
     </div>
   )

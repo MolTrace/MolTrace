@@ -274,9 +274,15 @@ export function CompoundRegistryWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Compound Registry</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · Compound Registry
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Compound Registry</h1>
+          <p className="text-sm text-muted-foreground">
             Track compounds, batches, samples, analytical evidence, reactions, reports, and regulatory dossiers in one
             connected registry.
           </p>

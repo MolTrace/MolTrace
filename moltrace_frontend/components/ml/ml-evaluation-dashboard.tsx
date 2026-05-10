@@ -9,7 +9,7 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -35,7 +35,7 @@ import {
   trackMlEvaluationRunCompleted,
   trackMlEvaluationRunStarted,
 } from "@/src/lib/analytics/analytics-client"
-import { AlertTriangle, ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { Activity, AlertTriangle, ArrowLeft, Loader2, PlayCircle, RefreshCw } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -301,8 +301,14 @@ export function MlEvaluationDashboard() {
               </Link>
             </Button>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">ML Evaluation</h1>
-          <p className="text-muted-foreground">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · ML Evaluation
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">ML Evaluation</h1>
+          <p className="text-sm text-muted-foreground">
             Run evaluations against dataset versions or benchmark registry datasets; review metrics and summaries only.
           </p>
         </div>
@@ -343,14 +349,14 @@ export function MlEvaluationDashboard() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Run evaluation</CardTitle>
-          <CardDescription>
-            Launch a model evaluation run against a dataset version or benchmark dataset. Evaluation split and configuration are stored with the run for reproducibility.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Launch"
+        title="Run evaluation"
+        icon={PlayCircle}
+        description="Launch a model evaluation run against a dataset version or benchmark dataset. Evaluation split and configuration are stored with the run for reproducibility."
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="artifact">model_artifact_id</Label>
             <Select value={artifactId || undefined} onValueChange={setArtifactId}>
@@ -497,17 +503,17 @@ export function MlEvaluationDashboard() {
             {submitBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Run evaluation
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Evaluation runs</CardTitle>
-          <CardDescription>
-            All model evaluation runs — status, metric summary, and artifact linkage. Select Load detail to expand full metrics and per-split breakdowns.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Runs"
+        title="Evaluation runs"
+        icon={Activity}
+        description="All model evaluation runs — status, metric summary, and artifact linkage. Select Load detail to expand full metrics and per-split breakdowns."
+      >
+        <div className="space-y-6">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errRuns ? (
@@ -725,8 +731,8 @@ export function MlEvaluationDashboard() {
               )
             })
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

@@ -11,7 +11,8 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { Plus, Rocket } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -217,7 +218,7 @@ export function AiCanaryDeploymentsWorkspace() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Canary Deployments</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Canary Deployments</h1>
         <p className="text-sm text-muted-foreground">Propose, review, and resolve canary deployments with human approval workflow.</p>
       </div>
 
@@ -245,12 +246,14 @@ export function AiCanaryDeploymentsWorkspace() {
 
       {loadErr ? <p className="text-sm text-destructive">{loadErr}</p> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Propose canary deployment</CardTitle>
-          <CardDescription>Route a fraction of live traffic to a candidate model artifact before promoting to full production.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Propose"
+        title="Propose canary deployment"
+        icon={Plus}
+        description="Route a fraction of live traffic to a candidate model artifact before promoting to full production."
+      >
+        <div className="space-y-4">
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-emerald-700">{formOk}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
@@ -278,15 +281,17 @@ export function AiCanaryDeploymentsWorkspace() {
             {submitBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             Start/propose
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Canary deployments</CardTitle>
-          <CardDescription>All proposed, active, and retired canary rollouts with their candidate artifact and traffic share.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 overflow-x-auto">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Deployments"
+        title="Canary deployments"
+        icon={Rocket}
+        description="All proposed, active, and retired canary rollouts with their candidate artifact and traffic share."
+      >
+        <div className="space-y-4 overflow-x-auto">
           <Table>
             <TableHeader><TableRow><TableHead>canary</TableHead><TableHead>service key</TableHead><TableHead>candidate artifact</TableHead><TableHead>status</TableHead><TableHead>created</TableHead><TableHead>actions</TableHead></TableRow></TableHeader>
             <TableBody>
@@ -327,8 +332,8 @@ export function AiCanaryDeploymentsWorkspace() {
               <p><span className="font-medium">summary:</span> {readRecordString(selectedDetail, "summary") ?? "-"}</p>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

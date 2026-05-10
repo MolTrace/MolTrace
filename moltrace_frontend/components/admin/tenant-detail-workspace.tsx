@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, BarChart3, FileText, Hash } from "lucide-react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -299,12 +299,9 @@ function Field({ label, value, valueKey }: { label: string; value: unknown; valu
 
 function StatCard({ title, value }: { title: string; value: string | number }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="text-2xl font-semibold">{value}</CardContent>
-    </Card>
+    <ModuleCard accent="slate" eyebrow="Stat" title={title} icon={Hash}>
+      <div className="text-2xl font-semibold">{value}</div>
+    </ModuleCard>
   )
 }
 
@@ -376,18 +373,18 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-        {description ? (
-          <CardDescription>{description}</CardDescription>
-        ) : null}
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <ModuleCard
+      accent="slate"
+      eyebrow="Section"
+      title={title}
+      icon={FileText}
+      description={description}
+    >
+      <div className="space-y-3">
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
         {children}
-      </CardContent>
-    </Card>
+      </div>
+    </ModuleCard>
   )
 }
 
@@ -2014,14 +2011,14 @@ function UsageProgramCard({
   metrics: { label: string; value: unknown }[]
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">
-          {order}. {title}
-        </CardTitle>
-        <CardDescription>Aggregate tenant usage only.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <ModuleCard
+      accent="slate"
+      eyebrow="Usage"
+      title={`${order}. ${title}`}
+      icon={BarChart3}
+      description="Aggregate tenant usage only."
+    >
+      <div className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {metrics.map((metric) => (
             <MetricCard key={metric.label} label={metric.label} value={metric.value} />
@@ -2035,8 +2032,8 @@ function UsageProgramCard({
             </div>
           </details>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </ModuleCard>
   )
 }
 
@@ -2896,7 +2893,7 @@ export function TenantDetailWorkspace() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">{title}</h1>
             <p className="text-muted-foreground">Tenant key: {tenantKey}</p>
           </div>
         </div>

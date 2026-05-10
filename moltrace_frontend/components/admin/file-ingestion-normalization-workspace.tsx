@@ -341,7 +341,7 @@ export function FileIngestionNormalizationWorkspace() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">File Ingestion + Normalization Dashboard</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">File Ingestion + Normalization Dashboard</h1>
         <p className="text-muted-foreground">
           Track imported files, view normalized artifact outputs, and review derived output metadata. Imported data
           requires review.

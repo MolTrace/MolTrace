@@ -10,7 +10,8 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { ListChecks, MessageSquare, Plus } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
@@ -249,7 +250,7 @@ export function AiActiveLearningWorkspace() {
     <div className="space-y-6">
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Prediction Feedback and Active Learning Queue</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Prediction Feedback and Active Learning Queue</h1>
           <InfoTooltip
             label="About Active Learning Queue"
             content="Active-learning candidates are low-confidence, out-of-domain, or human-corrected cases that can improve future dataset versions and models."
@@ -265,14 +266,14 @@ export function AiActiveLearningWorkspace() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Prediction feedback</CardTitle>
-          <CardDescription>
-            Submit reviewer feedback or a formal review decision (accept, reject, escalate) on a specific prediction.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Feedback"
+        title="Prediction feedback"
+        icon={MessageSquare}
+        description="Submit reviewer feedback or a formal review decision (accept, reject, escalate) on a specific prediction."
+      >
+        <div className="space-y-4">
           {feedbackErr ? <p className="text-sm text-destructive">{feedbackErr}</p> : null}
           {feedbackOk ? <p className="text-sm text-emerald-700">{feedbackOk}</p> : null}
 
@@ -338,17 +339,17 @@ export function AiActiveLearningWorkspace() {
             {feedbackBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             Submit feedback
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Create active-learning candidate</CardTitle>
-          <CardDescription>
-            Manually queue a prediction for human labeling — useful when a downstream reviewer flags a case the model missed.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Create"
+        title="Create active-learning candidate"
+        icon={Plus}
+        description="Manually queue a prediction for human labeling — useful when a downstream reviewer flags a case the model missed."
+      >
+        <div className="space-y-4">
           {candidateErr ? <p className="text-sm text-destructive">{candidateErr}</p> : null}
           {candidateOk ? <p className="text-sm text-emerald-700">{candidateOk}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
@@ -432,17 +433,17 @@ export function AiActiveLearningWorkspace() {
             {candidateCreateBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             Create candidate
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Learning Queue</CardTitle>
-          <CardDescription>
-            Predictions awaiting human review, with status changes (accept, reject, escalate) tracked inline.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Queue"
+        title="Active Learning Queue"
+        icon={ListChecks}
+        description="Predictions awaiting human review, with status changes (accept, reject, escalate) tracked inline."
+      >
+        <div className="overflow-x-auto">
           {queueErr ? <p className="mb-3 text-sm text-destructive">{queueErr}</p> : null}
           <Table>
             <TableHeader>
@@ -509,8 +510,8 @@ export function AiActiveLearningWorkspace() {
               ) : null}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

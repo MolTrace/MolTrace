@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { ApiError, apiFetch, readStoredAuthToken, buildApiPath } from "@/lib/api/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
-import { ServerOff, Download } from "lucide-react"
+import { ServerOff, Download, FileText, FolderDown, Plus } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -149,7 +149,7 @@ export function DebugBundlesWorkspace() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Debug Bundles</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Debug Bundles</h1>
             <InfoTooltip content={DEBUG_BUNDLE_TOOLTIP} label="About debug bundles" />
           </div>
           <p className="text-muted-foreground">
@@ -179,14 +179,14 @@ export function DebugBundlesWorkspace() {
 
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Create bundle</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">New debug bundle</CardTitle>
-            <CardDescription>
-              Capture a snapshot of session, project, or sample state for support investigations. Includes job summaries and artifact metadata; recent audit events and file hashes are optional.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Create"
+          title="New debug bundle"
+          icon={Plus}
+          description="Capture a snapshot of session, project, or sample state for support investigations. Includes job summaries and artifact metadata; recent audit events and file hashes are optional."
+        >
+          <div className="space-y-4 text-sm">
             <div className="space-y-2">
               <Label htmlFor="db-title">title</Label>
               <Input
@@ -263,18 +263,20 @@ export function DebugBundlesWorkspace() {
             <Button type="button" disabled={loadingCreate} onClick={() => void createBundle()}>
               {loadingCreate ? "Creating…" : "Create debug bundle"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Load existing</h2>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Fetch bundle</CardTitle>
-            <CardDescription>Load a previously created debug bundle by its ID.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-end gap-2">
+        <ModuleCard
+          accent="slate"
+          eyebrow="Load"
+          title="Fetch bundle"
+          icon={FolderDown}
+          description="Load a previously created debug bundle by its ID."
+        >
+          <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-2">
               <Label htmlFor="db-load-id">bundle id</Label>
               <Input
@@ -288,18 +290,20 @@ export function DebugBundlesWorkspace() {
             <Button type="button" variant="secondary" disabled={loadingGet} onClick={() => void getBundle(loadId)}>
               {loadingGet ? "Loading…" : "Load bundle"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
       {bundle ? (
         <div>
           <h2 className="mb-3 text-sm font-medium text-muted-foreground">Latest bundle</h2>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Bundle details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+          <ModuleCard
+            accent="slate"
+            eyebrow="Detail"
+            title="Bundle details"
+            icon={FileText}
+          >
+            <div className="space-y-3 text-sm">
               <dl className="grid gap-2 text-xs sm:grid-cols-2">
                 <div>
                   <dt className="text-muted-foreground">id</dt>
@@ -367,8 +371,8 @@ export function DebugBundlesWorkspace() {
                   Download becomes available once the bundle finishes building and its checksum is recorded.
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </ModuleCard>
         </div>
       ) : null}
     </div>

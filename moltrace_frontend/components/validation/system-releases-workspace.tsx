@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -19,6 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { FileText, GitBranch, Plus } from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -293,34 +294,34 @@ export function SystemReleasesWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">System Releases</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · System Releases
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">System Releases</h1>
+          <p className="text-sm text-muted-foreground">
             Create and review system release records with validation summaries, risk summaries, and e-signature approval.
           </p>
         </div>
         <BackendStatusIndicator />
       </div>
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+      {error ? <AlertCard variant="error" title="Error" description={error} /> : null}
 
-      {message ? (
-        <Alert>
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {message ? <AlertCard variant="success" title="Recorded" description={message} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Create system release</CardTitle>
-            <CardDescription>Create a system release record documenting a validated software version with qualification evidence and release approval status.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Create"
+          title="Create system release"
+          icon={Plus}
+          description="Create a system release record documenting a validated software version with qualification evidence and release approval status."
+        >
+          <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="system-release-version">release version</Label>
@@ -387,15 +388,17 @@ export function SystemReleasesWorkspace() {
             <Button type="button" onClick={createRelease} disabled={createBusy}>
               {createBusy ? "Creating..." : "Create system release"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Release detail</CardTitle>
-            <CardDescription>Selected release detail — version, release notes, qualification status, and linked validation artefacts.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Detail"
+          title="Release detail"
+          icon={FileText}
+          description="Selected release detail — version, release notes, qualification status, and linked validation artefacts."
+        >
+          <div className="space-y-5">
             {detailRelease ? (
               <>
                 <div className="grid gap-3 sm:grid-cols-4">
@@ -484,21 +487,23 @@ export function SystemReleasesWorkspace() {
                 {detailLoading ? "Loading system release..." : "Select a system release to view approval controls."}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-base">System releases</CardTitle>
-            <CardDescription>All system release records — version history, qualification status, and release approval audit trail.</CardDescription>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="History"
+        title="System releases"
+        icon={GitBranch}
+        description="All system release records — version history, qualification status, and release approval audit trail."
+      >
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadReleases()} disabled={loading}>
+              Refresh
+            </Button>
           </div>
-          <Button type="button" variant="outline" onClick={() => void loadReleases()} disabled={loading}>
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -547,8 +552,8 @@ export function SystemReleasesWorkspace() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

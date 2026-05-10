@@ -268,7 +268,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       </div>
 
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Regulatory Change Detail</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Change Detail</h1>
         <p className="text-sm text-muted-foreground">
           source change detected signals, possible impact triage, and requires qualified review workflow.
         </p>

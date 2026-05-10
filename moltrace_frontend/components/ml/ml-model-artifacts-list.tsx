@@ -8,7 +8,8 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { Boxes } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -59,7 +60,7 @@ export function MlModelArtifactsList() {
               </Link>
             </Button>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Model artifacts</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Model artifacts</h1>
           <p className="text-muted-foreground">
             Browse trained artifacts and open detail for evaluation links, model cards, and deployment context.
           </p>
@@ -81,14 +82,14 @@ export function MlModelArtifactsList() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Artifacts</CardTitle>
-          <CardDescription>
-            Model artifacts produced by completed training runs — name, task type, framework, and training dataset version.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Artifacts"
+        title="Artifacts"
+        icon={Boxes}
+        description="Model artifacts produced by completed training runs — name, task type, framework, and training dataset version."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : rows.length === 0 ? (
@@ -134,8 +135,8 @@ export function MlModelArtifactsList() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

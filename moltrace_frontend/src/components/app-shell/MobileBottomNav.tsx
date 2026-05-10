@@ -92,11 +92,21 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "inline-flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium",
+                "relative inline-flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium",
                 isActive ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
               )}
+              style={
+                isActive
+                  ? { boxShadow: "inset 0 2px 0 0 var(--mt-teal)" }
+                  : undefined
+              }
             >
-              <item.icon className="h-4 w-4 shrink-0" />
+              <item.icon
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  isActive && "text-[color:var(--mt-teal)]",
+                )}
+              />
               <span className="truncate">{item.label}</span>
             </Link>
           )
@@ -128,13 +138,23 @@ export function MobileBottomNav() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "inline-flex min-h-12 items-center gap-3 rounded-md px-3 text-sm font-medium",
+                      "relative inline-flex min-h-12 items-center gap-3 rounded-md px-3 text-sm font-medium",
                       isActive
                         ? "bg-secondary text-foreground"
                         : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
                     )}
+                    style={
+                      isActive
+                        ? { boxShadow: "inset 3px 0 0 0 var(--mt-teal)" }
+                        : undefined
+                    }
                   >
-                    <item.icon className="h-4 w-4 shrink-0" />
+                    <item.icon
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        isActive && "text-[color:var(--mt-teal)]",
+                      )}
+                    />
                     {item.label}
                   </Link>
                 )

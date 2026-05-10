@@ -9,7 +9,7 @@ import { readRecordNumber, readRecordString } from "@/components/projects/projec
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -35,7 +35,7 @@ import {
   trackMlTrainingRunCompleted,
   trackMlTrainingRunStarted,
 } from "@/src/lib/analytics/analytics-client"
-import { AlertTriangle, ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { Activity, AlertTriangle, ArrowLeft, Loader2, PlayCircle, RefreshCw } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -330,7 +330,7 @@ export function MlTrainingRunLauncher() {
               </Link>
             </Button>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">ML Training Run Launcher</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">ML Training Run Launcher</h1>
           <p className="text-muted-foreground">
             Start controlled training runs against approved or explicitly experimental dataset versions.
           </p>
@@ -375,14 +375,14 @@ export function MlTrainingRunLauncher() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Start training run</CardTitle>
-          <CardDescription>
-            Launch a supervised ML training run against a curated knowledge dataset version. Only dataset IDs and hyperparameters are sent — no raw data payload.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Launch"
+        title="Start training run"
+        icon={PlayCircle}
+        description="Launch a supervised ML training run against a curated knowledge dataset version. Only dataset IDs and hyperparameters are sent — no raw data payload."
+      >
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="task-key">task_key</Label>
@@ -518,17 +518,17 @@ export function MlTrainingRunLauncher() {
             {submitBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
             Start training run
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Training runs</CardTitle>
-          <CardDescription>
-            ML training run history — status, metrics, and artifact IDs for each completed or in-progress run. Artifact IDs appear when the backend reports success.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Runs"
+        title="Training runs"
+        icon={Activity}
+        description="ML training run history — status, metrics, and artifact IDs for each completed or in-progress run. Artifact IDs appear when the backend reports success."
+      >
+        <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
             Labels: <span className="font-medium text-foreground">training complete</span> aligns with{" "}
             <code className="text-xs">status === succeeded</code>;{" "}
@@ -624,8 +624,8 @@ export function MlTrainingRunLauncher() {
               </Table>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

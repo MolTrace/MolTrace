@@ -2,13 +2,14 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ApiError, apiFetch } from "@/lib/api/client"
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react"
+import { Loader2, RefreshCw } from "lucide-react"
 
 type AnyRecord = Record<string, unknown>
 
@@ -244,20 +245,24 @@ export function AiServicesDashboard() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">AI Services</h1>
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-teal)" }}
+        >
+          MolTrace · AI Services
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">AI Services</h1>
         <p className="text-sm text-muted-foreground">
           Controlled prediction services, model routing, active-learning feedback, and inference audit trails.
         </p>
       </div>
 
-      <Alert className="border-amber-500/30 bg-amber-500/10">
-        <AlertTriangle className="h-4 w-4 text-amber-600" />
-        <AlertTitle>Human review required</AlertTitle>
-        <AlertDescription>
-          AI predictions are decision support. Scientific and regulatory outputs require human review.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Human review required"
+        description="AI predictions are decision support. Scientific and regulatory outputs require human review."
+      />
 
       <div className="flex items-center justify-between">
         <Badge variant="outline">Read-only service overview</Badge>
@@ -295,54 +300,71 @@ export function AiServicesDashboard() {
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Active services</CardDescription>
-            <CardTitle className="text-2xl">{activeServices}</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardHeader className="pt-5 pb-5">
+            <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Active services</CardDescription>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{activeServices}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Predictions today</CardDescription>
-            <CardTitle className="text-2xl">{predictionsToday}</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardHeader className="pt-5 pb-5">
+            <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Predictions today</CardDescription>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{predictionsToday}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Low-confidence predictions</CardDescription>
-            <CardTitle className="text-2xl">{lowConfidencePredictions}</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardHeader className="pt-5 pb-5">
+            <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Low-confidence predictions</CardDescription>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{lowConfidencePredictions}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>OOD predictions</CardDescription>
-            <CardTitle className="text-2xl">{oodPredictions}</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardHeader className="pt-5 pb-5">
+            <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">OOD predictions</CardDescription>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{oodPredictions}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Active-learning candidates</CardDescription>
-            <CardTitle className="text-2xl">{activeLearningCandidates.length}</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardHeader className="pt-5 pb-5">
+            <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Active-learning candidates</CardDescription>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{activeLearningCandidates.length}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Services requiring review</CardDescription>
-            <CardTitle className="text-2xl">{servicesRequiringReview}</CardTitle>
+        <Card
+          className="overflow-hidden rounded-xl py-0"
+          style={{ borderTop: "3px solid var(--mt-teal)" }}
+        >
+          <CardHeader className="pt-5 pb-5">
+            <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Services requiring review</CardDescription>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{servicesRequiringReview}</CardTitle>
           </CardHeader>
         </Card>
       </section>
 
       <section>
-        <Card>
-          <CardHeader>
-            <CardTitle>AI service table</CardTitle>
-            <CardDescription>
-              All registered AI/ML services with their model, current status, and version.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {errServices ? <p className="text-sm text-destructive">{errServices}</p> : null}
+        <ModuleCard
+          accent="teal"
+          eyebrow="AI · Service Table"
+          title="AI service table"
+          description="All registered AI/ML services with their model, current status, and version."
+        >
+          <div className="space-y-2">
+            {errServices ? <p className="text-sm" style={{ color: "var(--mt-red)" }}>{errServices}</p> : null}
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -374,20 +396,19 @@ export function AiServicesDashboard() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
 
       <section>
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent predictions</CardTitle>
-            <CardDescription>
-              The most recent inference requests across all AI services with their confidence and review status.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {errPredictions ? <p className="text-sm text-destructive">{errPredictions}</p> : null}
+        <ModuleCard
+          accent="teal"
+          eyebrow="AI · Recent Predictions"
+          title="Recent predictions"
+          description="The most recent inference requests across all AI services with their confidence and review status."
+        >
+          <div className="space-y-2">
+            {errPredictions ? <p className="text-sm" style={{ color: "var(--mt-red)" }}>{errPredictions}</p> : null}
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -419,20 +440,19 @@ export function AiServicesDashboard() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Active-learning preview</CardTitle>
-            <CardDescription>
-              Predictions queued for human labeling — selected because the model was uncertain or the input was out-of-distribution.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {errActiveLearning ? <p className="text-sm text-destructive">{errActiveLearning}</p> : null}
+        <ModuleCard
+          accent="teal"
+          eyebrow="AI · Active Learning"
+          title="Active-learning preview"
+          description="Predictions queued for human labeling — selected because the model was uncertain or the input was out-of-distribution."
+        >
+          <div className="space-y-2">
+            {errActiveLearning ? <p className="text-sm" style={{ color: "var(--mt-red)" }}>{errActiveLearning}</p> : null}
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -462,18 +482,17 @@ export function AiServicesDashboard() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Model monitoring preview</CardTitle>
-            <CardDescription>
-              Live operational metrics — drift, latency, throughput, and out-of-distribution rate — across deployed services.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {errMonitoring ? <p className="text-sm text-destructive">{errMonitoring}</p> : null}
+        <ModuleCard
+          accent="teal"
+          eyebrow="AI · Model Monitoring"
+          title="Model monitoring preview"
+          description="Live operational metrics — drift, latency, throughput, and out-of-distribution rate — across deployed services."
+        >
+          <div className="space-y-2">
+            {errMonitoring ? <p className="text-sm" style={{ color: "var(--mt-red)" }}>{errMonitoring}</p> : null}
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -499,8 +518,8 @@ export function AiServicesDashboard() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </section>
     </div>
   )

@@ -10,7 +10,16 @@ export class ApiError extends Error {
   }
 }
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/backend"
+const DEFAULT_API_BASE = "/api/backend"
+
+function publicApiBase() {
+  const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim()
+  if (!configuredBase) return DEFAULT_API_BASE
+  if (/^https?:\/\//i.test(configuredBase)) return DEFAULT_API_BASE
+  return configuredBase
+}
+
+export const API_BASE = publicApiBase()
 export const AUTH_TOKEN_STORAGE_KEY = "moltrace.access_token"
 export const AUTH_USER_STORAGE_KEY = "moltrace.user"
 export const TENANT_ID_STORAGE_KEY = "moltrace.current_tenant_id"
@@ -18,6 +27,7 @@ export const GENERIC_REQUEST_FAILURE_MESSAGE = "Request could not be completed. 
 
 const INTERNAL_ERROR_MESSAGE_PATTERN =
   /(backend\s+requires\s+authentication|for\s+local\s+development|disable\s+backend\s+auth|disable_auth|disable_backend_auth|todo:|authorization\s*:\s*bearer|bearer\s*<\s*token\s*>|bearer\s+token|x-api-key|api[_\s-]?key|\b(?:get|post|put|patch|delete)\s+\/[a-z0-9]|\/api\/backend\/|raw\s+prompt|system\s+prompt|developer\s+prompt|chain[_\s-]?of[_\s-]?thought|\bcot\b|reasoning[_\s-]?trace|credential\s*[:=]|secret\s*[:=]|password\s*[:=]|private[_\s-]?key|service[_\s-]?account|traceback\s+\(most\s+recent\s+call\s+last\)|\bfile\s+"[^"]+")/i
+const NETWORK_ERROR_MESSAGE_PATTERN = /failed\s+to\s+fetch|network\s*error|load\s+failed/i
 
 type ApiRequestInit = Omit<RequestInit, "body"> & {
   body?: unknown
@@ -104,6 +114,7 @@ export function sanitizePublicApiErrorMessage(
 
   const candidate = message.trim()
   if (!candidate) return fallback
+  if (NETWORK_ERROR_MESSAGE_PATTERN.test(candidate)) return "Backend connection failed. Please retry in a moment."
   if (INTERNAL_ERROR_MESSAGE_PATTERN.test(candidate)) return fallback
   return candidate
 }

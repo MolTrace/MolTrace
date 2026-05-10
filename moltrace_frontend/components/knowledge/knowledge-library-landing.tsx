@@ -4,10 +4,11 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
 import {
   Table,
   TableBody,
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import {
-  AlertTriangle,
   BarChart3,
   BookMarked,
   ClipboardCheck,
@@ -184,23 +184,26 @@ export function KnowledgeLibraryLanding() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Knowledge Library</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · Knowledge Library
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Knowledge Library</h1>
+          <p className="text-sm text-muted-foreground">
             Ingest, extract, review, and reuse scientific, analytical, reaction, regulatory, and internal knowledge.
           </p>
         </div>
         <BackendStatusIndicator />
       </div>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" aria-hidden />
-        <AlertTitle className="text-sm">Human review required</AlertTitle>
-        <AlertDescription className="text-sm text-muted-foreground">
-          Extracted knowledge requires human review. Citations, provenance, and dataset splits must be preserved before
-          records are used for models or regulatory decisions.
-        </AlertDescription>
-      </Alert>
+      <AlertCard
+        variant="warning"
+        title="Human review required"
+        description="Extracted knowledge requires human review. Citations, provenance, and dataset splits must be preserved before records are used for models or regulatory decisions."
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -255,9 +258,8 @@ export function KnowledgeLibraryLanding() {
         errBenchmark ||
         errImprovement ||
         errDatasetVersions) && (
-        <Alert variant="destructive">
-          <AlertTitle>Partial load</AlertTitle>
-          <AlertDescription className="space-y-1 text-xs">
+        <AlertCard variant="error" title="Partial load">
+          <div className="space-y-1 text-xs text-foreground/90">
             {errSources ? <p>Sources: {errSources}</p> : null}
             {errRuns ? <p>Extraction runs: {errRuns}</p> : null}
             {errReview ? <p>Review tasks: {errReview}</p> : null}
@@ -265,20 +267,23 @@ export function KnowledgeLibraryLanding() {
             {errBenchmark ? <p>Benchmark candidates: {errBenchmark}</p> : null}
             {errImprovement ? <p>Model improvement queue: {errImprovement}</p> : null}
             {errDatasetVersions ? <p>Dataset versions: {errDatasetVersions}</p> : null}
-          </AlertDescription>
-        </Alert>
+          </div>
+        </AlertCard>
       )}
 
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Summary cards</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Sources</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Sources</CardTitle>
               <Library className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errSources ? null : sources.length, Boolean(errSources))}
               </div>
               {statSub({
@@ -289,13 +294,16 @@ export function KnowledgeLibraryLanding() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Extraction runs</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Extraction runs</CardTitle>
               <FileStack className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errRuns ? null : runs.length, Boolean(errRuns))}
               </div>
               {statSub({
@@ -306,13 +314,16 @@ export function KnowledgeLibraryLanding() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Records needing review</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Records needing review</CardTitle>
               <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errReview ? null : taskCounts.pending, Boolean(errReview))}
               </div>
               {statSub({
@@ -323,13 +334,16 @@ export function KnowledgeLibraryLanding() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Approved knowledge records</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Approved knowledge records</CardTitle>
               <BookMarked className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errReview ? null : taskCounts.accepted, Boolean(errReview))}
               </div>
               {statSub({
@@ -340,13 +354,16 @@ export function KnowledgeLibraryLanding() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Training dataset candidates</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Training dataset candidates</CardTitle>
               <Database className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errTraining ? null : trainingCandidates.length, Boolean(errTraining))}
               </div>
               {statSub({
@@ -357,13 +374,16 @@ export function KnowledgeLibraryLanding() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Benchmark candidates</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Benchmark candidates</CardTitle>
               <Layers className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errBenchmark ? null : benchmarkCandidates.length, Boolean(errBenchmark))}
               </div>
               {statSub({
@@ -374,13 +394,16 @@ export function KnowledgeLibraryLanding() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Model improvement items</CardTitle>
+          <Card
+            className="overflow-hidden rounded-xl py-0"
+            style={{ borderTop: "3px solid var(--mt-teal)" }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Model improvement items</CardTitle>
               <Wrench className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold tabular-nums">
+            <CardContent className="pb-5">
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
                 {statValue(errImprovement ? null : modelImprovement.length, Boolean(errImprovement))}
               </div>
               {statSub({
@@ -393,15 +416,19 @@ export function KnowledgeLibraryLanding() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Data science / ML readiness</CardTitle>
-          <CardDescription>
+      <ModuleCard
+        accent="teal"
+        eyebrow="ML Readiness"
+        title="Data science / ML readiness"
+        icon={Sparkles}
+        description={
+          <>
             Approved dataset snapshots ready for ML training — versions in snapshot:{" "}
             <span className="tabular-nums font-medium">{errDatasetVersions ? "—" : String(approvedDatasetVersions)}</span>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+          </>
+        }
+      >
+        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
             Training: {trainingCandidates.length} · Benchmark: {benchmarkCandidates.length} · Improvement queue:{" "}
@@ -411,17 +438,17 @@ export function KnowledgeLibraryLanding() {
             <BarChart3 className="h-4 w-4 shrink-0" aria-hidden />
             Dataset versions listed: {errDatasetVersions ? "—" : datasetVersions.length}
           </span>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Source library preview</CardTitle>
-          <CardDescription>
-            Scientific literature and structured knowledge sources registered for extraction and review.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Sources"
+        title="Source library preview"
+        icon={Library}
+        description="Scientific literature and structured knowledge sources registered for extraction and review."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -464,17 +491,17 @@ export function KnowledgeLibraryLanding() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Recent extraction runs</CardTitle>
-          <CardDescription>
-            Recent knowledge extraction pipeline runs — source, status, extracted entity count, and run timestamp.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Extractions"
+        title="Recent extraction runs"
+        icon={FileStack}
+        description="Recent knowledge extraction pipeline runs — source, status, extracted entity count, and run timestamp."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errRuns ? (
@@ -514,17 +541,17 @@ export function KnowledgeLibraryLanding() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Review queue preview</CardTitle>
-          <CardDescription>
-            Extracted knowledge claims pending expert review — status, source, and entity type for each queued review task.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Review"
+        title="Review queue preview"
+        icon={ClipboardCheck}
+        description="Extracted knowledge claims pending expert review — status, source, and entity type for each queued review task."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errReview ? (
@@ -567,17 +594,17 @@ export function KnowledgeLibraryLanding() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Training dataset candidates</CardTitle>
-          <CardDescription>
-            Reviewed knowledge claims nominated as training data for ML models — type, source, and curation status.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Training Data"
+        title="Training dataset candidates"
+        icon={Database}
+        description="Reviewed knowledge claims nominated as training data for ML models — type, source, and curation status."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errTraining ? (
@@ -611,17 +638,17 @@ export function KnowledgeLibraryLanding() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Benchmark dataset candidates</CardTitle>
-          <CardDescription>
-            Knowledge claims nominated as held-out benchmark evaluation data — type, source, and curation status.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Benchmark Data"
+        title="Benchmark dataset candidates"
+        icon={Layers}
+        description="Knowledge claims nominated as held-out benchmark evaluation data — type, source, and curation status."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errBenchmark ? (
@@ -655,17 +682,17 @@ export function KnowledgeLibraryLanding() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Model improvement queue</CardTitle>
-          <CardDescription>
-            Active model improvement signals — edge cases, failure modes, and feedback items queued for retraining consideration.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Improvement"
+        title="Model improvement queue"
+        icon={Wrench}
+        description="Active model improvement signals — edge cases, failure modes, and feedback items queued for retraining consideration."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errImprovement ? (
@@ -699,17 +726,17 @@ export function KnowledgeLibraryLanding() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Dataset versions</CardTitle>
-          <CardDescription>
-            Versioned knowledge dataset snapshots — approval status, entity counts, and provenance for each curated release.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="table-scroll min-w-0">
+      <ModuleCard
+        accent="teal"
+        eyebrow="Versions"
+        title="Dataset versions"
+        icon={BookMarked}
+        description="Versioned knowledge dataset snapshots — approval status, entity counts, and provenance for each curated release."
+      >
+        <div className="table-scroll min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : errDatasetVersions ? (
@@ -743,8 +770,8 @@ export function KnowledgeLibraryLanding() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
       <p className="text-xs text-muted-foreground">
         Knowledge Library lists are operational signals from your tenant API — not legal conclusions or agency positions.

@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,6 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { ClipboardList, FileSearch, ShieldCheck } from "lucide-react"
 
 type Row = Record<string, unknown>
 
@@ -238,37 +239,39 @@ export function DataIntegrityWorkspace() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Data Integrity Dashboard</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Data Integrity
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Data Integrity Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
             Run and review ALCOA+ style data integrity assessments for validation readiness records.
           </p>
         </div>
         <BackendStatusIndicator />
       </div>
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+      {error ? <AlertCard variant="error" title="Error" description={error} /> : null}
 
-      {message ? (
-        <Alert>
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {message ? <AlertCard variant="success" title="Recorded" description={message} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Run"
+          title={
+            <span className="flex items-center gap-2">
               Run data integrity assessment
               <InfoTooltip content={DATA_INTEGRITY_TOOLTIP} label="About data integrity assessment" />
-            </CardTitle>
-            <CardDescription>Run a data integrity assessment across a defined scope — checks ALCOA+ principles, audit trail coverage, and access-control compliance.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </span>
+          }
+          icon={ShieldCheck}
+          description="Run a data integrity assessment across a defined scope — checks ALCOA+ principles, audit trail coverage, and access-control compliance."
+        >
+          <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="data-integrity-scope">scope</Label>
@@ -298,15 +301,17 @@ export function DataIntegrityWorkspace() {
             <Button type="button" onClick={runAssessment} disabled={createBusy}>
               {createBusy ? "Running..." : "Run data integrity assessment"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Assessment detail</CardTitle>
-            <CardDescription>Selected assessment detail — scope, findings, ALCOA+ flags, and recommended remediation actions.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Detail"
+          title="Assessment detail"
+          icon={FileSearch}
+          description="Selected assessment detail — scope, findings, ALCOA+ flags, and recommended remediation actions."
+        >
+          <div className="space-y-5">
             {detailAssessment ? (
               <>
                 <div className="grid gap-3 sm:grid-cols-4">
@@ -382,21 +387,23 @@ export function DataIntegrityWorkspace() {
                 {detailLoading ? "Loading assessment..." : "Select an assessment to view ALCOA+ statuses."}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ModuleCard>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-base">Data integrity assessments</CardTitle>
-            <CardDescription>All data integrity assessments — scope, status, and findings summary across all completed and in-progress runs.</CardDescription>
+      <ModuleCard
+        accent="cyan"
+        eyebrow="Assessments"
+        title="Data integrity assessments"
+        icon={ClipboardList}
+        description="All data integrity assessments — scope, status, and findings summary across all completed and in-progress runs."
+      >
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadAssessments()} disabled={loading}>
+              Refresh
+            </Button>
           </div>
-          <Button type="button" variant="outline" onClick={() => void loadAssessments()} disabled={loading}>
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -453,8 +460,8 @@ export function DataIntegrityWorkspace() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

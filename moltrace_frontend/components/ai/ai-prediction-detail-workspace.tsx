@@ -99,7 +99,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Prediction Detail</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Prediction Detail</h1>
           <p className="text-sm text-muted-foreground">Prediction output requires review before scientific or regulatory use.</p>
         </div>
         <Button variant="outline" size="sm" asChild>

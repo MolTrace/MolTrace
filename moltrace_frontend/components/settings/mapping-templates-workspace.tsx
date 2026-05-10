@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { trackExternalObjectLinkCreated, trackMappingTemplateCreated } from "@/src/lib/analytics/analytics-client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { ExternalLink, FileBox, FileSpreadsheet, Link2, Plus, Tags } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -355,9 +356,15 @@ export function MappingTemplatesWorkspace() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">External Object Links and Mapping Templates</h1>
-        <p className="text-muted-foreground">
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-slate)" }}
+        >
+          MolTrace · Settings · Mapping Templates
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">External Object Links and Mapping Templates</h1>
+        <p className="text-sm text-muted-foreground">
           Configure mapping templates and external object links for connector-driven data flow.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -373,14 +380,14 @@ export function MappingTemplatesWorkspace() {
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Mapping template form</CardTitle>
-          <CardDescription>
-            Define how raw connector or instrument fields map to MolTrace entities. Templates can be created, browsed, and updated.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Form"
+        title="Mapping template form"
+        icon={Plus}
+        description="Define how raw connector or instrument fields map to MolTrace entities. Templates can be created, browsed, and updated."
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="mapping-connector">connector</Label>
@@ -443,14 +450,16 @@ export function MappingTemplatesWorkspace() {
               {updateTemplateBusy ? "Saving…" : "Save selected template"}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Mapping template table</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="slate"
+        eyebrow="Templates"
+        title="Mapping template table"
+        icon={Tags}
+      >
+        <div>
           {loadingTemplates ? <p className="text-sm text-muted-foreground">Loading mapping templates…</p> : null}
           {!loadingTemplates ? (
             <div className="overflow-x-auto rounded-md border">
@@ -499,17 +508,17 @@ export function MappingTemplatesWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create external record</CardTitle>
-          <CardDescription>
-            Register a record from an external system (LIMS, ELN, etc.) for cross-referencing within MolTrace.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Create"
+        title="Create external record"
+        icon={FileBox}
+        description="Register a record from an external system (LIMS, ELN, etc.) for cross-referencing within MolTrace."
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1">
               <Label htmlFor="external-record-connector">connector</Label>
@@ -546,14 +555,16 @@ export function MappingTemplatesWorkspace() {
           <Button type="button" disabled={createExternalRecordBusy} onClick={() => void createExternalRecord()}>
             {createExternalRecordBusy ? "Creating…" : "Create external record"}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">External record table</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="slate"
+        eyebrow="Records"
+        title="External record table"
+        icon={FileSpreadsheet}
+      >
+        <div>
           {loadingExternalRecords ? <p className="text-sm text-muted-foreground">Loading external records…</p> : null}
           {!loadingExternalRecords ? (
             <div className="overflow-x-auto rounded-md border">
@@ -603,17 +614,17 @@ export function MappingTemplatesWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create external link</CardTitle>
-          <CardDescription>
-            Link an external record to a MolTrace object (project, sample, compound, batch) for traceability.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <ModuleCard
+        accent="slate"
+        eyebrow="Link"
+        title="Create external link"
+        icon={Link2}
+        description="Link an external record to a MolTrace object (project, sample, compound, batch) for traceability."
+      >
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1">
               <Label htmlFor="external-link-record-id">external record ID</Label>
@@ -650,14 +661,16 @@ export function MappingTemplatesWorkspace() {
           <Button type="button" disabled={createExternalLinkBusy} onClick={() => void createExternalObjectLink()}>
             {createExternalLinkBusy ? "Creating…" : "Create external object link"}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">External object link table</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <ModuleCard
+        accent="slate"
+        eyebrow="Links"
+        title="External object link table"
+        icon={ExternalLink}
+      >
+        <div>
           {loadingExternalLinks ? <p className="text-sm text-muted-foreground">Loading external object links…</p> : null}
           {!loadingExternalLinks ? (
             <div className="overflow-x-auto rounded-md border">
@@ -693,8 +706,8 @@ export function MappingTemplatesWorkspace() {
               </Table>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ModuleCard>
     </div>
   )
 }

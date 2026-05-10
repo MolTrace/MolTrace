@@ -67,7 +67,7 @@ export default function AutomationRoiWorkspace() {
       <header className="flex flex-col gap-4 border-b pb-6 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Automation ROI</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Automation ROI</h1>
             <Badge variant="outline" className="font-normal">
               {DEMO_LABEL}
             </Badge>
