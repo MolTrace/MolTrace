@@ -1536,6 +1536,15 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             className="min-w-0"
           >
             <div className="space-y-3">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="spectracheck-candidates" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Candidate structures
+                </Label>
+                <InfoTooltip
+                  content='Use one candidate per line. Recommended format: Name | SMILES | role.'
+                  label="About Candidate structures"
+                />
+              </div>
               <Textarea
                 id="spectracheck-candidates"
                 value={candidatesText}

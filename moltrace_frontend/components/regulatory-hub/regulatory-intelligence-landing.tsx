@@ -532,17 +532,29 @@ export function RegulatoryIntelligenceLanding() {
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-8 pb-12">
-      <header className="space-y-1">
-        <p
-          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-cyan)" }}
-        >
-          MolTrace · Regulatory Hub
-        </p>
-        <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Hub</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Review impurity, qNMR, nitrosamine, and jurisdictional action cards.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            MolTrace · Regulatory Hub
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">
+            Regulatory Hub
+          </h1>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Review impurity, qNMR, nitrosamine, and jurisdictional action cards. Promote evidence into dossiers and dispatch reviewer actions.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/regulatory/notifications">Notifications</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/regulatory/action-queue">Action queue</Link>
+          </Button>
+        </div>
       </header>
 
       <AlertCard
@@ -559,7 +571,14 @@ export function RegulatoryIntelligenceLanding() {
         />
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Summary">
+      <section className="space-y-3" aria-label="Summary">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          Regulatory · At a glance
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <SummaryMetricCard
           title="Active dossiers"
           icon={<FolderOpen className="h-4 w-4 text-muted-foreground" />}
@@ -602,16 +621,39 @@ export function RegulatoryIntelligenceLanding() {
             )
           }
         />
+        </div>
       </section>
 
-      <RegulatoryHubValidationReadinessCard />
+      <section className="space-y-3" aria-label="Validation readiness">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          Regulatory · Validation Readiness
+        </p>
+        <RegulatoryHubValidationReadinessCard />
+      </section>
 
-      <RegulatoryNotificationsCompactCard />
+      <section className="space-y-3" aria-label="Notifications snapshot">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          Regulatory · Notifications snapshot
+        </p>
+        <RegulatoryNotificationsCompactCard />
+      </section>
 
       <section className="space-y-3" aria-labelledby="regulatory-action-cards-heading">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 id="regulatory-action-cards-heading" className="font-mono text-lg font-bold tracking-tight">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-cyan)" }}
+            >
+              Regulatory · Action Cards
+            </p>
+            <h2 id="regulatory-action-cards-heading" className="font-mono text-xl font-bold tracking-tight">
               Regulatory action cards
             </h2>
             <p className="text-sm text-muted-foreground">
@@ -652,8 +694,14 @@ export function RegulatoryIntelligenceLanding() {
       </section>
 
       <section className="space-y-3" aria-labelledby="regulatory-evidence-queue-heading">
-        <div>
-          <h2 id="regulatory-evidence-queue-heading" className="font-mono text-lg font-bold tracking-tight">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            Regulatory · Evidence Queue
+          </p>
+          <h2 id="regulatory-evidence-queue-heading" className="font-mono text-xl font-bold tracking-tight">
             Evidence queue
           </h2>
           <p className="text-sm text-muted-foreground">
