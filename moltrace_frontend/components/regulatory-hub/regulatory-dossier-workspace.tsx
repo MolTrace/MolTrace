@@ -3723,8 +3723,8 @@ export function RegulatoryDossierWorkspace() {
                 ) : (
                   <p className="text-sm text-muted-foreground">No nitrosamine watch assessment rows yet.</p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="qnmr-method-validation" className="min-w-0 max-w-full space-y-3">
@@ -3733,26 +3733,23 @@ export function RegulatoryDossierWorkspace() {
                 Back to Requirements
               </Button>
             </div>
-            <Card>
-              <CardHeader>
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="text-lg">qNMR / Method Validation</CardTitle>
-                    <InfoTooltip label="qNMR / Method Validation" content={QNMR_METHOD_VALIDATION_TOOLTIP} />
-                  </div>
-                  <CardDescription>
-                    qNMR compliance readiness and method validation profile — readiness states are ready for review, gaps identified, or not assessed. Do not equate with validated unless both backend outputs and a qualified reviewer explicitly support that qualification.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <Alert>
-                  <AlertDescription className="text-sm leading-relaxed text-muted-foreground">
-                    This workspace captures documentation readiness signals only. Use “ready for review”, “gaps
-                    identified”, or “not assessed” when describing states; avoid calling a method “validated” unless both
-                    backend outputs and qualified review explicitly support that wording.
-                  </AlertDescription>
-                </Alert>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · qNMR Validation"
+              title={
+                <span className="inline-flex items-center gap-2">
+                  qNMR / Method Validation
+                  <InfoTooltip label="qNMR / Method Validation" content={QNMR_METHOD_VALIDATION_TOOLTIP} />
+                </span>
+              }
+              description="qNMR compliance readiness and method validation profile — readiness states are ready for review, gaps identified, or not assessed. Do not equate with validated unless both backend outputs and a qualified reviewer explicitly support that qualification."
+            >
+              <div className="space-y-6">
+                <AlertCard
+                  variant="info"
+                  title="Documentation readiness signals only"
+                  description="This workspace captures documentation readiness signals only. Use “ready for review”, “gaps identified”, or “not assessed” when describing states; avoid calling a method “validated” unless both backend outputs and qualified review explicitly support that wording."
+                />
 
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                   <h3 className="text-sm font-semibold">Assess method validation readiness</h3>
@@ -4181,8 +4178,8 @@ export function RegulatoryDossierWorkspace() {
                     />
                   </CollapsibleContent>
                 </Collapsible>
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="ai-governance" className="min-w-0 max-w-full space-y-3">
@@ -4191,19 +4188,18 @@ export function RegulatoryDossierWorkspace() {
                 Back to Requirements
               </Button>
             </div>
-            <Card>
-              <CardHeader>
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <CardTitle className="text-lg">AI Governance</CardTitle>
-                    <InfoTooltip label="AI Governance" content={AI_GOVERNANCE_RECORD_TOOLTIP} />
-                  </div>
-                  <CardDescription>
-                    AI governance record for this dossier — documents the AI system name, version, intended use, and human oversight requirements for regulatory traceability.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · AI Governance"
+              title={
+                <span className="inline-flex items-center gap-2">
+                  AI Governance
+                  <InfoTooltip label="AI Governance" content={AI_GOVERNANCE_RECORD_TOOLTIP} />
+                </span>
+              }
+              description="AI governance record for this dossier — documents the AI system name, version, intended use, and human oversight requirements for regulatory traceability."
+            >
+              <div className="space-y-6">
                 {agCreateErr ? (
                   <Alert variant="destructive">
                     <AlertDescription className="text-sm">{agCreateErr}</AlertDescription>
@@ -4508,8 +4504,8 @@ export function RegulatoryDossierWorkspace() {
                     })
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="jurisdictional-map" className="min-w-0 max-w-full space-y-3">
@@ -5117,14 +5113,13 @@ export function RegulatoryDossierWorkspace() {
               </AlertDescription>
             </Alert>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Cited Q&amp;A</CardTitle>
-                <CardDescription>
-                  Cited regulatory Q&A — questions are answered by the backend using source-referenced guidance; responses are not synthesized in the browser. This is not legal advice.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Cited Q&A"
+              title="Cited Q&A"
+              description="Cited regulatory Q&A — questions are answered by the backend using source-referenced guidance; responses are not synthesized in the browser. This is not legal advice."
+            >
+              <div className="space-y-4">
                 <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">Dossier jurisdiction: </span>
                   {dossierJurisdictionLine}
@@ -5184,29 +5179,29 @@ export function RegulatoryDossierWorkspace() {
                   {qaBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Ask with cited sources
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
 
             {queryResult ? (
-              <Card>
-                <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base">Query response</CardTitle>
-                    <CardDescription>
-                      status:{" "}
-                      <span className="font-mono text-xs">{readRecordString(queryResult, "status") ?? "—"}</span>
-                    </CardDescription>
-                  </div>
+              <ModuleCard
+                accent="cyan"
+                eyebrow="QA · Query Response"
+                title="Query response"
+                description={
+                  <>
+                    status:{" "}
+                    <span className="font-mono text-xs">{readRecordString(queryResult, "status") ?? "—"}</span>
+                  </>
+                }
+                badge={
                   <Badge variant="secondary" className="shrink-0">
                     human_review_required: {String(queryResult.human_review_required ?? "—")}
                   </Badge>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm">
+                }
+              >
+                <div className="space-y-4 text-sm">
                   {readRecordString(queryResult, "status") === "insufficient_sources" ? (
-                    <Alert>
-                      <AlertTitle>Insufficient sources</AlertTitle>
-                      <AlertDescription className="text-sm">{INSUFFICIENT_SOURCES_USER_MESSAGE}</AlertDescription>
-                    </Alert>
+                    <AlertCard variant="info" title="Insufficient sources" description={INSUFFICIENT_SOURCES_USER_MESSAGE} />
                   ) : null}
 
                   <div>
@@ -5364,8 +5359,8 @@ export function RegulatoryDossierWorkspace() {
                   )}
 
                   <DeveloperJsonPanel data={queryResult} />
-                </CardContent>
-              </Card>
+                </div>
+              </ModuleCard>
             ) : null}
           </TabsContent>
 
@@ -5375,30 +5370,31 @@ export function RegulatoryDossierWorkspace() {
                 Back to Action Items
               </Button>
             </div>
-            <Card>
-              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
-                <div>
-                  <CardTitle className="text-lg">Risk Assessment</CardTitle>
-                  <CardDescription>
-                    Source-supported risk signals for this dossier — highlights gaps and contradictions for internal readiness review. Output requires qualified regulatory judgment and is not a substitute for it.
-                  </CardDescription>
-                </div>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Risk Assessment"
+              title="Risk Assessment"
+              description="Source-supported risk signals for this dossier — highlights gaps and contradictions for internal readiness review. Output requires qualified regulatory judgment and is not a substitute for it."
+              badge={
                 <Button type="button" variant="outline" size="sm" disabled={riskRefreshBusy} onClick={() => void createRiskAssessment()}>
                   {riskRefreshBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   Run risk assessment
                 </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Alert>
-                  <AlertDescription className="text-xs text-muted-foreground">
-                    Risk views highlight gaps and contradictions for internal readiness; treat as draft input that{" "}
-                    <span className="font-medium text-foreground">requires review</span> before decisions.
-                  </AlertDescription>
-                </Alert>
+              }
+            >
+              <div className="space-y-4">
+                <AlertCard
+                  variant="info"
+                  title="Draft input — review required"
+                  description={
+                    <>
+                      Risk views highlight gaps and contradictions for internal readiness; treat as draft input that{" "}
+                      <span className="font-medium text-foreground">requires review</span> before decisions.
+                    </>
+                  }
+                />
                 {riskActionErr ? (
-                  <Alert variant="destructive">
-                    <AlertDescription className="text-sm">{riskActionErr}</AlertDescription>
-                  </Alert>
+                  <AlertCard variant="error" title="Risk action failed" description={riskActionErr} />
                 ) : null}
                 {!riskAssessment && riskMissing ? (
                   <p className="text-sm text-muted-foreground">No saved risk assessment yet.</p>
@@ -5493,8 +5489,8 @@ export function RegulatoryDossierWorkspace() {
                     <DeveloperJsonPanel data={riskAssessment} />
                   </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="review" className="min-w-0 max-w-full space-y-3">
@@ -5503,14 +5499,13 @@ export function RegulatoryDossierWorkspace() {
                 Back to Action Items
               </Button>
             </div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Review</CardTitle>
-                <CardDescription>
-                  Record an internal review decision on this dossier — approve, reject, or escalate — with reviewer attribution. Not legal advice or external regulatory approval.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Review"
+              title="Review"
+              description="Record an internal review decision on this dossier — approve, reject, or escalate — with reviewer attribution. Not legal advice or external regulatory approval."
+            >
+              <div className="space-y-4">
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Internal review</AlertTitle>
@@ -5648,8 +5643,8 @@ export function RegulatoryDossierWorkspace() {
                     </div>
                   </>
                 ) : null}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="readiness" className="min-w-0 max-w-full space-y-3">
@@ -5658,28 +5653,35 @@ export function RegulatoryDossierWorkspace() {
                 Back to Action Items
               </Button>
             </div>
-            <Card>
-              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
-                <div>
-                  <CardTitle className="text-lg">Readiness Report</CardTitle>
-                  <CardDescription>
-                    Generate a readiness report summarizing evidence coverage and identified gaps. Readiness summaries{" "}
-                    <span className="font-medium text-foreground">require review</span> and are not compliance certificates.
-                  </CardDescription>
-                </div>
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Readiness"
+              title="Readiness Report"
+              description={
+                <>
+                  Generate a readiness report summarizing evidence coverage and identified gaps. Readiness summaries{" "}
+                  <span className="font-medium text-foreground">require review</span> and are not compliance certificates.
+                </>
+              }
+              badge={
                 <Button type="button" variant="outline" size="sm" disabled={readinessBusy} onClick={() => void generateReadinessReport()}>
                   {readinessBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   Generate readiness report
                 </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Alert>
-                  <AlertDescription className="text-xs text-muted-foreground">
-                    Use <span className="font-medium text-foreground">readiness summary</span> fields together with
-                    source-backed citations; where citations are missing, treat the package as{" "}
-                    <span className="font-medium text-foreground">source-supported</span> only after you attach them.
-                  </AlertDescription>
-                </Alert>
+              }
+            >
+              <div className="space-y-4">
+                <AlertCard
+                  variant="info"
+                  title="Source-supported only after citations attached"
+                  description={
+                    <>
+                      Use <span className="font-medium text-foreground">readiness summary</span> fields together with
+                      source-backed citations; where citations are missing, treat the package as{" "}
+                      <span className="font-medium text-foreground">source-supported</span> only after you attach them.
+                    </>
+                  }
+                />
                 {readinessErr ? (
                   <Alert variant="destructive">
                     <AlertDescription className="text-sm">{readinessErr}</AlertDescription>
@@ -5850,8 +5852,8 @@ export function RegulatoryDossierWorkspace() {
                     <DeveloperJsonPanel data={readinessReport} />
                   </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </ModuleCard>
             <CtdModule3BundleCard dossierId={dossierId} />
           </TabsContent>
 
