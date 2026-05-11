@@ -1,4 +1,4 @@
-# Regulatory Dossier tabs reskin — smoke 2026-05-11T01:51:36.512Z
+# Regulatory Dossier tabs reskin — smoke 2026-05-11T04:01:31.387Z
 
 - Pass: 54
 - Fail: 0
