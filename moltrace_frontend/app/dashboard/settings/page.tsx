@@ -15,10 +15,16 @@ import { User, Bell, Shield, Key, Building2, Plug, FolderSearch, Link2 } from "l
 export default function SettingsPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your account and application preferences.
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-slate)" }}
+        >
+          MolTrace · Dashboard · Settings
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Settings</h1>
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          Manage your account, application preferences, security, API keys, and connector configuration.
         </p>
       </div>
 

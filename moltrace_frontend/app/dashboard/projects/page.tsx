@@ -50,11 +50,17 @@ const projects = [
 export default function ProjectsPage() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">
-            Manage your analytical projects and collaborations.
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · Dashboard · Projects
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Projects</h1>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Cross-program project overview — sample counts, activity timelines, and quick links into spectroscopy, regulatory, and reaction workspaces.
           </p>
         </div>
         <Button className="gap-2">

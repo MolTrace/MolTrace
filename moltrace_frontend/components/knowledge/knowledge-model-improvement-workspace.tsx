@@ -243,9 +243,15 @@ export function KnowledgeModelImprovementWorkspace() {
           </div>
         </div>
 
-        <div>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-amber)" }}
+          >
+            MolTrace · Knowledge · Model Improvement
+          </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Model improvement queue</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="max-w-3xl text-sm text-muted-foreground">
             Operational backlog for model iteration — prioritized cases flagged for retraining, data augmentation, or review.
           </p>
         </div>

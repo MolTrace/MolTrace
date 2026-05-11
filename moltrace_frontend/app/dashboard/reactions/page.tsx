@@ -49,9 +49,15 @@ export default function ReactionsPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-6">
-          <div>
-            <h1 className="text-lg font-semibold">RXN-OPT-2024-156</h1>
-            <p className="text-sm text-muted-foreground">Suzuki Coupling Optimization</p>
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              MolTrace · Dashboard · Reactions
+            </p>
+            <h1 className="font-mono text-lg font-bold tracking-tight">RXN-OPT-2024-156</h1>
+            <p className="text-sm text-muted-foreground">Suzuki Coupling Optimization · demo campaign</p>
           </div>
           <div className="flex items-center gap-6 text-sm">
             <div>

@@ -186,7 +186,7 @@ function Field({ label, value }: { label: string; value: unknown }) {
 type StatAccent = "cyan" | "amber" | "red" | "green" | "violet"
 
 const STAT_ACCENT_VAR: Record<StatAccent, string> = {
-  cyan: "var(--mt-cyan)",
+  cyan: "var(--mt-green)",
   amber: "var(--mt-amber)",
   red: "var(--mt-red)",
   green: "var(--mt-green)",
@@ -919,7 +919,7 @@ export function ValidationProjectDetailWorkspace() {
           </Button>
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-green)" }}
           >
             MolTrace · Validation Project
           </p>
@@ -942,17 +942,17 @@ export function ValidationProjectDetailWorkspace() {
       {!loading && !error ? (
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="flex h-auto flex-wrap justify-start">
-            <TabsTrigger value="overview" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Overview</TabsTrigger>
-            <TabsTrigger value="urs" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">URS</TabsTrigger>
-            <TabsTrigger value="functional_specs" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Functional Specs</TabsTrigger>
-            <TabsTrigger value="risk_assessment" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Risk Assessment</TabsTrigger>
-            <TabsTrigger value="test_protocols" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Test Protocols</TabsTrigger>
-            <TabsTrigger value="test_executions" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Test Executions</TabsTrigger>
-            <TabsTrigger value="traceability" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Traceability</TabsTrigger>
-            <TabsTrigger value="esignatures" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">e-Signatures</TabsTrigger>
-            <TabsTrigger value="deviations_capa" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Deviations / CAPA</TabsTrigger>
-            <TabsTrigger value="inspection_package" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Inspection Package</TabsTrigger>
-            <TabsTrigger value="developer_json" className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Developer JSON</TabsTrigger>
+            <TabsTrigger value="overview" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Overview</TabsTrigger>
+            <TabsTrigger value="urs" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">URS</TabsTrigger>
+            <TabsTrigger value="functional_specs" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Functional Specs</TabsTrigger>
+            <TabsTrigger value="risk_assessment" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Risk Assessment</TabsTrigger>
+            <TabsTrigger value="test_protocols" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Test Protocols</TabsTrigger>
+            <TabsTrigger value="test_executions" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Test Executions</TabsTrigger>
+            <TabsTrigger value="traceability" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Traceability</TabsTrigger>
+            <TabsTrigger value="esignatures" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">e-Signatures</TabsTrigger>
+            <TabsTrigger value="deviations_capa" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Deviations / CAPA</TabsTrigger>
+            <TabsTrigger value="inspection_package" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Inspection Package</TabsTrigger>
+            <TabsTrigger value="developer_json" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Developer JSON</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">

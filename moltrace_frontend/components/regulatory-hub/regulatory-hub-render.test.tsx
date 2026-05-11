@@ -146,7 +146,7 @@ describe("Reaction Optimization Handoff Card (cross-module integration)", () => 
     const { ReactionOptimizationHandoffCard } = await import(
       "@/components/regulatory-hub/reaction-optimization-handoff-card"
     )
-    renderC(<ReactionOptimizationHandoffCard dossierId={1} compoundLabel="MTX-447" />)
+    renderC(<ReactionOptimizationHandoffCard dossierId={1} reactionProjectId={null} />)
     // Should render at least one heading or label related to reaction optimization
     await waitFor(() => {
       const found = screen.queryAllByText(/Reaction|Route|Optimization|Hand-off|Handoff/i)

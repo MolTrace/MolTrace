@@ -245,10 +245,21 @@ export function ReactionOptimizationLanding() {
       />
 
       <section aria-labelledby="campaign-summary-heading" className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="campaign-summary-heading" className="font-mono text-lg font-bold tracking-tight">
-            Campaign summary
-          </h2>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Reaction · Campaign Summary
+            </p>
+            <h2 id="campaign-summary-heading" className="font-mono text-xl font-bold tracking-tight">
+              Campaign summary
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Active campaigns, pending recommendations, and experiment throughput across loaded reaction projects.
+            </p>
+          </div>
           <DataStateBadge state={reactionDataState} />
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -309,12 +320,31 @@ export function ReactionOptimizationLanding() {
         ) : null}
       </section>
 
-      <ReactionValidationReadinessCard />
+      <section className="space-y-3" aria-label="Validation readiness">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-violet)" }}
+        >
+          Reaction · Validation Readiness
+        </p>
+        <ReactionValidationReadinessCard />
+      </section>
 
       <section aria-labelledby="recommendation-evidence-heading" className="space-y-3">
-        <h2 id="recommendation-evidence-heading" className="font-mono text-lg font-bold tracking-tight">
-          Recommendation evidence
-        </h2>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            Reaction · Recommendation Evidence
+          </p>
+          <h2 id="recommendation-evidence-heading" className="font-mono text-xl font-bold tracking-tight">
+            Recommendation evidence
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Top reaction recommendation card aggregated across loaded campaigns — open the project for full reasoning.
+          </p>
+        </div>
         <EvidenceCard
           title="Recommendation evidence"
           module="reactions"
@@ -351,12 +381,25 @@ export function ReactionOptimizationLanding() {
         />
       </section>
 
-      <ModuleCard
-        accent="violet"
-        eyebrow="Reaction · Create"
-        title="Create reaction project"
-        description="Create a project record for optimization review."
-      >
+      <section className="space-y-3" aria-label="Create reaction project">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            Reaction · Create Project
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">Spin up a new reaction project</h2>
+          <p className="text-sm text-muted-foreground">
+            Bind an objective and target product (SMILES) to a new project record. Variables, experiments, and recommendations land in the project workspace.
+          </p>
+        </div>
+        <ModuleCard
+          accent="violet"
+          eyebrow="Reaction · Create"
+          title="Create reaction project"
+          description="Create a project record for optimization review."
+        >
           <form className="space-y-4" onSubmit={(ev) => void handleCreate(ev)}>
             {createError ? (
               <AlertCard variant="error" title="Create failed" description={createError} />
@@ -437,12 +480,26 @@ export function ReactionOptimizationLanding() {
               {createBusy ? "Creating…" : "Create reaction project"}
             </Button>
           </form>
-      </ModuleCard>
+        </ModuleCard>
+      </section>
 
-      <ModuleCard
-        accent="violet"
-        eyebrow="Reaction · Projects"
-        title="Reaction projects"
+      <section className="space-y-3" aria-label="Reaction projects index">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            Reaction · Project Index
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">All reaction projects in this org</h2>
+          <p className="text-sm text-muted-foreground">
+            Per-project status, linked experiments, and pending recommendation counts — open any row for the full workspace.
+          </p>
+        </div>
+        <ModuleCard
+          accent="violet"
+          eyebrow="Reaction · Projects"
+          title="Reaction projects"
         description="Columns include linked experiment and recommendation counts when project details respond."
         badge={
           <Badge variant="secondary" className="font-normal">
@@ -511,8 +568,8 @@ export function ReactionOptimizationLanding() {
               </TableBody>
             </Table>
           </div>
-      </ModuleCard>
-
+        </ModuleCard>
+      </section>
     </div>
   )
 }

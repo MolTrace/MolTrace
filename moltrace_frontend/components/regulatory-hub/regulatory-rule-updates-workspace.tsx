@@ -307,9 +307,15 @@ export function RegulatoryRuleUpdatesWorkspace() {
         </Button>
       </div>
 
-      <header className="space-y-2">
+      <header className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-cyan)" }}
+        >
+          Regulatory · Rule Updates
+        </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Rule Update Proposals</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="max-w-3xl text-sm text-muted-foreground">
           Proposed rule updates require reviewer rationale and do not automatically alter source documents.
         </p>
       </header>

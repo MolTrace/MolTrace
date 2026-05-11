@@ -16,13 +16,38 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle, Loader2 } from "lucide-react"
+import { ModuleCard } from "@/components/dashboard/module-card"
+import { cn } from "@/lib/utils"
+import { AlertTriangle, BarChart3, Brain, Loader2, Settings2, Sparkles, Zap } from "lucide-react"
 import {
   EvidenceCard,
   type EvidenceModule,
   type EvidenceRiskLevel,
   type EvidenceStatus,
 } from "@/components/science/evidence-card"
+
+type ModuleKey = "spectracheck" | "reaction_optimization" | "regulatory" | "knowledge_extraction"
+
+const MODULE_ACCENT: Record<ModuleKey, "teal" | "violet" | "cyan" | "amber"> = {
+  spectracheck: "teal",
+  reaction_optimization: "violet",
+  regulatory: "cyan",
+  knowledge_extraction: "amber",
+}
+
+const MODULE_VAR: Record<ModuleKey, string> = {
+  spectracheck: "var(--mt-teal)",
+  reaction_optimization: "var(--mt-violet)",
+  regulatory: "var(--mt-cyan)",
+  knowledge_extraction: "var(--mt-amber)",
+}
+
+const MODULE_LABEL: Record<ModuleKey, string> = {
+  spectracheck: "SpectraCheck",
+  reaction_optimization: "Reaction Optimization",
+  regulatory: "Regulatory",
+  knowledge_extraction: "Knowledge Extraction",
+}
 
 type ServiceOption = {
   id: string
@@ -32,7 +57,7 @@ type ServiceOption = {
 }
 
 type Props = {
-  moduleKey: "spectracheck" | "reaction_optimization" | "regulatory" | "knowledge_extraction"
+  moduleKey: ModuleKey
   moduleTitle: string
   serviceOptions: ServiceOption[]
   summarySeed?: Record<string, unknown>
@@ -262,89 +287,177 @@ export function AiModulePredictionAugmentation({
     }
   }
 
+  const accent = MODULE_ACCENT[moduleKey]
+  const accentColor = MODULE_VAR[moduleKey]
+  const moduleLabel = MODULE_LABEL[moduleKey]
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{moduleTitle}: Optional controlled AI prediction</CardTitle>
-        <CardDescription>
+    <div className="space-y-6">
+      {/* Section header — eyebrow + h2 + subtitle (consistent with all other modules) */}
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: accentColor }}
+        >
+          {moduleLabel} · Optional AI Prediction
+        </p>
+        <h2 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+          <Brain className="h-5 w-5" style={{ color: accentColor }} aria-hidden />
+          {moduleTitle}: Optional controlled AI prediction
+        </h2>
+        <p className="max-w-3xl text-sm text-muted-foreground">
           Optional augmentation only. Existing scientific workflows remain unchanged and human review is required.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Alert className="border-amber-500/30 bg-amber-500/10">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertDescription>Use IDs and summaries only. Do not include raw spectra, full structures, or source text.</AlertDescription>
-        </Alert>
+        </p>
+      </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Prediction service</Label>
-            <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {serviceOptions.map((opt) => (
-                  <SelectItem key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* Safety alert — banner above all steps */}
+      <Alert className="border-amber-500/30 bg-amber-500/10">
+        <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <AlertDescription>Use IDs and summaries only. Do not include raw spectra, full structures, or source text.</AlertDescription>
+      </Alert>
+
+      {/* Step 1 — Setup */}
+      <ModuleCard
+        accent={accent}
+        eyebrow={`${moduleLabel} AI · Step 1 · Setup`}
+        title="Configure prediction inputs"
+        icon={Settings2}
+        description="Pick a service, attach optional ID anchors (artifact / evidence / compound / session), then provide an input summary JSON. IDs and summaries only — never raw data."
+        className="min-w-0"
+      >
+        <div className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Prediction service</Label>
+              <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {serviceOptions.map((opt) => (
+                    <SelectItem key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Service key</Label>
+              <Input value={selected.serviceKey} readOnly className="font-mono text-xs" />
+            </div>
+            <div className="space-y-2">
+              <Label>Task key</Label>
+              <Input value={selected.taskKey} readOnly className="font-mono text-xs" />
+            </div>
+            <div className="space-y-2">
+              <Label>artifact ID optional</Label>
+              <Input inputMode="numeric" value={artifactId} onChange={(e) => setArtifactId(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>evidence item ID optional</Label>
+              <Input inputMode="numeric" value={evidenceItemId} onChange={(e) => setEvidenceItemId(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>compound ID optional</Label>
+              <Input inputMode="numeric" value={compoundId} onChange={(e) => setCompoundId(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>session ID optional</Label>
+              <Input inputMode="numeric" value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>experimental mode</Label>
+              <Select value={experimentalMode ? "true" : "false"} onValueChange={(v) => setExperimentalMode(v === "true")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="false">false</SelectItem>
+                  <SelectItem value="true">true</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-2">
-            <Label>Service key</Label>
-            <Input value={selected.serviceKey} readOnly />
+            <Label>input summary JSON</Label>
+            <Textarea rows={5} value={inputSummaryJson} onChange={(e) => setInputSummaryJson(e.target.value)} className="font-mono text-xs" />
           </div>
           <div className="space-y-2">
-            <Label>Task key</Label>
-            <Input value={selected.taskKey} readOnly />
-          </div>
-          <div className="space-y-2">
-            <Label>artifact ID optional</Label>
-            <Input inputMode="numeric" value={artifactId} onChange={(e) => setArtifactId(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>evidence item ID optional</Label>
-            <Input inputMode="numeric" value={evidenceItemId} onChange={(e) => setEvidenceItemId(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>compound ID optional</Label>
-            <Input inputMode="numeric" value={compoundId} onChange={(e) => setCompoundId(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>session ID optional</Label>
-            <Input inputMode="numeric" value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>experimental mode</Label>
-            <Select value={experimentalMode ? "true" : "false"} onValueChange={(v) => setExperimentalMode(v === "true")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="false">false</SelectItem>
-                <SelectItem value="true">true</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>notes</Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes (no raw data)." />
           </div>
         </div>
+      </ModuleCard>
 
-        <div className="space-y-2">
-          <Label>input summary JSON</Label>
-          <Textarea rows={5} value={inputSummaryJson} onChange={(e) => setInputSummaryJson(e.target.value)} />
+      {/* Step 2 — Run */}
+      <ModuleCard
+        accent={accent}
+        eyebrow={`${moduleLabel} AI · Step 2 · Run`}
+        title="Run approved AI model"
+        icon={Zap}
+        description="Submit the prediction request to the controlled AI service. Returns a draft prediction that requires human review before use."
+        className="min-w-0"
+      >
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => void runPrediction()}
+            disabled={busy}
+            aria-label="Run approved AI model"
+            className={cn(
+              "group relative flex w-full flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
+              "hover:-translate-y-px hover:shadow-md",
+              busy ? "cursor-wait opacity-70" : "hover:shadow-md",
+            )}
+            style={{
+              borderTop: `3px solid ${accentColor}`,
+              borderColor: `${accentColor}66`,
+              backgroundColor: `color-mix(in oklab, ${accentColor} 12%, transparent)`,
+            }}
+          >
+            <div className="flex w-full items-center justify-between">
+              <span
+                className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                style={{ color: accentColor }}
+              >
+                <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                Predict
+              </span>
+              <span
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
+                style={{ color: accentColor }}
+              >
+                Optional
+              </span>
+            </div>
+            <span className="font-mono text-base font-bold leading-tight">
+              {busy ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Running prediction…
+                </span>
+              ) : (
+                "Run approved AI model"
+              )}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              POST /ai/predictions — submits a draft prediction request through the controlled AI service.
+            </span>
+          </button>
+          {err ? <p className="text-sm text-destructive">{err}</p> : null}
+          {ok ? <p className="text-sm text-emerald-700">{ok}</p> : null}
         </div>
-        <div className="space-y-2">
-          <Label>notes</Label>
-          <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes (no raw data)." />
-        </div>
-        {err ? <p className="text-sm text-destructive">{err}</p> : null}
-        {ok ? <p className="text-sm text-emerald-700">{ok}</p> : null}
-        <Button type="button" onClick={() => void runPrediction()} disabled={busy}>
-          {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-          Run approved AI model
-        </Button>
+      </ModuleCard>
 
-        {prediction ? (
-          <div className="space-y-3 rounded-md border p-3">
+      {/* Step 3 — Result + Feedback */}
+      {prediction ? (
+        <ModuleCard
+          accent={accent}
+          eyebrow={`${moduleLabel} AI · Step 3 · Result`}
+          title="Prediction result &amp; reviewer feedback"
+          icon={BarChart3}
+          description="Draft prediction with confidence and OOD flags — review, then submit feedback or escalate low-confidence cases to the Active Learning queue."
+          className="min-w-0"
+        >
+          <div className="space-y-4">
             <EvidenceCard
               title={`Prediction ${predictionId ?? "-"}`}
               module={evidenceModuleFor(moduleKey)}
@@ -367,38 +480,49 @@ export function AiModulePredictionAugmentation({
               review_status={humanReviewRequired ? "human review required" : "requires review"}
             />
 
-            <div className="grid gap-2 md:grid-cols-3">
-              <Select value={feedbackType} onValueChange={setFeedbackType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="accepted">accepted</SelectItem>
-                  <SelectItem value="rejected">rejected</SelectItem>
-                  <SelectItem value="corrected">corrected</SelectItem>
-                  <SelectItem value="uncertain">uncertain</SelectItem>
-                  <SelectItem value="useful">useful</SelectItem>
-                  <SelectItem value="not_useful">not_useful</SelectItem>
-                  <SelectItem value="error_case">error_case</SelectItem>
-                  <SelectItem value="other">other</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input value={feedbackComment} onChange={(e) => setFeedbackComment(e.target.value)} placeholder="Feedback comment" />
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => void submitFeedback()} disabled={feedbackBusy}>
-                  {feedbackBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                  Feedback
-                </Button>
-                <Button type="button" variant="outline" onClick={() => void queueLowConfidenceCase()} disabled={queueBusy}>
-                  {queueBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                  Add to Active Learning Queue
-                </Button>
+            <div
+              className="rounded-md border p-3"
+              style={{ borderColor: `${accentColor}33`, backgroundColor: `color-mix(in oklab, ${accentColor} 5%, transparent)` }}
+            >
+              <p
+                className="mb-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                style={{ color: accentColor }}
+              >
+                Reviewer feedback
+              </p>
+              <div className="grid gap-2 md:grid-cols-3">
+                <Select value={feedbackType} onValueChange={setFeedbackType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="accepted">accepted</SelectItem>
+                    <SelectItem value="rejected">rejected</SelectItem>
+                    <SelectItem value="corrected">corrected</SelectItem>
+                    <SelectItem value="uncertain">uncertain</SelectItem>
+                    <SelectItem value="useful">useful</SelectItem>
+                    <SelectItem value="not_useful">not_useful</SelectItem>
+                    <SelectItem value="error_case">error_case</SelectItem>
+                    <SelectItem value="other">other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input value={feedbackComment} onChange={(e) => setFeedbackComment(e.target.value)} placeholder="Feedback comment" />
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => void submitFeedback()} disabled={feedbackBusy}>
+                    {feedbackBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    Feedback
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => void queueLowConfidenceCase()} disabled={queueBusy}>
+                    {queueBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    Add to Active Learning Queue
+                  </Button>
+                </div>
               </div>
+              {feedbackErr ? <p className="mt-2 text-sm text-destructive">{feedbackErr}</p> : null}
+              {feedbackOk ? <p className="mt-2 text-sm text-emerald-700">{feedbackOk}</p> : null}
+              {queueMsg ? <p className="mt-2 text-sm text-muted-foreground">{queueMsg}</p> : null}
             </div>
-            {feedbackErr ? <p className="text-sm text-destructive">{feedbackErr}</p> : null}
-            {feedbackOk ? <p className="text-sm text-emerald-700">{feedbackOk}</p> : null}
-            {queueMsg ? <p className="text-sm text-muted-foreground">{queueMsg}</p> : null}
           </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        </ModuleCard>
+      ) : null}
+    </div>
   )
 }

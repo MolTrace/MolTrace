@@ -158,7 +158,7 @@ export default function ProjectDetailPage() {
   }, [projectId, project])
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-8">
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/projects" className="gap-1">
@@ -166,6 +166,19 @@ export default function ProjectDetailPage() {
             Projects
           </Link>
         </Button>
+      </div>
+
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-teal)" }}
+        >
+          Project · Detail
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Project workspace</h1>
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          Project metadata, samples, value summary, member access, and connected SpectraCheck / Regulatory / Reaction campaigns.
+        </p>
       </div>
 
       {unavailable && (

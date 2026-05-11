@@ -5,7 +5,7 @@ import { ChevronDown, type LucideIcon } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 
-export type DashboardSectionAccent = "teal" | "cyan" | "violet"
+export type DashboardSectionAccent = "teal" | "cyan" | "violet" | "amber" | "green"
 
 type DashboardSectionProps = {
   title: string
@@ -22,6 +22,8 @@ const ACCENT_VAR: Record<DashboardSectionAccent, string> = {
   teal: "var(--mt-teal)",
   cyan: "var(--mt-cyan)",
   violet: "var(--mt-violet)",
+  amber: "var(--mt-amber)",
+  green: "var(--mt-green)",
 }
 
 export function DashboardSection({

@@ -2183,7 +2183,19 @@ export function RegulatoryDossierWorkspace() {
             <TabsTrigger value="json" className={dossierTabClass}>Developer JSON</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="min-w-0 max-w-full space-y-4">
+          <TabsContent value="overview" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Overview
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Dossier metadata at a glance</h2>
+              <p className="text-sm text-muted-foreground">
+                Title, jurisdiction, intended use, status, last update, and review state — the source of truth for the rest of the workspace.
+              </p>
+            </div>
             {Number.isFinite(dossierId) ? <RegulatoryNotificationsCompactCard dossierId={dossierId} /> : null}
             <ModuleCard
               accent="cyan"
@@ -2406,7 +2418,19 @@ export function RegulatoryDossierWorkspace() {
             />
           </TabsContent>
 
-          <TabsContent value="requirements" className="min-w-0 max-w-full space-y-4">
+          <TabsContent value="requirements" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Requirements
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Requirements & evidence sections</h2>
+              <p className="text-sm text-muted-foreground">
+                Per-section coverage status and shortcuts to evidence, compliance rules, impurity register, solvents, nitrosamine watch, qNMR validation, and AI governance.
+              </p>
+            </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Sections"
@@ -2623,7 +2647,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="evidence" className="min-w-0 max-w-full space-y-4">
+          <TabsContent value="evidence" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Evidence Links
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Linked evidence & artifacts</h2>
+              <p className="text-sm text-muted-foreground">
+                SpectraCheck evidence items, dossier artifacts, and external citations attached to this dossier.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
                 Back to Requirements
@@ -2792,7 +2828,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="compliance-rules" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="compliance-rules" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Compliance Rules
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Active rule sets & coverage</h2>
+              <p className="text-sm text-muted-foreground">
+                Tenant rule sets evaluated against this dossier — open the rule-updates workspace to propose changes.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
                 Back to Requirements
@@ -2832,7 +2880,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="impurity-register" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="impurity-register" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Impurity Register
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Specified & unspecified impurities</h2>
+              <p className="text-sm text-muted-foreground">
+                ICH Q3A/Q3B-aligned register with thresholds, identification status, and qualified justifications.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
                 Back to Requirements
@@ -3095,7 +3155,19 @@ export function RegulatoryDossierWorkspace() {
             />
           </TabsContent>
 
-          <TabsContent value="residual-solvents" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="residual-solvents" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Residual Solvents
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">ICH Q3C residual-solvent watch</h2>
+              <p className="text-sm text-muted-foreground">
+                Class 1 / 2 / 3 solvent levels and PDE compliance against the active rule set.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
                 Back to Requirements
@@ -3373,7 +3445,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="nitrosamine-watch" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="nitrosamine-watch" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Nitrosamine Watch
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Nitrosamine risk assessment</h2>
+              <p className="text-sm text-muted-foreground">
+                FDA / EMA nitrosamine risk-narrative coverage with cited evidence and reviewer signoff state.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
                 Back to Requirements
@@ -3727,7 +3811,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="qnmr-method-validation" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="qnmr-method-validation" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · qNMR Validation
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">qNMR / method validation evidence</h2>
+              <p className="text-sm text-muted-foreground">
+                Method validation parameters, qualified-reference traceability, and reviewer signoff for quantitative NMR.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
                 Back to Requirements
@@ -4182,7 +4278,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="ai-governance" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="ai-governance" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · AI Governance
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">AI / model-governance trail</h2>
+              <p className="text-sm text-muted-foreground">
+                Model versions, prompts, validation evidence, and human-review checkpoints for AI-assisted dossier content.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
                 Back to Requirements
@@ -4508,7 +4616,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="jurisdictional-map" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="jurisdictional-map" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Jurisdictional Map
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Per-region requirement coverage</h2>
+              <p className="text-sm text-muted-foreground">
+                FDA / EMA / PMDA / multi-region requirement matrix with coverage status and missing-evidence callouts.
+              </p>
+            </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Jurisdictions"
@@ -4883,7 +5003,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="change-impact" className="min-w-0 max-w-full space-y-4">
+          <TabsContent value="change-impact" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Change Impact
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Detected regulatory changes affecting this dossier</h2>
+              <p className="text-sm text-muted-foreground">
+                Downstream impact of detected regulatory changes on this dossier's requirements, evidence links, rule sets, and action items.
+              </p>
+            </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Change Impact"
@@ -5058,7 +5190,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="action-items" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="action-items" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Action Items
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer & operational workflow</h2>
+              <p className="text-sm text-muted-foreground">
+                Cited Q&amp;A, risk hot-spots, review checkpoints, and submission-readiness — each routes to the global Action Queue when escalated.
+              </p>
+            </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Action Sections"
@@ -5098,7 +5242,19 @@ export function RegulatoryDossierWorkspace() {
             />
           </TabsContent>
 
-          <TabsContent value="qa" className="min-w-0 max-w-full space-y-4">
+          <TabsContent value="qa" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Cited Q&amp;A
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer Q&amp;A with citations</h2>
+              <p className="text-sm text-muted-foreground">
+                Question / answer pairs that must cite source evidence. Required before promoting to in-review.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
                 Back to Action Items
@@ -5364,7 +5520,19 @@ export function RegulatoryDossierWorkspace() {
             ) : null}
           </TabsContent>
 
-          <TabsContent value="risk" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="risk" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Risk Assessment
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Risk hot-spots & mitigation status</h2>
+              <p className="text-sm text-muted-foreground">
+                Per-requirement risk hints and overall dossier risk level — feeds the High-risk dossier KPI on the landing page.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
                 Back to Action Items
@@ -5493,7 +5661,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="review" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="review" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Review
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer decision &amp; attribution</h2>
+              <p className="text-sm text-muted-foreground">
+                Record an internal review decision (approve / reject / escalate) with reviewer attribution. Not legal advice or external regulatory approval.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
                 Back to Action Items
@@ -5647,7 +5827,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="readiness" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="readiness" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Readiness Report
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Submission readiness snapshot</h2>
+              <p className="text-sm text-muted-foreground">
+                Pre-submission checklist with per-section coverage and reviewer signoff state — share with the regulatory affairs team.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
                 Back to Action Items
@@ -5857,7 +6049,19 @@ export function RegulatoryDossierWorkspace() {
             <CtdModule3BundleCard dossierId={dossierId} />
           </TabsContent>
 
-          <TabsContent value="submission-package" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="submission-package" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Submission Package
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Assemble draft submission artefacts</h2>
+              <p className="text-sm text-muted-foreground">
+                Source-backed artefacts staged for review. Package status is backend-driven — treat as ready only when the status field explicitly says so.
+              </p>
+            </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Submission Package"
@@ -6074,7 +6278,19 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="json" className="min-w-0 max-w-full space-y-3">
+          <TabsContent value="json" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Developer JSON
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Raw payloads for debugging</h2>
+              <p className="text-sm text-muted-foreground">
+                Aggregated dossier payloads in this browser session — use to inspect backend response shape, warnings, and audit fields.
+              </p>
+            </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Developer JSON"
