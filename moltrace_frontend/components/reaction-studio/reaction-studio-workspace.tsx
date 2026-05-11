@@ -231,7 +231,19 @@ export function ReactionStudioWorkspace() {
       </header>
 
       {/* Reaction scheme */}
-      <section aria-labelledby="scheme-heading">
+      <section aria-labelledby="scheme-heading" className="space-y-4">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            Studio · Reaction Scheme
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">Structure drawing &amp; SMARTS canvas</h2>
+          <p className="text-sm text-muted-foreground">
+            Placeholder canvas for the route&apos;s structural representation — wire to a structure editor or ELN link when chemistry services are available.
+          </p>
+        </div>
         <ModuleCard
           accent="violet"
           eyebrow="Studio · Scheme"
@@ -249,7 +261,22 @@ export function ReactionStudioWorkspace() {
         </ModuleCard>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <section className="space-y-4" aria-labelledby="run-data-heading">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            Studio · Run Data
+          </p>
+          <h2 id="run-data-heading" className="font-mono text-xl font-bold tracking-tight">
+            Condition matrix &amp; outcomes
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Factor settings per run paired with measured yield / selectivity / impurity outcomes — review side-by-side to spot trends.
+          </p>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
         {/* Condition matrix */}
         <section aria-labelledby="conditions-heading">
           <ModuleCard
@@ -327,9 +354,25 @@ export function ReactionStudioWorkspace() {
             </div>
           </ModuleCard>
         </section>
-      </div>
+        </div>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <section className="space-y-4" aria-labelledby="connectors-heading">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            Studio · ELN Connectors
+          </p>
+          <h2 id="connectors-heading" className="font-mono text-xl font-bold tracking-tight">
+            ELN import &amp; export bridges
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Round-trip a route&apos;s conditions and outcomes between the studio and your ELN — both directions are demo placeholders until the connector services land.
+          </p>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="connector-import-heading">
           <ModuleCard
             accent="violet"
@@ -547,10 +590,23 @@ export function ReactionStudioWorkspace() {
             </Button>
           </div>
         </ModuleCard>
-      </div>
+        </div>
+      </section>
 
       {/* Response surface placeholder */}
-      <section aria-labelledby="surface-heading">
+      <section aria-labelledby="surface-heading" className="space-y-4">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            Studio · Response Surface
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">Predicted vs observed surface plot</h2>
+          <p className="text-sm text-muted-foreground">
+            Visualize how outcomes vary with the most influential factor pair — useful for spotting non-linear interactions.
+          </p>
+        </div>
         <ModuleCard
           accent="violet"
           eyebrow="Studio · Response Surface"
@@ -575,7 +631,19 @@ export function ReactionStudioWorkspace() {
       </section>
 
       {/* Human approval gate */}
-      <section aria-labelledby="approval-heading">
+      <section aria-labelledby="approval-heading" className="space-y-4">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet)" }}
+          >
+            Studio · Approval Gate
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">Human approval &amp; audit trail</h2>
+          <p className="text-sm text-muted-foreground">
+            Experimental decisions require qualified review. Signatures and audit trails attach here once the workflow API is connected.
+          </p>
+        </div>
         <ModuleCard
           accent="violet"
           eyebrow="Studio · Approval Gate"

@@ -164,9 +164,15 @@ export function KnowledgeReviewWorkspace() {
         </Button>
       </div>
 
-      <div>
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-amber)" }}
+        >
+          MolTrace · Knowledge · Review Queue
+        </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Knowledge review tasks</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="max-w-3xl text-sm text-muted-foreground">
           Workflow queue for extracted records. Status changes require reviewer identity and rationale.
         </p>
       </div>

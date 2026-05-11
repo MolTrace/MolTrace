@@ -342,11 +342,16 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
         </Button>
       </div>
 
-      <div>
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-amber)" }}
+        >
+          MolTrace · Knowledge · {recordKind === "reaction" ? "Reaction" : recordKind === "analytical" ? "Analytical" : "Regulatory"} Records
+        </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">{pageHeading(recordKind)}</h1>
-        <p className="text-sm text-muted-foreground">
-          Review machine-extracted fields before accepting them for downstream use. Extracted values are not validated as
-          correct until review completes.
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          Review machine-extracted fields before accepting them for downstream use. Extracted values are not validated as correct until review completes.
         </p>
       </div>
 

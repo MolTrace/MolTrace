@@ -107,11 +107,19 @@ export default function ProjectsIndexPage() {
   }
 
   return (
-    <div className="min-w-0 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">Manage your analytical projects and collaborations.</p>
+    <div className="min-w-0 space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-teal)" }}
+          >
+            MolTrace · Projects
+          </p>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Projects</h1>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Manage your analytical projects and collaborations. Each project binds spectroscopy sessions, regulatory dossiers, and reaction campaigns under a single shared sample-id namespace.
+          </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>

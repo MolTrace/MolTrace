@@ -297,7 +297,7 @@ export function SystemReleasesWorkspace() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-green)" }}
           >
             MolTrace · System Releases
           </p>

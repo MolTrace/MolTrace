@@ -756,7 +756,19 @@ export function RegulatoryIntelligenceLanding() {
         )}
       </section>
 
-      <section aria-labelledby="create-dossier-heading">
+      <section aria-labelledby="create-dossier-heading" className="space-y-3">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            Regulatory · Create Dossier
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">Spin up a new dossier</h2>
+          <p className="text-sm text-muted-foreground">
+            Bind a project + sample to a jurisdiction; optional links to compounds, projects, or compendia attach when present.
+          </p>
+        </div>
         <ModuleCard
           accent="cyan"
           eyebrow="Regulatory · Create"
@@ -920,6 +932,18 @@ export function RegulatoryIntelligenceLanding() {
       </section>
 
       <section aria-labelledby="dossiers-table-heading" className="space-y-3">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            Regulatory · Dossier Index
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">All dossiers in this org</h2>
+          <p className="text-sm text-muted-foreground">
+            Per-dossier requirement coverage, missing evidence count, and risk hint — open any row to drill into the workspace.
+          </p>
+        </div>
         <ModuleCard
           accent="cyan"
           eyebrow="Regulatory · Dossiers"
@@ -1005,10 +1029,16 @@ export function RegulatoryIntelligenceLanding() {
 
       <section className="space-y-3" aria-labelledby="related-workspaces-heading">
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-cyan)" }}
+            >
+              Regulatory · Related Workspaces
+            </p>
             <h2
               id="related-workspaces-heading"
-              className="font-mono text-lg font-bold tracking-tight"
+              className="font-mono text-xl font-bold tracking-tight"
             >
               Related regulatory workspaces
             </h2>
@@ -1049,6 +1079,18 @@ export function RegulatoryIntelligenceLanding() {
       </section>
 
       <section id="regulatory-source-library" className="space-y-3 scroll-mt-8">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            Regulatory · Source Library
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">Catalog snapshot</h2>
+          <p className="text-sm text-muted-foreground">
+            Quick-look catalog of registered source documents. Open the source library for the full list, search, and uploads.
+          </p>
+        </div>
         <ModuleCard
           accent="cyan"
           eyebrow="Regulatory · Sources"
@@ -1091,7 +1133,18 @@ export function RegulatoryIntelligenceLanding() {
       </section>
 
       <section id="regulatory-review-queue" className="space-y-3 scroll-mt-8">
-        <h2 className="font-mono text-lg font-bold tracking-tight">Regulatory review queue</h2>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            Regulatory · Review Queue
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">Regulatory review queue</h2>
+          <p className="text-sm text-muted-foreground">
+            Dossiers in <code className="rounded bg-muted px-1 font-mono text-xs">in_review</code> status — promote to a reviewer once human sign-off lands.
+          </p>
+        </div>
         {loading ? (
           <EvidenceCard
             title="Regulatory review evidence"

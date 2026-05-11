@@ -204,7 +204,7 @@ export function ValidationCenterWorkspace() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-green)" }}
           >
             MolTrace · Validation Center
           </p>
@@ -226,16 +226,16 @@ export function ValidationCenterWorkspace() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
         <Card
           className="overflow-hidden rounded-xl py-0"
-          style={{ borderTop: "3px solid var(--mt-cyan)" }}
+          style={{ borderTop: "3px solid var(--mt-green)" }}
         >
           <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
             <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Validation projects</CardTitle>
-            <FlaskConical className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
+            <FlaskConical className="h-4 w-4" style={{ color: "var(--mt-green)" }} aria-hidden />
           </CardHeader>
           <CardContent className="pb-5">
             <div
               className="font-mono text-3xl font-bold tabular-nums leading-none"
-              style={{ color: "var(--mt-cyan)" }}
+              style={{ color: "var(--mt-green)" }}
             >
               {summary.validationProjects}
             </div>
@@ -244,16 +244,16 @@ export function ValidationCenterWorkspace() {
 
         <Card
           className="overflow-hidden rounded-xl py-0"
-          style={{ borderTop: "3px solid var(--mt-cyan)" }}
+          style={{ borderTop: "3px solid var(--mt-green)" }}
         >
           <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
             <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Requirements</CardTitle>
-            <ListChecks className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
+            <ListChecks className="h-4 w-4" style={{ color: "var(--mt-green)" }} aria-hidden />
           </CardHeader>
           <CardContent className="pb-5">
             <div
               className="font-mono text-3xl font-bold tabular-nums leading-none"
-              style={{ color: "var(--mt-cyan)" }}
+              style={{ color: "var(--mt-green)" }}
             >
               {summary.requirements}
             </div>
@@ -280,16 +280,16 @@ export function ValidationCenterWorkspace() {
 
         <Card
           className="overflow-hidden rounded-xl py-0"
-          style={{ borderTop: "3px solid var(--mt-cyan)" }}
+          style={{ borderTop: "3px solid var(--mt-green)" }}
         >
           <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
             <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Test cases</CardTitle>
-            <ClipboardCheck className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
+            <ClipboardCheck className="h-4 w-4" style={{ color: "var(--mt-green)" }} aria-hidden />
           </CardHeader>
           <CardContent className="pb-5">
             <div
               className="font-mono text-3xl font-bold tabular-nums leading-none"
-              style={{ color: "var(--mt-cyan)" }}
+              style={{ color: "var(--mt-green)" }}
             >
               {summary.testCases}
             </div>
@@ -316,16 +316,16 @@ export function ValidationCenterWorkspace() {
 
         <Card
           className="overflow-hidden rounded-xl py-0"
-          style={{ borderTop: "3px solid var(--mt-cyan)" }}
+          style={{ borderTop: "3px solid var(--mt-green)" }}
         >
           <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
             <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Controlled records</CardTitle>
-            <FileCheck2 className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
+            <FileCheck2 className="h-4 w-4" style={{ color: "var(--mt-green)" }} aria-hidden />
           </CardHeader>
           <CardContent className="pb-5">
             <div
               className="font-mono text-3xl font-bold tabular-nums leading-none"
-              style={{ color: "var(--mt-cyan)" }}
+              style={{ color: "var(--mt-green)" }}
             >
               {summary.controlledRecords}
             </div>

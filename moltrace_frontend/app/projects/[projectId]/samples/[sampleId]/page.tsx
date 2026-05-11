@@ -101,7 +101,7 @@ export default function ProjectSampleDetailPage() {
   }, [sessionRows])
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-8">
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/projects/${encodeURIComponent(projectId)}`} className="gap-1">
@@ -112,6 +112,19 @@ export default function ProjectSampleDetailPage() {
         <Button variant="ghost" size="sm" asChild>
           <Link href="/projects">All projects</Link>
         </Button>
+      </div>
+
+      <div className="space-y-1">
+        <p
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          style={{ color: "var(--mt-teal)" }}
+        >
+          Project · Sample Detail
+        </p>
+        <h1 className="font-mono text-2xl font-bold tracking-tight">Sample workspace</h1>
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          Sample metadata, batches, evidence sessions, and direct entry points into SpectraCheck for spectroscopic analysis.
+        </p>
       </div>
 
       {unavailable && (

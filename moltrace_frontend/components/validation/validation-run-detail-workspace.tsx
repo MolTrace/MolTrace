@@ -208,7 +208,7 @@ export function ValidationRunDetailWorkspace() {
           </div>
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-green)" }}
           >
             MolTrace · Validation Run
           </p>
@@ -380,7 +380,7 @@ export function ValidationRunDetailWorkspace() {
 
           <Card
             className="overflow-hidden rounded-xl py-0"
-            style={{ borderTop: "3px solid var(--mt-cyan)" }}
+            style={{ borderTop: "3px solid var(--mt-green)" }}
           >
             <Collapsible open={devOpen} onOpenChange={setDevOpen}>
               <CollapsibleTrigger asChild>
@@ -389,7 +389,7 @@ export function ValidationRunDetailWorkspace() {
                   className="flex w-full items-center justify-between px-6 py-4 text-left hover:bg-muted/50"
                 >
                   <span className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" style={{ color: "var(--mt-cyan)" }} aria-hidden />
+                    <FileText className="h-4 w-4" style={{ color: "var(--mt-green)" }} aria-hidden />
                     <span className="font-mono text-base font-bold leading-none tracking-tight">Developer JSON</span>
                   </span>
                   <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", devOpen && "rotate-180")} />

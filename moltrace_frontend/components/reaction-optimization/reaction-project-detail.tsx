@@ -3753,7 +3753,19 @@ export function ReactionProjectDetail() {
           </TabsList>
         </div>
 
-        <TabsContent value="overview" className="mt-4 space-y-4">
+        <TabsContent value="overview" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Overview
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Reaction project at a glance</h2>
+            <p className="text-sm text-muted-foreground">
+              Project metadata, campaign aggregates, and recent activity — the source of truth for the rest of the workspace.
+            </p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card
               className="overflow-hidden rounded-xl py-0"
@@ -3867,6 +3879,18 @@ export function ReactionProjectDetail() {
         </TabsContent>
 
         <TabsContent value="variables" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Variables
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Optimization variable definitions</h2>
+            <p className="text-sm text-muted-foreground">
+              Continuous and categorical variables, their bounds, units, and encoding. Drives the design space and recommendation generation.
+            </p>
+          </div>
           <ModuleCard
             accent="violet"
             eyebrow="Reaction · Variables"
@@ -4000,6 +4024,18 @@ export function ReactionProjectDetail() {
         </TabsContent>
 
         <TabsContent value="experiments" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Experiments
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Experiment matrix &amp; outcomes</h2>
+            <p className="text-sm text-muted-foreground">
+              All experiments in this project — variable values, outcomes, and SpectraCheck-linked analytical results.
+            </p>
+          </div>
           <ModuleCard
             accent="violet"
             eyebrow="Reaction · Experiment Matrix"
@@ -4379,6 +4415,18 @@ export function ReactionProjectDetail() {
         </TabsContent>
 
         <TabsContent value="objective" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Objective
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Optimization objective &amp; weights</h2>
+            <p className="text-sm text-muted-foreground">
+              Single- or multi-objective definition with per-target weights and direction (maximize / minimize).
+            </p>
+          </div>
           <ModuleCard
             accent="violet"
             eyebrow="Reaction · Objective"
@@ -4527,6 +4575,18 @@ export function ReactionProjectDetail() {
         </TabsContent>
 
         <TabsContent value="cost-safety" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Cost &amp; Safety
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Cost profile &amp; safety constraints</h2>
+            <p className="text-sm text-muted-foreground">
+              Per-reagent costs and safety guard-rails — fed into the recommendation generator and Reaction Advisor.
+            </p>
+          </div>
           <ModuleCard
             accent="violet"
             eyebrow="Reaction · Cost"
@@ -4844,7 +4904,19 @@ export function ReactionProjectDetail() {
           </ModuleCard>
         </TabsContent>
 
-        <TabsContent value="optimization" className="mt-4 space-y-4">
+        <TabsContent value="optimization" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Optimization
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Bayesian optimization &amp; benchmark runs</h2>
+            <p className="text-sm text-muted-foreground">
+              Launch optimization cycles with regulatory constraints, compare BO vs LLM advisors, and inspect benchmark history.
+            </p>
+          </div>
           <ReactionRegulatoryConstraintsPanel
             reactionProjectId={reactionProjectId}
             onPayloadChange={setRegulatoryPayloadForOptimization}
@@ -5498,7 +5570,19 @@ export function ReactionProjectDetail() {
           </ModuleCard>
         </TabsContent>
 
-        <TabsContent value="advisor" className="mt-4 space-y-4">
+        <TabsContent value="advisor" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Optimization Advisor
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">LLM-assisted optimization advisor</h2>
+            <p className="text-sm text-muted-foreground">
+              Run the LLM advisor against literature priors and mechanistic hypotheses; inspect rationale and side-by-side BO comparisons.
+            </p>
+          </div>
           <ModuleCard
             accent="violet"
             eyebrow="Advisor · Run"
@@ -6464,7 +6548,19 @@ export function ReactionProjectDetail() {
           </ModuleCard>
         </TabsContent>
 
-        <TabsContent value="recommendations" className="mt-4 space-y-4">
+        <TabsContent value="recommendations" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Recommendations
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer queue &amp; approvals</h2>
+            <p className="text-sm text-muted-foreground">
+              Approve, reject, or convert recommendations to experiments. Chemist sign-off is required before execution.
+            </p>
+          </div>
           <ModuleCard
             accent="violet"
             eyebrow="Recommendations · Reviewer"
@@ -6774,7 +6870,19 @@ export function ReactionProjectDetail() {
           </ModuleCard>
         </TabsContent>
 
-        <TabsContent value="execution" className="mt-4 min-w-0 max-w-full space-y-4">
+        <TabsContent value="execution" className="mt-4 min-w-0 max-w-full space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Execution
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Lab execution batches &amp; outcomes</h2>
+            <p className="text-sm text-muted-foreground">
+              Track approved recommendations through execution batches, mark items running / completed / failed, and confirm outcomes against SpectraCheck-linked analytics. Not autonomous — requires human confirmation.
+            </p>
+          </div>
           <AlertCard
             variant="info"
             title="Human confirmation"
@@ -8587,7 +8695,19 @@ export function ReactionProjectDetail() {
           </ModuleCard>
         </TabsContent>
 
-        <TabsContent value="evidence" className="mt-4 space-y-4">
+        <TabsContent value="evidence" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Evidence Links
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">SpectraCheck-linked analytical evidence</h2>
+            <p className="text-sm text-muted-foreground">
+              Compound &amp; batch linking to SpectraCheck sessions for outcome-extraction provenance — the SpectraCheck ↔ Reaction integration seam.
+            </p>
+          </div>
           <ReactionStudioCompoundLinkingPanel
             loading={loading}
             project={project}
@@ -8679,7 +8799,19 @@ export function ReactionProjectDetail() {
           </ModuleCard>
         </TabsContent>
 
-        <TabsContent value="developer" className="mt-4">
+        <TabsContent value="developer" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet)" }}
+            >
+              Project · Developer JSON
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Raw payloads for debugging</h2>
+            <p className="text-sm text-muted-foreground">
+              Aggregated reaction-project payloads in this browser session — use to inspect backend response shape, audit fields, and warnings.
+            </p>
+          </div>
           <ModuleCard
             accent="violet"
             eyebrow="Reaction · Developer JSON"

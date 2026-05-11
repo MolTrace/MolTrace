@@ -147,9 +147,15 @@ export default function RegulatoryPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-lg font-semibold">REG-2024-0445</h1>
-            <p className="text-sm text-muted-foreground">API-Q4-Compound-A Regulatory Dossier</p>
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-cyan)" }}
+            >
+              MolTrace · Dashboard · Regulatory
+            </p>
+            <h1 className="font-mono text-lg font-bold tracking-tight">REG-2024-0445</h1>
+            <p className="text-sm text-muted-foreground">API-Q4-Compound-A Regulatory Dossier · demo dossier</p>
           </div>
           <div className="flex items-center gap-2">
             <Select defaultValue="us">

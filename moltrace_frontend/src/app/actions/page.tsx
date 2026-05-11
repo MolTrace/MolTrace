@@ -14,10 +14,83 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2 } from "lucide-react"
+import { ExternalLink, FilterX, Loader2 } from "lucide-react"
 import SavedReportsWorkspace from "@/components/reports/saved-reports-workspace"
 import ReviewQueueWorkspace from "@/components/review/review-queue-workspace"
 import { ValidationCenterWorkspace } from "@/components/validation/validation-center-workspace"
+
+// ── Color tokens for severity + status badges ─────────────────────────────
+function severityBadgeStyle(severity: string) {
+  const norm = severity.toLowerCase()
+  if (norm === "critical" || norm === "high") {
+    return {
+      borderColor: "var(--mt-red)",
+      backgroundColor: "color-mix(in oklab, var(--mt-red) 12%, transparent)",
+      color: "var(--mt-red)",
+    } as const
+  }
+  if (norm === "warning") {
+    return {
+      borderColor: "var(--mt-amber)",
+      backgroundColor: "color-mix(in oklab, var(--mt-amber) 12%, transparent)",
+      color: "var(--mt-amber)",
+    } as const
+  }
+  if (norm === "info") {
+    return {
+      borderColor: "var(--mt-cyan)",
+      backgroundColor: "color-mix(in oklab, var(--mt-cyan) 10%, transparent)",
+      color: "var(--mt-cyan)",
+    } as const
+  }
+  return {
+    borderColor: "var(--border)",
+    color: "var(--muted-foreground)",
+  } as const
+}
+
+function statusBadgeStyle(status: string) {
+  const norm = status.toLowerCase()
+  if (norm === "open") {
+    return {
+      borderColor: "var(--mt-cyan)",
+      backgroundColor: "color-mix(in oklab, var(--mt-cyan) 10%, transparent)",
+      color: "var(--mt-cyan)",
+    } as const
+  }
+  if (norm === "in_progress") {
+    return {
+      borderColor: "var(--mt-amber)",
+      backgroundColor: "color-mix(in oklab, var(--mt-amber) 12%, transparent)",
+      color: "var(--mt-amber)",
+    } as const
+  }
+  if (norm === "resolved") {
+    return {
+      borderColor: "var(--mt-green)",
+      backgroundColor: "color-mix(in oklab, var(--mt-green) 12%, transparent)",
+      color: "var(--mt-green)",
+    } as const
+  }
+  if (norm === "blocked") {
+    return {
+      borderColor: "var(--mt-red)",
+      backgroundColor: "color-mix(in oklab, var(--mt-red) 10%, transparent)",
+      color: "var(--mt-red)",
+    } as const
+  }
+  if (norm === "dismissed") {
+    return {
+      borderColor: "var(--mt-slate)",
+      backgroundColor: "color-mix(in oklab, var(--mt-slate) 10%, transparent)",
+      color: "var(--mt-slate)",
+    } as const
+  }
+  return {
+    borderColor: "var(--border)",
+    color: "var(--muted-foreground)",
+  } as const
+}
 
 const PROGRAMS = [
   { key: "spectracheck", label: "SpectraCheck" },
@@ -310,6 +383,42 @@ function CrossModuleActionQueueWorkspace() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {(() => {
+            const filtersActive =
+              fSource !== "__all__" ||
+              fTarget !== "__all__" ||
+              fSeverity !== "__all__" ||
+              fStatus !== "__all__" ||
+              fActionType !== "__all__"
+            return (
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <p
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                  style={{ color: "var(--mt-cyan)" }}
+                >
+                  Action Queue · Filters
+                </p>
+                {filtersActive ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-[11px]"
+                    onClick={() => {
+                      setFSource("__all__")
+                      setFTarget("__all__")
+                      setFSeverity("__all__")
+                      setFStatus("__all__")
+                      setFActionType("__all__")
+                    }}
+                  >
+                    <FilterX className="size-3" aria-hidden />
+                    Reset filters
+                  </Button>
+                ) : null}
+              </div>
+            )
+          })()}
           <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <div className="space-y-1.5">
               <Label className="text-xs">source program</Label>
@@ -381,9 +490,28 @@ function CrossModuleActionQueueWorkspace() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={10} className="text-muted-foreground">Loading…</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={10} className="py-6 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="size-4 animate-spin" aria-hidden />
+                        Loading cross-module action items…
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={10} className="text-muted-foreground">No action items.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={10} className="py-8">
+                      <div className="flex flex-col items-center justify-center gap-2 text-center">
+                        <FilterX className="size-5 text-muted-foreground/60" aria-hidden />
+                        <p className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                          No matches
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          No cross-module action items match the current filters. Try resetting filters or create a new item above.
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   filtered.map((row, i) => {
                     const id = readNum(row.id)
@@ -401,7 +529,21 @@ function CrossModuleActionQueueWorkspace() {
                         <TableCell>{programLabel(tgtProgram)}</TableCell>
                         <TableCell className="font-mono text-xs">{readStr(row.action_type) || "—"}</TableCell>
                         <TableCell className="max-w-[280px]">{readStr(row.title) || "—"}</TableCell>
-                        <TableCell><Badge variant="outline">{readStr(row.severity) || "—"}</Badge></TableCell>
+                        <TableCell>
+                          {(() => {
+                            const sev = readStr(row.severity)
+                            if (!sev) return <span className="text-muted-foreground">—</span>
+                            return (
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[10px] font-bold uppercase tracking-wide"
+                                style={severityBadgeStyle(sev)}
+                              >
+                                {sev}
+                              </Badge>
+                            )
+                          })()}
+                        </TableCell>
                         <TableCell>
                           {id == null ? (
                             <span>{readStr(row.status) || "—"}</span>
@@ -420,8 +562,22 @@ function CrossModuleActionQueueWorkspace() {
                           {srcType || "—"}:{srcId ?? "—"} → {tgtType || "—"}:{tgtId ?? "—"}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{formatDate(row.created_at)}</TableCell>
-                        <TableCell><Button variant="outline" size="sm" asChild><Link href={srcHref}>Open source</Link></Button></TableCell>
-                        <TableCell><Button variant="outline" size="sm" asChild><Link href={tgtHref}>Open target</Link></Button></TableCell>
+                        <TableCell>
+                          <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-[11px]" aria-label="Open source" asChild>
+                            <Link href={srcHref}>
+                              <ExternalLink className="size-3" aria-hidden />
+                              Open source
+                            </Link>
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-[11px]" aria-label="Open target" asChild>
+                            <Link href={tgtHref}>
+                              <ExternalLink className="size-3" aria-hidden />
+                              Open target
+                            </Link>
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     )
                   })
@@ -440,6 +596,18 @@ export default function CrossModuleActionQueuePage() {
     <AppShell>
       <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading action queue…</p>}>
         <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-cyan)" }}
+            >
+              MolTrace · Cross-Module Action Queue
+            </p>
+            <h1 className="font-mono text-2xl font-bold tracking-tight">Action Queue</h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Cross-module action items, saved reports, human-review queue, and validation-center status — all in one place. Coordinate work across SpectraCheck, Regulatory Hub, and Reaction Optimization.
+            </p>
+          </div>
           <Tabs defaultValue="action_queue" className="space-y-6">
             <TabsList>
               <TabsTrigger value="action_queue">Action Queue</TabsTrigger>

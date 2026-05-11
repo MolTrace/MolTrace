@@ -42,7 +42,88 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { CheckCircle2, Clock, FilterX, Loader2, Play, UserPlus, X } from "lucide-react"
+
+// ── Color tokens for severity + status badges ─────────────────────────────
+function severityBadgeStyle(severity: string | null | undefined) {
+  const norm = (severity ?? "").toLowerCase()
+  if (norm === "critical" || norm === "high") {
+    return {
+      borderColor: "var(--mt-red)",
+      backgroundColor: "color-mix(in oklab, var(--mt-red) 12%, transparent)",
+      color: "var(--mt-red)",
+    } as const
+  }
+  if (norm === "medium") {
+    return {
+      borderColor: "var(--mt-amber)",
+      backgroundColor: "color-mix(in oklab, var(--mt-amber) 12%, transparent)",
+      color: "var(--mt-amber)",
+    } as const
+  }
+  if (norm === "low") {
+    return {
+      borderColor: "var(--mt-slate)",
+      backgroundColor: "color-mix(in oklab, var(--mt-slate) 10%, transparent)",
+      color: "var(--mt-slate)",
+    } as const
+  }
+  if (norm === "info") {
+    return {
+      borderColor: "var(--mt-cyan)",
+      backgroundColor: "color-mix(in oklab, var(--mt-cyan) 10%, transparent)",
+      color: "var(--mt-cyan)",
+    } as const
+  }
+  return {
+    borderColor: "var(--border)",
+    color: "var(--muted-foreground)",
+  } as const
+}
+
+function statusBadgeStyle(status: string | null | undefined) {
+  const norm = (status ?? "").toLowerCase()
+  if (norm === "open") {
+    return {
+      borderColor: "var(--mt-cyan)",
+      backgroundColor: "color-mix(in oklab, var(--mt-cyan) 10%, transparent)",
+      color: "var(--mt-cyan)",
+    } as const
+  }
+  if (norm === "in_progress") {
+    return {
+      borderColor: "var(--mt-amber)",
+      backgroundColor: "color-mix(in oklab, var(--mt-amber) 12%, transparent)",
+      color: "var(--mt-amber)",
+    } as const
+  }
+  if (norm === "resolved") {
+    return {
+      borderColor: "var(--mt-green)",
+      backgroundColor: "color-mix(in oklab, var(--mt-green) 12%, transparent)",
+      color: "var(--mt-green)",
+    } as const
+  }
+  if (norm === "deferred") {
+    return {
+      borderColor: "var(--mt-violet)",
+      backgroundColor: "color-mix(in oklab, var(--mt-violet) 10%, transparent)",
+      color: "var(--mt-violet)",
+    } as const
+  }
+  if (norm === "dismissed") {
+    return {
+      borderColor: "var(--mt-slate)",
+      backgroundColor: "color-mix(in oklab, var(--mt-slate) 10%, transparent)",
+      color: "var(--mt-slate)",
+    } as const
+  }
+  return {
+    borderColor: "var(--border)",
+    color: "var(--muted-foreground)",
+  } as const
+}
 
 export const ACTION_QUEUE_TOOLTIP =
   "Regulatory action items are review tasks triggered by thresholds, missing evidence, nitrosamine risk, validation gaps, or jurisdictional differences."
@@ -270,12 +351,18 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
   return (
     <div className={compact ? "space-y-3" : "space-y-6"}>
       {!compact ? (
-        <Alert>
-          <AlertTitle className="text-sm">Workflow notice</AlertTitle>
-          <AlertDescription className="text-sm text-muted-foreground">
-            Action items are operational tasks from compliance workflows. They are not legal advice.
-          </AlertDescription>
-        </Alert>
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-cyan)" }}
+          >
+            Regulatory · Action Queue
+          </p>
+          <h2 className="font-mono text-xl font-bold tracking-tight">Action items</h2>
+          <p className="text-sm text-muted-foreground">
+            Operational tasks from compliance workflows — not legal advice. Filter by severity, status, type, owner, dossier, or change.
+          </p>
+        </div>
       ) : null}
 
       {err ? (
@@ -290,6 +377,45 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
             New action item
           </Button>
         </div>
+      ) : null}
+
+      {!compact ? (
+        (() => {
+          const filtersActive =
+            filterSeverity !== "__all__" ||
+            filterStatus !== "__all__" ||
+            filterActionType !== "__all__" ||
+            filterDossierId !== "__all__" ||
+            filterAssigned.trim() !== ""
+          return (
+            <div className="flex flex-wrap items-end justify-between gap-2 pt-2">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Action Queue · Filters
+              </p>
+              {filtersActive ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-[11px]"
+                  onClick={() => {
+                    setFilterSeverity("__all__")
+                    setFilterStatus("__all__")
+                    setFilterActionType("__all__")
+                    setFilterDossierId("__all__")
+                    setFilterAssigned("")
+                  }}
+                >
+                  <FilterX className="size-3" aria-hidden />
+                  Reset filters
+                </Button>
+              ) : null}
+            </div>
+          )
+        })()
       ) : null}
 
       <div
@@ -408,15 +534,25 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-sm text-muted-foreground">
-                  <Loader2 className="mr-2 inline size-4 animate-spin" aria-hidden />
-                  Loading…
+                <TableCell colSpan={12} className="py-6 text-sm text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    Loading action items…
+                  </div>
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-sm text-muted-foreground">
-                  No action items match the current filters.
+                <TableCell colSpan={12} className="py-8">
+                  <div className="flex flex-col items-center justify-center gap-2 text-center">
+                    <FilterX className="size-5 text-muted-foreground/60" aria-hidden />
+                    <p className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                      No matches
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      No action items match the current filters. Try resetting filters or check back after a surveillance run.
+                    </p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -437,8 +573,36 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
                     <TableCell className="font-mono text-[11px]">
                       {readRecordString(row, "action_type") ?? "—"}
                     </TableCell>
-                    <TableCell className="text-xs">{readRecordString(row, "severity") ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{readRecordString(row, "status") ?? "—"}</TableCell>
+                    <TableCell className="text-xs">
+                      {(() => {
+                        const sev = readRecordString(row, "severity")
+                        if (!sev) return <span className="text-muted-foreground">—</span>
+                        return (
+                          <Badge
+                            variant="outline"
+                            className="font-mono text-[10px] font-bold uppercase tracking-wide"
+                            style={severityBadgeStyle(sev)}
+                          >
+                            {sev}
+                          </Badge>
+                        )
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {(() => {
+                        const st = readRecordString(row, "status")
+                        if (!st) return <span className="text-muted-foreground">—</span>
+                        return (
+                          <Badge
+                            variant="outline"
+                            className="font-mono text-[10px] font-bold uppercase tracking-wide"
+                            style={statusBadgeStyle(st)}
+                          >
+                            {st.replace(/_/g, " ")}
+                          </Badge>
+                        )
+                      })()}
+                    </TableCell>
                     <TableCell className="text-xs">
                       {did != null ? (
                         <Link
@@ -468,52 +632,70 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
                       {formatIsoWhenPresent(readRecordString(row, "updated_at"))}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {busy ? (
+                          <Loader2 className="mr-1 size-3 animate-spin text-muted-foreground" aria-hidden />
+                        ) : null}
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-7 px-2 text-[11px]"
+                          className="h-7 gap-1 px-2 text-[11px]"
+                          aria-label="In progress"
+                          title="Mark as in progress"
                           disabled={busy}
                           onClick={() => void patchStatus(id, "in_progress", row)}
                         >
+                          <Play className="size-3" aria-hidden />
                           In progress
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-7 px-2 text-[11px]"
+                          className="h-7 gap-1 px-2 text-[11px]"
+                          aria-label="Resolve"
+                          title="Mark as resolved"
                           disabled={busy}
                           onClick={() => void patchStatus(id, "resolved", row)}
+                          style={{ borderColor: "color-mix(in oklab, var(--mt-green) 40%, var(--border))" }}
                         >
+                          <CheckCircle2 className="size-3" style={{ color: "var(--mt-green)" }} aria-hidden />
                           Resolve
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-7 px-2 text-[11px]"
+                          className="h-7 gap-1 px-2 text-[11px]"
+                          aria-label="Dismiss"
+                          title="Dismiss this action"
                           disabled={busy}
                           onClick={() => void patchStatus(id, "dismissed", row)}
                         >
+                          <X className="size-3" aria-hidden />
                           Dismiss
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-7 px-2 text-[11px]"
+                          className="h-7 gap-1 px-2 text-[11px]"
+                          aria-label="Defer"
+                          title="Defer to later"
                           disabled={busy}
                           onClick={() => void patchStatus(id, "deferred", row)}
                         >
+                          <Clock className="size-3" aria-hidden />
                           Defer
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-7 px-2 text-[11px]"
+                          className="h-7 gap-1 px-2 text-[11px]"
+                          aria-label="Assign"
+                          title="Assign owner"
                           disabled={busy}
                           onClick={() => {
                             setAssignTargetId(id)
@@ -521,6 +703,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
                             setAssignOpen(true)
                           }}
                         >
+                          <UserPlus className="size-3" aria-hidden />
                           Assign
                         </Button>
                       </div>

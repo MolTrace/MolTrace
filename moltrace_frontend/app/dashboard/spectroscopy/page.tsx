@@ -30,9 +30,15 @@ export default function SpectroscopyPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-lg font-semibold">NMR-2024-0847</h1>
-            <p className="text-sm text-muted-foreground">API-Q4-BATCH-12</p>
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-teal)" }}
+            >
+              MolTrace · Dashboard · Spectroscopy
+            </p>
+            <h1 className="font-mono text-lg font-bold tracking-tight">NMR-2024-0847</h1>
+            <p className="text-sm text-muted-foreground">API-Q4-BATCH-12 · demo session</p>
           </div>
           <div className="flex gap-2">
             <Badge variant="outline">1H NMR</Badge>
