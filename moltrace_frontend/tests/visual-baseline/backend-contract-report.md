@@ -1,11 +1,11 @@
-# MolTrace frontend/backend contract audit — 2026-05-10T14:01:46.121Z
+# MolTrace frontend/backend contract audit — 2026-05-12T02:49:40.022Z
 
 - OpenAPI URL: http://localhost:8000/openapi.json
 - Scanned source files: 504
 - Visual baseline routes: 71
 - Static app routes: 81
 - Backend OpenAPI operations: 781
-- Frontend backend API calls: 669
+- Frontend backend API calls: 673
 - Missing backend operations: 0
 - Unresolved static path expressions: 18
 
