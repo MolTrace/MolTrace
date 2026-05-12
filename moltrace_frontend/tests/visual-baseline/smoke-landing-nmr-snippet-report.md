@@ -1,4 +1,4 @@
-# Landing Spectroscopy explore carousel smoke — 2026-05-12T01:46:17.197Z
+# Landing Spectroscopy explore carousel smoke — 2026-05-12T12:54:18.804Z
 
 - Pass: 69
 - Fail: 0
@@ -14,7 +14,7 @@
 | Eyebrow 'Spectroscopy Intelligence · Live preview' rendered | ✓ |  |
 | Short framing 'Three spectra, one continuous picture of your molecule.' | ✓ |  |
 | Legacy long framing sentence is GONE (regression guard) | ✓ |  |
-| Hint row advertises auto-advance behavior | ✓ |  |
+| Auto-advance hint row REMOVED (no copy advertising the cadence) | ✓ |  |
 | Carousel container rendered (role=region + aria-roledescription) | ✓ |  |
 | Auto-play DISABLED by ?autoplay=0 (data-autoplay-state=stopped) | ✓ |  |
 | Slide 01: 'Resolved ¹H NMR' title rendered | ✓ |  |

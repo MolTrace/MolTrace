@@ -162,11 +162,14 @@ async function main() {
   })
   record("Legacy long framing sentence is GONE (regression guard)", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
-  // Hint row mentions auto-advance
-  r = await safe(() =>
-    page.locator("text=/Auto-advancing every 5 seconds/i").first().waitFor({ timeout: 10_000 }),
-  )
-  record("Hint row advertises auto-advance behavior", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
+  // The auto-advance "hint row" was removed per UX decision — the carousel
+  // still auto-advances (Phase B verifies that), but we no longer advertise
+  // the cadence in copy. This is a regression guard.
+  r = await safe(async () => {
+    const count = await page.locator("text=/Auto-advancing every 5 seconds/i").count()
+    if (count > 0) throw new Error(`auto-advance hint row should be removed, count=${count}`)
+  })
+  record("Auto-advance hint row REMOVED (no copy advertising the cadence)", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
   // ── 4. Carousel container with autoplay disabled by ?autoplay=0 ──
   const carouselWrapperSel = '[data-autoplay-state]'
