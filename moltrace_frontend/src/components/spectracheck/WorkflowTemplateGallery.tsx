@@ -260,10 +260,33 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
         <div className="grid gap-4 md:grid-cols-2">
           {load.templates.map((t) => {
             const selected = selectedId === t.id
+            // Hoisted so card-level click, keyboard, and the explicit "Select
+            // workflow" button all funnel through the same selection path.
+            const select = () => {
+              if (onTemplateSelect) onTemplateSelect(t)
+              else setInternalSelectedId(t.id)
+            }
             return (
               <Card
                 key={t.id}
-                className={`min-w-0 flex flex-col border-muted shadow-sm ${selected ? "ring-2 ring-primary/30" : ""}`}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected}
+                aria-label={`Select workflow template: ${t.name}`}
+                onClick={select}
+                onKeyDown={(e) => {
+                  // Enter / Space activate the card-as-button. Stop here so
+                  // the event doesn't double-fire if focus is on a nested
+                  // button — the inner button's own handler already wins
+                  // when focused directly.
+                  if (e.key === "Enter" || e.key === " ") {
+                    if (e.target === e.currentTarget) {
+                      e.preventDefault()
+                      select()
+                    }
+                  }
+                }}
+                className={`group min-w-0 flex flex-col border-muted shadow-sm cursor-pointer transition-colors hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selected ? "ring-2 ring-primary/30" : ""}`}
               >
                 <CardHeader className="pb-2">
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -295,9 +318,11 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
                     size="sm"
                     variant={selected ? "default" : "secondary"}
                     className="w-full sm:w-auto"
-                    onClick={() => {
-                      if (onTemplateSelect) onTemplateSelect(t)
-                      else setInternalSelectedId(t.id)
+                    onClick={(e) => {
+                      // stopPropagation so the card's onClick doesn't run a
+                      // second select() on top of this one.
+                      e.stopPropagation()
+                      select()
                     }}
                   >
                     Select workflow
@@ -307,7 +332,12 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
                     size="sm"
                     variant="outline"
                     className="w-full sm:w-auto"
-                    onClick={() => setStepsFor(t)}
+                    onClick={(e) => {
+                      // CRITICAL: stopPropagation so opening the steps dialog
+                      // does NOT also select the template.
+                      e.stopPropagation()
+                      setStepsFor(t)
+                    }}
                   >
                     View steps
                   </Button>

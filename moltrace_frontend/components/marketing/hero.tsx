@@ -19,7 +19,7 @@ export function Hero() {
             The Unified Intelligence Platform for Chemical and Pharmaceutical R&D.
           </h1>
           <p className="hero-copy-wrap mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl">
-            Accelerate discovery from raw spectral data to compliant, optimized reactions with MolTrace&apos;s hybrid AI
+            Accelerate discovery from raw spectral data to compliant, optimized reactions with MolTrace&apos;s hybrid native AI
             architecture.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">

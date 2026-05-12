@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-05-10T14:01:46.121Z",
+  "capturedAt": "2026-05-12T02:49:40.022Z",
   "openapiUrl": "http://localhost:8000/openapi.json",
   "scannedFiles": 504,
   "visualBaselineRoutes": 71,
@@ -17,7 +17,7 @@
     "/offline"
   ],
   "backendOperations": 781,
-  "frontendApiCalls": 669,
+  "frontendApiCalls": 673,
   "missingCount": 0,
   "unresolvedCount": 18,
   "missing": [],
