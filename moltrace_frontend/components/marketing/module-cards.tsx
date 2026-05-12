@@ -556,10 +556,7 @@ function SpectrumCarousel({ slides }: { slides: SlideDef[] }) {
       if (w <= 0) return
       const cur = Math.round(el.scrollLeft / w)
       const next = (cur + 1) % slides.length
-      const left = next * w
-      el.scrollTo({ left, behavior: "auto" })
-      el.scrollLeft = left
-      setActiveIdx(next)
+      el.scrollTo({ left: next * w, behavior: "smooth" })
     }, AUTOPLAY_INTERVAL_MS)
     return () => window.clearInterval(id)
   }, [autoplayActive, slides.length])
