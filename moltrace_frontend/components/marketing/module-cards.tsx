@@ -818,10 +818,6 @@ function SpectroscopyExploreInterface({ onClose }: { onClose: () => void }) {
       <div className="mt-6">
         <SpectrumCarousel slides={slides} />
       </div>
-
-      <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-        Auto-advancing every 5 seconds · drag, scroll, or use ← → to take over
-      </p>
     </div>
   )
 }
@@ -1488,6 +1484,15 @@ export function ModuleCards() {
         ) : exploreOpen && active === 2 ? (
           <ReactionExploreInterface onClose={() => setExploreOpen(false)} />
         ) : (
+          // The "Explore Module" CTA renders in two places (only one is
+          // visible at a time):
+          //   • Desktop (lg+): inside the info column under the writeup, so
+          //     the left column reads title → writeup → button while the
+          //     right column shows Capabilities side-by-side.
+          //   • Mobile (< lg): as a 3rd grid item, so the stacked order is
+          //     title + writeup → Capabilities → button. Putting the button
+          //     after Capabilities gives the user a chance to scan what the
+          //     module does before deciding to explore.
           <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
             {/* Left: info */}
             <div>
@@ -1502,12 +1507,11 @@ export function ModuleCards() {
               <p className="mt-4 text-base leading-relaxed text-muted-foreground">
                 {m.desc}
               </p>
-              {/* All three modules now use the in-place explore overlay — no
-                  more href="#demo" anchor for the non-Spectroscopy panels. */}
+              {/* Desktop-only Explore Module button (hidden on mobile) */}
               <button
                 type="button"
                 onClick={() => setExploreOpen(true)}
-                className={`mt-8 inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-85 ${m.color.btn}`}
+                className={`mt-8 hidden items-center gap-2 rounded-md px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-85 lg:inline-flex ${m.color.btn}`}
                 aria-expanded={exploreOpen}
               >
                 Explore Module
@@ -1529,6 +1533,19 @@ export function ModuleCards() {
                 ))}
               </ul>
             </div>
+
+            {/* Mobile-only Explore Module button: rendered as a 3rd grid item
+                so on stacked mobile it appears AFTER the Capabilities card.
+                Hidden at lg+ where the desktop button takes over. */}
+            <button
+              type="button"
+              onClick={() => setExploreOpen(true)}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-md px-5 py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-85 lg:hidden ${m.color.btn}`}
+              aria-expanded={exploreOpen}
+            >
+              Explore Module
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
       </div>
