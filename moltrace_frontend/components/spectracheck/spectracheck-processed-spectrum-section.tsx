@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectracheck/spectracheck-workspace-session-context"
+import { useProcessedTabState } from "@/components/spectracheck/spectracheck-tab-state-context"
 import { apiFetch } from "@/lib/api/client"
 import { trackFileUploaded } from "@/src/lib/analytics/analytics-client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
@@ -69,27 +70,84 @@ export function SpectraCheckProcessedSpectrumSection({
 }: Props) {
   const ws = useOptionalSpectraCheckWorkspaceSession()
   const analysisJob = useAnalysisJob()
-  const [sessionFileIdChoice, setSessionFileIdChoice] = useState("")
-  const [jobActionError, setJobActionError] = useState("")
+  const { state, update } = useProcessedTabState()
+  const {
+    sessionFileIdChoice,
+    jobActionError,
+    nucleus,
+    spectrometerMhz,
+    nmrTextOptional,
+    candidatesOptional,
+    previewResult,
+    analyzeResult,
+    previewError,
+    analyzeError,
+    previewLoading,
+    analyzeLoading,
+    selectedFile,
+    selectedFileName,
+    advancedOpen,
+  } = state
+
+  // Setter shims — keep the rest of the file unchanged while state lives in
+  // workspace-level context (survives tab unmount).
+  const setSessionFileIdChoice = useCallback(
+    (v: string) => update({ sessionFileIdChoice: v }),
+    [update],
+  )
+  const setJobActionError = useCallback((v: string) => update({ jobActionError: v }), [update])
+  const setNucleus = useCallback((v: "1H" | "13C") => update({ nucleus: v }), [update])
+  const setSpectrometerMhz = useCallback(
+    (v: string) => update({ spectrometerMhz: v }),
+    [update],
+  )
+  const setNmrTextOptional = useCallback(
+    (v: string) => update({ nmrTextOptional: v }),
+    [update],
+  )
+  const setCandidatesOptional = useCallback(
+    (v: string) => update({ candidatesOptional: v }),
+    [update],
+  )
+  const setPreviewResult = useCallback((v: unknown) => update({ previewResult: v }), [update])
+  const setAnalyzeResult = useCallback((v: unknown) => update({ analyzeResult: v }), [update])
+  const setPreviewError = useCallback((v: string) => update({ previewError: v }), [update])
+  const setAnalyzeError = useCallback((v: string) => update({ analyzeError: v }), [update])
+  const setPreviewLoading = useCallback(
+    (v: boolean) => update({ previewLoading: v }),
+    [update],
+  )
+  const setAnalyzeLoading = useCallback(
+    (v: boolean) => update({ analyzeLoading: v }),
+    [update],
+  )
+  const setSelectedFile = useCallback(
+    (v: File | null) => update({ selectedFile: v }),
+    [update],
+  )
+  const setSelectedFileName = useCallback(
+    (v: string | null) => update({ selectedFileName: v }),
+    [update],
+  )
+  const setAdvancedOpen = useCallback((v: boolean) => update({ advancedOpen: v }), [update])
 
   const fileRef = useRef<HTMLInputElement>(null)
-  const [nucleus, setNucleus] = useState<"1H" | "13C">("1H")
-  const [spectrometerMhz, setSpectrometerMhz] = useState("400")
-  const [nmrTextOptional, setNmrTextOptional] = useState("")
-  const [candidatesOptional, setCandidatesOptional] = useState("")
-
-  const [previewResult, setPreviewResult] = useState<unknown>(null)
-  const [analyzeResult, setAnalyzeResult] = useState<unknown>(null)
-  const [previewError, setPreviewError] = useState("")
-  const [analyzeError, setAnalyzeError] = useState("")
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [analyzeLoading, setAnalyzeLoading] = useState(false)
-
-  // Drop-zone UI state — file is mirrored into fileRef.files via DataTransfer.
   const [dragOver, setDragOver] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  // Re-attach persisted File to the input on remount so existing
+  // fileRef.current?.files?.[0] consumers keep working after a tab switch.
+  useEffect(() => {
+    if (!selectedFile) return
+    if (!fileRef.current || typeof DataTransfer === "undefined") return
+    if (fileRef.current.files && fileRef.current.files[0] === selectedFile) return
+    try {
+      const dt = new DataTransfer()
+      dt.items.add(selectedFile)
+      fileRef.current.files = dt.files
+    } catch {
+      // Test environments may forbid assigning FileList.
+    }
+  }, [selectedFile])
 
   function attachFile(file: File) {
     setSelectedFile(file)
@@ -261,13 +319,15 @@ export function SpectraCheckProcessedSpectrumSection({
   }
 
   function clearAll() {
-    setPreviewResult(null)
-    setAnalyzeResult(null)
-    setPreviewError("")
-    setAnalyzeError("")
+    update({
+      previewResult: null,
+      analyzeResult: null,
+      previewError: "",
+      analyzeError: "",
+      selectedFile: null,
+      selectedFileName: null,
+    })
     if (fileRef.current) fileRef.current.value = ""
-    setSelectedFile(null)
-    setSelectedFileName(null)
   }
 
   const displayPayload = analyzeResult ?? previewResult

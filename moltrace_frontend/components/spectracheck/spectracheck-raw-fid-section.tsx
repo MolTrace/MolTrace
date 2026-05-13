@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectracheck/spectracheck-workspace-session-context"
+import { useRawFidTabState } from "@/components/spectracheck/spectracheck-tab-state-context"
 import { apiFetch } from "@/lib/api/client"
 import { trackFileUploaded } from "@/src/lib/analytics/analytics-client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
@@ -64,27 +65,73 @@ const PRESETS = [
 
 export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent, registerDev }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [nucleus, setNucleus] = useState<"1H" | "13C">("1H")
-  const [vendor, setVendor] = useState("auto")
-  const [preset, setPreset] = useState<(typeof PRESETS)[number]["value"]>("safe_automatic")
+  const { state, update } = useRawFidTabState()
+  const {
+    nucleus,
+    vendor,
+    preset,
+    previewResult,
+    processResult,
+    previewError,
+    processError,
+    previewLoading,
+    processLoading,
+    previewSpectrum,
+    previewSpectrumLoading,
+    previewSpectrumError,
+    sessionRawFileIdChoice,
+    jobActionError,
+    selectedFile,
+    selectedFileName,
+    advancedOpen,
+  } = state
 
-  const [previewResult, setPreviewResult] = useState<unknown>(null)
-  const [processResult, setProcessResult] = useState<unknown>(null)
-  const [previewError, setPreviewError] = useState("")
-  const [processError, setProcessError] = useState("")
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [processLoading, setProcessLoading] = useState(false)
+  // Setter shims keep the rest of the JSX/handler code untouched while the
+  // underlying state lives in workspace-level context (survives tab unmount).
+  const setNucleus = useCallback((v: "1H" | "13C") => update({ nucleus: v }), [update])
+  const setVendor = useCallback((v: string) => update({ vendor: v as typeof state.vendor }), [update, state.vendor])
+  const setPreset = useCallback(
+    (v: (typeof PRESETS)[number]["value"]) => update({ preset: v }),
+    [update],
+  )
+  const setPreviewResult = useCallback((v: unknown) => update({ previewResult: v }), [update])
+  const setProcessResult = useCallback((v: unknown) => update({ processResult: v }), [update])
+  const setPreviewError = useCallback((v: string) => update({ previewError: v }), [update])
+  const setProcessError = useCallback((v: string) => update({ processError: v }), [update])
+  const setPreviewLoading = useCallback((v: boolean) => update({ previewLoading: v }), [update])
+  const setProcessLoading = useCallback((v: boolean) => update({ processLoading: v }), [update])
+  const setSessionRawFileIdChoice = useCallback(
+    (v: string) => update({ sessionRawFileIdChoice: v }),
+    [update],
+  )
+  const setJobActionError = useCallback((v: string) => update({ jobActionError: v }), [update])
+  const setSelectedFile = useCallback((v: File | null) => update({ selectedFile: v }), [update])
+  const setSelectedFileName = useCallback(
+    (v: string | null) => update({ selectedFileName: v }),
+    [update],
+  )
+  const setAdvancedOpen = useCallback((v: boolean) => update({ advancedOpen: v }), [update])
 
   const ws = useOptionalSpectraCheckWorkspaceSession()
   const analysisJob = useAnalysisJob()
-  const [sessionRawFileIdChoice, setSessionRawFileIdChoice] = useState("")
-  const [jobActionError, setJobActionError] = useState("")
 
-  // Drop-zone UI state — file mirrored into fileRef.files via DataTransfer.
+  // dragOver is purely ephemeral visual state — fine to reset on remount.
   const [dragOver, setDragOver] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  // Re-attach the persisted File to the (possibly remounted) <input> via DataTransfer
+  // so existing fileRef.current?.files?.[0] callsites continue to work after tab switches.
+  useEffect(() => {
+    if (!selectedFile) return
+    if (!fileRef.current || typeof DataTransfer === "undefined") return
+    if (fileRef.current.files && fileRef.current.files[0] === selectedFile) return
+    try {
+      const dt = new DataTransfer()
+      dt.items.add(selectedFile)
+      fileRef.current.files = dt.files
+    } catch {
+      // Test environments may forbid assigning FileList.
+    }
+  }, [selectedFile])
 
   function attachFile(file: File) {
     setSelectedFile(file)
@@ -214,6 +261,50 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     return fd
   }
 
+  async function runPreviewSpectrum(file: File) {
+    // Quick auto-FT so the user sees an actual spectrum alongside metadata —
+    // mirrors the processed-1H/13C "preview shows spectrum" UX. The user can
+    // still refine with the full "Process FID" action below.
+    update({ previewSpectrumLoading: true, previewSpectrumError: "", previewSpectrum: null })
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      fd.append("sample_id", sampleId)
+      fd.append("solvent", solvent)
+      fd.append("nucleus", nucleus)
+      fd.append("vendor", vendor)
+      fd.append("processing_preset", "safe_automatic")
+      fd.append("preserve_raw", "true")
+      const data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
+      pushDev("raw_fid_preview_spectrum", data)
+      const xy = extractSpectrumXY(data)
+      if (xy) {
+        const rec = isRecord(data) ? data : {}
+        update({
+          previewSpectrum: {
+            x: xy.x,
+            y: xy.y,
+            xLabel: typeof rec.x_label === "string" ? rec.x_label : "ppm",
+            yLabel: typeof rec.y_label === "string" ? rec.y_label : "intensity",
+            reversedXAxis: rec.reversed_x_axis !== false,
+            processingPreset: typeof rec.processing_preset === "string" ? rec.processing_preset : "safe_automatic",
+          },
+          previewSpectrumLoading: false,
+        })
+      } else {
+        update({
+          previewSpectrumError: "Auto-FT preview ran but returned no display-ready points.",
+          previewSpectrumLoading: false,
+        })
+      }
+    } catch (err) {
+      const msg = isMissingNmrEndpoint(err)
+        ? RAW_FID_BACKEND_MSG
+        : formatApiError(err, "Auto-FT preview failed")
+      update({ previewSpectrumError: msg, previewSpectrumLoading: false })
+    }
+  }
+
   async function runPreview() {
     const file = getSelectedFile()
     if (!file) {
@@ -233,6 +324,12 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
       else setPreviewError(formatApiError(err, "Raw FID preview failed"))
     } finally {
       setPreviewLoading(false)
+    }
+    // Kick off the auto-FT preview in parallel so the metadata renders
+    // immediately and the spectrum follows when it's ready. Skip if a full
+    // processed result is already on screen — that spectrum wins.
+    if (!processResult) {
+      void runPreviewSpectrum(file)
     }
   }
 
@@ -259,20 +356,31 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
   }
 
   function clearAll() {
-    setPreviewResult(null)
-    setProcessResult(null)
-    setPreviewError("")
-    setProcessError("")
+    update({
+      previewResult: null,
+      processResult: null,
+      previewError: "",
+      processError: "",
+      previewSpectrum: null,
+      previewSpectrumError: "",
+      previewSpectrumLoading: false,
+      selectedFile: null,
+      selectedFileName: null,
+    })
     if (fileRef.current) fileRef.current.value = ""
-    setSelectedFile(null)
-    setSelectedFileName(null)
   }
 
   const displayPayload = processResult ?? previewResult
 
   const xyProcess = processResult ? extractSpectrumXY(processResult) : null
   const xyPreview = previewResult ? extractSpectrumXY(previewResult) : null
-  const xy = xyProcess ?? xyPreview
+  // previewSpectrum is the auto-FT result chained from Preview — used when the
+  // full Process step hasn't run yet so the user still sees a spectrum.
+  const xyAutoPreview = previewSpectrum
+    ? { x: previewSpectrum.x, y: previewSpectrum.y }
+    : null
+  const xy = xyProcess ?? xyPreview ?? xyAutoPreview
+  const xyIsAutoPreview = !xyProcess && !xyPreview && xyAutoPreview != null
 
   const meta = displayPayload && isRecord(displayPayload) ? displayPayload : null
   const sha =
@@ -861,9 +969,38 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
             )}
 
             {/* Spectrum — full page width */}
-            <div className="min-w-0">
+            <div className="min-w-0 space-y-2">
+              {xyIsAutoPreview ? (
+                <div
+                  className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2"
+                  style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+                >
+                  <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--mt-teal)" }} aria-hidden />
+                  <p
+                    className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                    style={{ color: "var(--mt-teal)" }}
+                  >
+                    Auto-FT preview · {previewSpectrum?.processingPreset ?? "safe_automatic"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Quick Fourier-transformed preview. Run Process FID for full apodization, phasing, and baseline correction.
+                  </p>
+                </div>
+              ) : null}
               {xy ? (
                 <SpectrumViewer x={xy.x} y={xy.y} nucleus={nucleus} />
+              ) : previewSpectrumLoading ? (
+                <AlertCard
+                  variant="info"
+                  title="Generating preview spectrum…"
+                  description="Running auto-FT on the uploaded FID — this usually takes a few seconds."
+                />
+              ) : previewSpectrumError ? (
+                <AlertCard
+                  variant="warning"
+                  title="Preview spectrum unavailable"
+                  description={previewSpectrumError}
+                />
               ) : (
                 <AlertCard
                   variant="warning"
