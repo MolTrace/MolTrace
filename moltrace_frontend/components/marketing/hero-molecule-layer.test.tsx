@@ -27,4 +27,15 @@ describe("HeroMoleculeLayer", () => {
     expect(container.querySelector("canvas")).not.toBeInTheDocument()
     expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true")
   })
+
+  it("activates the animated canvas path on desktop with no reduced motion", () => {
+    installMatchMedia(true)
+
+    const { container } = render(<HeroMoleculeLayer />)
+
+    // Layer routes to the dynamic <HeroMoleculeBackground />; loading state
+    // is null in jsdom (no SSR, chunk not yet resolved). The key regression
+    // signal is that the static fallback div is *not* rendered here.
+    expect(container.querySelector('[aria-hidden="true"]')).toBeNull()
+  })
 })

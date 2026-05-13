@@ -3,7 +3,7 @@
 import { Canvas, useFrame } from "@react-three/fiber"
 import { Environment } from "@react-three/drei"
 import * as THREE from "three"
-import { Suspense, useMemo, useRef } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 
 /** Stylistic palette — cyan / emerald / violet (reference artwork) */
 const PALETTE = ["#22d3ee", "#34d399", "#a78bfa"] as const
@@ -141,7 +141,7 @@ function BondCylinder({
 
   return (
     <mesh position={position} quaternion={quaternion} renderOrder={0}>
-      <cylinderGeometry args={[STICK_R, STICK_R, height, 18]} />
+      <cylinderGeometry args={[STICK_R, STICK_R, height, 8]} />
       <meshPhysicalMaterial
         color="#c8cdd8"
         metalness={0.72}
@@ -158,7 +158,7 @@ function GlassAtom({ color, radius }: { color: string; radius: number }) {
   const emissive = useMemo(() => new THREE.Color(color).multiplyScalar(0.12), [color])
   return (
     <mesh renderOrder={1}>
-      <sphereGeometry args={[radius, 40, 40]} />
+      <sphereGeometry args={[radius, 16, 16]} />
       <meshPhysicalMaterial
         color={color}
         emissive={emissive}
@@ -219,8 +219,26 @@ function HypotheticalMoleculeScene() {
 }
 
 export function HeroMoleculeBackground() {
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  // Default true so the first paint is never blocked by waiting on IO.
+  // IO flips this off as soon as the hero scrolls fully out of view, which
+  // lets the canvas skip GPU work while the user is reading the rest of
+  // the page. `frameloop` is reactive in @react-three/fiber v9.
+  const [inView, setInView] = useState(true)
+
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el || typeof IntersectionObserver === "undefined") return
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry?.isIntersecting ?? false),
+      { rootMargin: "120px" },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
   return (
-    <div className="pointer-events-none absolute inset-0 z-[1] min-h-[560px] w-full opacity-[0.14]">
+    <div ref={wrapperRef} className="pointer-events-none absolute inset-0 z-[1] min-h-[560px] w-full opacity-[0.14]">
       <Canvas
         camera={{ position: [0, 0, 10.25], fov: 34 }}
         gl={{
@@ -230,7 +248,8 @@ export function HeroMoleculeBackground() {
           stencil: false,
           depth: true,
         }}
-        dpr={[1, 2]}
+        dpr={[1, 1.5]}
+        frameloop={inView ? "always" : "never"}
         style={{ width: "100%", height: "100%" }}
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0)
