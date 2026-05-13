@@ -25,12 +25,16 @@ function authFailureMessage(status: number) {
 }
 
 function backendBaseUrl() {
-  return (
+  // Explicit 127.0.0.1 avoids a macOS+Node20+ DNS hang where fetch() resolves
+  // "localhost" to ::1, the backend listens on IPv4 only, and the request
+  // stalls until the browser fires ERR_TIMED_OUT. Apply the same normalization
+  // when API_BASE_URL is set to a localhost variant via .env.local.
+  const raw =
     process.env.API_BASE_URL ||
     (process.env.NODE_ENV === "production"
       ? "https://moltrace-backend.onrender.com"
-      : "http://localhost:8000")
-  )
+      : "http://127.0.0.1:8000")
+  return raw.replace(/^http:\/\/localhost(:|\/|$)/i, "http://127.0.0.1$1")
 }
 
 async function proxy(request: NextRequest, context: RouteContext) {
@@ -56,9 +60,14 @@ async function proxy(request: NextRequest, context: RouteContext) {
       body: hasBody ? await request.arrayBuffer() : undefined,
       cache: "no-store",
     })
-  } catch {
+  } catch (err) {
+    console.error("[api/backend proxy] fetch failed:", target.toString(), err)
     return NextResponse.json(
-      { detail: "Backend connection failed. Please retry in a moment." },
+      {
+        detail: "Backend connection failed. Please retry in a moment.",
+        target: target.toString(),
+        error: String((err as Error)?.message ?? err),
+      },
       { status: 503 }
     )
   }

@@ -142,6 +142,54 @@ def test_nmr_processed_analyze_returns_peaks(tmp_path) -> None:
     assert any("Human review" in item for item in payload["evidence_summary"])
 
 
+def test_nmr_processed_analyze_returns_peak_enrichment(tmp_path) -> None:
+    """Per-peak categorization, impurity matches, labile-H summary, and
+    peak-category counts must be present in the analyze response."""
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "enrichment",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "nmr_text": (
+                    "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), "
+                    "1.26 (t, 3H), 2.10 (br s, 1H)"
+                ),
+                "candidates_text": "ethanol | CCO",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    # Each peak has the new enrichment keys.
+    for peak in payload["peaks"]:
+        assert "category" in peak, f"missing category on peak {peak}"
+        assert "chemical_region" in peak
+        assert "labile_hint" in peak
+        assert "category_reason" in peak
+
+    # Top-level summary fields are present and the right shape.
+    assert isinstance(payload["peak_category_summary"], dict)
+    assert sum(payload["peak_category_summary"].values()) == len(payload["peaks"])
+
+    assert isinstance(payload["labile_hydrogen_summary"], dict)
+    summary = payload["labile_hydrogen_summary"]
+    assert "expected_labile_h" in summary
+    assert "observed_labile_candidates" in summary
+    # Ethanol has 1 labile H (OH), and the 2.10 br s peak should be detected.
+    assert summary["expected_labile_h"] == 1
+    assert len(summary["observed_labile_candidates"]) >= 1
+
+    assert isinstance(payload["impurity_candidates"], list)
+    assert isinstance(payload["predicted_vs_observed"], list)
+    # With "ethanol | CCO" candidate, predicted vs observed should produce rows.
+    assert len(payload["predicted_vs_observed"]) > 0
+
+
 def test_nmr_processed_invalid_file_returns_clear_400(tmp_path) -> None:
     with _client(tmp_path) as client:
         response = client.post(

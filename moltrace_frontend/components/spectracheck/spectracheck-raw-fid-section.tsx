@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectracheck/spectracheck-workspace-session-context"
-import { useRawFidTabState } from "@/components/spectracheck/spectracheck-tab-state-context"
+import {
+  useRawFidTabState,
+  useSpectraCheckTabLink,
+} from "@/components/spectracheck/spectracheck-tab-state-context"
 import { apiFetch } from "@/lib/api/client"
 import { trackFileUploaded } from "@/src/lib/analytics/analytics-client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
@@ -114,6 +117,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
 
   const ws = useOptionalSpectraCheckWorkspaceSession()
   const analysisJob = useAnalysisJob()
+  const sendTabLink = useSpectraCheckTabLink()
 
   // dragOver is purely ephemeral visual state — fine to reset on remount.
   const [dragOver, setDragOver] = useState(false)
@@ -1047,6 +1051,72 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
                 }}
               />
             </div>
+
+            {/* Cross-tab handoff — push this FID spectrum into the Processed analyzer
+                so the user doesn't have to re-upload it as a CSV/JCAMP. */}
+            {xy ? (
+              <div
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+                style={{
+                  borderTop: "3px solid var(--mt-teal)",
+                  backgroundColor: "var(--mt-teal-soft)",
+                }}
+                data-testid="raw-fid-send-to-processed"
+              >
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
+                  <div>
+                    <p
+                      className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      Cross-tab link
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Send this FID-derived spectrum to the Processed analyzer — no re-upload needed.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() =>
+                    sendTabLink({
+                      kind: "raw_fid_to_processed",
+                      sourceLabel: `Raw FID · ${selectedFileName ?? "uploaded archive"}`,
+                      payload: {
+                        sample_id: sampleId.trim() || null,
+                        nucleus,
+                        filename: selectedFileName ?? undefined,
+                        point_count: xy.x.length,
+                        x: xy.x,
+                        y: xy.y,
+                        x_label: "ppm",
+                        y_label: "intensity",
+                        reversed_x_axis: true,
+                        metadata: {
+                          linked_from: "raw_fid_to_processed",
+                          source_filename: selectedFileName ?? null,
+                          source_processing_preset:
+                            xyIsAutoPreview && previewSpectrum
+                              ? previewSpectrum.processingPreset
+                              : processResult
+                                ? "user-selected"
+                                : null,
+                        },
+                        warnings: warnings,
+                        notes: [
+                          "Spectrum was forwarded from the Raw FID tab — re-runs against /nmr/processed/analyze when you press the Analyze action.",
+                        ],
+                      },
+                    })
+                  }
+                  data-testid="raw-fid-send-to-processed-button"
+                >
+                  Send to Processed analyzer
+                </Button>
+              </div>
+            ) : null}
 
             {/* Identity / processing / metadata / warnings — 2-col grid below */}
             <div className="grid min-w-0 gap-4 lg:grid-cols-2">

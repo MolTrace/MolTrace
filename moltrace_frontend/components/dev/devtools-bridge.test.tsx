@@ -9,21 +9,24 @@ afterEach(() => {
 })
 
 describe("DevToolsBridge", () => {
-  it("renders the React DevTools connector when NODE_ENV is not production", () => {
+  it("stays silent in development by default (no script, no console refused noise)", () => {
     vi.stubEnv("NODE_ENV", "development")
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_REACT_DEVTOOLS_BRIDGE", "")
     const { container } = render(<DevToolsBridge />)
-    const script = container.querySelector('script[src="http://localhost:8097"]')
-    expect(script).not.toBeNull()
+    expect(container.querySelector("script")).toBeNull()
+    expect(container.firstChild).toBeNull()
   })
 
-  it("renders the connector in the test environment too (parity with dev)", () => {
-    vi.stubEnv("NODE_ENV", "test")
+  it("renders the connector when explicitly opted in via env var", () => {
+    vi.stubEnv("NODE_ENV", "development")
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_REACT_DEVTOOLS_BRIDGE", "1")
     const { container } = render(<DevToolsBridge />)
     expect(container.querySelector('script[src="http://localhost:8097"]')).not.toBeNull()
   })
 
-  it("renders nothing in production so it does not block LCP on Render or Vercel", () => {
+  it("does not render even when opted in if NODE_ENV is production", () => {
     vi.stubEnv("NODE_ENV", "production")
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_REACT_DEVTOOLS_BRIDGE", "1")
     const { container } = render(<DevToolsBridge />)
     expect(container.querySelector("script")).toBeNull()
     expect(container.firstChild).toBeNull()

@@ -513,6 +513,10 @@ class NMRProcessedAnalyzeResponse(BaseModel):
     peaks: list[dict[str, Any]] = Field(default_factory=list)
     solvent_warnings: list[str] = Field(default_factory=list)
     impurity_warnings: list[str] = Field(default_factory=list)
+    impurity_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    predicted_vs_observed: list[dict[str, Any]] = Field(default_factory=list)
+    labile_hydrogen_summary: dict[str, Any] = Field(default_factory=dict)
+    peak_category_summary: dict[str, int] = Field(default_factory=dict)
     analysis_score: float | None = Field(default=None, ge=0.0, le=1.0)
     evidence_summary: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
@@ -555,6 +559,103 @@ class NMRRawFIDProcessResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class BenchmarkCase(BaseModel):
+    """A single (structure, observed-spectrum) pair for the SpectraCheck benchmark.
+
+    Designed for /benchmark/spectracheck/run. The case carries everything the
+    benchmark needs to score across the 5 layers: a candidate SMILES (the
+    "true" structure to evaluate against), the observed NMR text or peak list,
+    plus optional ranking candidates and an audit envelope.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str = Field(min_length=1, max_length=200)
+    smiles: str = Field(min_length=1, max_length=500)
+    nucleus: NMRFrontendNucleus = "1H"
+    solvent: str | None = Field(default=None, max_length=50)
+    observed_nmr_text: str = Field(min_length=3, max_length=10_000)
+    # Optional ranking field: pipe-block of candidate SMILES, same format as
+    # the existing candidate-comparison flow. The "true" SMILES above is what
+    # we expect the system to rank in the top-k.
+    candidate_block: str | None = Field(default=None, max_length=20_000)
+    # Optional provenance fields the regulatory_evidence layer scores.
+    sample_id: str | None = Field(default=None, max_length=100)
+    sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    operator: str | None = Field(default=None, max_length=200)
+    instrument: str | None = Field(default=None, max_length=200)
+    notes: list[str] = Field(default_factory=list)
+
+
+class BenchmarkLayerScore(BaseModel):
+    """A single layer's score with the components that produced it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: Literal[
+        "peak_level_accuracy",
+        "structural_ranking",
+        "explainability",
+        "robustness",
+        "regulatory_evidence",
+    ]
+    score: float = Field(ge=0.0, le=1.0)
+    components: dict[str, Any] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+
+
+class BenchmarkCaseResult(BaseModel):
+    """Per-case scorecard."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    smiles: str
+    nucleus: NMRFrontendNucleus
+    solvent: str | None = None
+    overall_score: float = Field(ge=0.0, le=1.0)
+    layers: list[BenchmarkLayerScore]
+    summary: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class BenchmarkAggregate(BaseModel):
+    """Per-layer mean across the suite."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    layer: Literal[
+        "peak_level_accuracy",
+        "structural_ranking",
+        "explainability",
+        "robustness",
+        "regulatory_evidence",
+    ]
+    mean_score: float = Field(ge=0.0, le=1.0)
+    case_count: int = Field(ge=0)
+    min_score: float = Field(ge=0.0, le=1.0)
+    max_score: float = Field(ge=0.0, le=1.0)
+
+
+class BenchmarkRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cases: list[BenchmarkCase] = Field(min_length=1, max_length=200)
+    # Robustness probe: drop the N hottest peaks (by integration) and re-score
+    # peak-level accuracy. Default 1; range 0..3 is plenty for a smoke check.
+    robustness_drop_peaks: int = Field(default=1, ge=0, le=5)
+
+
+class BenchmarkRunResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_count: int = Field(ge=0)
+    overall_mean_score: float = Field(ge=0.0, le=1.0)
+    aggregates: list[BenchmarkAggregate]
+    cases: list[BenchmarkCaseResult]
+    notes: list[str] = Field(default_factory=list)
 
 
 class FIDRunReviewCreate(BaseModel):

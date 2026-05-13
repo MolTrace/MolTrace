@@ -42,6 +42,7 @@ import {
 } from "@/components/spectracheck/spectracheck-result-panels"
 import { SpectraCheckProcessedSpectrumSection } from "@/components/spectracheck/spectracheck-processed-spectrum-section"
 import { SpectraCheckRawFidSection } from "@/components/spectracheck/spectracheck-raw-fid-section"
+import { SpectraCheckBenchmarkSection } from "@/components/spectracheck/spectracheck-benchmark-section"
 import {
   getNmrSolventForApi,
   NMR_SOLVENT_OPTIONS,
@@ -85,7 +86,10 @@ import { SpectraCheckSessionControls } from "@/components/spectracheck/spectrach
 import { SpectraCheckSystemStatusBadges } from "@/components/spectracheck/spectracheck-system-status-badges"
 import type { SessionSaveFeedback } from "@/components/spectracheck/spectracheck-session-controls"
 import { SpectraCheckWorkspaceSessionProvider } from "@/components/spectracheck/spectracheck-workspace-session-context"
-import { SpectraCheckTabStateProvider } from "@/components/spectracheck/spectracheck-tab-state-context"
+import {
+  SpectraCheckTabStateProvider,
+  useOptionalSpectraCheckTabState,
+} from "@/components/spectracheck/spectracheck-tab-state-context"
 import { trackEvidenceAdded, trackUnifiedEvidenceBuilt } from "@/src/lib/analytics/analytics-client"
 import { UploadCenter } from "@/src/components/spectracheck/UploadCenter"
 import { ArtifactBrowser } from "@/src/components/spectracheck/ArtifactBrowser"
@@ -252,6 +256,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
 
   const [activeTab, setActiveTab] = useState(defaultTab)
   const [sessionRecord, setSessionRecord] = useState<unknown>(null)
+  const tabStateCtx = useOptionalSpectraCheckTabState()
 
   const feedbackProjectId = useMemo(() => toFeedbackProjectId(selectedProjectId), [selectedProjectId])
   const feedbackSessionId = useMemo(() => toFeedbackSessionId(backendSessionId), [backendSessionId])
@@ -265,6 +270,37 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   const [candidatesText, setCandidatesText] = useState(defaultCandidates)
   const [protonText, setProtonText] = useState(defaultProton)
   const [carbonText, setCarbonText] = useState(defaultCarbon)
+  const [protonLinkedFrom, setProtonLinkedFrom] = useState<string | null>(null)
+  const [carbonLinkedFrom, setCarbonLinkedFrom] = useState<string | null>(null)
+
+  // Cross-tab handoff consumer: a sender writes pendingLink, this effect
+  // applies the side effect (push payload into the target tab's state +
+  // switch the active tab), then clears the slot.
+  useEffect(() => {
+    if (!tabStateCtx) return
+    const link = tabStateCtx.pendingLink
+    if (!link) return
+    if (link.kind === "raw_fid_to_processed") {
+      tabStateCtx.setProcessed({
+        previewResult: link.payload,
+        analyzeResult: null,
+        previewError: "",
+        analyzeError: "",
+        linkedFromSource: link.sourceLabel,
+        nucleus: link.payload.nucleus,
+      })
+      setActiveTab("tab-processed")
+    } else if (link.kind === "peaks_to_proton_text") {
+      setProtonText(link.payload.text)
+      setProtonLinkedFrom(link.sourceLabel)
+      setActiveTab("tab-nmr-text")
+    } else if (link.kind === "peaks_to_carbon_text") {
+      setCarbonText(link.payload.text)
+      setCarbonLinkedFrom(link.sourceLabel)
+      setActiveTab("tab-nmr-text")
+    }
+    tabStateCtx.setPendingLink(null)
+  }, [tabStateCtx?.pendingLink, tabStateCtx])
 
   const [nmrResult, setNmrResult] = useState<unknown>(null)
   const [nmrError, setNmrError] = useState("")
@@ -1149,6 +1185,13 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               Report
             </SpectraCheckTabWithTooltip>
             <SpectraCheckTabWithTooltip
+              value="tab-benchmark"
+              className={tabTriggerClass}
+              tooltip="Run the 5-layer SpectraCheck benchmark — peak-level accuracy, structural ranking, explainability, robustness, regulatory evidence."
+            >
+              Benchmark
+            </SpectraCheckTabWithTooltip>
+            <SpectraCheckTabWithTooltip
               value="tab-dev-json"
               className={tabTriggerClass}
               tooltip="Raw backend responses for debugging, validation, and frontend/backend schema inspection."
@@ -1602,10 +1645,35 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     {protonText.trim() ? "Detected ✓" : "Empty"}
                   </span>
                 </div>
+                {protonLinkedFrom ? (
+                  <div
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-1.5"
+                    style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+                    data-testid="nmr-text-proton-linked-from"
+                  >
+                    <p
+                      className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      Linked from {protonLinkedFrom}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setProtonLinkedFrom(null)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                ) : null}
                 <Textarea
                   id="spectracheck-proton"
                   value={protonText}
-                  onChange={(e) => setProtonText(e.target.value)}
+                  onChange={(e) => {
+                    setProtonText(e.target.value)
+                    if (protonLinkedFrom) setProtonLinkedFrom(null)
+                  }}
                   rows={5}
                   className="font-mono text-xs"
                 />
@@ -1630,10 +1698,35 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     {carbonText.trim() ? "Detected ✓" : "Empty"}
                   </span>
                 </div>
+                {carbonLinkedFrom ? (
+                  <div
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-1.5"
+                    style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+                    data-testid="nmr-text-carbon-linked-from"
+                  >
+                    <p
+                      className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      Linked from {carbonLinkedFrom}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setCarbonLinkedFrom(null)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                ) : null}
                 <Textarea
                   id="spectracheck-carbon"
                   value={carbonText}
-                  onChange={(e) => setCarbonText(e.target.value)}
+                  onChange={(e) => {
+                    setCarbonText(e.target.value)
+                    if (carbonLinkedFrom) setCarbonLinkedFrom(null)
+                  }}
                   rows={3}
                   className="font-mono text-xs"
                 />
@@ -3409,6 +3502,10 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             </p>
             <SpectraCheckReviewCollaborationPanel sessionId={backendSessionId} />
           </section>
+        </TabsContent>
+
+        <TabsContent value="tab-benchmark" className="mt-4 space-y-8">
+          <SpectraCheckBenchmarkSection />
         </TabsContent>
 
         <TabsContent value="tab-dev-json" className="mt-4 space-y-8">
