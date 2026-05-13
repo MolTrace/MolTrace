@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectracheck/spectracheck-workspace-session-context"
-import { useProcessedTabState } from "@/components/spectracheck/spectracheck-tab-state-context"
+import {
+  useProcessedTabState,
+  useSpectraCheckTabLink,
+} from "@/components/spectracheck/spectracheck-tab-state-context"
 import { apiFetch } from "@/lib/api/client"
 import { trackFileUploaded } from "@/src/lib/analytics/analytics-client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
@@ -12,6 +15,10 @@ import { SPECTRACHECK_PROCESSED_NMR_SPECTRUM_ACCEPT } from "@/src/lib/spectrache
 import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
 import { SpectrumViewer, type SpectrumPeakAnnotation } from "@/components/science/SpectrumViewer"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
+import {
+  EnrichedPickedPeaksPanel,
+  SpectraCheckEvidencePanels,
+} from "@/components/spectracheck/spectracheck-evidence-panels"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
@@ -34,7 +41,6 @@ import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
@@ -70,6 +76,7 @@ export function SpectraCheckProcessedSpectrumSection({
 }: Props) {
   const ws = useOptionalSpectraCheckWorkspaceSession()
   const analysisJob = useAnalysisJob()
+  const sendTabLink = useSpectraCheckTabLink()
   const { state, update } = useProcessedTabState()
   const {
     sessionFileIdChoice,
@@ -326,6 +333,7 @@ export function SpectraCheckProcessedSpectrumSection({
       analyzeError: "",
       selectedFile: null,
       selectedFileName: null,
+      linkedFromSource: null,
     })
     if (fileRef.current) fileRef.current.value = ""
   }
@@ -343,6 +351,38 @@ export function SpectraCheckProcessedSpectrumSection({
   ])
   const warnings = extractWarnings(displayPayload ?? {})
   const notes = extractNotes(displayPayload ?? {})
+
+  /** Build the canonical NMR-text string for the NMR-text tab handoff. */
+  const nmrTextFromPeaks = useCallback((): string | null => {
+    const rawPeaks = Array.isArray((displayPayload as { peaks?: unknown })?.peaks)
+      ? ((displayPayload as { peaks: unknown[] }).peaks as Array<Record<string, unknown>>)
+      : []
+    if (rawPeaks.length === 0) return null
+    const mhzNum = Number(spectrometerMhz)
+    const mhz = Number.isFinite(mhzNum) && mhzNum > 0 ? mhzNum : 400
+    if (nucleus === "1H") {
+      const parts = rawPeaks
+        .map((p) => {
+          const shift = typeof p.shift_ppm === "number" ? p.shift_ppm : null
+          if (shift === null) return null
+          const mult = typeof p.multiplicity === "string" ? p.multiplicity : "s"
+          const integration = typeof p.integration_h === "number" ? p.integration_h : 1
+          const jArr = Array.isArray(p.j_values_hz)
+            ? (p.j_values_hz as unknown[]).filter(
+                (v): v is number => typeof v === "number" && Number.isFinite(v),
+              )
+            : []
+          const jPart = jArr.length > 0 ? `, J = ${jArr.map((j) => j.toFixed(1)).join(", ")} Hz` : ""
+          return `${shift.toFixed(2)} (${mult}${jPart}, ${Math.max(1, Math.round(integration))}H)`
+        })
+        .filter((s): s is string => s !== null)
+      return `1H NMR (${mhz} MHz, ${solvent || "CDCl3"}) δ ${parts.join(", ")}`
+    }
+    const carbonParts = rawPeaks
+      .map((p) => (typeof p.shift_ppm === "number" ? p.shift_ppm.toFixed(1) : null))
+      .filter((s): s is string => s !== null)
+    return `13C NMR (${Math.round(mhz / 4)} MHz, ${solvent || "CDCl3"}) δ ${carbonParts.join(", ")}.`
+  }, [displayPayload, nucleus, solvent, spectrometerMhz])
 
   return (
     <div className="space-y-6">
@@ -795,6 +835,31 @@ export function SpectraCheckProcessedSpectrumSection({
           className="min-w-0"
         >
           <div className="space-y-4">
+            {/* Cross-tab "linked from" banner */}
+            {state.linkedFromSource ? (
+              <div
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2"
+                style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+                data-testid="processed-linked-from"
+              >
+                <p
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                  style={{ color: "var(--mt-teal)" }}
+                >
+                  Linked from {state.linkedFromSource}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => update({ linkedFromSource: null })}
+                  data-testid="processed-linked-from-dismiss"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            ) : null}
+
             {/* KPI tiles */}
             {(peakCount != null || score != null || warnings.length > 0) && (
               <div className="grid gap-3 sm:grid-cols-3">
@@ -926,6 +991,54 @@ export function SpectraCheckProcessedSpectrumSection({
               />
             </div>
 
+            {/* Cross-tab handoff — send the analyzer's peaks back to the NMR-text tab
+                as canonical NMR-string format so the user can hand-edit, then
+                re-run text-mode evidence against the same numbers. */}
+            {(() => {
+              const text = nmrTextFromPeaks()
+              if (!text) return null
+              return (
+                <div
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+                  style={{
+                    borderTop: "3px solid var(--mt-teal)",
+                    backgroundColor: "var(--mt-teal-soft)",
+                  }}
+                  data-testid="processed-send-to-nmr-text"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
+                    <div>
+                      <p
+                        className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                        style={{ color: "var(--mt-teal)" }}
+                      >
+                        Cross-tab link
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Push {nucleus} peaks to the NMR text + candidates tab as a hand-editable string.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() =>
+                      sendTabLink({
+                        kind:
+                          nucleus === "1H" ? "peaks_to_proton_text" : "peaks_to_carbon_text",
+                        sourceLabel: `Processed ${nucleus} · ${selectedFileName ?? "uploaded spectrum"}`,
+                        payload: { text, solvent, spectrometerMhz },
+                      })
+                    }
+                    data-testid="processed-send-to-nmr-text-button"
+                  >
+                    Send peaks to NMR text
+                  </Button>
+                </div>
+              )
+            })()}
+
             {/* Details + Picked peaks — 2-col below the spectrum */}
             <div className="grid min-w-0 gap-4 lg:grid-cols-2">
               {/* Notes / details */}
@@ -971,51 +1084,12 @@ export function SpectraCheckProcessedSpectrumSection({
                 </Card>
               )}
 
-              {/* Picked peaks */}
-              <Card
-                className="overflow-hidden rounded-xl py-0"
-                style={{ borderTop: "3px solid var(--mt-teal)" }}
-              >
-                <CardContent className="space-y-2 py-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      Picked peaks
-                    </p>
-                    {peaks.length > 0 && (
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        {peaks.length > 200 ? `${peaks.length} (showing 200)` : peaks.length}
-                      </span>
-                    )}
-                  </div>
-                  <div className="overflow-x-auto">
-                    {peaks.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No peaks in response payload.</p>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-[10px] uppercase tracking-wide">δ (ppm)</TableHead>
-                            <TableHead className="text-[10px] uppercase tracking-wide">Intensity</TableHead>
-                            <TableHead className="text-[10px] uppercase tracking-wide">Label</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {peaks.slice(0, 200).map((p, i) => (
-                            <TableRow key={i}>
-                              <TableCell className="font-mono text-xs">{p.ppm.toFixed(4)}</TableCell>
-                              <TableCell className="font-mono text-xs">
-                                {p.intensity != null ? p.intensity.toExponential(3) : "—"}
-                              </TableCell>
-                              <TableCell className="text-xs">{p.label ?? "—"}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Picked peaks — enriched with category, region, impurity match. */}
+              <EnrichedPickedPeaksPanel payload={displayPayload} />
             </div>
+
+            {/* Evidence panels — category mix, impurity candidates, labile-H reasoning, predicted vs observed. */}
+            <SpectraCheckEvidencePanels payload={displayPayload} />
 
             {/* Developer JSON — full width at the bottom */}
             <DeveloperJsonPanel data={displayPayload} />

@@ -71,7 +71,15 @@ from . import workflow_store as wf_store
 from .adduct_inference import AdductInferenceError, infer_adducts_and_isotopes
 from .analysis import analyze_inputs, validate_inputs
 from .baseline import normalize_baseline_mode
+from .benchmark import evaluate_suite
 from .candidate import compare_candidates, parse_candidate_text
+from .peak_categorization import (
+    build_impurity_candidates,
+    build_labile_hydrogen_summary,
+    build_peak_category_summary,
+    build_predicted_vs_observed,
+    enrich_peaks,
+)
 from .candidate_predicted import (
     PREDICTED_NMR_MATCH_LIMITATIONS,
     match_candidates_with_predicted_nmr,
@@ -213,6 +221,8 @@ from .models import (
     BenchmarkDatasetCandidateCreate,
     BenchmarkDatasetCandidateUpdate,
     BenchmarkDatasetCreate,
+    BenchmarkRunRequest,
+    BenchmarkRunResponse,
     CAPARecord,
     CAPARecordCreate,
     CAPARecordUpdate,
@@ -5255,6 +5265,26 @@ def _comparison_score(comparison: Any | None) -> float | None:
     return round(max(0.0, min(1.0, matched / total)), 4)
 
 
+def _first_smiles_from_candidates(candidates_text: str | None) -> str | None:
+    """Return the first SMILES from a pipe-delimited candidate block, if any.
+
+    Used by /nmr/processed/analyze to drive predicted-shift comparison and
+    structure-aware labile-H reasoning without requiring the user to pass the
+    SMILES separately.
+    """
+    if not candidates_text or not candidates_text.strip():
+        return None
+    try:
+        candidates = parse_candidate_text(candidates_text)
+    except ValueError:
+        return None
+    for candidate in candidates:
+        smiles = getattr(candidate, "smiles", None)
+        if isinstance(smiles, str) and smiles.strip():
+            return smiles.strip()
+    return None
+
+
 def _candidate_summary_from_text(
     *,
     candidates_text: str | None,
@@ -5676,6 +5706,24 @@ async def nmr_processed_analyze_route(
         raise _upload_http_400(exc, operation="NMR processed spectrum analysis") from exc
 
     metadata.update(candidate_metadata)
+
+    # Per-peak enrichment: category, chemical region, labile hint, impurity match.
+    # Adds keys to each peak dict without disturbing the existing shape.
+    candidate_smiles = _first_smiles_from_candidates(candidates_text)
+    structure_summary = None
+    if candidate_smiles:
+        try:
+            structure_summary = structure_summary_from_smiles(candidate_smiles)
+        except Exception:  # noqa: BLE001 — structure errors must not break analyze
+            structure_summary = None
+
+    peaks = enrich_peaks(
+        peaks=peaks,
+        nucleus=nucleus,
+        solvent=solvent,
+        structure=structure_summary,
+    )
+
     solvent_warnings = _solvent_warnings_from_processed(
         nucleus=nucleus,
         warnings=warnings,
@@ -5687,6 +5735,43 @@ async def nmr_processed_analyze_route(
         peaks=peaks,
         metadata=metadata,
     )
+
+    # Surface impurity candidates as a structured list (the parser stashes a
+    # richer payload in metadata for 1H; fall back to peak-derived matches).
+    metadata_impurity_candidates = metadata.get("impurity_candidates")
+    impurity_candidates_list = build_impurity_candidates(
+        peaks=peaks,
+        metadata_candidates=metadata_impurity_candidates
+        if isinstance(metadata_impurity_candidates, list)
+        else None,
+    )
+
+    labile_hydrogen_summary = build_labile_hydrogen_summary(
+        peaks=peaks,
+        structure=structure_summary,
+        solvent=solvent,
+    )
+
+    peak_category_summary = build_peak_category_summary(peaks)
+
+    predicted_vs_observed_rows: list[dict[str, Any]] = []
+    if candidate_smiles:
+        try:
+            prediction = predict_nmr_from_smiles(
+                candidate_smiles,
+                name=None,
+                solvent=solvent,
+            )
+            predicted_for_nucleus = (
+                prediction.proton_peaks if nucleus == "1H" else prediction.carbon13_peaks
+            )
+            predicted_vs_observed_rows = build_predicted_vs_observed(
+                predicted_peaks=predicted_for_nucleus,
+                observed_peaks=peaks,
+                nucleus=nucleus,
+            )
+        except Exception:  # noqa: BLE001 — prediction failures are non-fatal
+            predicted_vs_observed_rows = []
     score = candidate_score if candidate_score is not None else comparison_score
     evidence_summary = [
         f"Parsed {point_count} spectrum point(s) and returned {len(peaks)} inferred peak(s).",
@@ -5729,6 +5814,10 @@ async def nmr_processed_analyze_route(
         peaks=peaks,
         solvent_warnings=solvent_warnings,
         impurity_warnings=impurity_warnings,
+        impurity_candidates=impurity_candidates_list,
+        predicted_vs_observed=predicted_vs_observed_rows,
+        labile_hydrogen_summary=labile_hydrogen_summary,
+        peak_category_summary=peak_category_summary,
         analysis_score=score,
         evidence_summary=evidence_summary,
         warnings=list(dict.fromkeys(warnings)),
@@ -5946,6 +6035,40 @@ async def nmr_raw_fid_process_route(
         notes=notes,
         metadata=metadata,
     )
+
+
+@router.post(
+    "/benchmark/spectracheck/run",
+    response_model=BenchmarkRunResponse,
+    dependencies=[Depends(require_access_context)],
+)
+def benchmark_spectracheck_run_route(
+    payload: BenchmarkRunRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> BenchmarkRunResponse:
+    """Run the 5-layer SpectraCheck benchmark against a curated case suite.
+
+    Each case is scored on peak-level accuracy, structural ranking,
+    explainability, robustness, and regulatory evidence. Returns per-case
+    scorecards plus aggregated layer means.
+    """
+    result = evaluate_suite(
+        payload.cases,
+        robustness_drop_peaks=payload.robustness_drop_peaks,
+    )
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="benchmark.spectracheck.run",
+        message="SpectraCheck 5-layer benchmark suite executed.",
+        metadata={
+            "case_count": result.case_count,
+            "overall_mean_score": result.overall_mean_score,
+            "robustness_drop_peaks": payload.robustness_drop_peaks,
+        },
+    )
+    return result
 
 
 @router.get("/fid/presets", response_model=list[FIDProcessingPreset])

@@ -39,7 +39,47 @@ export type RawFidPreviewSpectrum = {
   processingPreset?: string
 }
 
+/**
+ * Cross-tab handoff payload. A sender writes this; the workspace consumes it
+ * in a `useEffect`, applies the appropriate side effect (write target tab's
+ * state, switch the active tab, surface a "linked from" banner), then clears
+ * it. This keeps each section ignorant of workspace internals.
+ */
+export type PendingTabLink =
+  | {
+      kind: "raw_fid_to_processed"
+      sourceLabel: string
+      payload: {
+        /** Mimics /nmr/processed/preview shape: x/y + nucleus + metadata */
+        sample_id?: string | null
+        nucleus: "1H" | "13C"
+        filename?: string
+        point_count?: number
+        x: number[]
+        y: number[]
+        x_label?: string
+        y_label?: string
+        reversed_x_axis?: boolean
+        metadata?: Record<string, unknown>
+        warnings?: string[]
+        notes?: string[]
+      }
+    }
+  | {
+      kind: "peaks_to_proton_text"
+      sourceLabel: string
+      payload: { text: string; solvent?: string | null; spectrometerMhz?: string | null }
+    }
+  | {
+      kind: "peaks_to_carbon_text"
+      sourceLabel: string
+      payload: { text: string; solvent?: string | null; spectrometerMhz?: string | null }
+    }
+
 export type RawFidTabState = {
+  /** Set when this tab's last result was pushed from another tab (currently unused but reserved). */
+  linkedFromSource: string | null
+
   // Acquisition controls
   nucleus: RawFidNucleus
   vendor: RawFidVendor
@@ -71,6 +111,9 @@ export type RawFidTabState = {
 }
 
 export type ProcessedTabState = {
+  /** Set when this tab's last result was pushed from another tab. */
+  linkedFromSource: string | null
+
   // Acquisition controls
   nucleus: RawFidNucleus
   spectrometerMhz: string
@@ -96,6 +139,7 @@ export type ProcessedTabState = {
 }
 
 const defaultRawFid: RawFidTabState = {
+  linkedFromSource: null,
   nucleus: "1H",
   vendor: "auto",
   preset: "safe_automatic",
@@ -116,6 +160,7 @@ const defaultRawFid: RawFidTabState = {
 }
 
 const defaultProcessed: ProcessedTabState = {
+  linkedFromSource: null,
   nucleus: "1H",
   spectrometerMhz: "400",
   nmrTextOptional: "",
@@ -141,6 +186,10 @@ export type SpectraCheckTabStateContextValue = {
   processed: ProcessedTabState
   setProcessed: (patch: Partial<ProcessedTabState>) => void
   resetProcessed: () => void
+
+  /** Senders write here; the workspace consumes + clears it. */
+  pendingLink: PendingTabLink | null
+  setPendingLink: (link: PendingTabLink | null) => void
 }
 
 const SpectraCheckTabStateContext =
@@ -149,6 +198,7 @@ const SpectraCheckTabStateContext =
 export function SpectraCheckTabStateProvider({ children }: { children: ReactNode }) {
   const [rawFid, setRawFidState] = useState<RawFidTabState>(defaultRawFid)
   const [processed, setProcessedState] = useState<ProcessedTabState>(defaultProcessed)
+  const [pendingLink, setPendingLink] = useState<PendingTabLink | null>(null)
 
   const setRawFid = useCallback((patch: Partial<RawFidTabState>) => {
     setRawFidState((prev) => ({ ...prev, ...patch }))
@@ -167,8 +217,25 @@ export function SpectraCheckTabStateProvider({ children }: { children: ReactNode
   }, [])
 
   const value = useMemo<SpectraCheckTabStateContextValue>(
-    () => ({ rawFid, setRawFid, resetRawFid, processed, setProcessed, resetProcessed }),
-    [rawFid, setRawFid, resetRawFid, processed, setProcessed, resetProcessed],
+    () => ({
+      rawFid,
+      setRawFid,
+      resetRawFid,
+      processed,
+      setProcessed,
+      resetProcessed,
+      pendingLink,
+      setPendingLink,
+    }),
+    [
+      rawFid,
+      setRawFid,
+      resetRawFid,
+      processed,
+      setProcessed,
+      resetProcessed,
+      pendingLink,
+    ],
   )
 
   return (
@@ -180,6 +247,19 @@ export function SpectraCheckTabStateProvider({ children }: { children: ReactNode
 
 export function useOptionalSpectraCheckTabState(): SpectraCheckTabStateContextValue | null {
   return useContext(SpectraCheckTabStateContext)
+}
+
+/** Convenience hook for senders. Returns a no-op when no provider is mounted. */
+export function useSpectraCheckTabLink(): (link: PendingTabLink) => void {
+  const ctx = useContext(SpectraCheckTabStateContext)
+  return useCallback(
+    (link: PendingTabLink) => {
+      if (ctx) {
+        ctx.setPendingLink(link)
+      }
+    },
+    [ctx],
+  )
 }
 
 /**
