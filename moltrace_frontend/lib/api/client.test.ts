@@ -150,4 +150,48 @@ describe("apiFetch", () => {
       "Backend connection failed. Please retry in a moment."
     )
   })
+
+  it("flattens FastAPI validation error arrays into a readable string (no [object Object])", async () => {
+    const fastApiValidationError = {
+      detail: [
+        { type: "missing", loc: ["body", "smiles"], msg: "Field required" },
+        { type: "string_type", loc: ["body", "sample_id"], msg: "Input should be a valid string" },
+      ],
+    }
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(JSON.stringify(fastApiValidationError), {
+          status: 422,
+          statusText: "Unprocessable Entity",
+          headers: { "content-type": "application/json" },
+        })
+      })
+    )
+
+    await expect(apiFetch("/analyze")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 422,
+    } satisfies Partial<ApiError>)
+    await expect(apiFetch("/analyze")).rejects.toMatchObject({
+      message: expect.stringContaining("body.smiles: Field required"),
+    } as unknown as Partial<ApiError>)
+  })
+
+  it("falls back to JSON.stringify for opaque detail objects", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(JSON.stringify({ detail: { foo: 42 } }), {
+          status: 500,
+          statusText: "Internal Server Error",
+          headers: { "content-type": "application/json" },
+        })
+      })
+    )
+    await expect(apiFetch("/oops")).rejects.toMatchObject({
+      name: "ApiError",
+      message: expect.not.stringContaining("[object Object]"),
+    } as unknown as Partial<ApiError>)
+  })
 })

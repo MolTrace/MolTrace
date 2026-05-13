@@ -47,6 +47,14 @@ function storeAuthSession(data: AuthPageResponse) {
   if (data.user) {
     window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(data.user))
   }
+
+  // Drop any local SpectraCheck session belonging to the previous user / draft
+  // so the next workspace mount falls back to molecular defaults.
+  try {
+    window.localStorage.removeItem("moltrace:spectracheck:evidence-session")
+  } catch {
+    // Privacy-mode / quota — ignore.
+  }
 }
 
 function authErrorMessage(error: unknown, fallback: string) {

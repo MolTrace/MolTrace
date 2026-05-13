@@ -84,9 +84,45 @@ async function readResponseData(response: Response) {
   return response.text()
 }
 
+function formatDetailValue(detail: unknown, fallback: string): string {
+  if (typeof detail === "string") return detail
+  if (Array.isArray(detail)) {
+    // FastAPI validation errors: [{ type, loc, msg, ... }, ...]
+    const messages = detail
+      .map((item) => {
+        if (typeof item === "string") return item
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>
+          const msg = typeof record.msg === "string" ? record.msg : null
+          const loc = Array.isArray(record.loc)
+            ? record.loc.filter((p) => typeof p === "string" || typeof p === "number").join(".")
+            : null
+          if (msg) return loc ? `${loc}: ${msg}` : msg
+          if (typeof record.message === "string") return record.message
+        }
+        return ""
+      })
+      .filter(Boolean)
+    if (messages.length > 0) return messages.join("; ")
+  }
+  if (detail && typeof detail === "object") {
+    const record = detail as Record<string, unknown>
+    if (typeof record.msg === "string") return record.msg
+    if (typeof record.message === "string") return record.message
+    try {
+      return JSON.stringify(detail)
+    } catch {
+      return fallback
+    }
+  }
+  return fallback
+}
+
 function messageFromErrorData(data: unknown, fallback: string) {
   if (data && typeof data === "object") {
-    if ("detail" in data) return String((data as { detail: unknown }).detail)
+    if ("detail" in data) {
+      return formatDetailValue((data as { detail: unknown }).detail, fallback)
+    }
     if ("message" in data) return String((data as { message: unknown }).message)
     if ("error" in data) {
       const error = (data as { error: unknown }).error
