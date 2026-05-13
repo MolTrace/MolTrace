@@ -85,6 +85,7 @@ import { SpectraCheckSessionControls } from "@/components/spectracheck/spectrach
 import { SpectraCheckSystemStatusBadges } from "@/components/spectracheck/spectracheck-system-status-badges"
 import type { SessionSaveFeedback } from "@/components/spectracheck/spectracheck-session-controls"
 import { SpectraCheckWorkspaceSessionProvider } from "@/components/spectracheck/spectracheck-workspace-session-context"
+import { SpectraCheckTabStateProvider } from "@/components/spectracheck/spectracheck-tab-state-context"
 import { trackEvidenceAdded, trackUnifiedEvidenceBuilt } from "@/src/lib/analytics/analytics-client"
 import { UploadCenter } from "@/src/components/spectracheck/UploadCenter"
 import { ArtifactBrowser } from "@/src/components/spectracheck/ArtifactBrowser"
@@ -185,7 +186,9 @@ export function SpectraCheckWorkspace(props: SpectraCheckWorkspaceProps = {}) {
   return (
     <SpectraCheckConfidenceAdvProvider>
       <SpectraCheckEvidenceProvider>
-        <SpectraCheckWorkspaceInner {...props} />
+        <SpectraCheckTabStateProvider>
+          <SpectraCheckWorkspaceInner {...props} />
+        </SpectraCheckTabStateProvider>
       </SpectraCheckEvidenceProvider>
     </SpectraCheckConfidenceAdvProvider>
   )

@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { OfflineBanner } from '@/src/components/pwa/OfflineBanner'
 import { InstallAppPrompt } from '@/src/components/pwa/InstallAppPrompt'
 import { PWAUpdateManager } from '@/src/components/pwa/PWAUpdateManager'
+import { DevToolsBridge } from '@/components/dev/devtools-bridge'
 import './globals.css'
 
 const PWA_ASSET_VERSION = '2026-05-08-v2'
@@ -50,7 +51,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="bg-background">
       <head>
-        <script src="http://localhost:8097"></script>
+        <DevToolsBridge />
       </head>
       <body suppressHydrationWarning className="font-sans antialiased">
         <ThemeProvider
