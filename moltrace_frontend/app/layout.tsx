@@ -49,6 +49,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="bg-background">
+      <head>
+        <script src="http://localhost:8097"></script>
+      </head>
       <body suppressHydrationWarning className="font-sans antialiased">
         <ThemeProvider
           attribute="class"
@@ -62,7 +65,10 @@ export default function RootLayout({
           <InstallAppPrompt />
           <Toaster />
         </ThemeProvider>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {/* Vercel injects /_vercel/insights/script.js only when hosted on Vercel.
+            On other platforms (e.g. Render) the script 404s and logs a noisy error.
+            Gate on the platform-supplied VERCEL env var so non-Vercel deploys stay clean. */}
+        {process.env.NODE_ENV === 'production' && process.env.VERCEL && <Analytics />}
       </body>
     </html>
   )
