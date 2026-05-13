@@ -7,7 +7,6 @@ import { HeroMoleculeLayer } from "./hero-molecule-layer"
 export function Hero() {
   return (
     <section className="hero-compat-surface relative overflow-hidden bg-background text-foreground">
-      <div className="scientific-grid-subtle absolute inset-0 z-0" aria-hidden />
       <HeroMoleculeLayer />
       <div className="hero-compat-overlay pointer-events-none absolute inset-0 z-[5]" aria-hidden />
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 lg:py-40">
