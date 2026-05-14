@@ -130,18 +130,48 @@ export function SpectrumViewer({
    * Tall peaks may clip at the top — that's standard NMR display behavior.
    */
   const { xMin, xMax, yMax } = useMemo(() => {
+    // Single-pass iterative scan. Replaces Math.min/max(...spread) — the spread
+    // operator hits the JS argument-count limit on long arrays (~50k+ items)
+    // and throws RangeError, freezing the spectrum render entirely.
     if (x.length === 0) {
       return { xMin: 0, xMax: 1, yMax: 1 }
     }
-    const xi = x.map(Number)
-    const obsBaseline = y.length ? Math.max(...y.map((v) => (Number.isFinite(v) ? Math.abs(v) : 0))) : 1
-    const predBaseline =
-      showPredicted && overlays?.predicted && overlays.predicted.y.length
-        ? Math.max(...overlays.predicted.y.map((v) => (Number.isFinite(v) ? Math.abs(v) : 0)))
-        : 0
+    let xLo = Number.POSITIVE_INFINITY
+    let xHi = Number.NEGATIVE_INFINITY
+    for (let i = 0; i < x.length; i++) {
+      const v = Number(x[i])
+      if (!Number.isFinite(v)) continue
+      if (v < xLo) xLo = v
+      if (v > xHi) xHi = v
+    }
+    if (!Number.isFinite(xLo) || !Number.isFinite(xHi)) {
+      xLo = 0
+      xHi = 1
+    }
+
+    let obsBaseline = 0
+    for (let i = 0; i < y.length; i++) {
+      const v = y[i]
+      if (!Number.isFinite(v)) continue
+      const abs = v < 0 ? -v : v
+      if (abs > obsBaseline) obsBaseline = abs
+    }
+    if (obsBaseline === 0) obsBaseline = 1
+
+    let predBaseline = 0
+    if (showPredicted && overlays?.predicted) {
+      const py = overlays.predicted.y
+      for (let i = 0; i < py.length; i++) {
+        const v = py[i]
+        if (!Number.isFinite(v)) continue
+        const abs = v < 0 ? -v : v
+        if (abs > predBaseline) predBaseline = abs
+      }
+    }
+
     return {
-      xMin: Math.min(...xi),
-      xMax: Math.max(...xi),
+      xMin: xLo,
+      xMax: xHi,
       yMax: Math.max(obsBaseline, predBaseline, 1),
     }
   }, [x, y, overlays, showPredicted])
