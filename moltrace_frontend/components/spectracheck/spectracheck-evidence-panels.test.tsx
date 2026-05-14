@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { render, screen } from "@testing-library/react"
 import {
+  DP4RankingPanel,
   EnrichedPickedPeaksPanel,
   ImpurityCandidatesPanel,
   LabileHydrogenPanel,
   PeakCategorySummaryPanel,
   PredictedVsObservedPanel,
+  ReferencesPanel,
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
 
@@ -213,5 +215,108 @@ describe("SpectraCheckEvidencePanels (composite)", () => {
     render(<SpectraCheckEvidencePanels payload={null} />)
     expect(screen.queryByTestId("peak-category-summary")).not.toBeInTheDocument()
     expect(screen.queryByTestId("impurity-candidates")).not.toBeInTheDocument()
+  })
+})
+
+describe("DP4RankingPanel", () => {
+  const DP4_PAYLOAD = {
+    dp4_ranking: [
+      {
+        candidate_index: 1,
+        candidate_label: "CCO",
+        dp4_probability: 0.72,
+        matched_peaks: 3,
+        mean_abs_error_ppm: 0.05,
+        rms_error_ppm: 0.07,
+        scaling_slope: 1.02,
+        scaling_intercept: 0.01,
+        notes: [],
+      },
+      {
+        candidate_index: 0,
+        candidate_label: "CO",
+        dp4_probability: 0.18,
+        matched_peaks: 2,
+        mean_abs_error_ppm: 0.21,
+        rms_error_ppm: 0.25,
+        scaling_slope: 1.0,
+        scaling_intercept: 0.0,
+        notes: ["Fewer than 3 paired peaks — linear scaling skipped."],
+      },
+    ],
+  }
+
+  it("renders a row per candidate with the DP4 probability badge", () => {
+    render(<DP4RankingPanel payload={DP4_PAYLOAD} />)
+    expect(screen.getByTestId("dp4-ranking")).toBeInTheDocument()
+    const rows = screen.getAllByTestId("dp4-ranking-row")
+    expect(rows).toHaveLength(2)
+    expect(screen.getByText("72%")).toBeInTheDocument()
+    expect(screen.getByText("18%")).toBeInTheDocument()
+  })
+
+  it("renders nothing when the ranking is empty", () => {
+    const { container } = render(<DP4RankingPanel payload={{ dp4_ranking: [] }} />)
+    expect(container.firstChild).toBeNull()
+  })
+})
+
+describe("ReferencesPanel", () => {
+  const REF_PAYLOAD = {
+    references: [
+      {
+        key: "smith_goodman_2010_dp4",
+        title: "Assigning the Stereochemistry of Pairs of Diastereoisomers (DP4)",
+        authors: "Smith S. G.; Goodman J. M.",
+        venue: "J. Am. Chem. Soc.",
+        year: 2010,
+        doi: "10.1021/ja105035r",
+      },
+      {
+        key: "silverstein_2014_8e",
+        title: "Spectrometric Identification of Organic Compounds (8th ed.)",
+        authors: "Silverstein R. M.; Webster F. X.",
+        venue: "Wiley",
+        year: 2014,
+      },
+    ],
+  }
+
+  it("renders one entry per reference with hyperlink to DOI when present", () => {
+    render(<ReferencesPanel payload={REF_PAYLOAD} />)
+    expect(screen.getByTestId("references-panel")).toBeInTheDocument()
+    expect(screen.getByText(/Smith S. G.; Goodman J. M./)).toBeInTheDocument()
+    expect(screen.getByText(/Spectrometric Identification/)).toBeInTheDocument()
+    // DOI link shape
+    const doiLink = screen.getByText(/Smith S. G.; Goodman J. M./).closest("a")
+    expect(doiLink).not.toBeNull()
+    expect(doiLink?.getAttribute("href")).toContain("doi.org/10.1021/ja105035r")
+  })
+
+  it("renders nothing when references list is empty", () => {
+    const { container } = render(<ReferencesPanel payload={{ references: [] }} />)
+    expect(container.firstChild).toBeNull()
+  })
+})
+
+describe("PredictedVsObservedPanel — DP4 columns", () => {
+  it("shows z_DP4 and confidence chips for matched rows", () => {
+    const payload = {
+      predicted_vs_observed: [
+        {
+          status: "matched",
+          predicted_ppm: 3.65,
+          observed_ppm: 3.66,
+          delta_ppm: 0.01,
+          z_dp4: -0.05,
+          tail_probability: 0.96,
+          confidence: "high",
+          predicted_environment: "OCH2",
+        },
+      ],
+    }
+    render(<PredictedVsObservedPanel payload={payload} />)
+    expect(screen.getByText("-0.05")).toBeInTheDocument()
+    expect(screen.getByText("high")).toBeInTheDocument()
   })
 })

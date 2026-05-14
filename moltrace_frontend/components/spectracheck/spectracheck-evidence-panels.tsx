@@ -27,7 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { AlertTriangle, Beaker, ListChecks, Sparkles, Tag } from "lucide-react"
+import { AlertTriangle, Beaker, BookOpen, ListChecks, Sparkles, Tag, Target } from "lucide-react"
 import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 
 type RawPeak = Record<string, unknown>
@@ -439,6 +439,8 @@ export function PredictedVsObservedPanel({ payload }: { payload: unknown }) {
               <TableHead className="text-[10px] uppercase tracking-wide">Pred (ppm)</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Obs (ppm)</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Δ (ppm)</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide" title="z = (predicted − observed) / σ_DP4, Smith & Goodman 2010">z_DP4</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide" title="DP4 confidence bucket vs. literature tolerance">Conf.</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Env</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">∫ H</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Category</TableHead>
@@ -450,6 +452,8 @@ export function PredictedVsObservedPanel({ payload }: { payload: unknown }) {
               const pred = asNumber(row.predicted_ppm)
               const obs = asNumber(row.observed_ppm)
               const delta = asNumber(row.delta_ppm)
+              const zDp4 = asNumber(row.z_dp4)
+              const conf = asString(row.confidence)
               const env = asString(row.predicted_environment)
               const integration = asNumber(row.observed_integration_h)
               const category = asString(row.category)
@@ -466,6 +470,14 @@ export function PredictedVsObservedPanel({ payload }: { payload: unknown }) {
                   : status === "unmatched_predicted"
                     ? "var(--mt-amber)"
                     : "var(--mt-red, #b8474a)"
+              const confColor =
+                conf === "high"
+                  ? "var(--mt-green)"
+                  : conf === "medium"
+                    ? "var(--mt-amber)"
+                    : conf === "low"
+                      ? "var(--mt-red, #b8474a)"
+                      : "var(--muted-foreground, #888)"
               return (
                 <TableRow key={idx} data-testid="predicted-observed-row">
                   <TableCell>
@@ -480,6 +492,22 @@ export function PredictedVsObservedPanel({ payload }: { payload: unknown }) {
                   <TableCell className="font-mono text-xs">{pred !== null ? pred.toFixed(3) : "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{obs !== null ? obs.toFixed(3) : "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{delta !== null ? delta.toFixed(3) : "—"}</TableCell>
+                  <TableCell className="font-mono text-xs" style={{ color: zDp4 != null && Math.abs(zDp4) > 1 ? "var(--mt-amber)" : undefined }}>
+                    {zDp4 !== null ? zDp4.toFixed(2) : "—"}
+                  </TableCell>
+                  <TableCell>
+                    {conf ? (
+                      <Badge
+                        variant="outline"
+                        className="font-mono text-[10px]"
+                        style={{ borderColor: confColor, color: confColor }}
+                      >
+                        {conf}
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                   <TableCell className="text-[11px] text-muted-foreground">{env ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs">
                     {integration !== null ? integration.toFixed(2) : "—"}
@@ -509,6 +537,152 @@ export function PredictedVsObservedPanel({ payload }: { payload: unknown }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// DP4 candidate ranking
+// ────────────────────────────────────────────────────────────────────────────
+
+export function DP4RankingPanel({ payload }: { payload: unknown }) {
+  if (!isRecord(payload)) return null
+  const raw = payload.dp4_ranking
+  if (!Array.isArray(raw)) return null
+  const rows = raw.filter((r): r is RawPeak => isRecord(r))
+  if (rows.length === 0) return null
+
+  return (
+    <div data-testid="dp4-ranking">
+    <ModuleCard
+      accent="teal"
+      eyebrow="Evidence · DP4 candidate ranking"
+      title="Smith & Goodman 2010 DP4 posterior probability"
+      icon={Target}
+      description={`Bayesian ranking under a Student's t error model with σ_1H=0.185 ppm (ν=14.18) / σ_13C=2.306 ppm (ν=11.38). Probabilities sum to 1.0 across the candidate list.`}
+    >
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-[10px] uppercase tracking-wide">#</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide">Candidate</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide">DP4 prob.</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide">Matched</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide">MAE (ppm)</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide">RMSE (ppm)</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide">Scaling</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row, idx) => {
+              const label = asString(row.candidate_label) ?? `candidate ${idx + 1}`
+              const prob = asNumber(row.dp4_probability) ?? 0
+              const matched = asNumber(row.matched_peaks)
+              const mae = asNumber(row.mean_abs_error_ppm)
+              const rmse = asNumber(row.rms_error_ppm)
+              const slope = asNumber(row.scaling_slope)
+              const intercept = asNumber(row.scaling_intercept)
+              const isWinner = idx === 0 && prob > 0
+              const tint = isWinner ? "var(--mt-teal)" : "var(--muted-foreground, #888)"
+              return (
+                <TableRow key={idx} data-testid="dp4-ranking-row">
+                  <TableCell className="font-mono text-xs" style={{ color: tint }}>
+                    {idx + 1}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs" style={{ color: isWinner ? tint : undefined, fontWeight: isWinner ? 700 : 400 }}>
+                    {label}
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <span
+                        className="font-mono text-xs font-bold tabular-nums"
+                        style={{ color: tint }}
+                      >
+                        {Math.round(prob * 100)}%
+                      </span>
+                      <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${Math.max(0, Math.min(100, prob * 100))}%`, backgroundColor: tint }}
+                        />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{matched != null ? matched : "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{mae != null ? mae.toFixed(3) : "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{rmse != null ? rmse.toFixed(3) : "—"}</TableCell>
+                  <TableCell className="font-mono text-[10px] text-muted-foreground">
+                    {slope != null && intercept != null
+                      ? `δ_obs = ${slope.toFixed(3)}·δ_pred ${intercept >= 0 ? "+" : "−"} ${Math.abs(intercept).toFixed(3)}`
+                      : "—"}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </ModuleCard>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// References / citation block
+// ────────────────────────────────────────────────────────────────────────────
+
+export function ReferencesPanel({ payload }: { payload: unknown }) {
+  if (!isRecord(payload)) return null
+  const raw = payload.references
+  if (!Array.isArray(raw)) return null
+  const refs = raw.filter((r): r is RawPeak => isRecord(r))
+  if (refs.length === 0) return null
+  return (
+    <Card
+      className="overflow-hidden rounded-xl py-0"
+      style={{ borderTop: "3px solid var(--mt-teal)" }}
+      data-testid="references-panel"
+    >
+      <CardContent className="space-y-2 py-3">
+        <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+          <BookOpen className="h-3 w-3" aria-hidden />
+          References used by this analysis
+        </p>
+        <ol className="list-inside list-decimal space-y-1 text-[11px] text-muted-foreground">
+          {refs.map((r, idx) => {
+            const title = asString(r.title)
+            const authors = asString(r.authors)
+            const venue = asString(r.venue)
+            const year = asNumber(r.year)
+            const doi = asString(r.doi)
+            const url = asString(r.url)
+            const href = doi ? `https://doi.org/${doi}` : (url ?? null)
+            const display = (
+              <span>
+                {authors ? <span className="font-medium text-foreground">{authors}</span> : null}
+                {authors ? ". " : null}
+                {title ? <span className="italic">{title}</span> : null}
+                {title ? ". " : null}
+                {venue ? <span>{venue}</span> : null}
+                {year ? <span> {year}</span> : null}
+                {doi ? <span className="ml-1 font-mono text-[10px]">doi:{doi}</span> : null}
+              </span>
+            )
+            return (
+              <li key={idx}>
+                {href ? (
+                  <a href={href} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                    {display}
+                  </a>
+                ) : (
+                  display
+                )}
+              </li>
+            )
+          })}
+        </ol>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Composite — drop in below the spectrum
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -520,7 +694,9 @@ export function SpectraCheckEvidencePanels({ payload }: { payload: unknown }) {
         <LabileHydrogenPanel payload={payload} />
         <ImpurityCandidatesPanel payload={payload} />
       </div>
+      <DP4RankingPanel payload={payload} />
       <PredictedVsObservedPanel payload={payload} />
+      <ReferencesPanel payload={payload} />
     </div>
   )
 }

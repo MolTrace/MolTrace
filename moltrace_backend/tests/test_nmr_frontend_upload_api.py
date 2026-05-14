@@ -188,6 +188,53 @@ def test_nmr_processed_analyze_returns_peak_enrichment(tmp_path) -> None:
     assert isinstance(payload["predicted_vs_observed"], list)
     # With "ethanol | CCO" candidate, predicted vs observed should produce rows.
     assert len(payload["predicted_vs_observed"]) > 0
+    # Each matched row carries the new literature-grounded confidence fields.
+    matched_rows = [r for r in payload["predicted_vs_observed"] if r["status"] == "matched"]
+    if matched_rows:
+        sample = matched_rows[0]
+        assert "z_dp4" in sample
+        assert "tail_probability" in sample
+        assert sample["confidence"] in {"high", "medium", "low"}
+
+    # references block always cites Smith & Goodman 2010 even for single-candidate analyses.
+    references = payload["references"]
+    assert isinstance(references, list) and len(references) > 0
+    ref_keys = {ref["key"] for ref in references}
+    assert "smith_goodman_2010_dp4" in ref_keys
+    assert "silverstein_2014_8e" in ref_keys
+
+
+def test_nmr_processed_analyze_runs_dp4_ranking_for_multiple_candidates(tmp_path) -> None:
+    """When the user supplies ≥2 candidate SMILES, the response must include
+    a DP4 ranking sorted by descending probability that sums to ~1.0."""
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "dp4-ranking",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "nmr_text": (
+                    "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), "
+                    "1.26 (t, 3H), 2.10 (br s, 1H)"
+                ),
+                "candidates_text": "Methanol | CO\nEthanol | CCO\nPropanol | CCCO",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    ranking = payload["dp4_ranking"]
+    assert isinstance(ranking, list) and len(ranking) >= 2
+    total_p = sum(row["dp4_probability"] for row in ranking)
+    assert 0.99 <= total_p <= 1.01
+    probabilities = [row["dp4_probability"] for row in ranking]
+    assert probabilities == sorted(probabilities, reverse=True)
+    # DP4-AI citation surfaces when a multi-candidate ranking is computed.
+    ref_keys = {r["key"] for r in payload["references"]}
+    assert "howarth_goodman_2020_dp4ai" in ref_keys
 
 
 def test_nmr_processed_invalid_file_returns_clear_400(tmp_path) -> None:

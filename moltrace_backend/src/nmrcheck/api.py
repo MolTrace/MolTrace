@@ -73,7 +73,9 @@ from .analysis import analyze_inputs, validate_inputs
 from .baseline import normalize_baseline_mode
 from .benchmark import evaluate_suite
 from .candidate import compare_candidates, parse_candidate_text
+from .literature_data import references_for_keys
 from .peak_categorization import (
+    build_dp4_candidate_ranking,
     build_impurity_candidates,
     build_labile_hydrogen_summary,
     build_peak_category_summary,
@@ -5285,6 +5287,27 @@ def _first_smiles_from_candidates(candidates_text: str | None) -> str | None:
     return None
 
 
+def _all_smiles_from_candidates(candidates_text: str | None) -> list[str]:
+    """Return every SMILES in a pipe-delimited candidate block, in order.
+
+    Used by /nmr/processed/analyze to drive the DP4 multi-candidate ranking
+    (Smith & Goodman 2010). Duplicates are preserved so the rank reflects
+    exactly what the user pasted.
+    """
+    if not candidates_text or not candidates_text.strip():
+        return []
+    try:
+        candidates = parse_candidate_text(candidates_text)
+    except ValueError:
+        return []
+    out: list[str] = []
+    for candidate in candidates:
+        smiles = getattr(candidate, "smiles", None)
+        if isinstance(smiles, str) and smiles.strip():
+            out.append(smiles.strip())
+    return out
+
+
 def _candidate_summary_from_text(
     *,
     candidates_text: str | None,
@@ -5755,6 +5778,7 @@ async def nmr_processed_analyze_route(
     peak_category_summary = build_peak_category_summary(peaks)
 
     predicted_vs_observed_rows: list[dict[str, Any]] = []
+    dp4_ranking_rows: list[dict[str, Any]] = []
     if candidate_smiles:
         try:
             prediction = predict_nmr_from_smiles(
@@ -5772,6 +5796,50 @@ async def nmr_processed_analyze_route(
             )
         except Exception:  # noqa: BLE001 — prediction failures are non-fatal
             predicted_vs_observed_rows = []
+
+    # DP4 candidate ranking when the user supplied a multi-candidate block.
+    # Implements Smith & Goodman 2010 with literature σ/ν; preserves the
+    # existing candidate-comparison score above (they're complementary —
+    # legacy score is heuristic, DP4 is the Bayesian posterior).
+    all_candidate_smiles = _all_smiles_from_candidates(candidates_text)
+    if len(all_candidate_smiles) >= 2:
+        candidate_predicted_lists: list[list[Any]] = []
+        candidate_labels: list[str] = []
+        for cand_smiles in all_candidate_smiles:
+            try:
+                cand_pred = predict_nmr_from_smiles(cand_smiles, name=None, solvent=solvent)
+                cand_peaks = (
+                    cand_pred.proton_peaks if nucleus == "1H" else cand_pred.carbon13_peaks
+                )
+                candidate_predicted_lists.append(cand_peaks)
+                candidate_labels.append(cand_smiles)
+            except Exception:  # noqa: BLE001 — skip a single candidate without killing the ranking
+                continue
+        if candidate_predicted_lists:
+            try:
+                dp4_ranking_rows = build_dp4_candidate_ranking(
+                    observed_peaks=peaks,
+                    candidate_predicted=candidate_predicted_lists,
+                    candidate_labels=candidate_labels,
+                    nucleus=nucleus,
+                )
+            except Exception:  # noqa: BLE001
+                dp4_ranking_rows = []
+
+    # Build the citation block from the literature module so the frontend
+    # can render anchored references next to each evidence layer.
+    citation_keys = [
+        "smith_goodman_2010_dp4",
+        "comp_nmr_survey_2024",
+        "csp5_2024",
+        "park_2021_molecular_search",
+        "silverstein_2014_8e",
+        "mestrenova_manual",
+    ]
+    if dp4_ranking_rows:
+        citation_keys.append("howarth_goodman_2020_dp4ai")
+        citation_keys.append("howarth_goodman_2022_dp5")
+    references_block = references_for_keys(citation_keys)
     score = candidate_score if candidate_score is not None else comparison_score
     evidence_summary = [
         f"Parsed {point_count} spectrum point(s) and returned {len(peaks)} inferred peak(s).",
@@ -5818,6 +5886,8 @@ async def nmr_processed_analyze_route(
         predicted_vs_observed=predicted_vs_observed_rows,
         labile_hydrogen_summary=labile_hydrogen_summary,
         peak_category_summary=peak_category_summary,
+        dp4_ranking=dp4_ranking_rows,
+        references=references_block,
         analysis_score=score,
         evidence_summary=evidence_summary,
         warnings=list(dict.fromkeys(warnings)),
