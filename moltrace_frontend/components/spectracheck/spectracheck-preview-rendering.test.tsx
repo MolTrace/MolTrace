@@ -95,40 +95,41 @@ describe("SpectraCheck preview rendering", () => {
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/preview", expect.any(Object)))
   })
 
-  it("Preview metadata only calls /nmr/raw-fid/preview (auto-FT is opt-in)", async () => {
+  it("renders processed analyze spectra from direct x/y arrays", async () => {
     apiFetchMock.mockResolvedValueOnce({
       sample_id: "sample-1",
-      filename: "raw.zip",
-      raw_sha256: "a".repeat(64),
-      vendor_detected: "Bruker",
       nucleus: "1H",
-      acquisition_parameters: {},
-      file_inventory: {},
+      filename: "trace.csv",
+      point_count: 3,
+      peak_count: 1,
+      x: [4.2, 4.1, 4],
+      y: [0, 3, 0],
+      peaks: [{ shift_ppm: 4.1, intensity: 3 }],
       warnings: [],
       notes: [],
       metadata: {},
     })
 
     renderWithEvidence(
-      <SpectraCheckRawFidSection sampleId="sample-1" onSampleIdChange={() => {}} solvent="CDCl3" />,
+      <SpectraCheckProcessedSpectrumSection
+        sampleId="sample-1"
+        onSampleIdChange={() => {}}
+        solvent="CDCl3"
+        candidatesText=""
+      />,
     )
 
-    fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
-      target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
+    fireEvent.change(screen.getByLabelText(/Processed spectrum file/i, { selector: "input" }), {
+      target: { files: [new File(["ppm,intensity\n4.2,0\n4.1,3\n4.0,0\n"], "trace.csv")] },
     })
-    fireEvent.click(screen.getByRole("button", { name: /Preview metadata/i }))
+    fireEvent.click(screen.getByRole("button", { name: /Run evidence match/i }))
 
-    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/preview", expect.any(Object)))
-    // Critical: the metadata preview must NOT auto-trigger /nmr/raw-fid/process.
-    // The opt-in "Show preview spectrum" button is what kicks off the auto-FT.
-    expect(apiFetchMock).toHaveBeenCalledTimes(1)
-    expect(apiFetchMock).not.toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object))
-    // Placeholder is shown with the opt-in button under it.
-    expect(await screen.findByText(/Raw spectrum not generated yet/i)).toBeInTheDocument()
-    expect(screen.getByTestId("raw-fid-show-preview-spectrum")).toBeInTheDocument()
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/analyze", expect.any(Object)))
+    expect(await screen.findByText(/Nucleus context/i)).toBeInTheDocument()
+    expect(screen.queryByText(/No spectrum loaded/i)).not.toBeInTheDocument()
   })
 
-  it("Show preview spectrum button fires the auto-FT process call on demand", async () => {
+  it("raw FID preview automatically generates and displays a quick spectrum", async () => {
     apiFetchMock.mockResolvedValueOnce({
       sample_id: "sample-1",
       filename: "raw.zip",
@@ -139,7 +140,7 @@ describe("SpectraCheck preview rendering", () => {
       file_inventory: {},
       warnings: [],
       notes: [],
-      metadata: {},
+      metadata: { raw_archive_id: "a".repeat(64) },
     })
     apiFetchMock.mockResolvedValueOnce({
       sample_id: "sample-1",
@@ -164,14 +165,46 @@ describe("SpectraCheck preview rendering", () => {
     fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
       target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
     })
-    fireEvent.click(screen.getByRole("button", { name: /Preview metadata/i }))
-    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/preview", expect.any(Object)))
+    fireEvent.click(screen.getByRole("button", { name: /Preview spectrum/i }))
 
-    // User explicitly opts in to the auto-FT.
-    fireEvent.click(screen.getByTestId("raw-fid-show-preview-spectrum"))
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/preview", expect.any(Object)))
+    await waitFor(() =>
+      expect(apiFetchMock).toHaveBeenCalledWith(`/raw-fid/${"a".repeat(64)}/preview`, expect.any(Object)),
+    )
+    expect(await screen.findByText(/Auto-FT preview/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Raw spectrum not generated yet/i)).not.toBeInTheDocument()
+  })
+
+  it("raw FID process displays returned spectrum points", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      filename: "raw.zip",
+      vendor_detected: "Bruker",
+      nucleus: "1H",
+      processing_preset: "safe_automatic",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 5, 0],
+      x_label: "ppm",
+      y_label: "intensity",
+      reversed_x_axis: true,
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
+
+    renderWithEvidence(
+      <SpectraCheckRawFidSection sampleId="sample-1" onSampleIdChange={() => {}} solvent="CDCl3" />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
+      target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Process FID/i }))
 
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object)))
-    expect(await screen.findByText(/Auto-FT preview/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Nucleus context/i)).toBeInTheDocument()
+    expect(screen.queryByText(/No spectrum loaded/i)).not.toBeInTheDocument()
   })
 
   it("runs raw FID preview from a dropped archive", async () => {
@@ -199,7 +232,7 @@ describe("SpectraCheck preview rendering", () => {
     })
     expect(await screen.findByText("dropped.zip")).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole("button", { name: /Preview metadata/i }))
+    fireEvent.click(screen.getByRole("button", { name: /Preview spectrum/i }))
 
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/preview", expect.any(Object)))
   })

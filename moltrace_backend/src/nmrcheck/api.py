@@ -5642,6 +5642,7 @@ async def nmr_processed_analyze_route(
                 display_mode="real",
                 vertical_gain=1.0,
             )
+            x_values, y_values = _xy_from_spectrum_points(preview.preview_points)
             peaks = _model_dicts(preview.inferred_peaks)
             metadata = {
                 **preview.metadata,
@@ -5678,6 +5679,7 @@ async def nmr_processed_analyze_route(
                 display_mode="real",
                 vertical_gain=1.0,
             )
+            x_values, y_values = _carbon13_preview_points(carbon_preview)
             peaks = _model_dicts(carbon_preview.peaks)
             generated_carbon13_text = _carbon13_text_from_peaks(peaks)
             metadata = {
@@ -5879,6 +5881,11 @@ async def nmr_processed_analyze_route(
         filename=filename,
         point_count=point_count,
         peak_count=len(peaks),
+        x=x_values,
+        y=y_values,
+        x_label="ppm",
+        y_label="intensity",
+        reversed_x_axis=_reversed_x_axis(x_values),
         peaks=peaks,
         solvent_warnings=solvent_warnings,
         impurity_warnings=impurity_warnings,

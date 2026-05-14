@@ -510,6 +510,11 @@ class NMRProcessedAnalyzeResponse(BaseModel):
     filename: str
     point_count: int = Field(ge=0)
     peak_count: int = Field(ge=0)
+    x: list[float] = Field(default_factory=list)
+    y: list[float] = Field(default_factory=list)
+    x_label: str = "ppm"
+    y_label: str = "intensity"
+    reversed_x_axis: bool = True
     peaks: list[dict[str, Any]] = Field(default_factory=list)
     solvent_warnings: list[str] = Field(default_factory=list)
     impurity_warnings: list[str] = Field(default_factory=list)
