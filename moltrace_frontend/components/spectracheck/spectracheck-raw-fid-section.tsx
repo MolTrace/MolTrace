@@ -329,12 +329,18 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     } finally {
       setPreviewLoading(false)
     }
-    // Kick off the auto-FT preview in parallel so the metadata renders
-    // immediately and the spectrum follows when it's ready. Skip if a full
-    // processed result is already on screen — that spectrum wins.
-    if (!processResult) {
-      void runPreviewSpectrum(file)
+    // Auto-FT is now opt-in via the dedicated "Show preview spectrum" button —
+    // it costs an extra /nmr/raw-fid/process call that can take seconds on
+    // large FIDs and was freezing the UI when chained automatically.
+  }
+
+  async function runPreviewSpectrumFromSelection() {
+    const file = getSelectedFile()
+    if (!file) {
+      update({ previewSpectrumError: "Choose a raw FID archive first." })
+      return
     }
+    await runPreviewSpectrum(file)
   }
 
   async function runProcess() {
@@ -1006,15 +1012,30 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
                   description={previewSpectrumError}
                 />
               ) : (
-                <AlertCard
-                  variant="warning"
-                  title="Raw spectrum not generated yet"
-                  description={
-                    processResult
-                      ? "Processing completed, but no display-ready spectrum points were returned. Review the response details below."
-                      : "Raw metadata preview checks the archive and hash only. Use Process raw FID to generate a derived spectrum plot."
-                  }
-                />
+                <div className="space-y-2">
+                  <AlertCard
+                    variant="warning"
+                    title="Raw spectrum not generated yet"
+                    description={
+                      processResult
+                        ? "Processing completed, but no display-ready spectrum points were returned. Review the response details below."
+                        : "Raw metadata preview checks the archive and hash only. Use Process raw FID to generate a derived spectrum plot — or run a quick auto-FT to see the spectrum without committing processing parameters."
+                    }
+                  />
+                  {!processResult ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void runPreviewSpectrumFromSelection()}
+                      disabled={previewSpectrumLoading}
+                      data-testid="raw-fid-show-preview-spectrum"
+                    >
+                      <Sparkles className="mr-1 h-3.5 w-3.5" aria-hidden />
+                      {previewSpectrumLoading ? "Generating preview spectrum…" : "Show preview spectrum (auto-FT)"}
+                    </Button>
+                  ) : null}
+                </div>
               )}
             </div>
 

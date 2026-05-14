@@ -95,9 +95,40 @@ describe("SpectraCheck preview rendering", () => {
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/preview", expect.any(Object)))
   })
 
-  it("chains an auto-FT preview spectrum after metadata-only preview", async () => {
-    // First call is the metadata preview, second is the auto-FT process step
-    // that the section kicks off so the user sees a spectrum alongside metadata.
+  it("Preview metadata only calls /nmr/raw-fid/preview (auto-FT is opt-in)", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      filename: "raw.zip",
+      raw_sha256: "a".repeat(64),
+      vendor_detected: "Bruker",
+      nucleus: "1H",
+      acquisition_parameters: {},
+      file_inventory: {},
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
+
+    renderWithEvidence(
+      <SpectraCheckRawFidSection sampleId="sample-1" onSampleIdChange={() => {}} solvent="CDCl3" />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
+      target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Preview metadata/i }))
+
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/preview", expect.any(Object)))
+    // Critical: the metadata preview must NOT auto-trigger /nmr/raw-fid/process.
+    // The opt-in "Show preview spectrum" button is what kicks off the auto-FT.
+    expect(apiFetchMock).toHaveBeenCalledTimes(1)
+    expect(apiFetchMock).not.toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object))
+    // Placeholder is shown with the opt-in button under it.
+    expect(await screen.findByText(/Raw spectrum not generated yet/i)).toBeInTheDocument()
+    expect(screen.getByTestId("raw-fid-show-preview-spectrum")).toBeInTheDocument()
+  })
+
+  it("Show preview spectrum button fires the auto-FT process call on demand", async () => {
     apiFetchMock.mockResolvedValueOnce({
       sample_id: "sample-1",
       filename: "raw.zip",
@@ -133,47 +164,14 @@ describe("SpectraCheck preview rendering", () => {
     fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
       target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
     })
-    // Step 2 "Inspect" action tile — accessible name includes the headline "Preview metadata".
     fireEvent.click(screen.getByRole("button", { name: /Preview metadata/i }))
-
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/preview", expect.any(Object)))
+
+    // User explicitly opts in to the auto-FT.
+    fireEvent.click(screen.getByTestId("raw-fid-show-preview-spectrum"))
+
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object)))
-    // Auto-FT preview badge appears once the chained call resolves.
     expect(await screen.findByText(/Auto-FT preview/i)).toBeInTheDocument()
-    // And the SpectrumViewer renders the real spectrum (no empty placeholder).
-    expect(screen.queryByText(/No spectrum loaded/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Raw spectrum not generated yet/i)).not.toBeInTheDocument()
-  })
-
-  it("falls back to the placeholder if the auto-FT preview fails", async () => {
-    apiFetchMock.mockResolvedValueOnce({
-      sample_id: "sample-1",
-      filename: "raw.zip",
-      raw_sha256: "a".repeat(64),
-      vendor_detected: "Bruker",
-      nucleus: "1H",
-      acquisition_parameters: {},
-      file_inventory: {},
-      warnings: [],
-      notes: [],
-      metadata: {},
-    })
-    apiFetchMock.mockRejectedValueOnce(new Error("FID could not be auto-processed"))
-
-    renderWithEvidence(
-      <SpectraCheckRawFidSection sampleId="sample-1" onSampleIdChange={() => {}} solvent="CDCl3" />,
-    )
-
-    fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
-      target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
-    })
-    fireEvent.click(screen.getByRole("button", { name: /Preview metadata/i }))
-
-    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/preview", expect.any(Object)))
-    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object)))
-    // Surface the auto-FT failure to the user instead of silently hiding it.
-    expect(await screen.findByText(/Preview spectrum unavailable/i)).toBeInTheDocument()
-    expect(screen.queryByText(/No spectrum loaded/i)).not.toBeInTheDocument()
   })
 
   it("runs raw FID preview from a dropped archive", async () => {

@@ -158,8 +158,8 @@ const tabTriggerClass = cn(
   "data-[state=inactive]:text-muted-foreground",
 )
 
-const defaultCandidates = `Ethanol | CCO | proposed
-Methanol | CO | starting material
+const defaultCandidates = `Methanol | CO | starting material
+Ethanol | CCO | proposed
 Propanol | CCCO | possible impurity`
 
 const defaultProton =
@@ -981,7 +981,11 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
     if (s.sampleId.trim()) setSampleId(s.sampleId)
     if (s.solventChoice.trim()) setSolventChoice(s.solventChoice)
     setCustomSolvent(s.customSolvent ?? "")
-    if (typeof s.candidatesText === "string" && s.candidatesText.trim()) setCandidatesText(s.candidatesText)
+    // Candidate structures intentionally always restore to the molecular
+    // defaults (Methanol/Ethanol/Propanol) on every workspace mount so a fresh
+    // analysis starts from a known baseline. Any user edits made during a
+    // session are not carried across refreshes / sign-ins.
+    setCandidatesText(defaultCandidates)
     if (typeof s.protonText === "string") setProtonText(s.protonText)
     if (typeof s.carbonText === "string") setCarbonText(s.carbonText)
   }, [])
