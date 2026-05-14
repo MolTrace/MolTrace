@@ -1,7 +1,7 @@
 "use client"
 
-import dynamic from "next/dynamic"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { UPlotCanvas } from "@/components/science/UPlotCanvas"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
@@ -21,10 +21,6 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react"
-
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false }) as React.ComponentType<
-  Record<string, unknown>
->
 
 /** Peak annotations from backend (no frontend picking). */
 export type SpectrumPeakAnnotation = {
@@ -181,94 +177,20 @@ export function SpectrumViewer({
   const effectiveXMin = xRange ? xRange[0] : xMin
   const effectiveXMax = xRange ? xRange[1] : xMax
 
-  const data = useMemo(() => {
-    if (x.length === 0) return []
-    const traces: object[] = [
-      {
-        type: "scattergl",
-        mode: "lines",
-        x,
-        y: displayY,
-        name: "Observed",
-        line: { width: 1.2, color: "#2563eb" },
-      },
-    ]
-    if (
-      showPredicted &&
-      overlays?.predicted &&
-      overlays.predicted.x.length === overlays.predicted.y.length &&
-      displayPred
-    ) {
-      traces.push({
-        type: "scattergl",
-        mode: "lines",
-        x: overlays.predicted.x,
-        y: displayPred,
-        name: overlays.predicted.label ?? "Predicted",
-        line: { width: 1, dash: "dash", color: "#c026d3" },
-        opacity: 0.85,
-      })
-    }
-    if (showPeaks && peaks.length > 0) {
-      const totalScale = gainMultiplier(gain01) * yZoom
-      const px = peaks.map((p) => p.ppm)
-      const py = peaks.map((p) =>
-        p.intensity != null ? p.intensity * totalScale : nearestYAtPpm(x, displayY, p.ppm)
-      )
-      traces.push({
-        type: "scattergl",
-        mode: "markers+text",
-        x: px,
-        y: py,
-        text: peaks.map((p) => p.label ?? ""),
-        textposition: "top center",
-        name: "Peaks",
-        marker: { size: 7, color: "#ea580c", line: { width: 0.5, color: "#fff" } },
-        textfont: { size: 10 },
-      })
-    }
-    return traces
-  }, [x, displayY, displayPred, overlays, peaks, showPeaks, showPredicted, gain01, yZoom])
-
-  const layout = useMemo(
-    () => ({
-      autosize: true,
-      margin: { l: 52, r: 16, t: 28, b: 44 },
-      paper_bgcolor: "transparent",
-      plot_bgcolor: "transparent",
-      showlegend: Boolean(overlays?.predicted && showPredicted) || (showPeaks && peaks.length > 0),
-      // dragmode: "zoom" → drag to select a zoom box (default).
-      //          "pan"  → drag to move the visible window around freely.
-      dragmode: dragMode,
-      xaxis: {
-        title: xLabel,
-        autorange: reversedXAxis ? "reversed" : true,
-        range: xRange ? [effectiveXMin, effectiveXMax] : undefined,
-        zeroline: false,
-      },
-      yaxis: {
-        title: yLabel,
-        range: [0, yMax],
-        zeroline: false,
-        fixedrange: false,
-      },
-      hovermode: "closest",
-      uirevision: "spectrum",
-    }),
-    [xLabel, yLabel, reversedXAxis, xRange, effectiveXMin, effectiveXMax, yMax, overlays, showPredicted, peaks.length, showPeaks, dragMode]
-  )
-
-  const onRelayout = useCallback((ev: Readonly<unknown>) => {
-    const raw = ev as Record<string, unknown>
-    const xr0 = raw["xaxis.range[0]"]
-    const xr1 = raw["xaxis.range[1]"]
-    if (typeof xr0 === "number" && typeof xr1 === "number") {
-      setXRange([xr0, xr1])
-    }
-    if (raw["xaxis.autorange"] === true) {
-      setXRange(null)
-    }
-  }, [])
+  /**
+   * Peak intensity values aligned to the *displayed* (gain-scaled) y axis,
+   * so the orange peak markers track the actual line drawn on screen.
+   */
+  const peakRenderPoints = useMemo(() => {
+    if (!showPeaks || peaks.length === 0) return undefined
+    const totalScale = gainMultiplier(gain01) * yZoom
+    return peaks.map((p) => ({
+      ppm: p.ppm,
+      intensity:
+        p.intensity != null ? p.intensity * totalScale : nearestYAtPpm(x, displayY, p.ppm),
+      label: p.label,
+    }))
+  }, [peaks, showPeaks, gain01, yZoom, x, displayY])
 
   /**
    * Full reset — restores every interactive setting to its first-preview state:
@@ -430,20 +352,22 @@ export function SpectrumViewer({
         ref={chartContainerRef}
         className="group sticky top-4 z-10 h-[min(560px,70vh)] min-h-[320px] w-full min-w-0 overflow-hidden rounded-lg border bg-card"
       >
-        <Plot
-          data={data}
-          layout={layout}
-          config={{
-            // Hide Plotly's built-in modebar — we provide a draggable, hover-revealed
-            // floating toolbar below that covers the same actions plus our app-specific toggles.
-            displayModeBar: false,
-            displaylogo: false,
-            responsive: true,
-            scrollZoom: true,
-          }}
-          style={{ width: "100%", height: "100%" }}
-          useResizeHandler
-          onRelayout={onRelayout}
+        <UPlotCanvas
+          x={x}
+          y={displayY}
+          predictedX={overlays?.predicted?.x}
+          predictedY={displayPred ?? undefined}
+          predictedLabel={overlays?.predicted?.label}
+          peaks={peakRenderPoints}
+          showPeaks={showPeaks}
+          showPredicted={showPredicted}
+          reversedXAxis={reversedXAxis}
+          xLabel={xLabel}
+          yLabel={yLabel}
+          xRange={xRange}
+          yMax={yMax}
+          dragMode={dragMode}
+          onXRangeChange={(range) => setXRange(range)}
         />
 
         {/*
