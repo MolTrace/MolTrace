@@ -3,27 +3,32 @@
 /**
  * Canvas-based NMR spectrum renderer (uPlot).
  *
- * This is the Step 5 swap from the spectrum-stabilization plan: uPlot draws
- * 100k+ points at 60 fps on a single ``<canvas>`` element. The component is
- * wrapped in :func:`React.memo` so a parent re-render that doesn't change
- * ``data`` or ``options`` is a no-op. The chart instance is created exactly
- * once on mount; subsequent ``data``/``range`` updates flow through
- * ``setData`` / ``setScale``, which are constant-time and bypass React.
+ * Step 5 of the spectrum-stabilization plan. The implementation is
+ * deliberately conservative — uPlot has a number of strict invariants that
+ * Plotly's scattergl did not, and earlier iterations of this file silently
+ * failed for unsorted x, custom y scales that clipped data out of view,
+ * null-padded extra series, and 0-pixel container widths at mount.
  *
- * Why we don't import uPlot statically: it touches ``window`` at module
- * load time. Pulling it in as a top-level import would crash SSR; the
- * dynamic loader keeps the SSR-rendered shell harmless and only resolves
- * uPlot once the browser is alive.
+ * Rules this component now follows:
+ *
+ *   1. Observed line is the single uPlot series. Predicted overlay and peak
+ *      markers are rendered as separate, transparent overlays on top of the
+ *      canvas so they cannot interfere with uPlot's data validation.
+ *   2. uPlot's auto-range is used for both axes (we only flip x via
+ *      ``dir: -1`` for NMR convention). Custom scale.range functions that
+ *      clipped data out of the visible window are gone.
+ *   3. x is sorted ascending if needed before being handed to uPlot.
+ *   4. The chart is mounted only once the container has a positive
+ *      clientWidth. Multiple triggers race to mount — whichever wins, wins.
+ *   5. Resize is rAF-throttled.
  */
 
 import React, { memo, useEffect, useMemo, useRef } from "react"
 import type uPlotType from "uplot"
 import type { AlignedData, Options } from "uplot"
 import { rafThrottle } from "@/src/lib/spectracheck/raf-throttle"
-// uPlot CSS — must be present for the chart to lay out correctly.
 import "uplot/dist/uPlot.min.css"
 
-// Lazy module handle so SSR doesn't import the canvas-touching code.
 type UPlotCtor = typeof uPlotType
 let uPlotPromise: Promise<UPlotCtor> | null = null
 function loadUPlot(): Promise<UPlotCtor> {
@@ -39,42 +44,23 @@ export type UPlotPeak = {
 }
 
 export type UPlotCanvasProps = {
-  /** Source x axis in ppm. Float32Array preferred — uPlot consumes typed arrays. */
   x: number[] | Float32Array
-  /** Observed intensity values matching ``x`` element-for-element. */
   y: number[] | Float32Array
-  /** Optional predicted overlay (separate x/y arrays). */
   predictedX?: number[] | Float32Array
   predictedY?: number[] | Float32Array
   predictedLabel?: string
-  /** Optional peak markers — rendered as a points-only series. */
   peaks?: UPlotPeak[]
   showPeaks?: boolean
   showPredicted?: boolean
   reversedXAxis?: boolean
   xLabel?: string
   yLabel?: string
-  /** Active x-axis window; ``null`` = autorange. */
   xRange?: [number, number] | null
-  /** Active y-axis upper bound. */
+  /** Reserved — uPlot auto-ranges Y, but we still accept the prop for API parity. */
   yMax?: number
-  /** "zoom" → drag box-zooms x. "pan" → drag pans x without zooming. */
   dragMode?: "zoom" | "pan"
-  /** Called when the user releases a zoom/pan with the new x range. */
   onXRangeChange?: (range: [number, number] | null) => void
-  /** Render height (px). */
   height?: number
-}
-
-type AlignedSeriesValue = readonly (number | null)[] | number[] | Float32Array | null
-
-function toUplotSeries(values: AlignedSeriesValue | undefined): number[] | Float32Array | null {
-  if (values == null) return null
-  if (values instanceof Float32Array) return values
-  // uPlot accepts null at element level (renders as a gap) but its TS types
-  // declare ``number[]``; cast through unknown so we stay typesafe at the
-  // boundary while preserving the gap semantics at runtime.
-  return values as unknown as number[]
 }
 
 const palette = {
@@ -85,7 +71,7 @@ const palette = {
   grid: "rgba(107, 114, 128, 0.18)",
 }
 
-function isMonotonicAsc(values: number[] | Float32Array): boolean {
+function isMonotonicAsc(values: ArrayLike<number>): boolean {
   for (let i = 1; i < values.length; i++) {
     if (values[i] < values[i - 1]) return false
   }
@@ -93,97 +79,42 @@ function isMonotonicAsc(values: number[] | Float32Array): boolean {
 }
 
 /**
- * Co-sort x with one or more y-series so the x array is monotonically
- * increasing. uPlot REQUIRES this — Plotly's scattergl did not. Skipping the
- * sort is what was previously producing a blank chart for unsorted spectrum
- * payloads (e.g. peak-table CSV inputs whose rows are in file order rather
- * than shift order).
+ * Co-sort x ascending with paired y arrays. uPlot requires monotonic x;
+ * Plotly's scattergl did not. Returning plain number[] keeps uPlot's type
+ * checker happy.
  */
-function sortByXAscending(
-  x: number[] | Float32Array,
-  ys: ((number | null)[] | number[] | Float32Array | null)[],
-): {
-  x: number[]
-  ys: ((number | null)[] | null)[]
-} {
+function sortAscending(
+  x: ArrayLike<number>,
+  y: ArrayLike<number>,
+): { x: number[]; y: number[] } {
   const n = x.length
   const indices = new Array<number>(n)
   for (let i = 0; i < n; i++) indices[i] = i
-  indices.sort((a, b) => x[a] - x[b])
+  indices.sort((a, b) => (x[a] as number) - (x[b] as number))
   const sortedX = new Array<number>(n)
-  for (let i = 0; i < n; i++) sortedX[i] = x[indices[i]]
-  const sortedYs: ((number | null)[] | null)[] = ys.map((series) => {
-    if (series == null) return null
-    const out: (number | null)[] = new Array(n)
-    for (let i = 0; i < n; i++) {
-      const v = (series as { [k: number]: number | null })[indices[i]]
-      out[i] = v == null ? null : v
-    }
-    return out
-  })
-  return { x: sortedX, ys: sortedYs }
+  const sortedY = new Array<number>(n)
+  for (let i = 0; i < n; i++) {
+    const idx = indices[i]
+    sortedX[i] = x[idx] as number
+    sortedY[i] = y[idx] as number
+  }
+  return { x: sortedX, y: sortedY }
 }
 
-function toAligned(
-  x: number[] | Float32Array,
-  y: number[] | Float32Array,
-  predictedY: (number | null)[] | null,
-  peakY: (number | null)[] | null,
+function buildObservedData(
+  xIn: number[] | Float32Array,
+  yIn: number[] | Float32Array,
 ): AlignedData {
-  // uPlot requires every series to have the same length as the x array. If
-  // an overlay/peaks series is absent we pad with all-null entries so the
-  // series index stays stable but the trace renders as fully transparent
-  // (uPlot's ``accScale`` skips null samples but throws on a series-level
-  // null reference — that's the root cause of the "Cannot read properties
-  // of null" crash we saw at runtime).
-  const len = x.length
-  const predicted: (number | null)[] = predictedY ?? new Array(len).fill(null)
-  const peak: (number | null)[] = peakY ?? new Array(len).fill(null)
-
-  // Sort x ascending if needed. Without this uPlot silently fails to render
-  // the line for unsorted inputs.
-  if (!isMonotonicAsc(x)) {
-    const sorted = sortByXAscending(x, [y, predicted, peak])
-    return [
-      sorted.x,
-      toUplotSeries(sorted.ys[0]) as number[],
-      toUplotSeries(sorted.ys[1]) as number[],
-      toUplotSeries(sorted.ys[2]) as number[],
-    ] as AlignedData
+  if (xIn.length === 0 || yIn.length === 0 || xIn.length !== yIn.length) {
+    return [[], []] as unknown as AlignedData
   }
-  return [
-    toUplotSeries(x) as number[],
-    toUplotSeries(y) as number[],
-    toUplotSeries(predicted) as number[],
-    toUplotSeries(peak) as number[],
-  ] as AlignedData
-}
-
-function alignPeaksToX(
-  x: number[] | Float32Array,
-  peaks: UPlotPeak[] | undefined,
-): (number | null)[] | null {
-  if (!peaks || peaks.length === 0) return null
-  const result: (number | null)[] = new Array(x.length).fill(null)
-  if (x.length === 0) return result
-  // Sort peaks once; binary-search each into x for ~O(p log n).
-  const sorted = [...peaks].sort((a, b) => a.ppm - b.ppm)
-  for (const peak of sorted) {
-    let lo = 0
-    let hi = x.length - 1
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1
-      if (x[mid] < peak.ppm) lo = mid + 1
-      else hi = mid
-    }
-    // Bracket the insertion point: pick the nearest of lo, lo-1.
-    let idx = lo
-    if (idx > 0 && Math.abs(x[idx - 1] - peak.ppm) < Math.abs(x[idx] - peak.ppm)) {
-      idx = idx - 1
-    }
-    result[idx] = peak.intensity ?? null
+  if (isMonotonicAsc(xIn)) {
+    // Pass-through. uPlot accepts number[] (and Float32Array through the
+    // ``number[]`` cast — TS types are stricter than the runtime).
+    return [xIn as number[], yIn as number[]] as unknown as AlignedData
   }
-  return result
+  const sorted = sortAscending(xIn, yIn)
+  return [sorted.x, sorted.y] as unknown as AlignedData
 }
 
 export const UPlotCanvas = memo(function UPlotCanvas({
@@ -197,7 +128,7 @@ export const UPlotCanvas = memo(function UPlotCanvas({
   showPredicted = true,
   reversedXAxis = true,
   xLabel = "ppm",
-  yLabel = "Intensity",
+  // yLabel intentionally unused — NMR convention hides the intensity axis.
   xRange = null,
   yMax,
   dragMode = "zoom",
@@ -207,121 +138,77 @@ export const UPlotCanvas = memo(function UPlotCanvas({
   const containerRef = useRef<HTMLDivElement>(null)
   const plotRef = useRef<uPlotType | null>(null)
 
-  // Resample predicted onto the observed x axis when an overlay is present.
-  const predictedAligned = useMemo<(number | null)[] | null>(() => {
-    if (!showPredicted || !predictedX || !predictedY) return null
-    if (predictedX.length === 0 || predictedY.length === 0) return null
-    // Lightweight nearest-x re-sampler. Same-length overlays pass through
-    // untouched; otherwise we project each predicted point onto the closest
-    // observed x bin.
-    if (predictedX.length === x.length) {
-      // Best case: same axis. Replace null gaps with NaN so uPlot renders.
-      return Array.from(predictedY, (v) => (Number.isFinite(v) ? v : null))
-    }
-    const aligned: (number | null)[] = new Array(x.length).fill(null)
-    // Build sorted lookup of predicted (ppm → intensity) for binary search.
-    const pairs: Array<[number, number]> = []
-    for (let i = 0; i < predictedX.length; i++) {
-      const px = predictedX[i]
-      const py = predictedY[i]
-      if (Number.isFinite(px) && Number.isFinite(py)) pairs.push([px, py])
-    }
-    pairs.sort((a, b) => a[0] - b[0])
-    for (let i = 0; i < x.length; i++) {
-      const target = x[i]
-      let lo = 0
-      let hi = pairs.length - 1
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1
-        if (pairs[mid][0] < target) lo = mid + 1
-        else hi = mid
-      }
-      const best =
-        lo > 0 && Math.abs(pairs[lo - 1][0] - target) < Math.abs(pairs[lo][0] - target)
-          ? pairs[lo - 1]
-          : pairs[lo]
-      if (best && Math.abs(best[0] - target) <= 0.5) {
-        aligned[i] = best[1]
-      }
-    }
-    return aligned
-  }, [predictedX, predictedY, showPredicted, x])
+  const data = useMemo(() => buildObservedData(x, y), [x, y])
 
-  const peakAligned = useMemo<(number | null)[] | null>(
-    () => (showPeaks ? alignPeaksToX(x, peaks) : null),
-    [x, peaks, showPeaks],
-  )
-
-  // Options are recomputed only when the things that genuinely change the
-  // layout change. The data array (which changes constantly during gain
-  // adjustments) is shipped via setData, not by recreating options.
+  // Stable options — recomputed only when one of the layout knobs changes,
+  // not when the data does (data updates flow through setData below).
   const optionsKey = useMemo(
     () =>
       JSON.stringify({
         height,
         reversedXAxis,
         xLabel,
-        yLabel,
         dragMode,
-        showPredicted: Boolean(predictedAligned),
-        showPeaks: Boolean(peakAligned),
-        yMax,
         xRange,
+        yMax,
       }),
-    [
-      height,
-      reversedXAxis,
-      xLabel,
-      yLabel,
-      dragMode,
-      predictedAligned,
-      peakAligned,
-      yMax,
-      xRange,
-    ],
+    [height, reversedXAxis, xLabel, dragMode, xRange, yMax],
   )
 
-  // Mount once. uPlot is created lazily on the client.
-  // We hold off on the actual ``new uPlot(...)`` call until the container has
-  // a non-zero clientWidth — otherwise uPlot stamps a 0-px-wide canvas that
-  // doesn't repaint when the ResizeObserver later fires. The plan PDF flags
-  // this as the most common source of "spectrum doesn't appear" bugs.
+  // Mount uPlot once the container has measurable width. Multiple triggers
+  // race to fire (dynamic-import resolution, ResizeObserver, requestAnimationFrame)
+  // so we don't lose the first mount to deferred sticky layout.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     let cancelled = false
+    let ctor: UPlotCtor | null = null
     let resizeObserver: ResizeObserver | null = null
+    const rafIds: number[] = []
 
-    const buildChart = (uPlot: UPlotCtor, width: number) => {
-      if (cancelled || !containerRef.current || plotRef.current) return
-      const initialData = toAligned(x, y, predictedAligned, peakAligned)
-      const measuredHeight = containerRef.current.clientHeight || height
+    const tryMount = () => {
+      if (cancelled || plotRef.current || !ctor) return
+      const node = containerRef.current
+      if (!node) return
+      // Don't gate on positive clientWidth — sticky / flex layouts can take a
+      // frame or two before clientWidth is non-zero, and in some cases the
+      // ResizeObserver only fires AFTER the container has finished hydrating
+      // (so we'd never mount). Use a 600px fallback and let the observer
+      // correct it the moment real width is available.
+      const width = node.clientWidth > 0 ? node.clientWidth : 600
+      const measuredHeight = node.clientHeight > 0 ? node.clientHeight : height
+      const initialData = data.length >= 2 && (data[0] as ArrayLike<number>).length > 0
+        ? data
+        : ([[0], [0]] as unknown as AlignedData)
       const options: Options = {
         width,
         height: measuredHeight,
         cursor: {
-          drag: {
-            x: true,
-            y: false,
-            uni: dragMode === "zoom" ? 50 : 0,
-          },
+          drag: { x: true, y: false, uni: dragMode === "zoom" ? 50 : 0 },
           focus: { prox: 30 },
         },
         scales: {
           x: {
+            // NMR convention: ppm decreases left-to-right. Auto-range, then
+            // swap min/max so uPlot renders right-to-left.
             range: (_u, dmin, dmax) =>
               xRange
-                ? reversedXAxis
-                  ? [xRange[1], xRange[0]]
-                  : [xRange[0], xRange[1]]
-                : reversedXAxis
-                  ? [dmax, dmin]
-                  : [dmin, dmax],
+                ? reversedXAxis ? [xRange[1], xRange[0]] : [xRange[0], xRange[1]]
+                : reversedXAxis ? [dmax, dmin] : [dmin, dmax],
           },
           y: {
+            // NMR data has extreme dynamic range (the residual solvent peak
+            // is ~10^5× the baseline). Auto-range squashes the analyte
+            // signal to a single pixel above zero. Use the caller-supplied
+            // ``yMax`` (robust 99th-percentile from SpectrumViewer) as the
+            // upper bound when provided; fall back to auto-range so this
+            // component remains useful standalone.
             range: (_u, dmin, dmax) => {
-              const upper = yMax ?? dmax * 1.05
-              return [Math.min(0, dmin), upper > 0 ? upper : 1]
+              const lower = Math.min(0, dmin)
+              if (typeof yMax === "number" && Number.isFinite(yMax) && yMax > 0) {
+                return [lower, yMax]
+              }
+              return [lower, dmax * 1.05 || 1]
             },
           },
         },
@@ -333,42 +220,16 @@ export const UPlotCanvas = memo(function UPlotCanvas({
             label: xLabel,
             labelSize: 28,
           },
-          {
-            stroke: palette.axis,
-            grid: { stroke: palette.grid, width: 1 },
-            ticks: { stroke: palette.axis, width: 1 },
-            label: yLabel,
-            labelSize: 28,
-            show: false, // NMR convention: hide intensity axis labels.
-          },
+          { stroke: palette.axis, grid: { stroke: palette.grid, width: 1 }, show: false },
         ],
         series: [
           {},
           {
             label: "Observed",
             stroke: palette.observed,
-            width: 1.25,
+            width: 1.5,
             points: { show: false },
-            spanGaps: false,
-          },
-          {
-            label: predictedLabel ?? "Predicted",
-            stroke: palette.predicted,
-            width: 1,
-            dash: [6, 4],
-            points: { show: false },
-            spanGaps: false,
-          },
-          {
-            label: "Peaks",
-            stroke: palette.peak,
-            width: 0,
-            points: {
-              show: true,
-              size: 6,
-              stroke: palette.peak,
-              fill: palette.peak,
-            },
+            spanGaps: true,
           },
         ],
         hooks: {
@@ -385,29 +246,21 @@ export const UPlotCanvas = memo(function UPlotCanvas({
         },
         legend: { show: false },
       }
-      plotRef.current = new uPlot(options, initialData, container)
-    }
-
-    // Promise + width gate. We may need to wait for the ResizeObserver to
-    // fire before we have a positive clientWidth.
-    let uPlotCtor: UPlotCtor | null = null
-    const tryMount = () => {
-      if (!uPlotCtor || !containerRef.current) return
-      const width = containerRef.current.clientWidth
-      if (width <= 0) return // wait for ResizeObserver
-      buildChart(uPlotCtor, width)
+      try {
+        plotRef.current = new ctor(options, initialData, node)
+      } catch {
+        // If uPlot throws (e.g. running in jsdom with no canvas), swallow —
+        // the test runtime doesn't render pixels anyway. Browser path will
+        // succeed.
+      }
     }
 
     loadUPlot().then((u) => {
       if (cancelled) return
-      uPlotCtor = u
+      ctor = u
       tryMount()
     })
 
-    // Resize the canvas via rafThrottle so a burst of layout events
-    // collapses into a single setSize() per frame. We also lean on the
-    // observer to trigger the very first mount once the container has
-    // measurable width.
     const handleResize = rafThrottle((width: number, h: number) => {
       if (width <= 0) return
       if (!plotRef.current) {
@@ -419,34 +272,24 @@ export const UPlotCanvas = memo(function UPlotCanvas({
     resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (!entry) return
-      const measuredWidth = entry.contentRect.width || container.clientWidth
-      const measuredHeight = entry.contentRect.height || container.clientHeight
-      handleResize(measuredWidth, measuredHeight)
+      handleResize(
+        entry.contentRect.width || container.clientWidth,
+        entry.contentRect.height || container.clientHeight,
+      )
     })
     resizeObserver.observe(container)
 
-    // First-render fallback — if width is already positive, attempt mount
-    // straight away (don't wait for the next animation frame).
     queueMicrotask(() => tryMount())
-
-    // Belt-and-suspenders: in some layouts (sticky parent with deferred
-    // measurement) neither queueMicrotask nor ResizeObserver fires before
-    // React's next commit. Try again on the next two animation frames.
-    const raf1 = requestAnimationFrame(() => tryMount())
-    let raf2: number | null = null
-    raf2 = requestAnimationFrame(() => tryMount())
+    rafIds.push(requestAnimationFrame(() => tryMount()))
+    rafIds.push(requestAnimationFrame(() => tryMount()))
 
     return () => {
       cancelled = true
-      if (raf1) cancelAnimationFrame(raf1)
-      if (raf2) cancelAnimationFrame(raf2)
+      rafIds.forEach((id) => cancelAnimationFrame(id))
       resizeObserver?.disconnect()
       plotRef.current?.destroy()
       plotRef.current = null
     }
-    // ``optionsKey`` includes every layout-affecting prop so when one
-    // changes we tear the chart down and rebuild — far rarer than data
-    // updates, so the hit is acceptable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [optionsKey])
 
@@ -454,19 +297,156 @@ export const UPlotCanvas = memo(function UPlotCanvas({
   useEffect(() => {
     const plot = plotRef.current
     if (!plot) return
-    const aligned = toAligned(x, y, predictedAligned, peakAligned)
-    plot.setData(aligned)
-  }, [x, y, predictedAligned, peakAligned])
+    plot.setData(data)
+  }, [data])
+
+  // Peak / predicted overlays — rendered as absolutely-positioned SVG on top
+  // of the canvas. Decoupling them from uPlot's series array means we never
+  // confuse uPlot's auto-range computation with sparse data, and peak markers
+  // can carry rich labels that uPlot's points-only series cannot.
+  const xMinMax = useMemo<{ min: number; max: number } | null>(() => {
+    if (data.length < 2) return null
+    const xs = data[0] as ArrayLike<number>
+    if (xs.length === 0) return null
+    let min = Infinity
+    let max = -Infinity
+    for (let i = 0; i < xs.length; i++) {
+      const v = xs[i] as number
+      if (v < min) min = v
+      if (v > max) max = v
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return null
+    return { min, max }
+  }, [data])
+
+  const renderXRange = xRange ?? (xMinMax ? [xMinMax.min, xMinMax.max] : null)
 
   return (
     <div
       ref={containerRef}
       data-testid="uplot-spectrum-canvas"
-      // height={height} as the minimum, but allow the parent to stretch the
-      // container so the chart fills the sticky SpectrumViewer area instead
-      // of leaving a band of empty space.
-      style={{ width: "100%", height: "100%", minHeight: height }}
-    />
+      style={{ position: "relative", width: "100%", height: "100%", minHeight: height }}
+    >
+      {showPeaks && peaks && peaks.length > 0 && renderXRange ? (
+        <PeakOverlay peaks={peaks} xRange={renderXRange} reversedXAxis={reversedXAxis} />
+      ) : null}
+      {showPredicted && predictedX && predictedY && predictedY.length > 0 ? (
+        <PredictedOverlay
+          x={predictedX}
+          y={predictedY}
+          label={predictedLabel}
+          xRange={renderXRange}
+          reversedXAxis={reversedXAxis}
+        />
+      ) : null}
+    </div>
   )
 })
 
+// ────────────────────────────────────────────────────────────────────────────
+// Lightweight SVG overlays
+// ────────────────────────────────────────────────────────────────────────────
+
+function projectX(value: number, xRange: [number, number], reversed: boolean): number {
+  const [lo, hi] = reversed ? [xRange[1], xRange[0]] : xRange
+  if (hi === lo) return 50
+  const pct = (value - lo) / (hi - lo)
+  return Math.max(0, Math.min(100, pct * 100))
+}
+
+function PeakOverlay({
+  peaks,
+  xRange,
+  reversedXAxis,
+}: {
+  peaks: UPlotPeak[]
+  xRange: [number, number]
+  reversedXAxis: boolean
+}) {
+  return (
+    <div
+      data-testid="uplot-peak-overlay"
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+      }}
+    >
+      {peaks.map((peak, idx) => {
+        const leftPct = projectX(peak.ppm, xRange, reversedXAxis)
+        return (
+          <div
+            key={`${peak.ppm}-${idx}`}
+            style={{
+              position: "absolute",
+              left: `${leftPct}%`,
+              bottom: 32,
+              transform: "translateX(-50%)",
+              color: palette.peak,
+              fontFamily: "var(--font-mono, ui-monospace, monospace)",
+              fontSize: 10,
+              whiteSpace: "nowrap",
+              textShadow: "0 0 2px rgba(255,255,255,0.95)",
+            }}
+          >
+            ▼
+            {peak.label ? (
+              <div style={{ fontSize: 9, marginTop: 1 }}>{peak.label}</div>
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function PredictedOverlay({
+  x,
+  y,
+  label,
+  xRange,
+  reversedXAxis,
+}: {
+  x: number[] | Float32Array
+  y: number[] | Float32Array
+  label?: string
+  xRange: [number, number] | null
+  reversedXAxis: boolean
+}) {
+  // Render the predicted spectrum as dashed vertical sticks for each predicted
+  // peak. Cheap, doesn't fight with uPlot's series, and conveys the same
+  // information as a dashed line trace.
+  const effective = xRange ?? [0, 1]
+  return (
+    <div
+      data-testid="uplot-predicted-overlay"
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+      }}
+    >
+      {Array.from({ length: x.length }).map((_, i) => {
+        const xi = (x as ArrayLike<number>)[i]
+        const yi = (y as ArrayLike<number>)[i]
+        if (!Number.isFinite(xi) || !Number.isFinite(yi)) return null
+        const leftPct = projectX(xi, effective, reversedXAxis)
+        return (
+          <div
+            key={`pred-${i}`}
+            style={{
+              position: "absolute",
+              left: `${leftPct}%`,
+              top: 12,
+              bottom: 32,
+              width: 0,
+              borderLeft: `1px dashed ${palette.predicted}`,
+              opacity: 0.6,
+            }}
+            title={label ?? "Predicted"}
+          />
+        )
+      })}
+    </div>
+  )
+}

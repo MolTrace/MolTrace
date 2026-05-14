@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectracheck/spectracheck-workspace-session-context"
 import {
   useProcessedTabState,
@@ -340,18 +340,41 @@ export function SpectraCheckProcessedSpectrumSection({
   }
 
   const displayPayload = analyzeResult ?? previewResult
-  const xy = extractSpectrumXY(displayPayload ?? {})
-  const peaks: SpectrumPeakAnnotation[] = extractPeaksFromPayload(displayPayload ?? {})
-  const overlays = extractPredictedOverlay(displayPayload ?? {})
-  const peakCount = extractNumericSummary(displayPayload ?? {}, ["peak_count", "n_peaks", "peaks_count", "num_peaks"])
-  const score = extractNumericSummary(displayPayload ?? {}, [
-    "analysis_score",
-    "score",
-    "overall_score",
-    "confidence_score",
-  ])
-  const warnings = extractWarnings(displayPayload ?? {})
-  const notes = extractNotes(displayPayload ?? {})
+
+  // Memoise every extraction against ``displayPayload``. Without these the
+  // helpers would run on every parent re-render (e.g. typing the Sample ID
+  // field) and produce fresh ``xy.x`` / ``xy.y`` arrays, forcing Plotly to
+  // re-render and the SpectrumViewer's expensive percentile / mask
+  // computations to re-run. That was the single biggest cause of the
+  // "shaky / blinking" chart behaviour.
+  const xy = useMemo(() => extractSpectrumXY(displayPayload ?? {}), [displayPayload])
+  const peaks = useMemo<SpectrumPeakAnnotation[]>(
+    () => extractPeaksFromPayload(displayPayload ?? {}),
+    [displayPayload],
+  )
+  const overlays = useMemo(() => extractPredictedOverlay(displayPayload ?? {}), [displayPayload])
+  const peakCount = useMemo(
+    () =>
+      extractNumericSummary(displayPayload ?? {}, [
+        "peak_count",
+        "n_peaks",
+        "peaks_count",
+        "num_peaks",
+      ]),
+    [displayPayload],
+  )
+  const score = useMemo(
+    () =>
+      extractNumericSummary(displayPayload ?? {}, [
+        "analysis_score",
+        "score",
+        "overall_score",
+        "confidence_score",
+      ]),
+    [displayPayload],
+  )
+  const warnings = useMemo(() => extractWarnings(displayPayload ?? {}), [displayPayload])
+  const notes = useMemo(() => extractNotes(displayPayload ?? {}), [displayPayload])
 
   /** Build the canonical NMR-text string for the NMR-text tab handoff. */
   const nmrTextFromPeaks = useCallback((): string | null => {
