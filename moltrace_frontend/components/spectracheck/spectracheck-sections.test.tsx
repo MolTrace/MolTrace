@@ -23,7 +23,7 @@ describe("SpectraCheck processed / raw sections", () => {
     render(<SpectraCheckRawFidSection sampleId="t1" onSampleIdChange={() => {}} solvent="CDCl3" />)
     expect(screen.getByText("Configure & upload raw FID archive")).toBeInTheDocument()
     // Action tile buttons (Step 2).
-    expect(screen.getByRole("button", { name: /Preview metadata/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /Preview spectrum/i })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /Process FID/i })).toBeInTheDocument()
   })
 

@@ -66,6 +66,22 @@ const PRESETS = [
   { value: "no_phase_correction", label: "No phase correction" },
 ] as const
 
+function extractRawArchiveId(payload: unknown): string | null {
+  if (!isRecord(payload)) return null
+  const meta = isRecord(payload.metadata) ? payload.metadata : null
+  const candidates = [
+    payload.raw_archive_id,
+    meta?.raw_archive_id,
+    payload.raw_sha256,
+    payload.sha256,
+    meta?.sha256,
+  ]
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return null
+}
+
 export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent, registerDev }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const { state, update } = useRawFidTabState()
@@ -265,25 +281,42 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     return fd
   }
 
-  async function runPreviewSpectrum(file: File) {
+  async function runPreviewSpectrum(file: File, archiveId?: string | null) {
     // Quick auto-FT so the user sees an actual spectrum alongside metadata —
     // mirrors the processed-1H/13C "preview shows spectrum" UX. The user can
     // still refine with the full "Process FID" action below.
     update({ previewSpectrumLoading: true, previewSpectrumError: "", previewSpectrum: null })
     try {
-      const fd = new FormData()
-      fd.append("file", file)
-      fd.append("sample_id", sampleId)
-      fd.append("solvent", solvent)
-      fd.append("nucleus", nucleus)
-      fd.append("vendor", vendor)
-      fd.append("processing_preset", "safe_automatic")
-      fd.append("preserve_raw", "true")
-      const data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
+      let data: unknown
+      const safeArchiveId = archiveId?.trim()
+      if (safeArchiveId) {
+        const fd = new FormData()
+        fd.append("sample_id", sampleId)
+        fd.append("solvent", solvent)
+        fd.append("nucleus", nucleus)
+        fd.append("selected_preset", "safe_automatic")
+        fd.append("processing_preset", "safe_automatic")
+        fd.append("save_run", "false")
+        data = await apiFetch<unknown>(`/raw-fid/${encodeURIComponent(safeArchiveId)}/preview`, {
+          method: "POST",
+          body: fd,
+        })
+      } else {
+        const fd = new FormData()
+        fd.append("file", file)
+        fd.append("sample_id", sampleId)
+        fd.append("solvent", solvent)
+        fd.append("nucleus", nucleus)
+        fd.append("vendor", vendor)
+        fd.append("processing_preset", "safe_automatic")
+        fd.append("preserve_raw", "true")
+        data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
+      }
       pushDev("raw_fid_preview_spectrum", data)
       const xy = extractSpectrumXY(data)
       if (xy) {
         const rec = isRecord(data) ? data : {}
+        const processingMetadata = isRecord(rec.processing_metadata) ? rec.processing_metadata : null
         update({
           previewSpectrum: {
             x: xy.x,
@@ -291,7 +324,12 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
             xLabel: typeof rec.x_label === "string" ? rec.x_label : "ppm",
             yLabel: typeof rec.y_label === "string" ? rec.y_label : "intensity",
             reversedXAxis: rec.reversed_x_axis !== false,
-            processingPreset: typeof rec.processing_preset === "string" ? rec.processing_preset : "safe_automatic",
+            processingPreset:
+              typeof rec.processing_preset === "string"
+                ? rec.processing_preset
+                : typeof processingMetadata?.selected_preset === "string"
+                  ? processingMetadata.selected_preset
+                  : "safe_automatic",
           },
           previewSpectrumLoading: false,
         })
@@ -318,20 +356,26 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     setPreviewLoading(true)
     setPreviewError("")
     setPreviewResult(null)
+    setProcessResult(null)
+    update({ previewSpectrum: null, previewSpectrumError: "", previewSpectrumLoading: false })
+    let shouldGenerateSpectrum = false
+    let previewArchiveId: string | null = null
     try {
       const fd = buildFormData(file, false)
       const data = await apiFetch<unknown>("/nmr/raw-fid/preview", { method: "POST", body: fd })
       setPreviewResult(data)
       pushDev("raw_fid_preview", data)
+      shouldGenerateSpectrum = true
+      previewArchiveId = extractRawArchiveId(data)
     } catch (err) {
       if (isMissingNmrEndpoint(err)) setPreviewError(RAW_FID_BACKEND_MSG)
       else setPreviewError(formatApiError(err, "Raw FID preview failed"))
     } finally {
       setPreviewLoading(false)
     }
-    // Auto-FT is now opt-in via the dedicated "Show preview spectrum" button —
-    // it costs an extra /nmr/raw-fid/process call that can take seconds on
-    // large FIDs and was freezing the UI when chained automatically.
+    if (shouldGenerateSpectrum) {
+      void runPreviewSpectrum(file, previewArchiveId)
+    }
   }
 
   async function runPreviewSpectrumFromSelection() {
@@ -340,7 +384,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
       update({ previewSpectrumError: "Choose a raw FID archive first." })
       return
     }
-    await runPreviewSpectrum(file)
+    await runPreviewSpectrum(file, extractRawArchiveId(previewResult))
   }
 
   async function runProcess() {
@@ -352,6 +396,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     setProcessLoading(true)
     setProcessError("")
     setProcessResult(null)
+    update({ previewSpectrum: null, previewSpectrumError: "", previewSpectrumLoading: false })
     try {
       const fd = buildFormData(file, true)
       const data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
@@ -685,7 +730,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
         eyebrow="Step 2 · Run"
         title="Inspect or process"
         icon={Zap}
-        description="Inspect archive metadata only, or process the FID through Fourier transform + apodization to generate a spectrum."
+        description="Preview archive metadata with an automatic quick spectrum, or process the FID through the full selected recipe."
         className="min-w-0"
       >
         <div className="space-y-4">
@@ -718,14 +763,14 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
                       Inspect
                     </span>
                     <span className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                      Metadata only
+                      Metadata + quick FT
                     </span>
                   </div>
                   <span className="font-mono text-base font-bold leading-tight">
-                    {previewLoading ? "Reading…" : "Preview metadata"}
+                    {previewLoading ? "Reading…" : "Preview spectrum"}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    Read archive contents, vendor, file hash, and acquisition parameters without processing.
+                    Read archive contents, vendor, file hash, and acquisition parameters, then display a quick spectrum.
                   </span>
                 </button>
               </TooltipTrigger>
@@ -872,7 +917,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
           description={
             processResult != null
               ? "Spectrum, processing parameters, and acquisition metadata from /nmr/raw-fid/process."
-              : "Archive metadata, vendor, and SHA-256 hash from /nmr/raw-fid/preview. Use Process to generate the spectrum."
+              : "Archive metadata, vendor, SHA-256 hash, and an automatic quick spectrum from Preview."
           }
           className="min-w-0"
         >
@@ -1019,7 +1064,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
                     description={
                       processResult
                         ? "Processing completed, but no display-ready spectrum points were returned. Review the response details below."
-                        : "Raw metadata preview checks the archive and hash only. Use Process raw FID to generate a derived spectrum plot — or run a quick auto-FT to see the spectrum without committing processing parameters."
+                        : "Preview completed, but no display-ready spectrum points were returned yet. Generate the quick auto-FT preview again, or run Process raw FID for the full selected recipe."
                     }
                   />
                   {!processResult ? (

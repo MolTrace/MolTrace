@@ -136,6 +136,9 @@ def test_nmr_processed_analyze_returns_peaks(tmp_path) -> None:
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["peak_count"] == 3
+    assert payload["x"] == [3.65, 1.26, 2.1]
+    assert len(payload["x"]) == len(payload["y"])
+    assert payload["x_label"] == "ppm"
     assert payload["peaks"][0]["shift_ppm"] == 3.65
     assert payload["analysis_score"] is not None
     assert payload["metadata"]["peak_inference"] == "enabled"

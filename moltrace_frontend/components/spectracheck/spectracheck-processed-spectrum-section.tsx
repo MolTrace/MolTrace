@@ -288,6 +288,7 @@ export function SpectraCheckProcessedSpectrumSection({
     setPreviewLoading(true)
     setPreviewError("")
     setPreviewResult(null)
+    setAnalyzeResult(null)
     try {
       const fd = buildBaseFormData(file)
       const data = await apiFetch<unknown>("/nmr/processed/preview", { method: "POST", body: fd })
