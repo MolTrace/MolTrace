@@ -85,6 +85,45 @@ const palette = {
   grid: "rgba(107, 114, 128, 0.18)",
 }
 
+function isMonotonicAsc(values: number[] | Float32Array): boolean {
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] < values[i - 1]) return false
+  }
+  return true
+}
+
+/**
+ * Co-sort x with one or more y-series so the x array is monotonically
+ * increasing. uPlot REQUIRES this — Plotly's scattergl did not. Skipping the
+ * sort is what was previously producing a blank chart for unsorted spectrum
+ * payloads (e.g. peak-table CSV inputs whose rows are in file order rather
+ * than shift order).
+ */
+function sortByXAscending(
+  x: number[] | Float32Array,
+  ys: ((number | null)[] | number[] | Float32Array | null)[],
+): {
+  x: number[]
+  ys: ((number | null)[] | null)[]
+} {
+  const n = x.length
+  const indices = new Array<number>(n)
+  for (let i = 0; i < n; i++) indices[i] = i
+  indices.sort((a, b) => x[a] - x[b])
+  const sortedX = new Array<number>(n)
+  for (let i = 0; i < n; i++) sortedX[i] = x[indices[i]]
+  const sortedYs: ((number | null)[] | null)[] = ys.map((series) => {
+    if (series == null) return null
+    const out: (number | null)[] = new Array(n)
+    for (let i = 0; i < n; i++) {
+      const v = (series as { [k: number]: number | null })[indices[i]]
+      out[i] = v == null ? null : v
+    }
+    return out
+  })
+  return { x: sortedX, ys: sortedYs }
+}
+
 function toAligned(
   x: number[] | Float32Array,
   y: number[] | Float32Array,
@@ -100,6 +139,18 @@ function toAligned(
   const len = x.length
   const predicted: (number | null)[] = predictedY ?? new Array(len).fill(null)
   const peak: (number | null)[] = peakY ?? new Array(len).fill(null)
+
+  // Sort x ascending if needed. Without this uPlot silently fails to render
+  // the line for unsorted inputs.
+  if (!isMonotonicAsc(x)) {
+    const sorted = sortByXAscending(x, [y, predicted, peak])
+    return [
+      sorted.x,
+      toUplotSeries(sorted.ys[0]) as number[],
+      toUplotSeries(sorted.ys[1]) as number[],
+      toUplotSeries(sorted.ys[2]) as number[],
+    ] as AlignedData
+  }
   return [
     toUplotSeries(x) as number[],
     toUplotSeries(y) as number[],
