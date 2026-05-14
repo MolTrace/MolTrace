@@ -517,6 +517,8 @@ class NMRProcessedAnalyzeResponse(BaseModel):
     predicted_vs_observed: list[dict[str, Any]] = Field(default_factory=list)
     labile_hydrogen_summary: dict[str, Any] = Field(default_factory=dict)
     peak_category_summary: dict[str, int] = Field(default_factory=dict)
+    dp4_ranking: list[dict[str, Any]] = Field(default_factory=list)
+    references: list[dict[str, Any]] = Field(default_factory=list)
     analysis_score: float | None = Field(default=None, ge=0.0, le=1.0)
     evidence_summary: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

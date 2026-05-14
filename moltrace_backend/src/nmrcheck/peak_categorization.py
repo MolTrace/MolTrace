@@ -30,7 +30,15 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Literal, Sequence
 
+from .dp4_scoring import pair_residual_dp4_score
 from .impurities import match_c13_impurity_shifts, match_h1_impurity_shifts
+from .literature_data import (
+    TOL_13C_ACCEPTABLE_PPM,
+    TOL_13C_STRICT_PPM,
+    TOL_1H_ACCEPTABLE_PPM,
+    TOL_1H_STRICT_PPM,
+    predictor_rmse,
+)
 from .models import PredictedNMRPeak, StructureSummary
 from .nmr_tables import (
     Nucleus,
@@ -409,12 +417,34 @@ def build_predicted_vs_observed(
 ) -> list[dict[str, Any]]:
     """Greedy nearest-shift matching between predicted and observed peaks.
 
-    Each result is a row with ``predicted_ppm``, ``observed_ppm``, ``delta_ppm``,
+    Each result row carries ``predicted_ppm``, ``observed_ppm``, ``delta_ppm``,
     ``status`` (``matched`` / ``unmatched_predicted`` / ``unmatched_observed``),
-    ``predicted_atom_index``, ``predicted_attached_h``, and ``predicted_environment``.
+    plus three literature-grounded confidence fields:
+
+    - ``z_dp4`` — signed (predicted − observed) / σ_DP4 [Smith & Goodman 2010].
+    - ``tail_probability`` — 1 − T_ν(|z_dp4|) (higher = better fit).
+    - ``confidence`` — categorical bucket grounded in the
+      Computational-NMR-survey "acceptable" deviation thresholds
+      (≤0.3 ppm 1H, ≤6 ppm 13C) and the strict DP4 σ.
+
+    The default tolerance is set from
+    :mod:`nmrcheck.literature_data` (``TOL_1H_ACCEPTABLE_PPM`` for 1H and
+    ``TOL_13C_ACCEPTABLE_PPM`` for 13C). Pass ``tolerance_ppm`` to override.
     """
     if tolerance_ppm is None:
-        tolerance_ppm = 0.35 if nucleus == "1H" else 4.0
+        tolerance_ppm = (
+            TOL_1H_ACCEPTABLE_PPM if nucleus == "1H" else TOL_13C_ACCEPTABLE_PPM
+        )
+    strict_tolerance = TOL_1H_STRICT_PPM if nucleus == "1H" else TOL_13C_STRICT_PPM
+    rmse_ref = predictor_rmse(nucleus)
+
+    def _confidence_bucket(delta: float) -> str:
+        abs_delta = abs(delta)
+        if abs_delta <= strict_tolerance:
+            return "high"
+        if abs_delta <= tolerance_ppm:
+            return "medium"
+        return "low"
 
     predicted_for_nucleus = [p for p in predicted_peaks if p.nucleus == nucleus]
     observed_with_index: list[tuple[int, float, dict[str, Any]]] = []
@@ -443,11 +473,17 @@ def build_predicted_vs_observed(
             observed_peak = next(
                 peak for idx, _, peak in observed_with_index if idx == best_idx
             )
+            observed_value = float(observed_peak.get("shift_ppm"))
+            dp4 = pair_residual_dp4_score(
+                observed_ppm=observed_value,
+                predicted_ppm=float(predicted.shift_ppm),
+                nucleus=nucleus,
+            )
             rows.append(
                 {
                     "status": "matched",
                     "predicted_ppm": float(predicted.shift_ppm),
-                    "observed_ppm": float(observed_peak.get("shift_ppm")),
+                    "observed_ppm": observed_value,
                     "delta_ppm": round(best_delta, 4),
                     "predicted_atom_index": predicted.atom_index,
                     "predicted_attached_h": predicted.attached_h,
@@ -456,6 +492,11 @@ def build_predicted_vs_observed(
                     "observed_multiplicity": observed_peak.get("multiplicity"),
                     "observed_integration_h": observed_peak.get("integration_h"),
                     "category": observed_peak.get("category"),
+                    # Literature-grounded confidence fields:
+                    "z_dp4": dp4["z_dp4"],
+                    "tail_probability": dp4["tail_probability"],
+                    "confidence": _confidence_bucket(best_delta),
+                    "predictor_rmse_ref_ppm": rmse_ref,
                 }
             )
         else:
@@ -506,8 +547,67 @@ def build_predicted_vs_observed(
     return rows
 
 
+def build_dp4_candidate_ranking(
+    *,
+    observed_peaks: Sequence[dict[str, Any]],
+    candidate_predicted: Sequence[Sequence[PredictedNMRPeak]],
+    candidate_labels: Sequence[str],
+    nucleus: Nucleus,
+) -> list[dict[str, Any]]:
+    """Run DP4 across a list of candidates and return a ranked, JSON-ready list.
+
+    Uses the published Smith & Goodman 2010 σ / ν (1H σ=0.185 ν=14.18;
+    13C σ=2.306 ν=11.38). Each row carries the candidate label, the DP4
+    posterior probability, the candidate's MAE and RMSE vs the observed shifts,
+    and the linear-scaling slope/intercept the fit produced.
+
+    Returned list is sorted by descending probability.
+    """
+    from .dp4_scoring import dp4_probabilities  # local import to avoid cycle in tests
+
+    observed_shifts = [
+        float(peak.get("shift_ppm"))
+        for peak in observed_peaks
+        if isinstance(peak.get("shift_ppm"), (int, float))
+    ]
+    candidate_shifts = [
+        [float(p.shift_ppm) for p in peaks if p.nucleus == nucleus]
+        for peaks in candidate_predicted
+    ]
+    if not observed_shifts or not any(candidate_shifts):
+        return []
+    scores = dp4_probabilities(
+        observed_shifts_ppm=observed_shifts,
+        candidate_predicted_shifts_ppm=candidate_shifts,
+        nucleus=nucleus,
+    )
+    rows = []
+    for score in scores:
+        label = (
+            candidate_labels[score.candidate_index]
+            if 0 <= score.candidate_index < len(candidate_labels)
+            else f"candidate_{score.candidate_index}"
+        )
+        rows.append(
+            {
+                "candidate_index": score.candidate_index,
+                "candidate_label": label,
+                "dp4_probability": score.probability,
+                "matched_peaks": score.matched_peaks,
+                "mean_abs_error_ppm": score.mean_abs_error_ppm,
+                "rms_error_ppm": score.rms_error_ppm,
+                "scaling_slope": score.slope,
+                "scaling_intercept": score.intercept,
+                "notes": list(score.notes),
+            }
+        )
+    rows.sort(key=lambda r: r["dp4_probability"], reverse=True)
+    return rows
+
+
 __all__ = [
     "PEAK_CATEGORIES",
+    "build_dp4_candidate_ranking",
     "build_impurity_candidates",
     "build_labile_hydrogen_summary",
     "build_peak_category_summary",
