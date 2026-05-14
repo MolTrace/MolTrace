@@ -231,18 +231,23 @@ export const UPlotCanvas = memo(function UPlotCanvas({
   )
 
   // Mount once. uPlot is created lazily on the client.
+  // We hold off on the actual ``new uPlot(...)`` call until the container has
+  // a non-zero clientWidth — otherwise uPlot stamps a 0-px-wide canvas that
+  // doesn't repaint when the ResizeObserver later fires. The plan PDF flags
+  // this as the most common source of "spectrum doesn't appear" bugs.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     let cancelled = false
     let resizeObserver: ResizeObserver | null = null
 
-    loadUPlot().then((uPlot) => {
-      if (cancelled || !containerRef.current) return
+    const buildChart = (uPlot: UPlotCtor, width: number) => {
+      if (cancelled || !containerRef.current || plotRef.current) return
       const initialData = toAligned(x, y, predictedAligned, peakAligned)
+      const measuredHeight = containerRef.current.clientHeight || height
       const options: Options = {
-        width: container.clientWidth || 600,
-        height,
+        width,
+        height: measuredHeight,
         cursor: {
           drag: {
             x: true,
@@ -330,22 +335,60 @@ export const UPlotCanvas = memo(function UPlotCanvas({
         legend: { show: false },
       }
       plotRef.current = new uPlot(options, initialData, container)
+    }
 
-      // Resize the canvas via rafThrottle so a burst of layout events
-      // collapses into a single setSize() per frame.
-      const handleResize = rafThrottle((width: number, h: number) => {
-        plotRef.current?.setSize({ width, height: h })
-      })
-      resizeObserver = new ResizeObserver((entries) => {
-        const entry = entries[0]
-        if (!entry) return
-        handleResize(entry.contentRect.width || container.clientWidth, height)
-      })
-      resizeObserver.observe(container)
+    // Promise + width gate. We may need to wait for the ResizeObserver to
+    // fire before we have a positive clientWidth.
+    let uPlotCtor: UPlotCtor | null = null
+    const tryMount = () => {
+      if (!uPlotCtor || !containerRef.current) return
+      const width = containerRef.current.clientWidth
+      if (width <= 0) return // wait for ResizeObserver
+      buildChart(uPlotCtor, width)
+    }
+
+    loadUPlot().then((u) => {
+      if (cancelled) return
+      uPlotCtor = u
+      tryMount()
     })
+
+    // Resize the canvas via rafThrottle so a burst of layout events
+    // collapses into a single setSize() per frame. We also lean on the
+    // observer to trigger the very first mount once the container has
+    // measurable width.
+    const handleResize = rafThrottle((width: number, h: number) => {
+      if (width <= 0) return
+      if (!plotRef.current) {
+        tryMount()
+        return
+      }
+      plotRef.current.setSize({ width, height: h || height })
+    })
+    resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const measuredWidth = entry.contentRect.width || container.clientWidth
+      const measuredHeight = entry.contentRect.height || container.clientHeight
+      handleResize(measuredWidth, measuredHeight)
+    })
+    resizeObserver.observe(container)
+
+    // First-render fallback — if width is already positive, attempt mount
+    // straight away (don't wait for the next animation frame).
+    queueMicrotask(() => tryMount())
+
+    // Belt-and-suspenders: in some layouts (sticky parent with deferred
+    // measurement) neither queueMicrotask nor ResizeObserver fires before
+    // React's next commit. Try again on the next two animation frames.
+    const raf1 = requestAnimationFrame(() => tryMount())
+    let raf2: number | null = null
+    raf2 = requestAnimationFrame(() => tryMount())
 
     return () => {
       cancelled = true
+      if (raf1) cancelAnimationFrame(raf1)
+      if (raf2) cancelAnimationFrame(raf2)
       resizeObserver?.disconnect()
       plotRef.current?.destroy()
       plotRef.current = null
@@ -364,5 +407,15 @@ export const UPlotCanvas = memo(function UPlotCanvas({
     plot.setData(aligned)
   }, [x, y, predictedAligned, peakAligned])
 
-  return <div ref={containerRef} data-testid="uplot-spectrum-canvas" style={{ width: "100%", height }} />
+  return (
+    <div
+      ref={containerRef}
+      data-testid="uplot-spectrum-canvas"
+      // height={height} as the minimum, but allow the parent to stretch the
+      // container so the chart fills the sticky SpectrumViewer area instead
+      // of leaving a band of empty space.
+      style={{ width: "100%", height: "100%", minHeight: height }}
+    />
+  )
 })
+

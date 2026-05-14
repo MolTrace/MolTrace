@@ -96,6 +96,7 @@ if (
     clip: () => undefined,
   }
   HTMLCanvasElement.prototype.getContext = function patched(
+    this: HTMLCanvasElement,
     contextId: string,
     ...args: unknown[]
   ) {
