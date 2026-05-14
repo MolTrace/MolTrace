@@ -59,4 +59,35 @@ describe("UPlotCanvas", () => {
       await new Promise((r) => setTimeout(r, 50))
     })
   })
+
+  it("renders a canvas even when x values arrive unsorted (peak-table CSV case)", async () => {
+    // The original bug: uPlot silently fails to draw the line when x is not
+    // monotonically increasing. UPlotCanvas now sorts before handing data to
+    // uPlot, so this case must still produce a canvas element.
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 720
+      },
+    })
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get() {
+        return 400
+      },
+    })
+
+    const { getByTestId } = render(
+      // Ethanol peak-table order: 3.65 ppm first, then 1.26, then 2.10 — NOT
+      // monotonic. The sort fix should normalize this to [1.26, 2.10, 3.65].
+      <UPlotCanvas x={[3.65, 1.26, 2.10]} y={[2, 3, 1]} height={400} />,
+    )
+    const container = getByTestId("uplot-spectrum-canvas")
+    await waitFor(
+      () => {
+        expect(container.querySelector("canvas")).not.toBeNull()
+      },
+      { timeout: 4000 },
+    )
+  })
 })
