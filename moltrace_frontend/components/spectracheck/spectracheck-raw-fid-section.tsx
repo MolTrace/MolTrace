@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectracheck/spectracheck-workspace-session-context"
 import {
   useRawFidTabState,
@@ -427,13 +427,24 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
 
   const displayPayload = processResult ?? previewResult
 
-  const xyProcess = processResult ? extractSpectrumXY(processResult) : null
-  const xyPreview = previewResult ? extractSpectrumXY(previewResult) : null
+  // Memoise xy extraction against the source result. Without this the
+  // extractor produces fresh ``{x, y}`` arrays on every parent re-render
+  // (e.g. typing the Sample ID field), which forces Plotly to redraw and
+  // makes the chart shake/blink during unrelated interactions.
+  const xyProcess = useMemo(
+    () => (processResult ? extractSpectrumXY(processResult) : null),
+    [processResult],
+  )
+  const xyPreview = useMemo(
+    () => (previewResult ? extractSpectrumXY(previewResult) : null),
+    [previewResult],
+  )
   // previewSpectrum is the auto-FT result chained from Preview — used when the
   // full Process step hasn't run yet so the user still sees a spectrum.
-  const xyAutoPreview = previewSpectrum
-    ? { x: previewSpectrum.x, y: previewSpectrum.y }
-    : null
+  const xyAutoPreview = useMemo(
+    () => (previewSpectrum ? { x: previewSpectrum.x, y: previewSpectrum.y } : null),
+    [previewSpectrum],
+  )
   const xy = xyProcess ?? xyPreview ?? xyAutoPreview
   const xyIsAutoPreview = !xyProcess && !xyPreview && xyAutoPreview != null
 

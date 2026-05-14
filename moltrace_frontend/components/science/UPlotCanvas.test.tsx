@@ -47,17 +47,22 @@ describe("UPlotCanvas", () => {
     )
   })
 
-  it("does not crash when the container width starts at 0 (waits for resize)", async () => {
-    // Default jsdom — clientWidth=0. The component must NOT throw.
+  it("mounts the canvas even when the container width starts at 0", async () => {
+    // Default jsdom — clientWidth=0. The component must mount uPlot anyway
+    // with a fallback width, otherwise the chart silently never renders.
     const { getByTestId } = render(
       <UPlotCanvas x={[1, 2, 3]} y={[0, 5, 0]} height={300} />,
     )
-    // Container still mounts; uPlot waits for measurable width.
-    expect(getByTestId("uplot-spectrum-canvas")).toBeInTheDocument()
-    // Allow microtask + a couple of frames; no exception should bubble.
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50))
-    })
+    const container = getByTestId("uplot-spectrum-canvas")
+    expect(container).toBeInTheDocument()
+    // The mount should still produce a <canvas> element — that's the signal
+    // that uPlot was actually constructed (not just its CSS preloaded).
+    await waitFor(
+      () => {
+        expect(container.querySelector("canvas")).not.toBeNull()
+      },
+      { timeout: 4000 },
+    )
   })
 
   it("renders a canvas even when x values arrive unsorted (peak-table CSV case)", async () => {

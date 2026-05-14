@@ -1,19 +1,33 @@
 "use client"
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UPlotCanvas } from "@/components/science/UPlotCanvas"
+import dynamic from "next/dynamic"
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+
+// Dynamic, client-side-only Plotly import. The dynamic boundary keeps the
+// SSR shell light and ensures react-plotly.js never sees ``window`` at
+// build time. ``memo`` wraps it so a parent re-render that doesn't change
+// any prop reference is a no-op — this is the React-side half of keeping
+// the chart non-shaky during sibling state churn.
+const Plot = memo(
+  dynamic(() => import("react-plotly.js"), { ssr: false }) as React.ComponentType<
+    Record<string, unknown>
+  >,
+) as React.ComponentType<Record<string, unknown>>
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
   ArrowRight,
+  Droplets,
   Expand,
   Eye,
   EyeOff,
   GripHorizontal,
   Hand,
   Layers,
+  Maximize2,
+  Minimize2,
   Minus,
   MousePointer2,
   Plus,
@@ -71,6 +85,144 @@ function deriveDisplayY(y: number[], gainSlider01: number, yZoom: number): numbe
   })
 }
 
+/**
+ * Detect the contiguous y-axis spike around the absolute-maximum sample and
+ * return the indices [start, end] of the spike, or null if no spike dominates.
+ *
+ * "Spike" = a contiguous run of samples whose |y| stays above
+ * ``MASK_SPIKE_FLOOR_MULTIPLIER × P95(|y|)``. A spike is only considered
+ * dominant if its peak is at least
+ * ``MASK_DOMINANCE_RATIO × P95(|y|)`` — otherwise the spectrum doesn't
+ * have a runaway solvent peak and there's nothing to mask.
+ *
+ * The width is also capped at ``MASK_MAX_WIDTH_FRACTION`` of the full x
+ * range so a peak that genuinely is broad (e.g. polymer averaging) isn't
+ * over-masked.
+ */
+const MASK_DOMINANCE_RATIO = 30
+const MASK_SPIKE_FLOOR_MULTIPLIER = 3
+const MASK_MAX_WIDTH_FRACTION = 0.08
+
+function detectDominantPeakRange(
+  x: ArrayLike<number>,
+  y: ArrayLike<number>,
+): { startIndex: number; endIndex: number; centerPpm: number } | null {
+  const n = x.length
+  if (n !== y.length || n < 50) return null
+
+  // Collect finite |y| values once for both percentile + max.
+  const abs = new Float64Array(n)
+  let valid = 0
+  let maxAbs = 0
+  let maxIdx = 0
+  for (let i = 0; i < n; i++) {
+    const v = y[i]
+    if (!Number.isFinite(v)) continue
+    const a = v < 0 ? -v : v
+    abs[valid++] = a
+    if (a > maxAbs) {
+      maxAbs = a
+      maxIdx = i
+    }
+  }
+  if (valid === 0 || maxAbs === 0) return null
+
+  // P95 of |y| for dominance ratio.
+  const sorted = Array.from(abs.subarray(0, valid))
+  sorted.sort((a, b) => a - b)
+  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]
+  if (p95 <= 0) return null
+  if (maxAbs < MASK_DOMINANCE_RATIO * p95) {
+    // No single peak dominates — leave the spectrum alone.
+    return null
+  }
+
+  // Walk outward from maxIdx until |y| drops below the spike floor.
+  const floor = MASK_SPIKE_FLOOR_MULTIPLIER * p95
+  let start = maxIdx
+  while (start > 0) {
+    const v = y[start - 1]
+    if (!Number.isFinite(v)) break
+    if (Math.abs(v) < floor) break
+    start--
+  }
+  let end = maxIdx
+  while (end < n - 1) {
+    const v = y[end + 1]
+    if (!Number.isFinite(v)) break
+    if (Math.abs(v) < floor) break
+    end++
+  }
+
+  // Cap the masked width so we never blank out more than a small fraction
+  // of the visible spectrum.
+  const xMinFinite = (x[0] as number) ?? 0
+  const xMaxFinite = (x[n - 1] as number) ?? xMinFinite + 1
+  const fullSpan = Math.abs(xMaxFinite - xMinFinite) || 1
+  const maxSpan = fullSpan * MASK_MAX_WIDTH_FRACTION
+  while (Math.abs((x[end] as number) - (x[start] as number)) > maxSpan && end > start + 2) {
+    // Shrink whichever side is farther from the maximum.
+    const distLow = Math.abs((x[maxIdx] as number) - (x[start] as number))
+    const distHigh = Math.abs((x[end] as number) - (x[maxIdx] as number))
+    if (distLow > distHigh) start++
+    else end--
+  }
+
+  return {
+    startIndex: start,
+    endIndex: end,
+    centerPpm: x[maxIdx] as number,
+  }
+}
+
+/**
+ * Robust absolute-value maximum for NMR display y-range.
+ *
+ * Plain ``max(|y|)`` is dominated by the residual-solvent / water peak that
+ * sits 3-6 orders of magnitude above the analyte signal. Using it as the
+ * y-axis ceiling compresses the actual spectrum into a single pixel above
+ * the baseline. We pick the 99th-percentile instead, multiplied by 1.2 to
+ * give the typical peaks a little headroom. The dominant peak then clips
+ * cleanly at the top of the chart — that's standard NMR display behaviour.
+ *
+ * Edge cases:
+ *  - Empty input → 1 (so callers can always use the value as a divisor).
+ *  - All-equal input → that value (no compression).
+ *  - Fewer than 100 samples → fall back to the true max (the percentile
+ *    isn't statistically meaningful below that threshold).
+ */
+function robustMaxAbs(values: ArrayLike<number>): number {
+  const n = values.length
+  if (n === 0) return 1
+  if (n < 100) {
+    let m = 0
+    for (let i = 0; i < n; i++) {
+      const v = values[i]
+      if (!Number.isFinite(v)) continue
+      const abs = v < 0 ? -v : v
+      if (abs > m) m = abs
+    }
+    return m || 1
+  }
+  // Copy into a typed array of absolute values and sort. O(n log n) once
+  // per data update — well below the cost of a re-render.
+  const abs = new Float64Array(n)
+  let count = 0
+  for (let i = 0; i < n; i++) {
+    const v = values[i]
+    if (!Number.isFinite(v)) continue
+    abs[count++] = v < 0 ? -v : v
+  }
+  if (count === 0) return 1
+  const slice = abs.subarray(0, count)
+  // In-place sort via .sort() needs a regular Array; we copy once.
+  const arr = Array.from(slice)
+  arr.sort((a, b) => a - b)
+  const idx = Math.min(arr.length - 1, Math.floor(arr.length * 0.99))
+  const p99 = arr[idx]
+  return p99 > 0 ? p99 * 1.2 : (arr[arr.length - 1] || 1)
+}
+
 function nearestYAtPpm(x: number[], yDisplay: number[], ppm: number): number {
   if (x.length === 0) return 0
   let best = 0
@@ -101,6 +253,15 @@ export function SpectrumViewer({
   const [gain01, setGain01] = useState(0)
   const [showPeaks, setShowPeaks] = useState(true)
   const [showPredicted, setShowPredicted] = useState(true)
+  // Mask the dominant solvent / water peak (e.g. HDO at ~4.79 in D2O) so
+  // the rest of the spectrum is visible. Auto-enabled — uses the runtime
+  // detector below to decide whether a mask is actually needed.
+  const [maskDominantPeak, setMaskDominantPeak] = useState(true)
+  // Compact mode (default) keeps the chart at ~360 px so the rest of Step 3
+  // (KPI tiles, picked peaks, evidence panels) remains on screen. The user
+  // can expand it via the toolbar when they need more vertical room for
+  // manipulation.
+  const [expanded, setExpanded] = useState(false)
   // yZoom is a discrete-step companion to gain01. Both multiply displayY (so peaks visibly grow).
   const [yZoom, setYZoom] = useState(1)
   // Drag mode for the chart canvas:
@@ -112,7 +273,27 @@ export function SpectrumViewer({
   // Drag persists per session in component state.
   const [toolbarOffset, setToolbarOffset] = useState({ x: 0, y: 0 })
 
-  const displayY = useMemo(() => deriveDisplayY(y, gain01, yZoom), [y, gain01, yZoom])
+  // Detect the runaway peak ONCE on the raw input (gain-independent). The
+  // detector returns null when no peak is more than MASK_DOMINANCE_RATIO×P95.
+  const dominantPeakRange = useMemo(
+    () => detectDominantPeakRange(x, y),
+    [x, y],
+  )
+
+  const rawDisplayY = useMemo(() => deriveDisplayY(y, gain01, yZoom), [y, gain01, yZoom])
+
+  // Apply the mask: replace the detected peak's samples with NaN so uPlot
+  // draws a clean gap. Falls back to the raw display y when masking is off
+  // or no dominant peak was found.
+  const displayY = useMemo(() => {
+    if (!maskDominantPeak || !dominantPeakRange) return rawDisplayY
+    const out = rawDisplayY.slice()
+    for (let i = dominantPeakRange.startIndex; i <= dominantPeakRange.endIndex; i++) {
+      out[i] = Number.NaN
+    }
+    return out
+  }, [rawDisplayY, maskDominantPeak, dominantPeakRange])
+
   const displayPred = useMemo(() => {
     if (!overlays?.predicted) return null
     return deriveDisplayY(overlays.predicted.y, gain01, yZoom)
@@ -145,24 +326,29 @@ export function SpectrumViewer({
       xHi = 1
     }
 
-    let obsBaseline = 0
-    for (let i = 0; i < y.length; i++) {
-      const v = y[i]
-      if (!Number.isFinite(v)) continue
-      const abs = v < 0 ? -v : v
-      if (abs > obsBaseline) obsBaseline = abs
+    // Robust y-max — NMR spectra usually have one dominant peak (residual
+    // solvent / water) that's many orders of magnitude above everything
+    // else. Anchoring yMax to the global max squashes the entire useful
+    // spectrum into 1 pixel of vertical space. The 99th-percentile of |y|
+    // (with a sane lower bound) keeps the typical peaks visible while the
+    // dominant peak clips off the top — standard NMR display behaviour.
+    //
+    // When the mask is active, build a copy of ``y`` that skips the masked
+    // region before computing the percentile, so the y-axis is anchored to
+    // the analyte signal rather than the now-invisible solvent spike.
+    let baselineY: ArrayLike<number> = y
+    if (maskDominantPeak && dominantPeakRange) {
+      const filtered: number[] = []
+      for (let i = 0; i < y.length; i++) {
+        if (i >= dominantPeakRange.startIndex && i <= dominantPeakRange.endIndex) continue
+        filtered.push(y[i])
+      }
+      baselineY = filtered
     }
-    if (obsBaseline === 0) obsBaseline = 1
-
+    const obsBaseline = robustMaxAbs(baselineY)
     let predBaseline = 0
     if (showPredicted && overlays?.predicted) {
-      const py = overlays.predicted.y
-      for (let i = 0; i < py.length; i++) {
-        const v = py[i]
-        if (!Number.isFinite(v)) continue
-        const abs = v < 0 ? -v : v
-        if (abs > predBaseline) predBaseline = abs
-      }
+      predBaseline = robustMaxAbs(overlays.predicted.y)
     }
 
     return {
@@ -170,7 +356,7 @@ export function SpectrumViewer({
       xMax: xHi,
       yMax: Math.max(obsBaseline, predBaseline, 1),
     }
-  }, [x, y, overlays, showPredicted])
+  }, [x, y, overlays, showPredicted, maskDominantPeak, dominantPeakRange])
 
   const [xRange, setXRange] = useState<[number, number] | null>(null)
 
@@ -178,19 +364,155 @@ export function SpectrumViewer({
   const effectiveXMax = xRange ? xRange[1] : xMax
 
   /**
-   * Peak intensity values aligned to the *displayed* (gain-scaled) y axis,
-   * so the orange peak markers track the actual line drawn on screen.
+   * Plotly data traces. Three potential layers:
+   *  - Observed line (always)
+   *  - Predicted overlay (when an ``overlays.predicted`` payload is passed)
+   *  - Peak markers (when peak annotations exist and the user hasn't hidden them)
+   *
+   * Critical for non-shaky rendering:
+   *  - Trace type ``scattergl`` uses WebGL — handles 50k+ points at 60 fps.
+   *  - ``displayY`` is already gain-scaled AND mask-aware (NaN values where
+   *    the dominant solvent peak should be hidden); Plotly draws NaN as a gap.
+   *  - The array references are stabilised by the upstream ``useMemo`` chain,
+   *    so Plotly's reactivity (driven by reference equality on ``data``) does
+   *    not redraw unless the actual numeric content changed.
    */
-  const peakRenderPoints = useMemo(() => {
-    if (!showPeaks || peaks.length === 0) return undefined
-    const totalScale = gainMultiplier(gain01) * yZoom
-    return peaks.map((p) => ({
-      ppm: p.ppm,
-      intensity:
+  const data = useMemo(() => {
+    if (x.length === 0) return []
+    const traces: object[] = [
+      {
+        type: "scattergl",
+        mode: "lines",
+        x,
+        y: displayY,
+        name: "Observed",
+        line: { width: 1.2, color: "#2563eb" },
+        connectgaps: false, // honour the mask's NaN holes
+        hovertemplate: "δ %{x:.3f} ppm<br>I = %{y:.2e}<extra></extra>",
+      },
+    ]
+    if (
+      showPredicted &&
+      overlays?.predicted &&
+      overlays.predicted.x.length === overlays.predicted.y.length &&
+      displayPred
+    ) {
+      traces.push({
+        type: "scattergl",
+        mode: "lines",
+        x: overlays.predicted.x,
+        y: displayPred,
+        name: overlays.predicted.label ?? "Predicted",
+        line: { width: 1, dash: "dash", color: "#c026d3" },
+        opacity: 0.85,
+      })
+    }
+    if (showPeaks && peaks.length > 0) {
+      const totalScale = gainMultiplier(gain01) * yZoom
+      const px = peaks.map((p) => p.ppm)
+      const py = peaks.map((p) =>
         p.intensity != null ? p.intensity * totalScale : nearestYAtPpm(x, displayY, p.ppm),
-      label: p.label,
-    }))
-  }, [peaks, showPeaks, gain01, yZoom, x, displayY])
+      )
+      traces.push({
+        type: "scattergl",
+        mode: "markers+text",
+        x: px,
+        y: py,
+        text: peaks.map((p) => p.label ?? ""),
+        textposition: "top center",
+        name: "Peaks",
+        marker: { size: 7, color: "#ea580c", line: { width: 0.5, color: "#fff" } },
+        textfont: { size: 10 },
+      })
+    }
+    return traces
+  }, [x, displayY, displayPred, overlays, peaks, showPeaks, showPredicted, gain01, yZoom])
+
+  /**
+   * Plotly layout. ``uirevision: "spectrum"`` is the key shake-killer: it
+   * tells Plotly to keep the current pan / zoom / drag state across data
+   * updates instead of resetting to autorange every time. Combined with the
+   * stable ``data`` reference above, this is what makes typing into a
+   * sibling input or wiggling the gain slider feel rock-steady.
+   */
+  const layout = useMemo(
+    () => ({
+      autosize: true,
+      margin: { l: 52, r: 16, t: 28, b: 44 },
+      paper_bgcolor: "transparent",
+      plot_bgcolor: "transparent",
+      showlegend: Boolean(overlays?.predicted && showPredicted) || (showPeaks && peaks.length > 0),
+      dragmode: dragMode,
+      xaxis: {
+        title: xLabel,
+        autorange: reversedXAxis ? "reversed" : true,
+        range: xRange ? [effectiveXMin, effectiveXMax] : undefined,
+        zeroline: false,
+      },
+      yaxis: {
+        title: yLabel,
+        // Anchored to the robust max — the dominant solvent peak (if any)
+        // clips at the top, the analyte signal occupies the visible range.
+        range: [0, yMax],
+        zeroline: false,
+        fixedrange: false,
+      },
+      hovermode: "closest",
+      uirevision: "spectrum",
+    }),
+    [
+      xLabel,
+      yLabel,
+      reversedXAxis,
+      xRange,
+      effectiveXMin,
+      effectiveXMax,
+      yMax,
+      overlays,
+      showPredicted,
+      peaks.length,
+      showPeaks,
+      dragMode,
+    ],
+  )
+
+  /**
+   * Plotly redraw gate. We hand Plotly a monotonically-increasing revision
+   * number that we only bump when the actual chart content changed. Stable
+   * React parent re-renders (sample-id typing, autosave ticks, sibling state
+   * churn) leave ``revision`` untouched, so Plotly skips the costly trace
+   * diff entirely — that's what keeps the chart from "blinking" during
+   * unrelated UI work.
+   */
+  const revision = useMemo(() => Date.now(), [
+    x,
+    y,
+    overlays,
+    peaks,
+    showPeaks,
+    showPredicted,
+    maskDominantPeak,
+    gain01,
+    yZoom,
+    yMax,
+  ])
+
+  /**
+   * Capture Plotly's internal pan / zoom into ``xRange`` state so the
+   * controls toolbar buttons (zoom in / out, pan left / right, reset) all
+   * stay in sync with the actual view.
+   */
+  const onRelayout = useCallback((ev: Readonly<unknown>) => {
+    const raw = ev as Record<string, unknown>
+    const xr0 = raw["xaxis.range[0]"]
+    const xr1 = raw["xaxis.range[1]"]
+    if (typeof xr0 === "number" && typeof xr1 === "number") {
+      setXRange([xr0, xr1])
+    }
+    if (raw["xaxis.autorange"] === true) {
+      setXRange(null)
+    }
+  }, [])
 
   /**
    * Full reset — restores every interactive setting to its first-preview state:
@@ -344,30 +666,35 @@ export function SpectrumViewer({
       )}
 
       {/*
-        Sticky spectrum container — pins to the top of the scrolling main panel
-        so spectrum operations (gain, zoom, drag, etc.) stay in view while the
-        user scrolls through Step 3 details (KPIs, picked peaks, etc.) below.
+        Inline (non-sticky) spectrum container. Compact by default (~360 px);
+        the toolbar's expand toggle bumps it to 70 vh when the user needs
+        more vertical room. No sticky positioning — the chart "hung" off
+        the top of the scroll context before, which made it harder to
+        manipulate alongside the rest of Step 3.
       */}
       <div
         ref={chartContainerRef}
-        className="group sticky top-4 z-10 h-[min(560px,70vh)] min-h-[320px] w-full min-w-0 overflow-hidden rounded-lg border bg-card"
+        className={cn(
+          "group relative w-full min-w-0 overflow-hidden rounded-lg border bg-card transition-[height] duration-200",
+          expanded ? "h-[min(640px,70vh)]" : "h-[360px]",
+        )}
       >
-        <UPlotCanvas
-          x={x}
-          y={displayY}
-          predictedX={overlays?.predicted?.x}
-          predictedY={displayPred ?? undefined}
-          predictedLabel={overlays?.predicted?.label}
-          peaks={peakRenderPoints}
-          showPeaks={showPeaks}
-          showPredicted={showPredicted}
-          reversedXAxis={reversedXAxis}
-          xLabel={xLabel}
-          yLabel={yLabel}
-          xRange={xRange}
-          yMax={yMax}
-          dragMode={dragMode}
-          onXRangeChange={(range) => setXRange(range)}
+        <Plot
+          data={data}
+          layout={layout}
+          revision={revision}
+          config={{
+            // Hide Plotly's built-in modebar — the floating toolbar below
+            // covers the same actions plus our app-specific toggles in a
+            // more compact form.
+            displayModeBar: false,
+            displaylogo: false,
+            responsive: true,
+            scrollZoom: true,
+          }}
+          style={{ width: "100%", height: "100%" }}
+          useResizeHandler
+          onRelayout={onRelayout}
         />
 
         {/*
@@ -382,8 +709,9 @@ export function SpectrumViewer({
           className={cn(
             "absolute z-20 select-none rounded-lg",
             "border border-border/40 bg-background/90 shadow-md backdrop-blur-md",
-            "opacity-0 transition-opacity duration-200",
-            "group-hover:opacity-100 group-focus-within:opacity-100 hover:opacity-100",
+            // Always visible. The opacity-on-hover trick was hiding the
+            // controls when the user wasn't already over them, which made
+            // them undiscoverable and triggered repaints on hover.
           )}
           style={{
             top: 12 + toolbarOffset.y,
@@ -535,6 +863,44 @@ export function SpectrumViewer({
                 <span className="sr-only">{showPredicted ? "Hide" : "Show"} predicted overlay</span>
               </Button>
             )}
+            {dominantPeakRange ? (
+              <Button
+                type="button"
+                variant={maskDominantPeak ? "secondary" : "outline"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setMaskDominantPeak((v) => !v)}
+                title={
+                  maskDominantPeak
+                    ? `Solvent peak at ~${dominantPeakRange.centerPpm.toFixed(2)} ppm is masked. Click to show it.`
+                    : `Solvent peak detected at ~${dominantPeakRange.centerPpm.toFixed(2)} ppm. Click to mask it.`
+                }
+                aria-pressed={maskDominantPeak}
+              >
+                <Droplets className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">
+                  {maskDominantPeak ? "Show" : "Hide"} solvent peak at {dominantPeakRange.centerPpm.toFixed(2)} ppm
+                </span>
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant={expanded ? "secondary" : "outline"}
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setExpanded((v) => !v)}
+              title={expanded ? "Collapse to compact view" : "Expand to full view"}
+              aria-pressed={expanded}
+            >
+              {expanded ? (
+                <Minimize2 className="h-3.5 w-3.5" aria-hidden />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+              )}
+              <span className="sr-only">
+                {expanded ? "Collapse spectrum" : "Expand spectrum"}
+              </span>
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -562,10 +928,11 @@ export function SpectrumViewer({
         <div
           ref={gainRailRef}
           className={cn(
-            "absolute top-3 right-3 bottom-3 z-10 flex w-11 flex-col items-center gap-2 rounded-lg",
+            // Anchored to the LEFT edge so the floating toolbar (top-right)
+            // and the gain rail no longer share the same corner. Always
+            // visible — discoverability + no opacity transition repaints.
+            "absolute top-3 bottom-3 left-3 z-10 flex w-11 flex-col items-center gap-2 rounded-lg",
             "border border-border/40 bg-background/85 px-1.5 py-3 shadow-sm backdrop-blur-md",
-            "opacity-0 transition-opacity duration-200",
-            "group-hover:opacity-100 group-focus-within:opacity-100 hover:opacity-100",
           )}
           aria-label="Intensity gain"
         >
