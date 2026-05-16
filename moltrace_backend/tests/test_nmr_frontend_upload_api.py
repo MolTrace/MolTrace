@@ -467,6 +467,126 @@ def test_nmr_processed_analyze_applies_per_class_prior(tmp_path) -> None:
     assert audit["renormalised_weights"]["carbon13"] > audit["original_weights"]["carbon13"]
 
 
+def test_nmr_processed_analyze_emits_proton_inventory_and_subset(tmp_path) -> None:
+    """End-to-end: /nmr/processed/analyze response carries:
+    - labile_hydrogen_summary.labile_subset declaring the EXACT element subset
+    - proton_inventory with observed + expected + deltas blocks
+    - references include shift-window literature citations."""
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "ethanol",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                # Ethanol: 1 OH, 0 NH, 0 SH → subset must be "OH" (not generic)
+                "nmr_text": "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), 1.26 (t, 3H), 2.10 (br s, 1H)",
+                "candidates_text": "Ethanol | CCO",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    # 1. Labile-H summary declares the exact subset.
+    labile = payload["labile_hydrogen_summary"]
+    assert labile["labile_subset"] == "OH"
+    assert labile["expected_oh_h"] == 1
+    assert labile["expected_nh_h"] == 0
+    assert labile["expected_sh_h"] == 0
+    assert any("(OH)" in note for note in labile["notes"])
+    assert not any("(OH/NH/SH)" in note for note in labile["notes"])
+
+    # 2. proton_inventory has observed + expected + deltas + warnings keys.
+    inventory = payload["proton_inventory"]
+    assert inventory["nucleus"] == "1H"
+    assert set(inventory["observed"].keys()) >= {
+        "aromatic",
+        "aliphatic",
+        "labile",
+        "non_labile",
+        "total",
+    }
+    assert inventory["expected"]["aliphatic"] == 5  # CH3 (3) + CH2 (2)
+    assert inventory["expected"]["labile"] == 1  # OH
+    assert inventory["expected"]["labile_subset"] == "OH"
+
+    # 3. The references block must include the shift-window citations.
+    ref_authors = {ref.get("authors", "") for ref in payload["references"]}
+    citation_text = " ".join(ref_authors)
+    assert "Pretsch" in citation_text or "Friebolin" in citation_text
+    assert "Gottlieb" in citation_text or "Fulmer" in citation_text
+
+
+def test_nmr_processed_analyze_tobramycin_peaks_are_anomeric_not_olefinic(
+    tmp_path,
+) -> None:
+    """Regression for user-reported bug: the bundled Tobramycin SMILES is fully
+    saturated (three aminosugar rings, no C=C bonds), so peaks in the 4.4–6
+    ppm window must be labelled 'anomeric' and NOT 'olefinic'.
+
+    Tobramycin SMILES (the one the user pasted):
+        O[C@@]1([H])[C@]([C@@H](O)[C@@H](O[C@@]([C@]2(O)[H])([H])
+        [C@@H](C([H])[C@H](N)[C@H]2O[C@@H](O[C@]([C@@]3([H])O)([H])CN)
+        [C@@H](C3([H])[H])N)N)O[C@@H]1CO)([H])N
+    """
+    tobramycin_smiles = (
+        "O[C@@]1([H])[C@]([C@@H](O)[C@@H](O[C@@]([C@]2(O)[H])([H])"
+        "[C@@H](C([H])[C@H](N)[C@H]2O[C@@H](O[C@]([C@@]3([H])O)([H])CN)"
+        "[C@@H](C3([H])[H])N)N)O[C@@H]1CO)([H])N"
+    )
+    # Peaks in the anomeric region above the D2O HOD residual (4.55–5.05 ppm).
+    # All three test peaks are at 5.10+ so the solvent short-circuit doesn't
+    # mask the anomeric classification we're checking.
+    peak_csv = (
+        b"shift_ppm,integration_h,multiplicity\n"
+        b"5.55,1,d\n"
+        b"5.30,1,d\n"
+        b"5.10,1,d\n"
+        b"3.65,1,m\n"
+        b"2.85,2,m\n"
+    )
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "tobramycin",
+                "nucleus": "1H",
+                "solvent": "D2O",
+                "candidates_text": f"Tobramycin | {tobramycin_smiles} | starting material",
+            },
+            files={"file": ("peaks.csv", peak_csv, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    # Find the picked peaks in the 4.4–6 ppm range and assert they are NOT
+    # categorised as "olefinic". They MUST be anomeric since the SMILES has
+    # anomeric protons and zero olefinic protons.
+    anomeric_window_peaks = [
+        p for p in payload["peaks"] if 4.4 <= float(p["shift_ppm"]) < 6.0
+    ]
+    assert len(anomeric_window_peaks) >= 1
+    for peak in anomeric_window_peaks:
+        assert peak["category"] == "anomeric", (
+            f"Tobramycin peak at {peak['shift_ppm']} ppm was categorised as "
+            f"'{peak['category']}' — should be 'anomeric' since SMILES is saturated."
+        )
+        assert "no olefinic" in peak["category_reason"].lower() or "anomeric assignment" in peak["category_reason"].lower(), (
+            f"Reason must justify the anomeric call: {peak['category_reason']}"
+        )
+
+    # The peak_category_summary must reflect the new category — not "olefinic".
+    summary = payload["peak_category_summary"]
+    assert "anomeric" in summary
+    assert "olefinic" not in summary, (
+        f"olefinic must not appear in peak_category_summary for tobramycin: {summary}"
+    )
+
+
 def test_nmr_processed_analyze_uses_shared_proton_carbon_layers(tmp_path) -> None:
     """Integration-audit fix: the shared session card's 1H + 13C texts (sent
     as proton_nmr_text + carbon13_text) feed candidate scoring as parallel

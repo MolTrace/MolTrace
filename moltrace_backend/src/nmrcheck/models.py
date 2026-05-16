@@ -148,10 +148,23 @@ class StructureSummary(BaseModel):
     molecular_weight: float
     total_hydrogens: int
     labile_hydrogens: int
+    # Per-element breakdown of the labile-H total. The three sum to
+    # ``labile_hydrogens`` for any valid neutral structure. Drives the exact
+    # "(OH)" / "(OH/NH)" / "(OH/NH/SH)" subset shown in the labile-H reasoning.
+    oh_hydrogen_count: int = 0
+    nh_hydrogen_count: int = 0
+    sh_hydrogen_count: int = 0
     non_labile_hydrogens: int
     aromatic_protons: int
     aliphatic_protons: int
     aromatic_atom_count: int
+    # Olefinic vs anomeric proton counts: used by the 1H peak categoriser to
+    # disambiguate peaks in the 4.4–6.0 ppm window. Tobramycin-style
+    # carbohydrates have anomeric_proton_count > 0 and olefinic_proton_count
+    # == 0; vinyl-containing molecules have the inverse. Both default to 0
+    # for back-compat with older serialised summaries.
+    olefinic_proton_count: int = 0
+    anomeric_proton_count: int = 0
 
 
 class SolventHeuristicHit(BaseModel):
@@ -522,6 +535,11 @@ class NMRProcessedAnalyzeResponse(BaseModel):
     predicted_vs_observed: list[dict[str, Any]] = Field(default_factory=list)
     labile_hydrogen_summary: dict[str, Any] = Field(default_factory=dict)
     peak_category_summary: dict[str, int] = Field(default_factory=dict)
+    # Aggregated proton inventory: observed-vs-expected counts by chemical
+    # class (aromatic / aliphatic / labile / non-labile, plus aldehyde and
+    # carboxyl detail) computed by ``build_proton_inventory``. Empty dict for
+    # 13C-only analyses. See peak_categorization.py for the literature basis.
+    proton_inventory: dict[str, Any] = Field(default_factory=dict)
     dp4_ranking: list[dict[str, Any]] = Field(default_factory=list)
     references: list[dict[str, Any]] = Field(default_factory=list)
     analysis_score: float | None = Field(default=None, ge=0.0, le=1.0)

@@ -17,6 +17,11 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import {
+  PEAK_CATEGORY_DEFAULT_COLOR,
+  humanizePeakCategory,
+  plotColorForCategory,
+} from "@/src/lib/spectracheck/peak-category-style"
+import {
   ArrowLeft,
   ArrowRight,
   Droplets,
@@ -34,11 +39,19 @@ import {
   ZoomOut,
 } from "lucide-react"
 
-/** Peak annotations from backend (no frontend picking). */
+/** Peak annotations from backend (no frontend picking).
+ *
+ * ``category`` is the enriched peak category from
+ * ``peak_categorization.PEAK_CATEGORIES`` (aromatic_alkene, aliphatic,
+ * labile_OH_NH_SH, …). Optional — when supplied, peaks are color-coded on the
+ * chart by category so reviewers can see aromatic / aliphatic / labile groups
+ * at a glance. See ``peak-category-style.ts`` for the palette.
+ */
 export type SpectrumPeakAnnotation = {
   ppm: number
   intensity?: number
   label?: string
+  category?: string
 }
 
 export type SpectrumOverlays = {
@@ -563,23 +576,74 @@ function SpectrumViewerImpl({
       })
     }
     if (showPeaks && peaks.length > 0) {
-      const px = peaks.map((p) => p.ppm)
-      const py = peaks.map((p) =>
+      // Compute display intensity once per peak — reused by the drop-line
+      // segment (baseline → peak top) AND the marker glyph so they stay
+      // perfectly aligned through every gain change.
+      const peakY = peaks.map((p) =>
         p.intensity != null
           ? scaleDisplayYValue(p.intensity, displayScale)
           : scaleDisplayYValue(nearestYAtPpm(x, y, p.ppm), displayScale),
       )
+
+      // Drop-lines: one vertical segment per peak from y=0 up to peakY[i].
+      // Plotly draws this as a single scatter trace with NaN-separated
+      // segments — cheaper than ``layout.shapes`` because the trace is
+      // re-rendered through Plotly's existing data diff and respects the
+      // gain-driven y scale without explicit layout invalidation.
+      const dropX: (number | null)[] = []
+      const dropY: (number | null)[] = []
+      for (let i = 0; i < peaks.length; i++) {
+        dropX.push(peaks[i].ppm, peaks[i].ppm, null)
+        dropY.push(0, peakY[i], null)
+      }
       traces.push({
         type: "scatter",
-        mode: "markers+text",
-        x: px,
-        y: py,
-        text: peaks.map((p) => p.label ?? ""),
-        textposition: "top center",
-        name: "Peaks",
-        marker: { size: 7, color: "#ea580c", line: { width: 0.5, color: "#fff" } },
-        textfont: { size: 10 },
+        mode: "lines",
+        x: dropX,
+        y: dropY,
+        name: "Peak markers",
+        showlegend: false,
+        hoverinfo: "skip",
+        line: { width: 1, color: "rgba(120, 120, 120, 0.45)" },
       })
+
+      // Group peaks by category so each category renders as its own colored
+      // scatter trace — gives the user a one-glance grouping (aromatic vs
+      // aliphatic vs labile) AND a working legend they can toggle.
+      // Peaks without a category fall through to the default orange.
+      type Bucket = { px: number[]; py: number[]; labels: string[] }
+      const byCategory = new Map<string, Bucket>()
+      for (let i = 0; i < peaks.length; i++) {
+        const cat = peaks[i].category ?? "unknown"
+        const bucket = byCategory.get(cat) ?? { px: [], py: [], labels: [] }
+        bucket.px.push(peaks[i].ppm)
+        bucket.py.push(peakY[i])
+        bucket.labels.push(peaks[i].label ?? "")
+        byCategory.set(cat, bucket)
+      }
+      // Render in a stable order so the legend doesn't reshuffle on every
+      // re-render (Plotly's diff is reference-stable so order matters).
+      const orderedCategories = Array.from(byCategory.keys()).sort()
+      for (const cat of orderedCategories) {
+        const bucket = byCategory.get(cat)
+        if (!bucket) continue
+        const color =
+          cat === "unknown"
+            ? PEAK_CATEGORY_DEFAULT_COLOR
+            : plotColorForCategory(cat)
+        traces.push({
+          type: "scatter",
+          mode: "markers+text",
+          x: bucket.px,
+          y: bucket.py,
+          text: bucket.labels,
+          textposition: "top center",
+          name: humanizePeakCategory(cat),
+          marker: { size: 7, color, line: { width: 0.5, color: "#fff" } },
+          textfont: { size: 10, color },
+          hovertemplate: "δ %{x:.3f} ppm<br>I = %{y:.2e}<br>%{text}<extra></extra>",
+        })
+      }
     }
     return traces
   }, [

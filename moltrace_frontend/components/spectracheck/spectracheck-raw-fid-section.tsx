@@ -23,7 +23,12 @@ import { SpectrumViewer } from "@/components/science/SpectrumViewer"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
-import { extractSpectrumXY, isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
+import {
+  extractPeaksFromPayload,
+  extractSpectrumXY,
+  isRecord,
+} from "@/components/spectracheck/spectracheck-nmr-result-parse"
+import type { SpectrumPeakAnnotation } from "@/components/science/SpectrumViewer"
 import { useStableXY } from "@/components/spectracheck/use-stable-xy"
 import { isMissingNmrEndpoint, RAW_FID_BACKEND_MSG } from "@/components/spectracheck/spectracheck-nmr-endpoint-messages"
 import { Badge } from "@/components/ui/badge"
@@ -507,6 +512,15 @@ export function SpectraCheckRawFidSection({
   // redrawing an already-painted line. [Mnova anti-shake §3]
   const xyResolved = xyProcess ?? xyPreview ?? xyAutoPreview
   const xy = useStableXY(xyResolved)
+
+  // Picked peaks for the chart overlay. Sourced from whichever payload is
+  // currently driving the viewer (process > preview). Same extractor the
+  // processed-spectrum tab uses, so the marker color-coding by category +
+  // drop-lines work uniformly across both sections.
+  const peaks = useMemo<SpectrumPeakAnnotation[]>(
+    () => extractPeaksFromPayload(displayPayload ?? {}),
+    [displayPayload],
+  )
   const xyIsAutoPreview = !xyProcess && !xyPreview && xyAutoPreview != null
 
   const meta = displayPayload && isRecord(displayPayload) ? displayPayload : null
@@ -1114,7 +1128,7 @@ export function SpectraCheckRawFidSection({
                 </div>
               ) : null}
               {xy ? (
-                <SpectrumViewer x={xy.x} y={xy.y} nucleus={nucleus} />
+                <SpectrumViewer x={xy.x} y={xy.y} peaks={peaks} nucleus={nucleus} />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (
                 <div
                   className="flex h-[360px] min-w-0 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 p-6 text-center"

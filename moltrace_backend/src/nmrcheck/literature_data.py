@@ -272,6 +272,54 @@ REFERENCES: Final[dict[str, dict[str, str | int | None]]] = {
         venue="Wiley",
         year=2014,
     ),
+    # The four canonical 1H/13C chemical-shift compilations cited as the
+    # basis for peak-region categorisation in ``peak_categorization.py``.
+    "pretsch_2020_tables_5e": _ref(
+        title=(
+            "Structure Determination of Organic Compounds: Tables of Spectral "
+            "Data (5th ed.)"
+        ),
+        authors="Pretsch E.; Bühlmann P.; Badertscher M.",
+        venue="Springer",
+        year=2020,
+        doi="10.1007/978-3-662-62439-5",
+    ),
+    "friebolin_2010_5e": _ref(
+        title="Basic One- and Two-Dimensional NMR Spectroscopy (5th ed.)",
+        authors="Friebolin H.",
+        venue="Wiley-VCH",
+        year=2010,
+    ),
+    "gottlieb_1997_solvent_impurities": _ref(
+        title=(
+            "NMR Chemical Shifts of Common Laboratory Solvents as Trace Impurities"
+        ),
+        authors="Gottlieb H. E.; Kotlyar V.; Nudelman A.",
+        venue="J. Org. Chem.",
+        year=1997,
+        doi="10.1021/jo971176v",
+    ),
+    "fulmer_2010_solvent_impurities": _ref(
+        title=(
+            "NMR Chemical Shifts of Trace Impurities: Common Laboratory Solvents, "
+            "Organics, and Gases in Deuterated Solvents Relevant to the "
+            "Organometallic Chemist"
+        ),
+        authors=(
+            "Fulmer G. R.; Miller A. J. M.; Sherden N. H.; Gottlieb H. E.; "
+            "Nudelman A.; Stoltz B. M.; Bercaw J. E.; Goldberg K. I."
+        ),
+        venue="Organometallics",
+        year=2010,
+        doi="10.1021/om100106e",
+    ),
+    "reich_nmr_resources": _ref(
+        title="OH and NH proton chemical shifts, exchange, and broadening (resource hub)",
+        authors="Reich H. J.",
+        venue="University of Wisconsin–Madison",
+        year=2024,
+        url="https://organicchemistrydata.org/hansreich/resources/nmr/",
+    ),
     "mestrenova_manual": _ref(
         title="MestReNova User Manual",
         authors="Mestrelab Research",
