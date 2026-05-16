@@ -47,6 +47,7 @@ import {
 } from "@/components/spectracheck/spectracheck-result-panels"
 import { SpectraCheckProcessedSpectrumSection } from "@/components/spectracheck/spectracheck-processed-spectrum-section"
 import { SpectraCheckRawFidSection } from "@/components/spectracheck/spectracheck-raw-fid-section"
+import { SessionValidateCard } from "@/components/spectracheck/spectracheck-session-validate-card"
 import { SpectraCheckBenchmarkSection } from "@/components/spectracheck/spectracheck-benchmark-section"
 import {
   getNmrSolventForApi,
@@ -1644,6 +1645,32 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   content='Use one candidate per line. Recommended format: Name | SMILES | role.'
                   label="About Candidate structures"
                 />
+                {/* Default-vs-modified badge — also rendered on Step 3 + the
+                    Step 4 Validate card. Tells the reviewer at-a-glance
+                    whether they're looking at the bundled example or their
+                    own data. */}
+                <span
+                  data-testid="candidates-dirty-state"
+                  className="ml-auto rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+                  style={{
+                    borderColor:
+                      candidatesText.trim() === defaultCandidates.trim()
+                        ? "var(--mt-amber)"
+                        : "var(--mt-teal)",
+                    color:
+                      candidatesText.trim() === defaultCandidates.trim()
+                        ? "var(--mt-amber)"
+                        : "var(--mt-teal)",
+                    backgroundColor:
+                      candidatesText.trim() === defaultCandidates.trim()
+                        ? "rgba(232, 160, 48, 0.12)"
+                        : "var(--mt-teal-soft)",
+                  }}
+                >
+                  {candidatesText.trim() === defaultCandidates.trim()
+                    ? "Example"
+                    : "Your data"}
+                </span>
               </div>
               <Textarea
                 id="spectracheck-candidates"
@@ -1688,16 +1715,44 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     content="Paste literature-style proton NMR text including shifts, multiplicities, couplings, and integrations when available."
                     label="About 1H NMR text"
                   />
-                  <span
-                    className="ml-auto rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
-                    style={{
-                      borderColor: protonText.trim() ? "var(--mt-teal)" : "var(--border)",
-                      color: protonText.trim() ? "var(--mt-teal)" : "var(--muted-foreground)",
-                      backgroundColor: protonText.trim() ? "var(--mt-teal-soft)" : "transparent",
-                    }}
-                  >
-                    {protonText.trim() ? "Detected ✓" : "Empty"}
-                  </span>
+                  {/* Status pill: differentiates Empty / Example default /
+                      user-modified data so the user knows whether what they
+                      see is the bundled ethanol example or their own input. */}
+                  {(() => {
+                    const trimmed = protonText.trim()
+                    const isEmpty = trimmed.length === 0
+                    const isDefault = !isEmpty && trimmed === defaultProton.trim()
+                    const isModified = !isEmpty && !isDefault
+                    const color = isModified
+                      ? "var(--mt-teal)"
+                      : isDefault
+                        ? "var(--mt-amber)"
+                        : "var(--muted-foreground)"
+                    const bg = isModified
+                      ? "var(--mt-teal-soft)"
+                      : isDefault
+                        ? "rgba(232, 160, 48, 0.12)"
+                        : "transparent"
+                    const border = isModified
+                      ? "var(--mt-teal)"
+                      : isDefault
+                        ? "var(--mt-amber)"
+                        : "var(--border)"
+                    const label = isModified
+                      ? "Your data ✓"
+                      : isDefault
+                        ? "Example"
+                        : "Empty"
+                    return (
+                      <span
+                        data-testid="proton-text-dirty-state"
+                        className="ml-auto rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+                        style={{ borderColor: border, color, backgroundColor: bg }}
+                      >
+                        {label}
+                      </span>
+                    )
+                  })()}
                 </div>
                 {protonLinkedFrom ? (
                   <div
@@ -1741,16 +1796,42 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     content="Paste literature-style carbon NMR text or a comma-separated list of 13C chemical shifts."
                     label="About 13C NMR text"
                   />
-                  <span
-                    className="ml-auto rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
-                    style={{
-                      borderColor: carbonText.trim() ? "var(--mt-teal)" : "var(--border)",
-                      color: carbonText.trim() ? "var(--mt-teal)" : "var(--muted-foreground)",
-                      backgroundColor: carbonText.trim() ? "var(--mt-teal-soft)" : "transparent",
-                    }}
-                  >
-                    {carbonText.trim() ? "Detected ✓" : "Empty"}
-                  </span>
+                  {/* Same default / modified / empty tri-state as the 1H pill above. */}
+                  {(() => {
+                    const trimmed = carbonText.trim()
+                    const isEmpty = trimmed.length === 0
+                    const isDefault = !isEmpty && trimmed === defaultCarbon.trim()
+                    const isModified = !isEmpty && !isDefault
+                    const color = isModified
+                      ? "var(--mt-teal)"
+                      : isDefault
+                        ? "var(--mt-amber)"
+                        : "var(--muted-foreground)"
+                    const bg = isModified
+                      ? "var(--mt-teal-soft)"
+                      : isDefault
+                        ? "rgba(232, 160, 48, 0.12)"
+                        : "transparent"
+                    const border = isModified
+                      ? "var(--mt-teal)"
+                      : isDefault
+                        ? "var(--mt-amber)"
+                        : "var(--border)"
+                    const label = isModified
+                      ? "Your data ✓"
+                      : isDefault
+                        ? "Example"
+                        : "Empty"
+                    return (
+                      <span
+                        data-testid="carbon-text-dirty-state"
+                        className="ml-auto rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+                        style={{ borderColor: border, color, backgroundColor: bg }}
+                      >
+                        {label}
+                      </span>
+                    )
+                  })()}
                 </div>
                 {carbonLinkedFrom ? (
                   <div
@@ -1787,6 +1868,23 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               </div>
             </div>
           </ModuleCard>
+
+          {/* Step 4 — Validate session inputs (optional pre-flight check).
+              Calls /analyze/validate; analysis is never gated on the result —
+              the card surfaces the structured ValidationReport so users see
+              exactly what passes / fails / mismatches before they upload. */}
+          <SessionValidateCard
+            sampleId={sampleId}
+            solvent={solventForApi}
+            candidatesText={candidatesText}
+            protonText={protonText}
+            carbonText={carbonText}
+            defaults={{
+              candidates: defaultCandidates,
+              proton: defaultProton,
+              carbon: defaultCarbon,
+            }}
+          />
 
           {/* Tip card */}
           <div

@@ -48,6 +48,8 @@ from . import analytics_store as analytics_store
 from .compound_classes import normalize_compound_class
 from . import collaboration_store as collab_store
 from . import compound_registry_store as compound_store
+# build_proton_inventory exported by peak_categorization — imported alongside
+# the other category builders below.
 from . import golden_pilot_store as golden_pilot_store
 from . import interoperability_store as interop_store
 from . import knowledge_flywheel_store as knowledge_store
@@ -81,6 +83,7 @@ from .peak_categorization import (
     build_labile_hydrogen_summary,
     build_peak_category_summary,
     build_predicted_vs_observed,
+    build_proton_inventory,
     enrich_peaks,
 )
 from .candidate_predicted import (
@@ -5820,6 +5823,15 @@ async def nmr_processed_analyze_route(
 
     peak_category_summary = build_peak_category_summary(peaks)
 
+    # Aggregated proton inventory: observed vs structural-expected counts by
+    # chemical class. Empty for 13C-only analyses; populated for 1H runs even
+    # when no SMILES is supplied (observed block only).
+    proton_inventory = build_proton_inventory(
+        peaks=peaks,
+        structure=structure_summary,
+        nucleus=nucleus,
+    )
+
     predicted_vs_observed_rows: list[dict[str, Any]] = []
     dp4_ranking_rows: list[dict[str, Any]] = []
     if candidate_smiles:
@@ -5877,6 +5889,14 @@ async def nmr_processed_analyze_route(
         "csp5_2024",
         "park_2021_molecular_search",
         "silverstein_2014_8e",
+        # 1H/13C chemical-shift window references underpinning the peak
+        # categorisation + proton-inventory blocks.
+        "pretsch_2020_tables_5e",
+        "friebolin_2010_5e",
+        # Residual-solvent windows + OH/NH/SH behaviour references.
+        "gottlieb_1997_solvent_impurities",
+        "fulmer_2010_solvent_impurities",
+        "reich_nmr_resources",
         "mestrenova_manual",
     ]
     if dp4_ranking_rows:
@@ -5934,6 +5954,7 @@ async def nmr_processed_analyze_route(
         predicted_vs_observed=predicted_vs_observed_rows,
         labile_hydrogen_summary=labile_hydrogen_summary,
         peak_category_summary=peak_category_summary,
+        proton_inventory=proton_inventory,
         dp4_ranking=dp4_ranking_rows,
         references=references_block,
         analysis_score=score,

@@ -106,14 +106,19 @@ export function extractPeaksFromPayload(payload: unknown): SpectrumPeakAnnotatio
   const out: SpectrumPeakAnnotation[] = []
   for (const p of raw) {
     if (!isRecord(p)) continue
-    const ppm = Number(p.ppm ?? p.shift ?? p.x)
+    const ppm = Number(p.ppm ?? p.shift ?? p.x ?? p.shift_ppm)
     if (!Number.isFinite(ppm)) continue
     const intensity = p.intensity != null ? Number(p.intensity) : p.height != null ? Number(p.height) : undefined
     const label = p.label != null ? String(p.label) : p.assignment != null ? String(p.assignment) : undefined
+    // ``category`` flows through unchanged when the backend's enrich_peaks
+    // attached one (processed analyze + raw-FID process responses both do).
+    // The viewer reads it to color-code markers per category.
+    const category = typeof p.category === "string" && p.category.length > 0 ? p.category : undefined
     out.push({
       ppm,
       intensity: intensity != null && Number.isFinite(intensity) ? intensity : undefined,
       label,
+      category,
     })
   }
   return out

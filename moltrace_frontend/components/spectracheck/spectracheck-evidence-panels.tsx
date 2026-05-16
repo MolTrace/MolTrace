@@ -38,6 +38,8 @@ type RawPeak = Record<string, unknown>
  */
 const CATEGORY_STYLE: Record<string, { color: string; bg: string }> = {
   aromatic_alkene: { color: "var(--mt-teal)", bg: "var(--mt-teal-soft)" },
+  // ``olefinic`` is now only assigned when the SMILES actually has olefinic
+  // (non-aromatic C=C) protons — see peak_categorization._classify_anomeric_vs_olefinic.
   olefinic: { color: "var(--mt-teal)", bg: "var(--mt-teal-soft)" },
   aldehyde: { color: "var(--mt-amber)", bg: "rgba(231, 165, 67, 0.12)" },
   carbonyl: { color: "var(--mt-amber)", bg: "rgba(231, 165, 67, 0.12)" },
@@ -46,6 +48,9 @@ const CATEGORY_STYLE: Record<string, { color: string; bg: string }> = {
   oxygenated: { color: "var(--mt-blue, #4c6fae)", bg: "rgba(76, 111, 174, 0.12)" },
   nitrogen_adjacent: { color: "var(--mt-blue, #4c6fae)", bg: "rgba(76, 111, 174, 0.12)" },
   anomeric: { color: "var(--mt-blue, #4c6fae)", bg: "rgba(76, 111, 174, 0.12)" },
+  // Distinct purple for the ambiguous bucket so reviewers know the
+  // categoriser couldn't disambiguate (no SMILES, or both motifs present).
+  anomeric_or_olefinic: { color: "#9333EA", bg: "rgba(147, 51, 234, 0.12)" },
   aliphatic: { color: "var(--mt-green)", bg: "var(--mt-green-soft)" },
   solvent: { color: "var(--mt-muted, #888)", bg: "rgba(128, 128, 128, 0.08)" },
   impurity: { color: "var(--mt-red, #b8474a)", bg: "rgba(184, 71, 74, 0.12)" },
@@ -59,6 +64,7 @@ function categoryStyle(category: string | null | undefined) {
 
 function humanizeCategory(category: string | null | undefined): string {
   if (!category) return "—"
+  if (category === "anomeric_or_olefinic") return "Anomeric / olefinic (ambiguous)"
   return category
     .replace(/_/g, " ")
     .replace("OH NH SH", "OH / NH / SH")
@@ -188,6 +194,150 @@ function EnrichedPickedPeaksPanelImpl({
             </TableBody>
           </Table>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Proton inventory — observed vs expected counts by chemical class
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Rows that compose the inventory tables — pure display, all numbers come
+ * straight from the backend's ``build_proton_inventory`` audit. */
+const PROTON_INVENTORY_ROWS: Array<{ key: string; label: string }> = [
+  { key: "aromatic", label: "Aromatic / vinyl-aryl" },
+  // Bucket key renamed from ``olefinic_vinylic`` → ``anomeric_or_olefinic`` —
+  // see peak_categorization.build_proton_inventory. Covers anomeric sugar
+  // protons (e.g. tobramycin), olefinic CH, and the ambiguous-without-SMILES
+  // case.
+  { key: "anomeric_or_olefinic", label: "Anomeric / olefinic (4.4–6 ppm)" },
+  { key: "aldehyde", label: "Aldehyde (9–10 ppm)" },
+  { key: "carboxylic_acid", label: "Carboxylic acid OH (10–13 ppm)" },
+  { key: "aliphatic", label: "Aliphatic (incl. O/N-adjacent)" },
+  { key: "labile", label: "Labile (OH / NH / SH / COOH)" },
+  { key: "non_labile", label: "Non-labile total" },
+  { key: "total", label: "Grand total" },
+]
+
+export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
+  if (!isRecord(payload)) return null
+  const inventory = payload.proton_inventory
+  if (!isRecord(inventory)) return null
+  if (inventory.nucleus !== "1H") return null
+  const observed = isRecord(inventory.observed) ? inventory.observed : {}
+  const expected = isRecord(inventory.expected) ? inventory.expected : {}
+  const deltas = isRecord(inventory.deltas) ? inventory.deltas : {}
+  const warningsRaw = inventory.warnings
+  const warnings = Array.isArray(warningsRaw)
+    ? warningsRaw.filter((w): w is string => typeof w === "string" && w.length > 0)
+    : []
+  const hasObserved = Object.values(observed).some(
+    (v) => typeof v === "number" && v > 0,
+  )
+  if (!hasObserved && Object.keys(expected).length === 0) return null
+  const hasExpected = Object.keys(expected).length > 0
+
+  return (
+    <Card
+      className="overflow-hidden rounded-xl py-0"
+      style={{ borderTop: "3px solid var(--mt-teal)" }}
+      data-testid="proton-inventory"
+    >
+      <CardContent className="space-y-2 py-3">
+        <p
+          className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+          style={{ color: "var(--mt-teal)" }}
+        >
+          <Tag className="h-3 w-3" aria-hidden />
+          Proton inventory (observed vs structural expectation)
+        </p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-[10px] uppercase tracking-wide">Class</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide text-right">Observed ∫H</TableHead>
+              {hasExpected ? (
+                <>
+                  <TableHead className="text-[10px] uppercase tracking-wide text-right">Expected H</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide text-right">Δ</TableHead>
+                </>
+              ) : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {PROTON_INVENTORY_ROWS.map((row) => {
+              const obs = asNumber(observed[row.key])
+              const exp = asNumber(expected[row.key])
+              const delta = asNumber(deltas[row.key])
+              if (obs === null && exp === null) return null
+              const deltaColor =
+                delta !== null && Math.abs(delta) >= 1.0 ? "var(--mt-amber)" : undefined
+              return (
+                <TableRow key={row.key} data-testid={`proton-inventory-${row.key}`}>
+                  <TableCell className="text-[11px] text-muted-foreground">{row.label}</TableCell>
+                  <TableCell className="font-mono text-xs text-right">
+                    {obs !== null ? obs.toFixed(1) : "—"}
+                  </TableCell>
+                  {hasExpected ? (
+                    <>
+                      <TableCell className="font-mono text-xs text-right">
+                        {exp !== null ? exp.toFixed(0) : "—"}
+                      </TableCell>
+                      <TableCell
+                        className="font-mono text-xs text-right"
+                        style={deltaColor ? { color: deltaColor } : undefined}
+                      >
+                        {delta !== null ? (delta > 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)) : "—"}
+                      </TableCell>
+                    </>
+                  ) : null}
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+        {hasExpected && isRecord(expected) ? (
+          <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-muted-foreground">
+            <span>Structural breakdown:</span>
+            {(asNumber(expected.oh) ?? 0) > 0 ? (
+              <span
+                className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+              >
+                {asNumber(expected.oh)} OH
+              </span>
+            ) : null}
+            {(asNumber(expected.nh) ?? 0) > 0 ? (
+              <span
+                className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+              >
+                {asNumber(expected.nh)} NH
+              </span>
+            ) : null}
+            {(asNumber(expected.sh) ?? 0) > 0 ? (
+              <span
+                className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+              >
+                {asNumber(expected.sh)} SH
+              </span>
+            ) : null}
+            {asString(expected.labile_subset) ? (
+              <span className="font-mono text-[10px] uppercase tracking-wide text-foreground">
+                Subset: {asString(expected.labile_subset)}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {warnings.length > 0 ? (
+          <ul className="list-inside list-disc space-y-0.5 text-[11px]" style={{ color: "var(--mt-amber)" }}>
+            {warnings.map((warning, idx) => (
+              <li key={idx}>{warning}</li>
+            ))}
+          </ul>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -325,6 +475,10 @@ export function LabileHydrogenPanel({ payload }: { payload: unknown }) {
   const summary = payload.labile_hydrogen_summary
   if (!isRecord(summary)) return null
   const expected = asNumber(summary.expected_labile_h) ?? 0
+  const expectedOh = asNumber(summary.expected_oh_h) ?? 0
+  const expectedNh = asNumber(summary.expected_nh_h) ?? 0
+  const expectedSh = asNumber(summary.expected_sh_h) ?? 0
+  const subsetLabel = asString(summary.labile_subset)
   const observedRaw = summary.observed_labile_candidates
   const observed = Array.isArray(observedRaw)
     ? observedRaw.filter((p): p is RawPeak => isRecord(p))
@@ -337,6 +491,10 @@ export function LabileHydrogenPanel({ payload }: { payload: unknown }) {
   if (expected === 0 && observed.length === 0 && notes.length === 0) {
     return null
   }
+  // Card header now reflects the EXACT element subset present in the SMILES
+  // (e.g. "(OH)" / "(OH/NH)" / "(OH/NH/SH)"). Falls back to the legacy generic
+  // when the backend didn't supply per-element counts (older sessions).
+  const headerSubset = subsetLabel && subsetLabel.length > 0 ? subsetLabel : "OH / NH / SH"
   return (
     <Card
       className="overflow-hidden rounded-xl py-0"
@@ -349,12 +507,37 @@ export function LabileHydrogenPanel({ payload }: { payload: unknown }) {
           style={{ color: "var(--mt-amber)" }}
         >
           <AlertTriangle className="h-3 w-3" aria-hidden />
-          Labile H reasoning (OH / NH / SH)
+          Labile H reasoning ({headerSubset})
         </p>
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
           <span>
             Expected labile H: <span className="font-mono font-bold text-foreground">{expected}</span>
           </span>
+          {/* Per-element breakdown chips — only render the ones that are present. */}
+          {expectedOh > 0 ? (
+            <span
+              className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+              style={{ borderColor: "var(--mt-amber)", color: "var(--mt-amber)" }}
+            >
+              {expectedOh} OH
+            </span>
+          ) : null}
+          {expectedNh > 0 ? (
+            <span
+              className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+              style={{ borderColor: "var(--mt-amber)", color: "var(--mt-amber)" }}
+            >
+              {expectedNh} NH
+            </span>
+          ) : null}
+          {expectedSh > 0 ? (
+            <span
+              className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+              style={{ borderColor: "var(--mt-amber)", color: "var(--mt-amber)" }}
+            >
+              {expectedSh} SH
+            </span>
+          ) : null}
           <span>
             Observed candidates: <span className="font-mono font-bold text-foreground">{observed.length}</span>
           </span>
@@ -690,6 +873,10 @@ function SpectraCheckEvidencePanelsImpl({ payload }: { payload: unknown }) {
   return (
     <div className="space-y-4">
       <PeakCategorySummaryPanel payload={payload} />
+      {/* Proton inventory sits beside peak-category chips so reviewers can
+          cross-check observed integrations against the structural prediction
+          before drilling into individual peak panels. */}
+      <ProtonInventoryPanel payload={payload} />
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         <LabileHydrogenPanel payload={payload} />
         <ImpurityCandidatesPanel payload={payload} />
