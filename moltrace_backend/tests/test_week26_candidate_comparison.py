@@ -236,3 +236,104 @@ def test_candidate_comparison_does_not_change_stable_endpoint_outputs(tmp_path) 
     assert spectrum_before.json() == spectrum_after.json()
     assert proton_before.json() == proton_after.json()
     assert carbon_before.json() == carbon_after.json()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Per-class priors (compound_class) tests
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_unspecified_compound_class_does_not_apply_prior() -> None:
+    """Default behaviour: no class → no audit metadata, default weights."""
+    result = compare_candidates(
+        CandidateComparisonRequest(
+            sample_id="no-class",
+            solvent="CDCl3",
+            proton_nmr_text=ETHANOL_1H,
+            carbon13_text=ETHANOL_13C,
+            candidates=[CandidateInput(name="Ethanol", smiles="CCO")],
+        )
+    )
+
+    assert result.compound_class is None
+    assert result.compound_class_prior_applied is None
+
+
+def test_compound_class_prior_renormalises_weights_and_emits_audit() -> None:
+    """When a recognised class is given the audit payload reports original +
+    renormalised weights that sum to 1.0."""
+    result = compare_candidates(
+        CandidateComparisonRequest(
+            sample_id="carbo",
+            solvent="D2O",
+            compound_class="carbohydrates",
+            proton_nmr_text="1H NMR (D2O) delta 5.20 (d, 1H), 3.40 (m, 6H)",
+            carbon13_text="13C NMR delta 102.5, 76.8, 73.4, 71.2, 70.1, 61.5",
+            candidates=[CandidateInput(name="Glucose", smiles="OCC1OC(O)C(O)C(O)C1O")],
+        )
+    )
+
+    audit = result.compound_class_prior_applied
+    assert audit is not None
+    assert audit["compound_class"] == "carbohydrates"
+    assert set(audit["original_weights"].keys()) == {
+        "structure",
+        "proton",
+        "carbon13",
+        "dept_apt",
+        "nmr2d",
+    }
+    renorm = audit["renormalised_weights"]
+    assert abs(sum(renorm.values()) - 1.0) < 1e-5, renorm
+    # Carbohydrates explicitly up-weight nmr2d (1.5x) and carbon13 (1.3x);
+    # the renormalised values must be strictly greater than the originals.
+    assert renorm["nmr2d"] > audit["original_weights"]["nmr2d"]
+    assert renorm["carbon13"] > audit["original_weights"]["carbon13"]
+    # And the human-readable notes should mention what was moved.
+    notes_text = " ".join(audit["notes"])
+    assert "carbohydrates" in notes_text.lower()
+    assert "Up-weighted" in notes_text or "carbon13" in notes_text
+
+
+def test_protein_class_downweights_proton_and_boosts_2d() -> None:
+    """Proteins: 1H overlap is severe so proton weight must drop, 2D must rise."""
+    result = compare_candidates(
+        CandidateComparisonRequest(
+            sample_id="protein-stub",
+            solvent="DMSO-d6",
+            compound_class="proteins",
+            proton_nmr_text=ETHANOL_1H,
+            candidates=[CandidateInput(name="Stub", smiles="CCO")],
+        )
+    )
+
+    audit = result.compound_class_prior_applied
+    assert audit is not None
+    assert audit["renormalised_weights"]["proton"] < audit["original_weights"]["proton"]
+    assert audit["renormalised_weights"]["nmr2d"] > audit["original_weights"]["nmr2d"]
+
+
+def test_unknown_compound_class_falls_through_without_audit() -> None:
+    """A class string with no entry in the multiplier table must NOT crash and
+    must NOT add an audit payload; a fall-through note is emitted instead."""
+    # We bypass normalize_compound_class here on purpose — the candidate
+    # comparator must be defensive even if a future caller forgets to normalise.
+    result = compare_candidates(
+        CandidateComparisonRequest(
+            sample_id="weird-class",
+            solvent="CDCl3",
+            compound_class="not_a_real_class_x",
+            proton_nmr_text=ETHANOL_1H,
+            candidates=[CandidateInput(name="Ethanol", smiles="CCO")],
+        )
+    )
+
+    assert result.compound_class == "not_a_real_class_x"
+    assert result.compound_class_prior_applied is None
+    assert any("no class-specific weighting" in note for note in result.notes)
+
+
+# NB: E2E tests for the /nmr/processed/analyze endpoint plumbing live in
+# test_nmr_frontend_upload_api.py, which uses a client factory that
+# initialises the audit_events table. The four tests above are unit-level
+# (calling compare_candidates directly) and avoid that dependency.

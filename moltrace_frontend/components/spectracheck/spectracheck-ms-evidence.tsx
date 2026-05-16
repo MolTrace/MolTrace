@@ -36,6 +36,11 @@ import {
   isMsSpectrumFilename,
 } from "@/src/lib/spectracheck/spectrum-file-formats"
 import {
+  COMPOUND_CLASS_UNSPECIFIED,
+  compoundClassForRequest,
+  type CompoundClassValue,
+} from "@/src/lib/spectracheck/compound-classes"
+import {
   Atom,
   BarChart3,
   Eye,
@@ -1724,6 +1729,7 @@ function FormulaSearchDetailTables({ result }: { result: unknown }) {
 type Props = {
   sampleId: string
   candidatesText: string
+  compoundClass?: CompoundClassValue
   /** When true together with `onLcmsHashForReport`, enables copying import SHA-256 into reporting UI */
   lcmsReportReady?: boolean
   onLcmsHashForReport?: (sha256: string) => void
@@ -1732,9 +1738,16 @@ type Props = {
 export function SpectraCheckMsEvidence({
   sampleId,
   candidatesText,
+  compoundClass = COMPOUND_CLASS_UNSPECIFIED,
   lcmsReportReady = false,
   onLcmsHashForReport,
 }: Props) {
+  const compoundClassParam = compoundClassForRequest(compoundClass)
+
+  function appendCompoundClass(fd: FormData) {
+    if (compoundClassParam) fd.append("compound_class", compoundClassParam)
+  }
+
   const [hrmsObservedMz, setHrmsObservedMz] = useState("47.04914")
   const [hrmsAdduct, setHrmsAdduct] = useState<string>("[M+H]+")
   const [hrmsIonMode, setHrmsIonMode] = useState("auto")
@@ -2132,6 +2145,7 @@ export function SpectraCheckMsEvidence({
     if (hrmsM1.trim()) fd.append("observed_m_plus_1_percent", hrmsM1.trim())
     if (hrmsM2.trim()) fd.append("observed_m_plus_2_percent", hrmsM2.trim())
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     try {
       const data = await apiFetch<unknown>("/ms/hrms/candidates/match/evidence", { method: "POST", body: fd })
       setHrmsMatchResult(data)
@@ -2194,6 +2208,7 @@ export function SpectraCheckMsEvidence({
     fd.append("formula_candidates_per_adduct", adductFormulaPerAdduct.trim() || "5")
     fd.append("max_c", adductMaxC.trim() || "20")
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     try {
       const data = await apiFetch<unknown>("/ms/adducts/infer/evidence", { method: "POST", body: fd })
       setAdductResult(data)
@@ -2219,6 +2234,7 @@ export function SpectraCheckMsEvidence({
     fd.append("max_peaks_to_annotate", msmsMaxPeaks.trim() || "50")
     if (msmsCandidatesText.trim()) fd.append("candidates_text", msmsCandidatesText.trim())
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     try {
       const data = await apiFetch<unknown>("/ms/msms/annotate/evidence", { method: "POST", body: fd })
       setMsmsResult(data)
@@ -2245,6 +2261,7 @@ export function SpectraCheckMsEvidence({
     fd.append("max_tree_depth", fragMaxDepth.trim() || "3")
     if (fragCandidatesText.trim()) fd.append("candidates_text", fragCandidatesText.trim())
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     try {
       const data = await apiFetch<unknown>("/ms/msms/fragmentation-tree/evidence", { method: "POST", body: fd })
       setFragResult(data)
@@ -2271,6 +2288,7 @@ export function SpectraCheckMsEvidence({
     const sid = lcmsImportSourceLabel.trim() || sampleId.trim()
     if (sid) fd.append("sample_id", sid)
     if (lcmsImportPrecursorMz.trim()) fd.append("preferred_msms_precursor_mz", lcmsImportPrecursorMz.trim())
+    appendCompoundClass(fd)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/import/bridge/upload", { method: "POST", body: fd })
       setLcmsImportResult(data)
@@ -2304,6 +2322,7 @@ export function SpectraCheckMsEvidence({
     fd.append("top_coeluting_ions", lcmsFeatTopCo.trim() || "5")
     fd.append("max_features", lcmsFeatMaxFeat.trim() || "20")
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/features/detect/upload", { method: "POST", body: fd })
       setLcmsFeatureResult(data)
@@ -2359,6 +2378,7 @@ export function SpectraCheckMsEvidence({
     fd.append("possible_background_ratio_threshold", lcmsGrpPossBg.trim() || "0.10")
     fd.append("blank_subtraction_factor", lcmsGrpBlankFact.trim() || "1.0")
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/features/group/evidence", { method: "POST", body: fd })
       setLcmsGrpResult(data)
@@ -2391,6 +2411,7 @@ export function SpectraCheckMsEvidence({
     fd.append("score_adduct_relationships", lcmsConAdductScore ? "true" : "false")
     fd.append("score_in_source_losses", lcmsConLoss ? "true" : "false")
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/features/consensus/evidence", { method: "POST", body: fd })
       setLcmsConResult(data)
@@ -2438,6 +2459,7 @@ export function SpectraCheckMsEvidence({
     fd.append("require_promoted_family", lcmsDerReqPromoted ? "true" : "false")
     if (lcmsDerSelectedFamilyId.trim()) fd.append("selected_family_id", lcmsDerSelectedFamilyId.trim())
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/dereplication/evidence", { method: "POST", body: fd })
       setLcmsDerResult(data)
@@ -2476,6 +2498,7 @@ export function SpectraCheckMsEvidence({
       selected_family_id: lcmsBridgeSelectedFamilyId.trim() || null,
       lcms_family_table_text: tableText || null,
     }
+    if (compoundClassParam) payload.compound_class = compoundClassParam
     if (sampleId.trim()) payload.sample_id = sampleId.trim()
     if (hasConsensusObj) payload.lcms_consensus_result = lcmsConResult
     try {

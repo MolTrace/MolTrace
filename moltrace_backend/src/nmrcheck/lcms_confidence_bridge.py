@@ -336,5 +336,6 @@ def score_lcms_candidates_against_consensus(req: LCMSConsensusCandidateBridgeReq
             "min_family_consensus_score": req.min_family_consensus_score,
             "mz_tolerance_da": req.mz_tolerance_da,
             "ppm_tolerance": req.ppm_tolerance,
+            "compound_class": req.compound_class,
         },
     )

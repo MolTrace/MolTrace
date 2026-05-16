@@ -7,7 +7,18 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="card"
       className={cn(
-        'bg-card/90 text-card-foreground flex flex-col gap-6 rounded-2xl border border-border/70 py-6 shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-md',
+        // bg-card (solid, NOT bg-card/90) + no backdrop-blur. The previous
+        // ``bg-card/90 backdrop-blur-sm`` combination forced every card
+        // onto its own GPU compositor layer; for tall cards (e.g. the
+        // SpectraCheck Step-3 results card, which can be 2000-3000 px tall
+        // with evidence panels populated), Chrome/Safari would fail to fit
+        // that layer into the compositor's texture budget and intermittently
+        // hide the card during scroll, then re-promote it — visible as the
+        // entire area disappearing and re-appearing as the user scrolls.
+        // Solid bg-card stays in document flow and never triggers
+        // promotion. The frosted-glass effect was decorative only.
+        // [Chromium issue 1308536 — backdrop-filter culling on tall layers]
+        'bg-card text-card-foreground flex flex-col gap-6 rounded-2xl border border-border/70 py-6 shadow-sm transition-shadow duration-200 hover:shadow-md',
         className,
       )}
       {...props}

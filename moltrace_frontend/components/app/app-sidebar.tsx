@@ -139,7 +139,15 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "flex h-full flex-col border-r border-border/70 bg-sidebar/95 backdrop-blur-sm transition-all duration-200",
+          // Solid bg-sidebar (no /95 alpha) + no backdrop-blur. The blurred
+          // frosted-glass sidebar promoted itself to a persistent GPU
+          // compositor layer the full height of the viewport. With the main
+          // scroll column next to it, Chrome/Safari can fail to keep both
+          // layers stable as the user scrolls — culling the main content
+          // intermittently and re-promoting it on the next paint, producing
+          // the "entire area disappears and reappears" symptom. Solid
+          // background stays in document flow and never triggers promotion.
+          "flex h-full flex-col border-r border-border/70 bg-sidebar transition-[width] duration-200",
           collapsed ? "w-14" : "w-56"
         )}
       >

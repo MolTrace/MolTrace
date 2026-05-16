@@ -15,7 +15,7 @@
  * without crashing on legacy responses.
  */
 
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -84,7 +84,7 @@ function extractRawPeaks(payload: unknown): RawPeak[] {
 // Picked peaks — enriched
 // ────────────────────────────────────────────────────────────────────────────
 
-export function EnrichedPickedPeaksPanel({
+function EnrichedPickedPeaksPanelImpl({
   payload,
   fallbackTitle = "Picked peaks",
 }: {
@@ -686,7 +686,7 @@ export function ReferencesPanel({ payload }: { payload: unknown }) {
 // Composite — drop in below the spectrum
 // ────────────────────────────────────────────────────────────────────────────
 
-export function SpectraCheckEvidencePanels({ payload }: { payload: unknown }) {
+function SpectraCheckEvidencePanelsImpl({ payload }: { payload: unknown }) {
   return (
     <div className="space-y-4">
       <PeakCategorySummaryPanel payload={payload} />
@@ -700,3 +700,19 @@ export function SpectraCheckEvidencePanels({ payload }: { payload: unknown }) {
     </div>
   )
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Memoised exports
+// ────────────────────────────────────────────────────────────────────────────
+//
+// The two composite-facing panels (``EnrichedPickedPeaksPanel`` and
+// ``SpectraCheckEvidencePanels``) are mounted in the Step-3 results card
+// under the spectrum. The section component now passes a deferred payload
+// reference to both, so re-renders triggered by unrelated state churn
+// (typing in Sample ID, gain-slider drag) hand them the SAME object
+// reference. Wrapping in ``React.memo`` short-circuits the entire panel
+// tree in that case — the chart and toolbar can repaint without
+// invalidating the picked-peaks table, DP4 ranking, predicted-vs-observed
+// table, impurity candidates, references, etc.
+export const EnrichedPickedPeaksPanel = memo(EnrichedPickedPeaksPanelImpl)
+export const SpectraCheckEvidencePanels = memo(SpectraCheckEvidencePanelsImpl)

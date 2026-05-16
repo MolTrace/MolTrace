@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from pydantic import BaseModel, Field
 
 from .database import get_nmr2d_run_by_id, save_nmr2d_run, update_nmr2d_run_review_status
+from .compound_classes import normalize_compound_class
 from .dept import DeptAptParseError, analyze_dept_apt_preview, parse_dept_apt_table
 from .exceptions import StructureParseError
 from .nmr2d_models import NMR2DAnalysisReport, NMR2DPreview, NMR2DRunRecord
@@ -65,18 +66,23 @@ async def nmr2d_preview(
     request: Request,
     file: UploadFile = File(...),
     experiment: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     include_contour_preview: bool = Form(default=False),
     context=Depends(__import__("nmrcheck.api", fromlist=["require_access_context"]).require_access_context),
 ) -> NMR2DPreview:
     _require_contour_preview_if_requested(request, include_contour_preview)
     filename = file.filename or "processed_2d_nmr.csv"
     content = await file.read()
+    normalized_compound_class = normalize_compound_class(compound_class)
     try:
         preview = parse_nmr2d_upload(
             filename,
             content,
             experiment_hint=experiment,
             include_contour_preview=include_contour_preview,
+        )
+        preview = preview.model_copy(
+            update={"metadata": {**preview.metadata, "compound_class": normalized_compound_class}}
         )
     except (NMR2DParseError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -86,7 +92,12 @@ async def nmr2d_preview(
         context=context,
         event_type="nmr2d.preview",
         message="Processed 2D NMR table previewed.",
-        metadata={"filename": filename, "experiments": preview.experiments, "peak_count": preview.peak_count},
+        metadata={
+            "filename": filename,
+            "experiments": preview.experiments,
+            "peak_count": preview.peak_count,
+            "compound_class": normalized_compound_class,
+        },
     )
     return preview
 
@@ -98,6 +109,7 @@ async def nmr2d_analyze(
     smiles: str = Form(...),
     sample_id: str | None = Form(default=None),
     solvent: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     proton_nmr_text: str | None = Form(default=None),
     carbon13_text: str | None = Form(default=None),
     experiment: str | None = Form(default=None),
@@ -112,12 +124,16 @@ async def nmr2d_analyze(
     _require_contour_preview_if_requested(request, include_contour_preview)
     filename = file.filename or "processed_2d_nmr.csv"
     content = await file.read()
+    normalized_compound_class = normalize_compound_class(compound_class)
     try:
         preview = parse_nmr2d_upload(
             filename,
             content,
             experiment_hint=experiment,
             include_contour_preview=include_contour_preview,
+        )
+        preview = preview.model_copy(
+            update={"metadata": {**preview.metadata, "compound_class": normalized_compound_class}}
         )
         dept_apt_peaks = None
         dept_apt_metadata = None
@@ -157,6 +173,9 @@ async def nmr2d_analyze(
             dept_apt_peaks=dept_apt_peaks,
             dept_apt_metadata=dept_apt_metadata,
         )
+        report = report.model_copy(
+            update={"metadata": {**report.metadata, "compound_class": normalized_compound_class}}
+        )
     except (NMR2DParseError, DeptAptParseError, StructureParseError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     run_id = None
@@ -183,6 +202,7 @@ async def nmr2d_analyze(
             "sample_id": sample_id,
             "experiments": report.experiments,
             "overall_score": report.overall_score,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
             "saved_run": save_run,
         },

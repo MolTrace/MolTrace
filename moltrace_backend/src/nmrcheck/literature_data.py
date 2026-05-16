@@ -97,6 +97,67 @@ PH0_RANGE_DEG: Final[tuple[float, float]] = (-180.0, 180.0)
 PH1_RANGE_DEG_PER_PPM: Final[tuple[float, float]] = (-360.0, 360.0)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Bruker / TopSpin defaults — community baseline that nmrcheck heuristics
+# tune against. Source: Claridge, "High-Resolution NMR Techniques in Organic
+# Chemistry" (Elsevier) §3; TopSpin published defaults; UCSB NMR Theory.
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: 1H line-broadening default (Hz). Claridge §3 / Bruker.
+BRUKER_LB_1H_HZ: Final[float] = 0.3
+#: 1H practical range (Hz). Claridge §3.
+BRUKER_LB_1H_RANGE: Final[tuple[float, float]] = (0.1, 1.0)
+#: 13C line-broadening default (Hz). Claridge §3 / Bruker.
+BRUKER_LB_13C_HZ: Final[float] = 1.0
+#: 13C practical range (Hz). Claridge §3.
+BRUKER_LB_13C_RANGE: Final[tuple[float, float]] = (1.0, 5.0)
+#: 19F line-broadening default (Hz) — same convention as 1H.
+BRUKER_LB_19F_HZ: Final[float] = 0.3
+#: Matched-filter rule of thumb (Claridge §3): set LB ≈ 0.75 × narrowest line.
+MATCHED_FILTER_LINE_WIDTH_FRACTION: Final[float] = 0.75
+#: Pure matched-filter time constant T for a Lorentzian of width W Hz:
+#: ``T = 1 / (π × W)``. Doubles line width to 2W but gives optimum SNR.
+#: [Nanalysis / Morris, "NMR Data Processing"]
+MATCHED_FILTER_T_FACTOR: Final[float] = 1.0  # numerator of T = 1 / (π·W)
+
+#: SSB convention — pure cosine bell (max sensitivity) for phase-sensitive 2D.
+#: [Claridge §3 / TopSpin]
+SSB_PHASE_SENSITIVE_2D: Final[int] = 2
+#: SSB convention — pure sine bell for magnitude-mode COSY/HMQC.
+SSB_MAGNITUDE_2D: Final[int] = 1
+
+#: 1H residual signal in CDCl3 (ppm vs TMS). [Claridge §3]
+CDCL3_RESIDUAL_1H_PPM: Final[float] = 7.26
+#: 13C centre of the CDCl3 1:1:1 triplet (ppm vs TMS). [Claridge §3]
+CDCL3_CENTRE_13C_PPM: Final[float] = 77.16
+#: TMS reference (ppm) for both 1H and 13C. [Claridge §3]
+TMS_REFERENCE_PPM: Final[float] = 0.0
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Display stability constants — Mnova-style "anti-shake" rules.
+# Source: MestreNova Manual §3 (Mouse Scroll & Mass Preferences) +
+# §7.4 (Phase Correction dialog) — see /tmp/nmr_display_data.md §15.
+# These are FRONTEND defaults the SpectrumViewer should honour.
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: Below this point count the chart renders markers; above, a smooth polyline.
+DISPLAY_POINT_MARKER_THRESHOLD: Final[int] = 128
+#: Robust max percentile for y-axis anchoring (P99 of |y|).
+DISPLAY_Y_ROBUST_MAX_PERCENTILE: Final[float] = 0.99
+#: Headroom multiplier above the robust max (so the line doesn't touch ceiling).
+DISPLAY_Y_HEADROOM_FACTOR: Final[float] = 1.20
+#: Dominant-peak detector — mask when max(|y|) > N × P95(|y|).
+DISPLAY_MASK_DOMINANCE_RATIO: Final[float] = 30.0
+#: Spike walk threshold — mask the contiguous region where |y| > N × P95(|y|).
+DISPLAY_MASK_SPIKE_FLOOR_MULTIPLIER: Final[float] = 3.0
+#: Cap the masked window at this fraction of the visible ppm range.
+DISPLAY_MASK_MAX_WIDTH_FRACTION: Final[float] = 0.08
+#: Compact / expanded chart heights (pixels). User can toggle in the toolbar.
+DISPLAY_HEIGHT_COMPACT_PX: Final[int] = 360
+DISPLAY_HEIGHT_EXPANDED_PX: Final[int] = 640
+#: Plotly downsample threshold — switch to scattergl above this point count.
+DISPLAY_SCATTERGL_THRESHOLD: Final[int] = 2_000
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Predictor accuracy benchmarks — used to weight per-peak confidence.
 # When SpectraCheck delivers a predicted-vs-observed comparison, the residual
 # can be expressed as a multiple of the predictor's published RMSE.
@@ -224,6 +285,26 @@ REFERENCES: Final[dict[str, dict[str, str | int | None]]] = {
         venue="NMR Blog — Nanalysis",
         year=2024,
         url="https://www.nanalysis.com/blog/phase-correction",
+    ),
+    "nanalysis_data_processing": _ref(
+        title="NMR data processing (time-domain weighting, zero-filling, FT)",
+        authors="Morris G. A.; Nanalysis Scientific",
+        venue="NMR Blog — Nanalysis",
+        year=2024,
+        url="https://www.nanalysis.com/blog/nmr-data-processing",
+    ),
+    "claridge_hr_nmr_techniques": _ref(
+        title="High-Resolution NMR Techniques in Organic Chemistry",
+        authors="Claridge T. D. W.",
+        venue="Elsevier (Pergamon)",
+        year=2016,
+        doi="10.1016/C2015-0-04654-8",
+    ),
+    "ucsb_nmr_theory": _ref(
+        title="NMR Theory and Practice (UCSB)",
+        authors="Zhou H.",
+        venue="UCSB NMR Facility lecture notes",
+        year=2022,
     ),
     "park_2021_molecular_search": _ref(
         title=(

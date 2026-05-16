@@ -109,3 +109,57 @@ class TestReferenceRegistry:
             assert "authors" in entry and entry["authors"], f"{key} missing authors"
             assert "venue" in entry and entry["venue"], f"{key} missing venue"
             assert isinstance(entry["year"], int), f"{key} year must be int"
+
+    def test_claridge_and_mnova_references_present(self) -> None:
+        # Phase-correction + apodization defaults trace back to these.
+        assert reference("claridge_hr_nmr_techniques") is not None
+        assert reference("mestrenova_manual") is not None
+        assert reference("nanalysis_phase_correction") is not None
+        assert reference("nanalysis_data_processing") is not None
+
+
+class TestBrukerDefaults:
+    def test_bruker_lb_defaults_match_claridge(self) -> None:
+        from nmrcheck.literature_data import (
+            BRUKER_LB_13C_HZ,
+            BRUKER_LB_13C_RANGE,
+            BRUKER_LB_19F_HZ,
+            BRUKER_LB_1H_HZ,
+            BRUKER_LB_1H_RANGE,
+            MATCHED_FILTER_LINE_WIDTH_FRACTION,
+        )
+
+        # Claridge §3 / Bruker TopSpin defaults.
+        assert BRUKER_LB_1H_HZ == pytest.approx(0.3)
+        assert BRUKER_LB_13C_HZ == pytest.approx(1.0)
+        assert BRUKER_LB_19F_HZ == pytest.approx(0.3)
+        assert BRUKER_LB_1H_RANGE == (0.1, 1.0)
+        assert BRUKER_LB_13C_RANGE == (1.0, 5.0)
+        # "Practical 75%" matched-filter rule.
+        assert MATCHED_FILTER_LINE_WIDTH_FRACTION == pytest.approx(0.75)
+
+
+class TestDisplayConstants:
+    def test_display_constants_align_with_mnova(self) -> None:
+        from nmrcheck.literature_data import (
+            DISPLAY_HEIGHT_COMPACT_PX,
+            DISPLAY_HEIGHT_EXPANDED_PX,
+            DISPLAY_MASK_DOMINANCE_RATIO,
+            DISPLAY_MASK_MAX_WIDTH_FRACTION,
+            DISPLAY_MASK_SPIKE_FLOOR_MULTIPLIER,
+            DISPLAY_POINT_MARKER_THRESHOLD,
+            DISPLAY_Y_HEADROOM_FACTOR,
+            DISPLAY_Y_ROBUST_MAX_PERCENTILE,
+        )
+
+        # Mnova preferences §3 / our viewer defaults.
+        assert DISPLAY_POINT_MARKER_THRESHOLD == 128
+        assert DISPLAY_Y_ROBUST_MAX_PERCENTILE == pytest.approx(0.99)
+        assert DISPLAY_Y_HEADROOM_FACTOR == pytest.approx(1.20)
+        # Compact is the default; expanded is the user opt-in.
+        assert DISPLAY_HEIGHT_COMPACT_PX < DISPLAY_HEIGHT_EXPANDED_PX
+        assert DISPLAY_HEIGHT_COMPACT_PX == 360
+        # Mask thresholds keep the runaway solvent peak out of the view.
+        assert DISPLAY_MASK_DOMINANCE_RATIO == pytest.approx(30.0)
+        assert DISPLAY_MASK_SPIKE_FLOOR_MULTIPLIER == pytest.approx(3.0)
+        assert 0 < DISPLAY_MASK_MAX_WIDTH_FRACTION < 0.25

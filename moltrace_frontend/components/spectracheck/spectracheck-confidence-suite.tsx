@@ -50,6 +50,12 @@ type SuiteProps = {
   candidatesText: string
   protonText: string
   carbonText: string
+  /**
+   * Compound-class hint from the shared session card. Forwarded to every
+   * unified-confidence / report build call as ``compound_class`` so the
+   * backend's class-conditioned scoring is consistent with the analyze runs.
+   */
+  compoundClass?: string
   /** Backend SpectraCheck session id when connected; enables saved-session review and audit. */
   backendSessionId?: string | null
 }
@@ -540,6 +546,7 @@ function UnifiedConfidenceTab({
   candidatesText,
   protonText,
   carbonText,
+  compoundClass,
   adv,
   backendSessionId = null,
 }: TabProps) {
@@ -568,6 +575,9 @@ function UnifiedConfidenceTab({
     fd.append("candidates_text", candidatesText)
     if (protonText.trim()) fd.append("observed_proton_text", protonText)
     if (carbonText.trim()) fd.append("observed_carbon13_text", carbonText)
+    if (compoundClass && compoundClass !== "unspecified") {
+      fd.append("compound_class", compoundClass)
+    }
     appendUnifiedFormData(fd, sampleId, solvent, adv)
     try {
       const data = await apiFetch<unknown>("/confidence/candidates/unified/evidence", { method: "POST", body: fd })

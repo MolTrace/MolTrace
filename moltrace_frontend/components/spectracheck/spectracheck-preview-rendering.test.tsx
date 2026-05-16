@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -14,6 +14,14 @@ vi.mock("@/lib/api/client", async () => {
     apiFetch: vi.fn(),
   }
 })
+
+vi.mock("@/components/science/SpectrumViewer", () => ({
+  SpectrumViewer: ({ nucleus }: { nucleus?: "1H" | "13C" }) => (
+    <div data-testid="spectrum-viewer">
+      Nucleus context: <span>{nucleus}</span>
+    </div>
+  ),
+}))
 
 const apiFetchMock = vi.mocked(apiFetch)
 
@@ -129,6 +137,50 @@ describe("SpectraCheck preview rendering", () => {
     expect(screen.queryByText(/No spectrum loaded/i)).not.toBeInTheDocument()
   })
 
+  it("shows the processed analysis interface immediately while first analyze is pending", async () => {
+    let resolveAnalyze: ((value: unknown) => void) | null = null
+    apiFetchMock.mockImplementationOnce(
+      () =>
+        new Promise<unknown>((resolve) => {
+          resolveAnalyze = resolve
+        }),
+    )
+
+    renderWithEvidence(
+      <SpectraCheckProcessedSpectrumSection
+        sampleId="sample-1"
+        onSampleIdChange={() => {}}
+        solvent="CDCl3"
+        candidatesText=""
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Processed spectrum file/i, { selector: "input" }), {
+      target: { files: [new File(["ppm,intensity\n4.2,0\n4.1,3\n4.0,0\n"], "trace.csv")] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Run evidence match/i }))
+
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/analyze", expect.any(Object)))
+    expect(screen.getByText(/Analysis output/i)).toBeInTheDocument()
+    expect(screen.getByTestId("processed-results-pending-spectrum")).toBeInTheDocument()
+    expect(screen.queryByText(/Waiting for API response/i)).not.toBeInTheDocument()
+
+    expect(resolveAnalyze).not.toBeNull()
+    await act(async () => {
+      ;(resolveAnalyze as unknown as (value: unknown) => void)({
+        sample_id: "sample-1",
+        nucleus: "1H",
+        filename: "trace.csv",
+        point_count: 3,
+        x: [4.2, 4.1, 4.0],
+        y: [0, 3, 0],
+        warnings: [],
+        notes: [],
+        metadata: {},
+      })
+    })
+  })
+
   it("raw FID preview automatically generates and displays a quick spectrum", async () => {
     apiFetchMock.mockResolvedValueOnce({
       sample_id: "sample-1",
@@ -205,6 +257,219 @@ describe("SpectraCheck preview rendering", () => {
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object)))
     expect(await screen.findByText(/Nucleus context/i)).toBeInTheDocument()
     expect(screen.queryByText(/No spectrum loaded/i)).not.toBeInTheDocument()
+  })
+
+  it("shows the raw FID processing interface immediately while first process is pending", async () => {
+    let resolveProcess: ((value: unknown) => void) | null = null
+    apiFetchMock.mockImplementationOnce(
+      () =>
+        new Promise<unknown>((resolve) => {
+          resolveProcess = resolve
+        }),
+    )
+
+    renderWithEvidence(
+      <SpectraCheckRawFidSection sampleId="sample-1" onSampleIdChange={() => {}} solvent="CDCl3" />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
+      target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Process FID/i }))
+
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object)))
+    expect(screen.getByText(/Processed FID output/i)).toBeInTheDocument()
+    expect(screen.getByTestId("raw-fid-results-pending-spectrum")).toBeInTheDocument()
+    expect(screen.queryByText(/Waiting for API response/i)).not.toBeInTheDocument()
+
+    expect(resolveProcess).not.toBeNull()
+    await act(async () => {
+      ;(resolveProcess as unknown as (value: unknown) => void)({
+        sample_id: "sample-1",
+        filename: "raw.zip",
+        vendor_detected: "Bruker",
+        nucleus: "1H",
+        point_count: 3,
+        x: [4.2, 4.1, 4.0],
+        y: [0, 5, 0],
+        warnings: [],
+        notes: [],
+        metadata: {},
+      })
+    })
+  })
+
+  it("keeps the prior chart mounted while analyze is in-flight (no flash)", async () => {
+    // Preview returns a working spectrum first.
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      nucleus: "1H",
+      filename: "preview.csv",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 5, 0],
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
+
+    renderWithEvidence(
+      <SpectraCheckProcessedSpectrumSection
+        sampleId="sample-1"
+        onSampleIdChange={() => {}}
+        solvent="CDCl3"
+        candidatesText=""
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Processed spectrum file/i, { selector: "input" }), {
+      target: { files: [new File(["ppm,intensity\n4.2,0\n4.1,5\n4.0,0\n"], "preview.csv")] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Inspect spectrum/i }))
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/preview", expect.any(Object)))
+    expect(await screen.findByText(/Nucleus context/i)).toBeInTheDocument()
+
+    // Now stage the analyze response as a deferred promise so we can
+    // observe the in-flight state. The previous chart MUST stay mounted
+    // (Nucleus-context text present) while the analyze is pending.
+    let resolveAnalyze: ((value: unknown) => void) | null = null
+    apiFetchMock.mockImplementationOnce(
+      () =>
+        new Promise<unknown>((resolve) => {
+          resolveAnalyze = resolve
+        }),
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: /Run evidence match/i }))
+
+    // While the analyze promise is unresolved, the chart's "Nucleus context"
+    // line — which only renders inside ``SpectrumViewer`` — must still be
+    // on screen. If the section pre-cleared the previous result the
+    // SpectrumViewer would have unmounted and this assertion would fail.
+    await waitFor(() =>
+      expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/analyze", expect.any(Object)),
+    )
+    expect(screen.getByText(/Nucleus context/i)).toBeInTheDocument()
+
+    // Resolve the analyze; chart updates atomically.
+    expect(resolveAnalyze).not.toBeNull()
+    ;(resolveAnalyze as unknown as (value: unknown) => void)({
+      sample_id: "sample-1",
+      nucleus: "1H",
+      filename: "analyze.csv",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 7, 0],
+      peak_count: 1,
+      peaks: [{ shift_ppm: 4.1, integration_h: 1, multiplicity: "s" }],
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
+    await waitFor(() =>
+      expect(screen.getByText(/Nucleus context/i)).toBeInTheDocument(),
+    )
+  })
+
+  it("replaces stale analyze output when a later preview finishes", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      nucleus: "1H",
+      filename: "analyze.csv",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 7, 0],
+      peak_count: 1,
+      analysis_score: 0.91,
+      peaks: [{ shift_ppm: 4.1, integration_h: 1, multiplicity: "s" }],
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
+
+    renderWithEvidence(
+      <SpectraCheckProcessedSpectrumSection
+        sampleId="sample-1"
+        onSampleIdChange={() => {}}
+        solvent="CDCl3"
+        candidatesText=""
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Processed spectrum file/i, { selector: "input" }), {
+      target: { files: [new File(["ppm,intensity\n4.2,0\n4.1,7\n4.0,0\n"], "analyze.csv")] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Run evidence match/i }))
+    expect(await screen.findByText(/Analysis score/i)).toBeInTheDocument()
+
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      nucleus: "1H",
+      filename: "preview.csv",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 5, 0],
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /Inspect spectrum/i }))
+
+    await waitFor(() =>
+      expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/preview", expect.any(Object)),
+    )
+    await waitFor(() => expect(screen.queryByText(/Analysis score/i)).not.toBeInTheDocument())
+    expect(screen.getByText(/Nucleus context/i)).toBeInTheDocument()
+  })
+
+  it("ignores an analyze response that resolves after Clear", async () => {
+    let resolveAnalyze: ((value: unknown) => void) | null = null
+    apiFetchMock.mockImplementationOnce(
+      () =>
+        new Promise<unknown>((resolve) => {
+          resolveAnalyze = resolve
+        }),
+    )
+
+    renderWithEvidence(
+      <SpectraCheckProcessedSpectrumSection
+        sampleId="sample-1"
+        onSampleIdChange={() => {}}
+        solvent="CDCl3"
+        candidatesText=""
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Processed spectrum file/i, { selector: "input" }), {
+      target: { files: [new File(["ppm,intensity\n4.2,0\n4.1,7\n4.0,0\n"], "pending.csv")] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Run evidence match/i }))
+    await waitFor(() =>
+      expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/analyze", expect.any(Object)),
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: /^Clear$/i }))
+    expect(screen.queryByTestId("processed-results-loading-badge")).not.toBeInTheDocument()
+
+    expect(resolveAnalyze).not.toBeNull()
+    await act(async () => {
+      ;(resolveAnalyze as unknown as (value: unknown) => void)({
+        sample_id: "sample-1",
+        nucleus: "1H",
+        filename: "pending.csv",
+        point_count: 3,
+        x: [4.2, 4.1, 4.0],
+        y: [0, 7, 0],
+        analysis_score: 0.91,
+        warnings: [],
+        notes: [],
+        metadata: {},
+      })
+    })
+
+    expect(screen.queryByText(/Nucleus context/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Analysis score/i)).not.toBeInTheDocument()
   })
 
   it("runs raw FID preview from a dropped archive", async () => {

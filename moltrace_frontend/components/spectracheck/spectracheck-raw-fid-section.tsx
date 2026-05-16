@@ -10,6 +10,11 @@ import { apiFetch } from "@/lib/api/client"
 import { trackFileUploaded } from "@/src/lib/analytics/analytics-client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
 import { buildAnalysisJobPayload } from "@/src/lib/spectracheck/buildAnalysisJobPayload"
+import {
+  COMPOUND_CLASS_UNSPECIFIED,
+  compoundClassForRequest,
+  type CompoundClassValue,
+} from "@/src/lib/spectracheck/compound-classes"
 import type { SessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { normalizeSessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { SPECTRACHECK_RAW_FID_ACCEPT, isRawFidArchiveFilename } from "@/src/lib/spectracheck/spectrum-file-formats"
@@ -19,6 +24,7 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { extractSpectrumXY, isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
+import { useStableXY } from "@/components/spectracheck/use-stable-xy"
 import { isMissingNmrEndpoint, RAW_FID_BACKEND_MSG } from "@/components/spectracheck/spectracheck-nmr-endpoint-messages"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -56,6 +62,12 @@ type Props = {
   sampleId: string
   onSampleIdChange: (value: string) => void
   solvent: string
+  /**
+   * Compound-class hint from the shared session. Forwarded to every preview /
+   * process request as ``compound_class`` so backend processing & downstream
+   * candidate scoring can apply class-specific priors.
+   */
+  compoundClass?: CompoundClassValue
   registerDev?: (key: string, value: unknown) => void
 }
 
@@ -82,7 +94,13 @@ function extractRawArchiveId(payload: unknown): string | null {
   return null
 }
 
-export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent, registerDev }: Props) {
+export function SpectraCheckRawFidSection({
+  sampleId,
+  onSampleIdChange,
+  solvent,
+  compoundClass = COMPOUND_CLASS_UNSPECIFIED,
+  registerDev,
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const { state, update } = useRawFidTabState()
   const {
@@ -219,6 +237,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
         setJobActionError("Choose a session raw FID archive or pick a local archive.")
         return
       }
+      const ccParam = compoundClassForRequest(compoundClass)
       const jid = await analysisJob.createJob(
         buildAnalysisJobPayload({
           sessionId: ws?.backendSessionId ?? null,
@@ -229,6 +248,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
             solvent,
             nucleus,
             vendor,
+            ...(ccParam ? { compound_class: ccParam } : {}),
           },
         }),
       )
@@ -246,6 +266,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
         setJobActionError("Choose a session raw FID archive or pick a local archive.")
         return
       }
+      const ccParam = compoundClassForRequest(compoundClass)
       const jid = await analysisJob.createJob(
         buildAnalysisJobPayload({
           sessionId: ws?.backendSessionId ?? null,
@@ -258,6 +279,7 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
             vendor,
             processing_preset: preset,
             preserve_raw: true,
+            ...(ccParam ? { compound_class: ccParam } : {}),
           },
         }),
       )
@@ -278,6 +300,8 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
       fd.append("processing_preset", preset)
       fd.append("preserve_raw", "true")
     }
+    const ccParam = compoundClassForRequest(compoundClass)
+    if (ccParam) fd.append("compound_class", ccParam)
     return fd
   }
 
@@ -285,7 +309,10 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     // Quick auto-FT so the user sees an actual spectrum alongside metadata —
     // mirrors the processed-1H/13C "preview shows spectrum" UX. The user can
     // still refine with the full "Process FID" action below.
-    update({ previewSpectrumLoading: true, previewSpectrumError: "", previewSpectrum: null })
+    //
+    // Hold onto the previous auto-FT spectrum while the new one fetches —
+    // clearing previewSpectrum here was an unmount source for SpectrumViewer.
+    update({ previewSpectrumLoading: true, previewSpectrumError: "" })
     try {
       let data: unknown
       const safeArchiveId = archiveId?.trim()
@@ -355,9 +382,13 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     }
     setPreviewLoading(true)
     setPreviewError("")
-    setPreviewResult(null)
-    setProcessResult(null)
-    update({ previewSpectrum: null, previewSpectrumError: "", previewSpectrumLoading: false })
+    // Keep prior chart on screen while the new preview/process runs. Mark
+    // ``previewSpectrumLoading`` so the badge shows "Generating preview
+    // spectrum…" but the SpectrumViewer is not unmounted. Clearing
+    // previewSpectrum/processResult here is what produced the analyze-mode
+    // flash. The user sees the OLD chart smoothly replaced by the new one
+    // when data arrives. [Mnova anti-shake §3]
+    update({ previewSpectrumError: "", previewSpectrumLoading: true })
     let shouldGenerateSpectrum = false
     let previewArchiveId: string | null = null
     try {
@@ -375,6 +406,10 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     }
     if (shouldGenerateSpectrum) {
       void runPreviewSpectrum(file, previewArchiveId)
+    } else {
+      // Preview metadata failed → flip the auto-FT loader off so the badge
+      // doesn't get stuck.
+      update({ previewSpectrumLoading: false })
     }
   }
 
@@ -395,8 +430,10 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     }
     setProcessLoading(true)
     setProcessError("")
-    setProcessResult(null)
-    update({ previewSpectrum: null, previewSpectrumError: "", previewSpectrumLoading: false })
+    // Keep the prior chart (auto-FT preview spectrum, if any) on screen
+    // while the full process runs. ``processLoading`` drives the badge.
+    // Clearing here was the source of the analyze-mode flash.
+    update({ previewSpectrumError: "" })
     try {
       const fd = buildFormData(file, true)
       const data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
@@ -426,6 +463,23 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
   }
 
   const displayPayload = processResult ?? previewResult
+  const resultsMode =
+    processLoading
+      ? "process"
+      : previewLoading || previewSpectrumLoading
+        ? "preview"
+        : processResult != null
+          ? "process"
+          : previewResult != null || previewSpectrum != null
+            ? "preview"
+            : null
+  const hasResultSurface = resultsMode != null
+  const payloadMode = processResult != null ? "process" : previewResult != null ? "preview" : resultsMode
+  const resultTitle = resultsMode === "process" ? "Processed FID output" : "Raw archive metadata"
+  const resultDescription =
+    resultsMode === "process"
+      ? "Spectrum, processing parameters, and acquisition metadata from /nmr/raw-fid/process."
+      : "Archive metadata, vendor, SHA-256 hash, and an automatic quick spectrum from Preview."
 
   // Memoise xy extraction against the source result. Without this the
   // extractor produces fresh ``{x, y}`` arrays on every parent re-render
@@ -445,7 +499,14 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
     () => (previewSpectrum ? { x: previewSpectrum.x, y: previewSpectrum.y } : null),
     [previewSpectrum],
   )
-  const xy = xyProcess ?? xyPreview ?? xyAutoPreview
+  // Stabilise the resolved spectrum xy reference across upstream transitions.
+  // The preview / process pipelines may hand us the same numeric x / y in
+  // back-to-back responses (e.g. re-running ``process`` with the same
+  // preset); reusing the previous reference keeps SpectrumViewer's expensive
+  // percentile / mask / sampling memos cached and prevents Plotly from
+  // redrawing an already-painted line. [Mnova anti-shake §3]
+  const xyResolved = xyProcess ?? xyPreview ?? xyAutoPreview
+  const xy = useStableXY(xyResolved)
   const xyIsAutoPreview = !xyProcess && !xyPreview && xyAutoPreview != null
 
   const meta = displayPayload && isRecord(displayPayload) ? displayPayload : null
@@ -898,41 +959,40 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
         </div>
       </ModuleCard>
 
-      {/* ── Loading skeleton ─────────────────────────────────────────── */}
-      {(previewLoading || processLoading) && (
-        <Card
-          className="overflow-hidden rounded-xl py-0"
-          style={{ borderTop: "3px solid var(--mt-teal)" }}
-        >
-          <CardContent className="flex items-center gap-3 py-5">
-            <div
-              className="h-2 w-2 animate-pulse rounded-full"
-              style={{ backgroundColor: "var(--mt-teal)" }}
-              aria-hidden
-            />
-            <p className="font-mono text-sm font-bold tracking-tight">
-              {previewLoading ? "Reading raw FID metadata…" : "Processing raw FID…"}
-            </p>
-            <p className="text-xs text-muted-foreground">Waiting for API response</p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* ── Step 3 — Results ──────────────────────────────────────────── */}
-      {displayPayload != null && !previewLoading && !processLoading && (
-        <ModuleCard
-          accent="teal"
-          eyebrow="Step 3 · Results"
-          title={processResult != null ? "Processed FID output" : "Raw archive metadata"}
-          icon={BarChart3}
-          description={
-            processResult != null
-              ? "Spectrum, processing parameters, and acquisition metadata from /nmr/raw-fid/process."
-              : "Archive metadata, vendor, SHA-256 hash, and an automatic quick spectrum from Preview."
-          }
-          className="min-w-0"
-        >
+      {/*
+        Show this surface as soon as Preview or Process starts. The result
+        card is the loading surface and the final surface, so it does not
+        get replaced by a different card once the server answers.
+      */}
+      {hasResultSurface && (
+        <div className="min-w-0" data-stable-results-surface="">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Step 3 · Results"
+            title={resultTitle}
+            icon={BarChart3}
+            description={resultDescription}
+            className="min-w-0 overflow-visible shadow-none"
+          >
           <div className="space-y-4">
+            {/* In-card loading badge — replaces the "hide whole card"
+                gate so the SpectrumViewer stays mounted while the
+                fetch runs (no flash). */}
+            {(previewLoading || processLoading) ? (
+              <div
+                className="flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-[11px]"
+                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+                data-testid="raw-fid-results-loading-badge"
+                aria-live="polite"
+              >
+                <span
+                  className="inline-block h-2 w-2 animate-pulse rounded-full"
+                  style={{ backgroundColor: "var(--mt-teal)" }}
+                />
+                {processLoading ? "Processing FID…" : "Refreshing preview…"}
+              </div>
+            ) : null}
             {/* KPI tiles — only shown when meaningful values are returned */}
             {(vendorDetected || sw != null || td != null || warnings.length > 0) && (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1055,12 +1115,27 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
               ) : null}
               {xy ? (
                 <SpectrumViewer x={xy.x} y={xy.y} nucleus={nucleus} />
-              ) : previewSpectrumLoading ? (
-                <AlertCard
-                  variant="info"
-                  title="Generating preview spectrum…"
-                  description="Running auto-FT on the uploaded FID — this usually takes a few seconds."
-                />
+              ) : processLoading || previewLoading || previewSpectrumLoading ? (
+                <div
+                  className="flex h-[360px] min-w-0 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 p-6 text-center"
+                  data-testid="raw-fid-results-pending-spectrum"
+                >
+                  <div
+                    className="mb-3 h-2 w-2 animate-pulse rounded-full"
+                    style={{ backgroundColor: "var(--mt-teal)" }}
+                    aria-hidden
+                  />
+                  <p className="font-mono text-sm font-bold tracking-tight">
+                    {processLoading
+                      ? "Processing FID spectrum…"
+                      : previewSpectrumLoading
+                        ? "Generating quick spectrum…"
+                        : "Reading raw FID metadata…"}
+                  </p>
+                  <p className="mt-1 max-w-md text-xs text-muted-foreground">
+                    The spectrum and processing details will populate here together when the server response is ready.
+                  </p>
+                </div>
               ) : previewSpectrumError ? (
                 <AlertCard
                   variant="warning"
@@ -1096,38 +1171,40 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
             </div>
 
             {/* Use Unified Evidence — prominent CTA row right under the spectrum */}
-            <div
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
-              style={{
-                borderTop: "3px solid var(--mt-teal)",
-                backgroundColor: "var(--mt-teal-soft)",
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
-                <div>
-                  <p
-                    className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                    style={{ color: "var(--mt-teal)" }}
-                  >
-                    Use in unified evidence
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Add this {processResult != null ? "processed FID" : "metadata preview"} to the unified evidence stream.
-                  </p>
-                </div>
-              </div>
-              <SpectraCheckUseUnifiedEvidenceButton
-                response={displayPayload}
-                meta={{
-                  layer: nucleus === "1H" ? "raw_fid_1h" : "raw_fid_13c",
-                  sourceTab: "Raw FID upload",
-                  title: processResult != null ? "Raw FID process" : "Raw FID preview",
-                  endpoint: processResult != null ? "/nmr/raw-fid/process" : "/nmr/raw-fid/preview",
-                  sampleId: sampleId.trim() || undefined,
+            {displayPayload != null ? (
+              <div
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+                style={{
+                  borderTop: "3px solid var(--mt-teal)",
+                  backgroundColor: "var(--mt-teal-soft)",
                 }}
-              />
-            </div>
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
+                  <div>
+                    <p
+                      className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      Use in unified evidence
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Add this {payloadMode === "process" ? "processed FID" : "metadata preview"} to the unified evidence stream.
+                    </p>
+                  </div>
+                </div>
+                <SpectraCheckUseUnifiedEvidenceButton
+                  response={displayPayload}
+                  meta={{
+                    layer: nucleus === "1H" ? "raw_fid_1h" : "raw_fid_13c",
+                    sourceTab: "Raw FID upload",
+                    title: payloadMode === "process" ? "Raw FID process" : "Raw FID preview",
+                    endpoint: payloadMode === "process" ? "/nmr/raw-fid/process" : "/nmr/raw-fid/preview",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+              </div>
+            ) : null}
 
             {/* Cross-tab handoff — push this FID spectrum into the Processed analyzer
                 so the user doesn't have to re-upload it as a CSV/JCAMP. */}
@@ -1196,124 +1273,127 @@ export function SpectraCheckRawFidSection({ sampleId, onSampleIdChange, solvent,
             ) : null}
 
             {/* Identity / processing / metadata / warnings — 2-col grid below */}
-            <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-              {/* Identity card (SHA-256 + badges) */}
-              {(sha || vendorDetected || nucleusMeta) && (
-                <Card
-                  className="overflow-hidden rounded-xl py-0"
-                  style={{ borderTop: "3px solid var(--mt-teal)" }}
-                >
-                  <CardContent className="space-y-3 py-3">
-                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      Identity
-                    </p>
-                    {sha && (
-                      <div>
-                        <p className="text-[11px] font-medium text-muted-foreground">Raw file SHA-256</p>
-                        <p className="mt-1 break-all font-mono text-[10px]">{sha}</p>
-                      </div>
-                    )}
-                    {(vendorDetected || nucleusMeta) && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {vendorDetected && (
-                          <Badge
-                            variant="outline"
-                            className="font-mono text-[10px]"
-                            style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
-                          >
-                            Vendor · {vendorDetected}
-                          </Badge>
-                        )}
-                        {nucleusMeta && (
-                          <Badge
-                            variant="outline"
-                            className="font-mono text-[10px]"
-                            style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
-                          >
-                            Nucleus · {nucleusMeta}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+            {displayPayload != null ? (
+              <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+                {/* Identity card (SHA-256 + badges) */}
+                {(sha || vendorDetected || nucleusMeta) && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-teal)" }}
+                  >
+                    <CardContent className="space-y-3 py-3">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        Identity
+                      </p>
+                      {sha && (
+                        <div>
+                          <p className="text-[11px] font-medium text-muted-foreground">Raw file SHA-256</p>
+                          <p className="mt-1 break-all font-mono text-[10px]">{sha}</p>
+                        </div>
+                      )}
+                      {(vendorDetected || nucleusMeta) && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {vendorDetected && (
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[10px]"
+                              style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                            >
+                              Vendor · {vendorDetected}
+                            </Badge>
+                          )}
+                          {nucleusMeta && (
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[10px]"
+                              style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                            >
+                              Nucleus · {nucleusMeta}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
-              {/* Processing parameters */}
-              {procParams != null && (
-                <Card
-                  className="overflow-hidden rounded-xl py-0"
-                  style={{ borderTop: "3px solid var(--mt-teal)" }}
-                >
-                  <CardContent className="space-y-2 py-3">
-                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      Processing parameters
-                    </p>
-                    <Textarea
-                      readOnly
-                      value={typeof procParams === "string" ? procParams : JSON.stringify(procParams, null, 2)}
-                      rows={6}
-                      className="font-mono text-[11px]"
-                    />
-                  </CardContent>
-                </Card>
-              )}
+                {/* Processing parameters */}
+                {procParams != null && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-teal)" }}
+                  >
+                    <CardContent className="space-y-2 py-3">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        Processing parameters
+                      </p>
+                      <Textarea
+                        readOnly
+                        value={typeof procParams === "string" ? procParams : JSON.stringify(procParams, null, 2)}
+                        rows={6}
+                        className="font-mono text-[11px]"
+                      />
+                    </CardContent>
+                  </Card>
+                )}
 
-              {/* Acquisition metadata */}
-              {meta?.acquisition_metadata != null && (
-                <Card
-                  className="overflow-hidden rounded-xl py-0"
-                  style={{ borderTop: "3px solid var(--mt-teal)" }}
-                >
-                  <CardContent className="space-y-2 py-3">
-                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      Acquisition metadata
-                    </p>
-                    <Textarea
-                      readOnly
-                      value={
-                        typeof meta.acquisition_metadata === "string"
-                          ? meta.acquisition_metadata
-                          : JSON.stringify(meta.acquisition_metadata, null, 2)
-                      }
-                      rows={5}
-                      className="font-mono text-[11px]"
-                    />
-                  </CardContent>
-                </Card>
-              )}
+                {/* Acquisition metadata */}
+                {meta?.acquisition_metadata != null && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-teal)" }}
+                  >
+                    <CardContent className="space-y-2 py-3">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        Acquisition metadata
+                      </p>
+                      <Textarea
+                        readOnly
+                        value={
+                          typeof meta.acquisition_metadata === "string"
+                            ? meta.acquisition_metadata
+                            : JSON.stringify(meta.acquisition_metadata, null, 2)
+                        }
+                        rows={5}
+                        className="font-mono text-[11px]"
+                      />
+                    </CardContent>
+                  </Card>
+                )}
 
-              {/* Warnings card */}
-              {warnings.length > 0 && (
-                <Card
-                  className="overflow-hidden rounded-xl py-0"
-                  style={{ borderTop: "3px solid var(--mt-amber)" }}
-                >
-                  <CardContent className="space-y-2 py-3">
-                    <p
-                      className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-amber)" }}
-                    >
-                      <AlertTriangle className="h-3 w-3" aria-hidden />
-                      Warnings
-                    </p>
-                    <ul
-                      className="list-inside list-disc space-y-0.5 text-xs"
-                      style={{ color: "var(--mt-amber)" }}
-                    >
-                      {warnings.map((w, i) => (
-                        <li key={i}>{w}</li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                {/* Warnings card */}
+                {warnings.length > 0 && (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: "3px solid var(--mt-amber)" }}
+                  >
+                    <CardContent className="space-y-2 py-3">
+                      <p
+                        className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                        style={{ color: "var(--mt-amber)" }}
+                      >
+                        <AlertTriangle className="h-3 w-3" aria-hidden />
+                        Warnings
+                      </p>
+                      <ul
+                        className="list-inside list-disc space-y-0.5 text-xs"
+                        style={{ color: "var(--mt-amber)" }}
+                      >
+                        {warnings.map((w, i) => (
+                          <li key={i}>{w}</li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            ) : null}
 
-            {/* Developer JSON — full width */}
-            <DeveloperJsonPanel data={displayPayload} />
+            {/* Developer JSON — full width. */}
+            {displayPayload != null ? <DeveloperJsonPanel data={displayPayload} /> : null}
           </div>
-        </ModuleCard>
+          </ModuleCard>
+        </div>
       )}
     </div>
   )

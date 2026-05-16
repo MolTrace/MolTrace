@@ -290,6 +290,8 @@ def build_unified_candidate_confidence(req: UnifiedCandidateConfidenceRequest) -
         "Human review is required, especially when top candidates are close or evidence streams disagree.",
     ]
     component_metadata: dict[str, Any] = {"layer_weights": weights}
+    if req.compound_class:
+        component_metadata["compound_class"] = req.compound_class
 
     observed_2d = _parse_optional_2d(req)
 

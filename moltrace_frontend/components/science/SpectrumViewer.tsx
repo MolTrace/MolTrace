@@ -23,13 +23,11 @@ import {
   Expand,
   Eye,
   EyeOff,
-  GripHorizontal,
   Hand,
   Layers,
   Maximize2,
   Minimize2,
   Minus,
-  MousePointer2,
   Plus,
   RotateCcw,
   ZoomIn,
@@ -65,6 +63,8 @@ export type SpectrumViewerProps = {
 }
 
 const DISPLAY_Y_CAP = 1e120
+const MAX_OBSERVED_TRACE_POINTS = 2_400
+const MAX_OVERLAY_TRACE_POINTS = 1_800
 
 /** Exponential mapping: slider 0..1 → multiplier 1..50000. */
 function gainMultiplier(gainSlider01: number): number {
@@ -76,13 +76,11 @@ function gainMultiplier(gainSlider01: number): number {
  * Both controls multiply the peak heights — this is what users see grow
  * vertically when they drag the slider or click "Taller peaks".
  */
-function deriveDisplayY(y: number[], gainSlider01: number, yZoom: number): number[] {
-  const total = gainMultiplier(gainSlider01) * yZoom
-  return y.map((v) => {
-    const raw = v * total
-    if (!Number.isFinite(raw)) return 0
-    return Math.min(Math.sign(raw) * Math.min(Math.abs(raw), DISPLAY_Y_CAP), DISPLAY_Y_CAP)
-  })
+function scaleDisplayYValue(v: number, total: number): number {
+  if (Number.isNaN(v)) return Number.NaN
+  const raw = v * total
+  if (!Number.isFinite(raw)) return 0
+  return Math.min(Math.sign(raw) * Math.min(Math.abs(raw), DISPLAY_Y_CAP), DISPLAY_Y_CAP)
 }
 
 /**
@@ -237,7 +235,149 @@ function nearestYAtPpm(x: number[], yDisplay: number[], ppm: number): number {
   return best
 }
 
-export function SpectrumViewer({
+export type SampledSpectrumTrace = {
+  x: number[]
+  y: number[]
+  sampled: boolean
+  sourceLength: number
+  visibleLength: number
+  meanBinSize: number | null
+}
+
+type SampleSpectrumTraceOptions = {
+  maxPoints: number
+  xRange?: readonly [number, number] | null
+  maskRange?: { startIndex: number; endIndex: number } | null
+}
+
+function isMaskedIndex(index: number, maskRange: { startIndex: number; endIndex: number } | null | undefined) {
+  return Boolean(maskRange && index >= maskRange.startIndex && index <= maskRange.endIndex)
+}
+
+/**
+ * Plotly-resampler-style min/max envelope for browser rendering.
+ *
+ * NMR spectra often have very narrow spikes. Plain stride sampling can skip
+ * those peaks entirely, so each bucket contributes both its local min and
+ * max in source order. That keeps peak shape visible while capping the trace
+ * size Plotly receives.
+ */
+export function sampleSpectrumTraceForPlot(
+  x: number[],
+  y: number[],
+  { maxPoints, xRange, maskRange }: SampleSpectrumTraceOptions,
+): SampledSpectrumTrace {
+  const sourceLength = Math.min(x.length, y.length)
+  if (sourceLength === 0) {
+    return { x: [], y: [], sampled: false, sourceLength, visibleLength: 0, meanBinSize: null }
+  }
+
+  const hasRange = xRange != null
+  const hasMask = maskRange != null
+  const clampedMaxPoints = Math.max(4, maxPoints)
+  if (!hasRange && !hasMask && sourceLength <= clampedMaxPoints) {
+    return { x, y, sampled: false, sourceLength, visibleLength: sourceLength, meanBinSize: null }
+  }
+
+  const low = hasRange ? Math.min(xRange[0], xRange[1]) : Number.NEGATIVE_INFINITY
+  const high = hasRange ? Math.max(xRange[0], xRange[1]) : Number.POSITIVE_INFINITY
+  const visibleIndices: number[] = []
+  for (let i = 0; i < sourceLength; i++) {
+    const xv = x[i]
+    if (!Number.isFinite(xv)) continue
+    if (xv < low || xv > high) continue
+    visibleIndices.push(i)
+  }
+
+  const visibleLength = visibleIndices.length
+  if (visibleLength === 0) {
+    return { x: [], y: [], sampled: false, sourceLength, visibleLength: 0, meanBinSize: null }
+  }
+
+  if (visibleLength <= clampedMaxPoints) {
+    const sx: number[] = []
+    const sy: number[] = []
+    for (const index of visibleIndices) {
+      sx.push(x[index])
+      sy.push(isMaskedIndex(index, maskRange) ? Number.NaN : y[index])
+    }
+    return {
+      x: sx,
+      y: sy,
+      sampled: false,
+      sourceLength,
+      visibleLength,
+      meanBinSize: null,
+    }
+  }
+
+  const sx: number[] = []
+  const sy: number[] = []
+  let lastAdded = -1
+
+  const addPoint = (index: number) => {
+    if (index < 0 || index === lastAdded) return
+    sx.push(x[index])
+    sy.push(isMaskedIndex(index, maskRange) ? Number.NaN : y[index])
+    lastAdded = index
+  }
+
+  addPoint(visibleIndices[0])
+  const bucketCount = Math.max(1, Math.floor((clampedMaxPoints - 2) / 2))
+  const meanBinSize = visibleLength / bucketCount
+  for (let bucket = 0; bucket < bucketCount; bucket++) {
+    const start = Math.floor((bucket * visibleLength) / bucketCount)
+    const end = Math.min(
+      visibleLength,
+      Math.max(start + 1, Math.floor(((bucket + 1) * visibleLength) / bucketCount)),
+    )
+    let minIndex = -1
+    let maxIndex = -1
+    let maskIndex = -1
+    let minY = Number.POSITIVE_INFINITY
+    let maxY = Number.NEGATIVE_INFINITY
+
+    for (let j = start; j < end; j++) {
+      const index = visibleIndices[j]
+      if (isMaskedIndex(index, maskRange)) {
+        if (maskIndex === -1) maskIndex = index
+        continue
+      }
+      const yv = y[index]
+      if (!Number.isFinite(yv)) continue
+      if (yv < minY) {
+        minY = yv
+        minIndex = index
+      }
+      if (yv > maxY) {
+        maxY = yv
+        maxIndex = index
+      }
+    }
+
+    const bucketIndices = Array.from(new Set([minIndex, maxIndex, maskIndex]))
+      .filter((index) => index >= 0)
+      .sort((a, b) => a - b)
+    for (const index of bucketIndices) addPoint(index)
+  }
+  addPoint(visibleIndices[visibleLength - 1])
+
+  return { x: sx, y: sy, sampled: true, sourceLength, visibleLength, meanBinSize }
+}
+
+function formatSampleBinSize(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`
+  if (value >= 10) return String(Math.round(value))
+  return value.toFixed(1)
+}
+
+function traceNameWithResampling(label: string, sample: SampledSpectrumTrace): string {
+  if (!sample.sampled || sample.meanBinSize == null) return label
+  return `${label} [R] ~${formatSampleBinSize(sample.meanBinSize)} samples`
+}
+
+function SpectrumViewerImpl({
   x,
   y,
   peaks = [],
@@ -262,17 +402,9 @@ export function SpectrumViewer({
   // can expand it via the toolbar when they need more vertical room for
   // manipulation.
   const [expanded, setExpanded] = useState(false)
-  // yZoom is a discrete-step companion to gain01. Both multiply displayY (so peaks visibly grow).
+  // yZoom is a discrete-step companion to gain01. Both multiply sampled y values so peaks visibly grow.
   const [yZoom, setYZoom] = useState(1)
-  // Drag mode for the chart canvas:
-  //  - "zoom" (default) → drag selects a zoom box (Plotly default).
-  //  - "pan"            → drag moves the visible window around (free-look mode).
-  // Toggleable from the floating toolbar; reset on "Full spectrum".
-  const [dragMode, setDragMode] = useState<"zoom" | "pan">("zoom")
-  // Floating draggable toolbar offset (relative to default top-right corner).
-  // Drag persists per session in component state.
-  const [toolbarOffset, setToolbarOffset] = useState({ x: 0, y: 0 })
-
+  const [moveMode, setMoveMode] = useState(false)
   // Detect the runaway peak ONCE on the raw input (gain-independent). The
   // detector returns null when no peak is more than MASK_DOMINANCE_RATIO×P95.
   const dominantPeakRange = useMemo(
@@ -280,28 +412,9 @@ export function SpectrumViewer({
     [x, y],
   )
 
-  const rawDisplayY = useMemo(() => deriveDisplayY(y, gain01, yZoom), [y, gain01, yZoom])
-
-  // Apply the mask: replace the detected peak's samples with NaN so uPlot
-  // draws a clean gap. Falls back to the raw display y when masking is off
-  // or no dominant peak was found.
-  const displayY = useMemo(() => {
-    if (!maskDominantPeak || !dominantPeakRange) return rawDisplayY
-    const out = rawDisplayY.slice()
-    for (let i = dominantPeakRange.startIndex; i <= dominantPeakRange.endIndex; i++) {
-      out[i] = Number.NaN
-    }
-    return out
-  }, [rawDisplayY, maskDominantPeak, dominantPeakRange])
-
-  const displayPred = useMemo(() => {
-    if (!overlays?.predicted) return null
-    return deriveDisplayY(overlays.predicted.y, gain01, yZoom)
-  }, [overlays, gain01, yZoom])
-
   /**
    * yMax is anchored to the BASELINE (un-scaled) source data. This is the
-   * critical fix: when gain or yZoom go up, displayY values increase but
+   * critical fix: when gain or yZoom go up, plotted y values increase but
    * yMax stays fixed, so the rendered peaks visibly grow taller within the
    * plot area (instead of the y-axis just rescaling its labels).
    * Tall peaks may clip at the top — that's standard NMR display behavior.
@@ -359,9 +472,47 @@ export function SpectrumViewer({
   }, [x, y, overlays, showPredicted, maskDominantPeak, dominantPeakRange])
 
   const [xRange, setXRange] = useState<[number, number] | null>(null)
+  const dragPanRef = useRef<{
+    pointerId: number
+    startClientX: number
+    startRange: [number, number]
+    paneWidth: number
+  } | null>(null)
 
   const effectiveXMin = xRange ? xRange[0] : xMin
   const effectiveXMax = xRange ? xRange[1] : xMax
+  const visibleXRange = useMemo<readonly [number, number] | null>(
+    () => (xRange ? ([effectiveXMin, effectiveXMax] as const) : null),
+    [xRange, effectiveXMin, effectiveXMax],
+  )
+  const displayScale = useMemo(() => gainMultiplier(gain01) * yZoom, [gain01, yZoom])
+  const observedSample = useMemo(
+    () =>
+      sampleSpectrumTraceForPlot(x, y, {
+        maxPoints: MAX_OBSERVED_TRACE_POINTS,
+        xRange: visibleXRange,
+        maskRange: maskDominantPeak ? dominantPeakRange : null,
+      }),
+    [x, y, visibleXRange, maskDominantPeak, dominantPeakRange],
+  )
+  const observedDisplayY = useMemo(
+    () => Array.from(observedSample.y, (v) => scaleDisplayYValue(v, displayScale)),
+    [observedSample, displayScale],
+  )
+  const predictedSample = useMemo(() => {
+    if (!overlays?.predicted || overlays.predicted.x.length !== overlays.predicted.y.length) {
+      return null
+    }
+    return sampleSpectrumTraceForPlot(overlays.predicted.x, overlays.predicted.y, {
+      maxPoints: MAX_OVERLAY_TRACE_POINTS,
+      xRange: visibleXRange,
+    })
+  }, [overlays, visibleXRange])
+  const displayPred = useMemo(() => {
+    if (!predictedSample) return null
+    return Array.from(predictedSample.y, (v) => scaleDisplayYValue(v, displayScale))
+  }, [predictedSample, displayScale])
+  const predictedLabel = overlays?.predicted?.label ?? "Predicted"
 
   /**
    * Plotly data traces. Three potential layers:
@@ -370,22 +521,27 @@ export function SpectrumViewer({
    *  - Peak markers (when peak annotations exist and the user hasn't hidden them)
    *
    * Critical for non-shaky rendering:
-   *  - Trace type ``scattergl`` uses WebGL — handles 50k+ points at 60 fps.
-   *  - ``displayY`` is already gain-scaled AND mask-aware (NaN values where
-   *    the dominant solvent peak should be hidden); Plotly draws NaN as a gap.
+   *  - Trace type ``scatter`` uses SVG instead of WebGL. The spectrum is
+   *    already downsampled before Plotly sees it, and avoiding WebGL prevents
+   *    scroll-time canvas/layer flicker in the large analysis result card.
+   *  - The observed / predicted arrays are min-max downsampled before Plotly
+   *    sees them, preserving narrow peaks without forcing WebGL to diff a
+   *    million-point trace on each React commit.
+   *  - ``observedDisplayY`` is already gain-scaled AND mask-aware (NaN values
+   *    where the dominant solvent peak should be hidden); Plotly draws NaN as a gap.
    *  - The array references are stabilised by the upstream ``useMemo`` chain,
    *    so Plotly's reactivity (driven by reference equality on ``data``) does
    *    not redraw unless the actual numeric content changed.
    */
   const data = useMemo(() => {
-    if (x.length === 0) return []
+    if (observedSample.x.length === 0) return []
     const traces: object[] = [
       {
-        type: "scattergl",
+        type: "scatter",
         mode: "lines",
-        x,
-        y: displayY,
-        name: "Observed",
+        x: observedSample.x,
+        y: observedDisplayY,
+        name: traceNameWithResampling("Observed", observedSample),
         line: { width: 1.2, color: "#2563eb" },
         connectgaps: false, // honour the mask's NaN holes
         hovertemplate: "δ %{x:.3f} ppm<br>I = %{y:.2e}<extra></extra>",
@@ -393,28 +549,28 @@ export function SpectrumViewer({
     ]
     if (
       showPredicted &&
-      overlays?.predicted &&
-      overlays.predicted.x.length === overlays.predicted.y.length &&
+      predictedSample &&
       displayPred
     ) {
       traces.push({
-        type: "scattergl",
+        type: "scatter",
         mode: "lines",
-        x: overlays.predicted.x,
+        x: predictedSample.x,
         y: displayPred,
-        name: overlays.predicted.label ?? "Predicted",
+        name: traceNameWithResampling(predictedLabel, predictedSample),
         line: { width: 1, dash: "dash", color: "#c026d3" },
         opacity: 0.85,
       })
     }
     if (showPeaks && peaks.length > 0) {
-      const totalScale = gainMultiplier(gain01) * yZoom
       const px = peaks.map((p) => p.ppm)
       const py = peaks.map((p) =>
-        p.intensity != null ? p.intensity * totalScale : nearestYAtPpm(x, displayY, p.ppm),
+        p.intensity != null
+          ? scaleDisplayYValue(p.intensity, displayScale)
+          : scaleDisplayYValue(nearestYAtPpm(x, y, p.ppm), displayScale),
       )
       traces.push({
-        type: "scattergl",
+        type: "scatter",
         mode: "markers+text",
         x: px,
         y: py,
@@ -426,28 +582,67 @@ export function SpectrumViewer({
       })
     }
     return traces
-  }, [x, displayY, displayPred, overlays, peaks, showPeaks, showPredicted, gain01, yZoom])
+  }, [
+    observedSample,
+    observedDisplayY,
+    displayPred,
+    predictedSample,
+    predictedLabel,
+    peaks,
+    showPeaks,
+    showPredicted,
+    displayScale,
+    x,
+    y,
+  ])
 
   /**
-   * Plotly layout. ``uirevision: "spectrum"`` is the key shake-killer: it
-   * tells Plotly to keep the current pan / zoom / drag state across data
-   * updates instead of resetting to autorange every time. Combined with the
-   * stable ``data`` reference above, this is what makes typing into a
-   * sibling input or wiggling the gain slider feel rock-steady.
+   * Plotly layout. Two Mnova-spec'd anti-shake rules implemented here:
+   *
+   *   1. ``uirevision: "spectrum"`` — Plotly keeps pan/zoom/drag state
+   *      across data updates instead of resetting to autorange every
+   *      time. [Mnova §3 Mouse Scroll]
+   *   2. Y-axis ``range`` is anchored to a stable ``yMax`` (the robust
+   *      99-th percentile, computed from the RAW input). Gain/yZoom
+   *      ticks therefore do NOT change layout, only ``data`` trace
+   *      values — i.e. "vertical-zoom does NOT re-trigger Fit to height"
+   *      [Mnova §3 Mass Preferences].
+   *
+   * Layout deps deliberately depend only on PRIMITIVES so a sibling re-
+   * render that hands us a fresh-but-equal ``overlays`` object reference
+   * doesn't invalidate the layout and trigger a Plotly redraw.
    */
+  const hasPredictedOverlay = Boolean(overlays?.predicted && showPredicted)
+  const hasPeakMarkers = showPeaks && peaks.length > 0
   const layout = useMemo(
     () => ({
       autosize: true,
-      margin: { l: 52, r: 16, t: 28, b: 44 },
+      margin: { l: 52, r: 16, t: 8, b: 44 },
       paper_bgcolor: "transparent",
       plot_bgcolor: "transparent",
-      showlegend: Boolean(overlays?.predicted && showPredicted) || (showPeaks && peaks.length > 0),
-      dragmode: dragMode,
+      showlegend: hasPredictedOverlay || hasPeakMarkers,
+      // Plotly is staticPlot:true so dragmode is moot — but explicitly
+      // setting ``false`` ensures no listener attach/detach happens even
+      // if a future refactor flips staticPlot off.
+      dragmode: false,
       xaxis: {
         title: xLabel,
-        autorange: reversedXAxis ? "reversed" : true,
-        range: xRange ? [effectiveXMin, effectiveXMax] : undefined,
+        // Plotly's `autorange` overrides `range`. When the user pans/zooms,
+        // we must switch `autorange` off AND pass the range in display order
+        // ([high, low] when reversed) — otherwise the chart silently snaps
+        // back to the full span and the ticks never change.
+        ...(xRange
+          ? {
+              autorange: false as const,
+              range: reversedXAxis
+                ? [effectiveXMax, effectiveXMin]
+                : [effectiveXMin, effectiveXMax],
+            }
+          : {
+              autorange: reversedXAxis ? ("reversed" as const) : true,
+            }),
         zeroline: false,
+        fixedrange: true,
       },
       yaxis: {
         title: yLabel,
@@ -455,9 +650,13 @@ export function SpectrumViewer({
         // clips at the top, the analyte signal occupies the visible range.
         range: [0, yMax],
         zeroline: false,
-        fixedrange: false,
+        fixedrange: true,
       },
-      hovermode: "closest",
+      // Hover crosshair OFF — every mouse move was firing Plotly's hover
+      // detector, which on dense traces (>10 k points) re-painted the
+      // overlay each frame. That was the visible flicker.
+      hovermode: false,
+      transition: { duration: 0 },
       uirevision: "spectrum",
     }),
     [
@@ -468,58 +667,16 @@ export function SpectrumViewer({
       effectiveXMin,
       effectiveXMax,
       yMax,
-      overlays,
-      showPredicted,
-      peaks.length,
-      showPeaks,
-      dragMode,
+      hasPredictedOverlay,
+      hasPeakMarkers,
     ],
   )
-
-  /**
-   * Plotly redraw gate. We hand Plotly a monotonically-increasing revision
-   * number that we only bump when the actual chart content changed. Stable
-   * React parent re-renders (sample-id typing, autosave ticks, sibling state
-   * churn) leave ``revision`` untouched, so Plotly skips the costly trace
-   * diff entirely — that's what keeps the chart from "blinking" during
-   * unrelated UI work.
-   */
-  const revision = useMemo(() => Date.now(), [
-    x,
-    y,
-    overlays,
-    peaks,
-    showPeaks,
-    showPredicted,
-    maskDominantPeak,
-    gain01,
-    yZoom,
-    yMax,
-  ])
-
-  /**
-   * Capture Plotly's internal pan / zoom into ``xRange`` state so the
-   * controls toolbar buttons (zoom in / out, pan left / right, reset) all
-   * stay in sync with the actual view.
-   */
-  const onRelayout = useCallback((ev: Readonly<unknown>) => {
-    const raw = ev as Record<string, unknown>
-    const xr0 = raw["xaxis.range[0]"]
-    const xr1 = raw["xaxis.range[1]"]
-    if (typeof xr0 === "number" && typeof xr1 === "number") {
-      setXRange([xr0, xr1])
-    }
-    if (raw["xaxis.autorange"] === true) {
-      setXRange(null)
-    }
-  }, [])
 
   /**
    * Full reset — restores every interactive setting to its first-preview state:
    *   • xRange   → null (Plotly autorange shows the full data span)
    *   • yZoom    → 1× (no peak height bumping)
    *   • gain01   → 0 (multiplier 1×; whole spectrum fits inside the y-axis)
-   *   • dragMode → "zoom" (default Plotly drag-to-zoom-box behavior)
    * Both "Reset zoom" and "Full spectrum" route through this so they always
    * restore the exact view the user saw on first preview.
    */
@@ -527,7 +684,6 @@ export function SpectrumViewer({
     setXRange(null)
     setYZoom(1)
     setGain01(0)
-    setDragMode("zoom")
   }, [])
 
   const resetZoom = resetAll
@@ -542,6 +698,67 @@ export function SpectrumViewer({
     },
     [effectiveXMin, effectiveXMax]
   )
+
+  const clampRangeToDomain = useCallback(
+    (range: [number, number]): [number, number] => {
+      const domainLo = Math.min(xMin, xMax)
+      const domainHi = Math.max(xMin, xMax)
+      const domainSpan = domainHi - domainLo
+      const span = range[1] - range[0]
+      if (domainSpan <= 0 || span <= 0 || span >= domainSpan) return range
+      if (range[0] < domainLo) return [domainLo, domainLo + span]
+      if (range[1] > domainHi) return [domainHi - span, domainHi]
+      return range
+    },
+    [xMin, xMax],
+  )
+
+  const startMoveDrag = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!moveMode || e.button !== 0) return
+      e.preventDefault()
+      const pane = e.currentTarget
+      dragPanRef.current = {
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startRange: [effectiveXMin, effectiveXMax],
+        paneWidth: Math.max(pane.getBoundingClientRect().width, 1),
+      }
+      try {
+        pane.setPointerCapture(e.pointerId)
+      } catch {
+        // Synthetic PointerEvents in tests/devtools may not register as
+        // active browser pointers. The drag state above is enough for the
+        // React move handler; real user pointers still get capture.
+      }
+    },
+    [moveMode, effectiveXMin, effectiveXMax],
+  )
+
+  const moveDrag = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dragPanRef.current
+      if (!drag || drag.pointerId !== e.pointerId) return
+      e.preventDefault()
+      const span = drag.startRange[1] - drag.startRange[0] || 1
+      const pixels = e.clientX - drag.startClientX
+      const direction = reversedXAxis ? 1 : -1
+      const delta = direction * (pixels / drag.paneWidth) * span
+      setXRange(clampRangeToDomain([drag.startRange[0] + delta, drag.startRange[1] + delta]))
+    },
+    [clampRangeToDomain, reversedXAxis],
+  )
+
+  const endMoveDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragPanRef.current
+    if (!drag || drag.pointerId !== e.pointerId) return
+    dragPanRef.current = null
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      // See setPointerCapture guard in startMoveDrag.
+    }
+  }, [])
 
   const bumpPeakHeight = useCallback((sign: 1 | -1) => {
     setYZoom((z) => {
@@ -580,63 +797,6 @@ export function SpectrumViewer({
     return () => el.removeEventListener("wheel", onWheel)
   }, [])
 
-  // ── Floating-toolbar pointer drag ───────────────────────────────────────
-  const chartContainerRef = useRef<HTMLDivElement | null>(null)
-  const dragStateRef = useRef<{
-    pointerId: number
-    startClientX: number
-    startClientY: number
-    startOffsetX: number
-    startOffsetY: number
-  } | null>(null)
-
-  const startDrag = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      // Only start drag on primary button (left mouse / single touch).
-      if (e.button !== 0) return
-      const target = e.currentTarget
-      target.setPointerCapture(e.pointerId)
-      dragStateRef.current = {
-        pointerId: e.pointerId,
-        startClientX: e.clientX,
-        startClientY: e.clientY,
-        startOffsetX: toolbarOffset.x,
-        startOffsetY: toolbarOffset.y,
-      }
-    },
-    [toolbarOffset],
-  )
-
-  const onDragMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragStateRef.current
-    if (!drag || drag.pointerId !== e.pointerId) return
-    const dx = e.clientX - drag.startClientX
-    const dy = e.clientY - drag.startClientY
-    // Clamp panel so it stays inside the chart container's bounds.
-    const container = chartContainerRef.current
-    if (!container) return
-    const rect = container.getBoundingClientRect()
-    // Toolbar is anchored to top-right; positive X offset moves it LEFT, positive Y moves it DOWN.
-    // Use raw deltas: dx becomes -newOffsetX (panel moves with cursor), dy becomes newOffsetY.
-    const nextX = drag.startOffsetX - dx
-    const nextY = drag.startOffsetY + dy
-    // Allow movement within a reasonable margin (0..rect.width-100 on x, 0..rect.height-60 on y).
-    const clampedX = Math.max(0, Math.min(rect.width - 100, nextX))
-    const clampedY = Math.max(0, Math.min(rect.height - 60, nextY))
-    setToolbarOffset({ x: clampedX, y: clampedY })
-  }, [])
-
-  const endDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragStateRef.current
-    if (!drag || drag.pointerId !== e.pointerId) return
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId)
-    } catch {
-      // pointer may have already been released; ignore.
-    }
-    dragStateRef.current = null
-  }, [])
-
   const placeholder = x.length === 0 || y.length === 0 || x.length !== y.length
 
   if (placeholder) {
@@ -666,300 +826,280 @@ export function SpectrumViewer({
       )}
 
       {/*
-        Inline (non-sticky) spectrum container. Compact by default (~360 px);
-        the toolbar's expand toggle bumps it to 70 vh when the user needs
-        more vertical room. No sticky positioning — the chart "hung" off
-        the top of the scroll context before, which made it harder to
-        manipulate alongside the rest of Step 3.
+        Spectrum container (compact by default). flex-col so the chart fills
+        the top and the controls dock at the bottom. Keep this as a normal
+        document-flow box: forcing a compositor layer with transform/
+        containment made the large analysis card disappear/reappear during
+        scroll on some browsers.
       */}
       <div
-        ref={chartContainerRef}
         className={cn(
-          "group relative w-full min-w-0 overflow-hidden rounded-lg border bg-card transition-[height] duration-200",
+          "group flex w-full min-w-0 flex-col overflow-hidden rounded-lg border bg-card",
           expanded ? "h-[min(640px,70vh)]" : "h-[360px]",
         )}
       >
-        <Plot
-          data={data}
-          layout={layout}
-          revision={revision}
-          config={{
-            // Hide Plotly's built-in modebar — the floating toolbar below
-            // covers the same actions plus our app-specific toggles in a
-            // more compact form.
-            displayModeBar: false,
-            displaylogo: false,
-            responsive: true,
-            scrollZoom: true,
-          }}
-          style={{ width: "100%", height: "100%" }}
-          useResizeHandler
-          onRelayout={onRelayout}
-        />
-
-        {/*
-          Floating, draggable, hover-revealed toolbar.
-          - Defaults to the top-right corner of the chart.
-          - User can grab the GripHorizontal handle and drag it anywhere within
-            the chart bounds (clamped in onDragMove).
-          - Hover-revealed via group-hover so it doesn't block the chart on idle.
-          - All button functions preserved from the previous static toolbar.
-        */}
+        {/* Chart pane — fills the available container height. */}
         <div
           className={cn(
-            "absolute z-20 select-none rounded-lg",
-            "border border-border/40 bg-background/90 shadow-md backdrop-blur-md",
-            // Always visible. The opacity-on-hover trick was hiding the
-            // controls when the user wasn't already over them, which made
-            // them undiscoverable and triggered repaints on hover.
+            "relative min-h-0 flex-1",
+            moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-default",
           )}
-          style={{
-            top: 12 + toolbarOffset.y,
-            right: 12 + toolbarOffset.x,
-          }}
+          data-testid="spectrum-move-pane"
+          onPointerDown={startMoveDrag}
+          onPointerMove={moveDrag}
+          onPointerUp={endMoveDrag}
+          onPointerCancel={endMoveDrag}
+          style={{ touchAction: moveMode ? "none" : "pan-y" }}
         >
-          {/* Drag handle — pointer events here move the panel. */}
-          <div
-            role="toolbar"
-            aria-label="Spectrum controls (drag to reposition)"
-            onPointerDown={startDrag}
-            onPointerMove={onDragMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-            className="flex cursor-grab items-center justify-center gap-1 border-b border-border/40 px-2 py-1 text-muted-foreground active:cursor-grabbing"
-          >
-            <GripHorizontal className="h-3 w-3" aria-hidden />
-            <span className="font-mono text-[9px] font-bold uppercase tracking-[0.18em]">
-              Controls
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-1 p-1.5">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={fullSpectrum}
-              title="Full spectrum (reset to first-preview view)"
-            >
-              <Expand className="h-3.5 w-3.5" aria-hidden />
-              <span className="sr-only">Full spectrum</span>
-            </Button>
-            {/*
-              Drag-mode toggle:
-              - When OFF (zoom): drag = box-zoom (Plotly default).
-              - When ON  (pan):  drag = move the spectrum around freely.
-              The icon swaps to communicate which mode is currently active.
-            */}
-            <Button
-              type="button"
-              variant={dragMode === "pan" ? "secondary" : "outline"}
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setDragMode((m) => (m === "pan" ? "zoom" : "pan"))}
-              title={
-                dragMode === "pan"
-                  ? "Move mode ON — drag the spectrum to pan. Click to switch back to zoom-box."
-                  : "Move mode OFF — drag the spectrum to zoom-box. Click to switch to pan."
-              }
-              aria-pressed={dragMode === "pan"}
-            >
-              {dragMode === "pan" ? (
-                <Hand className="h-3.5 w-3.5" aria-hidden />
-              ) : (
-                <MousePointer2 className="h-3.5 w-3.5" aria-hidden />
-              )}
-              <span className="sr-only">
-                {dragMode === "pan" ? "Pan mode active (drag spectrum to move)" : "Zoom mode active (drag spectrum to box-zoom)"}
+          <Plot
+            data={data}
+            layout={layout}
+            config={{
+              // Plotly is in fully-static mode here: every interaction
+              // (hover, scroll-wheel zoom, box-zoom, double-click reset,
+              // drag) is driven by our own toolbar buttons, which call
+              // setXRange/setGain01/etc. and let React update layout/data
+              // through Plotly's diff. That removes Plotly's listener
+              // attach/detach overhead — the single biggest remaining
+              // source of flicker.
+              displayModeBar: false,
+              displaylogo: false,
+              // ``responsive: true`` and ``useResizeHandler`` BOTH attach
+              // window-resize listeners and call ``Plotly.Plots.resize()``.
+              // Running them together caused a double-resize on every
+              // viewport change — and on every layout shift below the
+              // chart (e.g. evidence panels mounting after analyze lands)
+              // Plotly's internal ResizeObserver also fires. Keeping only
+              // ``useResizeHandler`` means the chart resizes when its own
+              // container changes size, not when an unrelated sibling
+              // mutates the DOM below it. [Mnova anti-shake §3]
+              responsive: false,
+              scrollZoom: false,
+              staticPlot: true,
+            }}
+            style={{ width: "100%", height: "100%" }}
+            useResizeHandler
+          />
+        </div>
+
+        {/*
+          Bottom controls bar — replaces the previous floating draggable
+          toolbar + vertical gain rail. Pinned to the bottom of the chart
+          container so it never overlaps the spectrum, never moves during
+          interaction, and never triggers an opacity-transition repaint.
+        */}
+        <div className="shrink-0 border-t bg-card/95 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Gain — horizontal slider replaces the old vertical rail. */}
+            <div ref={gainRailRef} className="flex min-w-[180px] flex-1 items-center gap-2">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Gain
               </span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => zoom("in")}
-              title="Zoom in (x-axis)"
-            >
-              <ZoomIn className="h-3.5 w-3.5" aria-hidden />
-              <span className="sr-only">Zoom in</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => zoom("out")}
-              title="Zoom out (x-axis)"
-            >
-              <ZoomOut className="h-3.5 w-3.5" aria-hidden />
-              <span className="sr-only">Zoom out</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => pan("left")}
-              title="Pan left"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-              <span className="sr-only">Pan left</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => pan("right")}
-              title="Pan right"
-            >
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-              <span className="sr-only">Pan right</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => bumpPeakHeight(1)}
-              title="Taller peaks"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden />
-              <span className="sr-only">Taller peaks</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => bumpPeakHeight(-1)}
-              title="Shorter peaks"
-            >
-              <Minus className="h-3.5 w-3.5" aria-hidden />
-              <span className="sr-only">Shorter peaks</span>
-            </Button>
-            <Button
-              type="button"
-              variant={showPeaks ? "secondary" : "outline"}
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setShowPeaks((v) => !v)}
-              title={showPeaks ? "Hide peak labels" : "Show peak labels"}
-            >
-              {showPeaks ? <Eye className="h-3.5 w-3.5" aria-hidden /> : <EyeOff className="h-3.5 w-3.5" aria-hidden />}
-              <span className="sr-only">{showPeaks ? "Hide" : "Show"} peak labels</span>
-            </Button>
-            {overlays?.predicted && (
+              <Slider
+                value={[gain01 * 100]}
+                min={0}
+                max={100}
+                step={0.5}
+                onValueChange={(v) => setGain01((v[0] ?? 0) / 100)}
+                className="flex-1"
+                aria-label="Intensity gain (display only)"
+              />
+              <span
+                className="font-mono text-[10px] tabular-nums text-muted-foreground"
+                title={`Total scale = gain × yZoom. yZoom=${yZoom.toFixed(2)}`}
+              >
+                ×{(gainMultiplier(gain01) * yZoom).toExponential(1)}
+              </span>
+            </div>
+
+            {/* Button row — every interaction is React-side; Plotly is static. */}
+            <div className="ml-auto flex flex-wrap items-center gap-1">
               <Button
                 type="button"
-                variant={showPredicted ? "secondary" : "outline"}
+                variant="outline"
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => setShowPredicted((v) => !v)}
-                title={showPredicted ? "Hide predicted overlay" : "Show predicted overlay"}
+                onClick={fullSpectrum}
+                title="Full spectrum (reset to first-preview view)"
               >
-                <Layers className="h-3.5 w-3.5" aria-hidden />
-                <span className="sr-only">{showPredicted ? "Hide" : "Show"} predicted overlay</span>
+                <Expand className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Full spectrum</span>
               </Button>
-            )}
-            {dominantPeakRange ? (
               <Button
                 type="button"
-                variant={maskDominantPeak ? "secondary" : "outline"}
+                variant="outline"
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => setMaskDominantPeak((v) => !v)}
-                title={
-                  maskDominantPeak
-                    ? `Solvent peak at ~${dominantPeakRange.centerPpm.toFixed(2)} ppm is masked. Click to show it.`
-                    : `Solvent peak detected at ~${dominantPeakRange.centerPpm.toFixed(2)} ppm. Click to mask it.`
-                }
-                aria-pressed={maskDominantPeak}
+                onClick={() => zoom("in")}
+                title="Zoom in (x-axis)"
               >
-                <Droplets className="h-3.5 w-3.5" aria-hidden />
+                <ZoomIn className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Zoom in</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => zoom("out")}
+                title="Zoom out (x-axis)"
+              >
+                <ZoomOut className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Zoom out</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => pan("left")}
+                title="Pan left"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Pan left</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => pan("right")}
+                title="Pan right"
+              >
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Pan right</span>
+              </Button>
+              <Button
+                type="button"
+                variant={moveMode ? "secondary" : "outline"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setMoveMode((v) => !v)}
+                title={moveMode ? "Move mode on — drag inside the spectrum to pan" : "Move spectrum"}
+                aria-pressed={moveMode}
+              >
+                <Hand className="h-3.5 w-3.5" aria-hidden />
                 <span className="sr-only">
-                  {maskDominantPeak ? "Show" : "Hide"} solvent peak at {dominantPeakRange.centerPpm.toFixed(2)} ppm
+                  {moveMode ? "Disable spectrum move mode" : "Move spectrum"}
                 </span>
               </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant={expanded ? "secondary" : "outline"}
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setExpanded((v) => !v)}
-              title={expanded ? "Collapse to compact view" : "Expand to full view"}
-              aria-pressed={expanded}
-            >
-              {expanded ? (
-                <Minimize2 className="h-3.5 w-3.5" aria-hidden />
-              ) : (
-                <Maximize2 className="h-3.5 w-3.5" aria-hidden />
-              )}
-              <span className="sr-only">
-                {expanded ? "Collapse spectrum" : "Expand spectrum"}
-              </span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={resetZoom}
-              title="Reset zoom"
-            >
-              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-              <span className="sr-only">Reset zoom</span>
-            </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => bumpPeakHeight(1)}
+                title="Taller peaks"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Taller peaks</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => bumpPeakHeight(-1)}
+                title="Shorter peaks"
+              >
+                <Minus className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Shorter peaks</span>
+              </Button>
+              <Button
+                type="button"
+                variant={showPeaks ? "secondary" : "outline"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setShowPeaks((v) => !v)}
+                title={showPeaks ? "Hide peak labels" : "Show peak labels"}
+              >
+                {showPeaks ? (
+                  <Eye className="h-3.5 w-3.5" aria-hidden />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5" aria-hidden />
+                )}
+                <span className="sr-only">
+                  {showPeaks ? "Hide" : "Show"} peak labels
+                </span>
+              </Button>
+              {overlays?.predicted ? (
+                <Button
+                  type="button"
+                  variant={showPredicted ? "secondary" : "outline"}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setShowPredicted((v) => !v)}
+                  title={showPredicted ? "Hide predicted overlay" : "Show predicted overlay"}
+                >
+                  <Layers className="h-3.5 w-3.5" aria-hidden />
+                  <span className="sr-only">
+                    {showPredicted ? "Hide" : "Show"} predicted overlay
+                  </span>
+                </Button>
+              ) : null}
+              {dominantPeakRange ? (
+                <Button
+                  type="button"
+                  variant={maskDominantPeak ? "secondary" : "outline"}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setMaskDominantPeak((v) => !v)}
+                  title={
+                    maskDominantPeak
+                      ? `Solvent peak at ~${dominantPeakRange.centerPpm.toFixed(2)} ppm is masked. Click to show it.`
+                      : `Solvent peak detected at ~${dominantPeakRange.centerPpm.toFixed(2)} ppm. Click to mask it.`
+                  }
+                  aria-pressed={maskDominantPeak}
+                >
+                  <Droplets className="h-3.5 w-3.5" aria-hidden />
+                  <span className="sr-only">
+                    {maskDominantPeak ? "Show" : "Hide"} solvent peak at {dominantPeakRange.centerPpm.toFixed(2)} ppm
+                  </span>
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant={expanded ? "secondary" : "outline"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setExpanded((v) => !v)}
+                title={expanded ? "Collapse to compact view" : "Expand to full view"}
+                aria-pressed={expanded}
+              >
+                {expanded ? (
+                  <Minimize2 className="h-3.5 w-3.5" aria-hidden />
+                ) : (
+                  <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+                )}
+                <span className="sr-only">
+                  {expanded ? "Collapse spectrum" : "Expand spectrum"}
+                </span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={resetZoom}
+                title="Reset axes"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Reset axes</span>
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/*
-          Modern vertical intensity gain rail.
-          - Anchored to the right edge of the (sticky) chart container — never
-            scrolls away with the page.
-          - Hidden until hover/focus on the chart; opacity transition.
-          - Wheel scroll on the rail adjusts gain (non-passive listener attached
-            via useEffect so preventDefault actually blocks page scroll).
-          - Vertical Radix slider — drag thumb with mouse / touchpad / touch.
-          - ArrowUp / ArrowDown for keyboard control when slider is focused.
-        */}
-        <div
-          ref={gainRailRef}
-          className={cn(
-            // Anchored to the LEFT edge so the floating toolbar (top-right)
-            // and the gain rail no longer share the same corner. Always
-            // visible — discoverability + no opacity transition repaints.
-            "absolute top-3 bottom-3 left-3 z-10 flex w-11 flex-col items-center gap-2 rounded-lg",
-            "border border-border/40 bg-background/85 px-1.5 py-3 shadow-sm backdrop-blur-md",
-          )}
-          aria-label="Intensity gain"
-        >
-          <span
-            className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground"
-            aria-hidden
-          >
-            Gain
-          </span>
-          <Slider
-            orientation="vertical"
-            value={[gain01 * 100]}
-            min={0}
-            max={100}
-            step={0.5}
-            onValueChange={(v) => setGain01((v[0] ?? 0) / 100)}
-            className="flex-1"
-            aria-label="Intensity gain (display only)"
-          />
-          <span
-            className="font-mono text-[9px] tabular-nums text-muted-foreground"
-            title={`Total scale = gain × yZoom. yZoom=${yZoom.toFixed(2)}`}
-          >
-            ×{(gainMultiplier(gain01) * yZoom).toExponential(1)}
-          </span>
-        </div>
       </div>
     </div>
   )
 }
+
+/**
+ * Public, memoised export. Wrapping the implementation in ``React.memo``
+ * short-circuits the entire viewer when its props (x, y, peaks, overlays,
+ * …) are referentially equal. Combined with the caller-side ``useMemo``
+ * wrapping of every extracted array, sibling state churn (sample-id
+ * keystrokes, autosave ticks) becomes invisible to the chart.
+ */
+export const SpectrumViewer = memo(SpectrumViewerImpl)

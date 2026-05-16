@@ -20,6 +20,11 @@ import {
   SPECTRACHECK_MS_SPECTRUM_ACCEPT,
   SPECTRACHECK_TEXT_SPECTRUM_ACCEPT,
 } from "@/src/lib/spectracheck/spectrum-file-formats"
+import {
+  COMPOUND_CLASS_UNSPECIFIED,
+  compoundClassForRequest,
+  type CompoundClassValue,
+} from "@/src/lib/spectracheck/compound-classes"
 
 const STEP_UNIFIED_META: Record<string, { layer: EvidenceLayerType; endpoint: string; title: string }> = {
   import: {
@@ -57,6 +62,7 @@ const STEP_UNIFIED_META: Record<string, { layer: EvidenceLayerType; endpoint: st
 type Props = {
   sampleId: string
   candidatesText: string
+  compoundClass?: CompoundClassValue
 }
 
 type StepDef = {
@@ -101,7 +107,17 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
 
-export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
+export function SpectraCheckLcmsWorkflow({
+  sampleId,
+  candidatesText,
+  compoundClass = COMPOUND_CLASS_UNSPECIFIED,
+}: Props) {
+  const compoundClassParam = compoundClassForRequest(compoundClass)
+
+  function appendCompoundClass(fd: FormData) {
+    if (compoundClassParam) fd.append("compound_class", compoundClassParam)
+  }
+
   const [stepIndex, setStepIndex] = useState(0)
 
   const [chainRawFile, setChainRawFile] = useState<File | null>(null)
@@ -247,6 +263,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
     fd.append("mz_tolerance_da", impMzTol.trim() || "0.02")
     fd.append("ppm_tolerance", impPpmTol.trim() || "20")
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     setImportBusy(true)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/import/bridge/upload", { method: "POST", body: fd })
@@ -284,6 +301,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
     fd.append("max_scans_to_report", detMaxScanRep.trim() || "1000")
     fd.append("max_xic_points", detMaxXic.trim() || "5000")
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     setDetectBusy(true)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/features/detect/upload", { method: "POST", body: fd })
@@ -329,6 +347,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
     fd.append("align_retention_times", grpAlignRt ? "true" : "false")
     fd.append("annotate_feature_families", grpAnnotFam ? "true" : "false")
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     setGroupBusy(true)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/features/group/upload", { method: "POST", body: fd })
@@ -375,6 +394,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
     fd.append("family_rt_tolerance_min", conFamRt.trim() || "0.15")
     fd.append("min_consensus_score_to_promote", conMinPromote.trim() || "0.62")
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     setConsensusBusy(true)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/features/consensus/upload", { method: "POST", body: fd })
@@ -397,6 +417,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
     const fd = new FormData()
     fd.append("file", f)
     if (sampleId.trim()) fd.append("sample_id", sampleId.trim())
+    appendCompoundClass(fd)
     setDereplicationBusy(true)
     try {
       const data = await apiFetch<unknown>("/ms/lcms/dereplication/upload", { method: "POST", body: fd })
@@ -427,7 +448,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
       setBridgeErr("Run the Feature-Family Consensus step first so a consensus payload can be sent.")
       return
     }
-    const payload = {
+    const payload: Record<string, unknown> = {
       sample_id: sampleId.trim() || null,
       candidates,
       lcms_consensus_result: consensusResult,
@@ -438,6 +459,7 @@ export function SpectraCheckLcmsWorkflow({ sampleId, candidatesText }: Props) {
       require_promoted_family: brRequirePromoted,
       selected_family_id: brFamilyId.trim() || null,
     }
+    if (compoundClassParam) payload.compound_class = compoundClassParam
     setBridgeBusy(true)
     try {
       const data = await apiFetch<unknown>("/confidence/candidates/lcms-consensus-bridge", {

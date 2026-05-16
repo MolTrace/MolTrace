@@ -933,9 +933,21 @@ class CandidateComparisonRequest(BaseModel):
     solvent: str | None = Field(default=None, max_length=50)
     proton_nmr_text: str | None = Field(default=None, max_length=20_000)
     carbon13_text: str | None = Field(default=None, max_length=20_000)
+    # Structural class prior supplied from the SpectraCheck workspace. When
+    # set, candidate scoring may apply class-specific weighting; when omitted,
+    # scoring runs with default priors. Canonical values are enumerated in
+    # ``moltrace_backend/src/nmrcheck/compound_classes.py``.
+    compound_class: str | None = Field(default=None, max_length=64)
     candidates: list[CandidateInput] = Field(min_length=1, max_length=25)
 
-    @field_validator("sample_id", "solvent", "proton_nmr_text", "carbon13_text", mode="before")
+    @field_validator(
+        "sample_id",
+        "solvent",
+        "proton_nmr_text",
+        "carbon13_text",
+        "compound_class",
+        mode="before",
+    )
     @classmethod
     def _optional_trim_evidence(cls, value: str | None) -> str | None:
         if value is None:
@@ -980,6 +992,13 @@ class CandidateComparisonResult(BaseModel):
 
     sample_id: str | None = None
     solvent: str | None = None
+    # Echo of the structural-class prior the caller supplied (if any).
+    compound_class: str | None = None
+    # Full audit payload of the per-class prior application: original weights,
+    # multipliers, post-renormalisation weights, and human-readable notes. Set
+    # only when a recognised class with a non-trivial multiplier table was
+    # supplied. See compound_class_priors.CompoundClassPriorReport.
+    compound_class_prior_applied: dict[str, Any] | None = None
     candidate_count: int
     best_candidate: CandidateComparisonItem | None = None
     ranked_candidates: list[CandidateComparisonItem] = Field(default_factory=list)
@@ -1253,6 +1272,7 @@ class HRMSCandidateMatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
     observed_mz: float = Field(gt=0.0)
     adduct: str = Field(default="[M+H]+", max_length=50)
     ion_mode: MassIonMode | None = None
@@ -1261,7 +1281,7 @@ class HRMSCandidateMatchRequest(BaseModel):
     observed_m_plus_2_percent: float | None = Field(default=None, ge=0.0)
     candidates: list[CandidateInput] = Field(min_length=1, max_length=50)
 
-    @field_validator("sample_id", "adduct", mode="before")
+    @field_validator("sample_id", "compound_class", "adduct", mode="before")
     @classmethod
     def _optional_trim_hrms_candidate(cls, value: str | None) -> str | None:
         if value is None:
@@ -1389,6 +1409,7 @@ class MSMSAnnotationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
     precursor_mz: float = Field(gt=0.0)
     adduct: str = Field(default="[M+H]+", max_length=50)
     ion_mode: MassIonMode | None = None
@@ -1400,7 +1421,7 @@ class MSMSAnnotationRequest(BaseModel):
     peak_list_text: str | None = Field(default=None, max_length=100_000)
     candidates: list[CandidateInput] = Field(default_factory=list, max_length=50)
 
-    @field_validator("sample_id", "adduct", "peak_list_text", mode="before")
+    @field_validator("sample_id", "compound_class", "adduct", "peak_list_text", mode="before")
     @classmethod
     def _optional_trim_msms(cls, value: str | None) -> str | None:
         if value is None:
@@ -1518,6 +1539,7 @@ class MSMSFragmentationTreeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
     precursor_mz: float = Field(gt=0.0)
     adduct: str = Field(default="[M+H]+", max_length=50)
     ion_mode: MassIonMode | None = None
@@ -1530,7 +1552,7 @@ class MSMSFragmentationTreeRequest(BaseModel):
     peak_list_text: str | None = Field(default=None, max_length=100_000)
     candidates: list[CandidateInput] = Field(default_factory=list, max_length=50)
 
-    @field_validator("sample_id", "adduct", "peak_list_text", mode="before")
+    @field_validator("sample_id", "compound_class", "adduct", "peak_list_text", mode="before")
     @classmethod
     def _optional_trim_fragmentation_tree(cls, value: str | None) -> str | None:
         if value is None:
@@ -1644,6 +1666,7 @@ class MS1AdductInferenceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
     peak_list_text: str | None = Field(default=None, max_length=100_000)
     peaks: list[MS1Peak] | None = Field(default=None, max_length=5000)
     ion_mode: MassIonMode | None = "positive"
@@ -1667,7 +1690,7 @@ class MS1AdductInferenceRequest(BaseModel):
     max_br: int = Field(default=1, ge=0, le=8)
     require_nonnegative_dbe: bool = True
 
-    @field_validator("sample_id", "peak_list_text", mode="before")
+    @field_validator("sample_id", "compound_class", "peak_list_text", mode="before")
     @classmethod
     def _optional_trim_ms1_adduct(cls, value: str | None) -> str | None:
         if value is None:
@@ -1736,6 +1759,7 @@ class UnifiedCandidateConfidenceRequest(BaseModel):
 
     sample_id: str | None = Field(default=None, max_length=100)
     solvent: str | None = Field(default=None, max_length=50)
+    compound_class: str | None = Field(default=None, max_length=64)
     candidates: list[CandidateInput] = Field(min_length=1, max_length=25)
 
     observed_proton_text: str | None = Field(default=None, max_length=50_000)
@@ -1808,6 +1832,7 @@ class UnifiedCandidateConfidenceRequest(BaseModel):
     @field_validator(
         "sample_id",
         "solvent",
+        "compound_class",
         "observed_proton_text",
         "observed_carbon13_text",
         "observed_nmr2d_text",
@@ -6554,6 +6579,7 @@ class LCMSImportBridgeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
     filename: str | None = Field(default=None, max_length=300)
     source_format: LCMSSourceFormat = "auto"
     source_text: str = Field(min_length=1, max_length=5_000_000)
@@ -6566,7 +6592,7 @@ class LCMSImportBridgeRequest(BaseModel):
     mz_tolerance_da: float = Field(default=0.02, gt=0.0, le=2.0)
     ppm_tolerance: float = Field(default=20.0, gt=0.0, le=500.0)
 
-    @field_validator("sample_id", "filename", mode="before")
+    @field_validator("sample_id", "compound_class", "filename", mode="before")
     @classmethod
     def _optional_trim_lcms_import(cls, value: str | None) -> str | None:
         if value is None:
@@ -6683,6 +6709,7 @@ class LCMSFeatureDetectionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
     filename: str | None = Field(default=None, max_length=300)
     source_format: LCMSSourceFormat = "auto"
     source_text: str = Field(min_length=1, max_length=5_000_000)
@@ -6700,7 +6727,7 @@ class LCMSFeatureDetectionRequest(BaseModel):
     max_scans_to_report: int = Field(default=1000, ge=1, le=20000)
     max_xic_points: int = Field(default=5000, ge=1, le=200000)
 
-    @field_validator("sample_id", "filename", "target_mz_text", mode="before")
+    @field_validator("sample_id", "compound_class", "filename", "target_mz_text", mode="before")
     @classmethod
     def _optional_trim_lcms_feature_fields(cls, value: str | None) -> str | None:
         if value is None:
@@ -6855,6 +6882,7 @@ class LCMSFeatureGroupingRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
     runs: list[LCMSFeatureGroupingRunInput] = Field(default_factory=list, max_length=20)
     reference_run_id: str | None = Field(default=None, max_length=100)
 
@@ -6890,7 +6918,12 @@ class LCMSFeatureGroupingRequest(BaseModel):
     max_groups_to_report: int = Field(default=100, ge=1, le=1000)
 
     @field_validator(
-        "sample_id", "reference_run_id", "target_mz_text", "alignment_anchor_mz_text", mode="before"
+        "sample_id",
+        "compound_class",
+        "reference_run_id",
+        "target_mz_text",
+        "alignment_anchor_mz_text",
+        mode="before",
     )
     @classmethod
     def _trim_grouping_optional_fields(cls, value: str | None) -> str | None:
@@ -7028,6 +7061,7 @@ class LCMSFeatureFamilyConsensusRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
     grouping_result: LCMSFeatureGroupingResult | None = None
     groups: list[LCMSFeatureGroup] = Field(default_factory=list, max_length=1000)
     feature_table_text: str | None = Field(default=None, max_length=2_000_000)
@@ -7060,6 +7094,7 @@ class LCMSFeatureFamilyConsensusRequest(BaseModel):
 
     @field_validator(
         "sample_id",
+        "compound_class",
         "feature_table_text",
         "anchor_group_id",
         "formula",
@@ -7133,6 +7168,7 @@ class LCMSConsensusCandidateBridgeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
     candidates: list[CandidateInput] = Field(min_length=1, max_length=25)
     lcms_consensus_result: LCMSFeatureFamilyConsensusResult | None = None
     lcms_consensus_request: LCMSFeatureFamilyConsensusRequest | None = None
@@ -7145,7 +7181,12 @@ class LCMSConsensusCandidateBridgeRequest(BaseModel):
     selected_family_id: str | None = Field(default=None, max_length=100)
 
     @field_validator(
-        "sample_id", "lcms_family_table_text", "adduct", "selected_family_id", mode="before"
+        "sample_id",
+        "compound_class",
+        "lcms_family_table_text",
+        "adduct",
+        "selected_family_id",
+        mode="before",
     )
     @classmethod
     def _trim_lcms_bridge_request_strings(cls, value: str | None) -> str | None:

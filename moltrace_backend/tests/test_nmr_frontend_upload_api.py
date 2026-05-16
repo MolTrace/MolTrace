@@ -357,3 +357,143 @@ def test_nmr_frontend_upload_routes_are_in_openapi(tmp_path) -> None:
     assert "/nmr/processed/analyze" in paths
     assert "/nmr/raw-fid/preview" in paths
     assert "/nmr/raw-fid/process" in paths
+
+
+def test_nmr_processed_analyze_echoes_compound_class_in_metadata(tmp_path) -> None:
+    """The compound_class form param round-trips into response metadata and
+    is forwarded to candidate comparison."""
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "compound-class-test",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "nmr_text": "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), 1.26 (t, 3H)",
+                "candidates_text": "ethanol | CCO",
+                "compound_class": "small_molecules",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["metadata"]["compound_class"] == "small_molecules"
+    candidate_comparison = payload["metadata"].get("candidate_comparison")
+    assert candidate_comparison is not None
+    assert candidate_comparison.get("compound_class") == "small_molecules"
+
+
+def test_nmr_processed_analyze_rejects_unknown_compound_class_with_warning(
+    tmp_path,
+) -> None:
+    """Unknown compound_class values are dropped (metadata is None) and a
+    warning is surfaced rather than 4xx-ing the request."""
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "bad-class",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "nmr_text": "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H)",
+                "candidates_text": "ethanol | CCO",
+                "compound_class": "not_a_real_class",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["metadata"]["compound_class"] is None
+    assert any(
+        "Ignored unrecognised compound_class" in warning
+        for warning in payload["warnings"]
+    )
+
+
+def test_nmr_raw_fid_preview_echoes_compound_class(tmp_path) -> None:
+    content = _build_bruker_zip()
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/raw-fid/preview",
+            headers=HEADERS,
+            data={
+                "sample_id": "raw-class",
+                "nucleus": "1H",
+                "vendor": "auto",
+                "compound_class": "natural_products",
+            },
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["metadata"]["compound_class"] == "natural_products"
+
+
+def test_nmr_processed_analyze_applies_per_class_prior(tmp_path) -> None:
+    """End-to-end: a recognised compound_class triggers the per-class weight
+    multiplier table; the audit payload reports renormalised weights summing
+    to 1.0 and is reachable via metadata.candidate_comparison."""
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "carbo-e2e",
+                "nucleus": "1H",
+                "solvent": "D2O",
+                "nmr_text": "1H NMR (D2O) delta 3.65 (q, 2H), 1.26 (t, 3H)",
+                "candidates_text": "Ethanol | CCO",
+                "compound_class": "carbohydrates",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    cc = payload["metadata"].get("candidate_comparison")
+    assert cc is not None
+    audit = cc.get("compound_class_prior_applied")
+    assert audit is not None
+    assert audit["compound_class"] == "carbohydrates"
+    assert abs(sum(audit["renormalised_weights"].values()) - 1.0) < 1e-5
+    # Carbohydrates explicitly boost nmr2d & carbon13 — verify the renormalised
+    # values move in the expected direction relative to defaults.
+    assert audit["renormalised_weights"]["nmr2d"] > audit["original_weights"]["nmr2d"]
+    assert audit["renormalised_weights"]["carbon13"] > audit["original_weights"]["carbon13"]
+
+
+def test_nmr_processed_analyze_uses_shared_proton_carbon_layers(tmp_path) -> None:
+    """Integration-audit fix: the shared session card's 1H + 13C texts (sent
+    as proton_nmr_text + carbon13_text) feed candidate scoring as parallel
+    evidence layers, not just the active nucleus."""
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "shared-layers",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                # Local override targeting the active 1H nucleus
+                "nmr_text": "1H NMR (CDCl3) delta 3.65 (q, 2H), 1.26 (t, 3H)",
+                # Shared session card values: BOTH must feed candidate scoring
+                "proton_nmr_text": "1H NMR (CDCl3) delta 3.65 (q, 2H), 1.26 (t, 3H)",
+                "carbon13_text": "13C NMR (CDCl3) delta 58.3, 18.2",
+                "candidates_text": "Ethanol | CCO",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    cc = payload["metadata"].get("candidate_comparison")
+    assert cc is not None
+    layers = cc.get("evidence_layers_used") or []
+    # The key assertion: BOTH 1H and 13C must be present, not just the active nucleus.
+    assert "1H" in layers, f"Expected 1H in evidence_layers_used, got {layers}"
+    assert "13C" in layers, f"Expected 13C in evidence_layers_used, got {layers}"

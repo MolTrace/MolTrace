@@ -6,17 +6,31 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Atom, Network, Settings2 } from "lucide-react"
+import {
+  COMPOUND_CLASS_UNSPECIFIED,
+  type CompoundClassValue,
+} from "@/src/lib/spectracheck/compound-classes"
 
 type Props = {
   sampleId: string
   candidatesText: string
+  /**
+   * Compound-class hint from the shared NMR text + candidates tab. Forwarded
+   * to MS / LC-MS workflows as endpoint metadata. MS scoring itself is left
+   * unchanged unless a route explicitly consumes the hint.
+   */
+  compoundClass?: CompoundClassValue
 }
 
 /**
  * MS Evidence Studio: composes existing MS and LC-MS modules with progressive disclosure.
  * Shared session fields remain on the NMR text + candidates tab only.
  */
-export function SpectraCheckMsEvidenceStudio({ sampleId, candidatesText }: Props) {
+export function SpectraCheckMsEvidenceStudio({
+  sampleId,
+  candidatesText,
+  compoundClass = COMPOUND_CLASS_UNSPECIFIED,
+}: Props) {
   return (
     <div className="min-w-0 space-y-12">
       {/* Header */}
@@ -83,7 +97,11 @@ export function SpectraCheckMsEvidenceStudio({ sampleId, candidatesText }: Props
         className="min-w-0"
       >
         <div className="min-w-0">
-          <SpectraCheckMsEvidence sampleId={sampleId} candidatesText={candidatesText} />
+          <SpectraCheckMsEvidence
+            sampleId={sampleId}
+            candidatesText={candidatesText}
+            compoundClass={compoundClass}
+          />
         </div>
       </ModuleCard>
 
@@ -103,7 +121,11 @@ export function SpectraCheckMsEvidenceStudio({ sampleId, candidatesText }: Props
             </AccordionTrigger>
             <AccordionContent className="min-w-0 pb-6 pt-0">
               <div className="min-w-0 overflow-x-auto">
-                <SpectraCheckLcmsWorkflow sampleId={sampleId} candidatesText={candidatesText} />
+                <SpectraCheckLcmsWorkflow
+                  sampleId={sampleId}
+                  candidatesText={candidatesText}
+                  compoundClass={compoundClass}
+                />
               </div>
             </AccordionContent>
           </AccordionItem>

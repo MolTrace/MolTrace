@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .carbon13 import Carbon13ParseError, analyze_carbon13_text
 from .chemistry import structure_summary_from_smiles
+from .compound_class_priors import apply_compound_class_weights
 from .dept import DeptAptAnalyzeResult
 from .exceptions import PeakParseError, StructureParseError
 from .models import (
@@ -102,6 +103,21 @@ def compare_candidates(
         value is not None for value in (request.proton_nmr_text, request.carbon13_text, global_dept_score, global_2d_score)
     )
 
+    # Default scoring weights — the per-class prior may override these (see
+    # compound_class_priors.py). Calling apply_compound_class_weights once
+    # outside the candidate loop keeps weights consistent across candidates
+    # and lets us echo the audit report into the response metadata.
+    base_weights: dict[str, float] = {
+        "structure": 0.08,
+        "proton": 0.36,
+        "carbon13": 0.34,
+        "dept_apt": 0.08,
+        "nmr2d": 0.14,
+    }
+    scoring_weights, prior_report = apply_compound_class_weights(
+        base_weights, request.compound_class
+    )
+
     for candidate in request.candidates:
         evidence_summary: list[str] = []
         contradictions: list[str] = []
@@ -171,14 +187,7 @@ def compare_candidates(
             "dept_apt": global_dept_score,
             "nmr2d": global_2d_score,
         }
-        weights = {
-            "structure": 0.08,
-            "proton": 0.36,
-            "carbon13": 0.34,
-            "dept_apt": 0.08,
-            "nmr2d": 0.14,
-        }
-        total_score = _weighted_score(components, weights) if valid else 0.0
+        total_score = _weighted_score(components, scoring_weights) if valid else 0.0
         if valid and not has_spectral_evidence:
             total_score = min(total_score, 0.35)
             evidence_summary.append("No spectral evidence was available; valid structure parsing is not strong support.")
@@ -227,9 +236,22 @@ def compare_candidates(
     if any(item.contradictions for item in ranked[:3]):
         ambiguity_alerts.append("One or more top candidates has contradictions that require human review.")
 
+    compound_class_prior_metadata: dict[str, object] | None = None
+    if request.compound_class:
+        if prior_report is not None:
+            compound_class_prior_metadata = prior_report.to_metadata()
+            notes.extend(prior_report.notes)
+        else:
+            notes.append(
+                f"Compound class '{request.compound_class}' was received but no class-specific "
+                "weighting is defined for it; default scoring weights were used."
+            )
+
     return CandidateComparisonResult(
         sample_id=request.sample_id,
         solvent=request.solvent,
+        compound_class=request.compound_class,
+        compound_class_prior_applied=compound_class_prior_metadata,
         candidate_count=len(ranked),
         best_candidate=ranked[0] if ranked else None,
         ranked_candidates=ranked,
