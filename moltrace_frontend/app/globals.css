@@ -177,6 +177,65 @@
   }
 }
 
+[data-stable-results-surface],
+[data-stable-results-surface] [data-slot="card"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  content-visibility: visible !important;
+  filter: none !important;
+  overflow-anchor: none;
+  transition: none !important;
+  will-change: auto !important;
+}
+
+[data-stable-results-surface] [data-slot="card"] {
+  background-color: var(--card) !important;
+  overflow: visible !important;
+}
+
+[data-stable-results-surface] * {
+  animation: none !important;
+  transition: none !important;
+}
+
+[data-stable-results-surface] button,
+[data-stable-results-surface] [role="button"],
+[data-stable-results-surface] [data-slot="badge"],
+[data-stable-results-surface] [data-slot="table-row"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+[data-stable-results-surface] .js-plotly-plot,
+[data-stable-results-surface] .plot-container,
+[data-stable-results-surface] .svg-container,
+[data-stable-results-surface] .main-svg,
+[data-stable-results-surface] .modebar-container,
+[data-stable-results-surface] .hoverlayer {
+  -webkit-backface-visibility: visible !important;
+  backface-visibility: visible !important;
+  contain: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+[data-stable-results-surface] .js-plotly-plot,
+[data-stable-results-surface] .plot-container,
+[data-stable-results-surface] .svg-container,
+[data-stable-results-surface] .main-svg {
+  pointer-events: none !important;
+}
+
+[data-stable-results-surface] .modebar-container,
+[data-stable-results-surface] .hoverlayer {
+  display: none !important;
+}
+
 /* ─── MolTrace design system palette ─────────────────────────────
    Additive only — does not override the semantic tokens above.
    Module palette: teal (spectroscopy), cyan (regulatory), violet (optimization).

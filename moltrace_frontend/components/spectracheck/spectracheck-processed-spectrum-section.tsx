@@ -10,6 +10,11 @@ import { apiFetch } from "@/lib/api/client"
 import { trackFileUploaded } from "@/src/lib/analytics/analytics-client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
 import { buildAnalysisJobPayload } from "@/src/lib/spectracheck/buildAnalysisJobPayload"
+import {
+  COMPOUND_CLASS_UNSPECIFIED,
+  compoundClassForRequest,
+  type CompoundClassValue,
+} from "@/src/lib/spectracheck/compound-classes"
 import { normalizeSessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { SPECTRACHECK_PROCESSED_NMR_SPECTRUM_ACCEPT } from "@/src/lib/spectracheck/spectrum-file-formats"
 import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
@@ -29,6 +34,7 @@ import {
   extractNumericSummary,
   extractWarnings,
 } from "@/components/spectracheck/spectracheck-nmr-result-parse"
+import { useStableXY } from "@/components/spectracheck/use-stable-xy"
 import {
   isMissingNmrEndpoint,
   PROCESSED_NMR_BACKEND_MSG,
@@ -45,6 +51,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
   AlertTriangle,
+  ArrowRight,
   BarChart3,
   ChevronDown,
   Eye,
@@ -64,6 +71,24 @@ type Props = {
   onSampleIdChange: (value: string) => void
   solvent: string
   candidatesText: string
+  /**
+   * Shared 1H NMR text from the session card. Forwarded to analyze requests as
+   * ``proton_nmr_text`` so candidate comparison can score the 1H layer even
+   * when the local "NMR text reference" override is empty.
+   */
+  protonText?: string
+  /**
+   * Shared 13C NMR text from the session card. Forwarded to analyze requests
+   * as ``carbon13_text`` so candidate comparison can score the 13C layer in
+   * parallel with 1H (multi-layer evidence).
+   */
+  carbonText?: string
+  /**
+   * Compound-class hint sourced from the shared NMR text + candidates tab.
+   * When non-default, it is forwarded as ``compound_class`` to every preview /
+   * analyze request — the backend uses it to bias candidate scoring.
+   */
+  compoundClass?: CompoundClassValue
   registerDev?: (key: string, value: unknown) => void
 }
 
@@ -72,6 +97,9 @@ export function SpectraCheckProcessedSpectrumSection({
   onSampleIdChange,
   solvent,
   candidatesText,
+  protonText = "",
+  carbonText = "",
+  compoundClass = COMPOUND_CLASS_UNSPECIFIED,
   registerDev,
 }: Props) {
   const ws = useOptionalSpectraCheckWorkspaceSession()
@@ -116,30 +144,21 @@ export function SpectraCheckProcessedSpectrumSection({
     (v: string) => update({ candidatesOptional: v }),
     [update],
   )
-  const setPreviewResult = useCallback((v: unknown) => update({ previewResult: v }), [update])
-  const setAnalyzeResult = useCallback((v: unknown) => update({ analyzeResult: v }), [update])
   const setPreviewError = useCallback((v: string) => update({ previewError: v }), [update])
   const setAnalyzeError = useCallback((v: string) => update({ analyzeError: v }), [update])
-  const setPreviewLoading = useCallback(
-    (v: boolean) => update({ previewLoading: v }),
-    [update],
-  )
-  const setAnalyzeLoading = useCallback(
-    (v: boolean) => update({ analyzeLoading: v }),
-    [update],
-  )
-  const setSelectedFile = useCallback(
-    (v: File | null) => update({ selectedFile: v }),
-    [update],
-  )
-  const setSelectedFileName = useCallback(
-    (v: string | null) => update({ selectedFileName: v }),
-    [update],
-  )
   const setAdvancedOpen = useCallback((v: boolean) => update({ advancedOpen: v }), [update])
 
   const fileRef = useRef<HTMLInputElement>(null)
+  const foregroundRequestInFlightRef = useRef(false)
+  const foregroundRequestSeqRef = useRef(0)
   const [dragOver, setDragOver] = useState(false)
+
+  useEffect(() => {
+    return () => {
+      foregroundRequestSeqRef.current += 1
+      foregroundRequestInFlightRef.current = false
+    }
+  }, [])
 
   // Re-attach persisted File to the input on remount so existing
   // fileRef.current?.files?.[0] consumers keep working after a tab switch.
@@ -156,9 +175,19 @@ export function SpectraCheckProcessedSpectrumSection({
     }
   }, [selectedFile])
 
+  function invalidateForegroundRequest() {
+    foregroundRequestSeqRef.current += 1
+    foregroundRequestInFlightRef.current = false
+  }
+
   function attachFile(file: File) {
-    setSelectedFile(file)
-    setSelectedFileName(file.name)
+    invalidateForegroundRequest()
+    update({
+      selectedFile: file,
+      selectedFileName: file.name,
+      previewLoading: false,
+      analyzeLoading: false,
+    })
 
     if (fileRef.current && typeof DataTransfer !== "undefined") {
       try {
@@ -176,9 +205,14 @@ export function SpectraCheckProcessedSpectrumSection({
   }
 
   function clearSelectedFile() {
+    invalidateForegroundRequest()
     if (fileRef.current) fileRef.current.value = ""
-    setSelectedFile(null)
-    setSelectedFileName(null)
+    update({
+      selectedFile: null,
+      selectedFileName: null,
+      previewLoading: false,
+      analyzeLoading: false,
+    })
   }
 
   const pushDev = useCallback(
@@ -217,6 +251,7 @@ export function SpectraCheckProcessedSpectrumSection({
         setJobActionError("Choose a session file or pick a local file.")
         return
       }
+      const ccParam = compoundClassForRequest(compoundClass)
       const jid = await analysisJob.createJob(
         buildAnalysisJobPayload({
           sessionId: ws?.backendSessionId ?? null,
@@ -228,6 +263,7 @@ export function SpectraCheckProcessedSpectrumSection({
             nucleus,
             spectrometer_frequency_mhz: Number(spectrometerMhz) || 400,
             ...(nmrTextOptional.trim() ? { nmr_text: nmrTextOptional.trim() } : {}),
+            ...(ccParam ? { compound_class: ccParam } : {}),
           },
         }),
       )
@@ -246,6 +282,9 @@ export function SpectraCheckProcessedSpectrumSection({
         return
       }
       const cand = candidatesOptional.trim() || candidatesText
+      const ccParam = compoundClassForRequest(compoundClass)
+      const sharedProton = protonText.trim()
+      const sharedCarbon = carbonText.trim()
       const jid = await analysisJob.createJob(
         buildAnalysisJobPayload({
           sessionId: ws?.backendSessionId ?? null,
@@ -257,7 +296,13 @@ export function SpectraCheckProcessedSpectrumSection({
             nucleus,
             spectrometer_frequency_mhz: Number(spectrometerMhz) || 400,
             ...(nmrTextOptional.trim() ? { nmr_text: nmrTextOptional.trim() } : {}),
+            // Shared session texts feed multi-layer candidate scoring on the
+            // backend (both 1H + 13C can contribute regardless of which
+            // nucleus this analyze run targets).
+            ...(sharedProton ? { proton_nmr_text: sharedProton } : {}),
+            ...(sharedCarbon ? { carbon13_text: sharedCarbon } : {}),
             ...(cand.trim() ? { candidates_text: cand.trim() } : {}),
+            ...(ccParam ? { compound_class: ccParam } : {}),
           },
         }),
       )
@@ -276,62 +321,107 @@ export function SpectraCheckProcessedSpectrumSection({
     fd.append("spectrometer_frequency_mhz", spectrometerMhz.trim() || "400")
     const nt = nmrTextOptional.trim()
     if (nt) fd.append("nmr_text", nt)
+    // Shared 1H / 13C texts from the session card. The backend treats these
+    // as multi-layer candidate evidence (in addition to ``nmr_text`` which is
+    // the local override targeting the active nucleus).
+    const sharedProton = protonText.trim()
+    if (sharedProton) fd.append("proton_nmr_text", sharedProton)
+    const sharedCarbon = carbonText.trim()
+    if (sharedCarbon) fd.append("carbon13_text", sharedCarbon)
+    const ccParam = compoundClassForRequest(compoundClass)
+    if (ccParam) fd.append("compound_class", ccParam)
     return fd
   }
 
   async function runPreview() {
+    if (foregroundRequestInFlightRef.current) return
     const file = getSelectedFile()
     if (!file) {
       setPreviewError("Choose a processed spectrum file.")
       return
     }
-    setPreviewLoading(true)
-    setPreviewError("")
-    setPreviewResult(null)
-    setAnalyzeResult(null)
+    foregroundRequestInFlightRef.current = true
+    const requestId = ++foregroundRequestSeqRef.current
+    update({ previewLoading: true, previewError: "" })
+    // Do NOT clear previewResult/analyzeResult here. Holding onto the prior
+    // chart while the new fetch runs avoids the hard unmount/remount of
+    // ``SpectrumViewer`` that the user sees as a flash. ``previewLoading``
+    // drives the inline loading badge; the chart updates atomically when
+    // the new data lands. [Mnova anti-shake §3 Mass Preferences]
     try {
       const fd = buildBaseFormData(file)
       const data = await apiFetch<unknown>("/nmr/processed/preview", { method: "POST", body: fd })
-      setPreviewResult(data)
-      pushDev("processed_preview", data)
+      if (foregroundRequestSeqRef.current === requestId) {
+        update({
+          previewResult: data,
+          analyzeResult: null,
+          previewLoading: false,
+        })
+        pushDev("processed_preview", data)
+      }
     } catch (err) {
-      if (isMissingNmrEndpoint(err)) setPreviewError(PROCESSED_NMR_BACKEND_MSG)
-      else setPreviewError(formatApiError(err, "Processed spectrum preview failed"))
+      if (foregroundRequestSeqRef.current === requestId) {
+        update({
+          previewError: isMissingNmrEndpoint(err)
+            ? PROCESSED_NMR_BACKEND_MSG
+            : formatApiError(err, "Processed spectrum preview failed"),
+          previewLoading: false,
+        })
+      }
     } finally {
-      setPreviewLoading(false)
+      if (foregroundRequestSeqRef.current === requestId) {
+        foregroundRequestInFlightRef.current = false
+      }
     }
   }
 
   async function runAnalyze() {
+    if (foregroundRequestInFlightRef.current) return
     const file = getSelectedFile()
     if (!file) {
       setAnalyzeError("Choose a processed spectrum file.")
       return
     }
-    setAnalyzeLoading(true)
-    setAnalyzeError("")
-    setAnalyzeResult(null)
+    foregroundRequestInFlightRef.current = true
+    const requestId = ++foregroundRequestSeqRef.current
+    update({ analyzeLoading: true, analyzeError: "" })
+    // Keep the previously rendered chart visible while the analyze runs —
+    // ``analyzeLoading`` already drives the spinner badge below. Clearing
+    // ``analyzeResult`` here was the unmount/remount source of the flash.
     try {
       const fd = buildBaseFormData(file)
       const cand = candidatesOptional.trim() || candidatesText
       if (cand.trim()) fd.append("candidates_text", cand)
       const data = await apiFetch<unknown>("/nmr/processed/analyze", { method: "POST", body: fd })
-      setAnalyzeResult(data)
-      pushDev("processed_analyze", data)
+      if (foregroundRequestSeqRef.current === requestId) {
+        update({ analyzeResult: data, analyzeLoading: false })
+        pushDev("processed_analyze", data)
+      }
     } catch (err) {
-      if (isMissingNmrEndpoint(err)) setAnalyzeError(PROCESSED_NMR_BACKEND_MSG)
-      else setAnalyzeError(formatApiError(err, "Processed spectrum analyze failed"))
+      if (foregroundRequestSeqRef.current === requestId) {
+        update({
+          analyzeError: isMissingNmrEndpoint(err)
+            ? PROCESSED_NMR_BACKEND_MSG
+            : formatApiError(err, "Processed spectrum analyze failed"),
+          analyzeLoading: false,
+        })
+      }
     } finally {
-      setAnalyzeLoading(false)
+      if (foregroundRequestSeqRef.current === requestId) {
+        foregroundRequestInFlightRef.current = false
+      }
     }
   }
 
   function clearAll() {
+    invalidateForegroundRequest()
     update({
       previewResult: null,
       analyzeResult: null,
       previewError: "",
       analyzeError: "",
+      previewLoading: false,
+      analyzeLoading: false,
       selectedFile: null,
       selectedFileName: null,
       linkedFromSource: null,
@@ -340,6 +430,24 @@ export function SpectraCheckProcessedSpectrumSection({
   }
 
   const displayPayload = analyzeResult ?? previewResult
+  const foregroundActionLoading = previewLoading || analyzeLoading
+  const resultsMode =
+    analyzeLoading
+      ? "analyze"
+      : previewLoading
+        ? "preview"
+        : analyzeResult != null
+          ? "analyze"
+          : previewResult != null
+            ? "preview"
+            : null
+  const hasResultSurface = resultsMode != null
+  const payloadMode = analyzeResult != null ? "analyze" : previewResult != null ? "preview" : resultsMode
+  const resultTitle = resultsMode === "analyze" ? "Analysis output" : "Preview output"
+  const resultDescription =
+    resultsMode === "analyze"
+      ? "Spectrum, picked peaks, and matching score from /nmr/processed/analyze."
+      : "Spectrum and picked peaks from /nmr/processed/preview."
 
   // Memoise every extraction against ``displayPayload``. Without these the
   // helpers would run on every parent re-render (e.g. typing the Sample ID
@@ -347,7 +455,14 @@ export function SpectraCheckProcessedSpectrumSection({
   // re-render and the SpectrumViewer's expensive percentile / mask
   // computations to re-run. That was the single biggest cause of the
   // "shaky / blinking" chart behaviour.
-  const xy = useMemo(() => extractSpectrumXY(displayPayload ?? {}), [displayPayload])
+  const rawXy = useMemo(() => extractSpectrumXY(displayPayload ?? {}), [displayPayload])
+  // ``/nmr/processed/preview`` and ``/nmr/processed/analyze`` return the
+  // SAME x / y for the same input — analyze just adds peaks / score /
+  // evidence layers. Stabilising the xy reference by sampled-content
+  // equality keeps the existing chart line painted in place across the
+  // preview→analyze transition; Plotly's internal diff sees trace 0
+  // unchanged and only adds the new peaks trace on top.
+  const xy = useStableXY(rawXy)
   const peaks = useMemo<SpectrumPeakAnnotation[]>(
     () => extractPeaksFromPayload(displayPayload ?? {}),
     [displayPayload],
@@ -555,11 +670,9 @@ export function SpectraCheckProcessedSpectrumSection({
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (file) {
-                  setSelectedFile(file)
-                  setSelectedFileName(file.name)
+                  attachFile(file)
                 } else {
-                  setSelectedFile(null)
-                  setSelectedFileName(null)
+                  clearSelectedFile()
                 }
               }}
             />
@@ -671,30 +784,30 @@ export function SpectraCheckProcessedSpectrumSection({
         className="min-w-0"
       >
         <div className="space-y-4">
-          {/* Two prominent action tiles */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            {/* Preview tile */}
+          {/* Two prominent action cards */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Preview card (secondary action) */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  disabled={previewLoading}
+                  disabled={foregroundActionLoading}
                   onClick={runPreview}
                   className={cn(
-                    "group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
-                    "hover:-translate-y-px hover:shadow-md",
-                    previewLoading
-                      ? "cursor-wait opacity-70"
-                      : "border-input hover:border-[color:var(--mt-teal)]/40"
+                    "group relative flex min-h-[148px] flex-col items-start gap-2.5 overflow-hidden rounded-2xl border-2 bg-card p-5 text-left shadow-sm transition-all duration-200",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--mt-teal)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    foregroundActionLoading
+                      ? "cursor-wait opacity-60"
+                      : "cursor-pointer border-[color:var(--mt-teal)]/30 hover:-translate-y-0.5 hover:border-[color:var(--mt-teal)] hover:shadow-lg hover:shadow-[color:var(--mt-teal)]/10 active:translate-y-0 active:shadow-md"
                   )}
-                  style={{
-                    borderTop: "3px solid var(--mt-teal)",
-                  }}
                 >
                   <div className="flex w-full items-center justify-between">
                     <span
-                      className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{
+                        backgroundColor: "var(--mt-teal-soft)",
+                        color: "var(--mt-teal)",
+                      }}
                     >
                       <Eye className="h-3.5 w-3.5" aria-hidden />
                       Preview
@@ -703,11 +816,18 @@ export function SpectraCheckProcessedSpectrumSection({
                       Quick look
                     </span>
                   </div>
-                  <span className="font-mono text-base font-bold leading-tight">
+                  <span className="font-mono text-lg font-bold leading-tight text-foreground">
                     {previewLoading ? "Previewing…" : "Inspect spectrum"}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-sm leading-snug text-muted-foreground">
                     Show peaks, intensities, and shape before running evidence matching.
+                  </span>
+                  <span
+                    className="mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] transition-transform duration-200 group-hover:translate-x-1"
+                    style={{ color: "var(--mt-teal)" }}
+                  >
+                    {previewLoading ? "Working" : "Click to preview"}
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                   </span>
                 </button>
               </TooltipTrigger>
@@ -716,45 +836,43 @@ export function SpectraCheckProcessedSpectrumSection({
               </TooltipContent>
             </Tooltip>
 
-            {/* Analyze tile (primary) */}
+            {/* Analyze card (primary action) */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  disabled={analyzeLoading}
+                  disabled={foregroundActionLoading}
                   onClick={runAnalyze}
                   className={cn(
-                    "group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
-                    "hover:-translate-y-px hover:shadow-md",
-                    analyzeLoading
+                    "group relative flex min-h-[148px] flex-col items-start gap-2.5 overflow-hidden rounded-2xl border-2 border-transparent p-5 text-left text-white shadow-lg transition-all duration-200",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--mt-teal)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    foregroundActionLoading
                       ? "cursor-wait opacity-70"
-                      : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                      : "cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[color:var(--mt-teal)]/30 active:translate-y-0 active:shadow-md"
                   )}
                   style={{
-                    borderTop: "3px solid var(--mt-teal)",
-                    backgroundColor: "var(--mt-teal-soft)",
+                    background:
+                      "linear-gradient(135deg, var(--mt-teal) 0%, #00B884 100%)",
                   }}
                 >
                   <div className="flex w-full items-center justify-between">
-                    <span
-                      className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal)" }}
-                    >
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
                       <Sparkles className="h-3.5 w-3.5" aria-hidden />
                       Analyze
                     </span>
-                    <span
-                      className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
-                      style={{ color: "var(--mt-teal)" }}
-                    >
-                      Recommended
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] shadow-sm" style={{ color: "var(--mt-teal)" }}>
+                      ★ Recommended
                     </span>
                   </div>
-                  <span className="font-mono text-base font-bold leading-tight">
+                  <span className="font-mono text-lg font-bold leading-tight text-white">
                     {analyzeLoading ? "Analyzing…" : "Run evidence match"}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-sm leading-snug text-white/85">
                     Detect peaks and match against candidate structures with scoring.
+                  </span>
+                  <span className="mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-white transition-transform duration-200 group-hover:translate-x-1">
+                    {analyzeLoading ? "Working" : "Click to run analysis"}
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                   </span>
                 </button>
               </TooltipTrigger>
@@ -824,41 +942,37 @@ export function SpectraCheckProcessedSpectrumSection({
         </div>
       </ModuleCard>
 
-      {/* ── Loading skeleton ─────────────────────────────────────────── */}
-      {(previewLoading || analyzeLoading) && (
-        <Card
-          className="overflow-hidden rounded-xl py-0"
-          style={{ borderTop: "3px solid var(--mt-teal)" }}
-        >
-          <CardContent className="flex items-center gap-3 py-5">
-            <div
-              className="h-2 w-2 animate-pulse rounded-full"
-              style={{ backgroundColor: "var(--mt-teal)" }}
-              aria-hidden
-            />
-            <p className="font-mono text-sm font-bold tracking-tight">
-              {previewLoading ? "Previewing spectrum…" : "Analyzing spectrum…"}
-            </p>
-            <p className="text-xs text-muted-foreground">Waiting for API response</p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* ── Step 3 — Results ──────────────────────────────────────────── */}
-      {displayPayload != null && !previewLoading && !analyzeLoading && (
-        <ModuleCard
-          accent="teal"
-          eyebrow="Step 3 · Results"
-          title={analyzeResult != null ? "Analysis output" : "Preview output"}
-          icon={BarChart3}
-          description={
-            analyzeResult != null
-              ? "Spectrum, picked peaks, and matching score from /nmr/processed/analyze."
-              : "Spectrum and picked peaks from /nmr/processed/preview."
-          }
-          className="min-w-0"
-        >
+      {/*
+        Show the Step-3 surface as soon as a foreground run starts, even on
+        the first request. That gives the user one stable output interface
+        instead of a separate loading card that gets replaced by results.
+      */}
+      {hasResultSurface && (
+        <div className="min-w-0" data-stable-results-surface="">
+          <ModuleCard
+            accent="teal"
+            eyebrow="Step 3 · Results"
+            title={resultTitle}
+            icon={BarChart3}
+            description={resultDescription}
+            className="min-w-0 overflow-visible shadow-none"
+          >
           <div className="space-y-4">
+            {/* In-card loading badge — replaces the previous "hide whole
+                card while loading" behaviour. SpectrumViewer stays mounted,
+                Plotly diffs the data atomically when new results arrive. */}
+            {(previewLoading || analyzeLoading) ? (
+              <div
+                className="flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-[11px]"
+                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+                data-testid="processed-results-loading-badge"
+                aria-live="polite"
+              >
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full" style={{ backgroundColor: "var(--mt-teal)" }} />
+                {analyzeLoading ? "Running evidence match…" : "Refreshing preview…"}
+              </div>
+            ) : null}
             {/* Cross-tab "linked from" banner */}
             {state.linkedFromSource ? (
               <div
@@ -972,6 +1086,23 @@ export function SpectraCheckProcessedSpectrumSection({
                   overlays={overlays}
                   nucleus={nucleus}
                 />
+              ) : foregroundActionLoading ? (
+                <div
+                  className="flex h-[360px] min-w-0 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 p-6 text-center"
+                  data-testid="processed-results-pending-spectrum"
+                >
+                  <div
+                    className="mb-3 h-2 w-2 animate-pulse rounded-full"
+                    style={{ backgroundColor: "var(--mt-teal)" }}
+                    aria-hidden
+                  />
+                  <p className="font-mono text-sm font-bold tracking-tight">
+                    {analyzeLoading ? "Running evidence match…" : "Previewing spectrum…"}
+                  </p>
+                  <p className="mt-1 max-w-md text-xs text-muted-foreground">
+                    The spectrum and analysis panels will populate here together when the server response is ready.
+                  </p>
+                </div>
               ) : (
                 <AlertCard
                   variant="warning"
@@ -982,38 +1113,40 @@ export function SpectraCheckProcessedSpectrumSection({
             </div>
 
             {/* Use Unified Evidence — prominent CTA row right under the spectrum */}
-            <div
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
-              style={{
-                borderTop: "3px solid var(--mt-teal)",
-                backgroundColor: "var(--mt-teal-soft)",
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
-                <div>
-                  <p
-                    className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                    style={{ color: "var(--mt-teal)" }}
-                  >
-                    Use in unified evidence
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Add this {analyzeResult != null ? "analysis" : "preview"} to the unified evidence stream.
-                  </p>
-                </div>
-              </div>
-              <SpectraCheckUseUnifiedEvidenceButton
-                response={displayPayload}
-                meta={{
-                  layer: nucleus === "1H" ? "processed_1h" : "processed_13c",
-                  sourceTab: "Processed 1H / 13C upload",
-                  title: analyzeResult != null ? "Processed spectrum analyze" : "Processed spectrum preview",
-                  endpoint: analyzeResult != null ? "/nmr/processed/analyze" : "/nmr/processed/preview",
-                  sampleId: sampleId.trim() || undefined,
+            {displayPayload != null ? (
+              <div
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+                style={{
+                  borderTop: "3px solid var(--mt-teal)",
+                  backgroundColor: "var(--mt-teal-soft)",
                 }}
-              />
-            </div>
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
+                  <div>
+                    <p
+                      className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      Use in unified evidence
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Add this {payloadMode === "analyze" ? "analysis" : "preview"} to the unified evidence stream.
+                    </p>
+                  </div>
+                </div>
+                <SpectraCheckUseUnifiedEvidenceButton
+                  response={displayPayload}
+                  meta={{
+                    layer: nucleus === "1H" ? "processed_1h" : "processed_13c",
+                    sourceTab: "Processed 1H / 13C upload",
+                    title: payloadMode === "analyze" ? "Processed spectrum analyze" : "Processed spectrum preview",
+                    endpoint: payloadMode === "analyze" ? "/nmr/processed/analyze" : "/nmr/processed/preview",
+                    sampleId: sampleId.trim() || undefined,
+                  }}
+                />
+              </div>
+            ) : null}
 
             {/* Cross-tab handoff — send the analyzer's peaks back to the NMR-text tab
                 as canonical NMR-string format so the user can hand-edit, then
@@ -1063,10 +1196,14 @@ export function SpectraCheckProcessedSpectrumSection({
               )
             })()}
 
-            {/* Details + Picked peaks — 2-col below the spectrum */}
-            <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-              {/* Notes / details */}
-              {(notes || warnings.length > 0 || (!peakCount && !score)) && (
+            {/* Details + Picked peaks — 2-col below the spectrum.
+                The grid container always renders once Step 3 is on screen so
+                its presence doesn't toggle when analyze lands. Inside, the
+                Details card ALWAYS renders with content tailored to the
+                current resultsMode — never disappears on preview→analyze. */}
+            {displayPayload != null ? (
+              <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+                {/* Notes / details — always rendered for layout stability. */}
                 <Card
                   className="overflow-hidden rounded-xl py-0"
                   style={{ borderTop: "3px solid var(--mt-teal)" }}
@@ -1075,13 +1212,13 @@ export function SpectraCheckProcessedSpectrumSection({
                     <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                       Details
                     </p>
-                    {notes && (
+                    {notes ? (
                       <div>
                         <p className="text-[11px] font-medium text-muted-foreground">Notes</p>
                         <p className="mt-1 leading-snug">{notes}</p>
                       </div>
-                    )}
-                    {warnings.length > 0 && (
+                    ) : null}
+                    {warnings.length > 0 ? (
                       <div>
                         <p
                           className="text-[11px] font-medium"
@@ -1098,27 +1235,37 @@ export function SpectraCheckProcessedSpectrumSection({
                           ))}
                         </ul>
                       </div>
-                    )}
-                    {!peakCount && !score && !notes && warnings.length === 0 && (
-                      <p className="text-muted-foreground">
-                        No structured summary keys detected — see developer JSON below.
+                    ) : null}
+                    {!notes && warnings.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        {peakCount != null || score != null
+                          ? `No additional details for this ${
+                              payloadMode === "analyze" ? "analysis" : "preview"
+                            }.`
+                          : "No structured summary keys detected — see developer JSON below."}
                       </p>
-                    )}
+                    ) : null}
                   </CardContent>
                 </Card>
-              )}
 
-              {/* Picked peaks — enriched with category, region, impurity match. */}
-              <EnrichedPickedPeaksPanel payload={displayPayload} />
-            </div>
+                {/* Picked peaks — enriched with category, region, impurity match.
+                    The panels use the same payload as the spectrum so the
+                    Step-3 result appears as one interface, not in staggered
+                    deferred passes. */}
+                <EnrichedPickedPeaksPanel payload={displayPayload} />
+              </div>
+            ) : null}
 
-            {/* Evidence panels — category mix, impurity candidates, labile-H reasoning, predicted vs observed. */}
-            <SpectraCheckEvidencePanels payload={displayPayload} />
+            {/* Evidence panels — category mix, impurity candidates, labile-H reasoning, predicted vs observed.
+                Render from the same payload as the spectrum to avoid staged
+                analysis-output flicker. */}
+            {displayPayload != null ? <SpectraCheckEvidencePanels payload={displayPayload} /> : null}
 
-            {/* Developer JSON — full width at the bottom */}
-            <DeveloperJsonPanel data={displayPayload} />
+            {/* Developer JSON — full width at the bottom. */}
+            {displayPayload != null ? <DeveloperJsonPanel data={displayPayload} /> : null}
           </div>
-        </ModuleCard>
+          </ModuleCard>
+        </div>
       )}
     </div>
   )

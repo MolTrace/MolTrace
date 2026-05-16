@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
-import { SpectrumViewer } from "@/components/science/SpectrumViewer"
+import { SpectrumViewer, sampleSpectrumTraceForPlot } from "@/components/science/SpectrumViewer"
 import { SpectraCheckProcessedSpectrumSection } from "@/components/spectracheck/spectracheck-processed-spectrum-section"
 import { SpectraCheckRawFidSection } from "@/components/spectracheck/spectracheck-raw-fid-section"
 describe("SpectraCheck processed / raw sections", () => {
@@ -91,5 +91,66 @@ describe("SpectrumViewer", () => {
   it("renders placeholder state without crashing when arrays are empty", () => {
     render(<SpectrumViewer x={[]} y={[]} />)
     expect(screen.getByText(/No spectrum loaded/i)).toBeInTheDocument()
+  })
+
+  it("exposes a bottom-toolbar move mode for dragging the spectrum", () => {
+    render(<SpectrumViewer x={[5, 4, 3, 2, 1]} y={[0, 1, 0, 2, 0]} />)
+
+    const moveButton = screen.getByRole("button", { name: /Move spectrum/i })
+    expect(moveButton).toHaveAttribute("aria-pressed", "false")
+
+    fireEvent.click(moveButton)
+    expect(screen.getByRole("button", { name: /Disable spectrum move mode/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+
+    const pane = screen.getByTestId("spectrum-move-pane")
+    vi.spyOn(pane, "getBoundingClientRect").mockReturnValue({
+      bottom: 260,
+      height: 240,
+      left: 0,
+      right: 500,
+      top: 20,
+      width: 500,
+      x: 0,
+      y: 20,
+      toJSON: () => ({}),
+    })
+    Object.assign(pane, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+    })
+
+    fireEvent.pointerDown(pane, { button: 0, clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(pane, { clientX: 180, pointerId: 1 })
+    fireEvent.pointerUp(pane, { pointerId: 1 })
+  })
+
+  it("downsamples dense traces without dropping narrow spikes", () => {
+    const x = Array.from({ length: 100_000 }, (_, i) => i)
+    const y = Array.from({ length: 100_000 }, () => 0)
+    y[12_345] = 1000
+
+    const sampled = sampleSpectrumTraceForPlot(x, y, { maxPoints: 1000 })
+
+    expect(sampled.sampled).toBe(true)
+    expect(sampled.x.length).toBeLessThanOrEqual(1000)
+    expect(sampled.y).toContain(1000)
+    expect(sampled.meanBinSize).toBeGreaterThan(1)
+  })
+
+  it("keeps a NaN gap when the dominant solvent range is masked", () => {
+    const x = Array.from({ length: 100 }, (_, i) => i)
+    const y = Array.from({ length: 100 }, (_, i) => i)
+
+    const sampled = sampleSpectrumTraceForPlot(x, y, {
+      maxPoints: 200,
+      maskRange: { startIndex: 45, endIndex: 55 },
+    })
+
+    expect(sampled.sampled).toBe(false)
+    expect(sampled.meanBinSize).toBeNull()
+    expect(sampled.y.some((v) => Number.isNaN(v))).toBe(true)
   })
 })

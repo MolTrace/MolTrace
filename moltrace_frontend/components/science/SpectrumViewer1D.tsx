@@ -286,8 +286,20 @@ export function SpectrumViewer1D({
       showlegend: data.length > 1,
       xaxis: {
         title: xLabel,
-        autorange: reversedXAxis ? ("reversed" as const) : true,
-        range: xRange ? [effectiveXMin, effectiveXMax] : undefined,
+        // Plotly's `autorange` overrides `range`. When xRange is set we have
+        // to disable autorange and pass the range in display order ([high,
+        // low] when reversed) — otherwise pan/zoom updates state but the
+        // chart silently snaps back to the full span and the ticks never move.
+        ...(xRange
+          ? {
+              autorange: false as const,
+              range: reversedXAxis
+                ? [effectiveXMax, effectiveXMin]
+                : [effectiveXMin, effectiveXMax],
+            }
+          : {
+              autorange: reversedXAxis ? ("reversed" as const) : true,
+            }),
         zeroline: false,
       },
       yaxis: {

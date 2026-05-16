@@ -45,6 +45,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from . import ai_evidence_store as ai_evidence_store
 from . import ai_inference_store as ai_store
 from . import analytics_store as analytics_store
+from .compound_classes import normalize_compound_class
 from . import collaboration_store as collab_store
 from . import compound_registry_store as compound_store
 from . import golden_pilot_store as golden_pilot_store
@@ -5315,6 +5316,7 @@ def _candidate_summary_from_text(
     solvent: str | None,
     proton_nmr_text: str | None,
     carbon13_text: str | None,
+    compound_class: str | None = None,
 ) -> tuple[float | None, list[str], dict[str, Any], list[str]]:
     if not candidates_text or not candidates_text.strip():
         return (None, [], {}, [])
@@ -5329,6 +5331,7 @@ def _candidate_summary_from_text(
             candidates=candidates,
             proton_nmr_text=proton_nmr_text,
             carbon13_text=carbon13_text,
+            compound_class=compound_class,
         )
     )
     best = result.best_candidate
@@ -5508,10 +5511,12 @@ async def nmr_processed_preview_route(
     nucleus: Literal["1H", "13C"] = Form(default="1H"),
     spectrometer_frequency_mhz: float | None = Form(default=None),
     nmr_text: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRProcessedPreviewResponse:
     filename = file.filename or "processed_spectrum.dat"
     content = await file.read()
+    normalized_compound_class = normalize_compound_class(compound_class)
     try:
         parser_filename, parser_content, parser_notes, parser_metadata = _processed_parser_upload(
             filename=filename,
@@ -5538,6 +5543,7 @@ async def nmr_processed_preview_route(
                 "legacy_route_wrapped": "/spectrum/preview",
                 "spectrometer_frequency_mhz": spectrometer_frequency_mhz,
                 "nmr_text_supplied": bool(nmr_text and nmr_text.strip()),
+                "compound_class": normalized_compound_class,
             }
             warnings = list(preview.warnings)
         else:
@@ -5559,9 +5565,14 @@ async def nmr_processed_preview_route(
                 "legacy_route_wrapped": "/carbon13/spectrum/preview",
                 "spectrometer_frequency_mhz": spectrometer_frequency_mhz,
                 "nmr_text_supplied": bool(nmr_text and nmr_text.strip()),
+                "compound_class": normalized_compound_class,
             }
             warnings = list(carbon_preview.warnings)
             preview = None
+        if compound_class and not normalized_compound_class:
+            warnings.append(
+                f"Ignored unrecognised compound_class='{compound_class}'. See compound_classes.py for the allowed list."
+            )
     except (SpectrumParseError, Carbon13ParseError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="NMR processed spectrum preview") from exc
 
@@ -5616,11 +5627,21 @@ async def nmr_processed_analyze_route(
     nucleus: Literal["1H", "13C"] = Form(default="1H"),
     spectrometer_frequency_mhz: float | None = Form(default=None),
     nmr_text: str | None = Form(default=None),
+    # Multi-layer NMR text inputs from the shared session card. When supplied
+    # they contribute to candidate scoring in PARALLEL with the active-nucleus
+    # ``nmr_text`` override — i.e. a 1H run can still be informed by the 13C
+    # text the user pasted on the session tab, and vice versa.
+    proton_nmr_text: str | None = Form(default=None),
+    carbon13_text: str | None = Form(default=None),
     candidates_text: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRProcessedAnalyzeResponse:
     filename = file.filename or "processed_spectrum.dat"
     content = await file.read()
+    normalized_compound_class = normalize_compound_class(compound_class)
+    shared_proton_text = (proton_nmr_text or "").strip() or None
+    shared_carbon_text = (carbon13_text or "").strip() or None
     candidate_score: float | None = None
     candidate_summary: list[str] = []
     candidate_metadata: dict[str, Any] = {}
@@ -5652,8 +5673,17 @@ async def nmr_processed_analyze_route(
                 "legacy_route_wrapped": "/spectrum/analyze",
                 "spectrometer_frequency_mhz": spectrometer_frequency_mhz,
                 "nmr_text_supplied": bool(nmr_text and nmr_text.strip()),
+                "compound_class": normalized_compound_class,
             }
             comparison_score = _comparison_score(preview.comparison)
+            # Multi-layer candidate scoring on a 1H analyze run:
+            #   proton_nmr_text ← local override > shared session 1H > inferred
+            #   carbon13_text   ← shared session 13C (when supplied)
+            proton_for_scoring = (
+                nmr_text.strip()
+                if nmr_text and nmr_text.strip()
+                else shared_proton_text or preview.inferred_nmr_text
+            )
             (
                 candidate_score,
                 candidate_summary,
@@ -5663,10 +5693,9 @@ async def nmr_processed_analyze_route(
                 candidates_text=candidates_text,
                 sample_id=sample_id,
                 solvent=solvent,
-                proton_nmr_text=(
-                    nmr_text.strip() if nmr_text and nmr_text.strip() else preview.inferred_nmr_text
-                ),
-                carbon13_text=None,
+                proton_nmr_text=proton_for_scoring,
+                carbon13_text=shared_carbon_text,
+                compound_class=normalized_compound_class,
             )
             warnings = [*preview.warnings, *candidate_warnings]
             point_count = preview.point_count
@@ -5691,6 +5720,7 @@ async def nmr_processed_analyze_route(
                 "spectrometer_frequency_mhz": spectrometer_frequency_mhz,
                 "nmr_text_supplied": bool(nmr_text and nmr_text.strip()),
                 "generated_carbon13_text": generated_carbon13_text,
+                "compound_class": normalized_compound_class,
             }
             if nmr_text and nmr_text.strip():
                 try:
@@ -5711,6 +5741,14 @@ async def nmr_processed_analyze_route(
                     }
                 except Carbon13ParseError as exc:
                     metadata["carbon13_text_comparison_error"] = str(exc)
+            # Multi-layer candidate scoring on a 13C analyze run:
+            #   carbon13_text   ← local override > shared session 13C > generated-from-peaks
+            #   proton_nmr_text ← shared session 1H (when supplied)
+            carbon_for_scoring = (
+                nmr_text.strip()
+                if nmr_text and nmr_text.strip()
+                else shared_carbon_text or generated_carbon13_text
+            )
             (
                 candidate_score,
                 candidate_summary,
@@ -5720,13 +5758,16 @@ async def nmr_processed_analyze_route(
                 candidates_text=candidates_text,
                 sample_id=sample_id,
                 solvent=solvent,
-                proton_nmr_text=None,
-                carbon13_text=(
-                    nmr_text.strip() if nmr_text and nmr_text.strip() else generated_carbon13_text
-                ),
+                proton_nmr_text=shared_proton_text,
+                carbon13_text=carbon_for_scoring,
+                compound_class=normalized_compound_class,
             )
             warnings = [*carbon_preview.warnings, *candidate_warnings]
             point_count = int(carbon_preview.metadata.get("point_count") or len(peaks))
+        if compound_class and not normalized_compound_class:
+            warnings.append(
+                f"Ignored unrecognised compound_class='{compound_class}'. See compound_classes.py for the allowed list."
+            )
     except (SpectrumParseError, Carbon13ParseError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="NMR processed spectrum analysis") from exc
 
@@ -5915,10 +5956,12 @@ async def nmr_raw_fid_preview_route(
     solvent: str | None = Form(default=None),
     nucleus: Literal["1H", "13C"] = Form(default="1H"),
     vendor: Literal["auto", "bruker", "agilent_varian"] = Form(default="auto"),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRRawFIDPreviewResponse:
     filename = file.filename or "raw_fid_archive.zip"
     content = await file.read()
+    normalized_compound_class = normalize_compound_class(compound_class)
     provenance = _raw_fid_upload_provenance(
         request,
         filename=filename,
@@ -5932,6 +5975,10 @@ async def nmr_raw_fid_preview_route(
         *list(provenance.get("warnings") or []),
         *_vendor_expectation_warnings(requested_vendor=vendor, vendor_detected=vendor_detected),
     ]
+    if compound_class and not normalized_compound_class:
+        warnings.append(
+            f"Ignored unrecognised compound_class='{compound_class}'. See compound_classes.py for the allowed list."
+        )
     notes = [
         "Raw archive was hashed, safely inspected, and stored as immutable source data.",
         "No Fourier transform, phasing, baseline correction, or peak picking was run by "
@@ -5947,6 +5994,7 @@ async def nmr_raw_fid_preview_route(
         "raw_bytes_returned": False,
         "requested_vendor": vendor,
         "legacy_route_wrapped": "/raw-fid/upload",
+        "compound_class": normalized_compound_class,
     }
     _audit_from_context(
         request,
@@ -5990,10 +6038,12 @@ async def nmr_raw_fid_process_route(
     vendor: Literal["auto", "bruker", "agilent_varian"] = Form(default="auto"),
     processing_preset: str | None = Form(default="balanced"),
     preserve_raw: bool = Form(default=True),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRRawFIDProcessResponse:
     filename = file.filename or "raw_fid_archive.zip"
     content = await file.read()
+    normalized_compound_class = normalize_compound_class(compound_class)
     raw_upload_provenance = _raw_fid_upload_provenance(
         request,
         filename=filename,
@@ -6006,6 +6056,10 @@ async def nmr_raw_fid_process_route(
         requested_vendor=vendor,
         vendor_detected=str(raw_upload_provenance.get("vendor_detected") or "unknown"),
     )
+    if compound_class and not normalized_compound_class:
+        extra_warnings.append(
+            f"Ignored unrecognised compound_class='{compound_class}'. See compound_classes.py for the allowed list."
+        )
     if not _coerce_optional_form_bool(preserve_raw, default=True):
         extra_warnings.append(
             "preserve_raw=false was ignored; raw FID uploads are always preserved as "
@@ -6077,6 +6131,7 @@ async def nmr_raw_fid_process_route(
         "requested_vendor": vendor,
         "preserve_raw": True,
         "legacy_route_wrapped": "/fid/process + immutable raw vault processing core",
+        "compound_class": normalized_compound_class,
     }
     _audit_from_context(
         request,
@@ -20095,6 +20150,7 @@ def compose_structure_elucidation_report_evidence_route(
     lcms_selected_family_id: str | None = Form(default=None),
     sample_id: str | None = Form(default=None),
     solvent: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     report_title: str = Form(default="Regulatory-ready Structure Elucidation Report"),
     project_name: str | None = Form(default=None),
     prepared_by: str | None = Form(default=None),
@@ -20111,9 +20167,11 @@ def compose_structure_elucidation_report_evidence_route(
 ) -> StructureElucidationReportResult:
     try:
         candidates = parse_candidate_text(candidates_text)
+        normalized_compound_class = normalize_compound_class(compound_class)
         unified_request = UnifiedCandidateConfidenceRequest(
             sample_id=sample_id,
             solvent=solvent,
+            compound_class=normalized_compound_class,
             candidates=candidates,
             observed_proton_text=observed_proton_text,
             observed_carbon13_text=observed_carbon13_text,
@@ -20193,6 +20251,7 @@ def compose_structure_elucidation_report_evidence_route(
             "release_gate": result.release_gate,
             "best_candidate": result.best_candidate.smiles if result.best_candidate else None,
             "report_sha256": result.provenance.get("report_sha256"),
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -20936,16 +20995,21 @@ async def dept_apt_preview_route(
     file: UploadFile = File(...),
     experiment_type: str | None = Form(default=None),
     apt_positive: str = Form(default="CH_CH3"),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> DeptAptPreviewReport:
     filename = file.filename or "dept_apt_peaks.csv"
     content = await file.read()
+    normalized_compound_class = normalize_compound_class(compound_class)
     try:
         preview = parse_dept_apt_table(
             filename,
             content,
             experiment_type=experiment_type,
             apt_positive=apt_positive,
+        )
+        preview = preview.model_copy(
+            update={"metadata": {**preview.metadata, "compound_class": normalized_compound_class}}
         )
     except (DeptAptParseError, PydanticValidationError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -20959,6 +21023,7 @@ async def dept_apt_preview_route(
             "experiment": preview.experiment_detected,
             "peak_count": preview.peak_count,
             "typed_peak_count": preview.metadata.get("typed_peak_count"),
+            "compound_class": normalized_compound_class,
         },
     )
     return preview
@@ -20976,16 +21041,21 @@ async def dept_apt_analyze_route(
     solvent: str | None = Form(default=None),
     experiment_type: str | None = Form(default=None),
     apt_positive: str = Form(default="CH_CH3"),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> DeptAptAnalyzeResult:
     filename = file.filename or "dept_apt_peaks.csv"
     content = await file.read()
+    normalized_compound_class = normalize_compound_class(compound_class)
     try:
         preview = parse_dept_apt_table(
             filename,
             content,
             experiment_type=experiment_type,
             apt_positive=apt_positive,
+        )
+        preview = preview.model_copy(
+            update={"metadata": {**preview.metadata, "compound_class": normalized_compound_class}}
         )
         result = analyze_dept_apt_preview(preview, carbon13_text=carbon13_text, solvent=solvent)
     except (DeptAptParseError, PydanticValidationError, ValueError) as exc:
@@ -21000,6 +21070,7 @@ async def dept_apt_analyze_route(
             "experiment": result.preview.experiment_detected,
             "matched_carbon13_count": result.matched_carbon13_count,
             "dept_apt_consistency_score": result.dept_apt_consistency_score,
+            "compound_class": normalized_compound_class,
         },
     )
     return result
@@ -21043,6 +21114,7 @@ async def candidate_compare_evidence_route(
     carbon13_text: str | None = Form(default=None),
     solvent: str | None = Form(default=None),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     nmr2d_file: UploadFile | None = File(default=None),
     nmr2d_experiment_type: str | None = Form(default=None),
     dept_apt_file: UploadFile | None = File(default=None),
@@ -21052,6 +21124,7 @@ async def candidate_compare_evidence_route(
 ) -> CandidateComparisonResult:
     try:
         candidates = parse_candidate_text(candidates_text)
+        normalized_compound_class = normalize_compound_class(compound_class)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -21106,6 +21179,7 @@ async def candidate_compare_evidence_route(
         solvent=solvent,
         proton_nmr_text=proton_nmr_text,
         carbon13_text=carbon13_text,
+        compound_class=normalized_compound_class,
         candidates=candidates,
     )
     result = compare_candidates(payload, dept_apt_result=dept_result, nmr2d_result=nmr2d_result)
@@ -21120,6 +21194,7 @@ async def candidate_compare_evidence_route(
             "evidence_layers": result.evidence_layers_used,
             "has_2d": nmr2d_result is not None,
             "has_dept_apt": dept_result is not None,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -21490,12 +21565,15 @@ def hrms_candidate_match_evidence_route(
     observed_m_plus_1_percent: float | None = Form(default=None),
     observed_m_plus_2_percent: float | None = Form(default=None),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> HRMSCandidateMatchResult:
     try:
         candidates = parse_candidate_text(candidates_text)
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = HRMSCandidateMatchRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             observed_mz=observed_mz,
             adduct=adduct,
             ion_mode=ion_mode,
@@ -21518,6 +21596,7 @@ def hrms_candidate_match_evidence_route(
             "observed_mz": result.observed_mz,
             "adduct": result.adduct.name,
             "best_match": result.best_match.smiles if result.best_match else None,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -21615,11 +21694,14 @@ def ms1_adduct_inference_evidence_route(
     max_cl: int = Form(default=2),
     max_br: int = Form(default=1),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> MS1AdductInferenceResult:
     try:
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = MS1AdductInferenceRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             peak_list_text=peak_list_text,
             ion_mode=ion_mode,
             target_mz=target_mz,
@@ -21658,6 +21740,7 @@ def ms1_adduct_inference_evidence_route(
             "best_score": result.best_adduct_candidate.candidate_score
             if result.best_adduct_candidate
             else None,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -21713,12 +21796,15 @@ def msms_annotate_evidence_route(
     max_peaks_to_annotate: int = Form(default=50),
     candidates_text: str | None = Form(default=None),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> MSMSAnnotationResult:
     try:
         candidates = parse_candidate_text(candidates_text or "") if candidates_text else []
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = MSMSAnnotationRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             precursor_mz=precursor_mz,
             adduct=adduct,
             ion_mode=ion_mode,
@@ -21744,6 +21830,7 @@ def msms_annotate_evidence_route(
             "candidate_count": result.candidate_count,
             "best_candidate": result.best_candidate.smiles if result.best_candidate else None,
             "annotated_peak_count": result.annotated_peak_count,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -21800,12 +21887,15 @@ def msms_fragmentation_tree_evidence_route(
     max_tree_depth: int = Form(default=3),
     candidates_text: str | None = Form(default=None),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> MSMSFragmentationTreeResult:
     try:
         candidates = parse_candidate_text(candidates_text or "") if candidates_text else []
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = MSMSFragmentationTreeRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             precursor_mz=precursor_mz,
             adduct=adduct,
             ion_mode=ion_mode,
@@ -21838,6 +21928,7 @@ def msms_fragmentation_tree_evidence_route(
             "candidate_count": result.candidate_count,
             "best_candidate": result.best_candidate.smiles if result.best_candidate else None,
             "best_score": result.best_candidate.tree_score if result.best_candidate else None,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -21964,13 +22055,16 @@ def unified_candidate_confidence_evidence_route(
     lcms_selected_family_id: str | None = Form(default=None),
     sample_id: str | None = Form(default=None),
     solvent: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> UnifiedCandidateConfidenceResult:
     try:
         candidates = parse_candidate_text(candidates_text)
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = UnifiedCandidateConfidenceRequest(
             sample_id=sample_id,
             solvent=solvent,
+            compound_class=normalized_compound_class,
             candidates=candidates,
             observed_proton_text=observed_proton_text,
             observed_carbon13_text=observed_carbon13_text,
@@ -22026,6 +22120,7 @@ def unified_candidate_confidence_evidence_route(
             "best_score": result.best_candidate.confidence_score if result.best_candidate else None,
             "evidence_layers_used": result.evidence_layers_used,
             "selected_adduct": result.selected_adduct,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -22117,11 +22212,14 @@ def lcms_import_bridge_evidence_route(
     mz_tolerance_da: float = Form(default=0.02),
     ppm_tolerance: float = Form(default=20.0),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSImportBridgeResult:
     try:
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = LCMSImportBridgeRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             filename=filename,
             source_format=source_format,
             source_text=source_text,
@@ -22150,6 +22248,7 @@ def lcms_import_bridge_evidence_route(
             "ms2_scan_count": result.ms2_scan_count,
             "file_sha256": result.file_sha256,
             "label": result.label,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -22174,13 +22273,16 @@ async def lcms_import_bridge_upload_route(
     mz_tolerance_da: float = Form(default=0.02),
     ppm_tolerance: float = Form(default=20.0),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSImportBridgeResult:
     raw_bytes = await file.read()
     source_text = raw_bytes.decode("utf-8", errors="replace")
     try:
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = LCMSImportBridgeRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             filename=file.filename,
             source_format=source_format,
             source_text=source_text,
@@ -22209,6 +22311,7 @@ async def lcms_import_bridge_upload_route(
             "ms2_scan_count": result.ms2_scan_count,
             "file_sha256": result.file_sha256,
             "label": result.label,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -22243,6 +22346,7 @@ def lcms_feature_detection_route(
             "weak_feature_count": result.weak_feature_count,
             "file_sha256": result.file_sha256,
             "label": result.label,
+            "compound_class": payload.compound_class,
             "human_review_required": True,
         },
     )
@@ -22272,11 +22376,14 @@ def lcms_feature_detection_evidence_route(
     max_scans_to_report: int = Form(default=1000),
     max_xic_points: int = Form(default=5000),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSFeatureDetectionResult:
     try:
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = LCMSFeatureDetectionRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             filename=filename,
             source_format=source_format,
             source_text=source_text,
@@ -22310,6 +22417,7 @@ def lcms_feature_detection_evidence_route(
             "weak_feature_count": result.weak_feature_count,
             "file_sha256": result.file_sha256,
             "label": result.label,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -22338,13 +22446,16 @@ async def lcms_feature_detection_upload_route(
     max_scans_to_report: int = Form(default=1000),
     max_xic_points: int = Form(default=5000),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSFeatureDetectionResult:
     raw_bytes = await file.read()
     source_text = raw_bytes.decode("utf-8", errors="replace")
     try:
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = LCMSFeatureDetectionRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             filename=file.filename,
             source_format=source_format,
             source_text=source_text,
@@ -22450,6 +22561,7 @@ def lcms_feature_grouping_evidence_route(
     align_retention_times: bool = Form(default=True),
     annotate_feature_families: bool = Form(default=True),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSFeatureGroupingResult:
     runs = [
@@ -22472,8 +22584,10 @@ def lcms_feature_grouping_evidence_route(
             )
         )
     try:
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = LCMSFeatureGroupingRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             runs=runs,
             target_mz_text=target_mz_text,
             alignment_anchor_mz_text=alignment_anchor_mz_text,
@@ -22509,6 +22623,7 @@ def lcms_feature_grouping_evidence_route(
             "sample_enriched_group_count": result.sample_enriched_group_count,
             "background_group_count": result.background_group_count,
             "label": result.label,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -22545,6 +22660,7 @@ async def lcms_feature_grouping_upload_route(
     align_retention_times: bool = Form(default=True),
     annotate_feature_families: bool = Form(default=True),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSFeatureGroupingResult:
     sample_text = (await sample_file.read()).decode("utf-8", errors="replace")
@@ -22570,8 +22686,10 @@ async def lcms_feature_grouping_upload_route(
                 )
             )
     try:
+        normalized_compound_class = normalize_compound_class(compound_class)
         payload = LCMSFeatureGroupingRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             runs=runs,
             target_mz_text=target_mz_text,
             alignment_anchor_mz_text=alignment_anchor_mz_text,
@@ -22607,6 +22725,7 @@ async def lcms_feature_grouping_upload_route(
             "sample_enriched_group_count": result.sample_enriched_group_count,
             "background_group_count": result.background_group_count,
             "label": result.label,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -22674,8 +22793,10 @@ def lcms_feature_family_consensus_evidence_route(
     score_in_source_losses: bool = Form(default=True),
     max_families_to_report: int = Form(default=50),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSFeatureFamilyConsensusResult:
+    normalized_compound_class = normalize_compound_class(compound_class)
     grouping_result = None
     if sample_source_text and sample_source_text.strip():
         runs = [
@@ -22699,6 +22820,7 @@ def lcms_feature_family_consensus_evidence_route(
             grouping_result = group_lcms_features(
                 LCMSFeatureGroupingRequest(
                     sample_id=sample_id,
+                    compound_class=normalized_compound_class,
                     runs=runs,
                     target_mz_text=target_mz_text,
                     mz_tolerance_da=mz_tolerance_da,
@@ -22715,6 +22837,7 @@ def lcms_feature_family_consensus_evidence_route(
     try:
         payload = LCMSFeatureFamilyConsensusRequest(
             sample_id=sample_id,
+            compound_class=normalized_compound_class,
             grouping_result=grouping_result,
             feature_table_text=feature_table_text,
             anchor_group_id=anchor_group_id,
@@ -22746,6 +22869,7 @@ def lcms_feature_family_consensus_evidence_route(
             "family_count": result.family_count,
             "promoted_family_count": result.promoted_family_count,
             "label": result.label,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -22771,8 +22895,10 @@ async def lcms_feature_family_consensus_upload_route(
     family_rt_tolerance_min: float = Form(default=0.15),
     min_consensus_score_to_promote: float = Form(default=0.62),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSFeatureFamilyConsensusResult:
+    normalized_compound_class = normalize_compound_class(compound_class)
     feature_table_text = None
     if feature_table_file is not None:
         feature_table_text = (await feature_table_file.read()).decode("utf-8", errors="replace")
@@ -22804,6 +22930,7 @@ async def lcms_feature_family_consensus_upload_route(
             grouping_result = group_lcms_features(
                 LCMSFeatureGroupingRequest(
                     sample_id=sample_id,
+                    compound_class=normalized_compound_class,
                     runs=runs,
                     target_mz_text=target_mz_text,
                     mz_tolerance_da=mz_tolerance_da,
@@ -22817,6 +22944,7 @@ async def lcms_feature_family_consensus_upload_route(
         result = score_lcms_feature_family_consensus(
             LCMSFeatureFamilyConsensusRequest(
                 sample_id=sample_id,
+                compound_class=normalized_compound_class,
                 grouping_result=grouping_result,
                 feature_table_text=feature_table_text,
                 formula=formula,
@@ -22838,6 +22966,7 @@ async def lcms_feature_family_consensus_upload_route(
             "family_count": result.family_count,
             "promoted_family_count": result.promoted_family_count,
             "label": result.label,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -22875,6 +23004,7 @@ def lcms_consensus_candidate_bridge_route(
             "eligible_family_count": result.eligible_family_count,
             "best_match": result.best_match.smiles if result.best_match else None,
             "best_score": result.best_match.score if result.best_match else None,
+            "compound_class": payload.compound_class,
             "human_review_required": True,
         },
     )
@@ -22988,6 +23118,7 @@ def _lcms_library_dereplication_result(
     require_promoted_family: bool,
     selected_family_id: str | None,
     source_kind: str,
+    compound_class: str | None = None,
 ) -> LCMSLibraryDereplicationResult:
     try:
         candidates = _parse_lcms_candidate_library(candidate_library_text)
@@ -23006,6 +23137,7 @@ def _lcms_library_dereplication_result(
         "candidate_library_supplied": bool(
             candidate_library_text and candidate_library_text.strip()
         ),
+        "compound_class": compound_class,
     }
     if file_sha256:
         base_metadata["file_sha256"] = file_sha256
@@ -23020,6 +23152,7 @@ def _lcms_library_dereplication_result(
             bridge_result = score_lcms_candidates_against_consensus(
                 LCMSConsensusCandidateBridgeRequest(
                     sample_id=sample_id,
+                    compound_class=compound_class,
                     candidates=candidates,
                     lcms_family_table_text=lcms_family_table_text,
                     adduct=adduct,
@@ -23117,8 +23250,10 @@ def lcms_library_dereplication_evidence_route(
     require_promoted_family: bool = Form(default=True),
     selected_family_id: str | None = Form(default=None),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSLibraryDereplicationResult:
+    normalized_compound_class = normalize_compound_class(compound_class)
     candidate_library_text = candidates_text or library_text
     if not (candidate_library_text and candidate_library_text.strip()) and not (
         lcms_family_table_text and lcms_family_table_text.strip()
@@ -23140,6 +23275,7 @@ def lcms_library_dereplication_evidence_route(
         require_promoted_family=require_promoted_family,
         selected_family_id=selected_family_id,
         source_kind="form_evidence",
+        compound_class=normalized_compound_class,
     )
     _audit_from_context(
         request,
@@ -23150,6 +23286,7 @@ def lcms_library_dereplication_evidence_route(
             "candidate_count": result.candidate_count,
             "family_count": result.family_count,
             "label": result.label,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )
@@ -23173,8 +23310,10 @@ async def lcms_library_dereplication_upload_route(
     require_promoted_family: bool = Form(default=True),
     selected_family_id: str | None = Form(default=None),
     sample_id: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> LCMSLibraryDereplicationResult:
+    normalized_compound_class = normalize_compound_class(compound_class)
     raw_bytes = await file.read()
     if not raw_bytes:
         raise HTTPException(status_code=400, detail="Uploaded dereplication file is empty.")
@@ -23204,6 +23343,7 @@ async def lcms_library_dereplication_upload_route(
         require_promoted_family=require_promoted_family,
         selected_family_id=selected_family_id,
         source_kind=source_kind,
+        compound_class=normalized_compound_class,
     )
     _audit_from_context(
         request,
@@ -23216,6 +23356,7 @@ async def lcms_library_dereplication_upload_route(
             "candidate_count": result.candidate_count,
             "family_count": result.family_count,
             "label": result.label,
+            "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
     )

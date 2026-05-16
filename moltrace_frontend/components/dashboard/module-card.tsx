@@ -49,7 +49,13 @@ export function ModuleCard({
   return (
     <Card
       className={cn(
-        "group relative h-full overflow-hidden rounded-xl py-0 transition-all duration-200",
+        // ``transition-all`` was animating EVERY changing CSS property — that
+        // included anything browsers nudge during scroll (e.g. scrollbar-
+        // induced layout, hover-intent on neighbouring elements), which
+        // surfaced as the card flashing during scroll. Narrow to the few
+        // properties that genuinely animate on hover (transform/border/shadow)
+        // so the card stays still while the user is just scrolling past it.
+        "group relative h-full overflow-hidden rounded-xl py-0 transition-[transform,border-color,box-shadow] duration-200",
         href && "hover:-translate-y-px hover:border-foreground/20 hover:shadow-md",
         className,
       )}

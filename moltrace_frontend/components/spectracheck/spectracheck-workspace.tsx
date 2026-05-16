@@ -26,6 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  COMPOUND_CLASS_OPTIONS,
+  COMPOUND_CLASS_UNSPECIFIED,
+  type CompoundClassValue,
+} from "@/src/lib/spectracheck/compound-classes"
 import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
@@ -270,6 +275,10 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   const [candidatesText, setCandidatesText] = useState(defaultCandidates)
   const [protonText, setProtonText] = useState(defaultProton)
   const [carbonText, setCarbonText] = useState(defaultCarbon)
+  // Compound class is shared across every analyzer tab — it narrows scoring &
+  // prediction priors in candidate comparison and downstream models. The
+  // canonical values + UI labels live in src/lib/spectracheck/compound-classes.
+  const [compoundClass, setCompoundClass] = useState<CompoundClassValue>(COMPOUND_CLASS_UNSPECIFIED)
   const [protonLinkedFrom, setProtonLinkedFrom] = useState<string | null>(null)
   const [carbonLinkedFrom, setCarbonLinkedFrom] = useState<string | null>(null)
 
@@ -1573,6 +1582,47 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   />
                 )}
               </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="spectracheck-compound-class" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Compound class
+                  </Label>
+                  <InfoTooltip
+                    content="Pick the structural class the sample is expected to belong to. Forwarded to every analyzer (processed 1H/13C, raw FID, MS) as a prior to narrow candidate scoring and prediction. Leave as Unspecified when you don't want to bias the search."
+                    label="About Compound class"
+                  />
+                </div>
+                <Select
+                  value={compoundClass}
+                  onValueChange={(v) => setCompoundClass(v as CompoundClassValue)}
+                >
+                  <SelectTrigger id="spectracheck-compound-class" className="w-full">
+                    <SelectValue placeholder="Select compound class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMPOUND_CLASS_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <span className="flex flex-col">
+                          <span>{opt.label}</span>
+                          <span className="text-[10px] text-muted-foreground">{opt.description}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {compoundClass !== COMPOUND_CLASS_UNSPECIFIED && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Sent to every analyze request as <span className="font-mono">compound_class</span>={" "}
+                    <span
+                      className="font-mono"
+                      style={{ color: "var(--mt-teal)" }}
+                    >
+                      {compoundClass}
+                    </span>
+                    .
+                  </p>
+                )}
+              </div>
             </div>
           </ModuleCard>
 
@@ -1762,6 +1812,9 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             onSampleIdChange={setSampleId}
             solvent={solventForApi}
             candidatesText={candidatesText}
+            protonText={protonText}
+            carbonText={carbonText}
+            compoundClass={compoundClass}
             registerDev={registerDev}
           />
         </TabsContent>
@@ -1771,6 +1824,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             sampleId={sampleId}
             onSampleIdChange={setSampleId}
             solvent={solventForApi}
+            compoundClass={compoundClass}
             registerDev={registerDev}
           />
         </TabsContent>
@@ -3368,7 +3422,11 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         </TabsContent>
 
         <TabsContent value="tab-ms-evidence" className="mt-4">
-          <SpectraCheckMsEvidenceStudio sampleId={sampleId} candidatesText={candidatesText} />
+          <SpectraCheckMsEvidenceStudio
+            sampleId={sampleId}
+            candidatesText={candidatesText}
+            compoundClass={compoundClass}
+          />
         </TabsContent>
 
         <TabsContent value="tab-evidence-queue" className="mt-4 space-y-8">
@@ -3444,6 +3502,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               candidatesText={candidatesText}
               protonText={protonText}
               carbonText={carbonText}
+              compoundClass={compoundClass}
               backendSessionId={backendSessionId}
             />
           </section>
@@ -3492,6 +3551,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               candidatesText={candidatesText}
               protonText={protonText}
               carbonText={carbonText}
+              compoundClass={compoundClass}
               backendSessionId={backendSessionId}
             />
           </section>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { memo, useMemo, useState } from "react"
 import {
   AlertTriangle,
   CheckCircle2,
@@ -26,9 +26,20 @@ import {
 } from "@/components/spectracheck/spectracheck-summary"
 import type { SpectraCheckUnifiedEvidenceMeta } from "@/src/lib/spectracheck/evidence-enqueue"
 
-export function DeveloperJsonPanel({ data }: { data: unknown }) {
+function DeveloperJsonPanelImpl({ data }: { data: unknown }) {
+  const [open, setOpen] = useState(false)
+  // ``JSON.stringify`` of a large analyze payload is the most expensive
+  // operation in the Step-3 results card (tens of thousands of points +
+  // peaks + predicted overlay can take a few ms). Only build it when the
+  // details disclosure is open so the normal results view can settle as
+  // one stable interface with the spectrum.
+  const text = useMemo(() => (open ? JSON.stringify(data, null, 2) : ""), [data, open])
   return (
-    <details className="rounded-lg border bg-card p-4">
+    <details
+      className="rounded-lg border bg-card p-4"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
         <FileJson className="h-4 w-4" />
         Developer JSON
@@ -46,12 +57,20 @@ export function DeveloperJsonPanel({ data }: { data: unknown }) {
           />
         </span>
       </summary>
-      <pre className="mt-4 max-h-[520px] overflow-x-auto overflow-y-auto whitespace-pre-wrap rounded-md bg-muted/40 p-4 text-xs leading-5">
-        {JSON.stringify(data, null, 2)}
-      </pre>
+      {open ? (
+        <pre className="mt-4 max-h-[520px] overflow-x-auto overflow-y-auto whitespace-pre-wrap rounded-md bg-muted/40 p-4 text-xs leading-5">
+          {text}
+        </pre>
+      ) : null}
     </details>
   )
 }
+
+// Memoised so the panel skips re-render entirely when its ``data`` prop
+// reference is unchanged. The section component passes the same payload
+// reference that drives the spectrum, so unrelated chart-side state churn
+// can short-circuit through here.
+export const DeveloperJsonPanel = memo(DeveloperJsonPanelImpl)
 
 function SummaryPanels({
   summary,
