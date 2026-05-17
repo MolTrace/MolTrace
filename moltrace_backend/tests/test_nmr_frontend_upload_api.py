@@ -414,6 +414,60 @@ def test_nmr_processed_analyze_rejects_unknown_compound_class_with_warning(
     )
 
 
+def test_nmr_raw_fid_process_returns_enriched_peaks_and_summaries(tmp_path) -> None:
+    """Parity check: /nmr/raw-fid/process must return the same enriched
+    peak/summary fields as /nmr/processed/analyze so the Raw FID tab can
+    mount the same evidence panels as the Processed tab."""
+    content = _build_bruker_zip()
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/raw-fid/process",
+            headers=HEADERS,
+            data={
+                "sample_id": "raw-fid-enriched",
+                "nucleus": "1H",
+                "vendor": "auto",
+                "processing_preset": "balanced",
+                # Shared session inputs that drive enrichment.
+                "candidates_text": "Ethanol | CCO",
+                "proton_nmr_text": "3.65 (q, 2H), 1.26 (t, 3H)",
+            },
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    # Wire-contract: every field the frontend panels consume must be present.
+    required_keys = {
+        "peaks",
+        "peak_count",
+        "peak_category_summary",
+        "labile_hydrogen_summary",
+        "proton_inventory",
+        "impurity_candidates",
+        "processing_parameters",
+    }
+    missing = required_keys - payload.keys()
+    assert not missing, f"raw-fid/process response missing keys: {missing}"
+
+    # Peaks must be enriched (category attached) when a SMILES is supplied.
+    assert isinstance(payload["peaks"], list)
+    if payload["peaks"]:
+        first_peak = payload["peaks"][0]
+        assert "category" in first_peak, (
+            "Enriched peaks must carry a category field; got peak shape "
+            f"{sorted(first_peak.keys())}"
+        )
+
+    # Audit metadata records that the shared NMR text + candidates reached the
+    # endpoint (parity with /nmr/processed/analyze).
+    metadata = payload["metadata"]
+    assert metadata.get("candidate_text_supplied") is True
+    assert metadata.get("proton_nmr_text_supplied") is True
+    assert metadata.get("carbon13_text_supplied") is False
+
+
 def test_nmr_raw_fid_preview_echoes_compound_class(tmp_path) -> None:
     content = _build_bruker_zip()
     with _client(tmp_path) as client:

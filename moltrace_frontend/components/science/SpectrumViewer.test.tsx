@@ -6,8 +6,8 @@ import { SpectrumViewer } from "@/components/science/SpectrumViewer"
 /**
  * Plotly is dynamically imported so this mock captures whatever ``data`` prop
  * is handed to the underlying Plot component. Each test then asserts on the
- * trace list (markers, drop-lines, per-category groups) without ever spinning
- * up react-plotly in jsdom.
+ * trace list (markers and per-category groups) plus layout shape guide-lines
+ * without ever spinning up react-plotly in jsdom.
  */
 type CapturedPlotProps = {
   data?: Array<{
@@ -20,6 +20,21 @@ type CapturedPlotProps = {
     marker?: { color?: string }
     showlegend?: boolean
   }>
+  layout?: {
+    uirevision?: unknown
+    shapes?: Array<{
+      type?: string
+      x0?: number
+      x1?: number
+      y0?: number
+      y1?: number
+      layer?: string
+    }>
+    yaxis?: {
+      range?: number[]
+      zeroline?: boolean
+    }
+  }
 }
 let capturedPlotProps: CapturedPlotProps | null = null
 
@@ -47,12 +62,36 @@ describe("SpectrumViewer — picked-peak rendering", () => {
   it("emits no peak traces when peaks=[]", () => {
     freshRender(<SpectrumViewer {...baseProps} />)
     const traces = capturedPlotProps?.data ?? []
-    // Only the observed-line trace; no drop-line trace, no marker trace.
+    // Only the observed-line trace; no marker trace.
     expect(traces).toHaveLength(1)
     expect(traces[0].name).toMatch(/Observed/)
+    expect(capturedPlotProps?.layout?.shapes).toHaveLength(0)
   })
 
-  it("adds a drop-line trace and one marker trace per category when peaks are supplied", () => {
+  it("keeps lower y-axis headroom so the baseline is not clipped at zero", () => {
+    freshRender(<SpectrumViewer x={[3, 2, 1]} y={[0, 1, 0]} />)
+
+    const yRange = capturedPlotProps?.layout?.yaxis?.range
+    expect(yRange?.[0]).toBeLessThan(0)
+    expect(yRange?.[1]).toBeGreaterThan(1)
+    expect(capturedPlotProps?.layout?.yaxis?.zeroline).toBe(true)
+  })
+
+  it("sets a stable Plotly uirevision so redraws preserve the current viewport", () => {
+    freshRender(<SpectrumViewer x={[3, 2, 1]} y={[0, 1, 0]} />)
+
+    expect(capturedPlotProps?.layout?.uirevision).toBe("spectrum")
+  })
+
+  it("keeps negative baseline excursions inside the initial y-axis range", () => {
+    freshRender(<SpectrumViewer x={[4, 3, 2, 1]} y={[-0.2, 0.1, 1, -0.1]} />)
+
+    const yRange = capturedPlotProps?.layout?.yaxis?.range
+    expect(yRange?.[0]).toBeLessThan(-0.2)
+    expect(yRange?.[1]).toBeGreaterThan(1)
+  })
+
+  it("adds shape guide-lines and one marker trace per category when peaks are supplied", () => {
     freshRender(
       <SpectrumViewer
         {...baseProps}
@@ -66,16 +105,17 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     )
     const traces = capturedPlotProps?.data ?? []
     const names = traces.map((t) => t.name)
-    // 1 observed line + 1 drop-line + 3 category groups (aromatic_alkene,
+    // 1 observed line + 3 category groups (aromatic_alkene,
     // oxygenated, aliphatic — the two aromatic peaks share a single trace).
-    expect(traces.length).toBe(5)
-    expect(names).toContain("Peak markers")
+    expect(traces.length).toBe(4)
+    expect(names).not.toContain("Peak markers")
     expect(names).toContain("Aromatic alkene")
     expect(names).toContain("Oxygenated")
     expect(names).toContain("Aliphatic")
+    expect(capturedPlotProps?.layout?.shapes).toHaveLength(4)
   })
 
-  it("draws drop-lines from y=0 to each peak intensity", () => {
+  it("draws peak guide-lines as layout shapes from y=0 to each peak intensity", () => {
     freshRender(
       <SpectrumViewer
         {...baseProps}
@@ -85,15 +125,24 @@ describe("SpectrumViewer — picked-peak rendering", () => {
         ]}
       />,
     )
-    const traces = capturedPlotProps?.data ?? []
-    const dropTrace = traces.find((t) => t.name === "Peak markers")
-    expect(dropTrace).toBeDefined()
-    expect(dropTrace?.mode).toBe("lines")
-    // Drop-line trace alternates [baseline, peakY, null] per peak.
-    expect(dropTrace?.y).toEqual([0, 1.0, null, 0, 0.6, null])
-    expect(dropTrace?.x).toEqual([7.26, 7.26, null, 1.26, 1.26, null])
-    // Drop-line is not in the legend so it doesn't clutter category toggles.
-    expect(dropTrace?.showlegend).toBe(false)
+    const shapes = capturedPlotProps?.layout?.shapes ?? []
+    expect(shapes).toHaveLength(2)
+    expect(shapes[0]).toMatchObject({
+      type: "line",
+      x0: 7.26,
+      x1: 7.26,
+      y0: 0,
+      y1: 1.0,
+      layer: "below",
+    })
+    expect(shapes[1]).toMatchObject({
+      type: "line",
+      x0: 1.26,
+      x1: 1.26,
+      y0: 0,
+      y1: 0.6,
+      layer: "below",
+    })
   })
 
   it("uses the per-category palette for marker colors", () => {
@@ -142,7 +191,7 @@ describe("SpectrumViewer — picked-peak rendering", () => {
       />,
     )
     const traces = capturedPlotProps?.data ?? []
-    // Filter to just the marker traces (skip observed line + drop-line) and
+    // Filter to just the marker traces (skip the observed line) and
     // check their order is alphabetical: Aliphatic < Aromatic alkene < Labile.
     const markerNames = traces
       .filter((t) => t.mode === "markers+text")

@@ -236,7 +236,7 @@ def test_trace_preview_builds_reference_comparison_and_uses_d2o_visible_target()
     assert any("26H" in note and "22 visible H" in note for note in preview.comparison.notes)
 
 
-def test_trace_preview_preserves_real_intensities_and_metadata_by_default() -> None:
+def test_trace_preview_applies_baseline_and_display_smoothing_by_default() -> None:
     rows = ["ppm,intensity"]
     for idx in range(401):
         x = 8.0 - idx * 0.02
@@ -254,8 +254,12 @@ def test_trace_preview_preserves_real_intensities_and_metadata_by_default() -> N
 
     preprocessing = preview.metadata["display_preprocessing"]
     assert preprocessing["baseline_smoothing"]["applied"] is False
+    assert preprocessing["trace_smoothing"]["applied"] is True
+    assert preprocessing["trace_smoothing"]["display_only"] is True
     assert preprocessing["display_solvent_masked"] is False
-    assert preview.metadata["evidence_trace_mode"] == "uploaded_intensity"
+    assert preview.metadata["processed_baseline_correction"]["correction_applied"] is True
+    assert preview.metadata["evidence_trace_mode"] == "uploaded_intensity_baseline_corrected"
+    assert preview.metadata["display"]["main_trace"] == "display_smoothed_evidence_intensity"
     assert preview.metadata["display_mode"] == "real"
     assert preview.metadata["display_gain"] == 1.0
     assert preview.metadata["baseline_lock_visual_only"] is True
@@ -274,7 +278,6 @@ def test_trace_preview_preserves_real_intensities_and_metadata_by_default() -> N
     assert solvent_display
     assert non_solvent_display
     assert max(solvent_display) > max(non_solvent_display)
-    assert any(point.shift_ppm == 7.26 and point.intensity > 79 for point in preview.preview_points)
 
 
 def test_vertical_gain_does_not_change_api_output_or_inferred_peaks() -> None:

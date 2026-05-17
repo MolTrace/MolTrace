@@ -6,11 +6,13 @@ import numpy as np
 
 from nmrcheck.baseline import (
     apply_bernstein_baseline_correction,
+    apply_signal_free_smooth_baseline_polish,
     apply_simple_baseline_correction,
     fit_bernstein_baseline,
 )
 from nmrcheck.fid import (
     _auto_phase_spectrum,
+    _smooth_fid_display_trace,
     apply_phase,
     fid_settings_from_preset,
     phase_score,
@@ -146,6 +148,93 @@ def test_bernstein_baseline_does_not_distort_already_clean_spectrum() -> None:
     assert np.median([abs(y) for x, y in corrected if abs(x - 4.0) > 0.2 and abs(x - 7.2) > 0.2]) < 0.05
 
 
+def test_signal_free_polish_flattens_rolling_fid_baseline_without_moving_peaks() -> None:
+    x_values = np.linspace(0.0, 12.0, 720)
+    baseline = (
+        0.34 * np.sin((x_values - 1.3) / 12.0 * 2.0 * np.pi)
+        + 0.18 * ((x_values - 6.0) / 6.0) ** 2
+        - 0.12 * (x_values - 6.0) / 6.0
+    )
+    peak_only = (
+        7.0 * np.exp(-((x_values - 2.15) ** 2) / (2 * 0.025**2))
+        + 5.5 * np.exp(-((x_values - 5.75) ** 2) / (2 * 0.030**2))
+        + 4.0 * np.exp(-((x_values - 9.35) ** 2) / (2 * 0.035**2))
+    )
+    points = [(float(x), float(y)) for x, y in zip(x_values, baseline + peak_only, strict=True)]
+
+    corrected, metadata, warnings = apply_signal_free_smooth_baseline_polish(points)
+
+    assert not warnings
+    assert metadata["correction_applied"] is True
+    assert metadata["qa_after"]["score"] >= metadata["qa_before"]["score"]
+    off_peak_raw = [
+        abs(y)
+        for (_x, y), peak_y in zip(points, peak_only, strict=True)
+        if peak_y < 0.02
+    ]
+    off_peak_corrected = [
+        abs(y)
+        for (_x, y), peak_y in zip(corrected, peak_only, strict=True)
+        if peak_y < 0.02
+    ]
+    assert np.median(off_peak_corrected) < np.median(off_peak_raw) * 0.25
+
+    peak_x_before = points[int(np.argmax([y for _x, y in points]))][0]
+    peak_x_after = corrected[int(np.argmax([y for _x, y in corrected]))][0]
+    assert abs(peak_x_after - peak_x_before) < 0.03
+
+    base_medians = []
+    for center in (2.15, 5.75, 9.35):
+        base_medians.append(
+            float(
+                np.median(
+                    [
+                        y
+                        for x, y in corrected
+                        if 0.12 <= abs(x - center) <= 0.22
+                    ]
+                )
+            )
+        )
+    assert max(base_medians) - min(base_medians) < 0.08
+
+
+def test_raw_fid_display_smoothing_is_stronger_in_aromatic_region() -> None:
+    x_values = np.linspace(12.0, 0.0, 2400)
+    aromatic_mask = (x_values >= 6.0) & (x_values <= 9.0)
+    peak = 5.0 * np.exp(-((x_values - 7.25) ** 2) / (2 * 0.018**2))
+    peak += 2.3 * np.exp(-((x_values - 1.15) ** 2) / (2 * 0.025**2))
+    ripple = 0.045 * np.sin(np.arange(x_values.size) * 1.7)
+    ripple += aromatic_mask * 0.16 * np.sin(np.arange(x_values.size) * 2.4)
+    points = [
+        (float(x), float(y))
+        for x, y in zip(x_values, peak + ripple, strict=True)
+    ]
+
+    smoothed, metadata = _smooth_fid_display_trace(points, nucleus="1H")
+
+    assert metadata["applied"] is True
+    assert metadata["display_only"] is True
+    assert metadata["aromatic_points_smoothed"] > 0
+    before_y = np.asarray([y for _x, y in points])
+    after_y = np.asarray([y for _x, y in smoothed])
+
+    def roughness(values: np.ndarray, mask: np.ndarray) -> float:
+        selected = values[mask]
+        return float(np.median(np.abs(np.diff(selected, n=2))))
+
+    aromatic_before = roughness(before_y, aromatic_mask)
+    aromatic_after = roughness(after_y, aromatic_mask)
+    aliphatic_mask = (x_values >= 0.6) & (x_values <= 2.0)
+    aliphatic_before = roughness(before_y, aliphatic_mask)
+    aliphatic_after = roughness(after_y, aliphatic_mask)
+
+    assert aromatic_after < aromatic_before * 0.4
+    assert aliphatic_after < aliphatic_before * 0.75
+    assert (aromatic_before - aromatic_after) > (aliphatic_before - aliphatic_after)
+    assert abs(float(x_values[np.argmax(before_y)]) - float(x_values[np.argmax(after_y)])) < 0.02
+
+
 def test_preserve_mode_does_not_change_points() -> None:
     points, _peak_only = _synthetic_cubic_baseline_points()
 
@@ -217,6 +306,8 @@ def test_raw_fid_processing_metadata_reports_auto_phase_and_bernstein_baseline()
     assert metadata.baseline_correction["baseline_correction"] == "bernstein"
     assert metadata.baseline_correction["baseline_order"] == 3
     assert metadata.baseline_correction["correction_applied"] is True
+    assert metadata.baseline_correction["post_baseline_polish"]["baseline_locked_to_zero"] is True
+    assert "qa_after" in metadata.baseline_correction["post_baseline_polish"]
     assert metadata.baseline_correction["flatness_qa"]
     assert report.metadata["baseline"]["mode"] == "bernstein"
     assert report.metadata["baseline"]["order"] == 3
@@ -224,6 +315,8 @@ def test_raw_fid_processing_metadata_reports_auto_phase_and_bernstein_baseline()
     assert report.metadata["baseline_qa"]
     assert report.metadata["original_spectrum_state"]["processing_stage"] == "post_fft_phase_pre_baseline"
     assert report.metadata["original_spectrum_state"]["preview_points_omitted"] is True
+    assert report.metadata["display_preprocessing"]["trace_smoothing"]["applied"] is True
+    assert report.metadata["display_preprocessing"]["trace_smoothing"]["display_only"] is True
     assert report.metadata["evidence_trace_mode"] == "raw_fid_fft_real_baseline_corrected"
 
 
@@ -259,26 +352,40 @@ def test_raw_fid_raw_preview_points_are_debug_only() -> None:
     assert "raw_preview_points" in debug.metadata
 
 
-def test_processed_uploaded_spectrum_does_not_baseline_correct_by_default() -> None:
+def test_processed_uploaded_spectrum_applies_default_baseline_and_display_smoothing() -> None:
     points, _peak_only = _synthetic_cubic_baseline_points()
 
     preview = parse_processed_spectrum(filename="processed.csv", content=_csv_trace(points))
 
-    assert [(p.shift_ppm, p.intensity) for p in preview.preview_points] == points
-    assert preview.metadata["processed_baseline_correction"]["correction_applied"] is False
-    assert preview.metadata["evidence_trace_mode"] == "uploaded_intensity"
+    assert [(p.shift_ppm, p.intensity) for p in preview.preview_points] != points
+    assert preview.metadata["processed_baseline_correction"]["order"] == 3
+    assert preview.metadata["processed_baseline_correction"]["correction_applied"] is True
+    assert (
+        preview.metadata["processed_baseline_correction"]["post_baseline_polish"]["baseline_locked_to_zero"]
+        is True
+    )
+    assert preview.metadata["display_preprocessing"]["trace_smoothing"]["applied"] is True
+    assert preview.metadata["display_preprocessing"]["trace_smoothing"]["display_only"] is True
+    assert preview.metadata["display"]["main_trace"] == "display_smoothed_evidence_intensity"
+    assert preview.metadata["evidence_trace_mode"] == "uploaded_intensity_baseline_corrected"
 
 
-def test_processed_uploaded_spectrum_applies_bernstein_only_when_explicit() -> None:
+def test_processed_uploaded_spectrum_can_preserve_baseline_when_explicit() -> None:
     points, _peak_only = _synthetic_cubic_baseline_points()
 
-    uncorrected = parse_processed_spectrum(filename="processed.csv", content=_csv_trace(points))
+    uncorrected = parse_processed_spectrum(
+        filename="processed.csv",
+        content=_csv_trace(points),
+        processed_baseline_correction="none",
+    )
     preview = parse_processed_spectrum(
         filename="processed.csv",
         content=_csv_trace(points),
         processed_baseline_correction="bernstein",
     )
 
+    assert uncorrected.metadata["processed_baseline_correction"]["correction_applied"] is False
+    assert uncorrected.metadata["evidence_trace_mode"] == "uploaded_intensity"
     assert [(p.shift_ppm, p.intensity) for p in preview.preview_points] != points
     assert preview.metadata["processed_baseline_correction"]["order"] == 3
     assert preview.metadata["processed_baseline_correction"]["correction_applied"] is True

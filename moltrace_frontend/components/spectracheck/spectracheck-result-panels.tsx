@@ -24,16 +24,19 @@ import {
   summarizeResult,
   type Summary,
 } from "@/components/spectracheck/spectracheck-summary"
+import { compactLargePayloadForDisplay } from "@/src/lib/spectracheck/compact-json"
 import type { SpectraCheckUnifiedEvidenceMeta } from "@/src/lib/spectracheck/evidence-enqueue"
 
 function DeveloperJsonPanelImpl({ data }: { data: unknown }) {
   const [open, setOpen] = useState(false)
-  // ``JSON.stringify`` of a large analyze payload is the most expensive
-  // operation in the Step-3 results card (tens of thousands of points +
-  // peaks + predicted overlay can take a few ms). Only build it when the
-  // details disclosure is open so the normal results view can settle as
-  // one stable interface with the spectrum.
-  const text = useMemo(() => (open ? JSON.stringify(data, null, 2) : ""), [data, open])
+  // ``JSON.stringify`` of a large analyze payload is expensive, and putting
+  // tens of thousands of x/y samples into a <pre> can make the dashboard
+  // blink while the DOM reconstructs. Keep the normal panel lazy, and compact
+  // only large arrays/strings when the reviewer explicitly opens it.
+  const text = useMemo(
+    () => (open ? JSON.stringify(compactLargePayloadForDisplay(data), null, 2) : ""),
+    [data, open],
+  )
   return (
     <details
       className="rounded-lg border bg-card p-4"
@@ -52,7 +55,7 @@ function DeveloperJsonPanelImpl({ data }: { data: unknown }) {
         >
           <InfoTooltip
             label="Developer JSON"
-            content="Raw API response JSON for debugging, audit trails, and reproducibility."
+            content="API response JSON for debugging, audit trails, and reproducibility. Large arrays are summarized to keep the dashboard responsive."
             className="size-4"
           />
         </span>

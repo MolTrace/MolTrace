@@ -46,7 +46,11 @@ export type TenantFeatureFlagRecord = {
 
 export type TenantModuleAccess = {
   key: "spectracheck" | "regulatory_hub" | "reaction_optimization"
-  label: "SpectraCheck" | "Regulatory Hub" | "Reaction Optimization"
+  // Display label union — "reaction_optimization" is shown as "ReactionIQ"
+  // on the Programs row (dashboard / tenant selector / mobile summary).
+  // The wire-side ``key`` remains "reaction_optimization" for entitlement /
+  // feature-flag stability.
+  label: "SpectraCheck" | "Regulatory Hub" | "ReactionIQ"
   enabled: boolean
 }
 
@@ -81,10 +85,17 @@ const LOCAL_TENANT: TenantRecord = {
   status: FALLBACK_TENANT_STATUS,
 }
 
+// Display labels for the three core MolTrace programs as they appear on the
+// dashboard "Programs" row, the tenant selector, and the mobile tenant
+// summary card. The ``key`` strings stay stable because they're used as
+// entitlement / feature-flag identifiers wire-side; only the human-readable
+// ``label`` is renamed. Keeping the rename here (rather than in each
+// renderer) guarantees the three places that show the modules on the same
+// line stay in lock-step.
 const CORE_MODULES: Omit<TenantModuleAccess, "enabled">[] = [
   { key: "spectracheck", label: "SpectraCheck" },
   { key: "regulatory_hub", label: "Regulatory Hub" },
-  { key: "reaction_optimization", label: "Reaction Optimization" },
+  { key: "reaction_optimization", label: "ReactionIQ" },
 ]
 
 const LOCAL_MODULE_ACCESS: TenantModuleAccess[] = CORE_MODULES.map((module) => ({

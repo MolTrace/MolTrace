@@ -17,6 +17,7 @@ import numpy as np
 
 from .baseline import (
     apply_bernstein_baseline_correction,
+    apply_signal_free_smooth_baseline_polish,
     apply_simple_baseline_correction,
     evaluate_baseline_flatness,
     normalize_baseline_mode,
@@ -40,6 +41,7 @@ from .spectrum import (
     _build_preserved_spectrum_state,
     _build_reference_guided_nmr_text,
     _build_spectrum_comparison,
+    _PREVIEW_DOWNSAMPLING_METHOD,
     _downsample_points,
     _estimates_to_peaks,
     _infer_peak_estimates,
@@ -47,6 +49,7 @@ from .spectrum import (
     _prepare_trace_display_points,
     _reference_assignments_to_peaks,
     _select_target_proton_count,
+    smooth_trace_display_points,
 )
 
 
@@ -1265,6 +1268,14 @@ def _baseline_correct_real(values: np.ndarray) -> np.ndarray:
     return corrected
 
 
+def _smooth_fid_display_trace(
+    points: list[tuple[float, float]],
+    *,
+    nucleus: str,
+) -> tuple[list[tuple[float, float]], dict[str, Any]]:
+    return smooth_trace_display_points(points, nucleus=nucleus)
+
+
 def _apply_fid_baseline_correction(
     points: list[tuple[float, float]],
     settings: FIDProcessingSettings,
@@ -1277,6 +1288,24 @@ def _apply_fid_baseline_correction(
             points,
             order=settings.baseline_order,
         )
+        if settings.auto_baseline and len(corrected) >= 32:
+            polished, polish_metadata, polish_warnings = apply_signal_free_smooth_baseline_polish(
+                corrected,
+            )
+            warnings.extend(note for note in polish_warnings if note not in warnings)
+            metadata["post_baseline_polish"] = polish_metadata
+            metadata["baseline_polish_applied"] = bool(polish_metadata.get("correction_applied"))
+            if polish_metadata.get("correction_applied"):
+                corrected = polished
+                metadata["correction_applied"] = True
+                metadata["baseline_locked_to_zero"] = True
+                flatness = polish_metadata.get("qa_after")
+                if isinstance(flatness, dict):
+                    metadata["qa"] = flatness
+                    metadata["flatness_qa"] = flatness
+                metadata["signal_free_fraction"] = polish_metadata.get("signal_free_fraction")
+                metadata["baseline_slope"] = polish_metadata.get("baseline_slope")
+                metadata["baseline_span"] = polish_metadata.get("baseline_span")
     else:
         corrected, metadata, warnings = apply_simple_baseline_correction(points, mode=mode)
     metadata.setdefault("mode", mode)
@@ -1782,6 +1811,11 @@ def _metadata_from_preview(
             "signal_free_fraction": (baseline_correction_detail or {}).get("signal_free_fraction"),
             "baseline_slope": (baseline_correction_detail or {}).get("baseline_slope"),
             "baseline_span": (baseline_correction_detail or {}).get("baseline_span"),
+            "baseline_polish_applied": (baseline_correction_detail or {}).get(
+                "baseline_polish_applied",
+                False,
+            ),
+            "post_baseline_polish": (baseline_correction_detail or {}).get("post_baseline_polish"),
             "flatness_qa": (baseline_correction_detail or {}).get("flatness_qa"),
             "warnings": (baseline_correction_detail or {}).get("warnings", []),
         },
@@ -2077,6 +2111,26 @@ def process_bruker_1d_zip(
             nucleus=nucleus_label,
             baseline_already_corrected=settings.auto_baseline,
         )
+        if settings.auto_baseline:
+            display_points, trace_smoothing_meta = _smooth_fid_display_trace(
+                display_points,
+                nucleus=nucleus_label,
+            )
+        else:
+            trace_smoothing_meta = {
+                "applied": False,
+                "display_only": True,
+                "evidence_trace_preserved": True,
+                "method": "none",
+                "reason": "auto_baseline_disabled",
+            }
+        display_meta["trace_smoothing"] = trace_smoothing_meta
+        if trace_smoothing_meta.get("applied"):
+            display_meta["note"] = (
+                "Raw FID preview points use display-only trace smoothing after "
+                "autophasing and baseline correction. Peak picking and evidence "
+                "scoring use the corrected unsmoothed evidence trace."
+            )
         warnings.extend(note for note in display_notes if note not in warnings)
         normalized_display_mode = settings.display_mode
         if normalized_display_mode == "magnifier":
@@ -2303,7 +2357,7 @@ def process_bruker_1d_zip(
                 "display_gain": float(settings.vertical_gain),
                 "baseline_lock_visual_only": bool(settings.baseline_lock_visual_only),
                 "preview_downsampling": {
-                    "method": "min_max_bucket_extrema_preserving",
+                    "method": _PREVIEW_DOWNSAMPLING_METHOD,
                     "point_limit": settings.max_preview_points,
                     "source_point_count": len(points),
                 },
@@ -2312,10 +2366,15 @@ def process_bruker_1d_zip(
                     "gain": float(settings.vertical_gain),
                     "vertical_gain": float(settings.vertical_gain),
                     "baseline_lock_visual_only": bool(settings.baseline_lock_visual_only),
-                    "main_trace": "original_evidence_intensity",
+                    "main_trace": (
+                        "display_smoothed_evidence_intensity"
+                        if trace_smoothing_meta.get("applied")
+                        else "original_evidence_intensity"
+                    ),
+                    "trace_smoothing": trace_smoothing_meta,
                     "weak_peak_magnifier": normalized_display_mode == "magnifier",
                     "downsampling": {
-                        "method": "min_max_bucket_extrema_preserving",
+                        "method": _PREVIEW_DOWNSAMPLING_METHOD,
                         "point_limit": settings.max_preview_points,
                     },
                 },

@@ -88,7 +88,7 @@ def test_invalid_13c_csv_rejected() -> None:
         )
 
 
-def test_processed_13c_trace_preserves_real_intensities_and_masks_only_for_peak_picking() -> None:
+def test_processed_13c_trace_applies_baseline_and_masks_only_for_peak_picking() -> None:
     rows = ["ppm,intensity"]
     for idx in range(601):
         x = 120.0 - idx * 0.2
@@ -106,8 +106,16 @@ def test_processed_13c_trace_preserves_real_intensities_and_masks_only_for_peak_
 
     preprocessing = preview.metadata["display_preprocessing"]
     assert preprocessing["baseline_smoothing"]["applied"] is False
+    assert preprocessing["trace_smoothing"]["applied"] is True
+    assert preprocessing["trace_smoothing"]["display_only"] is True
     assert preprocessing["display_solvent_masked"] is False
-    assert preview.metadata["evidence_trace_mode"] == "uploaded_intensity"
+    assert preview.metadata["processed_baseline_correction"]["correction_applied"] is True
+    assert (
+        preview.metadata["processed_baseline_correction"]["post_baseline_polish"]["baseline_locked_to_zero"]
+        is True
+    )
+    assert preview.metadata["evidence_trace_mode"] == "uploaded_intensity_baseline_corrected"
+    assert preview.metadata["display"]["main_trace"] == "display_smoothed_evidence_intensity"
     assert preview.metadata["display_mode"] == "real"
     assert preview.metadata["baseline_lock_visual_only"] is True
     assert "raw_preview_points" not in preview.metadata
@@ -155,6 +163,9 @@ def test_processed_13c_aromatic_region_resolves_on_curved_baseline() -> None:
     assert len(aromatic_peaks) >= 5
     assert max(baseline_points) - min(baseline_points) > 0.0
     assert preview.metadata["display_preprocessing"]["baseline_smoothing"]["baseline_locked_to_zero"] is False
+    assert preview.metadata["display_preprocessing"]["trace_smoothing"]["applied"] is True
+    assert preview.metadata["display_preprocessing"]["trace_smoothing"]["aromatic_points_smoothed"] > 0
+    assert preview.metadata["processed_baseline_correction"]["correction_applied"] is True
     assert preview.metadata["display_mode"] == "real"
 
 

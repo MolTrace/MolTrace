@@ -22,6 +22,10 @@ import {
   plotColorForCategory,
 } from "@/src/lib/spectracheck/peak-category-style"
 import {
+  combineSpectrumYRanges,
+  robustSpectrumYRange,
+} from "@/src/lib/spectracheck/spectrum-axis"
+import {
   ArrowLeft,
   ArrowRight,
   Droplets,
@@ -76,7 +80,9 @@ export type SpectrumViewerProps = {
 }
 
 const DISPLAY_Y_CAP = 1e120
-const MAX_OBSERVED_TRACE_POINTS = 2_400
+const MIN_VIEWPORT_TRACE_POINTS = 1_000
+const MAX_VIEWPORT_TRACE_POINTS = 3_000
+const VIEWPORT_POINTS_PER_PIXEL = 2
 const MAX_OVERLAY_TRACE_POINTS = 1_800
 
 /** Exponential mapping: slider 0..1 → multiplier 1..50000. */
@@ -186,54 +192,6 @@ function detectDominantPeakRange(
   }
 }
 
-/**
- * Robust absolute-value maximum for NMR display y-range.
- *
- * Plain ``max(|y|)`` is dominated by the residual-solvent / water peak that
- * sits 3-6 orders of magnitude above the analyte signal. Using it as the
- * y-axis ceiling compresses the actual spectrum into a single pixel above
- * the baseline. We pick the 99th-percentile instead, multiplied by 1.2 to
- * give the typical peaks a little headroom. The dominant peak then clips
- * cleanly at the top of the chart — that's standard NMR display behaviour.
- *
- * Edge cases:
- *  - Empty input → 1 (so callers can always use the value as a divisor).
- *  - All-equal input → that value (no compression).
- *  - Fewer than 100 samples → fall back to the true max (the percentile
- *    isn't statistically meaningful below that threshold).
- */
-function robustMaxAbs(values: ArrayLike<number>): number {
-  const n = values.length
-  if (n === 0) return 1
-  if (n < 100) {
-    let m = 0
-    for (let i = 0; i < n; i++) {
-      const v = values[i]
-      if (!Number.isFinite(v)) continue
-      const abs = v < 0 ? -v : v
-      if (abs > m) m = abs
-    }
-    return m || 1
-  }
-  // Copy into a typed array of absolute values and sort. O(n log n) once
-  // per data update — well below the cost of a re-render.
-  const abs = new Float64Array(n)
-  let count = 0
-  for (let i = 0; i < n; i++) {
-    const v = values[i]
-    if (!Number.isFinite(v)) continue
-    abs[count++] = v < 0 ? -v : v
-  }
-  if (count === 0) return 1
-  const slice = abs.subarray(0, count)
-  // In-place sort via .sort() needs a regular Array; we copy once.
-  const arr = Array.from(slice)
-  arr.sort((a, b) => a - b)
-  const idx = Math.min(arr.length - 1, Math.floor(arr.length * 0.99))
-  const p99 = arr[idx]
-  return p99 > 0 ? p99 * 1.2 : (arr[arr.length - 1] || 1)
-}
-
 function nearestYAtPpm(x: number[], yDisplay: number[], ppm: number): number {
   if (x.length === 0) return 0
   let best = 0
@@ -252,6 +210,7 @@ export type SampledSpectrumTrace = {
   x: number[]
   y: number[]
   sampled: boolean
+  method: "none" | "viewport_min_max_lttb"
   sourceLength: number
   visibleLength: number
   meanBinSize: number | null
@@ -265,6 +224,39 @@ type SampleSpectrumTraceOptions = {
 
 function isMaskedIndex(index: number, maskRange: { startIndex: number; endIndex: number } | null | undefined) {
   return Boolean(maskRange && index >= maskRange.startIndex && index <= maskRange.endIndex)
+}
+
+function finiteUnmaskedY(y: number[], index: number, maskRange: { startIndex: number; endIndex: number } | null | undefined) {
+  if (isMaskedIndex(index, maskRange)) return null
+  const value = y[index]
+  return Number.isFinite(value) ? value : null
+}
+
+function averageBucketPoint(
+  x: number[],
+  y: number[],
+  visibleIndices: number[],
+  start: number,
+  end: number,
+  maskRange: { startIndex: number; endIndex: number } | null | undefined,
+): { x: number; y: number } {
+  let sx = 0
+  let sy = 0
+  let count = 0
+  for (let i = start; i < end; i++) {
+    const index = visibleIndices[i]
+    const yv = finiteUnmaskedY(y, index, maskRange)
+    const xv = x[index]
+    if (yv == null || !Number.isFinite(xv)) continue
+    sx += xv
+    sy += yv
+    count++
+  }
+  if (count === 0) {
+    const fallbackIndex = visibleIndices[Math.max(0, Math.min(visibleIndices.length - 1, start))] ?? 0
+    return { x: x[fallbackIndex] ?? 0, y: finiteUnmaskedY(y, fallbackIndex, maskRange) ?? 0 }
+  }
+  return { x: sx / count, y: sy / count }
 }
 
 /**
@@ -282,14 +274,22 @@ export function sampleSpectrumTraceForPlot(
 ): SampledSpectrumTrace {
   const sourceLength = Math.min(x.length, y.length)
   if (sourceLength === 0) {
-    return { x: [], y: [], sampled: false, sourceLength, visibleLength: 0, meanBinSize: null }
+    return {
+      x: [],
+      y: [],
+      sampled: false,
+      method: "none",
+      sourceLength,
+      visibleLength: 0,
+      meanBinSize: null,
+    }
   }
 
   const hasRange = xRange != null
   const hasMask = maskRange != null
   const clampedMaxPoints = Math.max(4, maxPoints)
   if (!hasRange && !hasMask && sourceLength <= clampedMaxPoints) {
-    return { x, y, sampled: false, sourceLength, visibleLength: sourceLength, meanBinSize: null }
+    return { x, y, sampled: false, method: "none", sourceLength, visibleLength: sourceLength, meanBinSize: null }
   }
 
   const low = hasRange ? Math.min(xRange[0], xRange[1]) : Number.NEGATIVE_INFINITY
@@ -304,7 +304,15 @@ export function sampleSpectrumTraceForPlot(
 
   const visibleLength = visibleIndices.length
   if (visibleLength === 0) {
-    return { x: [], y: [], sampled: false, sourceLength, visibleLength: 0, meanBinSize: null }
+    return {
+      x: [],
+      y: [],
+      sampled: false,
+      method: "none",
+      sourceLength,
+      visibleLength: 0,
+      meanBinSize: null,
+    }
   }
 
   if (visibleLength <= clampedMaxPoints) {
@@ -318,6 +326,7 @@ export function sampleSpectrumTraceForPlot(
       x: sx,
       y: sy,
       sampled: false,
+      method: "none",
       sourceLength,
       visibleLength,
       meanBinSize: null,
@@ -336,7 +345,9 @@ export function sampleSpectrumTraceForPlot(
   }
 
   addPoint(visibleIndices[0])
-  const bucketCount = Math.max(1, Math.floor((clampedMaxPoints - 2) / 2))
+  let anchorIndex = visibleIndices.find((index) => finiteUnmaskedY(y, index, maskRange) != null) ?? visibleIndices[0]
+  const pointSlotsPerBucket = hasMask ? 4 : 3
+  const bucketCount = Math.max(1, Math.floor((clampedMaxPoints - 2) / pointSlotsPerBucket))
   const meanBinSize = visibleLength / bucketCount
   for (let bucket = 0; bucket < bucketCount; bucket++) {
     const start = Math.floor((bucket * visibleLength) / bucketCount)
@@ -344,11 +355,21 @@ export function sampleSpectrumTraceForPlot(
       visibleLength,
       Math.max(start + 1, Math.floor(((bucket + 1) * visibleLength) / bucketCount)),
     )
+    const nextStart = Math.min(visibleLength - 1, end)
+    const nextEnd = Math.min(
+      visibleLength,
+      Math.max(nextStart + 1, Math.floor(((bucket + 2) * visibleLength) / bucketCount)),
+    )
+    const nextAvg = averageBucketPoint(x, y, visibleIndices, nextStart, nextEnd, maskRange)
+    const ax = x[anchorIndex] ?? 0
+    const ay = finiteUnmaskedY(y, anchorIndex, maskRange) ?? 0
     let minIndex = -1
     let maxIndex = -1
+    let lttbIndex = -1
     let maskIndex = -1
     let minY = Number.POSITIVE_INFINITY
     let maxY = Number.NEGATIVE_INFINITY
+    let maxArea = Number.NEGATIVE_INFINITY
 
     for (let j = start; j < end; j++) {
       const index = visibleIndices[j]
@@ -357,7 +378,8 @@ export function sampleSpectrumTraceForPlot(
         continue
       }
       const yv = y[index]
-      if (!Number.isFinite(yv)) continue
+      const xv = x[index]
+      if (!Number.isFinite(yv) || !Number.isFinite(xv)) continue
       if (yv < minY) {
         minY = yv
         minIndex = index
@@ -366,16 +388,36 @@ export function sampleSpectrumTraceForPlot(
         maxY = yv
         maxIndex = index
       }
+      const area = Math.abs((ax - nextAvg.x) * (yv - ay) - (ax - xv) * (nextAvg.y - ay))
+      if (area > maxArea) {
+        maxArea = area
+        lttbIndex = index
+      }
     }
 
-    const bucketIndices = Array.from(new Set([minIndex, maxIndex, maskIndex]))
+    const bucketIndices = Array.from(new Set([minIndex, maxIndex, lttbIndex, maskIndex]))
       .filter((index) => index >= 0)
       .sort((a, b) => a - b)
     for (const index of bucketIndices) addPoint(index)
+    for (let i = bucketIndices.length - 1; i >= 0; i--) {
+      const index = bucketIndices[i]
+      if (finiteUnmaskedY(y, index, maskRange) != null) {
+        anchorIndex = index
+        break
+      }
+    }
   }
   addPoint(visibleIndices[visibleLength - 1])
 
-  return { x: sx, y: sy, sampled: true, sourceLength, visibleLength, meanBinSize }
+  return {
+    x: sx,
+    y: sy,
+    sampled: true,
+    method: "viewport_min_max_lttb",
+    sourceLength,
+    visibleLength,
+    meanBinSize,
+  }
 }
 
 function formatSampleBinSize(value: number): string {
@@ -418,6 +460,8 @@ function SpectrumViewerImpl({
   // yZoom is a discrete-step companion to gain01. Both multiply sampled y values so peaks visibly grow.
   const [yZoom, setYZoom] = useState(1)
   const [moveMode, setMoveMode] = useState(false)
+  const chartPaneRef = useRef<HTMLDivElement | null>(null)
+  const [plotPixelWidth, setPlotPixelWidth] = useState(1_200)
   // Detect the runaway peak ONCE on the raw input (gain-independent). The
   // detector returns null when no peak is more than MASK_DOMINANCE_RATIO×P95.
   const dominantPeakRange = useMemo(
@@ -425,19 +469,49 @@ function SpectrumViewerImpl({
     [x, y],
   )
 
+  // Tie the resampling target to the actual rendered viewport, not the raw
+  // spectrum length. This is the React/Plotly equivalent of plotly-resampler's
+  // callback budget: a 600 px chart gets ~1200 points, a wide chart tops out
+  // at 3000. Resize updates are coarse-grained so scrolling sibling panels
+  // cannot thrash Plotly with tiny width oscillations.
+  useEffect(() => {
+    const el = chartPaneRef.current
+    if (!el || typeof ResizeObserver === "undefined") return
+    let raf = 0
+    const commitWidth = (width: number) => {
+      const rounded = Math.max(320, Math.round(width))
+      setPlotPixelWidth((current) => (Math.abs(current - rounded) >= 48 ? rounded : current))
+    }
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width
+      if (!Number.isFinite(width)) return
+      window.cancelAnimationFrame(raf)
+      raf = window.requestAnimationFrame(() => commitWidth(width))
+    })
+    observer.observe(el)
+    commitWidth(el.getBoundingClientRect().width)
+    return () => {
+      window.cancelAnimationFrame(raf)
+      observer.disconnect()
+    }
+  }, [])
+
   /**
-   * yMax is anchored to the BASELINE (un-scaled) source data. This is the
-   * critical fix: when gain or yZoom go up, plotted y values increase but
-   * yMax stays fixed, so the rendered peaks visibly grow taller within the
-   * plot area (instead of the y-axis just rescaling its labels).
-   * Tall peaks may clip at the top — that's standard NMR display behavior.
+   * The y-axis range is anchored to the BASELINE (un-scaled) source data. When
+   * gain or yZoom go up, plotted y values increase but the range stays fixed,
+   * so peaks visibly grow taller instead of Plotly rescaling the labels.
+   *
+   * The lower bound is as important as the upper bound: raw/processed spectra
+   * routinely have small negative baseline excursions. A [0, yMax] axis chops
+   * the base of those peaks, which makes the preview look truncated rather
+   * than like a real spectrum.
    */
-  const { xMin, xMax, yMax } = useMemo(() => {
+  const { xMin, xMax, yMin, yMax } = useMemo(() => {
     // Single-pass iterative scan. Replaces Math.min/max(...spread) — the spread
     // operator hits the JS argument-count limit on long arrays (~50k+ items)
     // and throws RangeError, freezing the spectrum render entirely.
     if (x.length === 0) {
-      return { xMin: 0, xMax: 1, yMax: 1 }
+      return { xMin: 0, xMax: 1, yMin: -1, yMax: 1 }
     }
     let xLo = Number.POSITIVE_INFINITY
     let xHi = Number.NEGATIVE_INFINITY
@@ -452,12 +526,13 @@ function SpectrumViewerImpl({
       xHi = 1
     }
 
-    // Robust y-max — NMR spectra usually have one dominant peak (residual
+    // Robust y-range — NMR spectra usually have one dominant peak (residual
     // solvent / water) that's many orders of magnitude above everything
-    // else. Anchoring yMax to the global max squashes the entire useful
-    // spectrum into 1 pixel of vertical space. The 99th-percentile of |y|
-    // (with a sane lower bound) keeps the typical peaks visible while the
-    // dominant peak clips off the top — standard NMR display behaviour.
+    // else. Anchoring the upper limit to the global max squashes the useful
+    // spectrum into 1 pixel of vertical space, while anchoring the lower
+    // limit to 0 chops baseline/noise below zero. Robust quantiles keep the
+    // typical trace visible while the dominant peak clips off the top —
+    // standard NMR display behaviour.
     //
     // When the mask is active, build a copy of ``y`` that skips the masked
     // region before computing the percentile, so the y-axis is anchored to
@@ -471,16 +546,17 @@ function SpectrumViewerImpl({
       }
       baselineY = filtered
     }
-    const obsBaseline = robustMaxAbs(baselineY)
-    let predBaseline = 0
+    const ranges = [robustSpectrumYRange(baselineY)]
     if (showPredicted && overlays?.predicted) {
-      predBaseline = robustMaxAbs(overlays.predicted.y)
+      ranges.push(robustSpectrumYRange(overlays.predicted.y))
     }
+    const yRange = combineSpectrumYRanges(ranges)
 
     return {
       xMin: xLo,
       xMax: xHi,
-      yMax: Math.max(obsBaseline, predBaseline, 1),
+      yMin: yRange.yMin,
+      yMax: yRange.yMax,
     }
   }, [x, y, overlays, showPredicted, maskDominantPeak, dominantPeakRange])
 
@@ -498,15 +574,31 @@ function SpectrumViewerImpl({
     () => (xRange ? ([effectiveXMin, effectiveXMax] as const) : null),
     [xRange, effectiveXMin, effectiveXMax],
   )
+  const observedPointBudget = useMemo(
+    () =>
+      Math.max(
+        MIN_VIEWPORT_TRACE_POINTS,
+        Math.min(MAX_VIEWPORT_TRACE_POINTS, Math.round(plotPixelWidth * VIEWPORT_POINTS_PER_PIXEL)),
+      ),
+    [plotPixelWidth],
+  )
+  const overlayPointBudget = useMemo(
+    () =>
+      Math.max(
+        800,
+        Math.min(MAX_OVERLAY_TRACE_POINTS, Math.round(plotPixelWidth * 1.35)),
+      ),
+    [plotPixelWidth],
+  )
   const displayScale = useMemo(() => gainMultiplier(gain01) * yZoom, [gain01, yZoom])
   const observedSample = useMemo(
     () =>
       sampleSpectrumTraceForPlot(x, y, {
-        maxPoints: MAX_OBSERVED_TRACE_POINTS,
+        maxPoints: observedPointBudget,
         xRange: visibleXRange,
         maskRange: maskDominantPeak ? dominantPeakRange : null,
       }),
-    [x, y, visibleXRange, maskDominantPeak, dominantPeakRange],
+    [x, y, observedPointBudget, visibleXRange, maskDominantPeak, dominantPeakRange],
   )
   const observedDisplayY = useMemo(
     () => Array.from(observedSample.y, (v) => scaleDisplayYValue(v, displayScale)),
@@ -517,29 +609,63 @@ function SpectrumViewerImpl({
       return null
     }
     return sampleSpectrumTraceForPlot(overlays.predicted.x, overlays.predicted.y, {
-      maxPoints: MAX_OVERLAY_TRACE_POINTS,
+      maxPoints: overlayPointBudget,
       xRange: visibleXRange,
     })
-  }, [overlays, visibleXRange])
+  }, [overlays, overlayPointBudget, visibleXRange])
   const displayPred = useMemo(() => {
     if (!predictedSample) return null
     return Array.from(predictedSample.y, (v) => scaleDisplayYValue(v, displayScale))
   }, [predictedSample, displayScale])
   const predictedLabel = overlays?.predicted?.label ?? "Predicted"
+  const peakDisplayPoints = useMemo(
+    () =>
+      showPeaks
+        ? peaks.map((p) => ({
+            ppm: p.ppm,
+            y:
+              p.intensity != null
+                ? scaleDisplayYValue(p.intensity, displayScale)
+                : scaleDisplayYValue(nearestYAtPpm(x, y, p.ppm), displayScale),
+            label: p.label ?? "",
+            category: p.category ?? "unknown",
+          }))
+        : [],
+    [showPeaks, peaks, displayScale, x, y],
+  )
+  const peakGuideShapes = useMemo(
+    () =>
+      peakDisplayPoints
+        .filter((p) => Number.isFinite(p.ppm) && Number.isFinite(p.y))
+        .map((p) => ({
+          type: "line",
+          xref: "x",
+          yref: "y",
+          x0: p.ppm,
+          x1: p.ppm,
+          y0: 0,
+          y1: p.y,
+          line: { width: 1, color: "rgba(120, 120, 120, 0.45)" },
+          layer: "below",
+        })),
+    [peakDisplayPoints],
+  )
 
   /**
    * Plotly data traces. Three potential layers:
    *  - Observed line (always)
    *  - Predicted overlay (when an ``overlays.predicted`` payload is passed)
    *  - Peak markers (when peak annotations exist and the user hasn't hidden them)
+   *    Peak guide/drop-lines are layout shapes, not data traces, so Plotly's
+   *    trace-index diff stays stable even when peak annotations change.
    *
    * Critical for non-shaky rendering:
    *  - Trace type ``scatter`` uses SVG instead of WebGL. The spectrum is
    *    already downsampled before Plotly sees it, and avoiding WebGL prevents
    *    scroll-time canvas/layer flicker in the large analysis result card.
-   *  - The observed / predicted arrays are min-max downsampled before Plotly
-   *    sees them, preserving narrow peaks without forcing WebGL to diff a
-   *    million-point trace on each React commit.
+   *  - The observed / predicted arrays are viewport-limited with a
+   *    MinMaxLTTB envelope before Plotly sees them, preserving narrow peaks
+   *    without forcing WebGL to diff a million-point trace on each React commit.
    *  - ``observedDisplayY`` is already gain-scaled AND mask-aware (NaN values
    *    where the dominant solvent peak should be hidden); Plotly draws NaN as a gap.
    *  - The array references are stabilised by the upstream ``useMemo`` chain,
@@ -575,50 +701,19 @@ function SpectrumViewerImpl({
         opacity: 0.85,
       })
     }
-    if (showPeaks && peaks.length > 0) {
-      // Compute display intensity once per peak — reused by the drop-line
-      // segment (baseline → peak top) AND the marker glyph so they stay
-      // perfectly aligned through every gain change.
-      const peakY = peaks.map((p) =>
-        p.intensity != null
-          ? scaleDisplayYValue(p.intensity, displayScale)
-          : scaleDisplayYValue(nearestYAtPpm(x, y, p.ppm), displayScale),
-      )
-
-      // Drop-lines: one vertical segment per peak from y=0 up to peakY[i].
-      // Plotly draws this as a single scatter trace with NaN-separated
-      // segments — cheaper than ``layout.shapes`` because the trace is
-      // re-rendered through Plotly's existing data diff and respects the
-      // gain-driven y scale without explicit layout invalidation.
-      const dropX: (number | null)[] = []
-      const dropY: (number | null)[] = []
-      for (let i = 0; i < peaks.length; i++) {
-        dropX.push(peaks[i].ppm, peaks[i].ppm, null)
-        dropY.push(0, peakY[i], null)
-      }
-      traces.push({
-        type: "scatter",
-        mode: "lines",
-        x: dropX,
-        y: dropY,
-        name: "Peak markers",
-        showlegend: false,
-        hoverinfo: "skip",
-        line: { width: 1, color: "rgba(120, 120, 120, 0.45)" },
-      })
-
+    if (peakDisplayPoints.length > 0) {
       // Group peaks by category so each category renders as its own colored
       // scatter trace — gives the user a one-glance grouping (aromatic vs
       // aliphatic vs labile) AND a working legend they can toggle.
       // Peaks without a category fall through to the default orange.
       type Bucket = { px: number[]; py: number[]; labels: string[] }
       const byCategory = new Map<string, Bucket>()
-      for (let i = 0; i < peaks.length; i++) {
-        const cat = peaks[i].category ?? "unknown"
+      for (const peak of peakDisplayPoints) {
+        const cat = peak.category
         const bucket = byCategory.get(cat) ?? { px: [], py: [], labels: [] }
-        bucket.px.push(peaks[i].ppm)
-        bucket.py.push(peakY[i])
-        bucket.labels.push(peaks[i].label ?? "")
+        bucket.px.push(peak.ppm)
+        bucket.py.push(peak.y)
+        bucket.labels.push(peak.label)
         byCategory.set(cat, bucket)
       }
       // Render in a stable order so the legend doesn't reshuffle on every
@@ -652,12 +747,8 @@ function SpectrumViewerImpl({
     displayPred,
     predictedSample,
     predictedLabel,
-    peaks,
-    showPeaks,
+    peakDisplayPoints,
     showPredicted,
-    displayScale,
-    x,
-    y,
   ])
 
   /**
@@ -666,15 +757,16 @@ function SpectrumViewerImpl({
    *   1. ``uirevision: "spectrum"`` — Plotly keeps pan/zoom/drag state
    *      across data updates instead of resetting to autorange every
    *      time. [Mnova §3 Mouse Scroll]
-   *   2. Y-axis ``range`` is anchored to a stable ``yMax`` (the robust
-   *      99-th percentile, computed from the RAW input). Gain/yZoom
-   *      ticks therefore do NOT change layout, only ``data`` trace
-   *      values — i.e. "vertical-zoom does NOT re-trigger Fit to height"
+   *   2. Y-axis ``range`` is anchored to a stable robust source-data range
+   *      with bottom padding. Gain/yZoom ticks therefore do NOT change the
+   *      axis range, only ``data`` trace values and lightweight guide-line
+   *      shapes — i.e. "vertical-zoom does NOT re-trigger Fit to height"
    *      [Mnova §3 Mass Preferences].
    *
-   * Layout deps deliberately depend only on PRIMITIVES so a sibling re-
-   * render that hands us a fresh-but-equal ``overlays`` object reference
-   * doesn't invalidate the layout and trigger a Plotly redraw.
+   * Layout deps deliberately depend on primitives plus the precomputed
+   * shape overlay, so a sibling re-render that hands us a fresh-but-equal
+   * ``overlays`` object reference doesn't invalidate the layout and trigger
+   * a Plotly redraw.
    */
   const hasPredictedOverlay = Boolean(overlays?.predicted && showPredicted)
   const hasPeakMarkers = showPeaks && peaks.length > 0
@@ -710,16 +802,20 @@ function SpectrumViewerImpl({
       },
       yaxis: {
         title: yLabel,
-        // Anchored to the robust max — the dominant solvent peak (if any)
-        // clips at the top, the analyte signal occupies the visible range.
-        range: [0, yMax],
-        zeroline: false,
+        // Anchored to the robust source range — the baseline stays visible
+        // instead of being clipped at y=0, and dominant solvent peaks can
+        // still clip at the top like a standard NMR display.
+        range: [yMin, yMax],
+        zeroline: true,
+        zerolinecolor: "rgba(100, 116, 139, 0.45)",
+        zerolinewidth: 1,
         fixedrange: true,
       },
       // Hover crosshair OFF — every mouse move was firing Plotly's hover
       // detector, which on dense traces (>10 k points) re-painted the
       // overlay each frame. That was the visible flicker.
       hovermode: false,
+      shapes: peakGuideShapes,
       transition: { duration: 0 },
       uirevision: "spectrum",
     }),
@@ -730,9 +826,11 @@ function SpectrumViewerImpl({
       xRange,
       effectiveXMin,
       effectiveXMax,
+      yMin,
       yMax,
       hasPredictedOverlay,
       hasPeakMarkers,
+      peakGuideShapes,
     ],
   )
 
@@ -904,6 +1002,7 @@ function SpectrumViewerImpl({
       >
         {/* Chart pane — fills the available container height. */}
         <div
+          ref={chartPaneRef}
           className={cn(
             "relative min-h-0 flex-1",
             moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-default",
