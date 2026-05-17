@@ -10,6 +10,7 @@ from typing import Any
 
 from .baseline import (
     apply_bernstein_baseline_correction,
+    apply_signal_free_smooth_baseline_polish,
     apply_simple_baseline_correction,
     evaluate_baseline_flatness,
     normalize_baseline_mode,
@@ -29,6 +30,13 @@ from .nmr_tables import solvent_windows
 from .parser import ReferencePeakAssignment, normalize_multiplicity, normalize_nmr_text, parse_j_values_hz, parse_reference_nmr_text
 
 _FLOAT_RE = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
+_PREVIEW_DOWNSAMPLING_METHOD = "min_max_lttb_envelope"
+_PROCESSED_DISPLAY_DOWNSAMPLING_METHOD = "min_max_bucket_extrema_preserving"
+
+try:  # Optional C fast path; the pure-Python fallback below is deterministic.
+    import lttbc as _lttbc
+except Exception:  # pragma: no cover - exercised only when optional wheel is absent.
+    _lttbc = None
 
 
 class SpectrumParseError(ValueError):
@@ -89,6 +97,95 @@ def _safe_float(value: str | None) -> float | None:
         return None
 
 
+def _lttbc_selected_positions(clean: list[tuple[float, float, int]], target: int) -> list[int]:
+    if _lttbc is None or target < 3 or len(clean) <= target:
+        return []
+    try:
+        sampled_x, sampled_y = _lttbc.downsample(
+            [point[0] for point in clean],
+            [point[1] for point in clean],
+            min(target, len(clean)),
+        )
+    except Exception:
+        return []
+
+    positions_by_value: dict[tuple[float, float], list[int]] = {}
+    for position, (x, y, _) in enumerate(clean):
+        positions_by_value.setdefault((x, y), []).append(position)
+
+    cursors: dict[tuple[float, float], int] = {}
+    selected: list[int] = []
+    last_position = -1
+    for x_raw, y_raw in zip(sampled_x, sampled_y, strict=False):
+        key = (float(x_raw), float(y_raw))
+        positions = positions_by_value.get(key)
+        if not positions:
+            continue
+        cursor = cursors.get(key, 0)
+        while cursor < len(positions) and positions[cursor] <= last_position:
+            cursor += 1
+        if cursor >= len(positions):
+            continue
+        position = positions[cursor]
+        selected.append(position)
+        last_position = position
+        cursors[key] = cursor + 1
+    return selected
+
+
+def _average_clean_point(clean: list[tuple[float, float, int]], start: int, stop: int) -> tuple[float, float]:
+    sx = 0.0
+    sy = 0.0
+    count = 0
+    for idx in range(max(0, start), min(stop, len(clean))):
+        sx += clean[idx][0]
+        sy += clean[idx][1]
+        count += 1
+    if count == 0:
+        fallback = clean[min(max(start, 0), len(clean) - 1)]
+        return fallback[0], fallback[1]
+    return sx / count, sy / count
+
+
+def _python_lttb_position(
+    clean: list[tuple[float, float, int]],
+    *,
+    start: int,
+    stop: int,
+    next_start: int,
+    next_stop: int,
+    anchor_position: int,
+) -> int | None:
+    if start >= stop:
+        return None
+    anchor_x, anchor_y, _ = clean[anchor_position]
+    next_avg_x, next_avg_y = _average_clean_point(clean, next_start, next_stop)
+    best_position: int | None = None
+    best_area = -1.0
+    for position in range(start, stop):
+        x, y, _ = clean[position]
+        area = abs((anchor_x - next_avg_x) * (y - anchor_y) - (anchor_x - x) * (next_avg_y - anchor_y))
+        if area > best_area:
+            best_area = area
+            best_position = position
+    return best_position
+
+
+def _trim_selected_downsample_points(
+    ordered: list[tuple[float, float, int]],
+    *,
+    limit: int,
+) -> list[tuple[float, float, int]]:
+    if len(ordered) <= limit:
+        return ordered
+    if limit <= 2:
+        return ordered[:limit]
+    endpoints = [ordered[0], ordered[-1]]
+    interior = ordered[1:-1]
+    strongest = sorted(interior, key=lambda item: abs(item[1]), reverse=True)[: max(0, limit - 2)]
+    return [endpoints[0], *sorted(strongest, key=lambda item: item[2]), endpoints[1]]
+
+
 def _downsample_points(points: list[tuple[float, float]], limit: int = 700) -> list[SpectrumPoint]:
     if not points:
         return []
@@ -101,12 +198,14 @@ def _downsample_points(points: list[tuple[float, float]], limit: int = 700) -> l
     if len(clean) <= limit:
         return [SpectrumPoint(shift_ppm=x, intensity=y) for x, y, _ in clean]
     safe_limit = max(3, int(limit))
-    bucket_count = max(1, (safe_limit - 2) // 2)
+    bucket_count = max(1, (safe_limit - 2) // 3)
     bucket_size = (len(clean) - 2) / bucket_count
     selected: dict[int, tuple[float, float, int]] = {
         clean[0][2]: clean[0],
         clean[-1][2]: clean[-1],
     }
+    use_python_lttb = _lttbc is None
+    anchor_position = 0
     for bucket_idx in range(bucket_count):
         start = 1 + int(math.floor(bucket_idx * bucket_size))
         end = 1 + int(math.floor((bucket_idx + 1) * bucket_size))
@@ -123,6 +222,106 @@ def _downsample_points(points: list[tuple[float, float]], limit: int = 700) -> l
                 max_point = item
         selected[min_point[2]] = min_point
         selected[max_point[2]] = max_point
+        if use_python_lttb:
+            next_start = 1 + int(math.floor((bucket_idx + 1) * bucket_size))
+            next_stop = max(
+                next_start + 1,
+                min(1 + int(math.floor((bucket_idx + 2) * bucket_size)), len(clean) - 1),
+            )
+            lttb_position = _python_lttb_position(
+                clean,
+                start=start,
+                stop=stop,
+                next_start=next_start,
+                next_stop=next_stop,
+                anchor_position=anchor_position,
+            )
+            if lttb_position is not None:
+                lttb_point = clean[lttb_position]
+                selected[lttb_point[2]] = lttb_point
+                anchor_position = lttb_position
+    if _lttbc is not None:
+        lttb_target = max(3, safe_limit - (2 * bucket_count))
+        for position in _lttbc_selected_positions(clean, target=lttb_target):
+            point = clean[position]
+            selected[point[2]] = point
+    ordered = [selected[idx] for idx in sorted(selected)]
+    ordered = _trim_selected_downsample_points(ordered, limit=safe_limit)
+    return [SpectrumPoint(shift_ppm=x, intensity=y) for x, y, _ in ordered]
+
+
+def _downsample_processed_display_points(
+    points: list[tuple[float, float]],
+    limit: int = 700,
+) -> list[SpectrumPoint]:
+    """Previous processed-spectrum display sampler.
+
+    Processed spectra are already baseline-corrected and display-smoothed before
+    this step. The stronger MinMaxLTTB evidence sampler can re-emphasize tiny
+    baseline extrema after smoothing; for the processed preview surface, keep
+    the earlier min/max envelope so the baseline stays visually smooth.
+    """
+    if not points:
+        return []
+    clean: list[tuple[float, float, int]] = []
+    for idx, (x_raw, y_raw) in enumerate(points):
+        x = float(x_raw)
+        y = float(y_raw)
+        if math.isfinite(x) and math.isfinite(y):
+            clean.append((x, y, idx))
+    safe_limit = max(3, int(limit))
+    if len(clean) <= safe_limit:
+        return [SpectrumPoint(shift_ppm=x, intensity=y) for x, y, _ in clean]
+
+    sorted_y = sorted(y for _x, y, _idx in clean)
+    center = median(sorted_y)
+    noise = 1.4826 * _median_absolute_deviation(sorted_y)
+    y01 = _percentile(sorted_y, 1.0)
+    y10 = _percentile(sorted_y, 10.0)
+    y90 = _percentile(sorted_y, 90.0)
+    y99 = _percentile(sorted_y, 99.0)
+    robust_span = max(y99 - y01, y90 - y10, 0.0)
+    peak_threshold = max(noise * 5.0, robust_span * 0.003, abs(center) * 1e-6, 1e-12)
+
+    bucket_count = max(1, (safe_limit - 2) // 2)
+    bucket_size = (len(clean) - 2) / bucket_count
+    selected: dict[int, tuple[float, float, int]] = {
+        clean[0][2]: clean[0],
+        clean[-1][2]: clean[-1],
+    }
+    for bucket_idx in range(bucket_count):
+        start = 1 + int(math.floor(bucket_idx * bucket_size))
+        end = 1 + int(math.floor((bucket_idx + 1) * bucket_size))
+        stop = max(start + 1, min(end, len(clean) - 1))
+        if start >= stop:
+            continue
+        min_point = clean[start]
+        max_point = clean[start]
+        sx = 0.0
+        sy = 0.0
+        count = 0
+        for clean_idx in range(start + 1, stop):
+            item = clean[clean_idx]
+            if item[1] < min_point[1]:
+                min_point = item
+            if item[1] > max_point[1]:
+                max_point = item
+        for clean_idx in range(start, stop):
+            item = clean[clean_idx]
+            sx += item[0]
+            sy += item[1]
+            count += 1
+        bucket_span_y = max_point[1] - min_point[1]
+        bucket_has_peak = bucket_span_y >= peak_threshold or max(
+            abs(max_point[1] - center),
+            abs(min_point[1] - center),
+        ) >= peak_threshold * 2.0
+        if bucket_has_peak:
+            selected[min_point[2]] = min_point
+            selected[max_point[2]] = max_point
+        elif count:
+            midpoint = clean[start + (stop - start) // 2]
+            selected[midpoint[2]] = midpoint
     ordered = [selected[idx] for idx in sorted(selected)]
     return [SpectrumPoint(shift_ppm=x, intensity=y) for x, y, _ in ordered[:safe_limit]]
 
@@ -726,6 +925,221 @@ def _prepare_trace_display_points(
         ),
     }
     return points, meta, []
+
+
+def _display_smoothing_window(
+    x_values: Any,
+    *,
+    width_ppm: float,
+    minimum: int,
+    maximum: int,
+) -> int:
+    try:
+        import numpy as np
+
+        finite = np.asarray(x_values, dtype=float)
+        finite = finite[np.isfinite(finite)]
+        if finite.size < 3:
+            return 1
+        ordered = np.sort(finite)
+        steps = np.diff(ordered)
+        steps = steps[np.isfinite(steps) & (steps > 1e-12)]
+        if steps.size == 0:
+            return 1
+        ppm_step = float(np.median(steps))
+        window = int(round(float(width_ppm) / max(ppm_step, 1e-12)))
+        window = max(int(minimum), min(int(maximum), window))
+        if window % 2 == 0:
+            window += 1
+        limit = int(finite.size if finite.size % 2 else max(1, finite.size - 1))
+        return max(1, min(window, limit))
+    except Exception:
+        return max(1, int(minimum))
+
+
+def _smooth_display_values(values: Any, *, window: int) -> tuple[Any, str]:
+    import numpy as np
+
+    y = np.asarray(values, dtype=float)
+    if window <= 2 or y.size < window:
+        return y.copy(), "none"
+    try:
+        from scipy.signal import savgol_filter
+
+        polyorder = min(3, max(1, window - 2))
+        return (
+            np.asarray(
+                savgol_filter(y, window_length=window, polyorder=polyorder, mode="interp"),
+                dtype=float,
+            ),
+            "savitzky_golay",
+        )
+    except Exception:
+        kernel = np.ones(window, dtype=float) / float(window)
+        radius = window // 2
+        padded = np.pad(y, (radius, radius), mode="edge")
+        return (np.convolve(padded, kernel, mode="valid"), "moving_average")
+
+
+def _aromatic_display_window(nucleus: str) -> tuple[float, float] | None:
+    normalized = (nucleus or "").strip().upper().replace("-", "")
+    if normalized in {"13C", "C13", "CARBON13"}:
+        return (110.0, 160.0)
+    if normalized in {"1H", "H1", "PROTON", ""}:
+        return (6.0, 9.0)
+    return None
+
+
+def smooth_trace_display_points(
+    points: list[tuple[float, float]],
+    *,
+    nucleus: str,
+) -> tuple[list[tuple[float, float]], dict[str, Any]]:
+    clean = [
+        (float(x), float(y))
+        for x, y in points
+        if math.isfinite(float(x)) and math.isfinite(float(y))
+    ]
+    metadata: dict[str, Any] = {
+        "applied": False,
+        "display_only": True,
+        "evidence_trace_preserved": True,
+        "method": "none",
+    }
+    if len(clean) < 9:
+        metadata["reason"] = "too_few_points"
+        return clean, metadata
+
+    try:
+        import numpy as np
+
+        x_values = np.asarray([x for x, _y in clean], dtype=float)
+        y_values = np.asarray([y for _x, y in clean], dtype=float)
+        finite = np.isfinite(x_values) & np.isfinite(y_values)
+        if int(np.count_nonzero(finite)) < 9:
+            metadata["reason"] = "too_few_finite_points"
+            return clean, metadata
+
+        base_window = _display_smoothing_window(
+            x_values,
+            width_ppm=0.034,
+            minimum=7,
+            maximum=61,
+        )
+        aromatic_window = _display_smoothing_window(
+            x_values,
+            width_ppm=0.085,
+            minimum=max(base_window + 4, 11),
+            maximum=121,
+        )
+        base_values, base_method = _smooth_display_values(y_values, window=base_window)
+        aromatic_values, aromatic_method = _smooth_display_values(
+            y_values,
+            window=aromatic_window,
+        )
+
+        smoothed = base_values.copy()
+        aromatic_region = _aromatic_display_window(nucleus)
+        aromatic_count = 0
+        if aromatic_region is not None and aromatic_window > base_window:
+            low, high = aromatic_region
+            region_mask = (x_values >= low) & (x_values <= high)
+            aromatic_count = int(np.count_nonzero(region_mask))
+            if aromatic_count:
+                smoothed[region_mask] = (
+                    0.25 * base_values[region_mask]
+                    + 0.75 * aromatic_values[region_mask]
+                )
+
+        smoothed_points = [
+            (x, float(y))
+            for (x, _old_y), y in zip(clean, smoothed, strict=False)
+        ]
+        metadata.update(
+            {
+                "applied": True,
+                "method": (
+                    "adaptive_savgol_aromatic_region"
+                    if any("savitzky" in method for method in {base_method, aromatic_method})
+                    else "adaptive_moving_average_aromatic_region"
+                ),
+                "base_method": base_method,
+                "base_window_points": int(base_window),
+                "aromatic_window_points": int(aromatic_window),
+                "aromatic_region_ppm": (
+                    {
+                        "low": float(aromatic_region[0]),
+                        "high": float(aromatic_region[1]),
+                    }
+                    if aromatic_region is not None
+                    else None
+                ),
+                "aromatic_points_smoothed": aromatic_count,
+            }
+        )
+        return smoothed_points, metadata
+    except Exception as exc:
+        metadata["reason"] = f"smoothing_failed: {exc}"
+        return clean, metadata
+
+
+def apply_processed_trace_baseline_conditions(
+    points: list[tuple[float, float]],
+    *,
+    mode: str,
+    order: int = 3,
+    warnings: list[str] | None = None,
+    label: str = "processed-file",
+) -> tuple[list[tuple[float, float]], dict[str, Any], list[str]]:
+    notes = warnings if warnings is not None else []
+    processed_baseline_mode = normalize_baseline_mode(mode)
+    metadata: dict[str, Any] = {
+        "mode": processed_baseline_mode,
+        "method": processed_baseline_mode,
+        "order": int(order or 3),
+        "correction_applied": False,
+        "explicit": processed_baseline_mode not in {"none", "preserve"},
+    }
+    if processed_baseline_mode in {"none", "preserve"}:
+        return points, metadata, notes
+
+    if processed_baseline_mode == "bernstein":
+        corrected, metadata, baseline_warnings = apply_bernstein_baseline_correction(
+            points,
+            order=order,
+        )
+        if len(corrected) >= 32:
+            polished, polish_metadata, polish_warnings = apply_signal_free_smooth_baseline_polish(
+                corrected,
+            )
+            baseline_warnings.extend(
+                note for note in polish_warnings if note not in baseline_warnings
+            )
+            metadata["post_baseline_polish"] = polish_metadata
+            metadata["baseline_polish_applied"] = bool(polish_metadata.get("correction_applied"))
+            if polish_metadata.get("correction_applied"):
+                corrected = polished
+                metadata["correction_applied"] = True
+                metadata["baseline_locked_to_zero"] = True
+                flatness = polish_metadata.get("qa_after")
+                if isinstance(flatness, dict):
+                    metadata["qa"] = flatness
+                    metadata["flatness_qa"] = flatness
+                metadata["signal_free_fraction"] = polish_metadata.get("signal_free_fraction")
+                metadata["baseline_slope"] = polish_metadata.get("baseline_slope")
+                metadata["baseline_span"] = polish_metadata.get("baseline_span")
+    else:
+        corrected, metadata, baseline_warnings = apply_simple_baseline_correction(
+            points,
+            mode=processed_baseline_mode,
+        )
+    notes.extend(baseline_warnings)
+    if metadata.get("correction_applied"):
+        notes.append(
+            f"Automatic {label} baseline correction was applied using "
+            f"{metadata.get('method')}."
+        )
+    return corrected, metadata, notes
 
 
 def _classify_multiplicity(component_count: int, width_ppm: float, ppm_step: float) -> str:
@@ -1455,7 +1869,7 @@ def parse_processed_spectrum(
     vertical_gain: float = 1.0,
     debug_preview: bool = False,
     max_preview_points: int = 1200,
-    processed_baseline_correction: str = "none",
+    processed_baseline_correction: str = "bernstein",
     processed_baseline_order: int = 3,
     infer_peaks: bool = True,
 ) -> SpectrumPreviewReport:
@@ -1479,30 +1893,23 @@ def parse_processed_spectrum(
         )
 
     original_points = points[:]
-    processed_baseline_mode = normalize_baseline_mode(processed_baseline_correction)
-    processed_baseline_metadata: dict[str, Any] = {
-        "mode": processed_baseline_mode,
-        "method": processed_baseline_mode,
-        "order": int(processed_baseline_order or 3),
-        "correction_applied": False,
-        "explicit": processed_baseline_mode not in {"none", "preserve"},
-    }
-    if source_mode == "trace" and processed_baseline_mode not in {"none", "preserve"}:
-        if processed_baseline_mode == "bernstein":
-            points, processed_baseline_metadata, baseline_warnings = apply_bernstein_baseline_correction(
-                points,
-                order=processed_baseline_order,
-            )
-        else:
-            points, processed_baseline_metadata, baseline_warnings = apply_simple_baseline_correction(
-                points,
-                mode=processed_baseline_mode,
-            )
-        warnings.extend(baseline_warnings)
-        if processed_baseline_metadata.get("correction_applied"):
-            warnings.append(
-                f"Explicit processed-file baseline correction was applied using {processed_baseline_metadata.get('method')}."
-            )
+    if source_mode == "trace":
+        points, processed_baseline_metadata, warnings = apply_processed_trace_baseline_conditions(
+            points,
+            mode=processed_baseline_correction,
+            order=processed_baseline_order,
+            warnings=warnings,
+            label="processed-file 1H",
+        )
+    else:
+        processed_baseline_mode = normalize_baseline_mode(processed_baseline_correction)
+        processed_baseline_metadata = {
+            "mode": processed_baseline_mode,
+            "method": processed_baseline_mode,
+            "order": int(processed_baseline_order or 3),
+            "correction_applied": False,
+            "explicit": False,
+        }
 
     sensitivity = 0.12 if peak_sensitivity is None else float(peak_sensitivity)
     detection_gain = 1.0
@@ -1551,6 +1958,7 @@ def parse_processed_spectrum(
         normalized_display_mode = raw_display_mode
     viewer_gain = max(1.0, min(float(vertical_gain or 1.0), 1_000_000.0))
     preview_limit = max(100, min(int(max_preview_points or 1200), 5000))
+    smoothing_allowed = normalize_baseline_mode(processed_baseline_correction) not in {"none", "preserve"}
     display_points = points
     display_meta: dict[str, Any] = {
         "baseline_smoothing": {
@@ -1560,9 +1968,48 @@ def parse_processed_spectrum(
         },
         "display_solvent_masked": False,
     }
+    if source_mode == "trace":
+        display_points, display_meta, display_notes = _prepare_trace_display_points(
+            points,
+            solvent=solvent,
+            mask_solvent_regions=mask_solvent_regions,
+            nucleus="1H",
+            baseline_already_corrected=bool(
+                processed_baseline_metadata.get("correction_applied")
+            ),
+        )
+        if smoothing_allowed:
+            display_points, trace_smoothing_meta = smooth_trace_display_points(
+                display_points,
+                nucleus="1H",
+            )
+        else:
+            trace_smoothing_meta = {
+                "applied": False,
+                "display_only": True,
+                "evidence_trace_preserved": True,
+                "method": "none",
+                "reason": "uploaded_processed_trace_preserved",
+            }
+        display_meta["trace_smoothing"] = trace_smoothing_meta
+        if trace_smoothing_meta.get("applied"):
+            display_meta["note"] = (
+                "Processed 1H preview points use display-only trace smoothing after "
+                "automatic baseline correction. Peak picking and evidence scoring "
+                "use the corrected unsmoothed evidence trace."
+            )
+        warnings.extend(note for note in display_notes if note not in warnings)
+    else:
+        display_meta["trace_smoothing"] = {
+            "applied": False,
+            "display_only": True,
+            "evidence_trace_preserved": True,
+            "method": "none",
+            "reason": "peak_table_source",
+        }
 
     if not infer_peaks:
-        preview_points = _downsample_points(points, limit=preview_limit)
+        preview_points = _downsample_processed_display_points(display_points, limit=preview_limit)
         warnings = [
             warning
             for warning in warnings
@@ -1625,21 +2072,26 @@ def parse_processed_spectrum(
                     "gain": viewer_gain,
                     "vertical_gain": viewer_gain,
                     "baseline_lock_visual_only": True,
-                    "main_trace": "original_evidence_intensity",
+                    "main_trace": (
+                        "display_smoothed_evidence_intensity"
+                        if display_meta.get("trace_smoothing", {}).get("applied")
+                        else "original_evidence_intensity"
+                    ),
+                    "trace_smoothing": display_meta.get("trace_smoothing"),
                     "weak_peak_magnifier": False,
                     "downsampling": {
-                        "method": "min_max_bucket_extrema_preserving",
+                        "method": _PROCESSED_DISPLAY_DOWNSAMPLING_METHOD,
                         "point_limit": preview_limit,
                     },
                 },
                 "preview_downsampling": {
-                    "method": "min_max_bucket_extrema_preserving",
+                    "method": _PROCESSED_DISPLAY_DOWNSAMPLING_METHOD,
                     "point_limit": preview_limit,
                     "source_point_count": len(points),
                 },
                 "preview_fast_path": True,
                 "original_spectrum_state": _build_preview_spectrum_state(
-                    points,
+                    original_points,
                     preview_points,
                     source="uploaded_peak_table" if source_mode == "peak_table" else "uploaded_trace",
                     processing_stage="as_uploaded",
@@ -1683,13 +2135,6 @@ def parse_processed_spectrum(
         if mask_solvent_regions:
             inference_points, mask_notes = _apply_solvent_mask(points, solvent)
             warnings.extend(mask_notes)
-        display_points, display_meta, display_notes = _prepare_trace_display_points(
-            points,
-            solvent=solvent,
-            mask_solvent_regions=mask_solvent_regions,
-            nucleus="1H",
-        )
-        warnings.extend(note for note in display_notes if note not in warnings)
         if normalized_display_mode == "magnifier":
             magnifier = weak_peak_magnifier_view(
                 points,
@@ -1844,7 +2289,7 @@ def parse_processed_spectrum(
         format_detected=ext or "unknown",
         source_mode=source_mode,
         point_count=len(points),
-        preview_points=_downsample_points(points, limit=preview_limit),
+        preview_points=_downsample_processed_display_points(display_points, limit=preview_limit),
         inferred_peaks=inferred_peaks,
         inferred_nmr_text=reference_guided_nmr_text or raw_inferred_nmr_text,
         reference_nmr_text_normalized=reference_nmr_text_normalized,
@@ -1889,15 +2334,20 @@ def parse_processed_spectrum(
                 "gain": viewer_gain,
                 "vertical_gain": viewer_gain,
                 "baseline_lock_visual_only": True,
-                "main_trace": "original_evidence_intensity",
+                "main_trace": (
+                    "display_smoothed_evidence_intensity"
+                    if display_meta.get("trace_smoothing", {}).get("applied")
+                    else "original_evidence_intensity"
+                ),
+                "trace_smoothing": display_meta.get("trace_smoothing"),
                 "weak_peak_magnifier": normalized_display_mode == "magnifier",
                 "downsampling": {
-                    "method": "min_max_bucket_extrema_preserving",
+                    "method": _PROCESSED_DISPLAY_DOWNSAMPLING_METHOD,
                     "point_limit": preview_limit,
                 },
             },
             "preview_downsampling": {
-                "method": "min_max_bucket_extrema_preserving",
+                "method": _PROCESSED_DISPLAY_DOWNSAMPLING_METHOD,
                 "point_limit": preview_limit,
                 "source_point_count": len(points),
             },

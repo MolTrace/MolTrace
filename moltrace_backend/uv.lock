@@ -316,6 +316,21 @@ wheels = [
 ]
 
 [[package]]
+name = "lttbc"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/a2/a5a2b4f7839ca9ed5e226fbd6062e0f279449bd83fd9f0faf55123b2b0b0/lttbc-0.3.0.tar.gz", hash = "sha256:eecffefddf8883091070cbde460011c5301c9291ab61b707c87260071588a897", size = 93922, upload-time = "2024-10-23T01:52:12.279Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/ba/859878518dbc14d92e06835c8a05e0909068f072492b9dcb6b1b728e5f96/lttbc-0.3.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:9b7865e705f590d6dca2e2e7ed64a763bbcf1a3c47daff94ec1deb3646bb2513", size = 92178, upload-time = "2024-10-23T01:52:07.931Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/fc/d6c3c5a9dadf9c6bbba1520329e142d0d0b182ad2c333ae9de482f0894eb/lttbc-0.3.0-cp311-cp311-win_amd64.whl", hash = "sha256:573daf16ef466bce59c0e357534766db96ec99b18021db58bd9b80a8843a730f", size = 10677, upload-time = "2024-10-23T01:27:23.075Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/22/96bb74852f49c7b85450f48b2de1464022b53d016874ad7dc42fd26ca7e2/lttbc-0.3.0-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:e626ae7ab2a046303fb5663ee02c079637dad243ad90b54a3d84ec69d357469c", size = 92392, upload-time = "2024-10-23T01:52:09.82Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/07/412ac37f4560768048d73476ddf0a654cf6bd4910d32377def0d51988023/lttbc-0.3.0-cp312-cp312-win_amd64.whl", hash = "sha256:640163f7337c43cdb4b3545d8f7670a18a29bcc8a9e1c7f2182a2d5d07055b51", size = 10718, upload-time = "2024-10-23T01:27:24.526Z" },
+]
+
+[[package]]
 name = "mako"
 version = "1.3.11"
 source = { registry = "https://pypi.org/simple" }
@@ -467,6 +482,7 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "lttbc" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic", extra = ["email"] },
     { name = "python-multipart" },
@@ -494,6 +510,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.14,<2.0" },
     { name = "fastapi", specifier = ">=0.115,<1.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28" },
+    { name = "lttbc", specifier = ">=0.3.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.20" },
     { name = "nmrglue", marker = "extra == 'fid'", specifier = ">=0.11" },
     { name = "numpy", marker = "extra == 'fid'", specifier = ">=1.26" },

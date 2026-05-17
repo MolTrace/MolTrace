@@ -40,7 +40,7 @@ type MoreNavItem = {
 }
 
 const primaryNavItems: PrimaryNavItem[] = [
-  { href: "/", label: "Landing", icon: Home },
+  { href: "/", label: "Home", icon: Home },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/spectracheck", label: "SpectraCheck", icon: SpectraCheckLogoIcon },
   { href: "/regulatory", label: "Regulatory", icon: Scale },
@@ -86,6 +86,15 @@ export function MobileBottomNav() {
       aria-label="Mobile bottom navigation"
       className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90"
     >
+      {/* grid-cols-6 splits the bar into six equal cells (5 primary tabs +
+          More). Each cell is responsible for clipping its OWN label —
+          otherwise long labels like "SpectraCheck" or "Regulatory" overflow
+          their cell and visually overlap with neighbours on narrow phones.
+          The trick: ``items-center`` on a flex-col parent shrinks every
+          child to its intrinsic content width, which disables ``truncate``.
+          To restore truncation we give the label span an explicit
+          ``w-full`` (cell-wide) + ``text-center`` so it stays centred but
+          can clip overflow with an ellipsis. */}
       <div className="mx-auto grid max-w-screen-sm grid-cols-6 gap-1 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
         {primaryNavItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
@@ -94,7 +103,7 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "relative inline-flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium",
+                "relative inline-flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-md px-1 text-[11px] font-medium",
                 isActive ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
               )}
               style={
@@ -109,7 +118,9 @@ export function MobileBottomNav() {
                   isActive && "text-[color:var(--mt-teal)]",
                 )}
               />
-              <span className="truncate">{item.label}</span>
+              <span className="block w-full truncate text-center" data-testid="mobile-nav-label">
+                {item.label}
+              </span>
             </Link>
           )
         })}
@@ -119,12 +130,12 @@ export function MobileBottomNav() {
               type="button"
               variant={moreActive ? "secondary" : "ghost"}
               className={cn(
-                "min-h-12 min-w-0 flex-col gap-1 rounded-md px-1 text-[11px]",
+                "min-h-12 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-md px-1 text-[11px]",
                 !moreActive && "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
               )}
             >
               <SlidersHorizontal className="h-4 w-4 shrink-0" />
-              <span className="truncate">More</span>
+              <span className="block w-full truncate text-center">More</span>
             </Button>
           </SheetTrigger>
           <SheetContent side="bottom" className="max-h-[80vh] rounded-t-2xl px-0 pb-[calc(env(safe-area-inset-bottom)+1rem)]">

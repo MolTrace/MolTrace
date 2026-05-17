@@ -298,6 +298,256 @@ def apply_bernstein_baseline(
     return apply_bernstein_baseline_correction(points, order=order)
 
 
+def _baseline_fit_span(points: list[tuple[float, float]]) -> dict[str, float | int]:
+    baseline = estimate_baseline_points(points)
+    if len(baseline) < 3:
+        return {"span": 0.0, "slope": 0.0, "intercept": 0.0, "baseline_points": len(baseline)}
+    try:
+        import numpy as np
+
+        xs = np.asarray([x for x, _y in baseline], dtype=float)
+        ys = np.asarray([y for _x, y in baseline], dtype=float)
+        slope, intercept = np.polyfit(xs, ys, 1)
+        span = abs(float(slope)) * max(float(xs.max() - xs.min()), 0.0)
+        return {
+            "span": span,
+            "slope": float(slope),
+            "intercept": float(intercept),
+            "baseline_points": int(xs.size),
+        }
+    except Exception:
+        xs = [x for x, _y in baseline]
+        ys = [y for _x, y in baseline]
+        x_mean = sum(xs) / len(xs)
+        y_mean = sum(ys) / len(ys)
+        denom = sum((x - x_mean) ** 2 for x in xs) or 1e-12
+        slope = sum((x - x_mean) * (y - y_mean) for x, y in baseline) / denom
+        intercept = y_mean - slope * x_mean
+        return {
+            "span": abs(float(slope)) * max(max(xs) - min(xs), 0.0),
+            "slope": float(slope),
+            "intercept": float(intercept),
+            "baseline_points": len(baseline),
+        }
+
+
+def _rolling_signal_free_baseline(values: Any) -> tuple[Any, dict[str, Any]]:
+    import numpy as np
+
+    y = np.asarray(values, dtype=float).reshape(-1)
+    n = int(y.size)
+    if n == 0:
+        return y, {"method": "rolling_signal_free_smoother", "baseline_nodes": 0}
+    finite = np.isfinite(y)
+    if not np.any(finite):
+        return np.zeros_like(y), {"method": "rolling_signal_free_smoother", "baseline_nodes": 0}
+
+    bins = max(24, min(240, int(math.sqrt(n) * 3)))
+    node_x: list[float] = []
+    node_y: list[float] = []
+    for idx in range(bins):
+        low = int(round(idx * n / bins))
+        high = int(round((idx + 1) * n / bins))
+        segment = y[low:high]
+        segment = segment[np.isfinite(segment)]
+        if segment.size == 0:
+            continue
+        node_x.append((low + max(high - low, 1) / 2.0) / max(n - 1, 1))
+        node_y.append(float(np.percentile(segment, 18.0)))
+    if len(node_x) < 2:
+        return np.full_like(y, float(np.nanmedian(y[finite]))), {
+            "method": "rolling_signal_free_smoother",
+            "baseline_nodes": len(node_x),
+        }
+
+    grid = np.linspace(0.0, 1.0, n)
+    baseline = np.interp(grid, np.asarray(node_x, dtype=float), np.asarray(node_y, dtype=float))
+    kernel_width = max(9, min(n // 3 if n >= 3 else n, int(round(n * 0.035)) | 1))
+    if kernel_width >= 3:
+        half = kernel_width // 2
+        ramp = np.arange(1, half + 2, dtype=float)
+        kernel = np.concatenate([ramp, ramp[-2::-1]])
+        kernel = kernel / float(kernel.sum())
+        padded = np.pad(baseline, (half, half), mode="edge")
+        baseline = np.convolve(padded, kernel, mode="valid")
+    return baseline, {
+        "method": "rolling_signal_free_smoother",
+        "baseline_nodes": len(node_x),
+        "kernel_width": int(kernel_width),
+    }
+
+
+def _whittaker_signal_free_baseline(
+    values: Any,
+    *,
+    smoothness: float,
+    asymmetry: float,
+    max_iter: int,
+) -> tuple[Any, dict[str, Any]]:
+    import numpy as np
+
+    try:
+        from scipy import sparse
+        from scipy.sparse.linalg import spsolve
+    except Exception:
+        return _rolling_signal_free_baseline(values)
+
+    y = np.asarray(values, dtype=float).reshape(-1)
+    n = int(y.size)
+    if n < 4:
+        baseline = np.full_like(y, float(np.nanmedian(y)) if y.size else 0.0)
+        return baseline, {
+            "method": "constant_signal_free_baseline",
+            "baseline_nodes": n,
+        }
+
+    finite = np.isfinite(y)
+    if not np.any(finite):
+        return np.zeros_like(y), {
+            "method": "whittaker_asymmetric_smoother",
+            "iterations": 0,
+            "signal_free_fraction": 0.0,
+        }
+
+    work = y.copy()
+    fill_value = float(np.nanmedian(work[finite]))
+    work[~finite] = fill_value
+    weights = np.ones(n, dtype=float)
+    diff = sparse.diags([1.0, -2.0, 1.0], [0, 1, 2], shape=(n - 2, n), format="csc")
+    penalty = float(smoothness) * (diff.T @ diff)
+    p = max(0.001, min(0.2, float(asymmetry)))
+    baseline = np.full(n, fill_value, dtype=float)
+    iterations = max(1, min(25, int(max_iter)))
+    for _idx in range(iterations):
+        system = sparse.spdiags(weights, 0, n, n, format="csc") + penalty
+        baseline = np.asarray(spsolve(system, weights * work), dtype=float)
+        weights = np.where(work > baseline, p, 1.0 - p)
+        weights[~finite] = 0.0
+    signal_free_fraction = float(np.mean(weights > 0.5)) if weights.size else 0.0
+    return baseline, {
+        "method": "whittaker_asymmetric_smoother",
+        "iterations": iterations,
+        "smoothness": float(smoothness),
+        "asymmetry": p,
+        "signal_free_fraction": round(signal_free_fraction, 4),
+    }
+
+
+def apply_signal_free_smooth_baseline_polish(
+    points: list[tuple[float, float]],
+    *,
+    smoothness: float | None = None,
+    asymmetry: float = 0.01,
+    max_iter: int = 10,
+) -> tuple[list[tuple[float, float]], dict[str, Any], list[str]]:
+    """Remove residual rolling baseline using signal-free regions and smoothing.
+
+    This is a post-polish for already transformed FID spectra. It mirrors the
+    Mnova-style sequence of phase correction, Bernstein baseline correction, and
+    signal-free smoother cleanup for broad rolling baseline topographies.
+    """
+
+    warnings: list[str] = []
+    clean = [
+        (float(x), float(y))
+        for x, y in points
+        if math.isfinite(float(x)) and math.isfinite(float(y))
+    ]
+    before_qa = evaluate_baseline_flatness(clean, mode="signal_free_smoother").as_dict()
+    before_span = _baseline_fit_span(clean)
+    metadata: dict[str, Any] = {
+        "method": "signal_free_smooth_baseline_polish",
+        "correction_applied": False,
+        "baseline_locked_to_zero": True,
+        "qa_before": before_qa,
+        "residual_span_before": before_span,
+    }
+    if len(clean) < 32:
+        warnings.append("Too few points were available for signal-free baseline polishing.")
+        metadata["qa_after"] = before_qa
+        metadata["residual_span_after"] = before_span
+        return (clean, metadata, warnings)
+
+    try:
+        import numpy as np
+
+        y = np.asarray([value for _x, value in clean], dtype=float)
+        n = int(y.size)
+        scale = float(np.nanpercentile(np.abs(y), 99.5)) if y.size else 0.0
+        if scale <= 1e-12:
+            metadata["qa_after"] = before_qa
+            metadata["residual_span_after"] = before_span
+            return (clean, metadata, warnings)
+
+        lambda_value = float(smoothness) if smoothness is not None else 2.5e6 * (n / 1200.0) ** 2
+        lambda_value = max(5.0e4, min(2.5e9, lambda_value))
+        baseline, smoother_meta = _whittaker_signal_free_baseline(
+            y,
+            smoothness=lambda_value,
+            asymmetry=asymmetry,
+            max_iter=max_iter,
+        )
+        corrected_y = y - np.asarray(baseline, dtype=float)
+        finite = np.isfinite(corrected_y)
+        if np.any(finite):
+            centered = corrected_y[finite] - float(np.nanmedian(corrected_y[finite]))
+            abs_centered = np.abs(centered)
+            noise = 1.4826 * float(np.nanmedian(np.abs(centered - float(np.nanmedian(centered)))))
+            threshold = max(noise * 3.5, float(np.nanpercentile(abs_centered, 35.0)), 1e-12)
+            corrected_center = float(np.nanmedian(corrected_y[finite]))
+            signal_free = finite & (np.abs(corrected_y - corrected_center) <= threshold)
+            if int(np.count_nonzero(signal_free)) >= 3:
+                offset = float(np.nanmedian(corrected_y[signal_free]))
+                corrected_y = corrected_y - offset
+            else:
+                offset = float(np.nanmedian(corrected_y[finite]))
+                corrected_y = corrected_y - offset
+        else:
+            offset = 0.0
+
+        corrected = [(x, float(value)) for (x, _y), value in zip(clean, corrected_y, strict=False)]
+        after_qa = evaluate_baseline_flatness(corrected, mode="signal_free_smoother").as_dict()
+        after_span = _baseline_fit_span(corrected)
+        before_score = float(before_qa.get("score") or 0.0)
+        after_score = float(after_qa.get("score") or 0.0)
+        before_span_value = float(before_span.get("span") or 0.0)
+        after_span_value = float(after_span.get("span") or 0.0)
+        span_improved = before_span_value <= 1e-12 or after_span_value <= before_span_value * 1.05
+        if after_score + 1e-9 < before_score and not span_improved:
+            warnings.append(
+                "Signal-free baseline polish was skipped because flatness QA did not improve."
+            )
+            metadata.update(
+                {
+                    **smoother_meta,
+                    "qa_after": before_qa,
+                    "residual_span_after": before_span,
+                    "skipped_reason": "flatness_not_improved",
+                }
+            )
+            return (clean, metadata, warnings)
+
+        metadata.update(
+            {
+                **smoother_meta,
+                "correction_applied": True,
+                "baseline_residual_offset": round(float(offset), 10),
+                "qa_after": after_qa,
+                "residual_span_after": after_span,
+                "baseline_slope": round(float(after_span.get("slope") or 0.0), 10),
+                "baseline_span": round(float(after_span.get("span") or 0.0), 10),
+            }
+        )
+        return (corrected, metadata, warnings)
+    except Exception as exc:
+        warnings.append(
+            f"Signal-free baseline polish failed; Bernstein result was preserved ({exc})."
+        )
+        metadata["qa_after"] = before_qa
+        metadata["residual_span_after"] = before_span
+        return (clean, metadata, warnings)
+
+
 def apply_simple_baseline_correction(
     points: list[tuple[float, float]],
     *,

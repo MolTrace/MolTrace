@@ -2697,7 +2697,7 @@ export interface components {
             debug_preview: boolean;
             /**
              * Processed Baseline Correction
-             * @default none
+             * @default bernstein
              */
             processed_baseline_correction: string;
             /**
@@ -2736,7 +2736,7 @@ export interface components {
             debug_preview: boolean;
             /**
              * Processed Baseline Correction
-             * @default none
+             * @default bernstein
              */
             processed_baseline_correction: string;
             /**
@@ -4312,7 +4312,7 @@ export interface components {
             debug_preview: boolean;
             /**
              * Processed Baseline Correction
-             * @default none
+             * @default bernstein
              */
             processed_baseline_correction: string;
             /**
@@ -4359,7 +4359,7 @@ export interface components {
             debug_preview: boolean;
             /**
              * Processed Baseline Correction
-             * @default none
+             * @default bernstein
              */
             processed_baseline_correction: string;
             /**

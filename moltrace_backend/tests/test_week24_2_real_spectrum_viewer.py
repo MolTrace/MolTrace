@@ -126,7 +126,10 @@ def test_raw_preview_points_are_debug_only() -> None:
 
     assert "raw_preview_points" not in default.metadata
     assert "raw_preview_points" in debug.metadata
-    assert debug.metadata["raw_preview_points"] == [point.model_dump(mode="json") for point in debug.preview_points]
+    assert debug.metadata["display_preprocessing"]["trace_smoothing"]["applied"] is True
+    assert debug.metadata["raw_preview_points"] != [
+        point.model_dump(mode="json") for point in debug.preview_points
+    ]
 
 
 def test_default_preview_payload_is_capped_for_large_traces() -> None:
@@ -194,7 +197,8 @@ def test_raw_fid_processing_separates_evidence_trace_from_display_metadata() -> 
     assert report.metadata["display_mode"] == "real"
     assert report.metadata["display_gain"] == 50.0
     assert report.metadata["baseline_lock_visual_only"] is True
-    assert report.metadata["display"]["main_trace"] == "original_evidence_intensity"
+    assert report.metadata["display"]["main_trace"] == "display_smoothed_evidence_intensity"
+    assert report.metadata["display"]["trace_smoothing"]["display_only"] is True
     assert report.metadata["display"]["vertical_gain"] == 50.0
     assert report.metadata["display"]["weak_peak_magnifier"] is False
     assert "raw_preview_points" not in report.metadata

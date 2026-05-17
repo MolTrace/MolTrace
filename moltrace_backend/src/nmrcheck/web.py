@@ -695,8 +695,8 @@ def index() -> str:
                           <div class="field">
                             <label for="carbon13ProcessedBaselineCorrection">Apply processed-file baseline correction</label>
                             <select id="carbon13ProcessedBaselineCorrection">
-                              <option value="none" selected>Off / preserve uploaded trace</option>
-                              <option value="bernstein">Bernstein polynomial fit</option>
+                              <option value="bernstein" selected>Bernstein polynomial fit</option>
+                              <option value="none">Off / preserve uploaded trace</option>
                             </select>
                           </div>
                           <div class="field">
@@ -1931,8 +1931,8 @@ b_ms1_004,1,0.32,47.04914,3,</textarea>
                         <div class="field">
                           <label for="processedBaselineCorrection">Apply processed-file baseline correction</label>
                           <select id="processedBaselineCorrection">
-                            <option value="none" selected>Off / preserve uploaded trace</option>
-                            <option value="bernstein">Bernstein polynomial fit</option>
+                            <option value="bernstein" selected>Bernstein polynomial fit</option>
+                            <option value="none">Off / preserve uploaded trace</option>
                           </select>
                         </div>
                         <div class="field">
@@ -2636,9 +2636,9 @@ b_ms1_004,1,0.32,47.04914,3,</textarea>
             referenceNmrText: el("referenceNmrText")?.value || "",
             maskSolventRegions: Boolean(el("maskSolventRegions")?.checked),
             processedDisplayMode: el("processedDisplayMode")?.value || "real",
-            processedBaselineCorrection: el("processedBaselineCorrection")?.value || "none",
+            processedBaselineCorrection: el("processedBaselineCorrection")?.value || "bernstein",
             processedBaselineOrder: el("processedBaselineOrder")?.value || "3",
-            carbon13ProcessedBaselineCorrection: el("carbon13ProcessedBaselineCorrection")?.value || "none",
+            carbon13ProcessedBaselineCorrection: el("carbon13ProcessedBaselineCorrection")?.value || "bernstein",
             carbon13ProcessedBaselineOrder: el("carbon13ProcessedBaselineOrder")?.value || "3",
             fidProcessingPreset: el("fidProcessingPreset")?.value || "balanced",
             fidSolvent: el("fidSolvent")?.value || "",
@@ -2697,9 +2697,9 @@ b_ms1_004,1,0.32,47.04914,3,</textarea>
           }
           if (el("spectrumFile")) el("spectrumFile").value = "";
           if (el("processedDisplayMode")) el("processedDisplayMode").value = defaults.processedDisplayMode || "real";
-          if (el("processedBaselineCorrection")) el("processedBaselineCorrection").value = defaults.processedBaselineCorrection || "none";
+          if (el("processedBaselineCorrection")) el("processedBaselineCorrection").value = defaults.processedBaselineCorrection || "bernstein";
           if (el("processedBaselineOrder")) el("processedBaselineOrder").value = defaults.processedBaselineOrder || "3";
-          if (el("carbon13ProcessedBaselineCorrection")) el("carbon13ProcessedBaselineCorrection").value = defaults.carbon13ProcessedBaselineCorrection || "none";
+          if (el("carbon13ProcessedBaselineCorrection")) el("carbon13ProcessedBaselineCorrection").value = defaults.carbon13ProcessedBaselineCorrection || "bernstein";
           if (el("carbon13ProcessedBaselineOrder")) el("carbon13ProcessedBaselineOrder").value = defaults.carbon13ProcessedBaselineOrder || "3";
           if (el("fidFile")) el("fidFile").value = "";
           if (el("fidProcessingPreset")) {
@@ -3356,7 +3356,7 @@ b_ms1_004,1,0.32,47.04914,3,</textarea>
           if (solvent) formData.append("solvent", solvent);
           if (sampleId) formData.append("sample_id", sampleId);
           if (sensitivity) formData.append("peak_sensitivity", sensitivity);
-          const baselineMode = el("carbon13ProcessedBaselineCorrection")?.value || "none";
+          const baselineMode = el("carbon13ProcessedBaselineCorrection")?.value || "bernstein";
           const baselineOrder = el("carbon13ProcessedBaselineOrder")?.value || "3";
           const displayMode = el("carbon13ProcessedDisplayMode")?.value || "real";
           formData.append("mask_solvent_regions", "true");
@@ -8318,7 +8318,7 @@ b_ms1_004,1,0.32,47.04914,3,</textarea>
             formData.append("mask_solvent_regions", maskSolventRegions ? "true" : "false");
             formData.append("display_mode", el("processedDisplayMode")?.value || "real");
             formData.append("vertical_gain", "1");
-            formData.append("processed_baseline_correction", el("processedBaselineCorrection")?.value || "none");
+            formData.append("processed_baseline_correction", el("processedBaselineCorrection")?.value || "bernstein");
             formData.append("processed_baseline_order", el("processedBaselineOrder")?.value || "3");
             const data = await api("/spectrum/preview", { method: "POST", body: formData });
             setJson(data);
@@ -8374,7 +8374,7 @@ b_ms1_004,1,0.32,47.04914,3,</textarea>
             formData.append("mask_solvent_regions", maskSolventRegions ? "true" : "false");
             formData.append("display_mode", el("processedDisplayMode")?.value || "real");
             formData.append("vertical_gain", "1");
-            formData.append("processed_baseline_correction", el("processedBaselineCorrection")?.value || "none");
+            formData.append("processed_baseline_correction", el("processedBaselineCorrection")?.value || "bernstein");
             formData.append("processed_baseline_order", el("processedBaselineOrder")?.value || "3");
             const data = await api("/spectrum/analyze", { method: "POST", body: formData });
             setJson(data);

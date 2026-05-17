@@ -4929,7 +4929,7 @@ async def spectrum_preview(
     display_mode: str = Form(default="real"),
     vertical_gain: float = Form(default=1.0),
     debug_preview: bool = Form(default=False),
-    processed_baseline_correction: str = Form(default="none"),
+    processed_baseline_correction: str = Form(default="bernstein"),
     processed_baseline_order: int = Form(default=3),
     context: AccessContext = Depends(require_access_context),
 ) -> SpectrumPreviewReport:
@@ -4998,7 +4998,7 @@ async def spectrum_analyze(
     display_mode: str = Form(default="real"),
     vertical_gain: float = Form(default=1.0),
     debug_preview: bool = Form(default=False),
-    processed_baseline_correction: str = Form(default="none"),
+    processed_baseline_correction: str = Form(default="bernstein"),
     processed_baseline_order: int = Form(default=3),
     context: AccessContext = Depends(require_access_context),
 ) -> SpectrumAnalyzeResult:
@@ -5536,6 +5536,8 @@ async def nmr_processed_preview_route(
                 display_mode="real",
                 vertical_gain=1.0,
                 infer_peaks=False,
+                max_preview_points=5000,
+                processed_baseline_correction="preserve",
             )
             x_values, y_values = _xy_from_spectrum_points(preview.preview_points)
             metadata = {
@@ -5558,6 +5560,8 @@ async def nmr_processed_preview_route(
                 display_mode="real",
                 vertical_gain=1.0,
                 infer_peaks=False,
+                max_preview_points=5000,
+                processed_baseline_correction="preserve",
             )
             x_values, y_values = _carbon13_preview_points(carbon_preview)
             metadata = {
@@ -5665,6 +5669,8 @@ async def nmr_processed_analyze_route(
                 mask_solvent_regions=bool(solvent),
                 display_mode="real",
                 vertical_gain=1.0,
+                max_preview_points=5000,
+                processed_baseline_correction="preserve",
             )
             x_values, y_values = _xy_from_spectrum_points(preview.preview_points)
             peaks = _model_dicts(preview.inferred_peaks)
@@ -5710,6 +5716,8 @@ async def nmr_processed_analyze_route(
                 mask_solvent_regions=bool(solvent),
                 display_mode="real",
                 vertical_gain=1.0,
+                max_preview_points=5000,
+                processed_baseline_correction="preserve",
             )
             x_values, y_values = _carbon13_preview_points(carbon_preview)
             peaks = _model_dicts(carbon_preview.peaks)
@@ -6060,11 +6068,18 @@ async def nmr_raw_fid_process_route(
     processing_preset: str | None = Form(default="balanced"),
     preserve_raw: bool = Form(default=True),
     compound_class: str | None = Form(default=None),
+    # Shared session inputs (mirror /nmr/processed/analyze) — let the Raw FID
+    # tab mount the same evidence panels as the Processed tab.
+    candidates_text: str | None = Form(default=None),
+    proton_nmr_text: str | None = Form(default=None),
+    carbon13_text: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRRawFIDProcessResponse:
     filename = file.filename or "raw_fid_archive.zip"
     content = await file.read()
     normalized_compound_class = normalize_compound_class(compound_class)
+    shared_proton_text = (proton_nmr_text or "").strip() or None
+    shared_carbon_text = (carbon13_text or "").strip() or None
     raw_upload_provenance = _raw_fid_upload_provenance(
         request,
         filename=filename,
@@ -6138,6 +6153,45 @@ async def nmr_raw_fid_process_route(
     x_values, y_values = _xy_from_spectrum_points(preview.preview_points)
     raw_sha256 = str(raw_upload_provenance.get("sha256") or hashlib.sha256(content).hexdigest())
     processing_parameters = _processing_parameters_payload(preview)
+
+    # ── Enrich the FID-derived peaks so the Raw FID tab can mount the same
+    # evidence panels as /nmr/processed/analyze. Mirrors the same pipeline:
+    # parse SMILES → enrich peaks with category/region/labile_hint → build
+    # category summary, labile-H summary, proton inventory, impurity list.
+    # When candidates_text or NMR text are absent, downstream builders
+    # gracefully produce empty payloads. ──────────────────────────────────
+    fid_peaks: list[dict[str, Any]] = _model_dicts(preview.inferred_peaks)
+    candidate_smiles = _first_smiles_from_candidates(candidates_text)
+    structure_summary: StructureSummary | None = None
+    if candidate_smiles:
+        try:
+            structure_summary = structure_summary_from_smiles(candidate_smiles)
+        except Exception:  # noqa: BLE001 — structure parse errors must not break processing
+            structure_summary = None
+    fid_peaks = enrich_peaks(
+        peaks=fid_peaks,
+        nucleus=nucleus,
+        solvent=solvent,
+        structure=structure_summary,
+    )
+    peak_category_summary = build_peak_category_summary(fid_peaks)
+    labile_hydrogen_summary = build_labile_hydrogen_summary(
+        peaks=fid_peaks,
+        structure=structure_summary,
+        solvent=solvent,
+    )
+    proton_inventory = build_proton_inventory(
+        peaks=fid_peaks,
+        structure=structure_summary,
+        nucleus=nucleus,
+    )
+    impurity_candidates = build_impurity_candidates(peaks=fid_peaks)
+    # Touch the multi-layer text inputs for parity with /processed/analyze:
+    # they currently only feed audit metadata so the Raw FID tab's session
+    # values are visible in server-side audit, even though FID-stage peak
+    # picking itself doesn't yet consume them.
+    _ = shared_proton_text, shared_carbon_text
+
     notes = [
         "Raw archive was preserved as immutable source data before processing.",
         "Processing used a temporary derived workspace and did not overwrite raw vendor files.",
@@ -6153,6 +6207,9 @@ async def nmr_raw_fid_process_route(
         "preserve_raw": True,
         "legacy_route_wrapped": "/fid/process + immutable raw vault processing core",
         "compound_class": normalized_compound_class,
+        "proton_nmr_text_supplied": shared_proton_text is not None,
+        "carbon13_text_supplied": shared_carbon_text is not None,
+        "candidate_text_supplied": bool(candidates_text and candidates_text.strip()),
     }
     _audit_from_context(
         request,
@@ -6179,6 +6236,12 @@ async def nmr_raw_fid_process_route(
         processing_preset=settings.selected_preset,
         processing_parameters=processing_parameters,
         point_count=preview.point_count,
+        peak_count=len(fid_peaks),
+        peaks=fid_peaks,
+        peak_category_summary=peak_category_summary,
+        labile_hydrogen_summary=labile_hydrogen_summary,
+        proton_inventory=proton_inventory,
+        impurity_candidates=impurity_candidates,
         x=x_values,
         y=y_values,
         x_label="ppm",
@@ -23438,7 +23501,7 @@ async def carbon13_spectrum_preview_route(
     display_mode: str = Form(default="real"),
     vertical_gain: float = Form(default=1.0),
     debug_preview: bool = Form(default=False),
-    processed_baseline_correction: str = Form(default="none"),
+    processed_baseline_correction: str = Form(default="bernstein"),
     processed_baseline_order: int = Form(default=3),
     context: AccessContext = Depends(require_access_context),
 ) -> Carbon13UploadPreview:
@@ -23493,7 +23556,7 @@ async def carbon13_spectrum_analyze_route(
     display_mode: str = Form(default="real"),
     vertical_gain: float = Form(default=1.0),
     debug_preview: bool = Form(default=False),
-    processed_baseline_correction: str = Form(default="none"),
+    processed_baseline_correction: str = Form(default="bernstein"),
     processed_baseline_order: int = Form(default=3),
     context: AccessContext = Depends(require_access_context),
 ) -> Carbon13AnalysisReport:

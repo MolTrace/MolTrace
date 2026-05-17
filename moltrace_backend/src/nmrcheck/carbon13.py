@@ -15,12 +15,7 @@ from .chemistry import mol_from_smiles, structure_summary_from_smiles
 from .evidence import ratio_score
 from .exceptions import StructureParseError
 from .impurities import match_c13_impurity_shifts
-from .baseline import (
-    apply_bernstein_baseline_correction,
-    apply_simple_baseline_correction,
-    evaluate_baseline_flatness,
-    normalize_baseline_mode,
-)
+from .baseline import evaluate_baseline_flatness, normalize_baseline_mode
 from .mnova_view import weak_peak_magnifier_view
 from .models import (
     Carbon13AnalysisReport,
@@ -34,9 +29,14 @@ from .spectrum import _baseline_correct as _baseline_correct_trace
 from .spectrum import _apply_solvent_mask as _apply_trace_solvent_mask
 from .spectrum import _build_preserved_spectrum_state
 from .spectrum import _build_preview_spectrum_state
+from .spectrum import _PREVIEW_DOWNSAMPLING_METHOD
+from .spectrum import _PROCESSED_DISPLAY_DOWNSAMPLING_METHOD
 from .spectrum import _downsample_points
+from .spectrum import _downsample_processed_display_points
 from .spectrum import _prepare_trace_display_points
 from .spectrum import _preview_baseline_flatness_qa
+from .spectrum import apply_processed_trace_baseline_conditions
+from .spectrum import smooth_trace_display_points
 
 _FLOAT_RE = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
 _RANGE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)")
@@ -470,7 +470,7 @@ def parse_carbon13_processed_spectrum(
     vertical_gain: float = 1.0,
     debug_preview: bool = False,
     max_preview_points: int = 1200,
-    processed_baseline_correction: str = "none",
+    processed_baseline_correction: str = "bernstein",
     processed_baseline_order: int = 3,
     infer_peaks: bool = True,
 ) -> Carbon13UploadPreview:
@@ -517,30 +517,13 @@ def parse_carbon13_processed_spectrum(
     if not points:
         return parse_carbon13_table(filename, content, solvent=solvent)
     original_points = points[:]
-    processed_baseline_mode = normalize_baseline_mode(processed_baseline_correction)
-    processed_baseline_metadata: dict[str, Any] = {
-        "mode": processed_baseline_mode,
-        "method": processed_baseline_mode,
-        "order": int(processed_baseline_order or 3),
-        "correction_applied": False,
-        "explicit": processed_baseline_mode not in {"none", "preserve"},
-    }
-    if processed_baseline_mode not in {"none", "preserve"}:
-        if processed_baseline_mode == "bernstein":
-            points, processed_baseline_metadata, baseline_warnings = apply_bernstein_baseline_correction(
-                points,
-                order=processed_baseline_order,
-            )
-        else:
-            points, processed_baseline_metadata, baseline_warnings = apply_simple_baseline_correction(
-                points,
-                mode=processed_baseline_mode,
-            )
-        warnings.extend(baseline_warnings)
-        if processed_baseline_metadata.get("correction_applied"):
-            warnings.append(
-                f"Explicit processed-file ¹³C baseline correction was applied using {processed_baseline_metadata.get('method')}."
-            )
+    points, processed_baseline_metadata, warnings = apply_processed_trace_baseline_conditions(
+        points,
+        mode=processed_baseline_correction,
+        order=processed_baseline_order,
+        warnings=warnings,
+        label="processed-file 13C",
+    )
     raw_display_mode = (
         str(display_mode or "real").strip().lower().replace("-", "_").replace(" ", "_")
     )
@@ -574,6 +557,7 @@ def parse_carbon13_processed_spectrum(
         normalized_display_mode = raw_display_mode
     viewer_gain = max(1.0, min(float(vertical_gain or 1.0), 1_000_000.0))
     preview_limit = max(100, min(int(max_preview_points or 1200), 5000))
+    smoothing_allowed = normalize_baseline_mode(processed_baseline_correction) not in {"none", "preserve"}
     inference_points = points
     if mask_solvent_regions:
         inference_points, mask_notes = _apply_trace_solvent_mask(
@@ -587,7 +571,28 @@ def parse_carbon13_processed_spectrum(
         solvent=solvent,
         mask_solvent_regions=mask_solvent_regions,
         nucleus="13C",
+        baseline_already_corrected=bool(processed_baseline_metadata.get("correction_applied")),
     )
+    if smoothing_allowed:
+        display_points, trace_smoothing_meta = smooth_trace_display_points(
+            display_points,
+            nucleus="13C",
+        )
+    else:
+        trace_smoothing_meta = {
+            "applied": False,
+            "display_only": True,
+            "evidence_trace_preserved": True,
+            "method": "none",
+            "reason": "uploaded_processed_trace_preserved",
+        }
+    display_meta["trace_smoothing"] = trace_smoothing_meta
+    if trace_smoothing_meta.get("applied"):
+        display_meta["note"] = (
+            "Processed 13C preview points use display-only trace smoothing after "
+            "automatic baseline correction. Peak picking and evidence scoring "
+            "use the corrected unsmoothed evidence trace."
+        )
     warnings.extend(note for note in display_notes if note not in warnings)
     if normalized_display_mode == "magnifier":
         magnifier = weak_peak_magnifier_view(
@@ -606,7 +611,7 @@ def parse_carbon13_processed_spectrum(
         }
         warnings.extend(note for note in magnifier.warnings if note not in warnings)
     if not infer_peaks:
-        preview_points = _downsample_points(points, limit=preview_limit)
+        preview_points = _downsample_processed_display_points(display_points, limit=preview_limit)
         warnings.append("Display preview generated without ¹³C peak inference; use Analyze to run peak detection and evidence scoring.")
         return Carbon13UploadPreview(
             filename=filename,
@@ -642,21 +647,26 @@ def parse_carbon13_processed_spectrum(
                     "gain": viewer_gain,
                     "vertical_gain": viewer_gain,
                     "baseline_lock_visual_only": True,
-                    "main_trace": "original_evidence_intensity",
+                    "main_trace": (
+                        "display_smoothed_evidence_intensity"
+                        if display_meta.get("trace_smoothing", {}).get("applied")
+                        else "original_evidence_intensity"
+                    ),
+                    "trace_smoothing": display_meta.get("trace_smoothing"),
                     "weak_peak_magnifier": normalized_display_mode == "magnifier",
                     "downsampling": {
-                        "method": "min_max_bucket_extrema_preserving",
+                        "method": _PROCESSED_DISPLAY_DOWNSAMPLING_METHOD,
                         "point_limit": preview_limit,
                     },
                 },
                 "preview_downsampling": {
-                    "method": "min_max_bucket_extrema_preserving",
+                    "method": _PROCESSED_DISPLAY_DOWNSAMPLING_METHOD,
                     "point_limit": preview_limit,
                     "source_point_count": len(points),
                 },
                 "preview_fast_path": True,
                 "original_spectrum_state": _build_preview_spectrum_state(
-                    points,
+                    original_points,
                     preview_points,
                     source="uploaded_carbon13_trace",
                     processing_stage="as_uploaded",
@@ -698,7 +708,7 @@ def parse_carbon13_processed_spectrum(
             "mask_solvent_regions": mask_solvent_regions,
             "preview_points": [
                 point.model_dump(mode="json")
-                for point in _downsample_points(points, limit=preview_limit)
+                for point in _downsample_processed_display_points(display_points, limit=preview_limit)
             ],
             "display_preprocessing": display_meta,
             "processed_baseline_correction": processed_baseline_metadata,
@@ -719,15 +729,20 @@ def parse_carbon13_processed_spectrum(
                 "gain": viewer_gain,
                 "vertical_gain": viewer_gain,
                 "baseline_lock_visual_only": True,
-                "main_trace": "original_evidence_intensity",
+                "main_trace": (
+                    "display_smoothed_evidence_intensity"
+                    if display_meta.get("trace_smoothing", {}).get("applied")
+                    else "original_evidence_intensity"
+                ),
+                "trace_smoothing": display_meta.get("trace_smoothing"),
                 "weak_peak_magnifier": normalized_display_mode == "magnifier",
                 "downsampling": {
-                    "method": "min_max_bucket_extrema_preserving",
+                    "method": _PROCESSED_DISPLAY_DOWNSAMPLING_METHOD,
                     "point_limit": preview_limit,
                 },
             },
             "preview_downsampling": {
-                "method": "min_max_bucket_extrema_preserving",
+                "method": _PROCESSED_DISPLAY_DOWNSAMPLING_METHOD,
                 "point_limit": preview_limit,
                 "source_point_count": len(points),
             },

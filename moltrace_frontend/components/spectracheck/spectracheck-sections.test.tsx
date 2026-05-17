@@ -135,9 +135,28 @@ describe("SpectrumViewer", () => {
     const sampled = sampleSpectrumTraceForPlot(x, y, { maxPoints: 1000 })
 
     expect(sampled.sampled).toBe(true)
+    expect(sampled.method).toBe("viewport_min_max_lttb")
     expect(sampled.x.length).toBeLessThanOrEqual(1000)
     expect(sampled.y).toContain(1000)
     expect(sampled.meanBinSize).toBeGreaterThan(1)
+  })
+
+  it("resamples only the active viewport range", () => {
+    const x = Array.from({ length: 100_000 }, (_, i) => i)
+    const y = Array.from({ length: 100_000 }, () => 0)
+    y[12_345] = 1000
+    y[50_000] = 5000
+
+    const sampled = sampleSpectrumTraceForPlot(x, y, {
+      maxPoints: 1000,
+      xRange: [12_000, 13_000],
+    })
+
+    expect(sampled.sourceLength).toBe(100_000)
+    expect(sampled.visibleLength).toBe(1001)
+    expect(sampled.x.every((ppm) => ppm >= 12_000 && ppm <= 13_000)).toBe(true)
+    expect(sampled.y).toContain(1000)
+    expect(sampled.y).not.toContain(5000)
   })
 
   it("keeps a NaN gap when the dominant solvent range is masked", () => {

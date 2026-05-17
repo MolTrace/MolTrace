@@ -48,6 +48,7 @@ import {
 import { SpectraCheckProcessedSpectrumSection } from "@/components/spectracheck/spectracheck-processed-spectrum-section"
 import { SpectraCheckRawFidSection } from "@/components/spectracheck/spectracheck-raw-fid-section"
 import { SessionValidateCard } from "@/components/spectracheck/spectracheck-session-validate-card"
+import { ResetToExampleButton } from "@/components/spectracheck/spectracheck-reset-to-example-button"
 import { SpectraCheckBenchmarkSection } from "@/components/spectracheck/spectracheck-benchmark-section"
 import {
   getNmrSolventForApi,
@@ -60,6 +61,7 @@ import {
   saveSpectraCheckEvidenceSession,
   sanitizeEvidenceItemsForStorage,
 } from "@/src/lib/spectracheck/spectracheck-evidence-session"
+import { compactLargePayloadForDisplay } from "@/src/lib/spectracheck/compact-json"
 import type { EvidenceItem } from "@/src/lib/spectracheck/evidence-types"
 import { SpectraCheckEvidenceProvider, useSpectraCheckEvidence } from "@/src/lib/spectracheck/useSpectraCheckEvidence"
 import {
@@ -947,7 +949,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
 
   const [devSnapshots, setDevSnapshots] = useState<Record<string, unknown>>({})
   const registerDev = useCallback((key: string, value: unknown) => {
-    setDevSnapshots((prev) => ({ ...prev, [key]: value }))
+    setDevSnapshots((prev) => ({ ...prev, [key]: compactLargePayloadForDisplay(value) }))
   }, [])
   const regulatoryEvidenceItemIds = useMemo(
     () =>
@@ -1679,7 +1681,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 rows={5}
                 className="font-mono text-xs"
               />
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span
                   className="rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
                   style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
@@ -1692,6 +1694,16 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 >
                   Format: Name | SMILES | role
                 </span>
+                {/* Reset-to-example affordance — matches the 1H + 13C cards. */}
+                <div className="ml-auto">
+                  <ResetToExampleButton
+                    current={candidatesText}
+                    fallback={defaultCandidates}
+                    onReset={() => setCandidatesText(defaultCandidates)}
+                    testId="candidates-reset-button"
+                    title="Restore the bundled candidate structures example"
+                  />
+                </div>
               </div>
             </div>
           </ModuleCard>
@@ -1786,6 +1798,20 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   rows={5}
                   className="font-mono text-xs"
                 />
+                {/* Reset-to-example affordance: visible only when the user
+                    has modified or cleared the field. Restores the bundled
+                    ethanol-style example so reviewers can always recover the
+                    original placeholder without reloading the page. */}
+                <ResetToExampleButton
+                  current={protonText}
+                  fallback={defaultProton}
+                  onReset={() => {
+                    setProtonText(defaultProton)
+                    setProtonLinkedFrom(null)
+                  }}
+                  testId="proton-text-reset-button"
+                  title="Restore the bundled 1H NMR example"
+                />
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
@@ -1865,6 +1891,17 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   rows={3}
                   className="font-mono text-xs"
                 />
+                {/* Reset-to-example affordance — same behaviour as the 1H field. */}
+                <ResetToExampleButton
+                  current={carbonText}
+                  fallback={defaultCarbon}
+                  onReset={() => {
+                    setCarbonText(defaultCarbon)
+                    setCarbonLinkedFrom(null)
+                  }}
+                  testId="carbon-text-reset-button"
+                  title="Restore the bundled 13C NMR example"
+                />
               </div>
             </div>
           </ModuleCard>
@@ -1922,6 +1959,9 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             sampleId={sampleId}
             onSampleIdChange={setSampleId}
             solvent={solventForApi}
+            candidatesText={candidatesText}
+            protonText={protonText}
+            carbonText={carbonText}
             compoundClass={compoundClass}
             registerDev={registerDev}
           />

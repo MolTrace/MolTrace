@@ -576,6 +576,16 @@ class NMRRawFIDProcessResponse(BaseModel):
     processing_preset: str
     processing_parameters: dict[str, Any] = Field(default_factory=dict)
     point_count: int = Field(ge=0)
+    # Peak-level results (parity with /nmr/processed/analyze). Populated by
+    # running ``enrich_peaks`` over the FID-derived ``inferred_peaks`` so the
+    # Raw FID tab can mount the same EnrichedPickedPeaksPanel +
+    # SpectraCheckEvidencePanels composite as the Processed tab.
+    peak_count: int = Field(default=0, ge=0)
+    peaks: list[dict[str, Any]] = Field(default_factory=list)
+    peak_category_summary: dict[str, int] = Field(default_factory=dict)
+    labile_hydrogen_summary: dict[str, Any] = Field(default_factory=dict)
+    proton_inventory: dict[str, Any] = Field(default_factory=dict)
+    impurity_candidates: list[dict[str, Any]] = Field(default_factory=list)
     x: list[float] = Field(default_factory=list)
     y: list[float] = Field(default_factory=list)
     x_label: str = "ppm"

@@ -21,6 +21,14 @@ import { SPECTRACHECK_RAW_FID_ACCEPT, isRawFidArchiveFilename } from "@/src/lib/
 import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
 import { SpectrumViewer } from "@/components/science/SpectrumViewer"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
+import {
+  EnrichedPickedPeaksPanel,
+  SpectraCheckEvidencePanels,
+} from "@/components/spectracheck/spectracheck-evidence-panels"
+import {
+  MetadataKeyValueCard,
+  ProcessingParametersCard,
+} from "@/components/spectracheck/spectracheck-processing-parameters-card"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
@@ -40,7 +48,8 @@ import { ModuleCard } from "@/components/dashboard/module-card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+// Textarea import removed: processing-parameters + acquisition-metadata
+// cards now use ProcessingParametersCard / MetadataKeyValueCard.
 import { cn } from "@/lib/utils"
 import {
   Activity,
@@ -73,6 +82,19 @@ type Props = {
    * candidate scoring can apply class-specific priors.
    */
   compoundClass?: CompoundClassValue
+  /**
+   * Shared session-card values from the NMR text + candidates tab. Forwarded
+   * to ``/nmr/raw-fid/process`` so the backend can:
+   *   - Parse the first SMILES from ``candidatesText`` → enrich picked peaks
+   *     with category/region/labile_hint/impurity_match (same as the
+   *     Processed 1H/13C analyze pipeline).
+   *   - Mark whether 1H / 13C reference texts were supplied (audit trail).
+   * Default to empty strings so existing call sites that don't pass them
+   * still work and the FormData simply omits the param.
+   */
+  candidatesText?: string
+  protonText?: string
+  carbonText?: string
   registerDev?: (key: string, value: unknown) => void
 }
 
@@ -104,6 +126,9 @@ export function SpectraCheckRawFidSection({
   onSampleIdChange,
   solvent,
   compoundClass = COMPOUND_CLASS_UNSPECIFIED,
+  candidatesText = "",
+  protonText = "",
+  carbonText = "",
   registerDev,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -160,6 +185,10 @@ export function SpectraCheckRawFidSection({
 
   // dragOver is purely ephemeral visual state — fine to reset on remount.
   const [dragOver, setDragOver] = useState(false)
+  // Local state for the collapsible "Processing parameters" panel at the
+  // bottom of the results. Reference data the reviewer only opens when they
+  // need to audit the FID processing knobs, so the default is closed.
+  const [processingParamsOpen, setProcessingParamsOpen] = useState(false)
 
   // Re-attach the persisted File to the (possibly remounted) <input> via DataTransfer
   // so existing fileRef.current?.files?.[0] callsites continue to work after tab switches.
@@ -272,6 +301,9 @@ export function SpectraCheckRawFidSection({
         return
       }
       const ccParam = compoundClassForRequest(compoundClass)
+      const cand = candidatesText.trim()
+      const sharedProton = protonText.trim()
+      const sharedCarbon = carbonText.trim()
       const jid = await analysisJob.createJob(
         buildAnalysisJobPayload({
           sessionId: ws?.backendSessionId ?? null,
@@ -285,6 +317,9 @@ export function SpectraCheckRawFidSection({
             processing_preset: preset,
             preserve_raw: true,
             ...(ccParam ? { compound_class: ccParam } : {}),
+            ...(cand ? { candidates_text: cand } : {}),
+            ...(sharedProton ? { proton_nmr_text: sharedProton } : {}),
+            ...(sharedCarbon ? { carbon13_text: sharedCarbon } : {}),
           },
         }),
       )
@@ -307,6 +342,14 @@ export function SpectraCheckRawFidSection({
     }
     const ccParam = compoundClassForRequest(compoundClass)
     if (ccParam) fd.append("compound_class", ccParam)
+    // Shared session inputs — drives peak enrichment + evidence panels on
+    // the response (parity with /nmr/processed/analyze).
+    const cand = candidatesText.trim()
+    if (cand) fd.append("candidates_text", cand)
+    const sharedProton = protonText.trim()
+    if (sharedProton) fd.append("proton_nmr_text", sharedProton)
+    const sharedCarbon = carbonText.trim()
+    if (sharedCarbon) fd.append("carbon13_text", sharedCarbon)
     return fd
   }
 
@@ -361,7 +404,7 @@ export function SpectraCheckRawFidSection({
                 ? rec.processing_preset
                 : typeof processingMetadata?.selected_preset === "string"
                   ? processingMetadata.selected_preset
-                  : "safe_automatic",
+                  : "balanced",
           },
           previewSpectrumLoading: false,
         })
@@ -538,7 +581,8 @@ export function SpectraCheckRawFidSection({
   const nucleusMeta = meta && typeof meta.nucleus === "string" ? meta.nucleus : null
   const sw = meta && (meta.spectral_width_hz ?? meta.spectral_width ?? meta.sw)
   const td = meta && (meta.time_domain_points ?? meta.td ?? meta.np)
-  const procParams = meta && meta.processing_parameters != null ? meta.processing_parameters : meta?.parameters
+  // procParams derivation removed — ProcessingParametersCard reads
+  // ``payload.processing_parameters`` directly with its own type guards.
 
   const warnings =
     meta && Array.isArray(meta.warnings) ? meta.warnings.map(String) : meta && typeof meta.warnings === "string" ? [meta.warnings] : []
@@ -1331,49 +1375,20 @@ export function SpectraCheckRawFidSection({
                   </Card>
                 )}
 
-                {/* Processing parameters */}
-                {procParams != null && (
-                  <Card
-                    className="overflow-hidden rounded-xl py-0"
-                    style={{ borderTop: "3px solid var(--mt-teal)" }}
-                  >
-                    <CardContent className="space-y-2 py-3">
-                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                        Processing parameters
-                      </p>
-                      <Textarea
-                        readOnly
-                        value={typeof procParams === "string" ? procParams : JSON.stringify(procParams, null, 2)}
-                        rows={6}
-                        className="font-mono text-[11px]"
-                      />
-                    </CardContent>
-                  </Card>
-                )}
+                {/* Processing parameters moved to a collapsible at the bottom
+                    of the results (just above Developer JSON) so reviewers
+                    aren't forced to scroll past the processing knobs to see
+                    the picked-peaks / evidence panels that drive the analysis. */}
 
-                {/* Acquisition metadata */}
-                {meta?.acquisition_metadata != null && (
-                  <Card
-                    className="overflow-hidden rounded-xl py-0"
-                    style={{ borderTop: "3px solid var(--mt-teal)" }}
-                  >
-                    <CardContent className="space-y-2 py-3">
-                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                        Acquisition metadata
-                      </p>
-                      <Textarea
-                        readOnly
-                        value={
-                          typeof meta.acquisition_metadata === "string"
-                            ? meta.acquisition_metadata
-                            : JSON.stringify(meta.acquisition_metadata, null, 2)
-                        }
-                        rows={5}
-                        className="font-mono text-[11px]"
-                      />
-                    </CardContent>
-                  </Card>
-                )}
+                {/* Acquisition metadata — friendly flat key/value grid
+                    matching the processing-parameters card style. Previously
+                    a JSON-textarea dump. */}
+                <MetadataKeyValueCard
+                  payload={displayPayload}
+                  title="Acquisition metadata"
+                  field="acquisition_metadata"
+                  testId="acquisition-metadata-card"
+                />
 
                 {/* Warnings card */}
                 {warnings.length > 0 && (
@@ -1401,6 +1416,58 @@ export function SpectraCheckRawFidSection({
                   </Card>
                 )}
               </div>
+            ) : null}
+
+            {/* Enriched picked peaks + evidence panels — parity with the
+                Processed 1H/13C tab. ``/nmr/raw-fid/process`` now returns
+                the same shape (peaks with category/region, plus
+                peak_category_summary, labile_hydrogen_summary,
+                proton_inventory, impurity_candidates), so the same panels
+                light up here automatically. */}
+            {displayPayload != null ? (
+              <>
+                <EnrichedPickedPeaksPanel payload={displayPayload} />
+                <SpectraCheckEvidencePanels payload={displayPayload} />
+              </>
+            ) : null}
+
+            {/* Processing parameters — collapsible, second-to-last on the
+                page so reviewers see picked peaks + evidence first and only
+                expand the processing knobs when auditing. Defaults to closed. */}
+            {displayPayload != null ? (
+              <Collapsible
+                open={processingParamsOpen}
+                onOpenChange={setProcessingParamsOpen}
+                data-testid="processing-parameters-collapsible"
+              >
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-left transition-colors hover:bg-muted/30"
+                    data-testid="processing-parameters-collapsible-trigger"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Settings2 className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                        Processing parameters
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 text-muted-foreground transition-transform",
+                        processingParamsOpen && "rotate-180",
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent
+                  className="pt-3"
+                  data-testid="processing-parameters-collapsible-content"
+                >
+                  <ProcessingParametersCard payload={displayPayload} />
+                </CollapsibleContent>
+              </Collapsible>
             ) : null}
 
             {/* Developer JSON — full width. */}

@@ -344,7 +344,7 @@ def test_raw_bruker_fid_preserves_baseline_by_default_and_separates_display_meta
     assert report.metadata["display_mode"] == "real"
     assert report.metadata["display_gain"] == 1.0
     assert report.metadata["baseline_lock_visual_only"] is True
-    assert report.metadata["preview_downsampling"]["method"] == "min_max_bucket_extrema_preserving"
+    assert report.metadata["preview_downsampling"]["method"] == "min_max_lttb_envelope"
     assert "raw_preview_points" not in report.metadata
     assert report.metadata["display_preprocessing"]["display_baseline"] == 0.0
     assert report.metadata["display_preprocessing"]["baseline_smoothing"]["applied"] is False
