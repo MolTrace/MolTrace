@@ -6,7 +6,24 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { moltraceTraceClassName } from "@/components/branding/moltrace-wordmark"
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { Menu, ChevronDown } from "lucide-react"
+import {
+  ArrowRight,
+  BookOpen,
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  FileCheck,
+  FlaskConical,
+  GraduationCap,
+  Menu,
+  Microscope,
+  Pill,
+  ShieldCheck,
+  Waves,
+  Workflow,
+  type LucideIcon,
+} from "lucide-react"
 import { useState } from "react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 
@@ -17,19 +34,29 @@ const navItems = [
   { label: "Documentation", href: "/platform#docs" },
 ]
 
-const dropdowns: Record<string, { label: string; sub: string }[]> = {
+type DropdownItem = { label: string; sub: string; icon: LucideIcon }
+
+const dropdowns: Record<string, DropdownItem[]> = {
   Platform: [
-    { label: "Spectroscopy Intelligence",   sub: "NMR · MS · Structure elucidation"  },
-    { label: "Regulatory Intelligence Hub", sub: "ICH · FDA · EMA compliance"        },
-    { label: "Reaction Optimization",       sub: "Bayesian · Multi-objective"         },
-    { label: "Integrations",                sub: "Bruker · Agilent · LIMS"           },
+    { label: "Spectroscopy Intelligence",   sub: "NMR · MS · Structure elucidation",  icon: Waves        },
+    { label: "Regulatory Intelligence Hub", sub: "ICH · FDA · EMA compliance",        icon: ShieldCheck  },
+    { label: "Reaction Optimization",       sub: "Bayesian · Multi-objective",        icon: FlaskConical },
+    { label: "Integrations",                sub: "Bruker · Agilent · LIMS",           icon: Workflow     },
   ],
   Solutions: [
-    { label: "Pharmaceutical R&D",  sub: "Drug discovery & development" },
-    { label: "Academic Research",   sub: "University & institute labs"  },
-    { label: "CRO / Analytical",    sub: "Contract research orgs"       },
-    { label: "Regulatory Affairs",  sub: "Dossier & submission teams"   },
+    { label: "Pharmaceutical R&D",  sub: "Drug discovery & development", icon: Pill           },
+    { label: "Academic Research",   sub: "University & institute labs",  icon: GraduationCap  },
+    { label: "CRO / Analytical",    sub: "Contract research orgs",       icon: Microscope     },
+    { label: "Regulatory Affairs",  sub: "Dossier & submission teams",   icon: FileCheck      },
   ],
+}
+
+// Icons for the top-level nav entries that don't have a dropdown (Enterprise,
+// Documentation). Keyed by label so the mobile sheet can render a single
+// icon-led card per entry — same visual language as the dropdown children.
+const topLevelIcons: Record<string, LucideIcon> = {
+  Enterprise: Building2,
+  Documentation: BookOpen,
 }
 
 export function Header() {
@@ -126,49 +153,199 @@ export function Header() {
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px]">
+              {/*
+                Ultramodern mobile sidebar refresh:
+                - Glassy gradient background + subtle radial tint behind the
+                  brand block (teal soft glow)
+                - Icon-led item cards with soft-teal squircle, label + sub,
+                  trailing chevron that slides on hover
+                - Section eyebrows in teal uppercase tracking (matches the
+                  rest of the brand's eyebrow pattern)
+                - Pinned CTA footer with gradient teal "Request Demo" button
+              */}
+              <SheetContent
+                side="right"
+                data-testid="marketing-mobile-sidebar"
+                className="flex w-full max-w-[360px] flex-col gap-0 border-l border-l-[color:var(--mt-teal)]/15 bg-gradient-to-b from-background via-background to-background/95 p-0 backdrop-blur supports-[backdrop-filter]:bg-background/85"
+              >
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-                <nav className="flex flex-col gap-4 pt-8">
-                  {navItems.map((item) => {
-                    const hasDropdown = item.label in dropdowns
+
+                {/* Brand block */}
+                <div
+                  className="relative flex items-center gap-3 border-b border-b-[color:var(--mt-teal)]/10 px-5 py-5"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 0% 0%, var(--mt-teal-soft) 0%, transparent 60%)",
+                  }}
+                >
+                  <Link
+                    href="/"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3"
+                  >
+                    <MoleculeLogoMark className="h-9 w-9 rounded-xl" />
+                    <span>
+                      <span className="block text-base font-bold leading-tight tracking-tight">
+                        <span className="text-foreground">Mol</span>
+                        <span className={moltraceTraceClassName}>Trace</span>
+                      </span>
+                      <span
+                        className="block font-mono text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground"
+                      >
+                        Scientific intelligence
+                      </span>
+                    </span>
+                  </Link>
+                </div>
+
+                {/* Scrollable nav body */}
+                <nav className="flex-1 space-y-6 overflow-y-auto px-5 py-6">
+                  {/* Sectioned dropdowns (Platform, Solutions) */}
+                  {(["Platform", "Solutions"] as const).map((sectionLabel) => {
+                    const sectionHref = navItems.find((n) => n.label === sectionLabel)?.href ?? "#"
                     return (
-                      <div key={item.label}>
+                      <section key={sectionLabel} className="space-y-2.5">
                         <Link
-                          href={item.href}
+                          href={sectionHref}
                           onClick={() => setOpen(false)}
-                          className="text-lg text-muted-foreground transition-colors hover:text-foreground"
+                          className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.22em] transition-colors hover:opacity-80"
+                          style={{ color: "var(--mt-teal)" }}
                         >
-                          {item.label}
+                          {sectionLabel}
+                          <ChevronRight className="h-3 w-3" aria-hidden />
                         </Link>
-                        {hasDropdown && (
-                          <div className="ml-3 mt-2 flex flex-col gap-1.5 border-l pl-3">
-                            {dropdowns[item.label].map((sub) => (
+                        <div className="space-y-1">
+                          {dropdowns[sectionLabel].map((sub) => {
+                            const Icon = sub.icon
+                            return (
                               <a
                                 key={sub.label}
                                 href="#"
                                 onClick={() => setOpen(false)}
-                                className="text-sm text-muted-foreground hover:text-foreground"
+                                className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 transition-all hover:-translate-y-px hover:border-[color:var(--mt-teal)]/30 hover:bg-[color:var(--mt-teal-soft)] active:translate-y-0"
                               >
-                                {sub.label}
+                                <span
+                                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors"
+                                  style={{ backgroundColor: "var(--mt-teal-soft)" }}
+                                >
+                                  <Icon
+                                    className="h-4 w-4 transition-transform group-hover:scale-110"
+                                    style={{ color: "var(--mt-teal)" }}
+                                    aria-hidden
+                                  />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-semibold text-foreground">
+                                    {sub.label}
+                                  </span>
+                                  <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                                    {sub.sub}
+                                  </span>
+                                </span>
+                                <ChevronRight
+                                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                                  style={{ color: "var(--mt-teal)" }}
+                                  aria-hidden
+                                />
                               </a>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                            )
+                          })}
+                        </div>
+                      </section>
                     )
                   })}
-                  <div className="mt-4 flex flex-col gap-2">
-                    <Button variant="outline" asChild>
+
+                  {/* Single-link sections (Enterprise, Documentation) */}
+                  <section className="space-y-1.5">
+                    {navItems
+                      .filter((item) => !(item.label in dropdowns))
+                      .map((item) => {
+                        const Icon = topLevelIcons[item.label]
+                        return (
+                          <Link
+                            key={item.label}
+                            href={item.href}
+                            onClick={() => setOpen(false)}
+                            className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 transition-all hover:-translate-y-px hover:border-[color:var(--mt-teal)]/30 hover:bg-[color:var(--mt-teal-soft)] active:translate-y-0"
+                          >
+                            <span
+                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                              style={{ backgroundColor: "var(--mt-teal-soft)" }}
+                            >
+                              {Icon ? (
+                                <Icon
+                                  className="h-4 w-4 transition-transform group-hover:scale-110"
+                                  style={{ color: "var(--mt-teal)" }}
+                                  aria-hidden
+                                />
+                              ) : (
+                                <ClipboardCheck
+                                  className="h-4 w-4"
+                                  style={{ color: "var(--mt-teal)" }}
+                                  aria-hidden
+                                />
+                              )}
+                            </span>
+                            <span className="flex-1 text-sm font-semibold text-foreground">
+                              {item.label}
+                            </span>
+                            <ChevronRight
+                              className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"
+                              style={{ color: "var(--mt-teal)" }}
+                              aria-hidden
+                            />
+                          </Link>
+                        )
+                      })}
+                  </section>
+                </nav>
+
+                {/* Pinned CTA footer */}
+                <div
+                  className="space-y-2 border-t border-t-[color:var(--mt-teal)]/10 bg-background/95 px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur"
+                >
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]"
+                      asChild
+                      onClick={() => setOpen(false)}
+                    >
                       <Link href="/sign-in">Sign In</Link>
                     </Button>
-                    <Button variant="secondary" asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-[color:var(--mt-teal)]/40 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-foreground hover:border-[color:var(--mt-teal)] hover:bg-[color:var(--mt-teal-soft)]"
+                      asChild
+                      onClick={() => setOpen(false)}
+                    >
                       <Link href="/sign-up">Sign Up</Link>
                     </Button>
-                    <Button asChild>
-                      <Link href="#demo">Request Demo</Link>
-                    </Button>
                   </div>
-                </nav>
+                  <Button
+                    asChild
+                    onClick={() => setOpen(false)}
+                    className="group h-11 w-full font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[color:var(--mt-teal)]/30 active:translate-y-0"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, var(--mt-teal) 0%, #00B884 100%)",
+                    }}
+                  >
+                    <Link
+                      href="#demo"
+                      data-testid="marketing-mobile-sidebar-demo-cta"
+                      className="inline-flex items-center justify-center gap-2"
+                    >
+                      Request Demo
+                      <ArrowRight
+                        className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+                        aria-hidden
+                      />
+                    </Link>
+                  </Button>
+                </div>
               </SheetContent>
             </Sheet>
           ) : null}
