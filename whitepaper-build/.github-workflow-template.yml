@@ -1,0 +1,83 @@
+# MolTrace White-Paper PDF CI workflow.
+#
+# Copy this file to .github/workflows/whitepaper-build.yml in the repo to
+# enable. It is parked here as a template so the build system stays
+# self-contained until someone consciously turns it on.
+#
+# Triggers a build on any push or PR that touches a MolTrace_*.md file or
+# the build system itself. Uploads PDFs + SHA-256 manifest as workflow
+# artifacts. Posts the manifest to the run summary so reviewers can audit
+# which PDFs landed without downloading them.
+
+name: White-Paper PDF Build
+
+on:
+  push:
+    paths:
+      - "MolTrace_*.md"
+      - "whitepaper-build/**"
+  pull_request:
+    paths:
+      - "MolTrace_*.md"
+      - "whitepaper-build/**"
+  workflow_dispatch: {}
+
+jobs:
+  pdf:
+    name: Build PDFs (Pandoc + XeLaTeX)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc + TeX Live (XeLaTeX)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended \
+            texlive-latex-extra texlive-fonts-extra fonts-jetbrains-mono fonts-inter
+
+      - name: Verify toolchain
+        run: |
+          pandoc --version | head -1
+          xelatex --version | head -1
+
+      - name: Build all PDFs
+        run: make -C whitepaper-build all
+
+      - name: Build hash manifest
+        run: make -C whitepaper-build manifest
+
+      - name: Post manifest to summary
+        run: |
+          echo "## PDF Build Manifest" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat whitepaper-build/dist/MANIFEST.sha256 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload PDFs
+        uses: actions/upload-artifact@v4
+        with:
+          name: moltrace-whitepapers-pdf
+          path: |
+            whitepaper-build/dist/*.pdf
+            whitepaper-build/dist/MANIFEST.sha256
+          retention-days: 90
+
+  # Optional second job: Typst path. Disabled by default — uncomment to enable.
+  # typst:
+  #   name: Build PDFs (Typst)
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Install Typst
+  #       run: |
+  #         curl -fsSL https://github.com/typst/typst/releases/latest/download/typst-x86_64-unknown-linux-musl.tar.xz | tar -xJ
+  #         sudo mv typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst
+  #     - name: Build all (Typst)
+  #       run: make -C whitepaper-build all-typst
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: moltrace-whitepapers-typst-pdf
+  #         path: whitepaper-build/dist/*.pdf
