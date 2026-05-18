@@ -1,0 +1,121 @@
+% MolTrace White Paper — Pandoc / XeLaTeX header
+% Included via --include-in-header on every `make` invocation.
+
+% ────────────────────────────────────────────────────────────────────────
+% Fonts
+% ────────────────────────────────────────────────────────────────────────
+\usepackage{fontspec}
+
+% Body + heading font: try Source Sans 3 (modern, free, broad install).
+% Falls back to Helvetica Neue and then the system sans default.
+% Override via --variable=mainfont:"<font>" on the pandoc command line.
+\IfFontExistsTF{Source Sans 3}{%
+  \setmainfont{Source Sans 3}%
+}{\IfFontExistsTF{Helvetica Neue}{%
+  \setmainfont{Helvetica Neue}%
+}{}}
+
+\IfFontExistsTF{JetBrains Mono}{%
+  \setmonofont{JetBrains Mono}[Scale=0.92]%
+}{\IfFontExistsTF{Menlo}{%
+  \setmonofont{Menlo}[Scale=0.92]%
+}{}}
+
+% ────────────────────────────────────────────────────────────────────────
+% Colour theme — MolTrace brand
+% ────────────────────────────────────────────────────────────────────────
+\usepackage[dvipsnames]{xcolor}
+\definecolor{moltraceteal}{HTML}{00B884}
+\definecolor{moltraceink}{HTML}{0F172A}
+\definecolor{moltracemuted}{HTML}{475569}
+
+% ────────────────────────────────────────────────────────────────────────
+% Section heading styles (eyebrow / teal accents)
+% ────────────────────────────────────────────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\section}[block]
+  {\normalfont\Large\bfseries\color{moltraceteal}}
+  {\thesection}{0.6em}{}
+\titleformat{\subsection}[block]
+  {\normalfont\large\bfseries\color{moltraceink}}
+  {\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}[block]
+  {\normalfont\bfseries\color{moltraceink}}
+  {\thesubsubsection}{0.6em}{}
+
+% ────────────────────────────────────────────────────────────────────────
+% Links (PDF anchors + URL colour)
+% ────────────────────────────────────────────────────────────────────────
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=moltraceteal,
+  citecolor=moltraceteal,
+  urlcolor=moltraceteal,
+  pdfborder={0 0 0},
+  pdfproducer={MolTrace White Paper Build System},
+  pdfcreator={Pandoc + XeLaTeX}
+}
+
+% ────────────────────────────────────────────────────────────────────────
+% Page geometry overrides
+% ────────────────────────────────────────────────────────────────────────
+\usepackage{geometry}
+% Default geometry is set via --variable=geometry:margin=1in on the command
+% line; nothing extra needed here unless we want per-page overrides.
+
+% ────────────────────────────────────────────────────────────────────────
+% Code-block styling (monospaced, soft background)
+% ────────────────────────────────────────────────────────────────────────
+\usepackage{fancyvrb}
+\definecolor{codebg}{HTML}{F1F5F9}
+\fvset{
+  formatcom=\color{moltraceink},
+  fontsize=\small,
+  frame=single,
+  framerule=0pt,
+  rulecolor=\color{codebg},
+  framesep=8pt,
+  baselinestretch=1.1,
+}
+
+% ────────────────────────────────────────────────────────────────────────
+% Footnote sizing (citations are footnote-heavy)
+% ────────────────────────────────────────────────────────────────────────
+\usepackage[hang,bottom,flushmargin]{footmisc}
+\renewcommand{\footnotesize}{\fontsize{8.5}{10.5}\selectfont}
+
+% ────────────────────────────────────────────────────────────────────────
+% Tables — alternate-row tinting + crisp rules
+% ────────────────────────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{colortbl}
+\definecolor{tablestripe}{HTML}{F8FAFC}
+\rowcolors{2}{tablestripe}{white}
+
+% ────────────────────────────────────────────────────────────────────────
+% Headers & footers (footer carries © + version + page)
+% ────────────────────────────────────────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[L]{\footnotesize\color{moltracemuted}© 2026 MolTrace Technologies, Inc.}
+\fancyfoot[C]{\footnotesize\color{moltracemuted}MolTrace White Paper · 2026-Q2}
+\fancyfoot[R]{\footnotesize\color{moltracemuted}\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Title page footer stays clean
+\fancypagestyle{plain}{%
+  \fancyhf{}%
+  \fancyfoot[C]{\footnotesize\color{moltracemuted}© 2026 MolTrace Technologies, Inc.}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \renewcommand{\footrulewidth}{0pt}%
+}
+
+% ────────────────────────────────────────────────────────────────────────
+% Allow more aggressive hyphenation for long URLs / DOIs in references
+% ────────────────────────────────────────────────────────────────────────
+\sloppy
+\hyphenpenalty=4000
+\exhyphenpenalty=4000

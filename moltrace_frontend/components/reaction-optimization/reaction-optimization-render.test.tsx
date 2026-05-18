@@ -71,6 +71,19 @@ describe("Reaction Program Interface Workspace (wrapper tabs)", () => {
     expect(screen.getByRole("tab", { name: /Reaction Optimization/i })).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: /Reaction Studio/i })).toBeInTheDocument()
   })
+
+  it("uses the same dark active text color for violet program tabs in light mode", async () => {
+    const { ReactionProgramInterfaceWorkspace } = await import(
+      "@/components/reaction-optimization/reaction-program-interface-workspace"
+    )
+    renderC(<ReactionProgramInterfaceWorkspace />)
+    expect(screen.getByRole("tab", { name: /Reaction Optimization/i })).toHaveClass(
+      "data-[state=active]:[color:#04080F]",
+    )
+    expect(screen.getByRole("tab", { name: /Reaction Studio/i })).toHaveClass(
+      "data-[state=active]:[color:#04080F]",
+    )
+  })
 })
 
 describe("Reaction Project Detail (largest workspace, 11 tabs)", () => {
