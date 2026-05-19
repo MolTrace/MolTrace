@@ -24,10 +24,14 @@ export const AUTH_TOKEN_STORAGE_KEY = "moltrace.access_token"
 export const AUTH_USER_STORAGE_KEY = "moltrace.user"
 export const TENANT_ID_STORAGE_KEY = "moltrace.current_tenant_id"
 export const GENERIC_REQUEST_FAILURE_MESSAGE = "Request could not be completed. Please try again."
+const BACKEND_CONNECTION_FAILURE_MESSAGE = "Backend connection failed. Please retry in a moment."
 
 const INTERNAL_ERROR_MESSAGE_PATTERN =
   /(backend\s+requires\s+authentication|for\s+local\s+development|disable\s+backend\s+auth|disable_auth|disable_backend_auth|todo:|authorization\s*:\s*bearer|bearer\s*<\s*token\s*>|bearer\s+token|x-api-key|api[_\s-]?key|\b(?:get|post|put|patch|delete)\s+\/[a-z0-9]|\/api\/backend\/|raw\s+prompt|system\s+prompt|developer\s+prompt|chain[_\s-]?of[_\s-]?thought|\bcot\b|reasoning[_\s-]?trace|credential\s*[:=]|secret\s*[:=]|password\s*[:=]|private[_\s-]?key|service[_\s-]?account|traceback\s+\(most\s+recent\s+call\s+last\)|\bfile\s+"[^"]+")/i
 const NETWORK_ERROR_MESSAGE_PATTERN = /failed\s+to\s+fetch|network\s*error|load\s+failed/i
+const HTML_ERROR_MESSAGE_PATTERN = /<\s*(?:!doctype|html|head|body|title|style|script)\b/i
+const GATEWAY_ERROR_MESSAGE_PATTERN =
+  /\b(?:502|503|504)\b|bad\s+gateway|service\s+unavailable|gateway\s+timeout|powered\s+by\s+render|render.?s\s+documentation/i
 
 type ApiRequestInit = Omit<RequestInit, "body"> & {
   body?: unknown
@@ -114,7 +118,12 @@ export function sanitizePublicApiErrorMessage(
 
   const candidate = message.trim()
   if (!candidate) return fallback
-  if (NETWORK_ERROR_MESSAGE_PATTERN.test(candidate)) return "Backend connection failed. Please retry in a moment."
+  if (NETWORK_ERROR_MESSAGE_PATTERN.test(candidate)) return BACKEND_CONNECTION_FAILURE_MESSAGE
+  if (status === 502 || status === 503 || status === 504) return BACKEND_CONNECTION_FAILURE_MESSAGE
+  if (HTML_ERROR_MESSAGE_PATTERN.test(candidate) && GATEWAY_ERROR_MESSAGE_PATTERN.test(candidate)) {
+    return BACKEND_CONNECTION_FAILURE_MESSAGE
+  }
+  if (candidate.startsWith("<") && HTML_ERROR_MESSAGE_PATTERN.test(candidate)) return fallback
   if (INTERNAL_ERROR_MESSAGE_PATTERN.test(candidate)) return fallback
   return candidate
 }
