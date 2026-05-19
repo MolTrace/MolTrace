@@ -178,7 +178,7 @@
       <polygon points="48,0 64,32 48,64 32,32" fill="url(#moltrace-wordmark-mark-rightface)"/>
       <polygon points="32,32 48,64 16,64 0,32" fill="url(#moltrace-wordmark-mark-leftface)"/>
     </g>
-    <g mask="url(#moltrace-wordmark-mark-cutout)" filter="url(#moltrace-wordmark-mark-glow)" stroke="#26C6FF" stroke-width="1.2" stroke-linejoin="miter" fill="none">
+    <g mask="url(#moltrace-wordmark-mark-cutout)" stroke="#26C6FF" stroke-width="1.2" stroke-linejoin="miter" fill="none">
       <polygon points="26.464,16.000 22.000,18.000 19.536,16.000 21.536,12.000 26.000,10.000 28.464,12.000"/>
       <polygon points="52.732,28.464 50.000,27.000 49.268,21.536 51.268,17.536 54.000,19.000 54.732,24.464"/>
       <polygon points="31.464,55.000 29.000,57.000 24.536,55.000 22.536,51.000 25.000,49.000 29.464,51.000"/>
@@ -188,12 +188,10 @@
       <line x1="32" y1="32" x2="48" y2="64"/>
       <line x1="32" y1="32" x2="0" y2="32"/>
     </g>
-    <g filter="url(#moltrace-wordmark-mark-engrave)">
-      <text x="32" y="31.2" dy="0.33em"
-        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="36" font-weight="900" text-anchor="middle"
-        text-rendering="geometricPrecision" fill="url(#moltrace-wordmark-mark-mgrad)">m</text>
-    </g>
+    <text x="32" y="31.2" dy="0.33em"
+      font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+      font-size="36" font-weight="900" text-anchor="middle"
+      text-rendering="geometricPrecision" fill="url(#moltrace-wordmark-mark-mgrad)">m</text>
     <polygon points="16,0 48,0 64,32 48,64 16,64 0,32" fill="none" stroke="#26C6FF" stroke-width="4" stroke-linejoin="miter"/>
   </g>
 </svg>

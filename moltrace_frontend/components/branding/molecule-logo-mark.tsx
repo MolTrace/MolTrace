@@ -308,10 +308,9 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
         </g>
         {/* One honeycomb cell at the geometric centroid of each face,
             skewed to follow the face's perspective so it reads as
-            embedded on the surface. */}
+            embedded on the surface. Crisp strokes, no glow filter. */}
         <g
           mask={`url(#${maskId})`}
-          filter={`url(#${glowId})`}
           strokeWidth={1.2}
           strokeLinejoin="miter"
           strokeLinecap="butt"
@@ -353,16 +352,14 @@ export function MoleculeLogoMark({ className, textClassName }: MoleculeLogoMarkP
           <line x1="32" y1="32" x2="48" y2="64" />
           <line x1="32" y1="32" x2="0" y2="32" />
         </g>
-        {/* m engraved into the cube — dark cavity gradient + inner shadow
-            on top rim + inner highlight on lit floor → reads as inserted
-            into the cube surface with visible 3D depth. */}
+        {/* m drawn as a clean solid white letter on the cube — no engrave
+            filter so it reads as crisply visible, not inserted. */}
         <g
           className={letterClassName}
           fontFamily="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
           fontSize={40}
           fontWeight={900}
           textAnchor="middle"
-          filter={`url(#${engraveId})`}
         >
           <text x="32" y="32" dy="0.33em" fill={`url(#${mGradId})`}>
             m
