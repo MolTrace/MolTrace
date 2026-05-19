@@ -186,10 +186,12 @@
       <line x1="32" y1="32" x2="48" y2="64"/>
       <line x1="32" y1="32" x2="0" y2="32"/>
     </g>
-    <text x="32" y="31.2" dy="0.33em"
-      font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-      font-size="36" font-weight="900" text-anchor="middle"
-      text-rendering="geometricPrecision" fill="url(#moltrace-mark-mgrad)">m</text>
+    <g filter="url(#moltrace-mark-lift)">
+      <text x="32" y="31.2" dy="0.33em"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="36" font-weight="900" text-anchor="middle"
+        text-rendering="geometricPrecision" fill="url(#moltrace-mark-mgrad)">m</text>
+    </g>
     <polygon points="16,0 48,0 64,32 48,64 16,64 0,32" fill="none" stroke="#26C6FF" stroke-width="4" stroke-linejoin="miter"/>
   </g>
 </svg>
