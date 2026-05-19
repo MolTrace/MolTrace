@@ -151,6 +151,32 @@ describe("apiFetch", () => {
     )
   })
 
+  it("replaces provider gateway HTML with user-friendly copy", async () => {
+    const renderErrorPage =
+      '<!DOCTYPE html><html><head><title>502</title></head><body><h1>Bad Gateway</h1><p>Powered by Render</p></body></html>'
+
+    expect(sanitizePublicApiErrorMessage(renderErrorPage, 502)).toBe(
+      "Backend connection failed. Please retry in a moment."
+    )
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(renderErrorPage, {
+          status: 502,
+          statusText: "Bad Gateway",
+          headers: { "content-type": "text/html" },
+        })
+      })
+    )
+
+    await expect(apiFetch("/nmr/raw-fid/preview")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 502,
+      message: "Backend connection failed. Please retry in a moment.",
+    } satisfies Partial<ApiError>)
+  })
+
   it("flattens FastAPI validation error arrays into a readable string (no [object Object])", async () => {
     const fastApiValidationError = {
       detail: [
