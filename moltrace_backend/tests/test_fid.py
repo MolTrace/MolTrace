@@ -31,7 +31,12 @@ from nmrcheck.api import (
     report_from_analysis,
 )
 from nmrcheck.database import get_raw_archive_by_sha256, init_db, list_recent_analyses
-from nmrcheck.fid import FIDProcessingError, fid_settings_from_preset, process_bruker_1d_zip
+from nmrcheck.fid import (
+    FIDProcessingError,
+    fid_settings_from_preset,
+    normalize_apodization_mode,
+    process_bruker_1d_zip,
+)
 from nmrcheck.models import FIDProcessingRecipe, FIDRunReviewCreate
 from nmrcheck.raw_vault import build_raw_upload_provenance
 from nmrcheck.settings import Settings
@@ -48,6 +53,42 @@ def test_fid_processing_recipe_defaults_are_safe_real_spectrum_defaults() -> Non
     assert recipe.display_mode == "real"
     assert recipe.vertical_gain == 1.0
     assert recipe.debug_preview is False
+
+
+def test_raw_fid_accepts_sine_bell_windowing_before_fft() -> None:
+    assert normalize_apodization_mode("sine-bell") == "sine_bell"
+    settings = fid_settings_from_preset(
+        selected_preset="balanced",
+        apodization_mode="sine_bell",
+        line_broadening_hz=0.0,
+        zero_fill_factor=4,
+    )
+
+    report = process_bruker_1d_zip(
+        filename="bruker_dataset.zip",
+        content=_build_bruker_zip(),
+        settings=settings,
+    )
+
+    recipe = report.processing_metadata.processing_recipe
+    assert recipe.apodization_mode == "sine_bell"
+    assert report.metadata["line_broadening"]["window_function"] == "sine_bell"
+    assert report.metadata["line_broadening"]["window_applied"] is True
+    assert report.metadata["line_broadening"]["window"]["applied_before_fft"] is True
+    zero_filling = report.metadata["zero_filling"]
+    assert zero_filling["factor"] == 4
+    assert zero_filling["fft_size"] > zero_filling["input_points"]
+    assert zero_filling["zero_filled_points_added"] > 0
+    preparation = report.metadata["plotly_data_preparation"]
+    assert preparation["applied_before_plotly"] is True
+    assert preparation["sequence"] == [
+        "digital_filter_or_group_delay",
+        "apodization_window",
+        "zero_fill_fft",
+        "phase_correction",
+        "baseline_flattening",
+        "peak_preserving_downsample",
+    ]
 
 
 def _build_request() -> Request:

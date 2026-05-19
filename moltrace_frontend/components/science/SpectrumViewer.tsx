@@ -76,6 +76,7 @@ export type SpectrumViewerProps = {
   xLabel?: string
   yLabel?: string
   reversedXAxis?: boolean
+  renderMode?: "svg" | "webgl"
   className?: string
 }
 
@@ -441,6 +442,7 @@ function SpectrumViewerImpl({
   xLabel = "ppm",
   yLabel = "Intensity",
   reversedXAxis = true,
+  renderMode = "svg",
   className,
 }: SpectrumViewerProps) {
   // Default gain01 = 0 → multiplier 1×, so the entire spectrum fits within the
@@ -660,9 +662,9 @@ function SpectrumViewerImpl({
    *    trace-index diff stays stable even when peak annotations change.
    *
    * Critical for non-shaky rendering:
-   *  - Trace type ``scatter`` uses SVG instead of WebGL. The spectrum is
-   *    already downsampled before Plotly sees it, and avoiding WebGL prevents
-   *    scroll-time canvas/layer flicker in the large analysis result card.
+   *  - Trace type defaults to SVG ``scatter`` because processed spectra are
+   *    already downsampled before Plotly sees them. Raw FID can opt into
+   *    ``scattergl`` for dense FFT traces without changing the processed path.
    *  - The observed / predicted arrays are viewport-limited with a
    *    MinMaxLTTB envelope before Plotly sees them, preserving narrow peaks
    *    without forcing WebGL to diff a million-point trace on each React commit.
@@ -674,9 +676,10 @@ function SpectrumViewerImpl({
    */
   const data = useMemo(() => {
     if (observedSample.x.length === 0) return []
+    const lineTraceType = renderMode === "webgl" ? "scattergl" : "scatter"
     const traces: object[] = [
       {
-        type: "scatter",
+        type: lineTraceType,
         mode: "lines",
         x: observedSample.x,
         y: observedDisplayY,
@@ -692,13 +695,14 @@ function SpectrumViewerImpl({
       displayPred
     ) {
       traces.push({
-        type: "scatter",
+        type: lineTraceType,
         mode: "lines",
         x: predictedSample.x,
         y: displayPred,
         name: traceNameWithResampling(predictedLabel, predictedSample),
         line: { width: 1, dash: "dash", color: "#c026d3" },
         opacity: 0.85,
+        connectgaps: false,
       })
     }
     if (peakDisplayPoints.length > 0) {
@@ -748,6 +752,7 @@ function SpectrumViewerImpl({
     predictedSample,
     predictedLabel,
     peakDisplayPoints,
+    renderMode,
     showPredicted,
   ])
 

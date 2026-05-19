@@ -19,6 +19,7 @@ type CapturedPlotProps = {
     line?: { color?: string }
     marker?: { color?: string }
     showlegend?: boolean
+    connectgaps?: boolean
   }>
   layout?: {
     uirevision?: unknown
@@ -81,6 +82,14 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     freshRender(<SpectrumViewer x={[3, 2, 1]} y={[0, 1, 0]} />)
 
     expect(capturedPlotProps?.layout?.uirevision).toBe("spectrum")
+  })
+
+  it("uses Plotly WebGL for raw FID render mode without connecting gaps", () => {
+    freshRender(<SpectrumViewer x={[3, 2, 1]} y={[0, Number.NaN, 0.2]} renderMode="webgl" />)
+
+    const traces = capturedPlotProps?.data ?? []
+    expect(traces[0].type).toBe("scattergl")
+    expect(traces[0].connectgaps).toBe(false)
   })
 
   it("keeps negative baseline excursions inside the initial y-axis range", () => {
