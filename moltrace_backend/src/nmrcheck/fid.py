@@ -278,6 +278,15 @@ def normalize_apodization_mode(value: str | None) -> str:
         return "none"
     if normalized in {"exp", "exponential", "exponential_line_broadening", "line_broadening"}:
         return "exponential"
+    if normalized in {
+        "sine",
+        "sine_bell",
+        "sinebell",
+        "sinbell",
+        "sine_window",
+        "sine_bell_window",
+    }:
+        return "sine_bell"
     return "exponential"
 
 
@@ -920,6 +929,92 @@ def _next_power_of_two(value: int) -> int:
     return 1 << (max(1, int(value)) - 1).bit_length()
 
 
+def _fid_apodization_window(
+    size: int,
+    params: dict[str, Any],
+    line_broadening_hz: float,
+    *,
+    mode: str = "exponential",
+) -> tuple[np.ndarray, dict[str, Any]]:
+    normalized_mode = normalize_apodization_mode(mode)
+    n = max(0, int(size))
+    metadata: dict[str, Any] = {
+        "apodization_mode": normalized_mode,
+        "window_function": "none",
+        "window_applied": False,
+        "applied_before_fft": False,
+        "fid_points": n,
+        "line_broadening_hz": float(line_broadening_hz),
+    }
+    if n == 0:
+        metadata["skip_reason"] = "empty_fid"
+        return np.ones(0, dtype=float), metadata
+    if normalized_mode == "none":
+        metadata["skip_reason"] = "apodization_disabled"
+        return np.ones(n, dtype=float), metadata
+
+    if normalized_mode == "sine_bell":
+        # Classic sine-bell apodization damps the beginning/end of the time
+        # domain trace before FFT, reducing truncation ripple in dense raw FID
+        # previews. The +1/(N+1) form avoids exact zeros at the endpoints.
+        idx = np.arange(n, dtype=float)
+        window = np.sin(math.pi * (idx + 1.0) / (n + 1.0))
+        metadata.update(
+            {
+                "window_function": "sine_bell",
+                "window_applied": True,
+                "applied_before_fft": True,
+                "first_weight": round(float(window[0]), 10),
+                "last_weight": round(float(window[-1]), 10),
+                "max_weight": round(float(np.max(window)), 10),
+            }
+        )
+        return window, metadata
+
+    sw_h = _param_float(params, "SW_h", "SW_hz", "sw")
+    if sw_h is None or sw_h <= 0:
+        metadata["skip_reason"] = "missing_or_invalid_sweep_width"
+        return np.ones(n, dtype=float), metadata
+    if line_broadening_hz <= 0:
+        metadata["skip_reason"] = "line_broadening_non_positive"
+        return np.ones(n, dtype=float), metadata
+    dwell = 1.0 / sw_h
+    t = np.arange(n, dtype=float) * dwell
+    window = np.exp(-math.pi * float(line_broadening_hz) * t)
+    metadata.update(
+        {
+            "window_function": "exponential_line_broadening",
+            "window_applied": True,
+            "applied_before_fft": True,
+            "dwell_time_sec": round(float(dwell), 12),
+            "sweep_width_hz": round(float(sw_h), 6),
+            "first_weight": round(float(window[0]), 10),
+            "last_weight": round(float(window[-1]), 10),
+            "max_weight": round(float(np.max(window)), 10),
+        }
+    )
+    return window, metadata
+
+
+def _apply_fid_apodization(
+    fid: np.ndarray,
+    params: dict[str, Any],
+    line_broadening_hz: float,
+    *,
+    mode: str = "exponential",
+) -> tuple[np.ndarray, dict[str, Any]]:
+    working = np.array(fid, dtype=np.complex128, copy=True)
+    window, metadata = _fid_apodization_window(
+        working.size,
+        params,
+        line_broadening_hz,
+        mode=mode,
+    )
+    if window.size:
+        working = working * window
+    return working, metadata
+
+
 def _apply_line_broadening(
     fid: np.ndarray,
     params: dict[str, Any],
@@ -927,15 +1022,13 @@ def _apply_line_broadening(
     *,
     mode: str = "exponential",
 ) -> np.ndarray:
-    working = np.array(fid, dtype=np.complex128, copy=True)
-    if normalize_apodization_mode(mode) == "none" or line_broadening_hz <= 0:
-        return working
-    sw_h = _param_float(params, "SW_h", "SW_hz", "sw")
-    if sw_h is None or sw_h <= 0:
-        return working
-    dwell = 1.0 / sw_h
-    t = np.arange(working.size, dtype=float) * dwell
-    return working * np.exp(-math.pi * float(line_broadening_hz) * t)
+    windowed, _metadata = _apply_fid_apodization(
+        fid,
+        params,
+        line_broadening_hz,
+        mode=mode,
+    )
+    return windowed
 
 
 def _phase_spectrum(spectrum: np.ndarray, *, ph0: float, ph1: float = 0.0, pivot: int | None = None) -> np.ndarray:
@@ -1686,7 +1779,7 @@ def _recipe_from_processing_state(
     )
     baseline_mode = normalize_baseline_mode(str(baseline_mode))
     apodization_mode = normalize_apodization_mode(settings.apodization_mode)
-    if settings.line_broadening_hz <= 0:
+    if apodization_mode == "exponential" and settings.line_broadening_hz <= 0:
         apodization_mode = "none"
     return FIDProcessingRecipe(
         vendor=vendor_format_detected,
@@ -1727,6 +1820,8 @@ def _metadata_from_preview(
     settings: FIDProcessingSettings,
     acquisition_parameters: dict[str, Any],
     fft_size: int,
+    fid_points_before_zero_fill: int,
+    apodization_detail: dict[str, Any] | None,
     phase_angle_degrees: float,
     phase_settings_detail: dict[str, float] | None = None,
     baseline_correction_detail: dict[str, Any] | None = None,
@@ -1766,15 +1861,21 @@ def _metadata_from_preview(
         zero_filling={
             "factor": settings.zero_fill_factor,
             "fft_size": fft_size,
+            "input_points": int(fid_points_before_zero_fill),
+            "zero_filled_points_added": max(0, int(fft_size) - int(fid_points_before_zero_fill)),
         },
         line_broadening={
             "hz": settings.line_broadening_hz,
             "apodization_mode": processing_recipe.apodization_mode,
-            "window_function": (
+            "window_function": (apodization_detail or {}).get("window_function")
+            or (
                 "exponential_line_broadening"
                 if processing_recipe.apodization_mode == "exponential"
                 else "none"
             ),
+            "window_applied": bool((apodization_detail or {}).get("window_applied", False)),
+            "applied_before_fft": bool((apodization_detail or {}).get("applied_before_fft", False)),
+            "window": dict(apodization_detail or {}),
         },
         phase_settings={
             "automatic": phase_applied,
@@ -1994,7 +2095,8 @@ def process_bruker_1d_zip(
         fid_for_qa = np.asarray(fid, dtype=np.complex128)
         # Do not mutate raw vendor files or immutable raw archive.
         # Apodization and all later processing happen on this in-memory working copy.
-        fid = _apply_line_broadening(
+        fid_points_before_zero_fill = int(fid.size)
+        fid, apodization_detail = _apply_fid_apodization(
             fid,
             params,
             settings.line_broadening_hz,
@@ -2266,6 +2368,8 @@ def process_bruker_1d_zip(
             settings=settings,
             acquisition_parameters=acquisition_parameters,
             fft_size=int(fft_size),
+            fid_points_before_zero_fill=fid_points_before_zero_fill,
+            apodization_detail=apodization_detail,
             phase_angle_degrees=phase_settings["zero_order_degrees"],
             phase_settings_detail=phase_settings,
             baseline_correction_detail=baseline_correction_detail,
@@ -2308,6 +2412,26 @@ def process_bruker_1d_zip(
                 "line_broadening": metadata.line_broadening,
                 "phase_settings": metadata.phase_settings,
                 "baseline_correction": metadata.baseline_correction,
+                "plotly_data_preparation": {
+                    "applied_before_plotly": True,
+                    "source": "raw_fid_time_domain",
+                    "sequence": [
+                        "digital_filter_or_group_delay",
+                        "apodization_window",
+                        "zero_fill_fft",
+                        "phase_correction",
+                        "baseline_flattening",
+                        "peak_preserving_downsample",
+                    ],
+                    "windowing": metadata.line_broadening,
+                    "zero_filling": metadata.zero_filling,
+                    "baseline": metadata.baseline_correction,
+                    "downsampling": {
+                        "method": _PREVIEW_DOWNSAMPLING_METHOD,
+                        "point_limit": settings.max_preview_points,
+                        "source_point_count": len(points),
+                    },
+                },
                 "phase": {
                     "mode": metadata.phase_settings.get("phase_mode"),
                     "p0": metadata.phase_settings.get("phase_p0"),

@@ -1172,7 +1172,13 @@ export function SpectraCheckRawFidSection({
                 </div>
               ) : null}
               {xy ? (
-                <SpectrumViewer x={xy.x} y={xy.y} peaks={peaks} nucleus={nucleus} />
+                <SpectrumViewer
+                  x={xy.x}
+                  y={xy.y}
+                  peaks={peaks}
+                  nucleus={nucleus}
+                  renderMode="webgl"
+                />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (
                 <div
                   className="flex h-[360px] min-w-0 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 p-6 text-center"

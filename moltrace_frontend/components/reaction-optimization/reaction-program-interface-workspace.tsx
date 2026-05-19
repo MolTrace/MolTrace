@@ -25,17 +25,33 @@ export function ReactionProgramInterfaceWorkspace() {
         </p>
       </div>
 
+      {/*
+        Tabs row: on narrow viewports the second label "Reaction Studio
+        (program-level)" used to push past the right edge of the screen
+        because the default TabsList is ``inline-flex w-fit`` (sizes to its
+        content) inside a non-scrollable parent.
+
+        Fix:
+          - ``max-w-full overflow-x-auto`` lets the list scroll horizontally
+            when it can't fit its content into the parent's width.
+          - ``[scrollbar-width:none] [&::-webkit-scrollbar]:hidden`` hides the
+            scrollbar so the row stays clean (same convention as the
+            MobileBottomNav and AppShell mobile tab row).
+          - ``shrink-0`` on each trigger prevents the triggers from being
+            squeezed below their natural label width — the trigger is sized
+            to its content, and the LIST (not the triggers) overflows.
+      */}
       <Tabs defaultValue={defaultTab} className="space-y-4">
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabsTrigger
             value="reaction-overview"
-            className="font-mono data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+            className="shrink-0 font-mono data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
           >
             Reaction Optimization
           </TabsTrigger>
           <TabsTrigger
             value="reaction-studio"
-            className="font-mono data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+            className="shrink-0 font-mono data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
           >
             Reaction Studio (program-level)
           </TabsTrigger>
