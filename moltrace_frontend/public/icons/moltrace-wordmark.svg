@@ -7,10 +7,7 @@
     <clipPath id="moltrace-wordmark-mark-hex" clipPathUnits="userSpaceOnUse">
       <polygon points="16,0 48,0 64,32 48,64 16,64 0,32"/>
     </clipPath>
-  </defs>
-  <g clip-path="url(#moltrace-wordmark-mark-hex)">
-    <rect width="64" height="64" fill="#051f3a"/>
-    <g fill="none" stroke="#26C6FF" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" shape-rendering="geometricPrecision">
+    <g id="moltrace-wordmark-mark-cells" fill="none" stroke="#26C6FF" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" shape-rendering="geometricPrecision">
 <polygon points="-8.900,-8.375 -13.533,-5.700 -18.166,-8.375 -18.166,-13.725 -13.533,-16.400 -8.900,-13.725"/>
 <polygon points="0.367,-8.375 -4.266,-5.700 -8.900,-8.375 -8.900,-13.725 -4.266,-16.400 0.367,-13.725"/>
 <polygon points="9.633,-8.375 5.000,-5.700 0.367,-8.375 0.367,-13.725 5.000,-16.400 9.633,-13.725"/>
@@ -112,16 +109,92 @@
 <polygon points="55.966,71.875 51.332,74.550 46.699,71.875 46.699,66.525 51.332,63.850 55.966,66.525"/>
 <polygon points="65.232,71.875 60.599,74.550 55.966,71.875 55.966,66.525 60.599,63.850 65.232,66.525"/>
     </g>
-    <g
-      font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-      font-size="36"
-      font-weight="900"
-      text-anchor="middle"
-      text-rendering="geometricPrecision"
-    >
-      <text x="32" y="31.2" dy="0.33em" fill="none" stroke="#051f3a" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke">m</text>
-      <text x="32" y="31.2" dy="0.33em" fill="#FFFFFF">m</text>
+    <mask id="moltrace-wordmark-mark-cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <text x="32" y="31.2" dy="0.33em"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="36" font-weight="900" text-anchor="middle"
+        text-rendering="geometricPrecision" fill="#000">m</text>
+    </mask>
+    <filter id="moltrace-wordmark-mark-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.1" result="blur"/>
+      <feFlood flood-color="#26C6FF" flood-opacity="0.85" result="flood"/>
+      <feComposite in="flood" in2="blur" operator="in" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="moltrace-wordmark-mark-lift" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.6" result="blur"/>
+      <feOffset in="blur" dx="0" dy="0.9" result="offset"/>
+      <feComponentTransfer in="offset" result="shadow">
+        <feFuncA type="linear" slope="0.7"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="moltrace-wordmark-mark-engrave" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.8" result="blur"/>
+      <feOffset in="blur" dy="1.4" result="offsetDown"/>
+      <feComposite in="SourceAlpha" in2="offsetDown" operator="out" result="topRing"/>
+      <feFlood flood-color="#000" flood-opacity="0.9" result="darkColor"/>
+      <feComposite in="darkColor" in2="topRing" operator="in" result="topShadow"/>
+      <feOffset in="blur" dy="-1.4" result="offsetUp"/>
+      <feComposite in="SourceAlpha" in2="offsetUp" operator="out" result="bottomRing"/>
+      <feFlood flood-color="#9DD7F2" flood-opacity="0.6" result="lightColor"/>
+      <feComposite in="lightColor" in2="bottomRing" operator="in" result="bottomHighlight"/>
+      <feMerge>
+        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="bottomHighlight"/>
+        <feMergeNode in="topShadow"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="moltrace-wordmark-mark-mgrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="55%" stop-color="#F2FAFF"/>
+      <stop offset="100%" stop-color="#CFE9FF"/>
+    </linearGradient>
+    <linearGradient id="moltrace-wordmark-mark-topface" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2E78AC"/>
+      <stop offset="100%" stop-color="#0F3A5C"/>
+    </linearGradient>
+    <linearGradient id="moltrace-wordmark-mark-rightface" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#194C70"/>
+      <stop offset="100%" stop-color="#062337"/>
+    </linearGradient>
+    <linearGradient id="moltrace-wordmark-mark-leftface" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0D3050"/>
+      <stop offset="100%" stop-color="#021326"/>
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#moltrace-wordmark-mark-hex)">
+    <rect width="64" height="64" fill="#051f3a"/>
+    <g mask="url(#moltrace-wordmark-mark-cutout)">
+      <polygon points="16,0 48,0 32,32 0,32" fill="url(#moltrace-wordmark-mark-topface)"/>
+      <polygon points="48,0 64,32 48,64 32,32" fill="url(#moltrace-wordmark-mark-rightface)"/>
+      <polygon points="32,32 48,64 16,64 0,32" fill="url(#moltrace-wordmark-mark-leftface)"/>
     </g>
+    <g mask="url(#moltrace-wordmark-mark-cutout)" filter="url(#moltrace-wordmark-mark-glow)" stroke="#26C6FF" stroke-width="1.2" stroke-linejoin="miter" fill="none">
+      <polygon points="26.464,16.000 22.000,18.000 19.536,16.000 21.536,12.000 26.000,10.000 28.464,12.000"/>
+      <polygon points="52.732,28.464 50.000,27.000 49.268,21.536 51.268,17.536 54.000,19.000 54.732,24.464"/>
+      <polygon points="31.464,55.000 29.000,57.000 24.536,55.000 22.536,51.000 25.000,49.000 29.464,51.000"/>
+    </g>
+    <g mask="url(#moltrace-wordmark-mark-cutout)" filter="url(#moltrace-wordmark-mark-glow)" stroke="#26C6FF" stroke-width="1.4" stroke-linecap="round" fill="none">
+      <line x1="32" y1="32" x2="48" y2="0"/>
+      <line x1="32" y1="32" x2="48" y2="64"/>
+      <line x1="32" y1="32" x2="0" y2="32"/>
+    </g>
+    <g filter="url(#moltrace-wordmark-mark-engrave)">
+      <text x="32" y="31.2" dy="0.33em"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="36" font-weight="900" text-anchor="middle"
+        text-rendering="geometricPrecision" fill="url(#moltrace-wordmark-mark-mgrad)">m</text>
+    </g>
+    <polygon points="16,0 48,0 64,32 48,64 16,64 0,32" fill="none" stroke="#26C6FF" stroke-width="4" stroke-linejoin="miter"/>
   </g>
 </svg>
   </g>
