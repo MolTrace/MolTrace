@@ -5,6 +5,7 @@ import numpy as np
 from fastapi.testclient import TestClient
 
 from nmrcheck.api import create_app
+from nmrcheck.fid import fid_settings_from_preset, process_bruker_1d_zip
 from nmrcheck.models import Carbon13Peak, Peak, SpectrumPoint
 from nmrcheck.settings import Settings
 
@@ -63,6 +64,36 @@ def test_carbon13_upload_models_accept_realistic_axis_margins() -> None:
     SpectrumPoint(shift_ppm=-10.1448, intensity=0.0)
     Peak(shift_ppm=-10.1448, multiplicity="s", integration_h=1.0)
     Carbon13Peak(shift_ppm=-10.1448)
+
+
+def test_raw_carbon13_fid_uses_mnova_advised_processing_constraints() -> None:
+    report = process_bruker_1d_zip(
+        filename="ethanol_13c_raw.zip",
+        content=_build_carbon13_bruker_zip(),
+        nucleus="1H",
+        settings=fid_settings_from_preset(
+            selected_preset="balanced",
+            zero_fill_factor=1,
+            line_broadening_hz=0.3,
+            max_preview_points=700,
+        ),
+    )
+
+    assert report.metadata["nucleus"] == "13C"
+    advised = report.metadata["raw_fid_advised_processing"]
+    assert advised["applied"] is True
+    assert advised["scope"] == "raw_fid_only"
+    assert report.metadata["zero_filling"]["factor"] == 3
+    assert report.metadata["line_broadening"]["hz"] == 2.0
+    assert report.metadata["line_broadening"]["window_function"] == "exponential_line_broadening"
+    assert report.metadata["baseline"]["mode"] == "bernstein"
+    assert report.metadata["baseline"]["order"] == 3
+    assert report.metadata["preview_downsampling"]["point_limit"] == 4000
+    trace_display = report.metadata["display_preprocessing"]["trace_smoothing"]
+    assert trace_display["method"] == "mnova_raw_fid_noise_envelope"
+    assert trace_display["smoothing_kernel"] == "none"
+    assert trace_display["baseline_noise_preserved"] is True
+    assert not any("tuned for Bruker 1D 1H" in warning for warning in report.warnings)
 
 
 def test_carbon13_analyze_endpoint(tmp_path) -> None:

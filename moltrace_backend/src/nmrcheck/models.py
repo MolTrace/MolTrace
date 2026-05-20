@@ -392,7 +392,11 @@ class FIDProcessingSettings(BaseModel):
     baseline_lock_visual_only: bool = True
     peak_sensitivity: float | None = Field(default=None, ge=0.02, le=0.45)
     mask_solvent_regions: bool = True
-    max_preview_points: int = Field(default=700, ge=100, le=5000)
+    # Upper bound raised from 5000 → 24000 so the raw-FID preview can carry
+    # enough on-screen points to resolve 1H multiplet fine structure
+    # (doublets-of-doublets, triplets, quartets, anomeric couplings). At
+    # 5000 points a 7 Hz coupling collapsed into a single decimation bucket.
+    max_preview_points: int = Field(default=700, ge=100, le=24000)
     display_mode: Literal["real", "magnifier"] = "real"
     vertical_gain: float = Field(default=1.0, ge=1.0, le=1_000_000.0)
     debug_preview: bool = False

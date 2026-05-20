@@ -579,6 +579,7 @@ export function SpectraCheckRawFidSection({
   const vendorDetected =
     meta && (typeof meta.vendor_detected === "string" ? meta.vendor_detected : typeof meta.vendor === "string" ? meta.vendor : null)
   const nucleusMeta = meta && typeof meta.nucleus === "string" ? meta.nucleus : null
+  const resolvedNucleus = nucleusMeta === "13C" || nucleusMeta === "1H" ? nucleusMeta : nucleus
   const sw = meta && (meta.spectral_width_hz ?? meta.spectral_width ?? meta.sw)
   const td = meta && (meta.time_domain_points ?? meta.td ?? meta.np)
   // procParams derivation removed — ProcessingParametersCard reads
@@ -1176,7 +1177,7 @@ export function SpectraCheckRawFidSection({
                   x={xy.x}
                   y={xy.y}
                   peaks={peaks}
-                  nucleus={nucleus}
+                  nucleus={resolvedNucleus}
                   renderMode="webgl"
                 />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import io
+import hashlib
+import json
 import math
 import os
 import re
 import tarfile
 import warnings
 import zipfile
+from collections import OrderedDict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Lock
 from typing import Any
 
 import numpy as np
@@ -49,7 +53,7 @@ from .spectrum import (
     _prepare_trace_display_points,
     _reference_assignments_to_peaks,
     _select_target_proton_count,
-    smooth_trace_display_points,
+    _solvent_mask_windows,
 )
 
 
@@ -193,6 +197,47 @@ _FID_PRESET_DESCRIPTIONS: dict[FIDPresetId, str] = {
     ),
     "custom": "Preserves manually selected processing controls.",
 }
+_RAW_FID_MNOVA_ZERO_FILL_FACTOR = 3
+_RAW_FID_MNOVA_C13_LINE_BROADENING_HZ = 2.0
+_RAW_FID_MNOVA_BASELINE_ORDER = 3
+# Display point budget for the raw-FID preview. The previous 4000 was far
+# too coarse for a full 1H window: a 7 Hz triplet (~14 Hz wide) collapsed
+# into a single decimation bucket, so multiplet structure was invisible and
+# sharp peaks looked broken/disjointed. 16000 points gives ~3 points/Hz at
+# 400 MHz over 12 ppm, enough to render doublets-of-doublets, triplets and
+# quartets cleanly. Source rationale: MestreNova manual pp. 109, 140-141
+# (zero-filling raises "apparent digital resolution"; the on-screen trace
+# must carry that resolution through to be useful).
+_RAW_FID_MNOVA_C13_PREVIEW_POINTS = 16000
+_RAW_FID_MNOVA_H1_PREVIEW_POINTS = 16000
+# First-point correction — MestreNova manual p. 136: "multiply the first
+# point of the FID by 0.5 before FT". The discrete FT treats the FID as
+# periodic, so an uncorrected first point creates a constant vertical
+# baseline displacement (peaks that sit off / protrude through the
+# baseline). 0.5 is the manual's stated default.
+_RAW_FID_MNOVA_FIRST_POINT_SCALE = 0.5
+# Trapezoidal apodization ramp fraction for 1H — MestreNova manual p. 137
+# names the Trapezoidal window as the fix for "'sinc' artifacts resulting
+# from truncation of the FID". The window holds unit weight across the
+# resolution-bearing early FID, then ramps linearly to zero over the final
+# fraction below. 0.30 ramps only the last third (decayed-signal + noise
+# for a properly acquired 1H dataset), so it removes the truncation step
+# without the linewidth penalty of an exponential window — the manual
+# (pp. 128, 131) is explicit that exponential LB decreases 1H resolution.
+_RAW_FID_MNOVA_TRAPEZOID_RAMP_FRACTION = 0.30
+_RAW_FID_NOISE_RMS_SPAN_POINTS = 7
+_RAW_FID_SOLVENT_NEGATIVE_LOBE_SIGMA_LIMIT = 3.0
+_RAW_FID_SOLVENT_NEGATIVE_LOBE_PEAK_FRACTION_LIMIT = 0.02
+_RAW_FID_CARBON13_SOLVENT_FLOOR_PPM = 49.0
+_RAW_FID_CARBON13_SOLVENT_FLOOR_WINDOW = (
+    48.2,
+    50.2,
+    "13C solvent carbon near 49 ppm",
+)
+_RAW_FID_PROCESS_CACHE_VERSION = "raw-fid-solvent-display-v3"
+_RAW_FID_PROCESS_CACHE_MAX_ENTRIES = 12
+_RAW_FID_PROCESS_CACHE: OrderedDict[str, FIDPreviewReport] = OrderedDict()
+_RAW_FID_PROCESS_CACHE_LOCK = Lock()
 
 
 @contextmanager
@@ -287,6 +332,14 @@ def normalize_apodization_mode(value: str | None) -> str:
         "sine_bell_window",
     }:
         return "sine_bell"
+    if normalized in {
+        "trapezoid",
+        "trapezoidal",
+        "trap",
+        "trapezoidal_window",
+        "trapezium",
+    }:
+        return "trapezoidal"
     return "exponential"
 
 
@@ -622,6 +675,312 @@ def _param_float(params: dict[str, Any], *names: str) -> float | None:
         return float(str(value).strip())
     except (TypeError, ValueError):
         return None
+
+
+def _normalize_nucleus_label(value: Any) -> str | None:
+    if value is None:
+        return None
+    raw = str(_unwrap_param_value(value)).strip()
+    if not raw:
+        return None
+    token = re.sub(r"[^A-Z0-9]", "", raw.upper())
+    if any(marker in token for marker in ("13C", "C13", "CARBON13")) or token == "CARBON":
+        return "13C"
+    if token in {"1H", "H1", "PROTON"} or (
+        token.startswith("H") and "1" in token and "13" not in token
+    ):
+        return "1H"
+    if "19F" in token or "F19" in token:
+        return "19F"
+    if "31P" in token or "P31" in token:
+        return "31P"
+    return raw.strip()
+
+
+def _raw_fid_axis_looks_carbon13(x_values: np.ndarray) -> bool:
+    finite = x_values[np.isfinite(x_values)]
+    if finite.size < 2:
+        return False
+    ppm_low = float(np.min(finite))
+    ppm_high = float(np.max(finite))
+    return (ppm_high - ppm_low) >= 40.0 or ppm_high >= 80.0
+
+
+def _window_contains_ppm(windows: list[tuple[float, float, str]], ppm: float) -> bool:
+    return any(
+        min(float(low), float(high)) <= ppm <= max(float(low), float(high))
+        for low, high, _label in windows
+    )
+
+
+def _resolve_raw_fid_solvent_display_windows(
+    *,
+    solvent: str | None,
+    nucleus: str,
+    x_values: np.ndarray,
+) -> tuple[list[tuple[float, float, str]], str, bool, bool]:
+    normalized_nucleus = _normalize_nucleus_label(nucleus) or str(nucleus or "").strip()
+    axis_looks_carbon = _raw_fid_axis_looks_carbon13(x_values)
+    effective_nucleus = (
+        "13C" if normalized_nucleus == "13C" or axis_looks_carbon else normalized_nucleus
+    )
+    windows = _solvent_mask_windows(solvent, nucleus=effective_nucleus or "1H")
+
+    added_carbon13_floor_window = False
+    if (
+        effective_nucleus == "13C"
+        and axis_looks_carbon
+        and not windows
+        and not _window_contains_ppm(windows, _RAW_FID_CARBON13_SOLVENT_FLOOR_PPM)
+    ):
+        windows = [*windows, _RAW_FID_CARBON13_SOLVENT_FLOOR_WINDOW]
+        added_carbon13_floor_window = True
+
+    return windows, effective_nucleus, axis_looks_carbon, added_carbon13_floor_window
+
+
+def _resolve_raw_fid_nucleus(params: dict[str, Any], requested: str) -> str:
+    detected = _param(
+        params,
+        "NUC1",
+        "NUC",
+        "OBSNUC",
+        "TN",
+        "tn",
+        "nucleus",
+    )
+    return (
+        _normalize_nucleus_label(detected)
+        or _normalize_nucleus_label(requested)
+        or requested.strip()
+        or "1H"
+    )
+
+
+def _apply_raw_fid_mnova_constraints(
+    settings: FIDProcessingSettings,
+    *,
+    nucleus: str,
+) -> tuple[FIDProcessingSettings, dict[str, Any], list[str]]:
+    normalized = _normalize_nucleus_label(nucleus) or nucleus.strip() or "1H"
+    detail: dict[str, Any] = {
+        "applied": False,
+        "scope": "raw_fid_only",
+        "nucleus": normalized,
+        "manual_source": "MestreNova Manual, advised 1D processing",
+        "processed_uploads_touched": False,
+    }
+    notes: list[str] = []
+
+    if normalized == "13C":
+        # MestreNova Advised Processing for 13C (manual p. 106, p. 129):
+        #   3x zero-fill · exponential apodization LB 2.0 Hz ·
+        #   Regions-Analysis auto phase · Bernstein polynomial baseline
+        #   (order 3). The 2.0 Hz exponential also damps the FID tail, so a
+        #   separate truncation window is unnecessary for carbon.
+        constrained = settings.model_copy(
+            update={
+                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "apodization_mode": "exponential",
+                "line_broadening_hz": _RAW_FID_MNOVA_C13_LINE_BROADENING_HZ,
+                "phase_mode": "auto",
+                "auto_phase": True,
+                "baseline_correction": "bernstein",
+                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
+                "auto_baseline": True,
+                "max_preview_points": max(
+                    int(settings.max_preview_points),
+                    _RAW_FID_MNOVA_C13_PREVIEW_POINTS,
+                ),
+            }
+        )
+        detail.update(
+            {
+                "applied": True,
+                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "apodization_mode": "exponential",
+                "line_broadening_hz": _RAW_FID_MNOVA_C13_LINE_BROADENING_HZ,
+                "phase_mode": "auto",
+                "phase_reference": "MolTrace automatic 1D phase correction",
+                "baseline_correction": "bernstein",
+                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
+                "first_point_scale": _RAW_FID_MNOVA_FIRST_POINT_SCALE,
+                "max_preview_points": constrained.max_preview_points,
+            }
+        )
+        notes.append(
+            "Raw 13C FID advised processing applied: 3x zero-fill, exponential "
+            "LB 2.0 Hz, first-point correction 0.5, auto phase, and Bernstein-3 "
+            "baseline correction."
+        )
+        return constrained, detail, notes
+
+    if normalized == "1H":
+        # MestreNova Advised Processing for 1H (manual p. 106, p. 140):
+        #   3x zero-fill · resolution-preserving apodization · NO exponential
+        #   line broadening (manual pp. 128, 131 — an exponential window
+        #   "increase[s] linewidth, which is to say, a decrease in the
+        #   resolution") · Regions-Analysis auto phase · Bernstein
+        #   polynomial baseline (order 3).
+        #
+        # MestreNova's exact 1H window ("Stanning") is proprietary and not
+        # defined in the manual, so we use the manual's explicitly named,
+        # fully specified resolution-preserving truncation window instead —
+        # Trapezoidal (p. 137) — which preserves fine multiplet structure
+        # (dd, t, q, anomeric couplings) while removing the truncation step
+        # that makes peaks look broken / disjointed. line_broadening_hz is
+        # forced to 0.0 so no exponential broadening is applied.
+        constrained = settings.model_copy(
+            update={
+                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "apodization_mode": "trapezoidal",
+                "line_broadening_hz": 0.0,
+                "phase_mode": "auto",
+                "auto_phase": True,
+                "baseline_correction": "bernstein",
+                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
+                "auto_baseline": True,
+                "max_preview_points": max(
+                    int(settings.max_preview_points),
+                    _RAW_FID_MNOVA_H1_PREVIEW_POINTS,
+                ),
+            }
+        )
+        detail.update(
+            {
+                "applied": True,
+                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "apodization_mode": "trapezoidal",
+                "line_broadening_hz": 0.0,
+                "trapezoid_ramp_fraction": _RAW_FID_MNOVA_TRAPEZOID_RAMP_FRACTION,
+                "phase_mode": "auto",
+                "phase_reference": "MolTrace automatic 1D phase correction",
+                "baseline_correction": "bernstein",
+                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
+                "first_point_scale": _RAW_FID_MNOVA_FIRST_POINT_SCALE,
+                "max_preview_points": constrained.max_preview_points,
+            }
+        )
+        notes.append(
+            "Raw 1H FID advised processing applied: 3x zero-fill, trapezoidal "
+            "apodization (no exponential line broadening — preserves multiplet "
+            "resolution), first-point correction 0.5, auto phase, and "
+            "Bernstein-3 baseline correction."
+        )
+        return constrained, detail, notes
+
+    detail["reason"] = "no_raw_fid_constraints_for_nucleus"
+    return settings, detail, notes
+
+
+def _raw_fid_process_cache_key(
+    *,
+    filename: str,
+    content: bytes,
+    nucleus: str,
+    solvent: str | None,
+    reference_ppm: float | None,
+    reference_nmr_text: str | None,
+    settings: FIDProcessingSettings,
+    expected_total_h: int | None,
+    expected_non_labile_h: int | None,
+) -> str:
+    payload = {
+        "version": _RAW_FID_PROCESS_CACHE_VERSION,
+        "filename": filename,
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+        "nucleus": _normalize_nucleus_label(nucleus) or nucleus.strip() or "1H",
+        "solvent": solvent or "",
+        "reference_ppm": reference_ppm,
+        "reference_nmr_text_sha256": hashlib.sha256(
+            (reference_nmr_text or "").encode("utf-8")
+        ).hexdigest(),
+        "settings": settings.model_dump(mode="json"),
+        "expected_total_h": expected_total_h,
+        "expected_non_labile_h": expected_non_labile_h,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _raw_fid_cached_report_copy(
+    report: FIDPreviewReport,
+    *,
+    hit: bool,
+    raw_upload_provenance: dict[str, Any],
+) -> FIDPreviewReport:
+    copied = report.model_copy(deep=True)
+    cache_meta = {
+        "hit": bool(hit),
+        "scope": "raw_fid_only",
+        "key_version": _RAW_FID_PROCESS_CACHE_VERSION,
+        "processed_uploads_touched": False,
+    }
+    analysis_artifact_policy = {
+        **copied.processing_metadata.analysis_artifact_policy,
+        "processing_input_source": raw_upload_provenance.get("processing_input_source"),
+        "processing_loaded_from_vault": raw_upload_provenance.get(
+            "processing_loaded_from_vault",
+            False,
+        ),
+        "raw_archive_id": raw_upload_provenance.get("raw_archive_id"),
+        "raw_sha256": raw_upload_provenance.get("sha256"),
+        "storage_backend": raw_upload_provenance.get("storage_backend"),
+        "object_key": raw_upload_provenance.get("object_key"),
+    }
+    metadata = {
+        **copied.metadata,
+        "raw_upload_provenance": raw_upload_provenance,
+        "analysis_artifact_policy": analysis_artifact_policy,
+        "raw_fid_processing_cache": cache_meta,
+    }
+    processing_metadata = copied.processing_metadata.model_copy(
+        deep=True,
+        update={
+            "raw_upload_provenance": raw_upload_provenance,
+            "analysis_artifact_policy": analysis_artifact_policy,
+        },
+    )
+    return copied.model_copy(
+        update={
+            "metadata": metadata,
+            "processing_metadata": processing_metadata,
+        }
+    )
+
+
+def _get_raw_fid_process_cache(
+    cache_key: str,
+    *,
+    raw_upload_provenance: dict[str, Any],
+) -> FIDPreviewReport | None:
+    with _RAW_FID_PROCESS_CACHE_LOCK:
+        cached = _RAW_FID_PROCESS_CACHE.get(cache_key)
+        if cached is None:
+            return None
+        _RAW_FID_PROCESS_CACHE.move_to_end(cache_key)
+    return _raw_fid_cached_report_copy(
+        cached,
+        hit=True,
+        raw_upload_provenance=raw_upload_provenance,
+    )
+
+
+def _store_raw_fid_process_cache(
+    cache_key: str,
+    report: FIDPreviewReport,
+) -> FIDPreviewReport:
+    returned = _raw_fid_cached_report_copy(
+        report,
+        hit=False,
+        raw_upload_provenance=report.processing_metadata.raw_upload_provenance,
+    )
+    with _RAW_FID_PROCESS_CACHE_LOCK:
+        _RAW_FID_PROCESS_CACHE[cache_key] = returned.model_copy(deep=True)
+        _RAW_FID_PROCESS_CACHE.move_to_end(cache_key)
+        while len(_RAW_FID_PROCESS_CACHE) > _RAW_FID_PROCESS_CACHE_MAX_ENTRIES:
+            _RAW_FID_PROCESS_CACHE.popitem(last=False)
+    return returned
 
 
 def _safe_extract_zip(content: bytes, target_dir: Path) -> None:
@@ -967,6 +1326,37 @@ def _fid_apodization_window(
                 "first_weight": round(float(window[0]), 10),
                 "last_weight": round(float(window[-1]), 10),
                 "max_weight": round(float(np.max(window)), 10),
+            }
+        )
+        return window, metadata
+
+    if normalized_mode == "trapezoidal":
+        # Trapezoidal apodization — MestreNova manual p. 137: explicitly the
+        # window recommended to "avoid the 'sinc' artifacts resulting from
+        # truncation of the FID". Unit weight is held across the early,
+        # resolution-bearing part of the FID, then ramped linearly to zero
+        # over the final fraction. Unlike an exponential window it does not
+        # broaden lines (manual pp. 128, 131 — exponential LB decreases 1H
+        # resolution), so fine multiplet structure is preserved while the
+        # truncation step that produces broken-looking peaks is removed.
+        ramp_fraction = float(_RAW_FID_MNOVA_TRAPEZOID_RAMP_FRACTION)
+        ramp_fraction = min(0.95, max(0.0, ramp_fraction))
+        plateau = max(1, int(round(n * (1.0 - ramp_fraction))))
+        window = np.ones(n, dtype=float)
+        if plateau < n:
+            window[plateau:] = np.linspace(
+                1.0, 0.0, n - plateau, endpoint=True, dtype=float
+            )
+        metadata.update(
+            {
+                "window_function": "trapezoidal",
+                "window_applied": True,
+                "applied_before_fft": True,
+                "ramp_fraction": round(ramp_fraction, 6),
+                "plateau_points": int(plateau),
+                "first_weight": round(float(window[0]), 10),
+                "last_weight": round(float(window[-1]), 10),
+                "max_weight": 1.0,
             }
         )
         return window, metadata
@@ -1366,7 +1756,233 @@ def _smooth_fid_display_trace(
     *,
     nucleus: str,
 ) -> tuple[list[tuple[float, float]], dict[str, Any]]:
-    return smooth_trace_display_points(points, nucleus=nucleus)
+    if not points:
+        return (
+            points,
+            {
+                "applied": False,
+                "display_only": True,
+                "evidence_trace_preserved": True,
+                "method": "mnova_raw_fid_noise_envelope",
+                "reason": "no_points",
+            },
+        )
+
+    clean: list[tuple[float, float]] = []
+    for x_raw, y_raw in points:
+        x = float(x_raw)
+        y = float(y_raw)
+        if math.isfinite(x) and math.isfinite(y):
+            clean.append((x, y))
+    if len(clean) < _RAW_FID_NOISE_RMS_SPAN_POINTS:
+        return (
+            clean,
+            {
+                "applied": False,
+                "display_only": True,
+                "evidence_trace_preserved": True,
+                "method": "mnova_raw_fid_noise_envelope",
+                "reason": "too_few_points",
+            },
+        )
+
+    y_values = np.asarray([y for _x, y in clean], dtype=float)
+    abs_values = np.abs(y_values)
+    signal_cutoff = float(np.percentile(abs_values, 60.0))
+    signal_free_mask = abs_values <= signal_cutoff
+    if int(np.count_nonzero(signal_free_mask)) < _RAW_FID_NOISE_RMS_SPAN_POINTS:
+        signal_cutoff = float(np.percentile(abs_values, 75.0))
+        signal_free_mask = abs_values <= signal_cutoff
+    if int(np.count_nonzero(signal_free_mask)) < _RAW_FID_NOISE_RMS_SPAN_POINTS:
+        signal_free_mask = np.ones_like(y_values, dtype=bool)
+
+    baseline_center = float(np.median(y_values[signal_free_mask]))
+    centered = y_values - baseline_center
+    noise_reference = centered[signal_free_mask]
+    noise_median = float(np.median(noise_reference))
+    mad = float(np.median(np.abs(noise_reference - noise_median)))
+    noise_sigma = 1.4826 * mad
+    if not math.isfinite(noise_sigma) or noise_sigma <= 0.0:
+        noise_sigma = float(np.sqrt(np.mean(np.square(noise_reference - noise_median))))
+    if not math.isfinite(noise_sigma) or noise_sigma <= 0.0:
+        noise_sigma = 0.0
+
+    negative_limit = 0.0
+    negative_lobes_limited = 0
+
+    display = [
+        (x, float(y))
+        for (x, _old_y), y in zip(clean, centered, strict=True)
+    ]
+    return (
+        display,
+        {
+            "applied": True,
+            "display_only": True,
+            "evidence_trace_preserved": True,
+            "method": "mnova_raw_fid_noise_envelope",
+            "smoothing_kernel": "none",
+            "nucleus": _normalize_nucleus_label(nucleus) or nucleus,
+            "baseline_centered": True,
+            "baseline_center": round(baseline_center, 6),
+            "signal_free_fraction": round(
+                float(np.count_nonzero(signal_free_mask) / max(1, y_values.size)),
+                4,
+            ),
+            "noise_sigma": round(float(noise_sigma), 6),
+            "rms_calculation_span_points": _RAW_FID_NOISE_RMS_SPAN_POINTS,
+            "negative_lobe_limit": round(float(negative_limit), 6),
+            "negative_lobes_limited": negative_lobes_limited,
+            "positive_peaks_preserved": True,
+            "baseline_noise_preserved": True,
+        },
+    )
+
+
+def _fine_tune_solvent_display_regions(
+    points: list[tuple[float, float]],
+    *,
+    solvent: str | None,
+    nucleus: str,
+    noise_sigma: float | None = None,
+) -> tuple[list[tuple[float, float]], dict[str, Any]]:
+    base_meta: dict[str, Any] = {
+        "applied": False,
+        "display_only": True,
+        "evidence_trace_preserved": True,
+        "scope": "known_solvent_windows_only",
+        "method": "solvent_window_negative_lobe_floor",
+        "outside_solvent_windows_preserved": True,
+        "positive_peaks_preserved": True,
+        "negative_lobes_limited": 0,
+        "windows": [],
+    }
+    if not points:
+        base_meta["reason"] = "no_points"
+        return points, base_meta
+
+    clean: list[tuple[float, float]] = []
+    for x_raw, y_raw in points:
+        x = float(x_raw)
+        y = float(y_raw)
+        if math.isfinite(x) and math.isfinite(y):
+            clean.append((x, y))
+    if len(clean) < _RAW_FID_NOISE_RMS_SPAN_POINTS:
+        base_meta["reason"] = "too_few_points"
+        return clean, base_meta
+
+    x_values = np.asarray([x for x, _y in clean], dtype=float)
+    y_values = np.asarray([y for _x, y in clean], dtype=float)
+    windows, effective_nucleus, carbon13_axis, added_carbon13_floor_window = _resolve_raw_fid_solvent_display_windows(
+        solvent=solvent,
+        nucleus=nucleus,
+        x_values=x_values,
+    )
+    base_meta["nucleus"] = effective_nucleus
+    base_meta["carbon13_axis_detected"] = carbon13_axis
+    base_meta["added_carbon13_floor_window"] = added_carbon13_floor_window
+    base_meta["windows"] = [
+        {"low": round(float(low), 4), "high": round(float(high), 4), "label": label}
+        for low, high, label in windows
+    ]
+    if not windows:
+        base_meta["reason"] = "no_solvent_windows"
+        return clean, base_meta
+
+    out = y_values.copy()
+
+    solvent_mask = np.zeros_like(y_values, dtype=bool)
+    for low, high, _label in windows:
+        lo = min(float(low), float(high))
+        hi = max(float(low), float(high))
+        solvent_mask |= (x_values >= lo) & (x_values <= hi)
+
+    non_solvent = y_values[np.isfinite(y_values) & ~solvent_mask]
+    if non_solvent.size:
+        reference = non_solvent
+        cutoff = float(np.percentile(np.abs(reference - float(np.median(reference))), 60.0))
+        signal_free = reference[np.abs(reference - float(np.median(reference))) <= max(cutoff, 1e-12)]
+        if signal_free.size >= _RAW_FID_NOISE_RMS_SPAN_POINTS:
+            reference = signal_free
+        local_median = float(np.median(reference))
+        local_mad = float(np.median(np.abs(reference - local_median)))
+        local_sigma = 1.4826 * local_mad
+        if not math.isfinite(local_sigma) or local_sigma <= 0.0:
+            local_sigma = float(np.sqrt(np.mean(np.square(reference - local_median))))
+    else:
+        local_sigma = 0.0
+
+    sigma = float(noise_sigma or 0.0)
+    if not math.isfinite(sigma) or sigma <= 0.0:
+        sigma = local_sigma
+    if not math.isfinite(sigma) or sigma <= 0.0:
+        base_meta["reason"] = "noise_floor_unavailable"
+        return clean, base_meta
+
+    window_meta: list[dict[str, Any]] = []
+    total_limited = 0
+    for low, high, label in windows:
+        lo = min(float(low), float(high))
+        hi = max(float(low), float(high))
+        mask = (x_values >= lo) & (x_values <= hi)
+        if not int(np.count_nonzero(mask)):
+            window_meta.append(
+                {
+                    "low": round(lo, 4),
+                    "high": round(hi, 4),
+                    "label": label,
+                    "points_limited": 0,
+                    "reason": "no_points_in_window",
+                }
+            )
+            continue
+        y_window = out[mask]
+        local_positive_peak = float(np.max(y_window)) if y_window.size else 0.0
+        is_carbon13_floor_window = (
+            effective_nucleus == "13C"
+            and carbon13_axis
+            and lo <= _RAW_FID_CARBON13_SOLVENT_FLOOR_PPM <= hi
+        )
+        if is_carbon13_floor_window:
+            floor = 0.0
+            floor_mode = "baseline_floor"
+        else:
+            floor_magnitude = sigma * _RAW_FID_SOLVENT_NEGATIVE_LOBE_SIGMA_LIMIT
+            if local_positive_peak > sigma * 6.0:
+                floor_magnitude = min(
+                    floor_magnitude,
+                    local_positive_peak * _RAW_FID_SOLVENT_NEGATIVE_LOBE_PEAK_FRACTION_LIMIT,
+                )
+            floor = -max(float(floor_magnitude), 1e-12)
+            floor_mode = "noise_floor"
+        limited_mask = mask & (out < floor)
+        limited_count = int(np.count_nonzero(limited_mask))
+        if limited_count:
+            out[limited_mask] = floor
+            total_limited += limited_count
+        window_meta.append(
+            {
+                "low": round(lo, 4),
+                "high": round(hi, 4),
+                "label": label,
+                "negative_floor": round(float(floor), 6),
+                "floor_mode": floor_mode,
+                "points_limited": limited_count,
+            }
+        )
+
+    display = [(x, float(y)) for (x, _old_y), y in zip(clean, out, strict=True)]
+    return (
+        display,
+        {
+            **base_meta,
+            "applied": total_limited > 0,
+            "negative_lobes_limited": total_limited,
+            "noise_sigma": round(float(sigma), 6),
+            "windows": window_meta,
+            "reason": "applied" if total_limited > 0 else "no_solvent_negative_lobes_exceeded_floor",
+        },
+    )
 
 
 def _apply_fid_baseline_correction(
@@ -2005,6 +2621,23 @@ def process_bruker_1d_zip(
         content=content,
         provenance=raw_upload_provenance,
     )
+    cache_key = _raw_fid_process_cache_key(
+        filename=filename,
+        content=processing_content,
+        nucleus=nucleus,
+        solvent=solvent,
+        reference_ppm=reference_ppm,
+        reference_nmr_text=reference_nmr_text,
+        settings=settings,
+        expected_total_h=expected_total_h,
+        expected_non_labile_h=expected_non_labile_h,
+    )
+    cached_report = _get_raw_fid_process_cache(
+        cache_key,
+        raw_upload_provenance=raw_upload_provenance,
+    )
+    if cached_report is not None:
+        return cached_report
     inspection = inspect_zip_members(processing_content, filename=filename)
     warnings: list[str] = []
     # Do not mutate raw vendor files or immutable raw archive.
@@ -2093,9 +2726,27 @@ def process_bruker_1d_zip(
                     "fid and acqus files."
                 )
         fid_for_qa = np.asarray(fid, dtype=np.complex128)
+        nucleus = _resolve_raw_fid_nucleus(params, nucleus)
+        settings, raw_fid_advised_processing, raw_fid_advised_notes = (
+            _apply_raw_fid_mnova_constraints(settings, nucleus=nucleus)
+        )
+        warnings.extend(
+            note for note in raw_fid_advised_notes if note not in warnings
+        )
         # Do not mutate raw vendor files or immutable raw archive.
         # Apodization and all later processing happen on this in-memory working copy.
         fid_points_before_zero_fill = int(fid.size)
+        # First-point correction (MestreNova manual p. 136): the discrete FT
+        # treats the FID as periodic, so the un-scaled first point produces a
+        # constant vertical baseline displacement — a primary cause of peaks
+        # that protrude through / sit off the baseline. Multiplying the first
+        # point by 0.5 (the manual's stated default) removes that DC offset.
+        # Applied to a fresh copy so fid_for_qa and the immutable archive are
+        # never mutated. This runs after group-delay removal, so index 0 is
+        # the true first acquired point of the FID.
+        if fid.size:
+            fid = np.array(fid, dtype=np.complex128, copy=True)
+            fid[0] = fid[0] * _RAW_FID_MNOVA_FIRST_POINT_SCALE
         fid, apodization_detail = _apply_fid_apodization(
             fid,
             params,
@@ -2143,6 +2794,7 @@ def process_bruker_1d_zip(
                 "phase_pivot_index": phase_settings["pivot_index"],
                 "fid_points_after_group_delay": int(fid.size),
                 "fft_size": int(fft_size),
+                "raw_fid_advised_processing": raw_fid_advised_processing,
             }
         )
 
@@ -2218,20 +2870,38 @@ def process_bruker_1d_zip(
                 display_points,
                 nucleus=nucleus_label,
             )
+            display_points, solvent_fine_tune_meta = _fine_tune_solvent_display_regions(
+                display_points,
+                solvent=solvent,
+                nucleus=nucleus_label,
+                noise_sigma=trace_smoothing_meta.get("noise_sigma"),
+            )
+            trace_smoothing_meta["solvent_region_fine_tune"] = solvent_fine_tune_meta
         else:
+            solvent_fine_tune_meta = {
+                "applied": False,
+                "display_only": True,
+                "evidence_trace_preserved": True,
+                "scope": "known_solvent_windows_only",
+                "method": "solvent_window_negative_lobe_floor",
+                "reason": "auto_baseline_disabled",
+            }
             trace_smoothing_meta = {
                 "applied": False,
                 "display_only": True,
                 "evidence_trace_preserved": True,
                 "method": "none",
                 "reason": "auto_baseline_disabled",
+                "solvent_region_fine_tune": solvent_fine_tune_meta,
             }
         display_meta["trace_smoothing"] = trace_smoothing_meta
+        display_meta["solvent_region_fine_tune"] = solvent_fine_tune_meta
         if trace_smoothing_meta.get("applied"):
             display_meta["note"] = (
-                "Raw FID preview points use display-only trace smoothing after "
-                "autophasing and baseline correction. Peak picking and evidence "
-                "scoring use the corrected unsmoothed evidence trace."
+                "Raw FID preview points use display-only baseline centering and "
+                "solvent-window negative-lobe limiting after autophasing and baseline "
+                "correction. Peak picking and evidence scoring use the corrected "
+                "evidence trace."
             )
         warnings.extend(note for note in display_notes if note not in warnings)
         normalized_display_mode = settings.display_mode
@@ -2337,12 +3007,13 @@ def process_bruker_1d_zip(
             "Human reviewer signoff is required before using raw FID-derived evidence "
             "in a final report."
         )
-        if nucleus.strip().upper() not in {"1H", "H1", "PROTON"}:
+        normalized_warning_nucleus = _normalize_nucleus_label(nucleus)
+        if normalized_warning_nucleus not in {"1H", "13C"}:
             warnings.append(
                 f"Raw FID beta is tuned for {vendor_key} 1D 1H data; "
                 "this nucleus should be reviewed carefully."
             )
-        if nucleus.strip().upper() in {"13C", "C13", "CARBON13", "CARBON-13"}:
+        if normalized_warning_nucleus == "13C":
             warnings.append(
                 "13C FID intensity is not treated as quantitative carbon-count evidence; "
                 "review uses peak positions and context instead."
@@ -2384,7 +3055,7 @@ def process_bruker_1d_zip(
             pdata_present=pdata_present,
         )
 
-        return FIDPreviewReport(
+        report = FIDPreviewReport(
             filename=filename,
             format_detected=(
                 "varian_agilent_fid_zip"
@@ -2464,6 +3135,7 @@ def process_bruker_1d_zip(
                 "qa_diagnostics": metadata.qa_diagnostics.model_dump(mode="json"),
                 "processing_parameters": metadata.processing_parameters,
                 "processing_recipe": metadata.processing_recipe.model_dump(mode="json"),
+                "raw_fid_advised_processing": raw_fid_advised_processing,
                 "acquisition_parameters": metadata.acquisition_parameters,
                 "raw_dataset_files_found": metadata.raw_dataset_files_found,
                 "raw_upload_provenance": metadata.raw_upload_provenance,
@@ -2542,6 +3214,7 @@ def process_bruker_1d_zip(
             },
             processing_metadata=metadata,
         )
+        return _store_raw_fid_process_cache(cache_key, report)
 
 
 def process_raw_fid_zip_to_spectrum(
