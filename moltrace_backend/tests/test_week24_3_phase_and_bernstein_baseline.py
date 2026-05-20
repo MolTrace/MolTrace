@@ -12,6 +12,7 @@ from nmrcheck.baseline import (
 )
 from nmrcheck.fid import (
     _auto_phase_spectrum,
+    _fine_tune_solvent_display_regions,
     _smooth_fid_display_trace,
     apply_phase,
     fid_settings_from_preset,
@@ -199,40 +200,91 @@ def test_signal_free_polish_flattens_rolling_fid_baseline_without_moving_peaks()
     assert max(base_medians) - min(base_medians) < 0.08
 
 
-def test_raw_fid_display_smoothing_is_stronger_in_aromatic_region() -> None:
+def test_raw_fid_display_envelope_preserves_noise_and_limits_negative_lobes() -> None:
     x_values = np.linspace(12.0, 0.0, 2400)
-    aromatic_mask = (x_values >= 6.0) & (x_values <= 9.0)
     peak = 5.0 * np.exp(-((x_values - 7.25) ** 2) / (2 * 0.018**2))
     peak += 2.3 * np.exp(-((x_values - 1.15) ** 2) / (2 * 0.025**2))
     ripple = 0.045 * np.sin(np.arange(x_values.size) * 1.7)
-    ripple += aromatic_mask * 0.16 * np.sin(np.arange(x_values.size) * 2.4)
+    ripple += 0.035 * np.cos(np.arange(x_values.size) * 0.63)
+    negative_lobes = np.zeros_like(x_values)
+    negative_lobes[np.argmin(np.abs(x_values - 7.31))] = -3.0
+    negative_lobes[np.argmin(np.abs(x_values - 4.2))] = -2.4
     points = [
         (float(x), float(y))
-        for x, y in zip(x_values, peak + ripple, strict=True)
+        for x, y in zip(x_values, peak + ripple + negative_lobes, strict=True)
     ]
 
     smoothed, metadata = _smooth_fid_display_trace(points, nucleus="1H")
+    tuned, solvent_meta = _fine_tune_solvent_display_regions(
+        smoothed,
+        solvent="CDCl3",
+        nucleus="1H",
+        noise_sigma=metadata["noise_sigma"],
+    )
 
     assert metadata["applied"] is True
     assert metadata["display_only"] is True
-    assert metadata["aromatic_points_smoothed"] > 0
+    assert metadata["method"] == "mnova_raw_fid_noise_envelope"
+    assert metadata["smoothing_kernel"] == "none"
+    assert metadata["baseline_noise_preserved"] is True
+    assert metadata["negative_lobes_limited"] == 0
+    assert solvent_meta["applied"] is True
+    assert solvent_meta["negative_lobes_limited"] >= 1
+    assert solvent_meta["scope"] == "known_solvent_windows_only"
     before_y = np.asarray([y for _x, y in points])
-    after_y = np.asarray([y for _x, y in smoothed])
+    centered_y = np.asarray([y for _x, y in smoothed])
+    after_y = np.asarray([y for _x, y in tuned])
+    noise_mask = (x_values >= 10.0) & (x_values <= 11.5)
+    solvent_mask = (x_values >= 7.20) & (x_values <= 7.32)
+    non_solvent_negative_mask = np.isclose(x_values, 4.2, atol=0.01)
 
-    def roughness(values: np.ndarray, mask: np.ndarray) -> float:
-        selected = values[mask]
-        return float(np.median(np.abs(np.diff(selected, n=2))))
-
-    aromatic_before = roughness(before_y, aromatic_mask)
-    aromatic_after = roughness(after_y, aromatic_mask)
-    aliphatic_mask = (x_values >= 0.6) & (x_values <= 2.0)
-    aliphatic_before = roughness(before_y, aliphatic_mask)
-    aliphatic_after = roughness(after_y, aliphatic_mask)
-
-    assert aromatic_after < aromatic_before * 0.4
-    assert aliphatic_after < aliphatic_before * 0.75
-    assert (aromatic_before - aromatic_after) > (aliphatic_before - aliphatic_after)
+    assert float(np.max(after_y)) >= float(np.max(before_y)) * 0.99
+    assert float(np.min(after_y[solvent_mask])) > float(np.min(centered_y[solvent_mask]))
+    assert np.allclose(after_y[non_solvent_negative_mask], centered_y[non_solvent_negative_mask])
+    assert float(np.std(after_y[noise_mask])) > 0.0
+    assert float(np.max(after_y[noise_mask])) > 0.0
+    assert float(np.min(after_y[noise_mask])) < 0.0
     assert abs(float(x_values[np.argmax(before_y)]) - float(x_values[np.argmax(after_y)])) < 0.02
+
+
+def test_raw_fid_carbon13_solvent_region_near_49_ppm_uses_baseline_floor() -> None:
+    x_values = np.linspace(220.0, -10.0, 4800)
+    peak = 7.0 * np.exp(-((x_values - 49.0) ** 2) / (2 * 0.018**2))
+    peak += 2.5 * np.exp(-((x_values - 49.35) ** 2) / (2 * 0.026**2))
+    peak += 1.8 * np.exp(-((x_values - 52.0) ** 2) / (2 * 0.030**2))
+    ripple = 0.04 * np.sin(np.arange(x_values.size) * 1.31)
+    ripple += 0.025 * np.cos(np.arange(x_values.size) * 0.47)
+    negative_lobes = np.zeros_like(x_values)
+    negative_lobes[np.argmin(np.abs(x_values - 48.92))] = -3.8
+    negative_lobes[np.argmin(np.abs(x_values - 52.06))] = -2.2
+    points = [
+        (float(x), float(y))
+        for x, y in zip(x_values, peak + ripple + negative_lobes, strict=True)
+    ]
+
+    smoothed, metadata = _smooth_fid_display_trace(points, nucleus="1H")
+    centered_y = np.asarray([y for _x, y in smoothed])
+    solvent_mask = (x_values >= 48.2) & (x_values <= 50.2)
+    non_solvent_negative_mask = np.isclose(x_values, 52.06, atol=0.01)
+
+    for solvent, expect_fallback in (("methanol-d4", False), (None, True)):
+        tuned, solvent_meta = _fine_tune_solvent_display_regions(
+            smoothed,
+            solvent=solvent,
+            nucleus="1H",
+            noise_sigma=metadata["noise_sigma"],
+        )
+        after_y = np.asarray([y for _x, y in tuned])
+
+        assert solvent_meta["applied"] is True
+        assert solvent_meta["nucleus"] == "13C"
+        assert solvent_meta["carbon13_axis_detected"] is True
+        assert solvent_meta["added_carbon13_floor_window"] is expect_fallback
+        assert any(window.get("floor_mode") == "baseline_floor" for window in solvent_meta["windows"])
+        assert float(np.min(centered_y[solvent_mask])) < 0.0
+        assert float(np.min(after_y[solvent_mask])) >= 0.0
+        assert float(np.max(after_y[solvent_mask])) == float(np.max(centered_y[solvent_mask]))
+        assert np.allclose(after_y[non_solvent_negative_mask], centered_y[non_solvent_negative_mask])
 
 
 def test_preserve_mode_does_not_change_points() -> None:

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from .solvents import SOLVENT_PROFILES
+
 Nucleus = Literal["1H", "13C"]
 
 
@@ -112,9 +114,15 @@ def canonical_solvent(solvent: str | None) -> str | None:
     if not solvent:
         return None
     value = solvent.strip()
+    value_key = value.lower()
     for key in SOLVENT_IMPURITY_WINDOWS:
-        if key.lower() == value.lower():
+        if key.lower() == value_key:
             return key
+    for profile in SOLVENT_PROFILES:
+        if profile.canonical_name.lower() == value_key:
+            return profile.canonical_name
+        if any(alias.lower() == value_key for alias in profile.aliases):
+            return profile.canonical_name
     return value or None
 
 
