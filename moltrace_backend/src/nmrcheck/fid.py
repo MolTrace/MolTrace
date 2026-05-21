@@ -234,8 +234,8 @@ _RAW_FID_CARBON13_SOLVENT_FLOOR_WINDOW = (
     50.2,
     "13C solvent carbon near 49 ppm",
 )
-_RAW_FID_PROCESS_CACHE_VERSION = "raw-fid-solvent-display-v3"
-_RAW_FID_PROCESS_CACHE_MAX_ENTRIES = 12
+_RAW_FID_PROCESS_CACHE_VERSION = "raw-fid-inline-preview-v1"
+_RAW_FID_PROCESS_CACHE_MAX_ENTRIES = 32
 _RAW_FID_PROCESS_CACHE: OrderedDict[str, FIDPreviewReport] = OrderedDict()
 _RAW_FID_PROCESS_CACHE_LOCK = Lock()
 

@@ -86,6 +86,14 @@ const MAX_VIEWPORT_TRACE_POINTS = 3_000
 const VIEWPORT_POINTS_PER_PIXEL = 2
 const MAX_OVERLAY_TRACE_POINTS = 1_800
 
+/**
+ * Plotly plot-area inset, in pixels. Shared by the layout (so Plotly draws the
+ * traces inside this box) AND by the custom hover readout (so cursor-x maps to
+ * exactly the ppm Plotly rendered). Keeping a single source of truth is what
+ * makes the hover crosshair land on the spectrum line rather than near it.
+ */
+const PLOT_MARGIN = { l: 52, r: 16, t: 8, b: 44 } as const
+
 /** Exponential mapping: slider 0..1 → multiplier 1..50000. */
 function gainMultiplier(gainSlider01: number): number {
   return Math.exp(gainSlider01 * Math.log(50001))
@@ -217,6 +225,21 @@ export type SampledSpectrumTrace = {
   meanBinSize: number | null
 }
 
+/** Cursor readout shown by the custom (Plotly-free) hover overlay. */
+type HoverReadout = {
+  /** Crosshair x, in pixels from the chart pane's left edge. */
+  crosshairLeft: number
+  /** Plot-area top/bottom in pixels — the crosshair spans this. */
+  plotTop: number
+  plotBottom: number
+  /** Pane width, used to flip the readout chip away from the edge. */
+  paneWidth: number
+  /** Chemical shift (ppm) of the snapped sample. */
+  ppm: number
+  /** Source intensity of the snapped sample (NaN when masked). */
+  intensity: number
+}
+
 type SampleSpectrumTraceOptions = {
   maxPoints: number
   xRange?: readonly [number, number] | null
@@ -346,6 +369,32 @@ export function sampleSpectrumTraceForPlot(
   }
 
   addPoint(visibleIndices[0])
+  // Robust noise scale for the visible window: the median |Δy| between
+  // consecutive finite samples. Baseline noise dominates this median (peaks
+  // are a small minority of points), so it tracks the noise floor. Buckets
+  // whose dynamic range stays within a few × this scale are flat baseline —
+  // they are emitted as a single representative point instead of a min/max
+  // pair, so the baseline renders as a calm line and peaks resolve smoothly
+  // onto it rather than rising out of a zig-zag envelope band.
+  let noiseScale = 0
+  {
+    const deltas: number[] = []
+    let previous: number | null = null
+    for (let i = 0; i < visibleLength; i++) {
+      const value = y[visibleIndices[i]]
+      if (!Number.isFinite(value)) {
+        previous = null
+        continue
+      }
+      if (previous != null) deltas.push(Math.abs(value - previous))
+      previous = value
+    }
+    if (deltas.length > 0) {
+      deltas.sort((a, b) => a - b)
+      noiseScale = deltas[Math.floor(deltas.length / 2)]
+    }
+  }
+  const flatBucketSpread = noiseScale * 6
   let anchorIndex = visibleIndices.find((index) => finiteUnmaskedY(y, index, maskRange) != null) ?? visibleIndices[0]
   const pointSlotsPerBucket = hasMask ? 4 : 3
   const bucketCount = Math.max(1, Math.floor((clampedMaxPoints - 2) / pointSlotsPerBucket))
@@ -396,9 +445,21 @@ export function sampleSpectrumTraceForPlot(
       }
     }
 
-    const bucketIndices = Array.from(new Set([minIndex, maxIndex, lttbIndex, maskIndex]))
-      .filter((index) => index >= 0)
-      .sort((a, b) => a - b)
+    // Flat baseline bucket → one representative point (the LTTB pick already
+    // favours the most informative sample). Bucket with real dynamic range →
+    // keep the full min/max[/mask] envelope so narrow peaks always survive.
+    const bucketIsFlat =
+      maskIndex === -1 &&
+      minIndex >= 0 &&
+      maxIndex >= 0 &&
+      Number.isFinite(minY) &&
+      Number.isFinite(maxY) &&
+      maxY - minY <= flatBucketSpread
+    const bucketIndices = bucketIsFlat
+      ? [lttbIndex >= 0 ? lttbIndex : maxIndex]
+      : Array.from(new Set([minIndex, maxIndex, lttbIndex, maskIndex]))
+          .filter((index) => index >= 0)
+          .sort((a, b) => a - b)
     for (const index of bucketIndices) addPoint(index)
     for (let i = bucketIndices.length - 1; i >= 0; i--) {
       const index = bucketIndices[i]
@@ -462,6 +523,10 @@ function SpectrumViewerImpl({
   // yZoom is a discrete-step companion to gain01. Both multiply sampled y values so peaks visibly grow.
   const [yZoom, setYZoom] = useState(1)
   const [moveMode, setMoveMode] = useState(false)
+  // Custom hover readout (chemical shift + intensity at the cursor). Kept as
+  // its own state so a hover update re-renders ONLY the lightweight overlay
+  // below — never Plotly's data/layout — which is what keeps the chart stable.
+  const [hoverReadout, setHoverReadout] = useState<HoverReadout | null>(null)
   const chartPaneRef = useRef<HTMLDivElement | null>(null)
   const [plotPixelWidth, setPlotPixelWidth] = useState(1_200)
   // Detect the runaway peak ONCE on the raw input (gain-independent). The
@@ -778,7 +843,7 @@ function SpectrumViewerImpl({
   const layout = useMemo(
     () => ({
       autosize: true,
-      margin: { l: 52, r: 16, t: 8, b: 44 },
+      margin: PLOT_MARGIN,
       paper_bgcolor: "transparent",
       plot_bgcolor: "transparent",
       showlegend: hasPredictedOverlay || hasPeakMarkers,
@@ -788,20 +853,17 @@ function SpectrumViewerImpl({
       dragmode: false,
       xaxis: {
         title: xLabel,
-        // Plotly's `autorange` overrides `range`. When the user pans/zooms,
-        // we must switch `autorange` off AND pass the range in display order
-        // ([high, low] when reversed) — otherwise the chart silently snaps
-        // back to the full span and the ticks never change.
-        ...(xRange
-          ? {
-              autorange: false as const,
-              range: reversedXAxis
-                ? [effectiveXMax, effectiveXMin]
-                : [effectiveXMin, effectiveXMax],
-            }
-          : {
-              autorange: reversedXAxis ? ("reversed" as const) : true,
-            }),
+        // Always an explicit range — never Plotly autorange. Autorange pads
+        // the data span by a few percent, which (a) is not standard NMR
+        // display (spectra fill the frame edge-to-edge) and (b) would make
+        // the cursor→ppm mapping used by the hover readout disagree with
+        // where Plotly actually drew each point. effectiveXMin/effectiveXMax
+        // already fall back to the full data span when the user has not
+        // zoomed, so this stays correct in every view.
+        autorange: false as const,
+        range: reversedXAxis
+          ? [effectiveXMax, effectiveXMin]
+          : [effectiveXMin, effectiveXMax],
         zeroline: false,
         fixedrange: true,
       },
@@ -927,6 +989,122 @@ function SpectrumViewerImpl({
     }
   }, [])
 
+  // ── Custom hover readout ────────────────────────────────────────────────
+  // Plotly is left fully static (``hovermode:false``, ``staticPlot:true``):
+  // re-enabling Plotly's own hover repainted the overlay on every mouse move
+  // and was the historical flicker source. Instead the cursor is mapped to a
+  // ppm here, snapped to the nearest sampled point, and surfaced through a
+  // lightweight absolutely-positioned overlay. Because this never mutates
+  // Plotly's ``data``/``layout`` props, Plotly never redraws — the chart
+  // stays perfectly stable while the readout tracks the cursor.
+  const hoverRafRef = useRef(0)
+  const hoverPointerRef = useRef<{
+    width: number
+    height: number
+    px: number
+    py: number
+  } | null>(null)
+
+  const recomputeHover = useCallback(() => {
+    hoverRafRef.current = 0
+    const pointer = hoverPointerRef.current
+    if (!pointer) return
+    const { width, height, px, py } = pointer
+    const plotLeft = PLOT_MARGIN.l
+    const plotRight = width - PLOT_MARGIN.r
+    const plotTop = PLOT_MARGIN.t
+    const plotBottom = height - PLOT_MARGIN.b
+    const sampleX = observedSample.x
+    if (
+      plotRight - plotLeft <= 1 ||
+      plotBottom - plotTop <= 1 ||
+      px < plotLeft ||
+      px > plotRight ||
+      py < plotTop ||
+      py > plotBottom ||
+      sampleX.length === 0
+    ) {
+      setHoverReadout((current) => (current ? null : current))
+      return
+    }
+    const span = effectiveXMax - effectiveXMin
+    const frac = (px - plotLeft) / (plotRight - plotLeft)
+    const cursorPpm = reversedXAxis
+      ? effectiveXMax - frac * span
+      : effectiveXMin + frac * span
+    // Snap to the nearest rendered sample so the crosshair sits exactly on the
+    // spectrum line and the readout reflects a real data point.
+    let bestIndex = 0
+    let bestDistance = Infinity
+    for (let i = 0; i < sampleX.length; i++) {
+      const distance = Math.abs(sampleX[i] - cursorPpm)
+      if (distance < bestDistance) {
+        bestDistance = distance
+        bestIndex = i
+      }
+    }
+    const snappedPpm = sampleX[bestIndex]
+    const snappedIntensity = observedSample.y[bestIndex]
+    const snappedFrac =
+      span === 0
+        ? 0
+        : reversedXAxis
+          ? (effectiveXMax - snappedPpm) / span
+          : (snappedPpm - effectiveXMin) / span
+    setHoverReadout({
+      crosshairLeft: plotLeft + snappedFrac * (plotRight - plotLeft),
+      plotTop,
+      plotBottom,
+      paneWidth: width,
+      ppm: snappedPpm,
+      intensity: Number.isFinite(snappedIntensity) ? snappedIntensity : Number.NaN,
+    })
+  }, [observedSample, effectiveXMin, effectiveXMax, reversedXAxis])
+
+  const handleChartPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      moveDrag(e)
+      // While actively panning, hide the readout — the crosshair would fight
+      // the drag and the values are sliding under the cursor anyway.
+      if (dragPanRef.current) {
+        if (hoverRafRef.current) {
+          window.cancelAnimationFrame(hoverRafRef.current)
+          hoverRafRef.current = 0
+        }
+        setHoverReadout((current) => (current ? null : current))
+        return
+      }
+      const rect = e.currentTarget.getBoundingClientRect()
+      hoverPointerRef.current = {
+        width: rect.width,
+        height: rect.height,
+        px: e.clientX - rect.left,
+        py: e.clientY - rect.top,
+      }
+      // Coalesce to one readout update per animation frame.
+      if (!hoverRafRef.current) {
+        hoverRafRef.current = window.requestAnimationFrame(recomputeHover)
+      }
+    },
+    [moveDrag, recomputeHover],
+  )
+
+  const handleChartPointerLeave = useCallback(() => {
+    hoverPointerRef.current = null
+    if (hoverRafRef.current) {
+      window.cancelAnimationFrame(hoverRafRef.current)
+      hoverRafRef.current = 0
+    }
+    setHoverReadout((current) => (current ? null : current))
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (hoverRafRef.current) window.cancelAnimationFrame(hoverRafRef.current)
+    },
+    [],
+  )
+
   const bumpPeakHeight = useCallback((sign: 1 | -1) => {
     setYZoom((z) => {
       const next = z * (sign === 1 ? 1.12 : 1 / 1.12)
@@ -1010,13 +1188,14 @@ function SpectrumViewerImpl({
           ref={chartPaneRef}
           className={cn(
             "relative min-h-0 flex-1",
-            moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-default",
+            moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair",
           )}
           data-testid="spectrum-move-pane"
           onPointerDown={startMoveDrag}
-          onPointerMove={moveDrag}
+          onPointerMove={handleChartPointerMove}
           onPointerUp={endMoveDrag}
           onPointerCancel={endMoveDrag}
+          onPointerLeave={handleChartPointerLeave}
           style={{ touchAction: moveMode ? "none" : "pan-y" }}
         >
           <Plot
@@ -1048,6 +1227,45 @@ function SpectrumViewerImpl({
             style={{ width: "100%", height: "100%" }}
             useResizeHandler
           />
+
+          {/*
+            Custom hover overlay — a Plotly-free crosshair + chemical-shift
+            readout. Rendered as plain absolutely-positioned divs so it never
+            triggers a Plotly redraw (the chart stays stable). ``pointer-events
+            -none`` keeps the pane's own pan/hover pointer handlers working.
+          */}
+          {hoverReadout ? (
+            <div className="pointer-events-none absolute inset-0 z-10">
+              <div
+                className="absolute w-px bg-sky-500/70"
+                style={{
+                  left: hoverReadout.crosshairLeft,
+                  top: hoverReadout.plotTop,
+                  height: Math.max(0, hoverReadout.plotBottom - hoverReadout.plotTop),
+                }}
+              />
+              <div
+                role="status"
+                aria-live="polite"
+                className="absolute rounded-md border bg-popover/95 px-2 py-1 font-mono text-[11px] leading-tight shadow-sm"
+                style={{
+                  top: hoverReadout.plotTop + 4,
+                  ...(hoverReadout.crosshairLeft > hoverReadout.paneWidth / 2
+                    ? { right: hoverReadout.paneWidth - hoverReadout.crosshairLeft + 6 }
+                    : { left: hoverReadout.crosshairLeft + 6 }),
+                }}
+              >
+                <div className="font-semibold tabular-nums text-foreground">
+                  δ {hoverReadout.ppm.toFixed(3)} ppm
+                </div>
+                <div className="tabular-nums text-muted-foreground">
+                  {Number.isFinite(hoverReadout.intensity)
+                    ? `I ${hoverReadout.intensity.toExponential(2)}`
+                    : "I —"}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/*

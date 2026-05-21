@@ -8,7 +8,7 @@ import { PWAUpdateManager } from '@/src/components/pwa/PWAUpdateManager'
 import { DevToolsBridge } from '@/components/dev/devtools-bridge'
 import './globals.css'
 
-const PWA_ASSET_VERSION = '2026-05-08-v2'
+const PWA_ASSET_VERSION = '2026-05-21-engraved-white-cube-edge-v1'
 const versionedIcon = (src: string) => `${src}?v=${PWA_ASSET_VERSION}`
 
 export const metadata: Metadata = {

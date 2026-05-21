@@ -339,6 +339,9 @@ export function SpectraCheckRawFidSection({
     if (withProcess) {
       fd.append("processing_preset", preset)
       fd.append("preserve_raw", "true")
+    } else {
+      fd.append("processing_preset", "safe_automatic")
+      fd.append("include_spectrum", "true")
     }
     const ccParam = compoundClassForRequest(compoundClass)
     if (ccParam) fd.append("compound_class", ccParam)
@@ -352,6 +355,53 @@ export function SpectraCheckRawFidSection({
     if (sharedCarbon) fd.append("carbon13_text", sharedCarbon)
     return fd
   }
+
+  const applyPreviewSpectrumPayload = useCallback(
+    (data: unknown, fallbackPreset = "balanced") => {
+      const xy = extractSpectrumXY(data)
+      if (!xy) return false
+      const rec = isRecord(data) ? data : {}
+      const processingMetadata = isRecord(rec.processing_metadata) ? rec.processing_metadata : null
+      update({
+        previewSpectrum: {
+          x: xy.x,
+          y: xy.y,
+          xLabel: typeof rec.x_label === "string" ? rec.x_label : "ppm",
+          yLabel: typeof rec.y_label === "string" ? rec.y_label : "intensity",
+          reversedXAxis: rec.reversed_x_axis !== false,
+          processingPreset:
+            typeof rec.processing_preset === "string"
+              ? rec.processing_preset
+              : typeof processingMetadata?.selected_preset === "string"
+                ? processingMetadata.selected_preset
+                : fallbackPreset,
+        },
+        previewSpectrumError: "",
+        previewSpectrumLoading: false,
+      })
+      return true
+    },
+    [update],
+  )
+
+  const canPromotePreviewToProcess = useCallback(
+    (file: File) => {
+      if (preset !== "safe_automatic") return false
+      if (!previewResult || !extractSpectrumXY(previewResult)) return false
+      if (!isRecord(previewResult)) return false
+      const previewFilename = typeof previewResult.filename === "string" ? previewResult.filename : null
+      if (previewFilename && previewFilename !== file.name && previewFilename !== selectedFileName) return false
+      const metadata = isRecord(previewResult.metadata) ? previewResult.metadata : null
+      const previewPreset =
+        typeof previewResult.processing_preset === "string"
+          ? previewResult.processing_preset
+          : typeof metadata?.processing_preset === "string"
+            ? metadata.processing_preset
+            : null
+      return previewPreset == null || previewPreset === "safe_automatic" || previewPreset === "balanced"
+    },
+    [preset, previewResult, selectedFileName],
+  )
 
   async function runPreviewSpectrum(file: File, archiveId?: string | null) {
     // Quick auto-FT so the user sees an actual spectrum alongside metadata —
@@ -388,27 +438,7 @@ export function SpectraCheckRawFidSection({
         data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
       }
       pushDev("raw_fid_preview_spectrum", data)
-      const xy = extractSpectrumXY(data)
-      if (xy) {
-        const rec = isRecord(data) ? data : {}
-        const processingMetadata = isRecord(rec.processing_metadata) ? rec.processing_metadata : null
-        update({
-          previewSpectrum: {
-            x: xy.x,
-            y: xy.y,
-            xLabel: typeof rec.x_label === "string" ? rec.x_label : "ppm",
-            yLabel: typeof rec.y_label === "string" ? rec.y_label : "intensity",
-            reversedXAxis: rec.reversed_x_axis !== false,
-            processingPreset:
-              typeof rec.processing_preset === "string"
-                ? rec.processing_preset
-                : typeof processingMetadata?.selected_preset === "string"
-                  ? processingMetadata.selected_preset
-                  : "balanced",
-          },
-          previewSpectrumLoading: false,
-        })
-      } else {
+      if (!applyPreviewSpectrumPayload(data, "balanced")) {
         update({
           previewSpectrumError: "Auto-FT preview ran but returned no display-ready points.",
           previewSpectrumLoading: false,
@@ -444,7 +474,7 @@ export function SpectraCheckRawFidSection({
       const data = await apiFetch<unknown>("/nmr/raw-fid/preview", { method: "POST", body: fd })
       setPreviewResult(data)
       pushDev("raw_fid_preview", data)
-      shouldGenerateSpectrum = true
+      shouldGenerateSpectrum = !applyPreviewSpectrumPayload(data, "balanced")
       previewArchiveId = extractRawArchiveId(data)
     } catch (err) {
       if (isMissingNmrEndpoint(err)) setPreviewError(RAW_FID_BACKEND_MSG)
@@ -474,6 +504,23 @@ export function SpectraCheckRawFidSection({
     const file = getSelectedFile()
     if (!file) {
       setProcessError("Choose a raw FID archive (.zip / .tar.gz / .tgz).")
+      return
+    }
+    if (canPromotePreviewToProcess(file) && isRecord(previewResult)) {
+      setProcessError("")
+      const metadata = isRecord(previewResult.metadata) ? previewResult.metadata : {}
+      const promoted = {
+        ...previewResult,
+        processing_preset:
+          typeof previewResult.processing_preset === "string" ? previewResult.processing_preset : "safe_automatic",
+        metadata: {
+          ...metadata,
+          promoted_from_inline_preview: true,
+          endpoint_short_circuit: "/nmr/raw-fid/preview",
+        },
+      }
+      setProcessResult(promoted)
+      pushDev("raw_fid_process_inline_preview", promoted)
       return
     }
     setProcessLoading(true)
@@ -564,7 +611,14 @@ export function SpectraCheckRawFidSection({
     () => extractPeaksFromPayload(displayPayload ?? {}),
     [displayPayload],
   )
-  const xyIsAutoPreview = !xyProcess && !xyPreview && xyAutoPreview != null
+  const xyIsAutoPreview = !xyProcess && (xyPreview != null || xyAutoPreview != null)
+  const autoPreviewPreset = useMemo(() => {
+    if (previewSpectrum?.processingPreset) return previewSpectrum.processingPreset
+    if (previewResult && isRecord(previewResult) && typeof previewResult.processing_preset === "string") {
+      return previewResult.processing_preset
+    }
+    return "safe_automatic"
+  }, [previewResult, previewSpectrum])
 
   const meta = displayPayload && isRecord(displayPayload) ? displayPayload : null
   const sha =
@@ -847,7 +901,7 @@ export function SpectraCheckRawFidSection({
                   ))}
                 </select>
                 <p className="text-[11px] text-muted-foreground">
-                  Used when running <span className="font-mono">/process</span>. Preview ignores this.
+                  Used for full <span className="font-mono">/process</span>; preview uses the locked quick-spectrum preset.
                 </p>
               </div>
             </CollapsibleContent>
@@ -1165,7 +1219,7 @@ export function SpectraCheckRawFidSection({
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
                     style={{ color: "var(--mt-teal)" }}
                   >
-                    Auto-FT preview · {previewSpectrum?.processingPreset ?? "safe_automatic"}
+                    Auto-FT preview · {autoPreviewPreset}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
                     Quick Fourier-transformed preview. Run Process FID for full apodization, phasing, and baseline correction.
@@ -1316,12 +1370,7 @@ export function SpectraCheckRawFidSection({
                         metadata: {
                           linked_from: "raw_fid_to_processed",
                           source_filename: selectedFileName ?? null,
-                          source_processing_preset:
-                            xyIsAutoPreview && previewSpectrum
-                              ? previewSpectrum.processingPreset
-                              : processResult
-                                ? "user-selected"
-                                : null,
+                          source_processing_preset: xyIsAutoPreview ? autoPreviewPreset : processResult ? "user-selected" : null,
                         },
                         warnings: warnings,
                         notes: [
