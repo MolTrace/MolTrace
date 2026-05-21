@@ -14,6 +14,15 @@ const Plot = memo(
   >,
 ) as React.ComponentType<Record<string, unknown>>
 import { Button } from "@/components/ui/button"
+import {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import {
@@ -77,6 +86,13 @@ export type SpectrumViewerProps = {
   yLabel?: string
   reversedXAxis?: boolean
   renderMode?: "svg" | "webgl"
+  /**
+   * Display-only raw FID cleanup for aromatic windows. It smooths the
+   * baseline/base samples around 6.45-8.65 ppm (1H) and 105-165 ppm (13C)
+   * while preserving detected peak apices, so the raw archive remains
+   * immutable and processed spectra are not touched.
+   */
+  rawFidAromaticBaseSmoothing?: boolean
   className?: string
 }
 
@@ -85,6 +101,13 @@ const MIN_VIEWPORT_TRACE_POINTS = 1_000
 const MAX_VIEWPORT_TRACE_POINTS = 3_000
 const VIEWPORT_POINTS_PER_PIXEL = 2
 const MAX_OVERLAY_TRACE_POINTS = 1_800
+const AROMATIC_BASE_WINDOWS = [
+  { min: 6.45, max: 8.65 },
+  { min: 105, max: 165 },
+] as const
+const AROMATIC_BASE_PEAK_NOISE_MULTIPLIER = 3.5
+const AROMATIC_BASE_LOCAL_PEAK_NOISE_MULTIPLIER = 1.6
+const AROMATIC_BASE_FLOOR_NOISE_MULTIPLIER = 0.55
 
 /**
  * Plotly plot-area inset, in pixels. Shared by the layout (so Plotly draws the
@@ -109,6 +132,136 @@ function scaleDisplayYValue(v: number, total: number): number {
   const raw = v * total
   if (!Number.isFinite(raw)) return 0
   return Math.min(Math.sign(raw) * Math.min(Math.abs(raw), DISPLAY_Y_CAP), DISPLAY_Y_CAP)
+}
+
+function medianSorted(values: number[]): number {
+  if (values.length === 0) return 0
+  const mid = Math.floor(values.length / 2)
+  return values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid]
+}
+
+function robustMedian(values: number[]): number {
+  if (values.length === 0) return 0
+  const sorted = values.slice().sort((a, b) => a - b)
+  return medianSorted(sorted)
+}
+
+function robustNoiseFromResiduals(values: number[], center: number): number {
+  if (values.length < 3) return 0
+  const residuals = values.map((v) => Math.abs(v - center)).sort((a, b) => a - b)
+  const madNoise = medianSorted(residuals) * 1.4826
+
+  const deltas: number[] = []
+  let previous: number | null = null
+  for (const value of values) {
+    if (previous != null) deltas.push(Math.abs(value - previous))
+    previous = value
+  }
+  deltas.sort((a, b) => a - b)
+  const deltaNoise = deltas.length > 0 ? medianSorted(deltas) * 0.7413 : 0
+  return Math.max(madNoise, deltaNoise, 1e-12)
+}
+
+/**
+ * Mnova-style local display cleanup for raw FID aromatic regions.
+ *
+ * Constraints:
+ * - only acts inside aromatic windows (1H: 6.45-8.65 ppm; 13C: 105-165 ppm);
+ * - preserves peak apices and local maxima above the measured noise floor;
+ * - smooths only baseline/base samples using neighbouring non-peak points;
+ * - lifts base-only negative excursions to the local noise floor.
+ *
+ * This is deliberately display-only. It never mutates uploaded FID data,
+ * picked peaks, processed spectra, or non-aromatic ppm regions.
+ */
+export function smoothRawFidAromaticBaseForDisplay(x: number[], y: number[]): number[] {
+  const n = Math.min(x.length, y.length)
+  if (n < 16) return y
+
+  let out: number[] | null = null
+
+  for (const window of AROMATIC_BASE_WINDOWS) {
+    const source = out ?? y
+    const regionIndices: number[] = []
+    const regionValues: number[] = []
+    for (let i = 0; i < n; i++) {
+      const ppm = x[i]
+      const value = source[i]
+      if (!Number.isFinite(ppm) || !Number.isFinite(value)) continue
+      if (ppm < window.min || ppm > window.max) continue
+      regionIndices.push(i)
+      regionValues.push(value)
+    }
+    if (regionIndices.length < 12) continue
+
+    const baseline = robustMedian(regionValues)
+    const noise = robustNoiseFromResiduals(regionValues, baseline)
+    if (!Number.isFinite(noise) || noise <= 0) continue
+
+    const strongPeakCutoff = baseline + AROMATIC_BASE_PEAK_NOISE_MULTIPLIER * noise
+    const localPeakCutoff = baseline + AROMATIC_BASE_LOCAL_PEAK_NOISE_MULTIPLIER * noise
+    const floor = baseline - AROMATIC_BASE_FLOOR_NOISE_MULTIPLIER * noise
+    const target = out ?? y.slice()
+    out = target
+
+    const isProtectedPeak = (index: number): boolean => {
+      const value = source[index]
+      if (!Number.isFinite(value)) return false
+      if (value >= strongPeakCutoff) return true
+      if (value < localPeakCutoff) return false
+
+      let left = value
+      for (let i = index - 1; i >= 0; i--) {
+        if (x[i] < window.min || x[i] > window.max) break
+        if (Number.isFinite(source[i])) {
+          left = source[i]
+          break
+        }
+      }
+      let right = value
+      for (let i = index + 1; i < n; i++) {
+        if (x[i] < window.min || x[i] > window.max) break
+        if (Number.isFinite(source[i])) {
+          right = source[i]
+          break
+        }
+      }
+      return value >= left && value >= right
+    }
+
+    const protectedPeaks = new Set<number>()
+    for (const index of regionIndices) {
+      if (isProtectedPeak(index)) protectedPeaks.add(index)
+    }
+
+    for (let pos = 0; pos < regionIndices.length; pos++) {
+      const index = regionIndices[pos]
+      const value = source[index]
+      if (!Number.isFinite(value) || protectedPeaks.has(index)) continue
+
+      let weighted = 0
+      let weightSum = 0
+      for (let offset = -3; offset <= 3; offset++) {
+        const neighbourPos = pos + offset
+        if (neighbourPos < 0 || neighbourPos >= regionIndices.length) continue
+        const neighbourIndex = regionIndices[neighbourPos]
+        if (protectedPeaks.has(neighbourIndex)) continue
+        const neighbour = source[neighbourIndex]
+        if (!Number.isFinite(neighbour)) continue
+        if (neighbour > strongPeakCutoff) continue
+        const weight = 4 - Math.abs(offset)
+        weighted += neighbour * weight
+        weightSum += weight
+      }
+      if (weightSum === 0) continue
+
+      const localBase = weighted / weightSum
+      const blended = value * 0.35 + localBase * 0.65
+      target[index] = Math.max(blended, floor)
+    }
+  }
+
+  return out ?? y
 }
 
 /**
@@ -504,6 +657,7 @@ function SpectrumViewerImpl({
   yLabel = "Intensity",
   reversedXAxis = true,
   renderMode = "svg",
+  rawFidAromaticBaseSmoothing = false,
   className,
 }: SpectrumViewerProps) {
   // Default gain01 = 0 → multiplier 1×, so the entire spectrum fits within the
@@ -529,11 +683,15 @@ function SpectrumViewerImpl({
   const [hoverReadout, setHoverReadout] = useState<HoverReadout | null>(null)
   const chartPaneRef = useRef<HTMLDivElement | null>(null)
   const [plotPixelWidth, setPlotPixelWidth] = useState(1_200)
+  const displaySourceY = useMemo(
+    () => (rawFidAromaticBaseSmoothing ? smoothRawFidAromaticBaseForDisplay(x, y) : y),
+    [rawFidAromaticBaseSmoothing, x, y],
+  )
   // Detect the runaway peak ONCE on the raw input (gain-independent). The
   // detector returns null when no peak is more than MASK_DOMINANCE_RATIO×P95.
   const dominantPeakRange = useMemo(
-    () => detectDominantPeakRange(x, y),
-    [x, y],
+    () => detectDominantPeakRange(x, displaySourceY),
+    [x, displaySourceY],
   )
 
   // Tie the resampling target to the actual rendered viewport, not the raw
@@ -604,12 +762,12 @@ function SpectrumViewerImpl({
     // When the mask is active, build a copy of ``y`` that skips the masked
     // region before computing the percentile, so the y-axis is anchored to
     // the analyte signal rather than the now-invisible solvent spike.
-    let baselineY: ArrayLike<number> = y
+    let baselineY: ArrayLike<number> = displaySourceY
     if (maskDominantPeak && dominantPeakRange) {
       const filtered: number[] = []
-      for (let i = 0; i < y.length; i++) {
+      for (let i = 0; i < displaySourceY.length; i++) {
         if (i >= dominantPeakRange.startIndex && i <= dominantPeakRange.endIndex) continue
-        filtered.push(y[i])
+        filtered.push(displaySourceY[i])
       }
       baselineY = filtered
     }
@@ -625,7 +783,7 @@ function SpectrumViewerImpl({
       yMin: yRange.yMin,
       yMax: yRange.yMax,
     }
-  }, [x, y, overlays, showPredicted, maskDominantPeak, dominantPeakRange])
+  }, [x, displaySourceY, overlays, showPredicted, maskDominantPeak, dominantPeakRange])
 
   const [xRange, setXRange] = useState<[number, number] | null>(null)
   const dragPanRef = useRef<{
@@ -634,6 +792,13 @@ function SpectrumViewerImpl({
     startRange: [number, number]
     paneWidth: number
   } | null>(null)
+  // Pan stabilisation. The drag writes its target range into a ref and a single
+  // requestAnimationFrame commits it, so a 120 Hz+ pointer stream collapses to
+  // one setXRange per frame. ``isPanning`` additionally freezes the resampled
+  // trace for the duration of the drag (see ``sampleXRange`` below).
+  const [isPanning, setIsPanning] = useState(false)
+  const panRafRef = useRef(0)
+  const panTargetRef = useRef<[number, number] | null>(null)
 
   const effectiveXMin = xRange ? xRange[0] : xMin
   const effectiveXMax = xRange ? xRange[1] : xMax
@@ -641,6 +806,12 @@ function SpectrumViewerImpl({
     () => (xRange ? ([effectiveXMin, effectiveXMax] as const) : null),
     [xRange, effectiveXMin, effectiveXMax],
   )
+  // Range the trace is *resampled* against. Normally the visible viewport, but
+  // during an active pan it is frozen to the full span (null) so the min/max
+  // envelope cannot re-pick points frame to frame — the drag becomes a pure
+  // axis relayout over a fixed trace and the line stops shimmering. The precise
+  // viewport-density resample is restored the instant the drag ends.
+  const sampleXRange = isPanning ? null : visibleXRange
   const observedPointBudget = useMemo(
     () =>
       Math.max(
@@ -660,12 +831,12 @@ function SpectrumViewerImpl({
   const displayScale = useMemo(() => gainMultiplier(gain01) * yZoom, [gain01, yZoom])
   const observedSample = useMemo(
     () =>
-      sampleSpectrumTraceForPlot(x, y, {
+      sampleSpectrumTraceForPlot(x, displaySourceY, {
         maxPoints: observedPointBudget,
-        xRange: visibleXRange,
+        xRange: sampleXRange,
         maskRange: maskDominantPeak ? dominantPeakRange : null,
       }),
-    [x, y, observedPointBudget, visibleXRange, maskDominantPeak, dominantPeakRange],
+    [x, displaySourceY, observedPointBudget, sampleXRange, maskDominantPeak, dominantPeakRange],
   )
   const observedDisplayY = useMemo(
     () => Array.from(observedSample.y, (v) => scaleDisplayYValue(v, displayScale)),
@@ -677,9 +848,9 @@ function SpectrumViewerImpl({
     }
     return sampleSpectrumTraceForPlot(overlays.predicted.x, overlays.predicted.y, {
       maxPoints: overlayPointBudget,
-      xRange: visibleXRange,
+      xRange: sampleXRange,
     })
-  }, [overlays, overlayPointBudget, visibleXRange])
+  }, [overlays, overlayPointBudget, sampleXRange])
   const displayPred = useMemo(() => {
     if (!predictedSample) return null
     return Array.from(predictedSample.y, (v) => scaleDisplayYValue(v, displayScale))
@@ -693,12 +864,12 @@ function SpectrumViewerImpl({
             y:
               p.intensity != null
                 ? scaleDisplayYValue(p.intensity, displayScale)
-                : scaleDisplayYValue(nearestYAtPpm(x, y, p.ppm), displayScale),
+                : scaleDisplayYValue(nearestYAtPpm(x, displaySourceY, p.ppm), displayScale),
             label: p.label ?? "",
             category: p.category ?? "unknown",
           }))
         : [],
-    [showPeaks, peaks, displayScale, x, y],
+    [showPeaks, peaks, displayScale, x, displaySourceY],
   )
   const peakGuideShapes = useMemo(
     () =>
@@ -865,6 +1036,7 @@ function SpectrumViewerImpl({
           ? [effectiveXMax, effectiveXMin]
           : [effectiveXMin, effectiveXMax],
         zeroline: false,
+        showgrid: false,
         fixedrange: true,
       },
       yaxis: {
@@ -876,6 +1048,7 @@ function SpectrumViewerImpl({
         zeroline: true,
         zerolinecolor: "rgba(100, 116, 139, 0.45)",
         zerolinewidth: 1,
+        showgrid: false,
         fixedrange: true,
       },
       // Hover crosshair OFF — every mouse move was firing Plotly's hover
@@ -953,6 +1126,8 @@ function SpectrumViewerImpl({
         startRange: [effectiveXMin, effectiveXMax],
         paneWidth: Math.max(pane.getBoundingClientRect().width, 1),
       }
+      panTargetRef.current = null
+      setIsPanning(true)
       try {
         pane.setPointerCapture(e.pointerId)
       } catch {
@@ -973,7 +1148,19 @@ function SpectrumViewerImpl({
       const pixels = e.clientX - drag.startClientX
       const direction = reversedXAxis ? 1 : -1
       const delta = direction * (pixels / drag.paneWidth) * span
-      setXRange(clampRangeToDomain([drag.startRange[0] + delta, drag.startRange[1] + delta]))
+      panTargetRef.current = clampRangeToDomain([
+        drag.startRange[0] + delta,
+        drag.startRange[1] + delta,
+      ])
+      // Coalesce range updates to one per animation frame. Pointermove fires
+      // faster than the display refresh (120 Hz+ on many trackpads/mice); an
+      // unthrottled setXRange per event was a source of the pan judder.
+      if (!panRafRef.current) {
+        panRafRef.current = window.requestAnimationFrame(() => {
+          panRafRef.current = 0
+          if (panTargetRef.current) setXRange(panTargetRef.current)
+        })
+      }
     },
     [clampRangeToDomain, reversedXAxis],
   )
@@ -982,6 +1169,17 @@ function SpectrumViewerImpl({
     const drag = dragPanRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
     dragPanRef.current = null
+    // Flush any range update still queued for the next frame, then unfreeze
+    // the trace so the precise viewport-density resample is restored.
+    if (panRafRef.current) {
+      window.cancelAnimationFrame(panRafRef.current)
+      panRafRef.current = 0
+    }
+    if (panTargetRef.current) {
+      setXRange(panTargetRef.current)
+      panTargetRef.current = null
+    }
+    setIsPanning(false)
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {
@@ -1101,6 +1299,7 @@ function SpectrumViewerImpl({
   useEffect(
     () => () => {
       if (hoverRafRef.current) window.cancelAnimationFrame(hoverRafRef.current)
+      if (panRafRef.current) window.cancelAnimationFrame(panRafRef.current)
     },
     [],
   )
@@ -1183,7 +1382,14 @@ function SpectrumViewerImpl({
           expanded ? "h-[min(640px,70vh)]" : "h-[360px]",
         )}
       >
-        {/* Chart pane — fills the available container height. */}
+        {/*
+          Chart pane — fills the available container height. Wrapped in a
+          ContextMenu so a right-click anywhere on the spectrum opens the
+          manipulation menu. ``asChild`` keeps the pane a direct flex child
+          of the container, so its ``flex-1`` height is unchanged.
+        */}
+        <ContextMenu>
+        <ContextMenuTrigger asChild>
         <div
           ref={chartPaneRef}
           className={cn(
@@ -1267,6 +1473,66 @@ function SpectrumViewerImpl({
             </div>
           ) : null}
         </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-60">
+          <ContextMenuLabel>Spectrum</ContextMenuLabel>
+          <ContextMenuItem onSelect={() => zoom("in")}>Zoom in</ContextMenuItem>
+          <ContextMenuItem onSelect={() => zoom("out")}>Zoom out</ContextMenuItem>
+          <ContextMenuItem onSelect={fullSpectrum}>Full spectrum</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => pan("left")}>Pan left</ContextMenuItem>
+          <ContextMenuItem onSelect={() => pan("right")}>Pan right</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            onSelect={(event) => {
+              // Keep the menu open so peak height can be nudged repeatedly.
+              event.preventDefault()
+              bumpPeakHeight(1)
+            }}
+          >
+            Taller peaks
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={(event) => {
+              event.preventDefault()
+              bumpPeakHeight(-1)
+            }}
+          >
+            Shorter peaks
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuCheckboxItem
+            checked={showPeaks}
+            onCheckedChange={(value) => setShowPeaks(value === true)}
+          >
+            Peak labels
+          </ContextMenuCheckboxItem>
+          {overlays?.predicted ? (
+            <ContextMenuCheckboxItem
+              checked={showPredicted}
+              onCheckedChange={(value) => setShowPredicted(value === true)}
+            >
+              Predicted overlay
+            </ContextMenuCheckboxItem>
+          ) : null}
+          {dominantPeakRange ? (
+            <ContextMenuCheckboxItem
+              checked={maskDominantPeak}
+              onCheckedChange={(value) => setMaskDominantPeak(value === true)}
+            >
+              Mask solvent peak
+            </ContextMenuCheckboxItem>
+          ) : null}
+          <ContextMenuCheckboxItem
+            checked={expanded}
+            onCheckedChange={(value) => setExpanded(value === true)}
+          >
+            Expanded view
+          </ContextMenuCheckboxItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={resetZoom}>Reset axes</ContextMenuItem>
+        </ContextMenuContent>
+        </ContextMenu>
 
         {/*
           Bottom controls bar — replaces the previous floating draggable

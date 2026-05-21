@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest"
 import { render } from "@testing-library/react"
 
-import { SpectrumViewer } from "@/components/science/SpectrumViewer"
+import {
+  SpectrumViewer,
+  smoothRawFidAromaticBaseForDisplay,
+} from "@/components/science/SpectrumViewer"
 
 /**
  * Plotly is dynamically imported so this mock captures whatever ``data`` prop
@@ -206,5 +209,45 @@ describe("SpectrumViewer — picked-peak rendering", () => {
       .filter((t) => t.mode === "markers+text")
       .map((t) => t.name)
     expect(markerNames).toEqual(["Aliphatic", "Aromatic alkene", "Labile OH / NH / SH"])
+  })
+})
+
+describe("SpectrumViewer — raw FID aromatic base display smoothing", () => {
+  it("smooths only aromatic base samples while preserving peak apices and outside regions", () => {
+    const x = [
+      9.0, 8.55, 8.45, 8.35, 8.25, 8.15, 8.05, 7.95, 7.85, 7.75,
+      7.65, 7.55, 7.45, 7.35, 7.25, 7.15, 7.05, 6.95, 6.0,
+    ]
+    const y = [
+      99, 0.1, -2.2, 0.2, 0.0, 0.1, 30, -3.0, 0.2, 0.1,
+      5.0, 0.0, -1.6, 0.1, 0.0, 0.2, 0.1, 0.0, -9,
+    ]
+
+    const smoothed = smoothRawFidAromaticBaseForDisplay(x, y)
+
+    expect(smoothed[0]).toBe(y[0])
+    expect(smoothed[18]).toBe(y[18])
+    expect(smoothed[6]).toBe(y[6])
+    expect(smoothed[10]).toBe(y[10])
+    expect(smoothed[2]).toBeGreaterThan(y[2])
+    expect(smoothed[7]).toBeGreaterThan(y[7])
+    expect(smoothed[12]).toBeGreaterThan(y[12])
+  })
+
+  it("applies the aromatic base cleanup only when explicitly enabled", () => {
+    const x = [
+      8.55, 8.45, 8.35, 8.25, 8.15, 8.05, 7.95, 7.85, 7.75, 7.65,
+      7.55, 7.45, 7.35, 7.25, 7.15, 7.05,
+    ]
+    const y = [0, -2.4, 0.1, 0, 24, -3.1, 0.2, 0, 4.5, 0, -1.7, 0, 0.1, 0, 0.2, 0]
+
+    freshRender(<SpectrumViewer x={x} y={y} renderMode="webgl" />)
+    const rawTraceY = capturedPlotProps?.data?.[0]?.y as number[] | undefined
+    expect(rawTraceY).toContain(-3.1)
+
+    freshRender(<SpectrumViewer x={x} y={y} renderMode="webgl" rawFidAromaticBaseSmoothing />)
+    const smoothedTraceY = capturedPlotProps?.data?.[0]?.y as number[] | undefined
+    expect(smoothedTraceY?.some((value) => Number.isFinite(value) && value < -2)).toBe(false)
+    expect(smoothedTraceY).toContain(24)
   })
 })
