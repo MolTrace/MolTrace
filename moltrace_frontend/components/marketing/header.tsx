@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { moltraceTraceClassName } from "@/components/branding/moltrace-wordmark"
+import { moltraceTraceClassName, moltraceWordmark3DStyle } from "@/components/branding/moltrace-wordmark"
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
@@ -70,7 +70,10 @@ export function Header() {
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
             <MoleculeLogoMark className="h-8 w-8" />
-            <span className="text-lg font-semibold tracking-tight">
+            <span
+              className="text-lg font-semibold tracking-tight"
+              style={moltraceWordmark3DStyle}
+            >
               <span className="font-bold text-foreground">Mol</span>
               <span className={moltraceTraceClassName}>Trace</span>
             </span>
@@ -185,7 +188,10 @@ export function Header() {
                   >
                     <MoleculeLogoMark className="h-9 w-9 rounded-xl" />
                     <span>
-                      <span className="block text-base font-bold leading-tight tracking-tight">
+                      <span
+                        className="block text-base font-bold leading-tight tracking-tight"
+                        style={moltraceWordmark3DStyle}
+                      >
                         <span className="text-foreground">Mol</span>
                         <span className={moltraceTraceClassName}>Trace</span>
                       </span>

@@ -1,4 +1,4 @@
-var SW_VERSION = "2026-05-08-v2"
+var SW_VERSION = "2026-05-21-engraved-white-cube-edge-v1"
 var STATIC_CACHE = "moltrace-static-" + SW_VERSION
 var RUNTIME_CACHE = "moltrace-runtime-" + SW_VERSION
 var OFFLINE_URL = "/offline"

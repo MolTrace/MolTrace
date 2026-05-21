@@ -227,6 +227,79 @@ describe("SpectraCheck preview rendering", () => {
     expect(screen.queryByText(/Raw spectrum not generated yet/i)).not.toBeInTheDocument()
   })
 
+  it("raw FID preview uses inline spectrum data without a second processing request", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      filename: "raw.zip",
+      raw_sha256: "a".repeat(64),
+      vendor_detected: "Bruker",
+      nucleus: "1H",
+      processing_preset: "balanced",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 5, 0],
+      x_label: "ppm",
+      y_label: "intensity",
+      reversed_x_axis: true,
+      acquisition_parameters: {},
+      file_inventory: {},
+      warnings: [],
+      notes: [],
+      metadata: { raw_archive_id: "a".repeat(64), inline_spectrum_generated: true },
+    })
+
+    renderWithEvidence(
+      <SpectraCheckRawFidSection sampleId="sample-1" onSampleIdChange={() => {}} solvent="CDCl3" />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
+      target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Preview spectrum/i }))
+
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledTimes(1))
+    expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/preview", expect.any(Object))
+    expect(await screen.findByText(/Auto-FT preview/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Raw spectrum not generated yet/i)).not.toBeInTheDocument()
+  })
+
+  it("raw FID process reuses matching inline preview data for the safe automatic preset", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      filename: "raw.zip",
+      raw_sha256: "a".repeat(64),
+      vendor_detected: "Bruker",
+      nucleus: "1H",
+      processing_preset: "balanced",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 5, 0],
+      x_label: "ppm",
+      y_label: "intensity",
+      reversed_x_axis: true,
+      acquisition_parameters: {},
+      file_inventory: {},
+      warnings: [],
+      notes: [],
+      metadata: { raw_archive_id: "a".repeat(64), inline_spectrum_generated: true },
+    })
+
+    renderWithEvidence(
+      <SpectraCheckRawFidSection sampleId="sample-1" onSampleIdChange={() => {}} solvent="CDCl3" />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
+      target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Preview spectrum/i }))
+
+    expect(await screen.findByText(/Auto-FT preview/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /Process FID/i }))
+
+    await screen.findByText(/Processed FID output/i)
+    expect(apiFetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it("raw FID process displays returned spectrum points", async () => {
     apiFetchMock.mockResolvedValueOnce({
       sample_id: "sample-1",

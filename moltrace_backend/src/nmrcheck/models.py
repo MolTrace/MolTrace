@@ -564,6 +564,16 @@ class NMRRawFIDPreviewResponse(BaseModel):
     solvent: str | None = None
     acquisition_parameters: dict[str, Any] = Field(default_factory=dict)
     file_inventory: dict[str, Any] = Field(default_factory=dict)
+    processing_preset: str | None = None
+    processing_parameters: dict[str, Any] = Field(default_factory=dict)
+    point_count: int = Field(default=0, ge=0)
+    peak_count: int = Field(default=0, ge=0)
+    peaks: list[dict[str, Any]] = Field(default_factory=list)
+    x: list[float] = Field(default_factory=list)
+    y: list[float] = Field(default_factory=list)
+    x_label: str = "ppm"
+    y_label: str = "intensity"
+    reversed_x_axis: bool = True
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)

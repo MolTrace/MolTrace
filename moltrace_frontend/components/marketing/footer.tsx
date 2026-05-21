@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { moltraceTraceClassName } from "@/components/branding/moltrace-wordmark"
+import { moltraceTraceClassName, moltraceWordmark3DStyle } from "@/components/branding/moltrace-wordmark"
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
 
 const navigation = {
@@ -264,7 +264,10 @@ export function Footer() {
         <div className="space-y-3">
           <Link href="/" className="inline-flex items-center gap-2.5">
             <MoleculeLogoMark className="h-9 w-9" />
-            <span className="text-lg font-semibold tracking-tight">
+            <span
+              className="text-lg font-semibold tracking-tight"
+              style={moltraceWordmark3DStyle}
+            >
               <span className="font-bold text-foreground">Mol</span>
               <span className={moltraceTraceClassName}>Trace</span>
             </span>
