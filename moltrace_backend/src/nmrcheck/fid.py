@@ -37,6 +37,7 @@ from .models import (
     FIDQADiagnostics,
     Peak,
 )
+from .compound_class_priors import diagnostic_regions_for
 from .parser import ReferencePeakAssignment, normalize_nmr_text, parse_reference_nmr_text
 from .raw_vault import RawVaultError, build_raw_upload_provenance, load_raw_archive_bytes
 from .spectrum import (
@@ -835,6 +836,7 @@ def _raw_fid_process_cache_key(
     settings: FIDProcessingSettings,
     expected_total_h: int | None,
     expected_non_labile_h: int | None,
+    compound_class: str | None,
 ) -> str:
     payload = {
         "version": _RAW_FID_PROCESS_CACHE_VERSION,
@@ -849,6 +851,7 @@ def _raw_fid_process_cache_key(
         "settings": settings.model_dump(mode="json"),
         "expected_total_h": expected_total_h,
         "expected_non_labile_h": expected_non_labile_h,
+        "compound_class": compound_class or "",
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -2552,6 +2555,7 @@ def process_bruker_1d_zip(
     settings: FIDProcessingSettings | None = None,
     expected_total_h: int | None = None,
     expected_non_labile_h: int | None = None,
+    compound_class: str | None = None,
     raw_upload_provenance: dict[str, Any] | None = None,
 ) -> FIDPreviewReport:
     if not filename.lower().endswith((".zip", ".tar.gz", ".tgz")):
@@ -2582,6 +2586,7 @@ def process_bruker_1d_zip(
         settings=settings,
         expected_total_h=expected_total_h,
         expected_non_labile_h=expected_non_labile_h,
+        compound_class=compound_class,
     )
     cached_report = _get_raw_fid_process_cache(
         cache_key,
@@ -2932,6 +2937,9 @@ def process_bruker_1d_zip(
             target_total_h=target_total_h,
             frequency_mhz=frequency_mhz,
             fixed_sensitivity=fid_fixed_sensitivity,
+            priority_regions=diagnostic_regions_for(
+                compound_class, _normalize_nucleus_label(nucleus) or "1H"
+            ),
         )
         peaks, peak_meta = _estimates_to_peaks(estimates, target_total_h=target_total_h)
 

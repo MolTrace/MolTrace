@@ -5683,6 +5683,7 @@ async def nmr_processed_analyze_route(
                 mask_solvent_regions=bool(solvent),
                 expected_total_h=expected_total_h,
                 expected_non_labile_h=expected_non_labile_h,
+                compound_class=normalized_compound_class,
                 display_mode="real",
                 vertical_gain=1.0,
                 max_preview_points=5000,
@@ -5746,6 +5747,7 @@ async def nmr_processed_analyze_route(
                 parser_content,
                 solvent=solvent,
                 carbon13_text=carbon_text_for_guidance,
+                compound_class=normalized_compound_class,
                 mask_solvent_regions=bool(solvent),
                 display_mode="real",
                 vertical_gain=1.0,
@@ -6086,6 +6088,7 @@ async def nmr_raw_fid_preview_route(
                 solvent=solvent,
                 nucleus=nucleus,
                 settings=settings,
+                compound_class=normalized_compound_class,
                 raw_upload_provenance=raw_upload_provenance,
             )
             x_values, y_values = _xy_from_spectrum_points(spectrum_preview.preview_points)
@@ -6255,6 +6258,7 @@ async def nmr_raw_fid_process_route(
             reference_nmr_text=shared_proton_text if nucleus == "1H" else None,
             expected_total_h=raw_expected_total_h,
             expected_non_labile_h=raw_expected_non_labile_h,
+            compound_class=normalized_compound_class,
             raw_upload_provenance=raw_upload_provenance,
         )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:

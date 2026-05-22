@@ -3,7 +3,8 @@ import random
 from nmrcheck.spectrum import SpectrumParseError
 from nmrcheck.models import Peak
 from nmrcheck.parser import parse_reference_nmr_text
-from nmrcheck.spectrum import _build_reference_guided_nmr_text, _downsample_points, _round_half_integrations, _structure_guided_peak_estimates, parse_processed_spectrum
+from nmrcheck.compound_class_priors import diagnostic_regions_for
+from nmrcheck.spectrum import _build_reference_guided_nmr_text, _downsample_points, _infer_peak_estimates, _round_half_integrations, _structure_guided_peak_estimates, parse_processed_spectrum
 
 TOBRAMYCIN_REFERENCE_TEXT = """'H NMR (500 MHz, D2O) 8 5.23 (d, J = 3.6 Hz, 1H), 5.08 (d, J = 3.9 Hz, 1H), 3.95 (ddd,
 J= 10.3, 4.6, 2.6 Hz, 1H), 3.80 (dd, J = 6.6, 3.6 Hz, 2H), 3.68 (tdd, J = 9.2, 5.6, 3.1 Hz,
@@ -187,6 +188,29 @@ def test_structure_guided_sweep_honours_an_explicit_fixed_sensitivity() -> None:
         fixed_sensitivity=0.1,
     )
     assert chosen == 0.1
+
+
+def test_priority_regions_recover_a_weak_peak_a_uniform_threshold_misses() -> None:
+    # A weak peak inside a compound-class-diagnostic window (carbohydrate
+    # anomeric region) must be recovered when the class hint supplies that
+    # window, while staying below the normal uniform threshold without it.
+    rng = random.Random(5)
+    points: list[tuple[float, float]] = []
+    for idx in range(6000):
+        x = 10.0 - idx * (10.0 / 5999)
+        intensity = rng.gauss(0.0, 12.0)
+        intensity += _gaussian(x, 2.0, 0.012, 400.0)  # strong peak
+        intensity += _gaussian(x, 4.8, 0.012, 26.0)  # weak peak, anomeric region
+        points.append((x, intensity))
+
+    without_hint = _infer_peak_estimates(points, sensitivity=0.12)
+    with_hint = _infer_peak_estimates(
+        points,
+        sensitivity=0.12,
+        priority_regions=diagnostic_regions_for("carbohydrates", "1H"),
+    )
+    assert sorted(round(estimate.shift_ppm, 1) for estimate in without_hint) == [2.0]
+    assert sorted(round(estimate.shift_ppm, 1) for estimate in with_hint) == [2.0, 4.8]
 
 
 def test_parse_text_spectrum_pair_exports() -> None:

@@ -25,6 +25,7 @@ from .models import (
     SpectrumPoint,
     SpectrumPreviewReport,
 )
+from .compound_class_priors import diagnostic_regions_for
 from .impurities import match_h1_impurity_shifts
 from .nmr_tables import solvent_windows
 from .parser import ReferencePeakAssignment, normalize_multiplicity, normalize_nmr_text, parse_j_values_hz, parse_reference_nmr_text
@@ -1288,11 +1289,17 @@ def _sensitivity_to_noise_factor(sensitivity: float) -> float:
     return min(12.0, max(3.0, 3.0 + sensitivity * 24.0))
 
 
+def _in_priority_region(value: float, regions: tuple[tuple[float, float], ...]) -> bool:
+    """True when ``value`` (ppm) falls inside any ``(lo, hi)`` priority window."""
+    return any(lo <= value <= hi for lo, hi in regions)
+
+
 def _infer_peak_estimates(
     points: list[tuple[float, float]],
     *,
     sensitivity: float = 0.12,
     frequency_mhz: float | None = None,
+    priority_regions: tuple[tuple[float, float], ...] = (),
 ) -> list[_PeakEstimate]:
     """Detect peaks from a processed / FID-derived intensity trace.
 
@@ -1301,7 +1308,9 @@ def _infer_peak_estimates(
     1.4826·MAD noise estimate of the baseline-corrected trace. This replaces
     the former fraction-of-the-dynamic-range cut, which scaled with the
     tallest peak and therefore both missed genuine weak signals and admitted
-    noise spikes.
+    noise spikes. ``priority_regions`` are compound-class-diagnostic ppm
+    windows that receive a more sensitive (lower) threshold so weak diagnostic
+    peaks there are not missed.
     """
     if len(points) < 3:
         return []
@@ -1327,16 +1336,28 @@ def _infer_peak_estimates(
     # SNR detection threshold. σ is measured on the *unclipped* trace under
     # the same smoothing as the detection array so the two share a scale.
     noise_sigma = 0.0 if short_trace else _estimate_noise_sigma(_smooth(corrected, window=smoothing_window))
+    baseline_level = median(y_smoothed)
     if noise_sigma > 0.0:
-        threshold = median(y_smoothed) + _sensitivity_to_noise_factor(sensitivity) * noise_sigma
+        noise_factor = _sensitivity_to_noise_factor(sensitivity)
+        threshold = baseline_level + noise_factor * noise_sigma
+        # Inside compound-class-diagnostic windows, drop to a more sensitive
+        # SNR cut (floored at 3σ, the classic detection limit) so weak
+        # diagnostic peaks are not lost; the rest of the trace is unchanged.
+        region_threshold = baseline_level + max(3.0, noise_factor * 0.6) * noise_sigma
     else:
         # Flat / noise-free trace: fall back to a minimal relative cut.
         threshold = lo + 0.02 * (hi - lo)
+        region_threshold = threshold
 
     components: list[_PeakComponent] = []
     for idx in range(1, len(y_smoothed) - 1):
         center = y_smoothed[idx]
-        if center < threshold:
+        local_threshold = (
+            region_threshold
+            if priority_regions and _in_priority_region(x_vals[idx], priority_regions)
+            else threshold
+        )
+        if center < local_threshold:
             continue
         if center < y_smoothed[idx - 1] or center < y_smoothed[idx + 1]:
             continue
@@ -1908,6 +1929,7 @@ def _structure_guided_peak_estimates(
     target_total_h: float | None,
     frequency_mhz: float | None,
     fixed_sensitivity: float | None = None,
+    priority_regions: tuple[tuple[float, float], ...] = (),
 ) -> tuple[list[_PeakEstimate], SpectrumComparisonReport | None, float]:
     """Detect peaks with a structure / reference-guided sensitivity sweep.
 
@@ -1915,9 +1937,11 @@ def _structure_guided_peak_estimates(
     resulting peak list is scored against the reference assignments (coverage,
     missing / extra peaks, shift agreement, multiplicity match, visible-H
     error), and the best-scoring candidate wins. ``fixed_sensitivity`` collapses
-    the sweep to a single explicit value. Returns the winning estimates, the
-    comparison computed for that candidate, and the sensitivity chosen — shared
-    by the processed-upload and Raw-FID paths so both detect peaks identically.
+    the sweep to a single explicit value; ``priority_regions`` are forwarded to
+    the detector as compound-class-diagnostic windows. Returns the winning
+    estimates, the comparison computed for that candidate, and the sensitivity
+    chosen — shared by the processed-upload and Raw-FID paths so both detect
+    peaks identically.
     """
     sensitivity_candidates = (
         [fixed_sensitivity]
@@ -1937,6 +1961,7 @@ def _structure_guided_peak_estimates(
             points,
             sensitivity=sensitivity_candidate,
             frequency_mhz=frequency_mhz,
+            priority_regions=priority_regions,
         )
         candidate_peaks, _ = _estimates_to_peaks(estimates, target_total_h=target_total_h)
         observed_total = round(sum(peak.integration_h for peak in candidate_peaks), 4)
@@ -2002,6 +2027,7 @@ def parse_processed_spectrum(
     mask_solvent_regions: bool = False,
     expected_total_h: int | None = None,
     expected_non_labile_h: int | None = None,
+    compound_class: str | None = None,
     display_mode: str = "real",
     vertical_gain: float = 1.0,
     debug_preview: bool = False,
@@ -2290,6 +2316,7 @@ def parse_processed_spectrum(
             target_total_h=target_total_h,
             frequency_mhz=frequency_mhz,
             fixed_sensitivity=float(peak_sensitivity) if peak_sensitivity is not None else None,
+            priority_regions=diagnostic_regions_for(compound_class, "1H"),
         )
         inferred_peaks, peak_meta = _estimates_to_peaks(best_estimates, target_total_h=target_total_h)
         comparison = best_comparison or _build_spectrum_comparison(
