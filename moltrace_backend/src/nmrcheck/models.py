@@ -221,9 +221,10 @@ class AnalysisValidationInputs(BaseModel):
     sample_id: str | None = Field(default=None, max_length=100)
     smiles: str | None = Field(default=None, max_length=500)
     nmr_text: str | None = Field(default=None, max_length=10_000)
+    carbon13_text: str | None = Field(default=None, max_length=10_000)
     solvent: str | None = Field(default=None, max_length=50)
 
-    @field_validator("sample_id", "smiles", "nmr_text", "solvent", mode="before")
+    @field_validator("sample_id", "smiles", "nmr_text", "carbon13_text", "solvent", mode="before")
     @classmethod
     def _optional_trim(cls, value: str | None) -> str | None:
         if value is None:
@@ -282,6 +283,14 @@ class ValidationReport(BaseModel):
     observed_total_h: float | None = None
     adjusted_observed_total_h: float | None = None
     delta_visible_h: float | None = None
+    # ¹³C NMR text is an optional supplementary layer — these stay at their
+    # defaults when no ¹³C text is supplied, and the match/count fields only
+    # populate when a SMILES and ¹³C text are both present.
+    carbon13_text_valid: bool = False
+    structure_carbon13_match: bool = False
+    expected_carbon_count: int | None = None
+    observed_carbon_signal_count: int | None = None
+    delta_carbon_signals: int | None = None
     parsed_peaks: list[Peak] = Field(default_factory=list)
     structure: StructureSummary | None = None
     warnings: list[str] = Field(default_factory=list)

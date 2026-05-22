@@ -25,8 +25,11 @@ from .models import (
 )
 from .nmr_tables import classify_carbon13_region, find_solvent_or_impurity_hits
 from .parser import parse_reference_nmr_text
-from .spectrum import _baseline_correct as _baseline_correct_trace
 from .spectrum import _apply_solvent_mask as _apply_trace_solvent_mask
+from .spectrum import _estimate_noise_sigma
+from .spectrum import _ppm_step
+from .spectrum import _robust_polynomial_baseline_correct
+from .spectrum import _sensitivity_to_noise_factor
 from .spectrum import _build_preserved_spectrum_state
 from .spectrum import _build_preview_spectrum_state
 from .spectrum import _PREVIEW_DOWNSAMPLING_METHOD
@@ -42,6 +45,7 @@ _FLOAT_RE = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
 _RANGE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)")
 _C13_UPLOAD_MIN_PPM = -50.0
 _C13_UPLOAD_MAX_PPM = 260.0
+_C13_TEXT_MATCH_TOLERANCE_PPM = 0.35
 
 
 class Carbon13ParseError(ValueError):
@@ -427,14 +431,29 @@ def _infer_carbon13_trace_peaks(
         return []
     ordered = sorted(points, key=lambda item: item[0], reverse=True)
     x_vals = [float(x) for x, _ in ordered]
-    smoothing_window = 5 if len(ordered) >= 1200 else 3
-    y_vals = _smooth(_baseline_correct_trace([float(y) for _, y in ordered]), window=smoothing_window)
+    # Baseline-correct once: the unclipped result feeds an unbiased noise
+    # estimate, the zero-clipped result is the detection trace.
+    corrected, _baseline_meta = _robust_polynomial_baseline_correct(
+        [float(y) for _, y in ordered], orient_positive=True
+    )
+    if len(corrected) < 3:
+        return []
+    smoothing_window = 5 if len(corrected) >= 1200 else 3
+    y_vals = _smooth([max(0.0, value) for value in corrected], window=smoothing_window)
     low = min(y_vals)
     high = max(y_vals)
     if math.isclose(high, low):
         return []
     sensitivity = 0.12 if peak_sensitivity is None else min(max(float(peak_sensitivity), 0.02), 0.45)
-    threshold = max(low + sensitivity * (high - low), median(y_vals) * 1.08)
+    # SNR detection threshold — noise_factor·σ above the baseline, with σ the
+    # robust 1.4826·MAD noise estimate of the unclipped corrected trace. This
+    # replaces the former fraction-of-dynamic-range cut, so weak ¹³C carbons are
+    # not lost beneath a dominant signal and noise spikes are not picked.
+    noise_sigma = _estimate_noise_sigma(_smooth(corrected, window=smoothing_window))
+    if noise_sigma > 0.0:
+        threshold = median(y_vals) + _sensitivity_to_noise_factor(sensitivity) * noise_sigma
+    else:
+        threshold = low + 0.02 * (high - low)
     candidates: list[tuple[float, float]] = []
     for idx in range(1, len(y_vals) - 1):
         center = y_vals[idx]
@@ -445,13 +464,14 @@ def _infer_carbon13_trace_peaks(
         candidates.append((x_vals[idx], center))
     candidates.sort(key=lambda item: item[1], reverse=True)
     selected: list[tuple[float, float]] = []
-    min_sep_ppm = 0.25
+    # Resolution-driven dedup distance — replaces the former flat 0.25 ppm
+    # merge, which fused genuinely distinct carbons. Local maxima are already
+    # ≥2 samples apart, so this only collapses a noisy peak top.
+    min_sep_ppm = max(_ppm_step(x_vals) * 4, 0.01)
     for shift, intensity in candidates:
         if any(abs(shift - prior_shift) < min_sep_ppm for prior_shift, _ in selected):
             continue
         selected.append((shift, intensity))
-        if len(selected) >= 80:
-            break
     selected.sort(key=lambda item: item[0], reverse=True)
     return [
         _make_peak(shift, solvent=solvent, intensity=round(float(intensity), 6))
@@ -464,6 +484,7 @@ def parse_carbon13_processed_spectrum(
     content: bytes,
     *,
     solvent: str | None = None,
+    carbon13_text: str | None = None,
     peak_sensitivity: float | None = None,
     mask_solvent_regions: bool = True,
     display_mode: str = "real",
@@ -611,6 +632,17 @@ def parse_carbon13_processed_spectrum(
         }
         warnings.extend(note for note in magnifier.warnings if note not in warnings)
     if not infer_peaks:
+        text_guidance_meta = {
+            "carbon13_text_guidance_used": False,
+            "reference_peak_count": 0,
+            "matched_reference_peak_count": 0,
+            "missing_reference_peak_count": 0,
+            "filtered_unmatched_detected_peak_count": 0,
+            "match_tolerance_ppm": _C13_TEXT_MATCH_TOLERANCE_PPM,
+            "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
+            "skipped": True,
+            "reason": "peak_inference_disabled",
+        }
         preview_points = _downsample_processed_display_points(display_points, limit=preview_limit)
         warnings.append("Display preview generated without ¹³C peak inference; use Analyze to run peak detection and evidence scoring.")
         return Carbon13UploadPreview(
@@ -626,6 +658,8 @@ def parse_carbon13_processed_spectrum(
                 "peak_sensitivity": 0.12 if peak_sensitivity is None else peak_sensitivity,
                 "peak_inference": "skipped_for_display_preview",
                 "peak_inference_skipped": True,
+                "carbon13_text_guidance": text_guidance_meta,
+                "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
                 "mask_solvent_regions": mask_solvent_regions,
                 "preview_points": [point.model_dump(mode="json") for point in preview_points],
                 "display_preprocessing": display_meta,
@@ -687,6 +721,12 @@ def parse_carbon13_processed_spectrum(
     )
     if not peaks:
         raise Carbon13ParseError("No ¹³C peaks could be inferred from the uploaded processed spectrum.")
+    peaks, text_guidance_meta, text_guidance_notes = refine_carbon13_peaks_with_text_guidance(
+        peaks,
+        carbon13_text=carbon13_text,
+        solvent=solvent,
+    )
+    warnings.extend(note for note in text_guidance_notes if note not in warnings)
     warnings.append("Processed ¹³C spectrum trace detected; carbon peaks were inferred heuristically and should be reviewed.")
     if any(peak.is_likely_solvent for peak in peaks):
         warnings.append("One or more inferred ¹³C peaks fall in known solvent-carbon regions.")
@@ -705,6 +745,8 @@ def parse_carbon13_processed_spectrum(
             "peak_sensitivity": 0.12 if peak_sensitivity is None else peak_sensitivity,
             "peak_inference": "enabled",
             "peak_inference_skipped": False,
+            "carbon13_text_guidance": text_guidance_meta,
+            "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
             "mask_solvent_regions": mask_solvent_regions,
             "preview_points": [
                 point.model_dump(mode="json")
@@ -934,6 +976,89 @@ def refine_carbon13_peaks_with_context(
             f"Context-guided raw ¹³C peak filtering retained {len(retained_non_solvent)} non-solvent signal(s) closest to the SMILES-derived carbon count and suppressed {dropped_count} low-support candidate(s)."
         )
     return (retained, context_meta, notes)
+
+
+def refine_carbon13_peaks_with_text_guidance(
+    peaks: list[Carbon13Peak],
+    *,
+    carbon13_text: str | None = None,
+    solvent: str | None = None,
+    tolerance_ppm: float = _C13_TEXT_MATCH_TOLERANCE_PPM,
+) -> tuple[list[Carbon13Peak], dict[str, Any], list[str]]:
+    """Use supplied 13C text to filter detected peaks without fabricating missing ones."""
+    guidance_meta: dict[str, Any] = {
+        "carbon13_text_guidance_used": False,
+        "reference_peak_count": 0,
+        "matched_reference_peak_count": 0,
+        "missing_reference_peak_count": 0,
+        "filtered_unmatched_detected_peak_count": 0,
+        "match_tolerance_ppm": tolerance_ppm,
+        "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
+    }
+    notes: list[str] = []
+    if not carbon13_text or not carbon13_text.strip():
+        return (peaks, guidance_meta, notes)
+
+    try:
+        reference_peaks = parse_carbon13_text(carbon13_text, solvent=solvent)
+    except Carbon13ParseError as exc:
+        guidance_meta["carbon13_text_guidance_error"] = str(exc)
+        notes.append(f"13C NMR text guidance could not be applied because the text did not parse: {exc}")
+        return (peaks, guidance_meta, notes)
+
+    reference_non_solvent = [
+        peak for peak in reference_peaks if not peak.is_likely_solvent
+    ]
+    guidance_meta["carbon13_text_guidance_used"] = True
+    guidance_meta["reference_peak_count"] = len(reference_non_solvent)
+    if not reference_non_solvent or not peaks:
+        return (peaks, guidance_meta, notes)
+
+    solvent_peaks = [peak for peak in peaks if peak.is_likely_solvent]
+    candidate_peaks = [peak for peak in peaks if not peak.is_likely_solvent]
+    used_candidate_indices: set[int] = set()
+    matched_indices: set[int] = set()
+    missing_reference_shifts: list[float] = []
+
+    for reference_peak in reference_non_solvent:
+        ranked_matches = sorted(
+            (
+                (abs(float(candidate.shift_ppm) - float(reference_peak.shift_ppm)), idx)
+                for idx, candidate in enumerate(candidate_peaks)
+                if idx not in used_candidate_indices
+            ),
+            key=lambda item: item[0],
+        )
+        if ranked_matches and ranked_matches[0][0] <= tolerance_ppm:
+            _, matched_idx = ranked_matches[0]
+            used_candidate_indices.add(matched_idx)
+            matched_indices.add(matched_idx)
+        else:
+            missing_reference_shifts.append(round(float(reference_peak.shift_ppm), 3))
+
+    matched_peaks = [candidate_peaks[idx] for idx in sorted(matched_indices)]
+    guidance_meta["matched_reference_peak_count"] = len(matched_peaks)
+    guidance_meta["missing_reference_peak_count"] = len(missing_reference_shifts)
+    guidance_meta["missing_reference_shifts_ppm"] = missing_reference_shifts[:20]
+
+    if not matched_peaks:
+        notes.append(
+            "13C NMR text guidance did not filter the detected peak list because no detected non-solvent peaks matched the supplied 13C shifts within tolerance."
+        )
+        return (peaks, guidance_meta, notes)
+
+    filtered_count = max(0, len(candidate_peaks) - len(matched_peaks))
+    guidance_meta["filtered_unmatched_detected_peak_count"] = filtered_count
+    retained = sorted(matched_peaks + solvent_peaks, key=lambda peak: peak.shift_ppm, reverse=True)
+    if filtered_count:
+        notes.append(
+            f"13C NMR text guidance retained {len(matched_peaks)} independently detected non-solvent peak(s) that matched supplied 13C shifts and suppressed {filtered_count} unmatched candidate(s)."
+        )
+    if missing_reference_shifts:
+        notes.append(
+            f"13C NMR text listed {len(missing_reference_shifts)} shift(s) that were not independently detected within {tolerance_ppm:.2f} ppm; those peaks were not fabricated."
+        )
+    return (retained, guidance_meta, notes)
 
 
 def summarize_regions(peaks: list[Carbon13Peak]) -> list[Carbon13RegionSummary]:

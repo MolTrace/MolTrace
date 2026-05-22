@@ -466,6 +466,56 @@ def test_nmr_raw_fid_process_returns_enriched_peaks_and_summaries(tmp_path) -> N
     assert metadata.get("candidate_text_supplied") is True
     assert metadata.get("proton_nmr_text_supplied") is True
     assert metadata.get("carbon13_text_supplied") is False
+    guidance = metadata.get("raw_fid_peak_guidance") or {}
+    assert guidance.get("structure_smiles_used_for_peak_picking") == "CCO"
+    assert guidance.get("expected_total_h") == 6
+    assert guidance.get("expected_non_labile_h") == 5
+
+
+def test_nmr_raw_fid_process_links_13c_text_and_parsed_smiles(tmp_path) -> None:
+    """Raw-FID 13C processing must receive the same shared evidence as the
+    processed analyzer: parsed SMILES from candidates_text plus optional 13C
+    text, without fabricating peaks that were not detected."""
+    content = _build_bruker_zip()
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/raw-fid/process",
+            headers=HEADERS,
+            data={
+                "sample_id": "raw-fid-carbon-guided",
+                "nucleus": "13C",
+                "vendor": "auto",
+                "solvent": "CDCl3",
+                "processing_preset": "balanced",
+                "candidates_text": "Ethanol | CCO",
+                "proton_nmr_text": "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), 1.26 (t, 3H)",
+                "carbon13_text": "13C NMR (101 MHz, CDCl3) δ 58.2, 18.1",
+            },
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    metadata = payload["metadata"]
+    assert metadata.get("candidate_text_supplied") is True
+    assert metadata.get("proton_nmr_text_supplied") is True
+    assert metadata.get("carbon13_text_supplied") is True
+
+    guidance = metadata.get("raw_fid_peak_guidance") or {}
+    assert guidance.get("peak_evidence_policy") == "detected_peaks_only_no_reference_fabrication"
+    assert guidance.get("structure_smiles_used_for_peak_picking") == "CCO"
+    assert guidance.get("structure_guidance_source") == "candidates_text"
+    assert guidance.get("parsed_smiles_supplied_to_raw_fid") is True
+    assert guidance.get("carbon13_text_supplied_to_raw_fid") is True
+    assert guidance.get("carbon13_text_used_for_peak_guidance") is True
+
+    text_guidance = guidance.get("carbon13_text_guidance") or {}
+    assert text_guidance.get("carbon13_text_guidance_used") is True
+    assert text_guidance.get("reference_peak_count") == 2
+
+    context_guidance = guidance.get("carbon13_context_guidance") or {}
+    assert context_guidance.get("smiles_guidance_used") is True
+    assert context_guidance.get("expected_carbon_atoms") == 2
 
 
 def test_nmr_raw_fid_preview_echoes_compound_class(tmp_path) -> None:
@@ -671,3 +721,33 @@ def test_nmr_processed_analyze_uses_shared_proton_carbon_layers(tmp_path) -> Non
     # The key assertion: BOTH 1H and 13C must be present, not just the active nucleus.
     assert "1H" in layers, f"Expected 1H in evidence_layers_used, got {layers}"
     assert "13C" in layers, f"Expected 13C in evidence_layers_used, got {layers}"
+
+
+def test_nmr_processed_analyze_uses_shared_proton_text_for_peak_picking(tmp_path) -> None:
+    """The shared session 1H text must guide the detector, not only candidate scoring.
+
+    This catches the case where the frontend sends proton_nmr_text + candidates_text
+    but leaves the active local nmr_text empty; the detector should still receive
+    the reference text and the SMILES-derived proton target.
+    """
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "shared-proton-picking",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "proton_nmr_text": "1H NMR (CDCl3) delta 3.65 (q, 2H), 1.26 (t, 3H), 2.10 (br s, 1H)",
+                "candidates_text": "Ethanol | CCO",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    metadata = response.json()["metadata"]
+    assert metadata["proton_nmr_text_used_for_peak_picking"] is True
+    assert metadata["proton_peak_picking_reference_source"] == "proton_nmr_text"
+    assert metadata["structure_smiles_used_for_peak_picking"] == "CCO"
+    assert metadata["expected_total_h"] == 6
+    assert metadata["expected_non_labile_h"] == 5

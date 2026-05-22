@@ -52,6 +52,11 @@ type ValidationReport = {
   observed_total_h: number | null
   adjusted_observed_total_h: number | null
   delta_visible_h: number | null
+  carbon13_text_valid: boolean
+  structure_carbon13_match: boolean
+  expected_carbon_count: number | null
+  observed_carbon_signal_count: number | null
+  delta_carbon_signals: number | null
   parsed_peaks: unknown[]
   structure: unknown | null
   warnings: string[]
@@ -71,6 +76,11 @@ function makeReport(overrides: Partial<ValidationReport>): ValidationReport {
     observed_total_h: null,
     adjusted_observed_total_h: null,
     delta_visible_h: null,
+    carbon13_text_valid: false,
+    structure_carbon13_match: false,
+    expected_carbon_count: null,
+    observed_carbon_signal_count: null,
+    delta_carbon_signals: null,
     parsed_peaks: [],
     structure: null,
     warnings: [],
@@ -138,7 +148,7 @@ describe("SessionValidateCard — backend roundtrip", () => {
     apiFetchMock.mockReset()
   })
 
-  it("posts JSON to /analyze/validate using the first SMILES + 1H text + solvent", async () => {
+  it("posts JSON to /analyze/validate using the first SMILES + 1H text + 13C text + solvent", async () => {
     apiFetchMock.mockResolvedValueOnce(
       makeReport({
         structure_valid: true,
@@ -159,7 +169,7 @@ describe("SessionValidateCard — backend roundtrip", () => {
         solvent="CDCl3"
         candidatesText="Ethanol | CCO"
         protonText={DEFAULT_PROTON}
-        carbonText=""
+        carbonText={DEFAULT_CARBON}
         defaults={DEFAULTS}
       />,
     )
@@ -173,6 +183,7 @@ describe("SessionValidateCard — backend roundtrip", () => {
     const body = init?.body as Record<string, unknown>
     expect(body.smiles).toBe("CCO")
     expect(body.nmr_text).toBe(DEFAULT_PROTON)
+    expect(body.carbon13_text).toBe(DEFAULT_CARBON)
     expect(body.solvent).toBe("CDCl3")
     expect(body.sample_id).toBe("My Sample")
   })
@@ -349,5 +360,151 @@ describe("SessionValidateCard — backend roundtrip", () => {
     await screen.findByTestId("session-validate-result")
     // Button is still clickable so the user can re-validate after editing.
     expect(screen.getByTestId("session-validate-button")).not.toBeDisabled()
+  })
+})
+
+describe("SessionValidateCard — 13C NMR layer", () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset()
+  })
+
+  it("posts carbon13_text in the payload when the 13C textarea is non-empty", async () => {
+    apiFetchMock.mockResolvedValueOnce(makeReport({ structure_valid: true }))
+    const user = userEvent.setup()
+    render(
+      <SessionValidateCard
+        sampleId="SAMPLE-001"
+        solvent="CDCl3"
+        candidatesText="Ethanol | CCO"
+        protonText=""
+        carbonText="13C NMR (101 MHz, CDCl3) δ 58.3, 18.2"
+        defaults={DEFAULTS}
+      />,
+    )
+    await user.click(screen.getByTestId("session-validate-button"))
+
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledTimes(1))
+    const [, init] = apiFetchMock.mock.calls[0]
+    const body = init?.body as Record<string, unknown>
+    expect(body.carbon13_text).toBe("13C NMR (101 MHz, CDCl3) δ 58.3, 18.2")
+  })
+
+  it("sends carbon13_text as null when the 13C textarea is empty", async () => {
+    apiFetchMock.mockResolvedValueOnce(makeReport({ structure_valid: true }))
+    const user = userEvent.setup()
+    render(
+      <SessionValidateCard
+        sampleId="SAMPLE-001"
+        solvent="CDCl3"
+        candidatesText="Ethanol | CCO"
+        protonText={DEFAULT_PROTON}
+        carbonText=""
+        defaults={DEFAULTS}
+      />,
+    )
+    await user.click(screen.getByTestId("session-validate-button"))
+
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledTimes(1))
+    const [, init] = apiFetchMock.mock.calls[0]
+    const body = init?.body as Record<string, unknown>
+    expect(body.carbon13_text).toBeNull()
+  })
+
+  it("renders the 13C layer chips + carbon summary when 13C is supplied and matches", async () => {
+    apiFetchMock.mockResolvedValueOnce(
+      makeReport({
+        structure_valid: true,
+        nmr_text_valid: true,
+        structure_nmr_match: true,
+        analysis_ready: true,
+        carbon13_text_valid: true,
+        structure_carbon13_match: true,
+        expected_carbon_count: 2,
+        observed_carbon_signal_count: 2,
+        delta_carbon_signals: 0,
+      }),
+    )
+    const user = userEvent.setup()
+    render(
+      <SessionValidateCard
+        sampleId="SAMPLE-001"
+        solvent="CDCl3"
+        candidatesText="Ethanol | CCO"
+        protonText={DEFAULT_PROTON}
+        carbonText="13C NMR (101 MHz, CDCl3) δ 58.3, 18.2"
+        defaults={DEFAULTS}
+      />,
+    )
+    await user.click(screen.getByTestId("session-validate-button"))
+
+    await screen.findByTestId("session-validate-result")
+    expect(screen.getByTestId("carbon13-text-chip").dataset.state).toBe("ok")
+    expect(screen.getByTestId("carbon13-match-chip").dataset.state).toBe("ok")
+    expect(
+      screen.getByTestId("session-validate-carbon13-summary"),
+    ).toHaveTextContent(/Expected carbons/i)
+  })
+
+  it("hides the 13C chips and carbon summary when no 13C text is supplied", async () => {
+    apiFetchMock.mockResolvedValueOnce(
+      makeReport({
+        structure_valid: true,
+        nmr_text_valid: true,
+        structure_nmr_match: true,
+        analysis_ready: true,
+      }),
+    )
+    const user = userEvent.setup()
+    render(
+      <SessionValidateCard
+        sampleId="SAMPLE-001"
+        solvent="CDCl3"
+        candidatesText="Ethanol | CCO"
+        protonText={DEFAULT_PROTON}
+        carbonText=""
+        defaults={DEFAULTS}
+      />,
+    )
+    await user.click(screen.getByTestId("session-validate-button"))
+
+    await screen.findByTestId("session-validate-result")
+    expect(screen.queryByTestId("carbon13-text-chip")).toBeNull()
+    expect(screen.queryByTestId("carbon13-match-chip")).toBeNull()
+    expect(screen.queryByTestId("session-validate-carbon13-summary")).toBeNull()
+  })
+
+  it("renders 'Validation failed' when 13C reports more signals than carbons", async () => {
+    apiFetchMock.mockResolvedValueOnce(
+      makeReport({
+        structure_valid: true,
+        carbon13_text_valid: true,
+        structure_carbon13_match: false,
+        expected_carbon_count: 2,
+        observed_carbon_signal_count: 5,
+        delta_carbon_signals: 3,
+        errors: [
+          "SMILES / ¹³C NMR mismatch: the parsed text reports 5 carbon signals, but the structure has only 2 carbon atoms.",
+        ],
+      }),
+    )
+    const user = userEvent.setup()
+    render(
+      <SessionValidateCard
+        sampleId="SAMPLE-001"
+        solvent="CDCl3"
+        candidatesText="Ethanol | CCO"
+        protonText=""
+        carbonText="13C NMR δ 58.3, 18.2, 70.1, 120.4, 135.9"
+        defaults={DEFAULTS}
+      />,
+    )
+    await user.click(screen.getByTestId("session-validate-button"))
+
+    const result = await screen.findByTestId("session-validate-result")
+    expect(result.dataset.state).toBe("failed")
+    expect(screen.getByTestId("carbon13-match-chip").dataset.state).toBe("fail")
+    expect(screen.getByTestId("session-validate-errors")).toHaveTextContent(
+      /¹³C NMR mismatch/i,
+    )
   })
 })

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+from .carbon13 import (
+    Carbon13ParseError,
+    expected_carbon_count_from_smiles,
+    parse_carbon13_text,
+)
 from .chemistry import structure_summary_from_smiles
 from .exceptions import PeakParseError, StructureParseError
 from .models import (
     AnalysisInputs,
     AnalysisReport,
     AnalysisValidationInputs,
+    Carbon13Peak,
     Peak,
     StructureSummary,
     ValidationReport,
@@ -164,6 +170,56 @@ def _structure_match_validation(
     )
 
 
+def _carbon13_match_validation(
+    *,
+    peaks: list[Carbon13Peak],
+    expected_carbon_count: int,
+) -> tuple[list[str], list[str], int, int]:
+    """Cross-check the parsed ¹³C signal count against the SMILES carbon count.
+
+    Returns ``(errors, warnings, observed_signal_count, delta_signals)``.
+    Fewer signals than carbons is treated as benign — molecular symmetry and
+    equivalence collapse carbons onto shared signals — while more signals than
+    carbons is suspicious and escalates to an error once it exceeds a small
+    structure-scaled tolerance (rotamer doubling can explain a slight excess).
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    solvent_peaks = [peak for peak in peaks if peak.is_likely_solvent]
+    non_solvent_peaks = [peak for peak in peaks if not peak.is_likely_solvent]
+    observed = len(non_solvent_peaks)
+    delta = observed - expected_carbon_count
+
+    if solvent_peaks:
+        warnings.append(
+            f"{len(solvent_peaks)} likely residual-solvent ¹³C peak(s) were excluded "
+            "while checking the SMILES-to-¹³C signal-count match."
+        )
+
+    if delta > 0:
+        allowed_overage = max(1, round(expected_carbon_count * 0.15))
+        if delta > allowed_overage:
+            errors.append(
+                f"SMILES / ¹³C NMR mismatch: the parsed text reports {observed} carbon "
+                f"signals, but the structure has only {expected_carbon_count} carbon atoms."
+            )
+        else:
+            warnings.append(
+                f"The ¹³C text reports {observed} signals, slightly more than the "
+                f"structure's {expected_carbon_count} carbons; rotamers, an impurity "
+                "peak, or a stray value in the text are possible and worth a check."
+            )
+    elif delta < 0:
+        warnings.append(
+            f"The ¹³C text reports {observed} signals for a structure with "
+            f"{expected_carbon_count} carbons; fewer signals than carbons usually "
+            "reflects molecular symmetry or equivalence, though peak overlap and weak "
+            "quaternary carbons can also reduce the count."
+        )
+
+    return errors, warnings, observed, delta
+
+
 def validate_inputs(payload: AnalysisInputs | AnalysisValidationInputs) -> ValidationReport:
     warnings: list[str] = []
     errors: list[str] = []
@@ -172,13 +228,20 @@ def validate_inputs(payload: AnalysisInputs | AnalysisValidationInputs) -> Valid
     structure_valid = False
     nmr_text_valid = False
     structure_nmr_match = False
+    carbon13_text_valid = False
+    structure_carbon13_match = False
     smiles = (payload.smiles or "").strip()
     nmr_text = (payload.nmr_text or "").strip()
+    carbon13_text = (getattr(payload, "carbon13_text", None) or "").strip()
     solvent = _resolved_solvent(payload.solvent)
     expected_visible_h: float | None = None
     observed_total_h: float | None = None
     adjusted_observed_total_h: float | None = None
     delta_visible_h: float | None = None
+    parsed_carbon13_peaks: list[Carbon13Peak] = []
+    expected_carbon_count: int | None = None
+    observed_carbon_signal_count: int | None = None
+    delta_carbon_signals: int | None = None
 
     if smiles:
         try:
@@ -204,6 +267,16 @@ def validate_inputs(payload: AnalysisInputs | AnalysisValidationInputs) -> Valid
     else:
         warnings.append("Enter 1H NMR text before running analysis.")
 
+    # ¹³C NMR text is an optional supplementary layer: parse and cross-check it
+    # only when supplied. Its absence is intentionally silent (no warning),
+    # unlike the SMILES / ¹H NMR primary inputs above.
+    if carbon13_text:
+        try:
+            parsed_carbon13_peaks = parse_carbon13_text(carbon13_text, solvent=solvent)
+            carbon13_text_valid = True
+        except Carbon13ParseError as exc:
+            errors.append(str(exc))
+
     profile = get_solvent_profile(solvent)
     if solvent and profile is None:
         warnings.append(f"Solvent '{solvent}' is not recognized, so solvent-specific heuristics are disabled.")
@@ -228,6 +301,22 @@ def validate_inputs(payload: AnalysisInputs | AnalysisValidationInputs) -> Valid
         errors.extend(match_errors)
         warnings.extend(match_warnings)
         structure_nmr_match = not match_errors
+
+    if structure_valid and carbon13_text_valid:
+        expected_carbon_count = expected_carbon_count_from_smiles(smiles)
+        (
+            carbon_errors,
+            carbon_warnings,
+            observed_carbon_signal_count,
+            delta_carbon_signals,
+        ) = _carbon13_match_validation(
+            peaks=parsed_carbon13_peaks,
+            expected_carbon_count=expected_carbon_count,
+        )
+        errors.extend(carbon_errors)
+        warnings.extend(carbon_warnings)
+        structure_carbon13_match = not carbon_errors
+
     analysis_ready = structure_valid and nmr_text_valid and structure_nmr_match and not errors
 
     return ValidationReport(
@@ -242,6 +331,11 @@ def validate_inputs(payload: AnalysisInputs | AnalysisValidationInputs) -> Valid
         observed_total_h=observed_total_h,
         adjusted_observed_total_h=adjusted_observed_total_h,
         delta_visible_h=delta_visible_h,
+        carbon13_text_valid=carbon13_text_valid,
+        structure_carbon13_match=structure_carbon13_match,
+        expected_carbon_count=expected_carbon_count,
+        observed_carbon_signal_count=observed_carbon_signal_count,
+        delta_carbon_signals=delta_carbon_signals,
         parsed_peaks=parsed_peaks,
         structure=structure,
         warnings=warnings,

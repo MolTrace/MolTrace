@@ -1,15 +1,19 @@
 from pathlib import Path
 import json
+import math
+import random
 
 import pytest
 
 from nmrcheck.carbon13 import (
     Carbon13ParseError,
     analyze_carbon13_text,
+    carbon13_peaks_from_shift_values,
     parse_carbon13_processed_spectrum,
     parse_carbon13_table,
     parse_carbon13_text,
     refine_carbon13_peaks_with_context,
+    refine_carbon13_peaks_with_text_guidance,
 )
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "carbon13"
@@ -86,6 +90,28 @@ def test_invalid_13c_csv_rejected() -> None:
             (FIXTURE_DIR / "invalid_13c.csv").read_bytes(),
             solvent="CDCl3",
         )
+
+
+def test_carbon13_text_guidance_filters_detected_candidates_without_fabricating_missing() -> None:
+    peaks = carbon13_peaks_from_shift_values(
+        [(130.02, 10.0), (77.16, 100.0), (50.0, 2.0), (18.2, 8.0)],
+        solvent="CDCl3",
+    )
+
+    refined, meta, notes = refine_carbon13_peaks_with_text_guidance(
+        peaks,
+        carbon13_text="13C NMR (126 MHz, CDCl3) δ 130.0, 40.0, 18.2",
+        solvent="CDCl3",
+    )
+
+    non_solvent_shifts = [peak.shift_ppm for peak in refined if not peak.is_likely_solvent]
+    assert non_solvent_shifts == [130.02, 18.2]
+    assert all(abs(peak.shift_ppm - 40.0) > 0.01 for peak in refined)
+    assert any(peak.is_likely_solvent for peak in refined)
+    assert meta["matched_reference_peak_count"] == 2
+    assert meta["missing_reference_peak_count"] == 1
+    assert meta["filtered_unmatched_detected_peak_count"] == 1
+    assert any("not fabricated" in note for note in notes)
 
 
 def test_processed_13c_trace_applies_baseline_and_masks_only_for_peak_picking() -> None:
@@ -201,3 +227,61 @@ def test_context_guided_13c_peak_refinement_uses_smiles_and_proton_text() -> Non
     assert meta["context_filtered_peak_count"] > 0
     assert non_solvent_shifts == [58.3, 18.2]
     assert any("Context-guided raw ¹³C" in note for note in notes)
+
+
+def _carbon13_trace_csv(
+    peaks: list[tuple[float, float]],
+    *,
+    noise: float,
+    seed: int,
+) -> bytes:
+    """Synthesize a dense processed ¹³C-spectrum CSV: Gaussian peaks + noise.
+
+    An empty ``peaks`` list yields a pure-noise trace, which the SNR-based
+    detector must leave empty rather than inventing carbons.
+    """
+    rng = random.Random(seed)
+    rows = ["ppm,intensity"]
+    steps = int(210.0 / 0.025) + 1
+    for idx in range(steps):
+        x = 210.0 - idx * 0.025
+        intensity = rng.gauss(0.0, noise)
+        for center, amplitude in peaks:
+            intensity += amplitude * math.exp(-((x - center) ** 2) / (2 * 0.06**2))
+        rows.append(f"{x:.3f},{intensity:.5f}")
+    return ("\n".join(rows) + "\n").encode()
+
+
+def test_processed_13c_detector_recovers_carbon_count_under_noise() -> None:
+    # A dense ¹³C trace synthesized at six known shifts plus realistic noise
+    # must be detected back to the same six signals — the SNR threshold neither
+    # drops genuine carbons nor adds noise peaks.
+    carbons = [
+        (165.2, 200.0),
+        (140.1, 170.0),
+        (128.5, 150.0),
+        (72.3, 220.0),
+        (55.0, 130.0),
+        (21.8, 110.0),
+    ]
+    preview = parse_carbon13_processed_spectrum(
+        "trace.csv",
+        _carbon13_trace_csv(carbons, noise=3.0, seed=22),
+        solvent=None,
+    )
+    assert preview.source_mode == "processed_trace"
+    assert preview.observed_signal_count == len(carbons)
+    detected = sorted(round(peak.shift_ppm, 1) for peak in preview.peaks)
+    for center, _amplitude in carbons:
+        assert any(abs(center - shift) <= 0.2 for shift in detected)
+
+
+def test_processed_13c_detector_rejects_pure_noise_without_fabricating_peaks() -> None:
+    # A trace with no real signal must not yield invented ¹³C carbons; the
+    # processed-spectrum parser raises rather than fabricating a peak list.
+    with pytest.raises(Carbon13ParseError):
+        parse_carbon13_processed_spectrum(
+            "noise.csv",
+            _carbon13_trace_csv([], noise=4.0, seed=23),
+            solvent=None,
+        )
