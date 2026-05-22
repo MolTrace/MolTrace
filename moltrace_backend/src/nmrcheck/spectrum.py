@@ -1125,6 +1125,11 @@ def apply_processed_trace_baseline_conditions(
 
 
 def _classify_multiplicity(component_count: int, width_ppm: float, ppm_step: float) -> str:
+    # A local-maximum picker cannot resolve overlapped lines, so it cannot
+    # distinguish a quartet from a doublet-of-doublets (both four lines) or any
+    # busier pattern. Only s / d / t are claimed geometrically; four-plus lines
+    # are reported honestly as "m" unless a reference text confirms the pattern
+    # (see _apply_reference_multiplicity).
     broad_threshold = max(0.12, ppm_step * 24)
     if component_count <= 1:
         return "br s" if width_ppm >= broad_threshold else "s"
@@ -1132,8 +1137,6 @@ def _classify_multiplicity(component_count: int, width_ppm: float, ppm_step: flo
         return "d"
     if component_count == 3:
         return "t"
-    if component_count == 4:
-        return "q"
     return "m"
 
 
@@ -1530,6 +1533,48 @@ def _reference_coverage_matches(
         ]
         coverage.append((assignment, matching_peaks))
     return coverage
+
+
+def _apply_reference_multiplicity(
+    peaks: list[Peak],
+    reference_assignments: list[ReferencePeakAssignment],
+) -> list[Peak]:
+    """Adopt literature multiplicity + J for detected peaks matching the text.
+
+    The pasted ¹H NMR text is authoritative for coupling pattern and J values;
+    a local-maximum picker cannot reliably resolve overlapped multiplets
+    without spectral deconvolution. Each detected peak within shift tolerance
+    of a reference assignment therefore takes that assignment's multiplicity
+    and J-list. Peaks with no reference match keep their geometric label, and
+    the structure-vs-reference comparison is built *before* this step so its
+    multiplicity statistics still reflect raw detection.
+    """
+    if not reference_assignments:
+        return peaks
+    updated: list[Peak] = []
+    for peak in peaks:
+        best: ReferencePeakAssignment | None = None
+        best_delta: float | None = None
+        for assignment in reference_assignments:
+            match = _reference_shift_match(assignment, peak)
+            if match is None:
+                continue
+            _status, delta = match
+            if best_delta is None or delta < best_delta:
+                best_delta = delta
+                best = assignment
+        if best is None:
+            updated.append(peak)
+        else:
+            updated.append(
+                peak.model_copy(
+                    update={
+                        "multiplicity": best.multiplicity,
+                        "j_values_hz": list(best.j_values_hz),
+                    }
+                )
+            )
+    return updated
 
 
 def _build_reference_guided_nmr_text(
@@ -2324,6 +2369,9 @@ def parse_processed_spectrum(
             extracted_peaks=inferred_peaks,
             structure_visible_h=target_total_h,
         )
+        # Adopt literature multiplicity / J for reference-matched peaks (the
+        # comparison above is intentionally built first, on raw detection).
+        inferred_peaks = _apply_reference_multiplicity(inferred_peaks, reference_assignments)
         impurity_candidates = _build_impurity_candidates(
             inferred_peaks,
             solvent,
