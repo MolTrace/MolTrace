@@ -19,6 +19,10 @@ def _gaussian(x: float, center: float, width: float, amplitude: float) -> float:
     return amplitude * (2.718281828459045 ** exponent)
 
 
+def _lorentzian(x: float, amplitude: float, center: float, hwhm: float) -> float:
+    return amplitude * hwhm * hwhm / ((x - center) ** 2 + hwhm * hwhm)
+
+
 def _dense_sugar_trace_csv() -> bytes:
     xs = [5.4 - idx * 0.0005 for idx in range(int((5.4 - 1.1) / 0.0005) + 1)]
     peaks = [
@@ -240,6 +244,38 @@ def test_geometric_multiplicity_does_not_overclaim_quartets() -> None:
     assert _classify_multiplicity(3, 0.01, 0.001) == "t"
     assert _classify_multiplicity(4, 0.01, 0.001) == "m"
     assert _classify_multiplicity(6, 0.01, 0.001) == "m"
+
+
+def test_gsd_resolves_an_overlapped_quartet_through_the_full_pipeline() -> None:
+    # An overlapped quartet (J = 7 Hz) that the local-maximum picker sees as a
+    # two-bump envelope must be reported as a quartet once GSD deconvolution
+    # runs inside parse_processed_spectrum.
+    frequency = 400.0
+    j_ppm = 7.0 / frequency
+    quartet = [
+        (2.40 + k * j_ppm, amp)
+        for k, amp in zip((1.5, 0.5, -0.5, -1.5), (50.0, 150.0, 150.0, 50.0))
+    ]
+    rng = random.Random(7)
+    rows = ["ppm,intensity"]
+    point_count = 12000
+    for index in range(point_count):
+        x = 8.0 - index * (8.0 / (point_count - 1))
+        intensity = _lorentzian(x, 300.0, 7.00, 0.0030)
+        for center, amplitude in quartet:
+            intensity += _lorentzian(x, amplitude, center, 0.0045)
+        intensity += rng.gauss(0.0, 6.0)
+        rows.append(f"{x:.5f},{intensity:.4f}")
+    content = ("\n".join(rows) + "\n").encode()
+
+    preview = parse_processed_spectrum(
+        filename="trace.csv", content=content, frequency_mhz=frequency
+    )
+    near_quartet = [
+        peak for peak in preview.inferred_peaks if abs(peak.shift_ppm - 2.40) <= 0.05
+    ]
+    assert len(near_quartet) == 1
+    assert near_quartet[0].multiplicity == "q"
 
 
 def test_parse_text_spectrum_pair_exports() -> None:

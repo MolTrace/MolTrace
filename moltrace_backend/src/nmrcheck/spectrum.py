@@ -26,6 +26,7 @@ from .models import (
     SpectrumPreviewReport,
 )
 from .compound_class_priors import diagnostic_regions_for
+from .gsd import deconvolve_region, multiplicity_from_lines
 from .impurities import match_h1_impurity_shifts
 from .nmr_tables import solvent_windows
 from .parser import ReferencePeakAssignment, normalize_multiplicity, normalize_nmr_text, parse_j_values_hz, parse_reference_nmr_text
@@ -1190,6 +1191,9 @@ def _cluster_peak_components(
     *,
     sensitivity: float,
     frequency_mhz: float | None,
+    detection_trace: list[float] | None = None,
+    noise_sigma: float = 0.0,
+    deconvolve: bool = False,
 ) -> list[_PeakEstimate]:
     if not components:
         return []
@@ -1220,7 +1224,35 @@ def _cluster_peak_components(
         right_index = max(component.right_index for component in cluster)
         width_ppm = abs(x_vals[left_index] - x_vals[right_index]) if 0 <= left_index < len(x_vals) and 0 <= right_index < len(x_vals) else 0.0
         weighted_shift = sum(component.shift_ppm * component.area for component in cluster) / total_area
-        multiplicity = _classify_multiplicity(len(cluster), width_ppm, ppm_step)
+        # GSD: deconvolve multi-line clusters into resolved Lorentzian lines so
+        # multiplicity / J come from the true transition count, not the raw
+        # local-maximum count (run only on request — it is costly).
+        resolved_lines: list[tuple[float, float, float]] = []
+        if (
+            deconvolve
+            and detection_trace is not None
+            and len(cluster) >= 2
+            and 0 <= left_index < right_index < len(x_vals)
+        ):
+            lo_index = max(0, left_index - 4)
+            hi_index = min(len(x_vals) - 1, right_index + 4)
+            if hi_index - lo_index >= 8:
+                resolved_lines = deconvolve_region(
+                    x_vals[lo_index : hi_index + 1],
+                    detection_trace[lo_index : hi_index + 1],
+                    [component.shift_ppm for component in cluster],
+                    noise_sigma=noise_sigma,
+                    max_lines=max(8, len(cluster) + 6),
+                )
+        if resolved_lines:
+            multiplicity, j_values_hz = multiplicity_from_lines(
+                [line[0] for line in resolved_lines], frequency_mhz=frequency_mhz
+            )
+        else:
+            multiplicity = _classify_multiplicity(len(cluster), width_ppm, ppm_step)
+            j_values_hz = _estimate_cluster_j_values_hz(
+                cluster, frequency_mhz=frequency_mhz, multiplicity=multiplicity
+            )
         estimates.append(
             _PeakEstimate(
                 shift_ppm=weighted_shift,
@@ -1229,11 +1261,7 @@ def _cluster_peak_components(
                 multiplicity=multiplicity,
                 width_ppm=width_ppm,
                 component_count=len(cluster),
-                j_values_hz=_estimate_cluster_j_values_hz(
-                    cluster,
-                    frequency_mhz=frequency_mhz,
-                    multiplicity=multiplicity,
-                ),
+                j_values_hz=j_values_hz,
             )
         )
 
@@ -1303,6 +1331,7 @@ def _infer_peak_estimates(
     sensitivity: float = 0.12,
     frequency_mhz: float | None = None,
     priority_regions: tuple[tuple[float, float], ...] = (),
+    deconvolve: bool = False,
 ) -> list[_PeakEstimate]:
     """Detect peaks from a processed / FID-derived intensity trace.
 
@@ -1330,7 +1359,8 @@ def _infer_peak_estimates(
         return []
     short_trace = len(corrected) < 25
     smoothing_window = 1 if short_trace else 5 if len(corrected) >= 1200 else 3
-    y_smoothed = _smooth([max(0.0, value) for value in corrected], window=smoothing_window)
+    detection_clipped = [max(0.0, value) for value in corrected]
+    y_smoothed = _smooth(detection_clipped, window=smoothing_window)
     lo = min(y_smoothed)
     hi = max(y_smoothed)
     if math.isclose(hi, lo):
@@ -1408,6 +1438,9 @@ def _infer_peak_estimates(
         x_vals,
         sensitivity=sensitivity,
         frequency_mhz=frequency_mhz,
+        detection_trace=detection_clipped,
+        noise_sigma=noise_sigma,
+        deconvolve=deconvolve,
     )
 
 
@@ -2057,6 +2090,17 @@ def _structure_guided_peak_estimates(
             best_sensitivity = float(sensitivity_candidate)
             best_comparison = candidate_comparison
 
+    # GSD runs once, on the winning candidate only — Lorentzian deconvolution
+    # is far too costly to repeat for every sweep candidate, and it changes
+    # only multiplicity / J, never the peak shifts the sweep scores against.
+    if best_estimates:
+        best_estimates = _infer_peak_estimates(
+            points,
+            sensitivity=best_sensitivity,
+            frequency_mhz=frequency_mhz,
+            priority_regions=priority_regions,
+            deconvolve=True,
+        )
     return best_estimates, best_comparison, best_sensitivity
 
 
