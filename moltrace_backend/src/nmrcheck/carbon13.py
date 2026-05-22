@@ -12,6 +12,7 @@ from typing import Any
 from rdkit import Chem
 
 from .chemistry import mol_from_smiles, structure_summary_from_smiles
+from .compound_class_priors import diagnostic_regions_for
 from .evidence import ratio_score
 from .exceptions import StructureParseError
 from .impurities import match_c13_impurity_shifts
@@ -27,6 +28,7 @@ from .nmr_tables import classify_carbon13_region, find_solvent_or_impurity_hits
 from .parser import parse_reference_nmr_text
 from .spectrum import _apply_solvent_mask as _apply_trace_solvent_mask
 from .spectrum import _estimate_noise_sigma
+from .spectrum import _in_priority_region
 from .spectrum import _ppm_step
 from .spectrum import _robust_polynomial_baseline_correct
 from .spectrum import _sensitivity_to_noise_factor
@@ -426,6 +428,7 @@ def _infer_carbon13_trace_peaks(
     *,
     solvent: str | None = None,
     peak_sensitivity: float | None = None,
+    priority_regions: tuple[tuple[float, float], ...] = (),
 ) -> list[Carbon13Peak]:
     if len(points) < 3:
         return []
@@ -450,14 +453,25 @@ def _infer_carbon13_trace_peaks(
     # replaces the former fraction-of-dynamic-range cut, so weak ¹³C carbons are
     # not lost beneath a dominant signal and noise spikes are not picked.
     noise_sigma = _estimate_noise_sigma(_smooth(corrected, window=smoothing_window))
+    baseline_level = median(y_vals)
     if noise_sigma > 0.0:
-        threshold = median(y_vals) + _sensitivity_to_noise_factor(sensitivity) * noise_sigma
+        noise_factor = _sensitivity_to_noise_factor(sensitivity)
+        threshold = baseline_level + noise_factor * noise_sigma
+        # Inside compound-class-diagnostic windows, drop to a more sensitive
+        # SNR cut (floored at 3σ) so weak diagnostic carbons are not lost.
+        region_threshold = baseline_level + max(3.0, noise_factor * 0.6) * noise_sigma
     else:
         threshold = low + 0.02 * (high - low)
+        region_threshold = threshold
     candidates: list[tuple[float, float]] = []
     for idx in range(1, len(y_vals) - 1):
         center = y_vals[idx]
-        if center < threshold:
+        local_threshold = (
+            region_threshold
+            if priority_regions and _in_priority_region(x_vals[idx], priority_regions)
+            else threshold
+        )
+        if center < local_threshold:
             continue
         if center < y_vals[idx - 1] or center < y_vals[idx + 1]:
             continue
@@ -486,6 +500,7 @@ def parse_carbon13_processed_spectrum(
     solvent: str | None = None,
     carbon13_text: str | None = None,
     peak_sensitivity: float | None = None,
+    compound_class: str | None = None,
     mask_solvent_regions: bool = True,
     display_mode: str = "real",
     vertical_gain: float = 1.0,
@@ -718,6 +733,7 @@ def parse_carbon13_processed_spectrum(
         inference_points,
         solvent=solvent,
         peak_sensitivity=peak_sensitivity,
+        priority_regions=diagnostic_regions_for(compound_class, "13C"),
     )
     if not peaks:
         raise Carbon13ParseError("No ¹³C peaks could be inferred from the uploaded processed spectrum.")
