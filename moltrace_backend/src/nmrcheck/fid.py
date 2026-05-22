@@ -41,6 +41,7 @@ from .compound_class_priors import diagnostic_regions_for
 from .parser import ReferencePeakAssignment, normalize_nmr_text, parse_reference_nmr_text
 from .raw_vault import RawVaultError, build_raw_upload_provenance, load_raw_archive_bytes
 from .spectrum import (
+    _apply_reference_multiplicity,
     _apply_solvent_mask,
     _build_impurity_candidates,
     _build_preserved_spectrum_state,
@@ -2948,6 +2949,9 @@ def process_bruker_1d_zip(
             extracted_peaks=peaks,
             structure_visible_h=target_total_h,
         )
+        # Adopt literature multiplicity / J for reference-matched peaks (the
+        # comparison above is intentionally built first, on raw detection).
+        peaks = _apply_reference_multiplicity(peaks, reference_assignments)
         reference_guided_nmr_text: str | None = None
         reference_coverage_count = 0
         if reference_assignments and peaks:

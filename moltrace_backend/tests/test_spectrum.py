@@ -4,7 +4,7 @@ from nmrcheck.spectrum import SpectrumParseError
 from nmrcheck.models import Peak
 from nmrcheck.parser import parse_reference_nmr_text
 from nmrcheck.compound_class_priors import diagnostic_regions_for
-from nmrcheck.spectrum import _build_reference_guided_nmr_text, _downsample_points, _infer_peak_estimates, _round_half_integrations, _structure_guided_peak_estimates, parse_processed_spectrum
+from nmrcheck.spectrum import _apply_reference_multiplicity, _build_reference_guided_nmr_text, _classify_multiplicity, _downsample_points, _infer_peak_estimates, _round_half_integrations, _structure_guided_peak_estimates, parse_processed_spectrum
 
 TOBRAMYCIN_REFERENCE_TEXT = """'H NMR (500 MHz, D2O) 8 5.23 (d, J = 3.6 Hz, 1H), 5.08 (d, J = 3.9 Hz, 1H), 3.95 (ddd,
 J= 10.3, 4.6, 2.6 Hz, 1H), 3.80 (dd, J = 6.6, 3.6 Hz, 2H), 3.68 (tdd, J = 9.2, 5.6, 3.1 Hz,
@@ -211,6 +211,35 @@ def test_priority_regions_recover_a_weak_peak_a_uniform_threshold_misses() -> No
     )
     assert sorted(round(estimate.shift_ppm, 1) for estimate in without_hint) == [2.0]
     assert sorted(round(estimate.shift_ppm, 1) for estimate in with_hint) == [2.0, 4.8]
+
+
+def test_reference_multiplicity_is_adopted_for_matched_peaks() -> None:
+    # A detected peak that matches a literature 1H-text assignment must adopt
+    # that assignment's multiplicity and J — the text is authoritative for the
+    # coupling pattern. An unmatched peak keeps its geometric label.
+    _frequency, assignments = parse_reference_nmr_text(
+        "1H NMR (400 MHz, CDCl3) 3.65 (q, J = 7.1 Hz, 2H), 1.26 (t, J = 7.1 Hz, 3H)"
+    )
+    detected = [
+        Peak(shift_ppm=3.652, multiplicity="m", integration_h=2.0, j_values_hz=[]),
+        Peak(shift_ppm=1.261, multiplicity="q", integration_h=3.0, j_values_hz=[12.0]),
+        Peak(shift_ppm=9.99, multiplicity="m", integration_h=1.0, j_values_hz=[]),
+    ]
+    adopted = _apply_reference_multiplicity(detected, assignments)
+    assert (adopted[0].multiplicity, adopted[0].j_values_hz) == ("q", [7.1])
+    assert (adopted[1].multiplicity, adopted[1].j_values_hz) == ("t", [7.1])
+    assert (adopted[2].multiplicity, adopted[2].j_values_hz) == ("m", [])
+    # No reference text -> peaks returned unchanged.
+    assert _apply_reference_multiplicity(detected, []) == detected
+
+
+def test_geometric_multiplicity_does_not_overclaim_quartets() -> None:
+    # Without spectral deconvolution a four-line cluster cannot be told apart
+    # from a doublet-of-doublets, so it is reported honestly as "m".
+    assert _classify_multiplicity(2, 0.01, 0.001) == "d"
+    assert _classify_multiplicity(3, 0.01, 0.001) == "t"
+    assert _classify_multiplicity(4, 0.01, 0.001) == "m"
+    assert _classify_multiplicity(6, 0.01, 0.001) == "m"
 
 
 def test_parse_text_spectrum_pair_exports() -> None:
