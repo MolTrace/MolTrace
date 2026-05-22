@@ -169,6 +169,85 @@ def test_validate_inputs_accepts_d2o_non_labile_match() -> None:
     assert report.errors == []
 
 
+def test_validate_inputs_carbon13_text_matches_structure() -> None:
+    """A SMILES plus a 13C text whose signal count agrees with the carbon
+    count populates the new carbon-match fields and stays error-free."""
+    payload = AnalysisValidationInputs(
+        sample_id="c13-match",
+        smiles="CCO",  # ethanol — 2 carbons
+        carbon13_text="13C NMR (101 MHz, CDCl3) δ 58.3, 18.2",
+        solvent="CDCl3",
+    )
+
+    report = validate_inputs(payload)
+
+    assert report.carbon13_text_valid is True
+    assert report.structure_carbon13_match is True
+    assert report.expected_carbon_count == 2
+    assert report.observed_carbon_signal_count == 2
+    assert report.delta_carbon_signals == 0
+    assert report.errors == []
+
+
+def test_validate_inputs_carbon13_overcount_emits_error() -> None:
+    """More 13C signals than the structure has carbon atoms is a hard
+    mismatch — it must surface as an error, not just a warning."""
+    payload = AnalysisValidationInputs(
+        sample_id="c13-overcount",
+        smiles="CCO",  # ethanol — 2 carbons
+        carbon13_text="13C NMR δ 58.3, 18.2, 70.1, 120.4, 135.9",
+        solvent="CDCl3",
+    )
+
+    report = validate_inputs(payload)
+
+    assert report.carbon13_text_valid is True
+    assert report.structure_carbon13_match is False
+    assert report.delta_carbon_signals == 3
+    assert any("¹³C NMR mismatch" in error for error in report.errors)
+
+
+def test_validate_inputs_carbon13_symmetry_undercount_is_not_an_error() -> None:
+    """Fewer 13C signals than carbons is benign — molecular symmetry collapses
+    equivalent carbons — so it stays a match with only an informational
+    warning."""
+    payload = AnalysisValidationInputs(
+        sample_id="c13-symmetry",
+        smiles="c1ccccc1",  # benzene — 6 equivalent carbons, 1 signal
+        carbon13_text="13C NMR δ 128.5",
+    )
+
+    report = validate_inputs(payload)
+
+    assert report.carbon13_text_valid is True
+    assert report.structure_carbon13_match is True
+    assert report.delta_carbon_signals == -5
+    assert report.errors == []
+    assert any("symmetry" in warning for warning in report.warnings)
+
+
+def test_validate_inputs_absent_carbon13_text_is_silent() -> None:
+    """When no 13C text is supplied the carbon fields stay at their defaults,
+    no 13C-specific warning is emitted, and 13C absence never blocks the
+    analysis-ready green path — 13C is an optional supplementary layer."""
+    payload = AnalysisValidationInputs(
+        sample_id="no-c13",
+        smiles="CCO",
+        nmr_text="3.65 (q, 2H), 1.26 (t, 3H), 2.10 (br s, 1H)",
+        solvent="CDCl3",
+    )
+
+    report = validate_inputs(payload)
+
+    assert report.carbon13_text_valid is False
+    assert report.structure_carbon13_match is False
+    assert report.expected_carbon_count is None
+    assert report.observed_carbon_signal_count is None
+    assert report.delta_carbon_signals is None
+    assert not any("¹³C" in warning for warning in report.warnings)
+    assert report.analysis_ready is True
+
+
 def test_analyze_endpoint_rejects_mismatched_smiles_and_nmr_text() -> None:
     payload = AnalysisInputs(
         sample_id="mismatch-2",
@@ -323,6 +402,77 @@ def test_validate_endpoint_mismatch_emits_explicit_error() -> None:
     ), body["errors"]
 
 
+def test_validate_endpoint_carbon13_text_matches_structure() -> None:
+    """SMILES + a 13C text whose signal count agrees with the carbon count →
+    carbon13_text_valid and structure_carbon13_match both true, no errors.
+    The validate card renders the 13C layer chips in their 'ok' state."""
+    client = _validate_client()
+    response = client.post(
+        "/analyze/validate",
+        headers=_HEADERS,
+        json={
+            "sample_id": "ethanol-c13",
+            "smiles": "CCO",
+            "carbon13_text": "13C NMR (101 MHz, CDCl3) δ 58.3, 18.2",
+            "solvent": "CDCl3",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["carbon13_text_valid"] is True
+    assert body["structure_carbon13_match"] is True
+    assert body["expected_carbon_count"] == 2
+    assert body["observed_carbon_signal_count"] == 2
+    assert body["delta_carbon_signals"] == 0
+    assert body["errors"] == []
+
+
+def test_validate_endpoint_carbon13_overcount_emits_error() -> None:
+    """More 13C signals than carbon atoms → structure_carbon13_match false
+    with an explicit mismatch error (the card renders 'Validation failed')."""
+    client = _validate_client()
+    response = client.post(
+        "/analyze/validate",
+        headers=_HEADERS,
+        json={
+            "sample_id": "ethanol-c13-bad",
+            "smiles": "CCO",
+            "carbon13_text": "13C NMR δ 58.3, 18.2, 70.1, 120.4, 135.9",
+            "solvent": "CDCl3",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["carbon13_text_valid"] is True
+    assert body["structure_carbon13_match"] is False
+    assert len(body["errors"]) >= 1
+    assert any("¹³C NMR mismatch" in err for err in body["errors"]), body["errors"]
+
+
+def test_validate_endpoint_carbon13_text_only_returns_partial_no_errors() -> None:
+    """13C text alone is a valid input mode — the endpoint returns
+    carbon13_text_valid true with no errors, and 13C absence of a SMILES /
+    1H text keeps analysis_ready false (the card renders 'Partial inputs')."""
+    client = _validate_client()
+    response = client.post(
+        "/analyze/validate",
+        headers=_HEADERS,
+        json={
+            "smiles": None,
+            "nmr_text": None,
+            "carbon13_text": "13C NMR δ 58.3, 18.2",
+            "solvent": "CDCl3",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["carbon13_text_valid"] is True
+    assert body["structure_valid"] is False
+    assert body["nmr_text_valid"] is False
+    assert body["analysis_ready"] is False
+    assert body["errors"] == []
+
+
 def test_validate_endpoint_response_shape_matches_frontend_contract() -> None:
     """The frontend declares ValidationReport with a specific set of fields —
     this test asserts every one is present so the wire contract is locked."""
@@ -346,6 +496,11 @@ def test_validate_endpoint_response_shape_matches_frontend_contract() -> None:
         "observed_total_h",
         "adjusted_observed_total_h",
         "delta_visible_h",
+        "carbon13_text_valid",
+        "structure_carbon13_match",
+        "expected_carbon_count",
+        "observed_carbon_signal_count",
+        "delta_carbon_signals",
         "parsed_peaks",
         "structure",
         "warnings",

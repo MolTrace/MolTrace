@@ -37,7 +37,7 @@ from .models import (
     FIDQADiagnostics,
     Peak,
 )
-from .parser import normalize_nmr_text, parse_reference_nmr_text
+from .parser import ReferencePeakAssignment, normalize_nmr_text, parse_reference_nmr_text
 from .raw_vault import RawVaultError, build_raw_upload_provenance, load_raw_archive_bytes
 from .spectrum import (
     _apply_solvent_mask,
@@ -48,12 +48,12 @@ from .spectrum import (
     _PREVIEW_DOWNSAMPLING_METHOD,
     _downsample_points,
     _estimates_to_peaks,
-    _infer_peak_estimates,
     _peaks_to_nmr_text,
     _prepare_trace_display_points,
     _reference_assignments_to_peaks,
     _select_target_proton_count,
     _solvent_mask_windows,
+    _structure_guided_peak_estimates,
 )
 
 
@@ -200,16 +200,10 @@ _FID_PRESET_DESCRIPTIONS: dict[FIDPresetId, str] = {
 _RAW_FID_MNOVA_ZERO_FILL_FACTOR = 3
 _RAW_FID_MNOVA_C13_LINE_BROADENING_HZ = 2.0
 _RAW_FID_MNOVA_BASELINE_ORDER = 3
-# Display point budget for the raw-FID preview. The previous 4000 was far
-# too coarse for a full 1H window: a 7 Hz triplet (~14 Hz wide) collapsed
-# into a single decimation bucket, so multiplet structure was invisible and
-# sharp peaks looked broken/disjointed. 16000 points gives ~3 points/Hz at
-# 400 MHz over 12 ppm, enough to render doublets-of-doublets, triplets and
-# quartets cleanly. Source rationale: MestreNova manual pp. 109, 140-141
-# (zero-filling raises "apparent digital resolution"; the on-screen trace
-# must carry that resolution through to be useful).
-_RAW_FID_MNOVA_C13_PREVIEW_POINTS = 16000
-_RAW_FID_MNOVA_H1_PREVIEW_POINTS = 16000
+# Display point budget for the raw-FID 13C preview. Carbon should stay fast
+# and stick-like; 4000 points is enough for the broad carbon window after
+# peak-preserving downsampling.
+_RAW_FID_MNOVA_C13_PREVIEW_POINTS = 4000
 # First-point correction — MestreNova manual p. 136: "multiply the first
 # point of the FID by 0.5 before FT". The discrete FT treats the FID as
 # periodic, so an uncorrected first point creates a constant vertical
@@ -816,58 +810,15 @@ def _apply_raw_fid_mnova_constraints(
         return constrained, detail, notes
 
     if normalized == "1H":
-        # MestreNova Advised Processing for 1H (manual p. 106, p. 140):
-        #   3x zero-fill · resolution-preserving apodization · NO exponential
-        #   line broadening (manual pp. 128, 131 — an exponential window
-        #   "increase[s] linewidth, which is to say, a decrease in the
-        #   resolution") · Regions-Analysis auto phase · Bernstein
-        #   polynomial baseline (order 3).
-        #
-        # MestreNova's exact 1H window ("Stanning") is proprietary and not
-        # defined in the manual, so we use the manual's explicitly named,
-        # fully specified resolution-preserving truncation window instead —
-        # Trapezoidal (p. 137) — which preserves fine multiplet structure
-        # (dd, t, q, anomeric couplings) while removing the truncation step
-        # that makes peaks look broken / disjointed. line_broadening_hz is
-        # forced to 0.0 so no exponential broadening is applied.
-        constrained = settings.model_copy(
-            update={
-                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
-                "apodization_mode": "trapezoidal",
-                "line_broadening_hz": 0.0,
-                "phase_mode": "auto",
-                "auto_phase": True,
-                "baseline_correction": "bernstein",
-                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
-                "auto_baseline": True,
-                "max_preview_points": max(
-                    int(settings.max_preview_points),
-                    _RAW_FID_MNOVA_H1_PREVIEW_POINTS,
-                ),
-            }
-        )
         detail.update(
             {
-                "applied": True,
-                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
-                "apodization_mode": "trapezoidal",
-                "line_broadening_hz": 0.0,
-                "trapezoid_ramp_fraction": _RAW_FID_MNOVA_TRAPEZOID_RAMP_FRACTION,
-                "phase_mode": "auto",
-                "phase_reference": "MolTrace automatic 1D phase correction",
-                "baseline_correction": "bernstein",
-                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
-                "first_point_scale": _RAW_FID_MNOVA_FIRST_POINT_SCALE,
-                "max_preview_points": constrained.max_preview_points,
+                "reason": "proton_raw_fid_uses_selected_preset_or_explicit_settings",
+                "selected_zero_fill_factor": settings.zero_fill_factor,
+                "selected_apodization_mode": settings.apodization_mode,
+                "selected_line_broadening_hz": settings.line_broadening_hz,
             }
         )
-        notes.append(
-            "Raw 1H FID advised processing applied: 3x zero-fill, trapezoidal "
-            "apodization (no exponential line broadening — preserves multiplet "
-            "resolution), first-point correction 0.5, auto phase, and "
-            "Bernstein-3 baseline correction."
-        )
-        return constrained, detail, notes
+        return settings, detail, notes
 
     detail["reason"] = "no_raw_fid_constraints_for_nucleus"
     return settings, detail, notes
@@ -2940,22 +2891,14 @@ def process_bruker_1d_zip(
         if not settings.debug_preview:
             original_spectrum_state["preview_points"] = []
             original_spectrum_state["preview_points_omitted"] = True
-        sensitivity = settings.peak_sensitivity if settings.peak_sensitivity is not None else 0.12
         target_total_h = _select_target_proton_count(
             expected_total_h=expected_total_h,
             expected_non_labile_h=expected_non_labile_h,
             solvent=solvent,
         )
         frequency_mhz = _param_float(params, "SFO1", "BF1", "sfrq", "reffrq")
-        estimates = _infer_peak_estimates(
-            inference_points,
-            sensitivity=sensitivity,
-            detection_gain=1.0,
-            frequency_mhz=frequency_mhz,
-        )
-        peaks, peak_meta = _estimates_to_peaks(estimates, target_total_h=target_total_h)
         reference_nmr_text_normalized: str | None = None
-        reference_assignments = []
+        reference_assignments: list[ReferencePeakAssignment] = []
         reference_peaks: list[Peak] = []
         if reference_nmr_text and reference_nmr_text.strip():
             try:
@@ -2973,7 +2916,26 @@ def process_bruker_1d_zip(
                     reference_nmr_text_normalized = reference_nmr_text.strip()
                 warnings.append(f"Reference 1H NMR text could not be parsed: {exc}")
 
-        comparison = _build_spectrum_comparison(
+        # Structure-guided detection: when a reference text or a structure
+        # proton target is available, sweep the SNR sensitivity and keep the
+        # peak list that best matches it — the same auto-tuning the processed
+        # upload path runs, so both upload paths detect peaks identically.
+        fid_fixed_sensitivity = (
+            settings.peak_sensitivity
+            if not reference_assignments and target_total_h is None
+            else None
+        )
+        estimates, best_comparison, _chosen_sensitivity = _structure_guided_peak_estimates(
+            inference_points,
+            reference_assignments=reference_assignments,
+            reference_peaks=reference_peaks,
+            target_total_h=target_total_h,
+            frequency_mhz=frequency_mhz,
+            fixed_sensitivity=fid_fixed_sensitivity,
+        )
+        peaks, peak_meta = _estimates_to_peaks(estimates, target_total_h=target_total_h)
+
+        comparison = best_comparison or _build_spectrum_comparison(
             reference_assignments=reference_assignments,
             extracted_peaks=peaks,
             structure_visible_h=target_total_h,

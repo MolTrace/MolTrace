@@ -178,6 +178,83 @@ COMPOUND_CLASS_WEIGHT_MULTIPLIERS: Final[Mapping[str, Mapping[str, float]]] = {
 }
 
 
+# Diagnostic chemical-shift windows per compound class, by nucleus. Peak
+# detection applies a modestly lower (more sensitive) noise factor inside these
+# windows: they hold each class's most diagnostic signals — anomeric
+# carbohydrate resonances, peptide amide NH, steroid angular methyls, olefinic
+# lipid carbons — which are frequently weak or congested and the first lost to a
+# uniform threshold. Windows are ``(lo_ppm, hi_ppm)`` and intentionally broad;
+# they are standard-practice heuristics grounded in the same references as the
+# multiplier table above. Classes without a single tight diagnostic region are
+# omitted (detection then uses its normal uniform noise threshold).
+COMPOUND_CLASS_DIAGNOSTIC_REGIONS: Final[
+    Mapping[str, Mapping[str, tuple[tuple[float, float], ...]]]
+] = {
+    "alkaloids": {
+        "1H": ((2.2, 4.2),),  # N-adjacent CH
+        "13C": ((40.0, 70.0),),
+    },
+    "carbohydrates": {
+        "1H": ((4.3, 5.6),),  # anomeric protons
+        "13C": ((90.0, 112.0),),  # anomeric carbons
+    },
+    "fatty_acids": {
+        "1H": ((5.1, 5.6),),  # olefinic
+        "13C": ((125.0, 132.0), (165.0, 180.0)),  # olefinic + carbonyl
+    },
+    "flavonoids": {
+        "1H": ((6.0, 8.3),),  # aromatic / olefinic
+        "13C": ((95.0, 165.0),),
+    },
+    "glycoproteins": {
+        "1H": ((4.3, 5.6), (6.0, 8.8)),
+        "13C": ((90.0, 112.0), (168.0, 182.0)),
+    },
+    "lipids": {
+        "1H": ((5.1, 5.6),),  # olefinic
+        "13C": ((125.0, 132.0), (165.0, 180.0)),
+    },
+    "nucleic_acids": {
+        "1H": ((5.2, 8.5),),  # base + anomeric
+        "13C": ((70.0, 160.0),),
+    },
+    "peptides": {
+        "1H": ((6.0, 8.8),),  # amide NH
+        "13C": ((168.0, 182.0),),  # carbonyl
+    },
+    "proteins": {
+        "1H": ((6.0, 8.8),),
+        "13C": ((168.0, 182.0),),
+    },
+    "steroids": {
+        "1H": ((0.5, 1.3),),  # angular methyls
+        "13C": ((10.0, 25.0),),
+    },
+    "terpenoids": {
+        "1H": ((0.5, 1.8),),  # methyls
+        "13C": ((10.0, 32.0),),
+    },
+}
+
+
+def diagnostic_regions_for(
+    compound_class: str | None,
+    nucleus: str,
+) -> tuple[tuple[float, float], ...]:
+    """Return the diagnostic ppm windows for a compound class on a nucleus.
+
+    ``nucleus`` is ``"1H"`` or ``"13C"``. Returns an empty tuple for an
+    unspecified / unrecognised class, or one with no tight diagnostic region —
+    in which case detection uses its normal uniform noise threshold.
+    """
+    if not compound_class:
+        return ()
+    by_nucleus = COMPOUND_CLASS_DIAGNOSTIC_REGIONS.get(compound_class.strip().lower())
+    if not by_nucleus:
+        return ()
+    return tuple(by_nucleus.get(nucleus, ()))
+
+
 @dataclass(frozen=True)
 class CompoundClassPriorReport:
     """Audit record of a per-class prior application.

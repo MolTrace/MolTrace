@@ -793,25 +793,6 @@ def _ppm_step(x_vals: list[float]) -> float:
     return median(deltas) if deltas else 0.005
 
 
-def _apply_detection_gain(values: list[float], gain: float) -> list[float]:
-    if not values:
-        return []
-    gain = max(1.0, float(gain))
-    if math.isclose(gain, 1.0):
-        return values[:]
-    lo = min(values)
-    hi = max(values)
-    if math.isclose(hi, lo):
-        return values[:]
-    span = hi - lo
-    gamma = 1.0 / (1.0 + math.log2(gain))
-    boosted: list[float] = []
-    for value in values:
-        normalized = max(0.0, min(1.0, (value - lo) / span))
-        boosted.append(lo + (normalized**gamma) * span)
-    return boosted
-
-
 def _normalize_solvent_key(solvent: str | None) -> str | None:
     if not solvent:
         return None
@@ -1264,43 +1245,109 @@ def _cluster_peak_components(
     return filtered
 
 
+def _estimate_noise_sigma(values: list[float]) -> float:
+    """Robust noise σ for SNR-based peak detection.
+
+    NMR peaks occupy only a small fraction of a spectrum, so the bulk of the
+    points are baseline noise. A first MAD pass fixes a rough scale; points
+    further than a few rough-MADs from the centre are peak signal and are
+    dropped, then a second MAD over the surviving noise pool — scaled by the
+    1.4826 normal-consistency constant — yields a σ that the peaks themselves
+    cannot inflate. Falls back to a first-difference estimate when the trace
+    is too flat for the MAD pass to resolve a scale.
+    """
+    finite = [value for value in values if math.isfinite(value)]
+    if len(finite) < 8:
+        return 0.0
+    rough_mad = _median_absolute_deviation(finite)
+    if rough_mad > 0.0:
+        center = median(finite)
+        noise_pool = [value for value in finite if abs(value - center) <= 6.0 * rough_mad]
+        if len(noise_pool) >= 8:
+            sigma = 1.4826 * _median_absolute_deviation(noise_pool)
+            if sigma > 0.0:
+                return sigma
+    diffs = [abs(finite[idx + 1] - finite[idx]) for idx in range(len(finite) - 1)]
+    if diffs:
+        # First differences of white noise carry σ·√2; recover σ from their
+        # MAD so a slowly drifting baseline cannot masquerade as noise.
+        return max(0.0, 1.4826 * median(diffs) / math.sqrt(2.0))
+    return 0.0
+
+
+def _sensitivity_to_noise_factor(sensitivity: float) -> float:
+    """Map the ``sensitivity`` knob onto an SNR (noise-factor) multiplier.
+
+    Detection rejects anything that does not rise at least noise_factor·σ
+    above the baseline — the directly noise-referenced criterion Mnova calls
+    the "noise factor". A larger ``sensitivity`` yields a larger multiplier
+    (fewer, higher-confidence peaks), preserving the direction of the legacy
+    knob so the structure-guided tuning sweep keeps its ordering.
+    """
+    sensitivity = min(max(sensitivity, 0.02), 0.45)
+    return min(12.0, max(3.0, 3.0 + sensitivity * 24.0))
+
+
 def _infer_peak_estimates(
     points: list[tuple[float, float]],
     *,
     sensitivity: float = 0.12,
-    detection_gain: float = 1.0,
     frequency_mhz: float | None = None,
 ) -> list[_PeakEstimate]:
+    """Detect peaks from a processed / FID-derived intensity trace.
+
+    Peaks are local maxima that rise an SNR-scaled amount above the noise
+    floor: the threshold is ``noise_factor · σ``, where σ is the robust
+    1.4826·MAD noise estimate of the baseline-corrected trace. This replaces
+    the former fraction-of-the-dynamic-range cut, which scaled with the
+    tallest peak and therefore both missed genuine weak signals and admitted
+    noise spikes.
+    """
     if len(points) < 3:
         return []
     ordered = sorted(points, key=lambda item: item[0], reverse=True)
     x_vals = [x for x, _ in ordered]
-    y_raw = _baseline_correct([float(y) for _, y in ordered])
-    smoothing_window = 5 if len(y_raw) >= 1200 else 3
-    y_smoothed = _smooth(y_raw, window=smoothing_window)
-    y_vals = _apply_detection_gain(y_smoothed, detection_gain)
-    lo = min(y_vals)
-    hi = max(y_vals)
+    sensitivity = min(max(sensitivity, 0.02), 0.45)
+    # Baseline-correct once: the unclipped result feeds an unbiased noise
+    # estimate; the zero-clipped result is the detection / integration trace
+    # (identical to the previous _baseline_correct output).
+    corrected, _baseline_meta = _robust_polynomial_baseline_correct(
+        [float(y) for _, y in ordered], orient_positive=True
+    )
+    if len(corrected) < 3:
+        return []
+    short_trace = len(corrected) < 25
+    smoothing_window = 1 if short_trace else 5 if len(corrected) >= 1200 else 3
+    y_smoothed = _smooth([max(0.0, value) for value in corrected], window=smoothing_window)
+    lo = min(y_smoothed)
+    hi = max(y_smoothed)
     if math.isclose(hi, lo):
         return []
-    sensitivity = min(max(sensitivity, 0.02), 0.45)
-    threshold = max(lo + sensitivity * (hi - lo), median(y_vals) * 1.05)
+
+    # SNR detection threshold. σ is measured on the *unclipped* trace under
+    # the same smoothing as the detection array so the two share a scale.
+    noise_sigma = 0.0 if short_trace else _estimate_noise_sigma(_smooth(corrected, window=smoothing_window))
+    if noise_sigma > 0.0:
+        threshold = median(y_smoothed) + _sensitivity_to_noise_factor(sensitivity) * noise_sigma
+    else:
+        # Flat / noise-free trace: fall back to a minimal relative cut.
+        threshold = lo + 0.02 * (hi - lo)
 
     components: list[_PeakComponent] = []
-    for idx in range(1, len(y_vals) - 1):
-        center = y_vals[idx]
+    for idx in range(1, len(y_smoothed) - 1):
+        center = y_smoothed[idx]
         if center < threshold:
             continue
-        if center < y_vals[idx - 1] or center < y_vals[idx + 1]:
+        if center < y_smoothed[idx - 1] or center < y_smoothed[idx + 1]:
             continue
 
         left = idx - 1
-        while left > 0 and y_vals[left] >= y_vals[left - 1]:
+        while left > 0 and y_smoothed[left] >= y_smoothed[left - 1]:
             left -= 1
             if idx - left > 40:
                 break
         right = idx + 1
-        while right < len(y_vals) - 1 and y_vals[right] >= y_vals[right + 1]:
+        while right < len(y_smoothed) - 1 and y_smoothed[right] >= y_smoothed[right + 1]:
             right += 1
             if right - idx > 40:
                 break
@@ -1853,6 +1900,96 @@ def _build_impurity_candidates(
     return trimmed
 
 
+def _structure_guided_peak_estimates(
+    points: list[tuple[float, float]],
+    *,
+    reference_assignments: list[ReferencePeakAssignment],
+    reference_peaks: list[Peak],
+    target_total_h: float | None,
+    frequency_mhz: float | None,
+    fixed_sensitivity: float | None = None,
+) -> tuple[list[_PeakEstimate], SpectrumComparisonReport | None, float]:
+    """Detect peaks with a structure / reference-guided sensitivity sweep.
+
+    Each candidate SNR sensitivity is run through the noise-based detector, the
+    resulting peak list is scored against the reference assignments (coverage,
+    missing / extra peaks, shift agreement, multiplicity match, visible-H
+    error), and the best-scoring candidate wins. ``fixed_sensitivity`` collapses
+    the sweep to a single explicit value. Returns the winning estimates, the
+    comparison computed for that candidate, and the sensitivity chosen — shared
+    by the processed-upload and Raw-FID paths so both detect peaks identically.
+    """
+    sensitivity_candidates = (
+        [fixed_sensitivity]
+        if fixed_sensitivity is not None
+        else [0.06, 0.08, 0.1, 0.12, 0.15]
+    )
+    max_reasonable_peaks = (
+        max(12, int(target_total_h) + 4) if target_total_h is not None else 18
+    )
+    best_estimates: list[_PeakEstimate] = []
+    best_sensitivity = float(sensitivity_candidates[0])
+    best_comparison: SpectrumComparisonReport | None = None
+    best_key: tuple[float, ...] | None = None
+
+    for sensitivity_candidate in sensitivity_candidates:
+        estimates = _infer_peak_estimates(
+            points,
+            sensitivity=sensitivity_candidate,
+            frequency_mhz=frequency_mhz,
+        )
+        candidate_peaks, _ = _estimates_to_peaks(estimates, target_total_h=target_total_h)
+        observed_total = round(sum(peak.integration_h for peak in candidate_peaks), 4)
+        candidate_target_total = (
+            target_total_h
+            if target_total_h is not None
+            else (
+                round(sum(peak.integration_h for peak in reference_peaks), 4)
+                if reference_peaks
+                else None
+            )
+        )
+        visible_total_error = (
+            abs(observed_total - candidate_target_total)
+            if candidate_target_total is not None
+            else 0.0
+        )
+        peak_penalty = max(0, len(candidate_peaks) - max_reasonable_peaks) * 0.2
+        candidate_reference_coverage = sum(
+            1
+            for _, matches in _reference_coverage_matches(reference_assignments, candidate_peaks)
+            if matches
+        )
+        candidate_comparison = _build_spectrum_comparison(
+            reference_assignments=reference_assignments,
+            extracted_peaks=candidate_peaks,
+            structure_visible_h=target_total_h,
+        )
+        if candidate_comparison is not None:
+            key: tuple[float, ...] = (
+                float(len(reference_assignments) - candidate_reference_coverage),
+                float(candidate_comparison.missing_count),
+                float(candidate_comparison.extra_count),
+                candidate_comparison.total_shift_delta_ppm,
+                round(visible_total_error, 4),
+                float(-candidate_comparison.multiplicity_match_count),
+                float(sensitivity_candidate),
+            )
+        else:
+            key = (
+                round(visible_total_error + peak_penalty, 4),
+                float(-len(candidate_peaks)),
+                float(sensitivity_candidate),
+            )
+        if best_key is None or key < best_key:
+            best_key = key
+            best_estimates = estimates
+            best_sensitivity = float(sensitivity_candidate)
+            best_comparison = candidate_comparison
+
+    return best_estimates, best_comparison, best_sensitivity
+
+
 def parse_processed_spectrum(
     *,
     filename: str,
@@ -1912,7 +2049,6 @@ def parse_processed_spectrum(
         }
 
     sensitivity = 0.12 if peak_sensitivity is None else float(peak_sensitivity)
-    detection_gain = 1.0
     target_total_h = _select_target_proton_count(
         expected_total_h=expected_total_h,
         expected_non_labile_h=expected_non_labile_h,
@@ -2047,7 +2183,6 @@ def parse_processed_spectrum(
                 "peak_sensitivity_percent": round(sensitivity * 100),
                 "peak_inference": "skipped_for_display_preview",
                 "peak_inference_skipped": True,
-                "detection_gain": round(detection_gain, 3),
                 "target_total_h": expected_total_h,
                 "target_non_labile_h": expected_non_labile_h,
                 "target_visible_h": target_total_h,
@@ -2148,75 +2283,14 @@ def parse_processed_spectrum(
                 ),
             }
             warnings.extend(note for note in magnifier.warnings if note not in warnings)
-        sensitivity_candidates = [sensitivity] if peak_sensitivity is not None else [0.06, 0.08, 0.1, 0.12, 0.15]
-        gain_candidates = [1.0, 1.6, 2.5, 4.0, 6.0, 10.0] if target_total_h is not None else [1.0]
-        best_estimates: list[_PeakEstimate] = []
-        best_sensitivity = sensitivity
-        best_gain = 1.0
-        best_key: tuple[float, ...] | None = None
-        max_reasonable_peaks = max(12, int(target_total_h) + 4) if target_total_h is not None else 18
-        best_comparison: SpectrumComparisonReport | None = None
-
-        for sensitivity_candidate in sensitivity_candidates:
-            for gain_candidate in gain_candidates:
-                estimates = _infer_peak_estimates(
-                    inference_points,
-                    sensitivity=sensitivity_candidate,
-                    detection_gain=gain_candidate,
-                    frequency_mhz=frequency_mhz,
-                )
-                candidate_peaks, _ = _estimates_to_peaks(estimates, target_total_h=target_total_h)
-                observed_total = round(sum(peak.integration_h for peak in candidate_peaks), 4)
-                candidate_target_total = (
-                    target_total_h
-                    if target_total_h is not None
-                    else (
-                        round(sum(peak.integration_h for peak in reference_peaks), 4)
-                        if reference_peaks
-                        else None
-                    )
-                )
-                visible_total_error = (
-                    abs(observed_total - candidate_target_total)
-                    if candidate_target_total is not None
-                    else 0.0
-                )
-                peak_penalty = max(0, len(candidate_peaks) - max_reasonable_peaks) * 0.2
-                candidate_reference_coverage = sum(
-                    1 for _, matches in _reference_coverage_matches(reference_assignments, candidate_peaks) if matches
-                )
-                candidate_comparison = _build_spectrum_comparison(
-                    reference_assignments=reference_assignments,
-                    extracted_peaks=candidate_peaks,
-                    structure_visible_h=target_total_h,
-                )
-                if candidate_comparison is not None:
-                    key = (
-                        float(len(reference_assignments) - candidate_reference_coverage),
-                        float(candidate_comparison.missing_count),
-                        float(candidate_comparison.extra_count),
-                        candidate_comparison.total_shift_delta_ppm,
-                        round(visible_total_error, 4),
-                        float(-candidate_comparison.multiplicity_match_count),
-                        abs(gain_candidate - 1.0),
-                        sensitivity_candidate,
-                    )
-                else:
-                    key = (
-                        round(visible_total_error + peak_penalty, 4),
-                        float(-len(candidate_peaks)),
-                        abs(gain_candidate - 1.0),
-                        sensitivity_candidate,
-                    )
-                if best_key is None or key < best_key:
-                    best_key = key
-                    best_estimates = estimates
-                    best_sensitivity = sensitivity_candidate
-                    best_gain = gain_candidate
-                    best_comparison = candidate_comparison
-
-        sensitivity = best_sensitivity
-        detection_gain = best_gain
+        best_estimates, best_comparison, sensitivity = _structure_guided_peak_estimates(
+            inference_points,
+            reference_assignments=reference_assignments,
+            reference_peaks=reference_peaks,
+            target_total_h=target_total_h,
+            frequency_mhz=frequency_mhz,
+            fixed_sensitivity=float(peak_sensitivity) if peak_sensitivity is not None else None,
+        )
         inferred_peaks, peak_meta = _estimates_to_peaks(best_estimates, target_total_h=target_total_h)
         comparison = best_comparison or _build_spectrum_comparison(
             reference_assignments=reference_assignments,
@@ -2238,10 +2312,6 @@ def parse_processed_spectrum(
             if target_total_h is not None:
                 warnings.append(
                     "Peak picking was auto-tuned against the supplied structure so weaker signals can be lifted and matched more closely to the expected 1H count."
-                )
-            if detection_gain > 1.0:
-                warnings.append(
-                    f"A structure-guided detection gain of {detection_gain:.1f}× was applied during peak picking to expose weaker peaks beneath dominant signals."
                 )
             if comparison is not None:
                 warnings.append("Reference-text comparison was applied to score peak-picking candidates and summarize mismatches.")
@@ -2267,15 +2337,10 @@ def parse_processed_spectrum(
             warnings.append(
                 "Reference-guided assignment text was emitted for overlapping regions so the generated peak list can preserve recognized shift ranges and multiplicities."
             )
-        elif frequency_mhz is not None and reference_peaks:
-            reference_guided_nmr_text = _normalized_reference_peak_text(
-                reference_peaks,
-                target_total_h=target_total_h,
+        else:
+            warnings.append(
+                "Reference NMR text was used for comparison and scoring only; generated assignments were not emitted because independently detected peaks did not cover enough referenced regions."
             )
-            if reference_guided_nmr_text is not None:
-                warnings.append(
-                    "Reference assignment text was normalized to the structure/solvent visible-proton target because trace peak picking was too sparse to preserve coupling details."
-                )
 
     original_spectrum_state = _build_preserved_spectrum_state(
         original_points,
@@ -2304,12 +2369,13 @@ def parse_processed_spectrum(
             "reference_total_h": round(sum(peak.integration_h for peak in reference_peaks), 4) if reference_peaks else 0.0,
             "reference_coverage_count": reference_coverage_count,
             "reference_guided_text_used": reference_guided_nmr_text is not None,
+            "reference_guided_text_abstained": bool(reference_assignments) and reference_guided_nmr_text is None,
             "raw_extracted_nmr_text": raw_inferred_nmr_text,
+            "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
             "peak_sensitivity": sensitivity,
             "peak_sensitivity_percent": round(sensitivity * 100),
             "peak_inference": "enabled",
             "peak_inference_skipped": False,
-            "detection_gain": round(detection_gain, 3),
             "target_total_h": expected_total_h,
             "target_non_labile_h": expected_non_labile_h,
             "target_visible_h": target_total_h,

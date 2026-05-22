@@ -1,7 +1,9 @@
+import random
+
 from nmrcheck.spectrum import SpectrumParseError
 from nmrcheck.models import Peak
 from nmrcheck.parser import parse_reference_nmr_text
-from nmrcheck.spectrum import _build_reference_guided_nmr_text, _downsample_points, _round_half_integrations, parse_processed_spectrum
+from nmrcheck.spectrum import _build_reference_guided_nmr_text, _downsample_points, _round_half_integrations, _structure_guided_peak_estimates, parse_processed_spectrum
 
 TOBRAMYCIN_REFERENCE_TEXT = """'H NMR (500 MHz, D2O) 8 5.23 (d, J = 3.6 Hz, 1H), 5.08 (d, J = 3.9 Hz, 1H), 3.95 (ddd,
 J= 10.3, 4.6, 2.6 Hz, 1H), 3.80 (dd, J = 6.6, 3.6 Hz, 2H), 3.68 (tdd, J = 9.2, 5.6, 3.1 Hz,
@@ -65,6 +67,28 @@ def _resolved_multiplet_trace_csv() -> bytes:
     return ("\n".join(rows) + "\n").encode()
 
 
+def _noisy_trace_csv(
+    peaks: list[tuple[float, float, float]],
+    *,
+    noise: float,
+    seed: int,
+) -> bytes:
+    """Synthesize a dense processed-spectrum CSV: Gaussian peaks + Gaussian noise.
+
+    ``peaks`` are ``(center_ppm, width_ppm, amplitude)`` triples. An empty list
+    yields a pure-noise trace, which the SNR-based detector must leave empty.
+    """
+    rng = random.Random(seed)
+    xs = [9.0 - idx * 0.0015 for idx in range(6000)]
+    rows = ["ppm,intensity"]
+    for x in xs:
+        intensity = rng.gauss(0.0, noise)
+        for center, width, amplitude in peaks:
+            intensity += _gaussian(x, center, width, amplitude)
+        rows.append(f"{x:.4f},{intensity:.6f}")
+    return ("\n".join(rows) + "\n").encode()
+
+
 def test_parse_peak_table_csv() -> None:
     content = b"shift_ppm,multiplicity,integration_h\n3.50,q,2\n1.20,t,3\n"
     preview = parse_processed_spectrum(filename="peaks.csv", content=content, solvent="CDCl3")
@@ -74,11 +98,95 @@ def test_parse_peak_table_csv() -> None:
 
 
 def test_parse_trace_csv_infers_peaks() -> None:
-    content = b"ppm,intensity\n4.0,0\n3.8,1\n3.6,5\n3.4,1\n3.2,0\n2.0,0\n1.8,1\n1.6,4\n1.4,1\n1.2,0\n"
-    preview = parse_processed_spectrum(filename="trace.csv", content=content)
+    # A realistic dense processed-spectrum trace: the SNR-based detector needs
+    # enough baseline points to estimate the noise floor, so a handful-of-points
+    # toy is not a representative fixture for trace peak inference.
+    preview = parse_processed_spectrum(filename="trace.csv", content=_dense_sugar_trace_csv())
     assert preview.source_mode == "trace"
-    assert preview.point_count >= 10
+    assert preview.point_count >= 1000
     assert len(preview.inferred_peaks) >= 1
+
+
+def test_trace_detector_rejects_pure_noise_without_inventing_peaks() -> None:
+    # A trace with no real signal — only Gaussian noise. The SNR-based detector
+    # must not invent peaks from noise fluctuations ("no random predictions").
+    preview = parse_processed_spectrum(
+        filename="noise.csv",
+        content=_noisy_trace_csv([], noise=5.0, seed=1),
+    )
+    assert preview.source_mode == "trace"
+    assert preview.inferred_peaks == []
+
+
+def test_trace_detector_recovers_reference_multiplet_count_under_noise() -> None:
+    # Ground truth = a literature 1H reference text. A spectrum synthesized at
+    # its reported shifts plus realistic noise must be detected back to the same
+    # multiplet count and positions — the SNR threshold neither drops genuine
+    # peaks nor adds noise peaks.
+    reference = (
+        "1H NMR (500 MHz, CDCl3) 7.34 (t, 2H), 3.62 (s, 2H), "
+        "2.41 (q, 2H), 1.58 (m, 2H), 0.92 (t, 3H)"
+    )
+    _frequency, assignments = parse_reference_nmr_text(reference)
+    synthetic_peaks = [
+        (assignment.shift_ppm, 0.012, 30.0 + 20.0 * float(assignment.integration_h))
+        for assignment in assignments
+    ]
+    preview = parse_processed_spectrum(
+        filename="trace.csv",
+        content=_noisy_trace_csv(synthetic_peaks, noise=4.0, seed=3),
+    )
+    detected = sorted(peak.shift_ppm for peak in preview.inferred_peaks)
+    assert len(detected) == len(assignments)
+    for assignment in assignments:
+        assert any(abs(assignment.shift_ppm - shift) <= 0.06 for shift in detected)
+
+
+def test_structure_guided_sweep_recovers_reference_multiplets_under_noise() -> None:
+    # The shared structure-guided sweep (used by both the processed-upload and
+    # Raw-FID paths) must pick the SNR sensitivity whose detected peak list best
+    # matches the reference, recovering the reported multiplet count under noise.
+    reference = (
+        "1H NMR (400 MHz, CDCl3) 7.34 (t, 2H), 3.62 (s, 2H), "
+        "2.41 (q, 2H), 1.58 (m, 2H), 0.92 (t, 3H)"
+    )
+    _frequency, assignments = parse_reference_nmr_text(reference)
+    rng = random.Random(11)
+    points: list[tuple[float, float]] = []
+    for idx in range(6000):
+        x = 9.0 - idx * 0.0015
+        intensity = rng.gauss(0.0, 4.0)
+        for assignment in assignments:
+            intensity += _gaussian(x, assignment.shift_ppm, 0.012, 60.0)
+        points.append((x, intensity))
+
+    estimates, comparison, chosen = _structure_guided_peak_estimates(
+        points,
+        reference_assignments=assignments,
+        reference_peaks=[],
+        target_total_h=None,
+        frequency_mhz=400.0,
+    )
+    detected = sorted(round(estimate.shift_ppm, 2) for estimate in estimates)
+    assert len(estimates) == len(assignments)
+    for assignment in assignments:
+        assert any(abs(assignment.shift_ppm - shift) <= 0.06 for shift in detected)
+    assert comparison is not None
+    assert chosen in {0.06, 0.08, 0.1, 0.12, 0.15}
+
+
+def test_structure_guided_sweep_honours_an_explicit_fixed_sensitivity() -> None:
+    # An explicit fixed sensitivity collapses the sweep to that single value.
+    points = [(9.0 - idx * 0.0015, 0.0) for idx in range(3000)]
+    _estimates, _comparison, chosen = _structure_guided_peak_estimates(
+        points,
+        reference_assignments=[],
+        reference_peaks=[],
+        target_total_h=None,
+        frequency_mhz=None,
+        fixed_sensitivity=0.1,
+    )
+    assert chosen == 0.1
 
 
 def test_parse_text_spectrum_pair_exports() -> None:
@@ -360,3 +468,27 @@ def test_peak_table_preview_emits_reference_guided_range_text_for_dense_assignme
     assert "3.60 - 3.53 (t, 3H)" in preview.inferred_nmr_text
     assert "3.11 - 2.98 (m, 4H)" in preview.inferred_nmr_text
     assert "2.93 (tdd" in preview.inferred_nmr_text
+
+
+def test_trace_reference_text_does_not_fabricate_missing_assignments() -> None:
+    rows = ["ppm,intensity"]
+    for idx in range(401):
+        x = 2.0 - idx * 0.005
+        intensity = 0.01 + _gaussian(x, 1.0, 0.01, 12.0)
+        rows.append(f"{x:.4f},{intensity:.8f}")
+
+    reference = "1H NMR (500 MHz, CDCl3) δ 7.20 (s, 1H), 1.00 (s, 3H)"
+    preview = parse_processed_spectrum(
+        filename="trace.csv",
+        content=("\n".join(rows) + "\n").encode(),
+        solvent="CDCl3",
+        frequency_mhz=500.0,
+        reference_nmr_text=reference,
+    )
+
+    assert "7.20" not in preview.inferred_nmr_text
+    assert preview.metadata["reference_guided_text_used"] is False
+    assert preview.metadata["reference_guided_text_abstained"] is True
+    assert preview.metadata["peak_evidence_policy"] == "detected_peaks_only_no_reference_fabrication"
+    assert preview.comparison is not None
+    assert preview.comparison.missing_count >= 1
