@@ -7,6 +7,7 @@ import importlib.util
 import io
 import json
 import logging
+import math
 import re
 import uuid
 import zipfile
@@ -14,6 +15,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from html import escape as html_escape
 from pathlib import Path
 from typing import Any, Literal
@@ -85,6 +87,8 @@ from .peak_categorization import (
     build_predicted_vs_observed,
     build_proton_inventory,
     enrich_peaks,
+    is_aminoglycoside_like_structure,
+    reconcile_proton_peaks_with_reference_text,
 )
 from .candidate_predicted import (
     PREDICTED_NMR_MATCH_LIMITATIONS,
@@ -822,7 +826,7 @@ from .models import (
 )
 from .msms import MSMSError, annotate_msms
 from .nmr2d import NMR2DParseError, analyze_nmr2d_preview, parse_nmr2d_upload
-from .nmr_prediction import predict_nmr_from_smiles
+from .nmr_prediction import predict_nmr_from_smiles_fast
 from .proton import analyze_proton_evidence
 from .queueing import enqueue_job_processing
 from .raw_vault import (
@@ -5197,6 +5201,91 @@ def _xy_from_spectrum_points(points: list[Any]) -> tuple[list[float], list[float
     return (x_values, y_values)
 
 
+def _processed_preview_points_upload(
+    preview_points_json: str | None,
+    *,
+    filename: str,
+) -> tuple[str, bytes, list[str], dict[str, Any]] | None:
+    """Build a lightweight processed-spectrum upload from a rendered preview.
+
+    The processed-spectrum UI always previews before evidence matching. When
+    the user clicks "Run evidence match", reusing those display-ready points
+    avoids a second full upload parse while still running the normal backend
+    peak-picking / evidence layers.
+    """
+
+    raw = (preview_points_json or "").strip()
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+    x_values: list[float] = []
+    y_values: list[float] = []
+    if isinstance(payload, dict):
+        x_raw = payload.get("x")
+        y_raw = payload.get("y")
+        if not isinstance(x_raw, list) or not isinstance(y_raw, list):
+            return None
+        for x_item, y_item in zip(x_raw, y_raw, strict=False):
+            try:
+                x = float(x_item)
+                y = float(y_item)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(x) and math.isfinite(y):
+                x_values.append(x)
+                y_values.append(y)
+    elif isinstance(payload, list):
+        for row in payload:
+            if isinstance(row, dict):
+                x_item = row.get("shift_ppm", row.get("ppm", row.get("x")))
+                y_item = row.get("intensity", row.get("y"))
+            elif isinstance(row, list | tuple) and len(row) >= 2:
+                x_item = row[0]
+                y_item = row[1]
+            else:
+                continue
+            try:
+                x = float(x_item)
+                y = float(y_item)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(x) and math.isfinite(y):
+                x_values.append(x)
+                y_values.append(y)
+    else:
+        return None
+
+    if len(x_values) < 16 or len(x_values) != len(y_values):
+        return None
+
+    # Keep the request bounded even if a future viewer sends a dense trace.
+    max_points = 20_000
+    if len(x_values) > max_points:
+        stride = max(1, math.ceil(len(x_values) / max_points))
+        x_values = x_values[::stride]
+        y_values = y_values[::stride]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ppm", "intensity"])
+    writer.writerows(zip(x_values, y_values, strict=False))
+    fast_filename = f"{Path(filename).stem or 'processed_preview'}-preview-trace.csv"
+    notes = [
+        "Reused the already-rendered preview trace for evidence matching; "
+        "this avoids reparsing the uploaded processed spectrum on Run evidence match.",
+    ]
+    metadata = {
+        "frontend_preview_trace_reused": True,
+        "frontend_preview_point_count": len(x_values),
+        "frontend_preview_source_filename": filename,
+    }
+    return fast_filename, output.getvalue().encode("utf-8"), notes, metadata
+
+
 def _reversed_x_axis(x_values: list[float]) -> bool:
     return len(x_values) < 2 or x_values[0] > x_values[-1]
 
@@ -5328,20 +5417,40 @@ def _candidate_summary_from_text(
     carbon13_text: str | None,
     compound_class: str | None = None,
 ) -> tuple[float | None, list[str], dict[str, Any], list[str]]:
+    score, summary, metadata, warnings = _candidate_summary_from_text_cached(
+        (candidates_text or "").strip(),
+        (sample_id or "").strip(),
+        (solvent or "").strip(),
+        (proton_nmr_text or "").strip(),
+        (carbon13_text or "").strip(),
+        (compound_class or "").strip(),
+    )
+    return score, list(summary), dict(metadata), list(warnings)
+
+
+@lru_cache(maxsize=256)
+def _candidate_summary_from_text_cached(
+    candidates_text: str,
+    sample_id: str,
+    solvent: str,
+    proton_nmr_text: str,
+    carbon13_text: str,
+    compound_class: str,
+) -> tuple[float | None, tuple[str, ...], dict[str, Any], tuple[str, ...]]:
     if not candidates_text or not candidates_text.strip():
-        return (None, [], {}, [])
+        return (None, (), {}, ())
     try:
         candidates = parse_candidate_text(candidates_text)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     result = compare_candidates(
         CandidateComparisonRequest(
-            sample_id=sample_id,
-            solvent=solvent,
+            sample_id=sample_id or None,
+            solvent=solvent or None,
             candidates=candidates,
-            proton_nmr_text=proton_nmr_text,
-            carbon13_text=carbon13_text,
-            compound_class=compound_class,
+            proton_nmr_text=proton_nmr_text or None,
+            carbon13_text=carbon13_text or None,
+            compound_class=compound_class or None,
         )
     )
     best = result.best_candidate
@@ -5355,8 +5464,8 @@ def _candidate_summary_from_text(
             f"Best-ranked candidate: {best.name or best.smiles} with score {best.total_score:.3f}.",
         )
     metadata = {"candidate_comparison": result.model_dump(mode="json")}
-    warnings = list(result.warnings)
-    return (best.total_score if best is not None else None, summary, metadata, warnings)
+    warnings = tuple(result.warnings)
+    return (best.total_score if best is not None else None, tuple(summary), metadata, warnings)
 
 
 def _carbon13_text_from_peaks(peaks: list[dict[str, Any]]) -> str:
@@ -5650,6 +5759,7 @@ async def nmr_processed_analyze_route(
     candidates_text: str | None = Form(default=None),
     compound_class: str | None = Form(default=None),
     include_spectrum: bool = Form(default=True),
+    preview_points_json: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRProcessedAnalyzeResponse:
     filename = file.filename or "processed_spectrum.dat"
@@ -5665,11 +5775,19 @@ async def nmr_processed_analyze_route(
     candidate_metadata: dict[str, Any] = {}
     candidate_warnings: list[str] = []
     comparison_score: float | None = None
+    proton_reference_for_detection: str | None = None
     try:
-        parser_filename, parser_content, parser_notes, parser_metadata = _processed_parser_upload(
+        preview_upload = _processed_preview_points_upload(
+            preview_points_json,
             filename=filename,
-            content=content,
         )
+        if preview_upload is not None:
+            parser_filename, parser_content, parser_notes, parser_metadata = preview_upload
+        else:
+            parser_filename, parser_content, parser_notes, parser_metadata = _processed_parser_upload(
+                filename=filename,
+                content=content,
+            )
         if nucleus == "1H":
             proton_reference_for_detection = (
                 nmr_text.strip()
@@ -5834,6 +5952,25 @@ async def nmr_processed_analyze_route(
         except Exception:  # noqa: BLE001 — structure errors must not break analyze
             structure_summary = None
 
+    if nucleus == "1H":
+        peaks, proton_reconciliation = reconcile_proton_peaks_with_reference_text(
+            peaks=peaks,
+            reference_nmr_text=proton_reference_for_detection,
+            solvent=solvent,
+            structure=structure_summary,
+        )
+        metadata["proton_peak_reconciliation"] = proton_reconciliation
+        if proton_reconciliation.get("applied"):
+            metadata["observed_total_h"] = proton_reconciliation.get("observed_total_h")
+            metadata["adjusted_observed_total_h"] = proton_reconciliation.get(
+                "adjusted_observed_total_h"
+            )
+            metadata["expected_visible_h"] = proton_reconciliation.get("expected_visible_h")
+            warnings.append(
+                "Supplied 1H NMR text was reconciled with spectrum-derived peaks so integration "
+                "and proton inventory use the parsed observed H values."
+            )
+
     peaks = enrich_peaks(
         peaks=peaks,
         nucleus=nucleus,
@@ -5879,12 +6016,15 @@ async def nmr_processed_analyze_route(
         structure=structure_summary,
         nucleus=nucleus,
     )
+    proton_reconciliation_payload = metadata.get("proton_peak_reconciliation")
+    if isinstance(proton_reconciliation_payload, dict) and proton_inventory:
+        proton_inventory["reconciliation"] = proton_reconciliation_payload
 
     predicted_vs_observed_rows: list[dict[str, Any]] = []
     dp4_ranking_rows: list[dict[str, Any]] = []
     if candidate_smiles:
         try:
-            prediction = predict_nmr_from_smiles(
+            prediction = predict_nmr_from_smiles_fast(
                 candidate_smiles,
                 name=None,
                 solvent=solvent,
@@ -5910,7 +6050,7 @@ async def nmr_processed_analyze_route(
         candidate_labels: list[str] = []
         for cand_smiles in all_candidate_smiles:
             try:
-                cand_pred = predict_nmr_from_smiles(cand_smiles, name=None, solvent=solvent)
+                cand_pred = predict_nmr_from_smiles_fast(cand_smiles, name=None, solvent=solvent)
                 cand_peaks = (
                     cand_pred.proton_peaks if nucleus == "1H" else cand_pred.carbon13_peaks
                 )
@@ -5950,6 +6090,18 @@ async def nmr_processed_analyze_route(
     if dp4_ranking_rows:
         citation_keys.append("howarth_goodman_2020_dp4ai")
         citation_keys.append("howarth_goodman_2022_dp5")
+    if (
+        (structure_summary is not None and is_aminoglycoside_like_structure(structure_summary))
+        or peak_category_summary.get("carbohydrate_sugar")
+    ):
+        citation_keys.extend(
+            [
+                "alkhzem_2020_tobramycin_multinuclear_nmr",
+                "fontana_widmalm_2023_glycan_nmr",
+                "hotor_2025_sulfated_pseudo_trisaccharides",
+            ]
+        )
+    citation_keys = list(dict.fromkeys(citation_keys))
     references_block = references_for_keys(citation_keys)
     score = candidate_score if candidate_score is not None else comparison_score
     evidence_summary = [
@@ -6384,6 +6536,23 @@ async def nmr_raw_fid_process_route(
             structure_summary = structure_summary_from_smiles(candidate_smiles)
         except Exception:  # noqa: BLE001 — structure parse errors must not break processing
             structure_summary = None
+    raw_proton_reconciliation: dict[str, Any] = {"applied": False, "reason": "non_proton_nucleus"}
+    if nucleus == "1H":
+        fid_peaks, raw_proton_reconciliation = reconcile_proton_peaks_with_reference_text(
+            peaks=fid_peaks,
+            reference_nmr_text=shared_proton_text,
+            solvent=solvent,
+            structure=structure_summary,
+        )
+        raw_fid_peak_guidance["proton_peak_reconciliation"] = raw_proton_reconciliation
+        if raw_proton_reconciliation.get("applied"):
+            raw_fid_peak_guidance["peak_evidence_policy"] = (
+                "reference_text_guides_integration; spectrum_only_peaks_preserved_but_excluded_from_proton_inventory"
+            )
+            guidance_warnings.append(
+                "Supplied 1H NMR text was reconciled with raw-FID picked peaks so integration "
+                "and proton inventory use the parsed observed H values."
+            )
     fid_peaks = enrich_peaks(
         peaks=fid_peaks,
         nucleus=nucleus,
@@ -6401,7 +6570,48 @@ async def nmr_raw_fid_process_route(
         structure=structure_summary,
         nucleus=nucleus,
     )
+    if raw_proton_reconciliation.get("applied") and proton_inventory:
+        proton_inventory["reconciliation"] = raw_proton_reconciliation
     impurity_candidates = build_impurity_candidates(peaks=fid_peaks)
+    predicted_vs_observed_rows: list[dict[str, Any]] = []
+    if candidate_smiles:
+        try:
+            prediction = predict_nmr_from_smiles_fast(
+                candidate_smiles,
+                name=None,
+                solvent=solvent,
+            )
+            predicted_for_nucleus = (
+                prediction.proton_peaks if nucleus == "1H" else prediction.carbon13_peaks
+            )
+            predicted_vs_observed_rows = build_predicted_vs_observed(
+                predicted_peaks=predicted_for_nucleus,
+                observed_peaks=fid_peaks,
+                nucleus=nucleus,
+            )
+        except Exception:  # noqa: BLE001 — prediction failures are non-fatal
+            predicted_vs_observed_rows = []
+
+    raw_citation_keys = [
+        "pretsch_2020_tables_5e",
+        "friebolin_2010_5e",
+        "gottlieb_1997_solvent_impurities",
+        "fulmer_2010_solvent_impurities",
+        "reich_nmr_resources",
+        "mestrenova_manual",
+    ]
+    if (
+        (structure_summary is not None and is_aminoglycoside_like_structure(structure_summary))
+        or peak_category_summary.get("carbohydrate_sugar")
+    ):
+        raw_citation_keys.extend(
+            [
+                "alkhzem_2020_tobramycin_multinuclear_nmr",
+                "fontana_widmalm_2023_glycan_nmr",
+                "hotor_2025_sulfated_pseudo_trisaccharides",
+            ]
+        )
+    raw_references_block = references_for_keys(list(dict.fromkeys(raw_citation_keys)))
 
     notes = [
         "Raw archive was preserved as immutable source data before processing.",
@@ -6422,9 +6632,15 @@ async def nmr_raw_fid_process_route(
         "carbon13_text_supplied": shared_carbon_text is not None,
         "candidate_text_supplied": bool(candidates_text and candidates_text.strip()),
         "raw_fid_peak_guidance": raw_fid_peak_guidance,
-        "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
+        "peak_evidence_policy": raw_fid_peak_guidance.get("peak_evidence_policy"),
         "spectrum_points_included": include_spectrum_value,
     }
+    if raw_proton_reconciliation.get("applied"):
+        metadata["observed_total_h"] = raw_proton_reconciliation.get("observed_total_h")
+        metadata["adjusted_observed_total_h"] = raw_proton_reconciliation.get(
+            "adjusted_observed_total_h"
+        )
+        metadata["expected_visible_h"] = raw_proton_reconciliation.get("expected_visible_h")
     if not include_spectrum_value:
         metadata["spectrum_points_omitted_reason"] = "frontend_already_has_preview_trace"
     _audit_from_context(
@@ -6458,6 +6674,8 @@ async def nmr_raw_fid_process_route(
         labile_hydrogen_summary=labile_hydrogen_summary,
         proton_inventory=proton_inventory,
         impurity_candidates=impurity_candidates,
+        predicted_vs_observed=predicted_vs_observed_rows,
+        references=raw_references_block,
         x=x_values if include_spectrum_value else [],
         y=y_values if include_spectrum_value else [],
         x_label="ppm",
@@ -21653,7 +21871,7 @@ def predicted_nmr_preview_route(
     solvent: str | None = Query(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> PredictedNMRReport:
-    report = predict_nmr_from_smiles(payload.smiles, name=payload.name, solvent=solvent)
+    report = predict_nmr_from_smiles_fast(payload.smiles, name=payload.name, solvent=solvent)
     _audit_from_context(
         request,
         context=context,

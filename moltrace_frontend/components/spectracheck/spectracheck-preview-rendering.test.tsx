@@ -16,8 +16,8 @@ vi.mock("@/lib/api/client", async () => {
 })
 
 vi.mock("@/components/science/SpectrumViewer", () => ({
-  SpectrumViewer: ({ nucleus }: { nucleus?: "1H" | "13C" }) => (
-    <div data-testid="spectrum-viewer">
+  SpectrumViewer: ({ nucleus, peaks }: { nucleus?: "1H" | "13C"; peaks?: unknown[] }) => (
+    <div data-testid="spectrum-viewer" data-peak-count={peaks?.length ?? 0}>
       Nucleus context: <span>{nucleus}</span>
     </div>
   ),
@@ -109,9 +109,18 @@ describe("SpectraCheck preview rendering", () => {
       nucleus: "1H",
       filename: "trace.csv",
       point_count: 3,
-      peak_count: 1,
       x: [4.2, 4.1, 4],
       y: [0, 3, 0],
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      nucleus: "1H",
+      filename: "trace.csv",
+      point_count: 3,
+      peak_count: 1,
       peaks: [{ shift_ppm: 4.1, intensity: 3 }],
       warnings: [],
       notes: [],
@@ -132,12 +141,27 @@ describe("SpectraCheck preview rendering", () => {
     })
     fireEvent.click(screen.getByRole("button", { name: /Run evidence match/i }))
 
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/preview", expect.any(Object)))
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/analyze", expect.any(Object)))
+    const analyzeCall = apiFetchMock.mock.calls.find(([path]) => path === "/nmr/processed/analyze")
+    expect((analyzeCall?.[1]?.body as FormData).get("include_spectrum")).toBe("false")
+    expect((analyzeCall?.[1]?.body as FormData).get("preview_points_json")).toBeTruthy()
     expect(await screen.findByText(/Nucleus context/i)).toBeInTheDocument()
     expect(screen.queryByText(/No spectrum loaded/i)).not.toBeInTheDocument()
   })
 
   it("shows the processed analysis interface immediately while first analyze is pending", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      nucleus: "1H",
+      filename: "trace.csv",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 3, 0],
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
     let resolveAnalyze: ((value: unknown) => void) | null = null
     apiFetchMock.mockImplementationOnce(
       () =>
@@ -160,9 +184,11 @@ describe("SpectraCheck preview rendering", () => {
     })
     fireEvent.click(screen.getByRole("button", { name: /Run evidence match/i }))
 
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/preview", expect.any(Object)))
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/analyze", expect.any(Object)))
     expect(screen.getByText(/Analysis output/i)).toBeInTheDocument()
-    expect(screen.getByTestId("processed-results-pending-spectrum")).toBeInTheDocument()
+    expect(screen.getByText(/Nucleus context/i)).toBeInTheDocument()
+    expect(screen.queryByTestId("processed-results-pending-spectrum")).not.toBeInTheDocument()
     expect(screen.queryByText(/Waiting for API response/i)).not.toBeInTheDocument()
 
     expect(resolveAnalyze).not.toBeNull()
@@ -202,6 +228,7 @@ describe("SpectraCheck preview rendering", () => {
       point_count: 3,
       x: [4.2, 4.1, 4.0],
       y: [0, 5, 0],
+      peaks: [{ shift_ppm: 4.1, intensity: 5, category: "oxygenated" }],
       x_label: "ppm",
       y_label: "intensity",
       reversed_x_axis: true,
@@ -238,6 +265,7 @@ describe("SpectraCheck preview rendering", () => {
       point_count: 3,
       x: [4.2, 4.1, 4.0],
       y: [0, 5, 0],
+      peaks: [{ shift_ppm: 4.1, intensity: 5, category: "oxygenated" }],
       x_label: "ppm",
       y_label: "intensity",
       reversed_x_axis: true,
@@ -263,7 +291,7 @@ describe("SpectraCheck preview rendering", () => {
     expect(screen.queryByText(/Raw spectrum not generated yet/i)).not.toBeInTheDocument()
   })
 
-  it("raw FID process reuses matching inline preview data for the safe automatic preset", async () => {
+  it("raw FID process always calls the process endpoint after preview", async () => {
     apiFetchMock.mockResolvedValueOnce({
       sample_id: "sample-1",
       filename: "raw.zip",
@@ -274,6 +302,62 @@ describe("SpectraCheck preview rendering", () => {
       point_count: 3,
       x: [4.2, 4.1, 4.0],
       y: [0, 5, 0],
+      peaks: [{ shift_ppm: 4.1, intensity: 5, category: "oxygenated" }],
+      x_label: "ppm",
+      y_label: "intensity",
+      reversed_x_axis: true,
+      acquisition_parameters: {},
+      file_inventory: {},
+      warnings: [],
+      notes: [],
+      metadata: { raw_archive_id: "a".repeat(64), inline_spectrum_generated: true },
+    })
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      filename: "raw.zip",
+      vendor_detected: "Bruker",
+      nucleus: "1H",
+      processing_preset: "safe_automatic",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 6, 0],
+      x_label: "ppm",
+      y_label: "intensity",
+      reversed_x_axis: true,
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
+
+    renderWithEvidence(
+      <SpectraCheckRawFidSection sampleId="sample-1" onSampleIdChange={() => {}} solvent="CDCl3" />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/Raw FID archive/i, { selector: "input" }), {
+      target: { files: [new File(["raw"], "raw.zip", { type: "application/zip" })] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Preview spectrum/i }))
+
+    expect(await screen.findByText(/Auto-FT preview/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /Process FID/i }))
+
+    await screen.findByText(/Processed FID output/i)
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object)))
+    expect(apiFetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("raw FID preview renders a trace-only spectrum even when payload contains peaks", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      filename: "raw.zip",
+      raw_sha256: "a".repeat(64),
+      vendor_detected: "Bruker",
+      nucleus: "1H",
+      processing_preset: "balanced",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 5, 0],
+      peaks: [{ shift_ppm: 4.1, intensity: 5, category: "unknown" }],
       x_label: "ppm",
       y_label: "intensity",
       reversed_x_axis: true,
@@ -293,11 +377,8 @@ describe("SpectraCheck preview rendering", () => {
     })
     fireEvent.click(screen.getByRole("button", { name: /Preview spectrum/i }))
 
-    expect(await screen.findByText(/Auto-FT preview/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("button", { name: /Process FID/i }))
-
-    await screen.findByText(/Processed FID output/i)
-    expect(apiFetchMock).toHaveBeenCalledTimes(1)
+    const viewer = await screen.findByTestId("spectrum-viewer")
+    expect(viewer).toHaveAttribute("data-peak-count", "0")
   })
 
   it("raw FID process displays returned spectrum points", async () => {
@@ -310,6 +391,7 @@ describe("SpectraCheck preview rendering", () => {
       point_count: 3,
       x: [4.2, 4.1, 4.0],
       y: [0, 5, 0],
+      peaks: [{ shift_ppm: 4.1, intensity: 5, category: "oxygenated" }],
       x_label: "ppm",
       y_label: "intensity",
       reversed_x_axis: true,
@@ -329,6 +411,7 @@ describe("SpectraCheck preview rendering", () => {
 
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object)))
     expect(await screen.findByText(/Nucleus context/i)).toBeInTheDocument()
+    expect(screen.getByTestId("spectrum-viewer")).toHaveAttribute("data-peak-count", "1")
     expect(screen.queryByText(/No spectrum loaded/i)).not.toBeInTheDocument()
   })
 
@@ -424,6 +507,7 @@ describe("SpectraCheck preview rendering", () => {
     )
     const analyzeCall = apiFetchMock.mock.calls.find(([path]) => path === "/nmr/processed/analyze")
     expect((analyzeCall?.[1]?.body as FormData).get("include_spectrum")).toBe("false")
+    expect((analyzeCall?.[1]?.body as FormData).get("preview_points_json")).toBeTruthy()
     expect(screen.getByText(/Nucleus context/i)).toBeInTheDocument()
 
     // Resolve the analyze; chart updates atomically.
@@ -454,6 +538,15 @@ describe("SpectraCheck preview rendering", () => {
       point_count: 3,
       x: [4.2, 4.1, 4.0],
       y: [0, 7, 0],
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      nucleus: "1H",
+      filename: "analyze.csv",
+      point_count: 3,
       peak_count: 1,
       analysis_score: 0.91,
       peaks: [{ shift_ppm: 4.1, integration_h: 1, multiplicity: "s" }],
@@ -475,6 +568,7 @@ describe("SpectraCheck preview rendering", () => {
       target: { files: [new File(["ppm,intensity\n4.2,0\n4.1,7\n4.0,0\n"], "analyze.csv")] },
     })
     fireEvent.click(screen.getByRole("button", { name: /Run evidence match/i }))
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/analyze", expect.any(Object)))
     expect(await screen.findByText(/Analysis score/i)).toBeInTheDocument()
 
     apiFetchMock.mockResolvedValueOnce({
@@ -499,6 +593,17 @@ describe("SpectraCheck preview rendering", () => {
   })
 
   it("ignores an analyze response that resolves after Clear", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      sample_id: "sample-1",
+      nucleus: "1H",
+      filename: "pending.csv",
+      point_count: 3,
+      x: [4.2, 4.1, 4.0],
+      y: [0, 7, 0],
+      warnings: [],
+      notes: [],
+      metadata: {},
+    })
     let resolveAnalyze: ((value: unknown) => void) | null = null
     apiFetchMock.mockImplementationOnce(
       () =>

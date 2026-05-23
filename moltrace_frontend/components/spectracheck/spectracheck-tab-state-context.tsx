@@ -29,6 +29,7 @@ export type RawFidPreset =
   | "imported_parameters"
   | "no_baseline_correction"
   | "no_phase_correction"
+export type RawFidResultMode = "preview" | "process"
 
 export type RawFidPreviewSpectrum = {
   x: number[]
@@ -104,6 +105,10 @@ export type RawFidTabState = {
   previewSpectrumLoading: boolean
   previewSpectrumError: string
 
+  // Which raw-FID result surface the user last requested. Preview and Process
+  // keep independent payloads so switching modes does not destroy prior work.
+  activeResultMode: RawFidResultMode | null
+
   // UI helpers
   advancedOpen: boolean
   sessionRawFileIdChoice: string
@@ -154,6 +159,7 @@ const defaultRawFid: RawFidTabState = {
   previewSpectrum: null,
   previewSpectrumLoading: false,
   previewSpectrumError: "",
+  activeResultMode: null,
   advancedOpen: false,
   sessionRawFileIdChoice: "",
   jobActionError: "",

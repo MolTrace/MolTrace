@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import time
+from functools import lru_cache
+
 from .carbon13 import Carbon13ParseError
 from .exceptions import PeakParseError
 from .models import (
@@ -9,7 +13,7 @@ from .models import (
 )
 from .nmr2d import NMR2DPreviewReport
 from .nmr_prediction import (
-    predict_nmr_from_smiles,
+    predict_nmr_from_smiles_fast,
     score_observed_2d_against_predicted_hsqc,
     score_observed_against_predicted_carbon13,
     score_observed_against_predicted_proton,
@@ -92,6 +96,54 @@ def match_candidates_with_predicted_nmr(
     *,
     observed_nmr2d: NMR2DPreviewReport | None = None,
 ) -> CandidatePredictedNMRMatchResult:
+    start = time.perf_counter()
+    if observed_nmr2d is None:
+        key = _match_request_cache_key(request)
+        before = _cached_match_candidates_with_predicted_nmr.cache_info()
+        result = _cached_match_candidates_with_predicted_nmr(key)
+        after = _cached_match_candidates_with_predicted_nmr.cache_info()
+        cache_state = "hit" if after.hits > before.hits else "miss"
+        return result.model_copy(
+            update={
+                "metadata": {
+                    **result.metadata,
+                    "match_cache": cache_state,
+                    "elapsed_ms": round((time.perf_counter() - start) * 1000, 2),
+                }
+            },
+            deep=False,
+        )
+
+    return _match_candidates_with_predicted_nmr_uncached(
+        request,
+        observed_nmr2d=observed_nmr2d,
+        started_at=start,
+    )
+
+
+def _match_request_cache_key(request: CandidatePredictedNMRMatchRequest) -> str:
+    return json.dumps(
+        request.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+@lru_cache(maxsize=256)
+def _cached_match_candidates_with_predicted_nmr(
+    request_json: str,
+) -> CandidatePredictedNMRMatchResult:
+    request = CandidatePredictedNMRMatchRequest.model_validate_json(request_json)
+    return _match_candidates_with_predicted_nmr_uncached(request, observed_nmr2d=None)
+
+
+def _match_candidates_with_predicted_nmr_uncached(
+    request: CandidatePredictedNMRMatchRequest,
+    *,
+    observed_nmr2d: NMR2DPreviewReport | None = None,
+    started_at: float | None = None,
+) -> CandidatePredictedNMRMatchResult:
+    start = time.perf_counter() if started_at is None else started_at
     evidence_layers: list[str] = []
     if request.observed_proton_text:
         evidence_layers.append("1H predicted-match")
@@ -122,7 +174,7 @@ def match_candidates_with_predicted_nmr(
 
     raw_items: list[CandidatePredictedNMRMatchItem] = []
     for candidate in request.candidates:
-        prediction = predict_nmr_from_smiles(
+        prediction = predict_nmr_from_smiles_fast(
             candidate.smiles,
             name=candidate.name,
             solvent=request.solvent,
@@ -282,6 +334,8 @@ def match_candidates_with_predicted_nmr(
             "prediction_engine": "heuristic_rdkit_region_model",
             "prediction_status": "transparent_beta",
             "candidate_limit": 25,
+            "match_cache": "miss",
+            "elapsed_ms": round((time.perf_counter() - start) * 1000, 2),
             "human_review_required": True,
         },
     )

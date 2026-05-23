@@ -42,27 +42,29 @@ import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-pars
 type RawPeak = Record<string, unknown>
 
 /**
- * Color cues for peak categories. Keep the palette small so the picked-peaks
- * table reads as a single-glance grouping.
+ * Color cues for peak categories. Each public category has its own hue so the
+ * plot legend and picked-peak table do not merge carbohydrate, heteroatom, and
+ * ambiguous assignments into the same visual bucket.
  */
 const CATEGORY_STYLE: Record<string, { color: string; bg: string }> = {
-  aromatic_alkene: { color: "var(--mt-teal)", bg: "var(--mt-teal-soft)" },
+  aromatic_alkene: { color: "#00A6A6", bg: "rgba(0, 166, 166, 0.12)" },
   // ``olefinic`` is now only assigned when the SMILES actually has olefinic
   // (non-aromatic C=C) protons — see peak_categorization._classify_anomeric_vs_olefinic.
-  olefinic: { color: "var(--mt-teal)", bg: "var(--mt-teal-soft)" },
-  aldehyde: { color: "var(--mt-amber)", bg: "rgba(231, 165, 67, 0.12)" },
-  carbonyl: { color: "var(--mt-amber)", bg: "rgba(231, 165, 67, 0.12)" },
-  carboxylic_acid: { color: "var(--mt-amber)", bg: "rgba(231, 165, 67, 0.12)" },
-  labile_OH_NH_SH: { color: "var(--mt-amber)", bg: "rgba(231, 165, 67, 0.12)" },
-  oxygenated: { color: "var(--mt-blue, #4c6fae)", bg: "rgba(76, 111, 174, 0.12)" },
-  nitrogen_adjacent: { color: "var(--mt-blue, #4c6fae)", bg: "rgba(76, 111, 174, 0.12)" },
-  anomeric: { color: "var(--mt-blue, #4c6fae)", bg: "rgba(76, 111, 174, 0.12)" },
+  olefinic: { color: "#0EA5E9", bg: "rgba(14, 165, 233, 0.12)" },
+  aldehyde: { color: "#D97706", bg: "rgba(217, 119, 6, 0.12)" },
+  carbonyl: { color: "#7C2D12", bg: "rgba(124, 45, 18, 0.12)" },
+  carboxylic_acid: { color: "#F59E0B", bg: "rgba(245, 158, 11, 0.12)" },
+  labile_OH_NH_SH: { color: "#A16207", bg: "rgba(161, 98, 7, 0.12)" },
+  oxygenated: { color: "#2563EB", bg: "rgba(37, 99, 235, 0.12)" },
+  nitrogen_adjacent: { color: "#0F766E", bg: "rgba(15, 118, 110, 0.12)" },
+  anomeric: { color: "#8B5CF6", bg: "rgba(139, 92, 246, 0.12)" },
+  carbohydrate_sugar: { color: "#16A34A", bg: "rgba(22, 163, 74, 0.12)" },
   // Distinct purple for the ambiguous bucket so reviewers know the
   // categoriser couldn't disambiguate (no SMILES, or both motifs present).
   anomeric_or_olefinic: { color: "#9333EA", bg: "rgba(147, 51, 234, 0.12)" },
-  aliphatic: { color: "var(--mt-green)", bg: "var(--mt-green-soft)" },
+  aliphatic: { color: "#65A30D", bg: "rgba(101, 163, 13, 0.12)" },
   solvent: { color: "var(--mt-muted, #888)", bg: "rgba(128, 128, 128, 0.08)" },
-  impurity: { color: "var(--mt-red, #b8474a)", bg: "rgba(184, 71, 74, 0.12)" },
+  impurity: { color: "#E84040", bg: "rgba(232, 64, 64, 0.12)" },
   unknown: { color: "var(--mt-muted, #888)", bg: "rgba(128, 128, 128, 0.08)" },
 }
 
@@ -74,10 +76,47 @@ function categoryStyle(category: string | null | undefined) {
 function humanizeCategory(category: string | null | undefined): string {
   if (!category) return "—"
   if (category === "anomeric_or_olefinic") return "Anomeric / olefinic (ambiguous)"
+  if (category === "carbohydrate_sugar") return "Carbohydrate sugar backbone"
   return category
     .replace(/_/g, " ")
     .replace("OH NH SH", "OH / NH / SH")
     .replace(/^\w/, (c) => c.toUpperCase())
+}
+
+function peakEvidenceLabel(peak: RawPeak): { label: string; title: string } | null {
+  const source = asString(peak.pick_source)
+  const integrationSource = asString(peak.integration_source)
+  const basis = asString(peak.inventory_basis)
+  const excluded = peak.inventory_exclude === true
+  const excludeReason = asString(peak.inventory_exclude_reason)
+
+  if (!source && !integrationSource && !basis && !excluded) return null
+
+  let label = "Spectrum"
+  if (source === "spectrum_and_nmr_text") {
+    label = "Spectrum + text"
+  } else if (source === "nmr_text_unconfirmed_by_picker") {
+    label = "NMR text"
+  } else if (source === "nmr_text_split_from_overlapped_spectrum_peak") {
+    label = "Text split"
+  } else if (source === "spectrum_only_unmatched_to_nmr_text") {
+    label = "Spectrum only"
+  } else if (integrationSource === "nmr_text" || basis === "nmr_text") {
+    label = "NMR text"
+  }
+
+  const details = [
+    source ? `pick source: ${source}` : null,
+    integrationSource ? `integration: ${integrationSource}` : null,
+    basis ? `inventory basis: ${basis}` : null,
+    excluded ? "excluded from proton inventory" : null,
+    excludeReason,
+  ].filter((item): item is string => Boolean(item))
+
+  return {
+    label: excluded ? `${label} · excluded` : label,
+    title: details.join("; "),
+  }
 }
 
 function asNumber(value: unknown): number | null {
@@ -111,6 +150,7 @@ function EnrichedPickedPeaksPanelImpl({
     return null
   }
   const hasEnrichment = peaks.some((p) => "category" in p)
+  const hasEvidenceSource = peaks.some((p) => peakEvidenceLabel(p) !== null)
   const visible = peaks.slice(0, 200)
   return (
     <Card
@@ -136,6 +176,9 @@ function EnrichedPickedPeaksPanelImpl({
                 <TableHead className="text-[10px] uppercase tracking-wide">Mult</TableHead>
                 <TableHead className="text-[10px] uppercase tracking-wide">∫ H</TableHead>
                 <TableHead className="text-[10px] uppercase tracking-wide">J (Hz)</TableHead>
+                {hasEvidenceSource ? (
+                  <TableHead className="text-[10px] uppercase tracking-wide">Evidence</TableHead>
+                ) : null}
                 {hasEnrichment ? (
                   <>
                     <TableHead className="text-[10px] uppercase tracking-wide">Category</TableHead>
@@ -164,6 +207,7 @@ function EnrichedPickedPeaksPanelImpl({
                 const labile = peak.labile_hint === true
                 const reason = asString(peak.category_reason)
                 const style = categoryStyle(category)
+                const evidence = peakEvidenceLabel(peak)
                 return (
                   <TableRow key={idx} data-testid="enriched-peak-row">
                     <TableCell className="font-mono text-xs">{shift !== null ? shift.toFixed(3) : "—"}</TableCell>
@@ -172,6 +216,21 @@ function EnrichedPickedPeaksPanelImpl({
                       {integration !== null ? integration.toFixed(2) : "—"}
                     </TableCell>
                     <TableCell className="font-mono text-[10px]">{j || "—"}</TableCell>
+                    {hasEvidenceSource ? (
+                      <TableCell>
+                        {evidence ? (
+                          <Badge
+                            variant="outline"
+                            className="font-mono text-[10px]"
+                            title={evidence.title || undefined}
+                          >
+                            {evidence.label}
+                          </Badge>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                    ) : null}
                     {hasEnrichment ? (
                       <>
                         <TableCell>
@@ -192,7 +251,7 @@ function EnrichedPickedPeaksPanelImpl({
                         <TableCell className="text-[11px] text-muted-foreground" title={reason ?? undefined}>
                           {region ?? "—"}
                         </TableCell>
-                        <TableCell className="text-[11px]" style={{ color: impurity ? "var(--mt-red, #b8474a)" : undefined }}>
+                        <TableCell className="text-[11px]" style={{ color: impurity ? "#E84040" : undefined }}>
                           {impurity ?? "—"}
                         </TableCell>
                       </>
@@ -296,7 +355,8 @@ const PROTON_INVENTORY_ROWS: Array<{ key: string; label: string }> = [
   // see peak_categorization.build_proton_inventory. Covers anomeric sugar
   // protons (e.g. tobramycin), olefinic CH, and the ambiguous-without-SMILES
   // case.
-  { key: "anomeric_or_olefinic", label: "Anomeric / olefinic (4.4–6 ppm)" },
+  { key: "anomeric_or_olefinic", label: "Anomeric / olefinic (structure-capped)" },
+  { key: "carbohydrate_sugar", label: "Sugar backbone (2.9–5.3 ppm)" },
   { key: "aldehyde", label: "Aldehyde (9–10 ppm)" },
   { key: "carboxylic_acid", label: "Carboxylic acid OH (10–13 ppm)" },
   { key: "aliphatic", label: "Aliphatic (incl. O/N-adjacent)" },
@@ -313,6 +373,8 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
   const observed = isRecord(inventory.observed) ? inventory.observed : {}
   const expected = isRecord(inventory.expected) ? inventory.expected : {}
   const deltas = isRecord(inventory.deltas) ? inventory.deltas : {}
+  const integrationBasis = asString(inventory.integration_basis)
+  const reconciliation = isRecord(inventory.reconciliation) ? inventory.reconciliation : null
   const warningsRaw = inventory.warnings
   const warnings = Array.isArray(warningsRaw)
     ? warningsRaw.filter((w): w is string => typeof w === "string" && w.length > 0)
@@ -337,6 +399,43 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
           <Tag className="h-3 w-3" aria-hidden />
           Proton inventory (observed vs structural expectation)
         </p>
+        {integrationBasis || reconciliation ? (
+          <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+            {integrationBasis ? (
+              <span>
+                Basis: <span className="font-mono font-bold text-foreground">{integrationBasis}</span>
+              </span>
+            ) : null}
+            {reconciliation ? (
+              <>
+                {asNumber(reconciliation.observed_total_h) !== null ? (
+                  <span>
+                    Text total:{" "}
+                    <span className="font-mono font-bold text-foreground">
+                      {(asNumber(reconciliation.observed_total_h) as number).toFixed(1)}H
+                    </span>
+                  </span>
+                ) : null}
+                {asNumber(reconciliation.adjusted_observed_total_h) !== null ? (
+                  <span>
+                    Adjusted:{" "}
+                    <span className="font-mono font-bold text-foreground">
+                      {(asNumber(reconciliation.adjusted_observed_total_h) as number).toFixed(1)}H
+                    </span>
+                  </span>
+                ) : null}
+                {asNumber(reconciliation.expected_visible_h) !== null ? (
+                  <span>
+                    Expected visible:{" "}
+                    <span className="font-mono font-bold text-foreground">
+                      {(asNumber(reconciliation.expected_visible_h) as number).toFixed(0)}H
+                    </span>
+                  </span>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        ) : null}
         <Table>
           <TableHeader>
             <TableRow>

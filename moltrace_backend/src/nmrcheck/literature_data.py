@@ -327,6 +327,40 @@ REFERENCES: Final[dict[str, dict[str, str | int | None]]] = {
         year=2024,
         url="https://mestrelab.com",
     ),
+    "alkhzem_2020_tobramycin_multinuclear_nmr": _ref(
+        title=(
+            "Individual pKa Values of Tobramycin, Kanamycin B, Amikacin, "
+            "Sisomicin, and Netilmicin Determined by Multinuclear NMR Spectroscopy"
+        ),
+        authors="Alkhzem A. H.; Woodman T. J.; Blagbrough I. S.",
+        venue="ACS Omega",
+        year=2020,
+        doi="10.1021/acsomega.0c02744",
+        url="https://pubs.acs.org/doi/10.1021/acsomega.0c02744",
+    ),
+    "fontana_widmalm_2023_glycan_nmr": _ref(
+        title="Primary Structure of Glycans by NMR Spectroscopy",
+        authors="Fontana C.; Widmalm G.",
+        venue="Chemical Reviews",
+        year=2023,
+        doi="10.1021/acs.chemrev.2c00580",
+        url="https://pubs.acs.org/doi/10.1021/acs.chemrev.2c00580",
+    ),
+    "hotor_2025_sulfated_pseudo_trisaccharides": _ref(
+        title=(
+            "Could Hydrophobicity of Sulfated Pseudo-Trisaccharides Derived "
+            "from Repurposing Aminoglycoside Tobramycin Modulate the "
+            "Enzymatic Activity of Heparanase?"
+        ),
+        authors=(
+            "Hotor M.; Wakpal J.; Effah S. Y.; Alom N.-E.; Walker A. R.; "
+            "Nguyen H. M."
+        ),
+        venue="Journal of Medicinal Chemistry",
+        year=2025,
+        doi="10.1021/acs.jmedchem.5c00611",
+        url="https://pubs.acs.org/doi/10.1021/acs.jmedchem.5c00611",
+    ),
     "nanalysis_phase_correction": _ref(
         title="NMR data processing: Phase Correction",
         authors="Nanalysis Scientific",

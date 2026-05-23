@@ -14,15 +14,6 @@ const Plot = memo(
   >,
 ) as React.ComponentType<Record<string, unknown>>
 import { Button } from "@/components/ui/button"
-import {
-  ContextMenu,
-  ContextMenuCheckboxItem,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuLabel,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import {
@@ -37,6 +28,7 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   Droplets,
   Expand,
   Eye,
@@ -93,6 +85,17 @@ export type SpectrumViewerProps = {
    * immutable and processed spectra are not touched.
    */
   rawFidAromaticBaseSmoothing?: boolean
+  /**
+   * Optional observed-trace sampling budget. Processed spectra use the compact
+   * defaults; raw FID can opt into a denser Plotly trace so fine multiplet
+   * structure is visible without zooming.
+   */
+  maxObservedPoints?: number
+  observedPointsPerPixel?: number
+  /** Initial visibility for peak category markers and their legend. */
+  defaultShowPeaks?: boolean
+  /** Initial visibility for Mnova-style vertical peak guides and ppm labels. */
+  defaultShowPeakGuides?: boolean
   className?: string
 }
 
@@ -116,10 +119,94 @@ const AROMATIC_BASE_FLOOR_NOISE_MULTIPLIER = 0.55
  * makes the hover crosshair land on the spectrum line rather than near it.
  */
 const PLOT_MARGIN = { l: 52, r: 16, t: 8, b: 44 } as const
+const CONTEXT_MENU_PADDING = 8
+const CONTEXT_MENU_ESTIMATED_WIDTH = 240
+const CONTEXT_MENU_ESTIMATED_HEIGHT = 520
+
+type PlotlyAxisLike = {
+  _offset?: number
+  _length?: number
+  p2l?: (px: number) => unknown
+  p2c?: (px: number) => unknown
+}
+
+type PlotlyGraphDivLike = {
+  _fullLayout?: {
+    xaxis?: PlotlyAxisLike
+    yaxis?: PlotlyAxisLike
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, max))
+}
+
+function spectrumContextMenuMaxHeight(): number | undefined {
+  if (typeof window === "undefined") return undefined
+  const viewport = window.visualViewport
+  const height = viewport?.height ?? window.innerHeight
+  return Math.max(160, Math.floor(height - CONTEXT_MENU_PADDING * 2))
+}
+
+function clampSpectrumContextMenuPosition(
+  x: number,
+  y: number,
+  width = CONTEXT_MENU_ESTIMATED_WIDTH,
+  height = CONTEXT_MENU_ESTIMATED_HEIGHT,
+): { x: number; y: number } {
+  if (typeof window === "undefined") return { x, y }
+  const viewport = window.visualViewport
+  const left = viewport?.offsetLeft ?? 0
+  const top = viewport?.offsetTop ?? 0
+  const viewportWidth = viewport?.width ?? window.innerWidth
+  const viewportHeight = viewport?.height ?? window.innerHeight
+  const availableWidth = Math.max(1, viewportWidth - CONTEXT_MENU_PADDING * 2)
+  const availableHeight = Math.max(1, viewportHeight - CONTEXT_MENU_PADDING * 2)
+  const clampedWidth = Math.min(width, availableWidth)
+  const clampedHeight = Math.min(height, availableHeight)
+  return {
+    x: clamp(
+      x,
+      left + CONTEXT_MENU_PADDING,
+      left + viewportWidth - CONTEXT_MENU_PADDING - clampedWidth,
+    ),
+    y: clamp(
+      y,
+      top + CONTEXT_MENU_PADDING,
+      top + viewportHeight - CONTEXT_MENU_PADDING - clampedHeight,
+    ),
+  }
+}
 
 type PlotPointerShift = {
   crosshairLeft: number
   ppm: number
+}
+
+function axisPixelBounds(
+  axis: PlotlyAxisLike | null | undefined,
+  fallbackStart: number,
+  fallbackEnd: number,
+): [number, number] {
+  const offset = axis?._offset
+  const length = axis?._length
+  if (
+    typeof offset === "number" &&
+    typeof length === "number" &&
+    Number.isFinite(offset) &&
+    Number.isFinite(length) &&
+    length > 1
+  ) {
+    return [offset, offset + length]
+  }
+  return [fallbackStart, fallbackEnd]
+}
+
+function ppmFromPlotlyAxis(axis: PlotlyAxisLike | null | undefined, pxWithinAxis: number): number | null {
+  const convert = axis?.p2l ?? axis?.p2c
+  if (typeof convert !== "function") return null
+  const ppm = Number(convert.call(axis, pxWithinAxis))
+  return Number.isFinite(ppm) ? ppm : null
 }
 
 export function chemicalShiftFromPlotPointer({
@@ -129,6 +216,7 @@ export function chemicalShiftFromPlotPointer({
   effectiveXMax,
   reversedXAxis,
   margin = PLOT_MARGIN,
+  plotlyXAxis,
 }: {
   pointerX: number
   paneWidth: number
@@ -136,9 +224,9 @@ export function chemicalShiftFromPlotPointer({
   effectiveXMax: number
   reversedXAxis: boolean
   margin?: typeof PLOT_MARGIN
+  plotlyXAxis?: PlotlyAxisLike | null
 }): PlotPointerShift | null {
-  const plotLeft = margin.l
-  const plotRight = paneWidth - margin.r
+  const [plotLeft, plotRight] = axisPixelBounds(plotlyXAxis, margin.l, paneWidth - margin.r)
   const plotWidth = plotRight - plotLeft
   const span = effectiveXMax - effectiveXMin
   if (
@@ -154,9 +242,10 @@ export function chemicalShiftFromPlotPointer({
   }
   const crosshairLeft = Math.min(Math.max(pointerX, plotLeft), plotRight)
   const frac = (crosshairLeft - plotLeft) / plotWidth
+  const plotlyPpm = ppmFromPlotlyAxis(plotlyXAxis, crosshairLeft - plotLeft)
   return {
     crosshairLeft,
-    ppm: reversedXAxis ? effectiveXMax - frac * span : effectiveXMin + frac * span,
+    ppm: plotlyPpm ?? (reversedXAxis ? effectiveXMax - frac * span : effectiveXMin + frac * span),
   }
 }
 
@@ -203,6 +292,35 @@ function robustNoiseFromResiduals(values: number[], center: number): number {
   deltas.sort((a, b) => a - b)
   const deltaNoise = deltas.length > 0 ? medianSorted(deltas) * 0.7413 : 0
   return Math.max(madNoise, deltaNoise, 1e-12)
+}
+
+/**
+ * Whole-spectrum baseline noise σ estimator, robust to peaks and dispersion
+ * artefacts. The median |Δy| between consecutive finite samples is dominated
+ * by baseline noise — peaks are a sparse minority — so it tracks the noise
+ * floor reliably across NMR uploads of any size or dynamic range.
+ *
+ * Scaled by 1/Φ⁻¹(3/4) ≈ 0.7413 so the returned value is the σ of an
+ * equivalent Gaussian noise process, matching the convention used by
+ * Mestrenova's noise-factor peak threshold (manual §8.2.1).
+ */
+function estimateBaselineNoiseSigma(values: ArrayLike<number>): number {
+  if (values.length < 4) return 0
+  const deltas: number[] = []
+  let previous: number | null = null
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i]
+    if (!Number.isFinite(value)) {
+      previous = null
+      continue
+    }
+    if (previous != null) deltas.push(Math.abs(value - previous))
+    previous = value
+  }
+  if (deltas.length === 0) return 0
+  deltas.sort((a, b) => a - b)
+  const sigma = medianSorted(deltas) * 0.7413
+  return Number.isFinite(sigma) && sigma > 0 ? sigma : 0
 }
 
 /**
@@ -766,13 +884,20 @@ function SpectrumViewerImpl({
   reversedXAxis = true,
   renderMode = "svg",
   rawFidAromaticBaseSmoothing = false,
+  maxObservedPoints = MAX_VIEWPORT_TRACE_POINTS,
+  observedPointsPerPixel = VIEWPORT_POINTS_PER_PIXEL,
+  defaultShowPeaks = false,
+  defaultShowPeakGuides = false,
   className,
 }: SpectrumViewerProps) {
   // Default gain01 = 0 → multiplier 1×, so the entire spectrum fits within the
   // chart's baseline y-axis on initial render and after a Full-spectrum reset.
   const [gain01, setGain01] = useState(0)
-  const [showPeaks, setShowPeaks] = useState(true)
+  const [showPeaks, setShowPeaks] = useState(defaultShowPeaks)
+  const [showPeakGuides, setShowPeakGuides] = useState(defaultShowPeakGuides)
   const [showPredicted, setShowPredicted] = useState(true)
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null)
+  const contextMenuOpen = contextMenuPosition !== null
   // Mask the dominant solvent / water peak (e.g. HDO at ~4.79 in D2O) so
   // the rest of the spectrum is visible. Auto-enabled — uses the runtime
   // detector below to decide whether a mask is actually needed.
@@ -790,6 +915,7 @@ function SpectrumViewerImpl({
   // below — never Plotly's data/layout — which is what keeps the chart stable.
   const [hoverReadout, setHoverReadout] = useState<HoverReadout | null>(null)
   const chartPaneRef = useRef<HTMLDivElement | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement | null>(null)
   const [plotPixelWidth, setPlotPixelWidth] = useState(1_200)
   const displaySourceY = useMemo(
     () => (rawFidAromaticBaseSmoothing ? smoothRawFidAromaticBaseForDisplay(x, y) : y),
@@ -879,9 +1005,22 @@ function SpectrumViewerImpl({
       }
       baselineY = filtered
     }
-    const ranges = [robustSpectrumYRange(baselineY)]
+    // Noise σ for the baseline. Passed to ``robustSpectrumYRange`` so it
+    // can clamp the visible bottom near ``-4σ`` — honest noise stays
+    // visible, but big negative dispersion lobes around saturated solvent
+    // / aromatic peaks fall below the frame instead of cutting through the
+    // baseline. Matches Mestrenova's "Only Positive" display convention
+    // (manual §8.2.2 GSD, §7.4 phase correction alternatives).
+    const baselineNoiseSigma = estimateBaselineNoiseSigma(baselineY)
+    const ranges = [
+      robustSpectrumYRange(baselineY, { noiseFloor: baselineNoiseSigma }),
+    ]
     if (showPredicted && overlays?.predicted) {
-      ranges.push(robustSpectrumYRange(overlays.predicted.y))
+      ranges.push(
+        robustSpectrumYRange(overlays.predicted.y, {
+          noiseFloor: estimateBaselineNoiseSigma(overlays.predicted.y),
+        }),
+      )
     }
     const yRange = combineSpectrumYRanges(ranges)
 
@@ -894,6 +1033,7 @@ function SpectrumViewerImpl({
   }, [x, displaySourceY, overlays, showPredicted, maskDominantPeak, dominantPeakRange])
 
   const [xRange, setXRange] = useState<[number, number] | null>(null)
+  const plotDivRef = useRef<PlotlyGraphDivLike | null>(null)
   const dragPanRef = useRef<{
     pointerId: number
     startClientX: number
@@ -920,13 +1060,28 @@ function SpectrumViewerImpl({
   // axis relayout over a fixed trace and the line stops shimmering. The precise
   // viewport-density resample is restored the instant the drag ends.
   const sampleXRange = isPanning ? null : visibleXRange
+  const normalizedMaxObservedPoints = useMemo(
+    () =>
+      Math.max(
+        MIN_VIEWPORT_TRACE_POINTS,
+        Math.min(24_000, Math.round(maxObservedPoints)),
+      ),
+    [maxObservedPoints],
+  )
+  const normalizedObservedPointsPerPixel = useMemo(
+    () => Math.max(1, Math.min(24, observedPointsPerPixel)),
+    [observedPointsPerPixel],
+  )
   const observedPointBudget = useMemo(
     () =>
       Math.max(
         MIN_VIEWPORT_TRACE_POINTS,
-        Math.min(MAX_VIEWPORT_TRACE_POINTS, Math.round(plotPixelWidth * VIEWPORT_POINTS_PER_PIXEL)),
+        Math.min(
+          normalizedMaxObservedPoints,
+          Math.round(plotPixelWidth * normalizedObservedPointsPerPixel),
+        ),
       ),
-    [plotPixelWidth],
+    [plotPixelWidth, normalizedMaxObservedPoints, normalizedObservedPointsPerPixel],
   )
   const overlayPointBudget = useMemo(
     () =>
@@ -966,36 +1121,99 @@ function SpectrumViewerImpl({
   const predictedLabel = overlays?.predicted?.label ?? "Predicted"
   const peakDisplayPoints = useMemo(
     () =>
-      showPeaks
-        ? peaks.map((p) => ({
-            ppm: p.ppm,
-            y:
-              p.intensity != null
-                ? scaleDisplayYValue(p.intensity, displayScale)
-                : scaleDisplayYValue(nearestYAtPpm(x, displaySourceY, p.ppm), displayScale),
-            label: p.label ?? "",
-            category: p.category ?? "unknown",
-          }))
-        : [],
-    [showPeaks, peaks, displayScale, x, displaySourceY],
+      peaks.map((p) => ({
+        ppm: p.ppm,
+        y:
+          p.intensity != null
+            ? scaleDisplayYValue(p.intensity, displayScale)
+            : scaleDisplayYValue(nearestYAtPpm(x, displaySourceY, p.ppm), displayScale),
+        label: p.label ?? "",
+        category: p.category ?? "unknown",
+      })),
+    [peaks, displayScale, x, displaySourceY],
   )
   const peakGuideShapes = useMemo(
     () =>
-      peakDisplayPoints
-        .filter((p) => Number.isFinite(p.ppm) && Number.isFinite(p.y))
-        .map((p) => ({
-          type: "line",
-          xref: "x",
-          yref: "y",
-          x0: p.ppm,
-          x1: p.ppm,
-          y0: 0,
-          y1: p.y,
-          line: { width: 1, color: "rgba(120, 120, 120, 0.45)" },
-          layer: "below",
-        })),
-    [peakDisplayPoints],
+      showPeakGuides
+        ? peakDisplayPoints
+            .filter((p) => Number.isFinite(p.ppm) && Number.isFinite(p.y))
+            .map((p) => ({
+              type: "line",
+              xref: "x",
+              yref: "y",
+              x0: p.ppm,
+              x1: p.ppm,
+              y0: 0,
+              y1: p.y,
+              line: { width: 1, color: "rgba(120, 120, 120, 0.45)" },
+              layer: "below",
+            }))
+        : [],
+    [peakDisplayPoints, showPeakGuides],
   )
+
+  /**
+   * Mestrenova-style apex ticks + rotated ppm labels.
+   *
+   * Mestrenova draws a thin vertical "stick" above each picked peak's apex
+   * and writes the chemical shift rotated 90° at the top (manual §8.2 figures,
+   * pp. 202, 252). Even when several lines of a multiplet visually merge into
+   * a single envelope at the chart's zoom level (a "blob"), the row of apex
+   * ticks above the trace makes the underlying line count — and therefore
+   * the multiplicity — immediately obvious to the eye.
+   *
+   * The tick endpoints share a common ``labelRowY`` near the top of the
+   * frame so the labels align in a horizontal row. ``apexClampY`` cannot
+   * exceed ``labelRowY``: if a peak apex would extend above the row (e.g.
+   * a clipped residual solvent spike), the tick collapses to zero length
+   * and the label sits next to the apex instead.
+   */
+  const peakApexLabelLayout = useMemo(() => {
+    if (!showPeakGuides || peakDisplayPoints.length === 0) {
+      return { shapes: [] as object[], annotations: [] as object[] }
+    }
+    if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMax <= yMin) {
+      return { shapes: [] as object[], annotations: [] as object[] }
+    }
+    const span = yMax - yMin
+    // Label row at ~92% of the visible height; ticks are short enough that
+    // ppm labels never collide with the chart's title or top frame.
+    const labelRowY = yMin + span * 0.92
+    const shapes: object[] = []
+    const annotations: object[] = []
+    for (const peak of peakDisplayPoints) {
+      if (!Number.isFinite(peak.ppm) || !Number.isFinite(peak.y)) continue
+      const color =
+        peak.category === "unknown"
+          ? PEAK_CATEGORY_DEFAULT_COLOR
+          : plotColorForCategory(peak.category)
+      const apexClampY = Math.min(peak.y, labelRowY)
+      shapes.push({
+        type: "line",
+        xref: "x",
+        yref: "y",
+        x0: peak.ppm,
+        x1: peak.ppm,
+        y0: apexClampY,
+        y1: labelRowY,
+        line: { width: 1.1, color },
+        layer: "above",
+      })
+      annotations.push({
+        xref: "x",
+        yref: "y",
+        x: peak.ppm,
+        y: labelRowY,
+        text: peak.ppm.toFixed(2),
+        textangle: -90,
+        showarrow: false,
+        xanchor: "center",
+        yanchor: "bottom",
+        font: { size: 10, color },
+      })
+    }
+    return { shapes, annotations }
+  }, [peakDisplayPoints, showPeakGuides, yMin, yMax])
 
   /**
    * Plotly data traces. Three potential layers:
@@ -1049,7 +1267,7 @@ function SpectrumViewerImpl({
         connectgaps: false,
       })
     }
-    if (peakDisplayPoints.length > 0) {
+    if (showPeaks && peakDisplayPoints.length > 0) {
       // Group peaks by category so each category renders as its own colored
       // scatter trace — gives the user a one-glance grouping (aromatic vs
       // aliphatic vs labile) AND a working legend they can toggle.
@@ -1076,15 +1294,20 @@ function SpectrumViewerImpl({
             : plotColorForCategory(cat)
         traces.push({
           type: "scatter",
-          mode: "markers+text",
+          // ``markers`` only: the per-peak ppm labels live in layout
+          // annotations (Mnova-style rotated stick labels, see
+          // ``peakApexLabelLayout`` above) so they survive Plotly's
+          // marker-overlap collision avoidance and align in a horizontal
+          // row across the top of the frame. The full multiplicity label
+          // (e.g. "7.46 (s, 3H)") still appears in the hover tooltip via
+          // ``hovertext``.
+          mode: "markers",
           x: bucket.px,
           y: bucket.py,
-          text: bucket.labels,
-          textposition: "top center",
+          hovertext: bucket.labels,
           name: humanizePeakCategory(cat),
           marker: { size: 7, color, line: { width: 0.5, color: "#fff" } },
-          textfont: { size: 10, color },
-          hovertemplate: "δ %{x:.3f} ppm<br>I = %{y:.2e}<br>%{text}<extra></extra>",
+          hovertemplate: "δ %{x:.3f} ppm<br>I = %{y:.2e}<br>%{hovertext}<extra></extra>",
         })
       }
     }
@@ -1097,6 +1320,7 @@ function SpectrumViewerImpl({
     predictedLabel,
     peakDisplayPoints,
     renderMode,
+    showPeaks,
     showPredicted,
   ])
 
@@ -1163,7 +1387,14 @@ function SpectrumViewerImpl({
       // detector, which on dense traces (>10 k points) re-painted the
       // overlay each frame. That was the visible flicker.
       hovermode: false,
-      shapes: peakGuideShapes,
+      // Layout shapes = (a) drop-line guides from baseline up to each apex
+      // and (b) Mnova-style apex ticks from each apex up to the common
+      // label row near the top of the frame. The drop-line gives the eye a
+      // direct mapping from peak → ppm axis; the apex tick + rotated label
+      // makes the multiplicity readable at any zoom level (manual §8.2,
+      // pp. 202, 252).
+      shapes: [...peakGuideShapes, ...peakApexLabelLayout.shapes],
+      annotations: peakApexLabelLayout.annotations,
       transition: { duration: 0 },
       uirevision: "spectrum",
     }),
@@ -1179,14 +1410,20 @@ function SpectrumViewerImpl({
       hasPredictedOverlay,
       hasPeakMarkers,
       peakGuideShapes,
+      peakApexLabelLayout,
     ],
   )
+
+  const rememberPlotlyGraphDiv = useCallback((_figure: unknown, graphDiv: unknown) => {
+    plotDivRef.current = (graphDiv as PlotlyGraphDivLike | null) ?? null
+  }, [])
 
   /**
    * Full reset — restores every interactive setting to its first-preview state:
    *   • xRange   → null (Plotly autorange shows the full data span)
    *   • yZoom    → 1× (no peak height bumping)
    *   • gain01   → 0 (multiplier 1×; whole spectrum fits inside the y-axis)
+   *   • peak overlays/guides → initial defaults for this viewer
    * Both "Reset zoom" and "Full spectrum" route through this so they always
    * restore the exact view the user saw on first preview.
    */
@@ -1194,7 +1431,9 @@ function SpectrumViewerImpl({
     setXRange(null)
     setYZoom(1)
     setGain01(0)
-  }, [])
+    setShowPeaks(defaultShowPeaks)
+    setShowPeakGuides(defaultShowPeakGuides)
+  }, [defaultShowPeakGuides, defaultShowPeaks])
 
   const resetZoom = resetAll
   const fullSpectrum = resetAll
@@ -1312,15 +1551,27 @@ function SpectrumViewerImpl({
     py: number
   } | null>(null)
 
+  const clearHoverReadout = useCallback(() => {
+    hoverPointerRef.current = null
+    if (hoverRafRef.current) {
+      window.cancelAnimationFrame(hoverRafRef.current)
+      hoverRafRef.current = 0
+    }
+    setHoverReadout((current) => (current ? null : current))
+  }, [])
+
   const recomputeHover = useCallback(() => {
     hoverRafRef.current = 0
+    if (contextMenuOpen) {
+      clearHoverReadout()
+      return
+    }
     const pointer = hoverPointerRef.current
     if (!pointer) return
     const { width, height, px, py } = pointer
-    const plotLeft = PLOT_MARGIN.l
-    const plotRight = width - PLOT_MARGIN.r
-    const plotTop = PLOT_MARGIN.t
-    const plotBottom = height - PLOT_MARGIN.b
+    const fullLayout = plotDivRef.current?._fullLayout
+    const [plotLeft, plotRight] = axisPixelBounds(fullLayout?.xaxis, PLOT_MARGIN.l, width - PLOT_MARGIN.r)
+    const [plotTop, plotBottom] = axisPixelBounds(fullLayout?.yaxis, PLOT_MARGIN.t, height - PLOT_MARGIN.b)
     if (
       plotRight - plotLeft <= 1 ||
       plotBottom - plotTop <= 1 ||
@@ -1340,6 +1591,7 @@ function SpectrumViewerImpl({
       effectiveXMin,
       effectiveXMax,
       reversedXAxis,
+      plotlyXAxis: fullLayout?.xaxis,
     })
     if (!shift) {
       setHoverReadout((current) => (current ? null : current))
@@ -1367,19 +1619,21 @@ function SpectrumViewerImpl({
     reversedXAxis,
     maskDominantPeak,
     dominantPeakRange,
+    contextMenuOpen,
+    clearHoverReadout,
   ])
 
   const handleChartPointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       moveDrag(e)
+      if (contextMenuOpen) {
+        clearHoverReadout()
+        return
+      }
       // While actively panning, hide the readout — the crosshair would fight
       // the drag and the values are sliding under the cursor anyway.
       if (dragPanRef.current) {
-        if (hoverRafRef.current) {
-          window.cancelAnimationFrame(hoverRafRef.current)
-          hoverRafRef.current = 0
-        }
-        setHoverReadout((current) => (current ? null : current))
+        clearHoverReadout()
         return
       }
       const rect = e.currentTarget.getBoundingClientRect()
@@ -1394,17 +1648,61 @@ function SpectrumViewerImpl({
         hoverRafRef.current = window.requestAnimationFrame(recomputeHover)
       }
     },
-    [moveDrag, recomputeHover],
+    [moveDrag, contextMenuOpen, clearHoverReadout, recomputeHover],
   )
 
   const handleChartPointerLeave = useCallback(() => {
-    hoverPointerRef.current = null
-    if (hoverRafRef.current) {
-      window.cancelAnimationFrame(hoverRafRef.current)
-      hoverRafRef.current = 0
-    }
-    setHoverReadout((current) => (current ? null : current))
+    clearHoverReadout()
+  }, [clearHoverReadout])
+
+  const openSpectrumContextMenu = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      clearHoverReadout()
+      setContextMenuPosition(clampSpectrumContextMenuPosition(event.clientX, event.clientY))
+    },
+    [clearHoverReadout],
+  )
+
+  const closeSpectrumContextMenu = useCallback(() => {
+    setContextMenuPosition(null)
   }, [])
+
+  useEffect(() => {
+    if (!contextMenuOpen) return
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (target instanceof Node && contextMenuRef.current?.contains(target)) return
+      closeSpectrumContextMenu()
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSpectrumContextMenu()
+    }
+    document.addEventListener("pointerdown", handlePointerDown, true)
+    document.addEventListener("keydown", handleKeyDown, true)
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true)
+      document.removeEventListener("keydown", handleKeyDown, true)
+    }
+  }, [closeSpectrumContextMenu, contextMenuOpen])
+
+  useEffect(() => {
+    if (!contextMenuOpen || !contextMenuPosition || !contextMenuRef.current) return
+    const rect = contextMenuRef.current.getBoundingClientRect()
+    const next = clampSpectrumContextMenuPosition(
+      contextMenuPosition.x,
+      contextMenuPosition.y,
+      rect.width,
+      rect.height,
+    )
+    if (
+      Math.abs(next.x - contextMenuPosition.x) > 0.5 ||
+      Math.abs(next.y - contextMenuPosition.y) > 0.5
+    ) {
+      setContextMenuPosition(next)
+    }
+  }, [contextMenuOpen, contextMenuPosition])
 
   useEffect(
     () => () => {
@@ -1493,13 +1791,10 @@ function SpectrumViewerImpl({
         )}
       >
         {/*
-          Chart pane — fills the available container height. Wrapped in a
-          ContextMenu so a right-click anywhere on the spectrum opens the
-          manipulation menu. ``asChild`` keeps the pane a direct flex child
-          of the container, so its ``flex-1`` height is unchanged.
+          Chart pane — fills the available container height. The context menu
+          is opened from capture phase so Plotly's internal layers cannot
+          swallow the right-click before SpectrumViewer sees it.
         */}
-        <ContextMenu>
-        <ContextMenuTrigger asChild>
         <div
           ref={chartPaneRef}
           className={cn(
@@ -1507,6 +1802,7 @@ function SpectrumViewerImpl({
             moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair",
           )}
           data-testid="spectrum-move-pane"
+          onContextMenuCapture={openSpectrumContextMenu}
           onPointerDown={startMoveDrag}
           onPointerMove={handleChartPointerMove}
           onPointerUp={endMoveDrag}
@@ -1542,6 +1838,8 @@ function SpectrumViewerImpl({
             }}
             style={{ width: "100%", height: "100%" }}
             useResizeHandler
+            onInitialized={rememberPlotlyGraphDiv}
+            onUpdate={rememberPlotlyGraphDiv}
           />
 
           {/*
@@ -1583,66 +1881,159 @@ function SpectrumViewerImpl({
             </div>
           ) : null}
         </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-60">
-          <ContextMenuLabel>Spectrum</ContextMenuLabel>
-          <ContextMenuItem onSelect={() => zoom("in")}>Zoom in</ContextMenuItem>
-          <ContextMenuItem onSelect={() => zoom("out")}>Zoom out</ContextMenuItem>
-          <ContextMenuItem onSelect={fullSpectrum}>Full spectrum</ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => pan("left")}>Pan left</ContextMenuItem>
-          <ContextMenuItem onSelect={() => pan("right")}>Pan right</ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            onSelect={(event) => {
-              // Keep the menu open so peak height can be nudged repeatedly.
+        {contextMenuPosition ? (
+          <div
+            ref={contextMenuRef}
+            role="menu"
+            aria-label="Spectrum"
+            className="fixed z-50 w-60 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            style={{
+              left: contextMenuPosition.x,
+              top: contextMenuPosition.y,
+              maxHeight: spectrumContextMenuMaxHeight(),
+            }}
+            onContextMenu={(event) => {
               event.preventDefault()
-              bumpPeakHeight(1)
+              event.stopPropagation()
             }}
           >
-            Taller peaks
-          </ContextMenuItem>
-          <ContextMenuItem
-            onSelect={(event) => {
-              event.preventDefault()
-              bumpPeakHeight(-1)
-            }}
-          >
-            Shorter peaks
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuCheckboxItem
-            checked={showPeaks}
-            onCheckedChange={(value) => setShowPeaks(value === true)}
-          >
-            Peak labels
-          </ContextMenuCheckboxItem>
-          {overlays?.predicted ? (
-            <ContextMenuCheckboxItem
-              checked={showPredicted}
-              onCheckedChange={(value) => setShowPredicted(value === true)}
+            <div className="px-2 py-1.5 text-sm font-medium text-foreground">Spectrum</div>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => zoom("in")}
             >
-              Predicted overlay
-            </ContextMenuCheckboxItem>
-          ) : null}
-          {dominantPeakRange ? (
-            <ContextMenuCheckboxItem
-              checked={maskDominantPeak}
-              onCheckedChange={(value) => setMaskDominantPeak(value === true)}
+              Zoom in
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => zoom("out")}
             >
-              Mask solvent peak
-            </ContextMenuCheckboxItem>
-          ) : null}
-          <ContextMenuCheckboxItem
-            checked={expanded}
-            onCheckedChange={(value) => setExpanded(value === true)}
-          >
-            Expanded view
-          </ContextMenuCheckboxItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={resetZoom}>Reset axes</ContextMenuItem>
-        </ContextMenuContent>
-        </ContextMenu>
+              Zoom out
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={fullSpectrum}
+            >
+              Full spectrum
+            </button>
+            <div className="-mx-1 my-1 h-px bg-border" />
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => pan("left")}
+            >
+              Pan left
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => pan("right")}
+            >
+              Pan right
+            </button>
+            <div className="-mx-1 my-1 h-px bg-border" />
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => bumpPeakHeight(1)}
+            >
+              Taller peaks
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => bumpPeakHeight(-1)}
+            >
+              Shorter peaks
+            </button>
+            <div className="-mx-1 my-1 h-px bg-border" />
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={showPeaks}
+              className="flex w-full items-center gap-2 rounded-sm py-1.5 pr-2 pl-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => setShowPeaks((value) => !value)}
+            >
+              <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
+                {showPeaks ? <Check className="size-4" /> : null}
+              </span>
+              Peak markers and legend
+            </button>
+            {peaks.length > 0 ? (
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={showPeakGuides}
+                className="flex w-full items-center gap-2 rounded-sm py-1.5 pr-2 pl-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                onClick={() => setShowPeakGuides((value) => !value)}
+              >
+                <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
+                  {showPeakGuides ? <Check className="size-4" /> : null}
+                </span>
+                Vertical peak guides
+              </button>
+            ) : null}
+            {overlays?.predicted ? (
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={showPredicted}
+                className="flex w-full items-center gap-2 rounded-sm py-1.5 pr-2 pl-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                onClick={() => setShowPredicted((value) => !value)}
+              >
+                <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
+                  {showPredicted ? <Check className="size-4" /> : null}
+                </span>
+                Predicted overlay
+              </button>
+            ) : null}
+            {dominantPeakRange ? (
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={maskDominantPeak}
+                className="flex w-full items-center gap-2 rounded-sm py-1.5 pr-2 pl-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                onClick={() => setMaskDominantPeak((value) => !value)}
+              >
+                <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
+                  {maskDominantPeak ? <Check className="size-4" /> : null}
+                </span>
+                Mask solvent peak
+              </button>
+            ) : null}
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={expanded}
+              className="flex w-full items-center gap-2 rounded-sm py-1.5 pr-2 pl-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => setExpanded((value) => !value)}
+            >
+              <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
+                {expanded ? <Check className="size-4" /> : null}
+              </span>
+              Expanded view
+            </button>
+            <div className="-mx-1 my-1 h-px bg-border" />
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={resetZoom}
+            >
+              Reset axes
+            </button>
+          </div>
+        ) : null}
 
         {/*
           Bottom controls bar — replaces the previous floating draggable
@@ -1773,7 +2164,8 @@ function SpectrumViewerImpl({
                 size="icon"
                 className="h-7 w-7"
                 onClick={() => setShowPeaks((v) => !v)}
-                title={showPeaks ? "Hide peak labels" : "Show peak labels"}
+                title={showPeaks ? "Hide peak markers and legend" : "Show peak markers and legend"}
+                aria-pressed={showPeaks}
               >
                 {showPeaks ? (
                   <Eye className="h-3.5 w-3.5" aria-hidden />
@@ -1781,7 +2173,7 @@ function SpectrumViewerImpl({
                   <EyeOff className="h-3.5 w-3.5" aria-hidden />
                 )}
                 <span className="sr-only">
-                  {showPeaks ? "Hide" : "Show"} peak labels
+                  {showPeaks ? "Hide" : "Show"} peak markers and legend
                 </span>
               </Button>
               {overlays?.predicted ? (

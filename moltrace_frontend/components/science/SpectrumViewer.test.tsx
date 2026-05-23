@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { render } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 import {
   SpectrumViewer,
@@ -23,11 +23,13 @@ type CapturedPlotProps = {
     y?: unknown[]
     line?: { color?: string }
     marker?: { color?: string }
+    hovertext?: unknown[]
     showlegend?: boolean
     connectgaps?: boolean
   }>
   layout?: {
     uirevision?: unknown
+    showlegend?: boolean
     shapes?: Array<{
       type?: string
       x0?: number
@@ -35,6 +37,15 @@ type CapturedPlotProps = {
       y0?: number
       y1?: number
       layer?: string
+      line?: { color?: string; width?: number }
+    }>
+    annotations?: Array<{
+      x?: number
+      y?: number
+      text?: string
+      textangle?: number
+      showarrow?: boolean
+      font?: { color?: string; size?: number }
     }>
     yaxis?: {
       range?: number[]
@@ -64,6 +75,10 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     y: [0.1, 0.2, 0.05],
     nucleus: "1H" as const,
   }
+  const visiblePeakOverlayDefaults = {
+    defaultShowPeaks: true,
+    defaultShowPeakGuides: true,
+  }
 
   it("emits no peak traces when peaks=[]", () => {
     freshRender(<SpectrumViewer {...baseProps} />)
@@ -72,6 +87,8 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     expect(traces).toHaveLength(1)
     expect(traces[0].name).toMatch(/Observed/)
     expect(capturedPlotProps?.layout?.shapes).toHaveLength(0)
+    // No peaks → no Mnova-style apex tick annotations either.
+    expect(capturedPlotProps?.layout?.annotations ?? []).toHaveLength(0)
   })
 
   it("keeps lower y-axis headroom so the baseline is not clipped at zero", () => {
@@ -97,6 +114,31 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     expect(traces[0].connectgaps).toBe(false)
   })
 
+  it("lets raw FID opt into a denser display budget for resolved multiplets", () => {
+    const x = Array.from({ length: 5000 }, (_unused, index) => 10 - index * 0.001)
+    const y = Array.from({ length: 5000 }, (_unused, index) =>
+      index % 127 === 0 ? 10 : Math.sin(index * 0.2) * 0.01,
+    )
+
+    freshRender(<SpectrumViewer x={x} y={y} />)
+    expect(capturedPlotProps?.data?.[0]?.name).toMatch(/\[R\]/)
+
+    freshRender(
+      <SpectrumViewer
+        x={x}
+        y={y}
+        renderMode="webgl"
+        maxObservedPoints={12_000}
+        observedPointsPerPixel={24}
+      />,
+    )
+
+    const trace = capturedPlotProps?.data?.[0]
+    expect(trace?.type).toBe("scattergl")
+    expect(trace?.name).toBe("Observed")
+    expect(trace?.x).toHaveLength(5000)
+  })
+
   it("keeps negative baseline excursions inside the initial y-axis range", () => {
     freshRender(<SpectrumViewer x={[4, 3, 2, 1]} y={[-0.2, 0.1, 1, -0.1]} />)
 
@@ -105,10 +147,33 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     expect(yRange?.[1]).toBeGreaterThan(1)
   })
 
+  it("clips pathological negative dispersion lobes below the visible frame (Mnova-style)", () => {
+    // Synthetic baseline noise on [-0.05, +0.05] plus a single deep
+    // dispersion lobe at index 4 — the kind of artefact that haunts the
+    // solvent/aromatic windows when a Bruker FID is processed without
+    // careful phase correction. Mestrenova clips such lobes below the
+    // frame (manual §8.2.2: "Peaks Type: Only Positive") so the displayed
+    // baseline stays flat instead of being punched through.
+    const xs = Array.from({ length: 200 }, (_, i) => 10 - i * 0.05)
+    const ys = Array.from({ length: 200 }, (_, i) =>
+      i === 4 ? -8 : ((i * 9301 + 49297) % 233 - 116) / 2000,
+    )
+    freshRender(<SpectrumViewer x={xs} y={ys} />)
+    const yRange = capturedPlotProps?.layout?.yaxis?.range ?? [0, 0]
+    // The frame's bottom must be far above the -8 artefact — otherwise
+    // the dispersion lobe would extend down into the visible chart and
+    // protrude through the baseline.
+    expect(yRange[0]).toBeGreaterThan(-1)
+    // …but the honest baseline noise (~±0.05) must still be inside the
+    // visible frame, not clipped at zero like Magnitude mode would do.
+    expect(yRange[0]).toBeLessThan(0)
+  })
+
   it("adds shape guide-lines and one marker trace per category when peaks are supplied", () => {
     freshRender(
       <SpectrumViewer
         {...baseProps}
+        {...visiblePeakOverlayDefaults}
         peaks={[
           { ppm: 7.26, intensity: 1.0, label: "Ar-H", category: "aromatic_alkene" },
           { ppm: 3.65, intensity: 0.8, label: "CH2-O", category: "oxygenated" },
@@ -126,13 +191,18 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     expect(names).toContain("Aromatic alkene")
     expect(names).toContain("Oxygenated")
     expect(names).toContain("Aliphatic")
-    expect(capturedPlotProps?.layout?.shapes).toHaveLength(4)
+    // Layout shapes per peak = drop-line (below the apex) + apex tick
+    // (above the apex, up to the common label row). 4 peaks → 8 shapes.
+    expect(capturedPlotProps?.layout?.shapes).toHaveLength(8)
+    // One rotated ppm annotation per peak (Mestrenova-style stick label).
+    expect(capturedPlotProps?.layout?.annotations).toHaveLength(4)
   })
 
-  it("draws peak guide-lines as layout shapes from y=0 to each peak intensity", () => {
+  it("draws drop-line guides from y=0 to each peak apex (Mnova-style under-the-trace cue)", () => {
     freshRender(
       <SpectrumViewer
         {...baseProps}
+        {...visiblePeakOverlayDefaults}
         peaks={[
           { ppm: 7.26, intensity: 1.0, category: "aromatic_alkene" },
           { ppm: 1.26, intensity: 0.6, category: "aliphatic" },
@@ -140,7 +210,9 @@ describe("SpectrumViewer — picked-peak rendering", () => {
       />,
     )
     const shapes = capturedPlotProps?.layout?.shapes ?? []
-    expect(shapes).toHaveLength(2)
+    // 2 drop-lines + 2 apex ticks = 4 total shapes.
+    expect(shapes).toHaveLength(4)
+    // The first two shapes are the drop-lines from baseline up to each apex.
     expect(shapes[0]).toMatchObject({
       type: "line",
       x0: 7.26,
@@ -159,10 +231,119 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     })
   })
 
+  it("defaults peak markers/legend and vertical peak guide lines off, then exposes both in the right-click menu", async () => {
+    const { getByTestId, queryByRole } = freshRender(
+      <SpectrumViewer
+        {...baseProps}
+        peaks={[
+          { ppm: 7.26, intensity: 1.0, category: "aromatic_alkene" },
+          { ppm: 1.26, intensity: 0.6, category: "aliphatic" },
+        ]}
+      />,
+    )
+
+    expect(capturedPlotProps?.layout?.shapes).toHaveLength(0)
+    expect(capturedPlotProps?.layout?.annotations).toHaveLength(0)
+    expect(capturedPlotProps?.layout?.showlegend).toBe(false)
+    expect(capturedPlotProps?.data?.map((trace) => trace.name)).toEqual(["Observed"])
+    expect(queryByRole("switch", { name: /vertical peak guide lines/i })).toBeNull()
+
+    fireEvent.contextMenu(getByTestId("plotly-mock"))
+    const guidesItem = await screen.findByRole("menuitemcheckbox", { name: /vertical peak guides/i })
+    expect(guidesItem).toHaveAttribute("aria-checked", "false")
+    fireEvent.click(guidesItem)
+
+    await waitFor(() => {
+      expect(capturedPlotProps?.layout?.shapes).toHaveLength(4)
+      expect(capturedPlotProps?.layout?.annotations).toHaveLength(2)
+    })
+    expect(screen.getByRole("menu", { name: /spectrum/i })).toBeInTheDocument()
+    expect(screen.getByRole("menuitemcheckbox", { name: /vertical peak guides/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /peak markers and legend/i }))
+
+    const traces = capturedPlotProps?.data ?? []
+    expect(capturedPlotProps?.layout?.showlegend).toBe(true)
+    expect(traces.map((trace) => trace.name)).toEqual([
+      "Observed",
+      "Aliphatic",
+      "Aromatic alkene",
+    ])
+  })
+
+  it("keeps the right-click spectrum menu inside the viewport", async () => {
+    const originalWidth = window.innerWidth
+    const originalHeight = window.innerHeight
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 260 })
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 220 })
+
+    const { getByTestId } = freshRender(
+      <SpectrumViewer
+        {...baseProps}
+        peaks={[
+          { ppm: 7.26, intensity: 1.0, category: "aromatic_alkene" },
+          { ppm: 1.26, intensity: 0.6, category: "aliphatic" },
+        ]}
+      />,
+    )
+
+    fireEvent.contextMenu(getByTestId("plotly-mock"), { clientX: 259, clientY: 219 })
+
+    const menu = await screen.findByRole("menu", { name: /spectrum/i })
+    expect(menu).toHaveStyle({ left: "12px", top: "8px", maxHeight: "204px" })
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth })
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight })
+  })
+
+  it("renders Mnova-style apex ticks + rotated ppm labels for each picked peak", () => {
+    // Spectrum y range must encompass both peak apices so the apex ticks
+    // have meaningful length up to the common label row — mimics a real
+    // 1H spectrum where peaks sit comfortably below the chart's top edge.
+    const xs = [10, 7.26, 5, 1.26, 0]
+    const ys = [0.0, 1.0, 0.05, 0.6, 0.0]
+    freshRender(
+      <SpectrumViewer
+        x={xs}
+        y={ys}
+        nucleus="1H"
+        {...visiblePeakOverlayDefaults}
+        peaks={[
+          { ppm: 7.26, intensity: 1.0, category: "aromatic_alkene" },
+          { ppm: 1.26, intensity: 0.6, category: "aliphatic" },
+        ]}
+      />,
+    )
+    const shapes = capturedPlotProps?.layout?.shapes ?? []
+    // Apex ticks sit at indices [2, 3] (after the two drop-lines).
+    const tickA = shapes[2]
+    const tickB = shapes[3]
+    // Both ticks share the same upper y (the common label row).
+    expect(tickA?.x0).toBe(7.26)
+    expect(tickB?.x0).toBe(1.26)
+    expect(tickA?.y1).toBe(tickB?.y1)
+    // Each tick starts at its peak apex and rises up to the label row.
+    expect(tickA?.y0).toBe(1.0)
+    expect(tickB?.y0).toBe(0.6)
+    expect(tickA?.y1).toBeGreaterThan(1.0)
+    // Annotations carry the rotated ppm labels, two-decimal format.
+    const annotations = capturedPlotProps?.layout?.annotations ?? []
+    expect(annotations).toHaveLength(2)
+    const annA = annotations.find((a) => a.x === 7.26)
+    const annB = annotations.find((a) => a.x === 1.26)
+    expect(annA?.text).toBe("7.26")
+    expect(annB?.text).toBe("1.26")
+    // Mnova writes the stick label rotated 90° (vertical).
+    expect(annA?.textangle).toBe(-90)
+    expect(annB?.textangle).toBe(-90)
+    expect(annA?.showarrow).toBe(false)
+  })
+
   it("uses the per-category palette for marker colors", () => {
     freshRender(
       <SpectrumViewer
         {...baseProps}
+        {...visiblePeakOverlayDefaults}
         peaks={[
           { ppm: 7.26, intensity: 1.0, category: "aromatic_alkene" },
           { ppm: 11.5, intensity: 0.1, category: "labile_OH_NH_SH" },
@@ -174,15 +355,16 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     const aromatic = traces.find((t) => t.name === "Aromatic alkene")
     const labile = traces.find((t) => t.name === "Labile OH / NH / SH")
     const aliphatic = traces.find((t) => t.name === "Aliphatic")
-    expect(aromatic?.marker?.color).toBe("#00B884") // teal
-    expect(labile?.marker?.color).toBe("#E8A030") // amber
-    expect(aliphatic?.marker?.color).toBe("#22C55E") // green
+    expect(aromatic?.marker?.color).toBe("#00A6A6")
+    expect(labile?.marker?.color).toBe("#A16207")
+    expect(aliphatic?.marker?.color).toBe("#65A30D")
   })
 
   it("falls back to the default color when a peak has no category", () => {
     freshRender(
       <SpectrumViewer
         {...baseProps}
+        {...visiblePeakOverlayDefaults}
         peaks={[{ ppm: 3.65, intensity: 1.0 }]}
       />,
     )
@@ -197,6 +379,7 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     freshRender(
       <SpectrumViewer
         {...baseProps}
+        {...visiblePeakOverlayDefaults}
         peaks={[
           { ppm: 1.26, intensity: 0.6, category: "aliphatic" },
           { ppm: 7.26, intensity: 1.0, category: "aromatic_alkene" },
@@ -207,8 +390,11 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     const traces = capturedPlotProps?.data ?? []
     // Filter to just the marker traces (skip the observed line) and
     // check their order is alphabetical: Aliphatic < Aromatic alkene < Labile.
+    // The per-peak labels now live in layout annotations (Mnova-style
+    // rotated stick labels), so the marker traces themselves are pure
+    // ``markers`` rather than ``markers+text``.
     const markerNames = traces
-      .filter((t) => t.mode === "markers+text")
+      .filter((t) => t.mode === "markers")
       .map((t) => t.name)
     expect(markerNames).toEqual(["Aliphatic", "Aromatic alkene", "Labile OH / NH / SH"])
   })
@@ -261,6 +447,25 @@ describe("SpectrumViewer — hover chemical shift mapping", () => {
 
     expect(left?.ppm).toBeCloseTo(0)
     expect(right?.ppm).toBeCloseTo(10)
+  })
+
+  it("uses Plotly's rendered x-axis converter when available", () => {
+    const plotlyXAxis = {
+      _offset: 80,
+      _length: 800,
+      p2l: (px: number) => 10 - px / 80,
+    }
+    const middle = chemicalShiftFromPlotPointer({
+      pointerX: 480,
+      paneWidth: 1000,
+      effectiveXMin: 0,
+      effectiveXMax: 10,
+      reversedXAxis: true,
+      plotlyXAxis,
+    })
+
+    expect(middle?.crosshairLeft).toBe(480)
+    expect(middle?.ppm).toBeCloseTo(5)
   })
 
   it("uses source data, not downsampled display points, for nearby intensity lookup", () => {

@@ -9,27 +9,23 @@
  */
 
 export const PEAK_CATEGORY_PLOT_COLOR: Record<string, string> = {
-  // Aromatic stays teal; OLEFINIC (only assigned when the SMILES actually has
-  // C=C bonds) keeps the teal hue because both are sp2.
-  aromatic_alkene: "#00B884",
-  olefinic: "#00B884",
-  // Aldehyde / carbonyl / carboxylic-acid OH / labile share amber.
-  aldehyde: "#E8A030",
-  carbonyl: "#E8A030",
-  carboxylic_acid: "#E8A030",
-  labile_OH_NH_SH: "#E8A030",
-  // Heteroatom-adjacent CH + anomeric sugar protons all share slate-blue.
-  // Anomeric is now its own category in the 4.4–6 ppm window when the SMILES
-  // resolves to a carbohydrate-style sp3-C-with-two-O motif.
-  oxygenated: "#4C6FAE",
-  nitrogen_adjacent: "#4C6FAE",
-  anomeric: "#4C6FAE",
+  // Use distinct hues per category so mixed carbohydrate / impurity /
+  // heteroatom regions remain visually separable in the legend.
+  aromatic_alkene: "#00A6A6",
+  olefinic: "#0EA5E9",
+  aldehyde: "#D97706",
+  carbonyl: "#7C2D12",
+  carboxylic_acid: "#F59E0B",
+  labile_OH_NH_SH: "#A16207",
+  oxygenated: "#2563EB",
+  nitrogen_adjacent: "#0F766E",
+  anomeric: "#8B5CF6",
+  carbohydrate_sugar: "#16A34A",
   // Anomeric-OR-olefinic (ambiguous, no SMILES or both motifs present): use a
   // distinct purple so reviewers see immediately the categoriser couldn't
   // disambiguate. Click the legend entry to inspect.
   anomeric_or_olefinic: "#9333EA",
-  // Aliphatic stays green to match the panel.
-  aliphatic: "#22C55E",
+  aliphatic: "#65A30D",
   // Solvent / unknown stay muted so they don't dominate the chart.
   solvent: "#94A3B8",
   unknown: "#94A3B8",
@@ -52,6 +48,7 @@ export function plotColorForCategory(category: string | null | undefined): strin
 export function humanizePeakCategory(category: string | null | undefined): string {
   if (!category) return "Peaks"
   if (category === "anomeric_or_olefinic") return "Anomeric / olefinic (ambiguous)"
+  if (category === "carbohydrate_sugar") return "Carbohydrate sugar backbone"
   return category
     .replace(/_/g, " ")
     .replace("OH NH SH", "OH / NH / SH")

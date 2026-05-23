@@ -176,6 +176,8 @@ export function SpectraCheckProcessedSpectrumSection({
   const fileRef = useRef<HTMLInputElement>(null)
   const foregroundRequestInFlightRef = useRef(false)
   const foregroundRequestSeqRef = useRef(0)
+  const processedPreviewCacheRef = useRef(new Map<string, unknown>())
+  const processedAnalyzeCacheRef = useRef(new Map<string, unknown>())
   const [dragOver, setDragOver] = useState(false)
 
   useEffect(() => {
@@ -227,6 +229,25 @@ export function SpectraCheckProcessedSpectrumSection({
 
   function getSelectedFile() {
     return fileRef.current?.files?.[0] ?? selectedFile
+  }
+
+  function buildProcessedRequestKey(file: File, mode: "preview" | "analyze") {
+    const cand = candidatesOptional.trim() || candidatesText
+    return JSON.stringify({
+      mode,
+      fileName: file.name,
+      fileSize: file.size,
+      fileLastModified: file.lastModified,
+      sampleId: sampleId.trim(),
+      solvent: solvent.trim(),
+      nucleus,
+      spectrometerMhz: spectrometerMhz.trim() || "400",
+      nmrText: nmrTextOptional.trim(),
+      protonText: protonText.trim(),
+      carbonText: carbonText.trim(),
+      compoundClass: compoundClassForRequest(compoundClass) || "",
+      candidatesText: mode === "analyze" ? cand.trim() : "",
+    })
   }
 
   function clearSelectedFile() {
@@ -374,9 +395,23 @@ export function SpectraCheckProcessedSpectrumSection({
     // drives the inline loading badge; the chart updates atomically when
     // the new data lands. [Mnova anti-shake §3 Mass Preferences]
     try {
+      const previewCacheKey = buildProcessedRequestKey(file, "preview")
+      const cachedPreview = processedPreviewCacheRef.current.get(previewCacheKey)
+      if (cachedPreview !== undefined) {
+        if (foregroundRequestSeqRef.current === requestId) {
+          update({
+            previewResult: cachedPreview,
+            analyzeResult: null,
+            previewLoading: false,
+          })
+          pushDev("processed_preview", cachedPreview)
+        }
+        return
+      }
       const fd = buildBaseFormData(file)
       const data = await apiFetch<unknown>("/nmr/processed/preview", { method: "POST", body: fd })
       if (foregroundRequestSeqRef.current === requestId) {
+        processedPreviewCacheRef.current.set(previewCacheKey, data)
         update({
           previewResult: data,
           analyzeResult: null,
@@ -414,14 +449,77 @@ export function SpectraCheckProcessedSpectrumSection({
     // ``analyzeLoading`` already drives the spinner badge below. Clearing
     // ``analyzeResult`` here was the unmount/remount source of the flash.
     try {
+      const analyzeCacheKey = buildProcessedRequestKey(file, "analyze")
+      const cachedAnalyze = processedAnalyzeCacheRef.current.get(analyzeCacheKey)
+      if (cachedAnalyze !== undefined) {
+        if (foregroundRequestSeqRef.current === requestId) {
+          update({ analyzeResult: cachedAnalyze, analyzeLoading: false })
+          pushDev("processed_analyze", cachedAnalyze)
+        }
+        return
+      }
+      let previewPayloadForAnalyze: unknown =
+        payloadMatchesFilename(previewResult, file.name) ? previewResult : null
+      let previewTraceForAnalyze =
+        previewPayloadForAnalyze != null ? extractSpectrumXY(previewPayloadForAnalyze) : null
+      let canReusePreviewTrace = previewTraceForAnalyze !== null
+      if (!canReusePreviewTrace) {
+        try {
+          const previewCacheKey = buildProcessedRequestKey(file, "preview")
+          const cachedPreview = processedPreviewCacheRef.current.get(previewCacheKey)
+          if (cachedPreview !== undefined) {
+            update({
+              previewResult: cachedPreview,
+              analyzeResult: null,
+              previewError: "",
+            })
+            pushDev("processed_preview", cachedPreview)
+            previewPayloadForAnalyze = payloadMatchesFilename(cachedPreview, file.name) ? cachedPreview : null
+            previewTraceForAnalyze =
+              previewPayloadForAnalyze != null ? extractSpectrumXY(previewPayloadForAnalyze) : null
+            canReusePreviewTrace = previewTraceForAnalyze !== null
+          }
+        } catch {
+          // Cache lookup should not block the canonical preview fallback.
+        }
+      }
+      if (!canReusePreviewTrace) {
+        try {
+          const previewData = await apiFetch<unknown>("/nmr/processed/preview", {
+            method: "POST",
+            body: buildBaseFormData(file),
+          })
+          if (foregroundRequestSeqRef.current !== requestId) return
+          processedPreviewCacheRef.current.set(buildProcessedRequestKey(file, "preview"), previewData)
+          update({
+            previewResult: previewData,
+            analyzeResult: null,
+            previewError: "",
+          })
+          pushDev("processed_preview", previewData)
+          previewPayloadForAnalyze = payloadMatchesFilename(previewData, file.name) ? previewData : null
+          previewTraceForAnalyze =
+            previewPayloadForAnalyze != null ? extractSpectrumXY(previewPayloadForAnalyze) : null
+          canReusePreviewTrace = previewTraceForAnalyze !== null
+        } catch (previewErr) {
+          if (foregroundRequestSeqRef.current !== requestId) return
+          update({
+            previewError: isMissingNmrEndpoint(previewErr)
+              ? PROCESSED_NMR_BACKEND_MSG
+              : formatApiError(previewErr, "Processed spectrum preview failed"),
+          })
+        }
+      }
       const fd = buildBaseFormData(file)
       const cand = candidatesOptional.trim() || candidatesText
       if (cand.trim()) fd.append("candidates_text", cand)
-      const canReusePreviewTrace =
-        payloadMatchesFilename(previewResult, file.name) && extractSpectrumXY(previewResult) !== null
       if (canReusePreviewTrace) fd.append("include_spectrum", "false")
+      if (previewTraceForAnalyze) {
+        fd.append("preview_points_json", JSON.stringify(previewTraceForAnalyze))
+      }
       const data = await apiFetch<unknown>("/nmr/processed/analyze", { method: "POST", body: fd })
       if (foregroundRequestSeqRef.current === requestId) {
+        processedAnalyzeCacheRef.current.set(analyzeCacheKey, data)
         update({ analyzeResult: data, analyzeLoading: false })
         pushDev("processed_analyze", data)
       }
