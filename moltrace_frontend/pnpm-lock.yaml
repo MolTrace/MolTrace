@@ -170,9 +170,6 @@ importers:
       three:
         specifier: ^0.184.0
         version: 0.184.0
-      uplot:
-        specifier: ^1.6.32
-        version: 1.6.32
       vaul:
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -4772,9 +4769,6 @@ packages:
 
   update-diff@1.1.0:
     resolution: {integrity: sha512-rCiBPiHxZwT4+sBhEbChzpO5hYHjm91kScWgdHf4Qeafs6Ba7MBl+d9GlGv72bcTZQO0sLmtQS1pHSWoCLtN/A==}
-
-  uplot@1.6.32:
-    resolution: {integrity: sha512-KIMVnG68zvu5XXUbC4LQEPnhwOxBuLyW1AHtpm6IKTXImkbLgkMy+jabjLgSLMasNuGGzQm/ep3tOkyTxpiQIw==}
 
   uri-js-replace@1.0.1:
     resolution: {integrity: sha512-W+C9NWNLFOoBI2QWDp4UT9pv65r2w5Cx+3sTYFvtMdDBxkKt1syCqsUdSFAChbEe1uK5TfS04wt/nGwmaeIQ0g==}
@@ -9901,8 +9895,6 @@ snapshots:
       picocolors: 1.1.1
 
   update-diff@1.1.0: {}
-
-  uplot@1.6.32: {}
 
   uri-js-replace@1.0.1: {}
 

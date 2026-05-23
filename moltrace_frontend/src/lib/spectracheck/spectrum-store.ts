@@ -6,10 +6,11 @@
  * spectrum component only re-renders when ``ppmAxis`` or ``intensities``
  * actually change reference — a parent re-render from an unrelated state
  * change (button hover three components away) no longer cascades into the
- * canvas.
+ * chart.
  *
  * Why Float32Array: it's referentially stable, half the bytes of a regular
- * array, and uPlot consumes it directly without conversion.
+ * array, and Plotly can consume typed arrays without copying them into plain
+ * JavaScript arrays.
  */
 
 import { create } from "zustand"

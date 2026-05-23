@@ -12,8 +12,9 @@
  *
  *  - ``downsample`` — Largest-Triangle-Three-Buckets (LTTB) reduces N points
  *    to ``targetPoints`` while preserving the visual silhouette of the
- *    spectrum. Critical when uPlot is asked to plot 65k+ samples in a
- *    300-pixel-wide chart — nothing else can fit on screen anyway.
+ *    spectrum. Critical when a browser renderer is asked to plot 65k+
+ *    samples in a 300-pixel-wide chart — nothing else can fit on screen
+ *    anyway.
  *  - ``pickPeaks`` — local-maxima with neighbour-radius confirmation.
  *  - ``ping`` — cheap roundtrip used in tests to verify the worker is alive.
  *
