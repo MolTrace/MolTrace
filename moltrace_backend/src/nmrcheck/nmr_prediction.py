@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from rdkit import Chem
@@ -386,6 +387,32 @@ def predict_nmr_from_smiles(smiles: str, *, name: str | None = None, solvent: st
             "anomeric_proton_count": summary.anomeric_proton_count,
         },
     )
+
+
+@lru_cache(maxsize=2048)
+def _predict_nmr_from_smiles_cached(smiles: str, solvent_key: str) -> PredictedNMRReport:
+    return predict_nmr_from_smiles(smiles, name=None, solvent=solvent_key or None)
+
+
+def predict_nmr_from_smiles_fast(
+    smiles: str,
+    *,
+    name: str | None = None,
+    solvent: str | None = None,
+) -> PredictedNMRReport:
+    """Return a cached prediction for UI/evidence-match paths.
+
+    RDKit atom-environment prediction is deterministic for a given SMILES and
+    solvent. Keeping the structural prediction hot lets evidence matching score
+    the observed text immediately on repeat runs instead of rebuilding the same
+    predicted 1H/13C peak lists.
+    """
+    smiles_key = smiles.strip()
+    solvent_key = (solvent or "").strip()
+    report = _predict_nmr_from_smiles_cached(smiles_key, solvent_key)
+    if report.name == name:
+        return report
+    return report.model_copy(update={"name": name}, deep=False)
 
 
 def _matches_to_models(matches: list[Any]) -> list[SpectralSimilarityMatch]:

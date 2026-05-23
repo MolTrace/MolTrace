@@ -11,6 +11,7 @@ from nmrcheck.baseline import (
     fit_bernstein_baseline,
 )
 from nmrcheck.fid import (
+    _apply_raw_fid_mnova_constraints,
     _auto_phase_spectrum,
     _fine_tune_solvent_display_regions,
     _smooth_fid_display_trace,
@@ -29,6 +30,27 @@ def _csv_trace(points: list[tuple[float, float]]) -> bytes:
     writer.writerow(["ppm", "intensity"])
     writer.writerows(points)
     return out.getvalue().encode()
+
+
+def test_raw_fid_proton_mnova_constraints_preserve_multiplet_resolution() -> None:
+    settings = fid_settings_from_preset(selected_preset="balanced")
+
+    constrained, detail, notes = _apply_raw_fid_mnova_constraints(settings, nucleus="1H")
+
+    assert detail["applied"] is True
+    assert detail["scope"] == "raw_fid_only"
+    assert detail["processed_uploads_touched"] is False
+    assert detail["resolution_policy"] == "multiplet_preserving_no_exponential_line_broadening"
+    assert constrained.zero_fill_factor == 3
+    assert constrained.apodization_mode == "trapezoidal"
+    assert constrained.line_broadening_hz == 0.0
+    assert constrained.auto_phase is True
+    assert constrained.phase_mode == "auto"
+    assert constrained.auto_baseline is True
+    assert constrained.baseline_correction == "bernstein"
+    assert constrained.baseline_order == 3
+    assert constrained.max_preview_points >= 12000
+    assert any("Raw 1H FID advised processing applied" in note for note in notes)
 
 
 def _synthetic_cubic_baseline_points() -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:

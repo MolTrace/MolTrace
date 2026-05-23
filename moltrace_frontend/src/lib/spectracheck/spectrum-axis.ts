@@ -7,6 +7,27 @@ type SpectrumYRangeOptions = {
   lowerQuantile?: number
   upperQuantile?: number
   paddingRatio?: number
+  /**
+   * Baseline noise scale (σ) for the trace, typically the median |Δy| between
+   * consecutive baseline samples. When supplied, the lower y-axis bound is
+   * clamped to at most ``noiseFloorSigmas × noiseFloor`` below zero so that
+   * pathological negative dispersion lobes around saturated solvent / aromatic
+   * peaks fall *below* the visible frame instead of protruding through the
+   * baseline.
+   *
+   * This mirrors Mestrenova's display convention: the GSD peak picker defaults
+   * to ``Peaks Type: Only Positive`` (MNova manual §8.2.2) and the displayed
+   * frame floors near the noise envelope so dispersion artefacts never appear
+   * as negative peaks under the baseline. Honest baseline noise (a few × σ)
+   * stays visible because it sits inside the clamp.
+   */
+  noiseFloor?: number
+  /**
+   * Multiplier on ``noiseFloor`` for the clamp. Defaults to 4 — wide enough
+   * for honest 3σ-4σ noise tails to remain inside the visible frame while
+   * truncating anything deeper as artefact.
+   */
+  noiseFloorSigmas?: number
 }
 
 /**
@@ -17,6 +38,11 @@ type SpectrumYRangeOptions = {
  * real trace; plotting to the absolute max compresses the analyte region. This
  * helper keeps the ordinary spectrum visible by using robust lower/upper
  * quantiles and adding headroom on both sides.
+ *
+ * When a ``noiseFloor`` (baseline σ) is supplied, the lower bound is *also*
+ * clamped at ``-noiseFloorSigmas × noiseFloor`` so that large negative
+ * dispersion lobes near saturated solvent / aromatic peaks do not push the
+ * visible frame down with them — Mestrenova-style "Only Positive" display.
  */
 export function robustSpectrumYRange(
   values: ArrayLike<number>,
@@ -25,6 +51,8 @@ export function robustSpectrumYRange(
   const lowerQuantile = options.lowerQuantile ?? 0.01
   const upperQuantile = options.upperQuantile ?? 0.99
   const paddingRatio = options.paddingRatio ?? 0.12
+  const noiseFloor = options.noiseFloor
+  const noiseFloorSigmas = options.noiseFloorSigmas ?? 4
   const finite: number[] = []
 
   for (let i = 0; i < values.length; i++) {
@@ -74,8 +102,23 @@ export function robustSpectrumYRange(
   }
 
   const pad = Math.max(span * paddingRatio, reference * 0.01)
-  const yMin = low - pad
+  let yMin = low - pad
   const yMax = high + pad
+
+  // Noise-floor clamp. With ``noiseFloor`` supplied we keep yMin *no deeper*
+  // than ``-noiseFloorSigmas × noiseFloor`` so a few-σ noise envelope stays
+  // visible (honest baseline) while solvent/aromatic dispersion lobes that
+  // dip far below get clipped off the bottom of the frame — Mnova convention.
+  if (
+    typeof noiseFloor === "number" &&
+    Number.isFinite(noiseFloor) &&
+    noiseFloor > 0
+  ) {
+    const clampedFloor = -noiseFloorSigmas * noiseFloor
+    if (yMin < clampedFloor) {
+      yMin = clampedFloor
+    }
+  }
 
   if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMax <= yMin) {
     return { yMin: -1, yMax: 1 }

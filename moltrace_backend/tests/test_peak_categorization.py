@@ -574,6 +574,100 @@ class TestProtonCategoriserUsesStructure:
         assert result["category"] == "solvent"
 
 
+class TestAminoglycosideCarbohydrateRefinement:
+    """Tobramycin-class aminoglycosides are saturated pseudo-trisaccharides.
+
+    Their 1H NMR text can contain many signals in the broad anomeric/sugar
+    region, but only two should be treated as anomeric for these derivatives;
+    the rest belong to the sugar-backbone envelope unless solvent/impurity
+    matching has already excluded them.
+    """
+
+    def test_tobramycin_enrichment_caps_anomeric_and_labels_sugar_backbone(self) -> None:
+        structure = structure_summary_from_smiles(TOBRAMYCIN_SMILES)
+        peaks = [
+            {
+                "shift_ppm": 5.18,
+                "multiplicity": "d",
+                "integration_h": 1.0,
+                "pick_source": "nmr_text",
+                "inventory_basis": "nmr_text",
+            },
+            {
+                "shift_ppm": 4.96,
+                "multiplicity": "d",
+                "integration_h": 1.0,
+                "pick_source": "nmr_text",
+                "inventory_basis": "nmr_text",
+            },
+            {
+                "shift_ppm": 4.58,
+                "multiplicity": "m",
+                "integration_h": 1.0,
+                "pick_source": "nmr_text",
+                "inventory_basis": "nmr_text",
+            },
+            {
+                "shift_ppm": 4.12,
+                "multiplicity": "m",
+                "integration_h": 2.0,
+                "pick_source": "nmr_text",
+                "inventory_basis": "nmr_text",
+            },
+            {
+                "shift_ppm": 3.21,
+                "multiplicity": "m",
+                "integration_h": 4.0,
+                "pick_source": "nmr_text",
+                "inventory_basis": "nmr_text",
+            },
+            {
+                "shift_ppm": 2.72,
+                "multiplicity": "m",
+                "integration_h": 1.0,
+                "pick_source": "nmr_text",
+                "inventory_basis": "nmr_text",
+            },
+        ]
+
+        enriched = enrich_peaks(
+            peaks=peaks,
+            nucleus="1H",
+            solvent=None,
+            structure=structure,
+        )
+
+        assert sum(peak["category"] == "anomeric" for peak in enriched) == 2
+        by_shift = {round(float(peak["shift_ppm"]), 2): peak for peak in enriched}
+        assert by_shift[5.18]["category"] == "anomeric"
+        assert by_shift[4.96]["category"] == "anomeric"
+        assert by_shift[4.58]["category"] == "carbohydrate_sugar"
+        assert by_shift[4.12]["category"] == "carbohydrate_sugar"
+        assert by_shift[3.21]["category"] == "carbohydrate_sugar"
+        assert by_shift[2.72]["category"] == "nitrogen_adjacent"
+        assert "Aminoglycoside" in by_shift[4.58]["category_reason"]
+
+    def test_proton_inventory_includes_sugar_backbone_and_two_anomeric_expectation(
+        self,
+    ) -> None:
+        structure = structure_summary_from_smiles(TOBRAMYCIN_SMILES)
+        peaks = [
+            {"category": "anomeric", "integration_h": 2.0},
+            {"category": "carbohydrate_sugar", "integration_h": 8.0},
+            {"category": "aliphatic", "integration_h": 1.0},
+        ]
+
+        result = build_proton_inventory(peaks=peaks, structure=structure, nucleus="1H")
+
+        assert result["observed"]["anomeric_or_olefinic"] == 2.0
+        assert result["observed"]["carbohydrate_sugar"] == 8.0
+        # The aliphatic inventory includes sugar-backbone CH/CH2 protons so the
+        # observed-vs-expected non-labile total still compares against structure.
+        assert result["observed"]["aliphatic"] == 9.0
+        assert result["expected"]["anomeric_or_olefinic"] == 2
+        assert result["deltas"]["anomeric_or_olefinic"] == 0.0
+
+
 class TestProtonInventoryBucketRename:
     """Inventory bucket key was renamed to ``anomeric_or_olefinic`` so the
     label matches what's now possible in the data."""

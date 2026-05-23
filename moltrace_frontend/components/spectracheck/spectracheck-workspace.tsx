@@ -317,6 +317,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   const [nmrResult, setNmrResult] = useState<unknown>(null)
   const [nmrError, setNmrError] = useState("")
   const [nmrLoading, setNmrLoading] = useState(false)
+  const nmrEvidenceCacheRef = useRef(new Map<string, unknown>())
 
   const deptFileRef = useRef<HTMLInputElement>(null)
   const [deptExperimentType, setDeptExperimentType] = useState("")
@@ -460,7 +461,19 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
     event.preventDefault()
     setNmrLoading(true)
     setNmrError("")
-    setNmrResult(null)
+    const cacheKey = JSON.stringify({
+      candidatesText: candidatesText.trim(),
+      protonText: protonText.trim(),
+      carbonText: carbonText.trim(),
+      solvent: solventForApi.trim(),
+      sampleId: sampleId.trim(),
+    })
+    const cached = nmrEvidenceCacheRef.current.get(cacheKey)
+    if (cached !== undefined) {
+      setNmrResult(cached)
+      setNmrLoading(false)
+      return
+    }
 
     const formData = new FormData()
     formData.append("candidates_text", candidatesText)
@@ -474,6 +487,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         method: "POST",
         body: formData,
       })
+      nmrEvidenceCacheRef.current.set(cacheKey, data)
       setNmrResult(data)
     } catch (err) {
       setNmrError(formatApiError(err, "SpectraCheck analysis failed"))

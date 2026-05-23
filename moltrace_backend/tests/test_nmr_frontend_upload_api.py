@@ -1,5 +1,6 @@
 import hashlib
 import io
+import json
 import zipfile
 
 import numpy as np
@@ -176,6 +177,35 @@ def test_nmr_processed_analyze_can_omit_spectrum_points_for_fast_display(tmp_pat
         == "frontend_already_has_preview_trace"
     )
     assert payload["peaks"][0]["shift_ppm"] == 3.65
+
+
+def test_nmr_processed_analyze_reuses_frontend_preview_trace(tmp_path) -> None:
+    preview_trace = {
+        "x": [round(4.2 - idx * 0.01, 3) for idx in range(25)],
+        "y": [0.0 for _ in range(25)],
+    }
+    preview_trace["y"][10] = 9.0
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "analyze-preview-trace",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "include_spectrum": "false",
+                "preview_points_json": json.dumps(preview_trace),
+            },
+            files={"file": ("ignored-upload.txt", b"not a parseable spectrum", "text/plain")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["x"] == []
+    assert payload["y"] == []
+    assert payload["metadata"]["frontend_preview_trace_reused"] is True
+    assert payload["metadata"]["frontend_preview_point_count"] == len(preview_trace["x"])
+    assert payload["metadata"]["spectrum_points_omitted_reason"] == "frontend_already_has_preview_trace"
 
 
 def test_nmr_processed_analyze_returns_peak_enrichment(tmp_path) -> None:
@@ -510,6 +540,7 @@ def test_nmr_raw_fid_process_returns_enriched_peaks_and_summaries(tmp_path) -> N
         "labile_hydrogen_summary",
         "proton_inventory",
         "impurity_candidates",
+        "predicted_vs_observed",
         "processing_parameters",
     }
     missing = required_keys - payload.keys()
@@ -534,6 +565,7 @@ def test_nmr_raw_fid_process_returns_enriched_peaks_and_summaries(tmp_path) -> N
     assert guidance.get("structure_smiles_used_for_peak_picking") == "CCO"
     assert guidance.get("expected_total_h") == 6
     assert guidance.get("expected_non_labile_h") == 5
+    assert isinstance(payload["predicted_vs_observed"], list)
 
 
 def test_nmr_raw_fid_process_links_13c_text_and_parsed_smiles(tmp_path) -> None:
@@ -735,12 +767,65 @@ def test_nmr_processed_analyze_emits_proton_inventory_and_subset(tmp_path) -> No
     assert "Gottlieb" in citation_text or "Fulmer" in citation_text
 
 
+def test_nmr_processed_analyze_reconciles_picked_peaks_to_text_and_smiles(
+    tmp_path,
+) -> None:
+    """When supplied 1H text contains more assignments than the picker finds,
+    the result tables must use the parsed text integrations as the observed H
+    inventory while preserving spectrum-only peaks as excluded review evidence.
+    """
+    sparse_peak_csv = (
+        b"shift_ppm,integration_h,multiplicity\n"
+        b"7.30,1,m\n"
+        b"4.65,1,s\n"
+    )
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "benzyl-alcohol-c11-style",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "nmr_text": (
+                    "1H NMR (400 MHz, CDCl3) δ 7.38 - 7.25 (m, 5H), "
+                    "4.65 (s, 2H), 2.10 (br s, 1H)"
+                ),
+                "candidates_text": "Benzyl alcohol | OCc1ccccc1",
+            },
+            files={"file": ("sparse.csv", sparse_peak_csv, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    reconciliation = payload["metadata"]["proton_peak_reconciliation"]
+    assert reconciliation["applied"] is True
+    assert reconciliation["reference_peak_count"] == 3
+    assert reconciliation["observed_total_h"] == 8.0
+    assert reconciliation["adjusted_observed_total_h"] == 8.0
+
+    peaks = payload["peaks"]
+    text_guided = [p for p in peaks if p.get("inventory_basis") == "nmr_text"]
+    assert len(text_guided) == 3
+    assert round(sum(float(p["integration_h"]) for p in text_guided), 4) == 8.0
+    assert any(p.get("pick_source") == "nmr_text_unconfirmed_by_picker" for p in peaks)
+
+    inventory = payload["proton_inventory"]
+    assert inventory["integration_basis"] == "nmr_text_guided"
+    assert inventory["observed"]["total"] == 8.0
+    assert inventory["expected"]["total"] == 8
+    assert inventory["deltas"]["total"] == 0.0
+    assert inventory["reconciliation"]["adjusted_observed_total_h"] == 8.0
+
+
 def test_nmr_processed_analyze_tobramycin_peaks_are_anomeric_not_olefinic(
     tmp_path,
 ) -> None:
     """Regression for user-reported bug: the bundled Tobramycin SMILES is fully
-    saturated (three aminosugar rings, no C=C bonds), so peaks in the 4.4–6
-    ppm window must be labelled 'anomeric' and NOT 'olefinic'.
+    saturated (aminoglycoside sugar rings, no C=C bonds). The 4.4-6 ppm window
+    therefore must never be called olefinic. Tobramycin-class inputs are now
+    capped at two anomeric 1H signals; any remaining analyte peaks in the
+    sugar envelope are carbohydrate-backbone peaks.
 
     Tobramycin SMILES (the one the user pasted):
         O[C@@]1([H])[C@]([C@@H](O)[C@@H](O[C@@]([C@]2(O)[H])([H])
@@ -779,24 +864,35 @@ def test_nmr_processed_analyze_tobramycin_peaks_are_anomeric_not_olefinic(
     assert response.status_code == 200, response.text
     payload = response.json()
     # Find the picked peaks in the 4.4–6 ppm range and assert they are NOT
-    # categorised as "olefinic". They MUST be anomeric since the SMILES has
-    # anomeric protons and zero olefinic protons.
+    # categorised as "olefinic". Only two should remain anomeric for
+    # tobramycin-style aminoglycosides; the extra text-backed sugar signal is
+    # part of the carbohydrate backbone.
     anomeric_window_peaks = [
         p for p in payload["peaks"] if 4.4 <= float(p["shift_ppm"]) < 6.0
     ]
     assert len(anomeric_window_peaks) >= 1
-    for peak in anomeric_window_peaks:
-        assert peak["category"] == "anomeric", (
+    assert all(peak["category"] != "olefinic" for peak in anomeric_window_peaks)
+    anomeric_peaks = [peak for peak in anomeric_window_peaks if peak["category"] == "anomeric"]
+    sugar_peaks = [
+        peak for peak in anomeric_window_peaks if peak["category"] == "carbohydrate_sugar"
+    ]
+    assert len(anomeric_peaks) == 2, anomeric_window_peaks
+    assert len(sugar_peaks) >= 1, anomeric_window_peaks
+    for peak in anomeric_peaks:
+        assert "anomeric" in peak["category_reason"].lower(), (
             f"Tobramycin peak at {peak['shift_ppm']} ppm was categorised as "
-            f"'{peak['category']}' — should be 'anomeric' since SMILES is saturated."
+            f"'{peak['category']}' without an anomeric rationale."
         )
-        assert "no olefinic" in peak["category_reason"].lower() or "anomeric assignment" in peak["category_reason"].lower(), (
-            f"Reason must justify the anomeric call: {peak['category_reason']}"
+    for peak in sugar_peaks:
+        assert "aminoglycoside" in peak["category_reason"].lower(), (
+            f"Reason must justify the sugar-backbone call: {peak['category_reason']}"
         )
 
-    # The peak_category_summary must reflect the new category — not "olefinic".
+    # The peak_category_summary must reflect the structure-aware categories —
+    # never the legacy "olefinic" bucket for saturated aminoglycosides.
     summary = payload["peak_category_summary"]
     assert "anomeric" in summary
+    assert "carbohydrate_sugar" in summary
     assert "olefinic" not in summary, (
         f"olefinic must not appear in peak_category_summary for tobramycin: {summary}"
     )

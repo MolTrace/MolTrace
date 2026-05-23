@@ -609,6 +609,8 @@ class NMRRawFIDProcessResponse(BaseModel):
     labile_hydrogen_summary: dict[str, Any] = Field(default_factory=dict)
     proton_inventory: dict[str, Any] = Field(default_factory=dict)
     impurity_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    predicted_vs_observed: list[dict[str, Any]] = Field(default_factory=list)
+    references: list[dict[str, Any]] = Field(default_factory=list)
     x: list[float] = Field(default_factory=list)
     y: list[float] = Field(default_factory=list)
     x_label: str = "ppm"

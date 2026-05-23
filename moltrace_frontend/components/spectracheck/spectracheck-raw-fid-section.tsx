@@ -37,7 +37,6 @@ import {
   extractSpectrumXY,
   isRecord,
 } from "@/components/spectracheck/spectracheck-nmr-result-parse"
-import type { SpectrumPeakAnnotation } from "@/components/science/SpectrumViewer"
 import { useStableXY } from "@/components/spectracheck/use-stable-xy"
 import { isMissingNmrEndpoint, RAW_FID_BACKEND_MSG } from "@/components/spectracheck/spectracheck-nmr-endpoint-messages"
 import { Badge } from "@/components/ui/badge"
@@ -106,6 +105,8 @@ const PRESETS = [
   { value: "no_phase_correction", label: "No phase correction" },
 ] as const
 
+const EMPTY_SPECTRUM_PEAKS: never[] = []
+
 function extractRawArchiveId(payload: unknown): string | null {
   if (!isRecord(payload)) return null
   const meta = isRecord(payload.metadata) ? payload.metadata : null
@@ -147,6 +148,7 @@ export function SpectraCheckRawFidSection({
     previewSpectrum,
     previewSpectrumLoading,
     previewSpectrumError,
+    activeResultMode,
     sessionRawFileIdChoice,
     jobActionError,
     selectedFile,
@@ -389,25 +391,6 @@ export function SpectraCheckRawFidSection({
     [update],
   )
 
-  const canPromotePreviewToProcess = useCallback(
-    (file: File) => {
-      if (preset !== "safe_automatic") return false
-      if (!previewResult || !extractSpectrumXY(previewResult)) return false
-      if (!isRecord(previewResult)) return false
-      const previewFilename = typeof previewResult.filename === "string" ? previewResult.filename : null
-      if (previewFilename && previewFilename !== file.name && previewFilename !== selectedFileName) return false
-      const metadata = isRecord(previewResult.metadata) ? previewResult.metadata : null
-      const previewPreset =
-        typeof previewResult.processing_preset === "string"
-          ? previewResult.processing_preset
-          : typeof metadata?.processing_preset === "string"
-            ? metadata.processing_preset
-            : null
-      return previewPreset == null || previewPreset === "safe_automatic" || previewPreset === "balanced"
-    },
-    [preset, previewResult, selectedFileName],
-  )
-
   async function runPreviewSpectrum(file: File, archiveId?: string | null) {
     // Quick auto-FT so the user sees an actual spectrum alongside metadata —
     // mirrors the processed-1H/13C "preview shows spectrum" UX. The user can
@@ -433,16 +416,10 @@ export function SpectraCheckRawFidSection({
           body: fd,
         })
       } else {
-        const fd = new FormData()
-        fd.append("file", file)
-        fd.append("sample_id", sampleId)
-        fd.append("solvent", solvent)
-        fd.append("nucleus", nucleus)
-        fd.append("vendor", vendor)
-        fd.append("processing_preset", "safe_automatic")
-        fd.append("preserve_raw", "true")
-        appendSharedSessionGuidance(fd)
-        data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
+        data = await apiFetch<unknown>("/nmr/raw-fid/preview", {
+          method: "POST",
+          body: buildFormData(file, false),
+        })
       }
       pushDev("raw_fid_preview_spectrum", data)
       if (!applyPreviewSpectrumPayload(data, "balanced")) {
@@ -473,7 +450,7 @@ export function SpectraCheckRawFidSection({
     // previewSpectrum/processResult here is what produced the analyze-mode
     // flash. The user sees the OLD chart smoothly replaced by the new one
     // when data arrives. [Mnova anti-shake §3]
-    update({ previewSpectrumError: "", previewSpectrumLoading: true })
+    update({ previewSpectrumError: "", previewSpectrumLoading: true, activeResultMode: "preview" })
     let shouldGenerateSpectrum = false
     let previewArchiveId: string | null = null
     try {
@@ -513,29 +490,12 @@ export function SpectraCheckRawFidSection({
       setProcessError("Choose a raw FID archive (.zip / .tar.gz / .tgz).")
       return
     }
-    if (canPromotePreviewToProcess(file) && isRecord(previewResult)) {
-      setProcessError("")
-      const metadata = isRecord(previewResult.metadata) ? previewResult.metadata : {}
-      const promoted = {
-        ...previewResult,
-        processing_preset:
-          typeof previewResult.processing_preset === "string" ? previewResult.processing_preset : "safe_automatic",
-        metadata: {
-          ...metadata,
-          promoted_from_inline_preview: true,
-          endpoint_short_circuit: "/nmr/raw-fid/preview",
-        },
-      }
-      setProcessResult(promoted)
-      pushDev("raw_fid_process_inline_preview", promoted)
-      return
-    }
     setProcessLoading(true)
     setProcessError("")
     // Keep the prior chart (auto-FT preview spectrum, if any) on screen
     // while the full process runs. ``processLoading`` drives the badge.
     // Clearing here was the source of the analyze-mode flash.
-    update({ previewSpectrumError: "" })
+    update({ previewSpectrumError: "", activeResultMode: "process" })
     try {
       const fd = buildFormData(file, true)
       const data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
@@ -558,25 +518,31 @@ export function SpectraCheckRawFidSection({
       previewSpectrum: null,
       previewSpectrumError: "",
       previewSpectrumLoading: false,
+      activeResultMode: null,
       selectedFile: null,
       selectedFileName: null,
     })
     if (fileRef.current) fileRef.current.value = ""
   }
 
-  const displayPayload = processResult ?? previewResult
   const resultsMode =
     processLoading
       ? "process"
       : previewLoading || previewSpectrumLoading
         ? "preview"
-        : processResult != null
+        : activeResultMode === "process" && processResult != null
           ? "process"
-          : previewResult != null || previewSpectrum != null
+          : activeResultMode === "preview" && (previewResult != null || previewSpectrum != null)
             ? "preview"
-            : null
+            : processResult != null
+              ? "process"
+              : previewResult != null || previewSpectrum != null
+                ? "preview"
+                : null
   const hasResultSurface = resultsMode != null
-  const payloadMode = processResult != null ? "process" : previewResult != null ? "preview" : resultsMode
+  const displayPayload =
+    resultsMode === "process" ? processResult : resultsMode === "preview" ? previewResult : null
+  const payloadMode = resultsMode
   const resultTitle = resultsMode === "process" ? "Processed FID output" : "Raw archive metadata"
   const resultDescription =
     resultsMode === "process"
@@ -601,24 +567,26 @@ export function SpectraCheckRawFidSection({
     () => (previewSpectrum ? { x: previewSpectrum.x, y: previewSpectrum.y } : null),
     [previewSpectrum],
   )
+  const processPeaks = useMemo(
+    () => (processResult ? extractPeaksFromPayload(processResult) : []),
+    [processResult],
+  )
   // Stabilise the resolved spectrum xy reference across upstream transitions.
   // The preview / process pipelines may hand us the same numeric x / y in
   // back-to-back responses (e.g. re-running ``process`` with the same
   // preset); reusing the previous reference keeps SpectrumViewer's expensive
   // percentile / mask / sampling memos cached and prevents Plotly from
   // redrawing an already-painted line. [Mnova anti-shake §3]
-  const xyResolved = xyProcess ?? xyPreview ?? xyAutoPreview
+  const xyResolved =
+    resultsMode === "process"
+      ? processResult
+        ? xyProcess
+        : xyProcess ?? xyPreview ?? xyAutoPreview
+      : xyPreview ?? xyAutoPreview
   const xy = useStableXY(xyResolved)
+  const viewerPeaks = resultsMode === "process" ? processPeaks : EMPTY_SPECTRUM_PEAKS
 
-  // Picked peaks for the chart overlay. Sourced from whichever payload is
-  // currently driving the viewer (process > preview). Same extractor the
-  // processed-spectrum tab uses, so the marker color-coding by category +
-  // drop-lines work uniformly across both sections.
-  const peaks = useMemo<SpectrumPeakAnnotation[]>(
-    () => extractPeaksFromPayload(displayPayload ?? {}),
-    [displayPayload],
-  )
-  const xyIsAutoPreview = !xyProcess && (xyPreview != null || xyAutoPreview != null)
+  const xyIsAutoPreview = resultsMode === "preview" && (xyPreview != null || xyAutoPreview != null)
   const autoPreviewPreset = useMemo(() => {
     if (previewSpectrum?.processingPreset) return previewSpectrum.processingPreset
     if (previewResult && isRecord(previewResult) && typeof previewResult.processing_preset === "string") {
@@ -1234,13 +1202,19 @@ export function SpectraCheckRawFidSection({
                 </div>
               ) : null}
               {xy ? (
+                // Raw FID needs a denser Plotly trace than processed uploads
+                // so dd/t/q/m fine structure is visible without zooming. The
+                // aromatic cleanup is display-only and peak-preserving; it
+                // does not touch the evidence trace or processed spectra.
                 <SpectrumViewer
                   x={xy.x}
                   y={xy.y}
-                  peaks={peaks}
+                  peaks={viewerPeaks}
                   nucleus={resolvedNucleus}
                   renderMode="webgl"
                   rawFidAromaticBaseSmoothing
+                  maxObservedPoints={12_000}
+                  observedPointsPerPixel={24}
                 />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (
                 <div
@@ -1488,7 +1462,7 @@ export function SpectraCheckRawFidSection({
                 peak_category_summary, labile_hydrogen_summary,
                 proton_inventory, impurity_candidates), so the same panels
                 light up here automatically. */}
-            {displayPayload != null ? (
+            {resultsMode === "process" && displayPayload != null ? (
               <>
                 {/* Inferred NMR prose summary — same panel as the processed
                     1H/13C tab so the deconvolution + reference-guided

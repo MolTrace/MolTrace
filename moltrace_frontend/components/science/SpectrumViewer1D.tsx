@@ -63,6 +63,14 @@ export type SpectrumViewer1DProps = {
 
 const DISPLAY_Y_CAP = 1e120
 
+export function normalizePlotlyXRange(a: number, b: number): [number, number] {
+  return a <= b ? [a, b] : [b, a]
+}
+
+function hoverFormatForNucleus(nucleus?: string): string {
+  return nucleus === "13C" ? ".2f" : ".4f"
+}
+
 /** Display-only gain: exponential multiplier with baseline anchored at series minimum (smooth high gain, stable baseline). */
 function deriveDisplayY(y: number[], gainSlider01: number): number[] {
   const mult = Math.exp(gainSlider01 * Math.log(50001))
@@ -215,6 +223,7 @@ export function SpectrumViewer1D({
 
   const data = useMemo(() => {
     if (empty || mismatch) return []
+    const ppmHoverFormat = hoverFormatForNucleus(nucleus)
     const traces: object[] = [
       {
         type: "scattergl",
@@ -223,6 +232,7 @@ export function SpectrumViewer1D({
         y: displayPrimary.y,
         name: "Spectrum",
         line: { width: 1.2, color: "#2563eb" },
+        hovertemplate: `%{x:${ppmHoverFormat}} ppm<br>${yLabel}: %{y:.4g}<extra>Spectrum</extra>`,
       },
     ]
     if (showOverlaysMaster) {
@@ -238,6 +248,7 @@ export function SpectrumViewer1D({
           name: o.name,
           line: { width: 1, dash: "dash", color: "#c026d3" },
           opacity: 0.85,
+          hovertemplate: `%{x:${ppmHoverFormat}} ppm<br>${yLabel}: %{y:.4g}<extra>${o.name}</extra>`,
         })
       })
     }
@@ -258,6 +269,7 @@ export function SpectrumViewer1D({
         name: "Peaks",
         marker: { size: 7, color: "#ea580c", line: { width: 0.5, color: "#fff" } },
         textfont: { size: 10 },
+        hovertemplate: `%{x:${ppmHoverFormat}} ppm<br>${yLabel}: %{y:.4g}<extra>Peak</extra>`,
       })
     }
     return traces
@@ -274,6 +286,8 @@ export function SpectrumViewer1D({
     showOverlaysMaster,
     showPeakLabels,
     gain01,
+    nucleus,
+    yLabel,
   ])
 
   const layout = useMemo(
@@ -301,17 +315,26 @@ export function SpectrumViewer1D({
               autorange: reversedXAxis ? ("reversed" as const) : true,
             }),
         zeroline: false,
+        showgrid: false,
+        showspikes: true,
+        spikemode: "across" as const,
+        spikesnap: "cursor" as const,
+        spikecolor: "#0f766e",
+        spikethickness: 1,
+        spikedash: "solid" as const,
+        hoverformat: hoverFormatForNucleus(nucleus),
       },
       yaxis: {
         title: yLabel,
         range: [0, yMax],
         zeroline: false,
+        showgrid: false,
         fixedrange: false,
       },
       hovermode: "closest" as const,
       uirevision: "spectrum1d",
     }),
-    [title, xLabel, yLabel, reversedXAxis, xRange, effectiveXMin, effectiveXMax, yMax, data.length]
+    [title, xLabel, yLabel, reversedXAxis, xRange, effectiveXMin, effectiveXMax, yMax, data.length, nucleus]
   )
 
   const onRelayout = useCallback((ev: Readonly<unknown>) => {
@@ -319,9 +342,9 @@ export function SpectrumViewer1D({
     const xr0 = raw["xaxis.range[0]"]
     const xr1 = raw["xaxis.range[1]"]
     if (typeof xr0 === "number" && typeof xr1 === "number") {
-      setXRange([xr0, xr1])
+      setXRange(normalizePlotlyXRange(xr0, xr1))
     }
-    if (raw["xaxis.autorange"] === true) {
+    if (raw["xaxis.autorange"] === true || raw["xaxis.autorange"] === "reversed") {
       setXRange(null)
     }
   }, [])

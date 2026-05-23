@@ -117,6 +117,13 @@ class TestReferenceRegistry:
         assert reference("nanalysis_phase_correction") is not None
         assert reference("nanalysis_data_processing") is not None
 
+    def test_tobramycin_pseudo_trisaccharide_publication_present(self) -> None:
+        ref = reference("hotor_2025_sulfated_pseudo_trisaccharides")
+        assert ref is not None
+        assert ref["year"] == 2025
+        assert "Tobramycin" in ref["title"]
+        assert ref["doi"] == "10.1021/acs.jmedchem.5c00611"
+
 
 class TestBrukerDefaults:
     def test_bruker_lb_defaults_match_claridge(self) -> None:

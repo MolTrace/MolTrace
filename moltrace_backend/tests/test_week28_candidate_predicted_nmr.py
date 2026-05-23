@@ -86,6 +86,29 @@ def test_candidate_specific_predicted_matching_ranks_ethanol_highest():
     assert "13C predicted-match" in result.evidence_layers_used
 
 
+def test_candidate_specific_predicted_matching_reuses_identical_request_cache():
+    request = CandidatePredictedNMRMatchRequest(
+        sample_id="cache-speed-regression-ethanol",
+        solvent="CDCl3",
+        observed_proton_text=ETHANOL_1H,
+        observed_carbon13_text=ETHANOL_13C,
+        candidates=[
+            CandidateInput(name="methanol", smiles="CO"),
+            CandidateInput(name="ethanol", smiles="CCO"),
+            CandidateInput(name="propanol", smiles="CCCO"),
+        ],
+    )
+
+    first = match_candidates_with_predicted_nmr(request)
+    second = match_candidates_with_predicted_nmr(request)
+
+    assert first.best_candidate is not None
+    assert second.best_candidate is not None
+    assert first.best_candidate.name == second.best_candidate.name == "ethanol"
+    assert first.metadata["match_cache"] == "miss"
+    assert second.metadata["match_cache"] == "hit"
+
+
 def test_candidate_specific_predicted_matching_preserves_requires_review_for_weak_evidence():
     result = match_candidates_with_predicted_nmr(
         CandidatePredictedNMRMatchRequest(

@@ -52,6 +52,7 @@ and the proton-inventory aggregator; lookup keys live in
 
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable, Literal, Sequence
 
 from .dp4_scoring import pair_residual_dp4_score
@@ -63,13 +64,16 @@ from .literature_data import (
     TOL_1H_STRICT_PPM,
     predictor_rmse,
 )
-from .models import PredictedNMRPeak, StructureSummary
+from .exceptions import PeakParseError
+from .models import Peak, PredictedNMRPeak, StructureSummary
 from .nmr_tables import (
     Nucleus,
     classify_carbon13_region,
     classify_proton_region,
     find_solvent_or_impurity_hits,
 )
+from .parser import ReferencePeakAssignment, parse_reference_nmr_text
+from .solvents import find_solvent_peak_hit_indices
 
 # Public peak categories. Keep the set small and visualisable; resist adding
 # every flavour of chemical region — those live in ``chemical_region`` instead.
@@ -88,6 +92,7 @@ PEAK_CATEGORIES = (
     "aldehyde",
     "carboxylic_acid",
     "anomeric",
+    "carbohydrate_sugar",
     "anomeric_or_olefinic",
     "carbonyl",
     "oxygenated",
@@ -97,6 +102,183 @@ PEAK_CATEGORIES = (
     "impurity",
     "unknown",
 )
+
+AMINOGLYCOSIDE_SUGAR_LOW_PPM = 2.90
+AMINOGLYCOSIDE_SUGAR_HIGH_PPM = 5.30
+AMINOGLYCOSIDE_ANOMERIC_LOW_PPM = 4.40
+AMINOGLYCOSIDE_ANOMERIC_HIGH_PPM = 5.55
+
+
+def _formula_element_count(formula: str | None, element: str) -> int:
+    if not formula:
+        return 0
+    match = re.search(rf"{re.escape(element)}(?![a-z])(\d*)", formula)
+    if not match:
+        return 0
+    value = match.group(1)
+    return int(value) if value else 1
+
+
+def _is_carbohydrate_like_structure(structure: StructureSummary | None) -> bool:
+    if structure is None:
+        return False
+    oxygen_count = _formula_element_count(getattr(structure, "formula", None), "O")
+    anomeric_h = int(getattr(structure, "anomeric_proton_count", 0) or 0)
+    olefinic_h = int(getattr(structure, "olefinic_proton_count", 0) or 0)
+    aromatic_atoms = int(getattr(structure, "aromatic_atom_count", 0) or 0)
+    return oxygen_count >= 4 and anomeric_h > 0 and olefinic_h == 0 and aromatic_atoms == 0
+
+
+def is_aminoglycoside_like_structure(structure: StructureSummary | None) -> bool:
+    """Return True for amino-sugar / aminoglycoside-like carbohydrate inputs.
+
+    The structural test is deliberately conservative: anomeric/acetal protons,
+    no olefinic protons, no aromatic atoms, oxygen-rich formula, and at least
+    one nitrogen atom. This captures tobramycin-style pseudo-trisaccharides
+    without changing ordinary aliphatic, aromatic, or alkene-containing cases.
+    """
+    if not _is_carbohydrate_like_structure(structure):
+        return False
+    nitrogen_count = _formula_element_count(getattr(structure, "formula", None), "N")
+    return nitrogen_count >= 1
+
+
+def _expected_anomeric_signal_count(structure: StructureSummary | None) -> int:
+    if structure is None:
+        return 0
+    anomeric_h = int(getattr(structure, "anomeric_proton_count", 0) or 0)
+    olefinic_h = int(getattr(structure, "olefinic_proton_count", 0) or 0)
+    if is_aminoglycoside_like_structure(structure):
+        # Tobramycin-class 4,6-disubstituted 2-deoxystreptamine compounds carry
+        # two sugar anomeric signals in the 1H spectrum; remaining sugar-ring
+        # CH/CH2 resonances belong to the oxygenated/nitrogenated backbone.
+        return min(2, anomeric_h) if anomeric_h > 0 else 0
+    return max(0, anomeric_h) + max(0, olefinic_h)
+
+
+def _is_analyte_proton_category(category: str | None) -> bool:
+    return category not in {"solvent", "impurity", "labile_OH_NH_SH", "aldehyde", "carboxylic_acid"}
+
+
+def _peak_inventory_integration_value(peak: dict[str, Any]) -> float | None:
+    for key in ("inventory_integration_h", "reference_integration_h", "integration_h"):
+        value = peak.get(key)
+        if isinstance(value, (int, float)):
+            return float(value)
+    return None
+
+
+def _score_anomeric_candidate(peak: dict[str, Any]) -> float:
+    shift = peak.get("shift_ppm")
+    if not isinstance(shift, (int, float)):
+        return -1.0
+    shift_value = float(shift)
+    score = 0.0
+    if AMINOGLYCOSIDE_ANOMERIC_LOW_PPM <= shift_value <= AMINOGLYCOSIDE_ANOMERIC_HIGH_PPM:
+        score += 4.0
+    # In aminoglycoside 1H text, the two anomeric resonances are usually
+    # discrete ~1H assignments, commonly doublet-like. Prefer text-backed
+    # one-proton candidates, but keep spectrum-only fallbacks available.
+    integration = _peak_inventory_integration_value(peak)
+    if integration is not None:
+        score += max(0.0, 2.0 - min(abs(integration - 1.0), 2.0))
+    multiplicity = str(peak.get("multiplicity") or "").strip().lower()
+    if multiplicity in {"d", "dd", "ddd", "br d"}:
+        score += 0.75
+    source = str(peak.get("pick_source") or "")
+    if "nmr_text" in source:
+        score += 0.75
+    # Prefer the downfield edge of the anomeric band when all else is equal;
+    # oxygenated H2-H6 sugar-ring protons then remain in the backbone bucket.
+    score += max(0.0, shift_value - AMINOGLYCOSIDE_ANOMERIC_LOW_PPM) * 0.02
+    return score
+
+
+def _with_appended_reason(peak: dict[str, Any], reason: str) -> dict[str, Any]:
+    updated = dict(peak)
+    existing = str(updated.get("category_reason") or "").strip()
+    updated["category_reason"] = f"{existing} {reason}".strip() if existing else reason
+    return updated
+
+
+def _refine_carbohydrate_peak_categories(
+    peaks: Sequence[dict[str, Any]],
+    structure: StructureSummary | None,
+) -> list[dict[str, Any]]:
+    if not _is_carbohydrate_like_structure(structure):
+        return [dict(peak) for peak in peaks]
+
+    expected_anomeric_count = _expected_anomeric_signal_count(structure)
+    candidate_indices: list[int] = []
+    for idx, peak in enumerate(peaks):
+        shift = peak.get("shift_ppm")
+        category = peak.get("category")
+        if not isinstance(shift, (int, float)) or not isinstance(category, str):
+            continue
+        if not _is_analyte_proton_category(category):
+            continue
+        if AMINOGLYCOSIDE_ANOMERIC_LOW_PPM <= float(shift) <= AMINOGLYCOSIDE_ANOMERIC_HIGH_PPM:
+            candidate_indices.append(idx)
+
+    selected_anomeric = set(
+        sorted(
+            candidate_indices,
+            key=lambda idx: _score_anomeric_candidate(peaks[idx]),
+            reverse=True,
+        )[:expected_anomeric_count]
+    )
+
+    refined: list[dict[str, Any]] = []
+    aminoglycoside_like = is_aminoglycoside_like_structure(structure)
+    for idx, original in enumerate(peaks):
+        peak = dict(original)
+        shift = peak.get("shift_ppm")
+        category = peak.get("category")
+        if not isinstance(shift, (int, float)) or not isinstance(category, str):
+            refined.append(peak)
+            continue
+        shift_value = float(shift)
+        if not _is_analyte_proton_category(category):
+            refined.append(peak)
+            continue
+
+        if idx in selected_anomeric:
+            peak["category"] = "anomeric"
+            reason = (
+                "Selected as one of the structure-supported anomeric 1H signals; "
+                "the SMILES/formula are carbohydrate-like with no olefinic protons."
+            )
+            if aminoglycoside_like:
+                reason += " Aminoglycoside-like inputs are capped at two anomeric peaks."
+            refined.append(_with_appended_reason(peak, reason))
+            continue
+
+        if aminoglycoside_like and AMINOGLYCOSIDE_SUGAR_LOW_PPM <= shift_value <= AMINOGLYCOSIDE_SUGAR_HIGH_PPM:
+            peak["category"] = "carbohydrate_sugar"
+            refined.append(
+                _with_appended_reason(
+                    peak,
+                    "Aminoglycoside sugar-backbone refinement: 2.9-5.3 ppm "
+                    "belongs to the pseudo-trisaccharide CH/CH2 envelope unless "
+                    "selected as one of the two anomeric signals.",
+                )
+            )
+            continue
+
+        if category in {"anomeric", "anomeric_or_olefinic", "olefinic"} and 4.4 <= shift_value < 6.0:
+            peak["category"] = "oxygenated"
+            refined.append(
+                _with_appended_reason(
+                    peak,
+                    "Carbohydrate-like structure has no olefinic protons and this "
+                    "peak was not selected as an anomeric signal, so it is treated "
+                    "as heteroatom-adjacent sugar/protected-carbohydrate CH.",
+                )
+            )
+            continue
+
+        refined.append(peak)
+    return refined
 
 
 def _is_broad_multiplicity(multiplicity: str | None) -> bool:
@@ -380,8 +562,281 @@ def enrich_peaks(
             solvent=solvent,
             structure=structure,
         )
+        if (
+            nucleus == "1H"
+            and raw.get("inventory_basis") == "nmr_text"
+            and not raw.get("inventory_exclude")
+            and category.get("category") in {"solvent", "impurity"}
+        ):
+            overlapping_solvent_hit = category.get("solvent_hit")
+            overlapping_impurity_match = category.get("impurity_match")
+            category = categorize_peak(
+                nucleus=nucleus,
+                shift_ppm=float(shift),
+                multiplicity=str(raw.get("multiplicity") or "") or None,
+                solvent=None,
+                structure=structure,
+            )
+            category["overlapping_solvent_hit"] = overlapping_solvent_hit
+            category["overlapping_impurity_match"] = overlapping_impurity_match
+            category["category_reason"] = (
+                f"{category.get('category_reason', '')} Supplied 1H text treats this "
+                "assignment as analyte evidence, so overlapping residual-solvent or "
+                "impurity-library windows are review flags rather than grounds to "
+                "remove it from the proton inventory."
+            ).strip()
         enriched.append({**raw, **category})
+    if nucleus == "1H":
+        return _refine_carbohydrate_peak_categories(enriched, structure)
     return enriched
+
+
+def _reference_assignment_window(assignment: ReferencePeakAssignment) -> tuple[float, float]:
+    if assignment.shift_start_ppm is not None and assignment.shift_end_ppm is not None:
+        low = min(float(assignment.shift_start_ppm), float(assignment.shift_end_ppm)) - 0.035
+        high = max(float(assignment.shift_start_ppm), float(assignment.shift_end_ppm)) + 0.035
+        return (low, high)
+    shift = float(assignment.shift_ppm)
+    return (shift - 0.07, shift + 0.07)
+
+
+def _reference_assignment_contains_peak(
+    assignment: ReferencePeakAssignment,
+    shift_ppm: float,
+) -> bool:
+    low, high = _reference_assignment_window(assignment)
+    return low <= shift_ppm <= high
+
+
+def _reference_assignment_delta(
+    assignment: ReferencePeakAssignment,
+    shift_ppm: float,
+) -> float:
+    if _reference_assignment_contains_peak(assignment, shift_ppm):
+        return 0.0
+    low, high = _reference_assignment_window(assignment)
+    return min(abs(shift_ppm - low), abs(shift_ppm - high), abs(shift_ppm - float(assignment.shift_ppm)))
+
+
+def _is_reference_solvent_assignment(
+    assignment: ReferencePeakAssignment,
+    solvent: str | None,
+) -> bool:
+    # Reference-text ranges often span a residual-solvent coordinate, especially
+    # aromatic multiplets around CDCl3 at 7.26 ppm.  Do not exclude those from
+    # adjusted observed H: only point-like solvent/water assignments are safe
+    # to remove from the text-backed proton inventory.
+    if assignment.shift_start_ppm is not None or assignment.shift_end_ppm is not None:
+        return False
+    if assignment.multiplicity not in {"s", "br", "br s", "broad"}:
+        return False
+    try:
+        return bool(find_solvent_peak_hit_indices([assignment.as_peak()], solvent))
+    except Exception:  # noqa: BLE001 - solvent heuristics must not block reconciliation
+        return False
+
+
+def _reference_shift_payload(assignment: ReferencePeakAssignment) -> dict[str, Any]:
+    return {
+        "reference_shift_ppm": float(assignment.shift_ppm),
+        "reference_shift_start_ppm": assignment.shift_start_ppm,
+        "reference_shift_end_ppm": assignment.shift_end_ppm,
+        "reference_raw_text": assignment.raw_text,
+    }
+
+
+def _assignment_peak_dict(
+    assignment: ReferencePeakAssignment,
+    *,
+    spectrum_confirmed: bool,
+    linked_spectrum_shift_ppm: float | None,
+    used_for_inventory: bool,
+    solvent_excluded: bool,
+    source: str,
+) -> dict[str, Any]:
+    peak = assignment.as_peak()
+    return {
+        "shift_ppm": float(peak.shift_ppm),
+        "multiplicity": peak.multiplicity,
+        "integration_h": float(peak.integration_h),
+        "j_values_hz": list(peak.j_values_hz),
+        **_reference_shift_payload(assignment),
+        "reference_integration_h": float(assignment.integration_h),
+        "inventory_integration_h": 0.0 if solvent_excluded else float(assignment.integration_h),
+        "integration_source": "nmr_text",
+        "inventory_basis": "nmr_text",
+        "pick_source": source,
+        "spectrum_confirmed": spectrum_confirmed,
+        "linked_spectrum_shift_ppm": linked_spectrum_shift_ppm,
+        "inventory_exclude": not used_for_inventory,
+        "inventory_exclude_reason": (
+            "reference solvent/water assignment excluded from adjusted observed H"
+            if solvent_excluded
+            else None
+        ),
+    }
+
+
+def reconcile_proton_peaks_with_reference_text(
+    *,
+    peaks: Sequence[dict[str, Any]],
+    reference_nmr_text: str | None,
+    solvent: str | None,
+    structure: StructureSummary | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Align picked 1H peaks with the authoritative parsed 1H text.
+
+    This is deliberately evidence-based, not predictive: parsed NMR text is
+    treated as observed analytical evidence, while the spectrum trace is used
+    to mark whether each assignment was independently picked. The resulting
+    list preserves all original spectrum peaks, but proton-inventory
+    integration switches to the text-backed values when text is available.
+    """
+    source_peaks = [dict(peak) for peak in peaks]
+    if not reference_nmr_text or not reference_nmr_text.strip():
+        return source_peaks, {"applied": False, "reason": "no_reference_nmr_text"}
+
+    try:
+        normalized_text, assignments = parse_reference_nmr_text(reference_nmr_text)
+    except PeakParseError as exc:
+        return source_peaks, {
+            "applied": False,
+            "reason": "reference_parse_failed",
+            "error": str(exc),
+        }
+
+    if not assignments:
+        return source_peaks, {"applied": False, "reason": "reference_had_no_assignments"}
+
+    indexed_spectrum: list[tuple[int, float, dict[str, Any]]] = []
+    for idx, peak in enumerate(source_peaks):
+        shift = peak.get("shift_ppm")
+        if isinstance(shift, (int, float)):
+            indexed_spectrum.append((idx, float(shift), peak))
+
+    used_spectrum_indices: set[int] = set()
+    reconciled: list[dict[str, Any]] = []
+    matched_reference_count = 0
+    spectrum_confirmed_reference_count = 0
+    added_reference_count = 0
+    solvent_reference_count = 0
+    reference_total_h = 0.0
+    adjusted_reference_total_h = 0.0
+
+    for assignment in assignments:
+        reference_total_h += float(assignment.integration_h)
+        solvent_excluded = _is_reference_solvent_assignment(assignment, solvent)
+        if solvent_excluded:
+            solvent_reference_count += 1
+        else:
+            adjusted_reference_total_h += float(assignment.integration_h)
+
+        best_unused: tuple[int, float, dict[str, Any], float] | None = None
+        best_any: tuple[int, float, dict[str, Any], float] | None = None
+        for idx, shift, spectrum_peak in indexed_spectrum:
+            if not _reference_assignment_contains_peak(assignment, shift):
+                continue
+            delta = _reference_assignment_delta(assignment, shift)
+            candidate = (idx, shift, spectrum_peak, delta)
+            if best_any is None or delta < best_any[3]:
+                best_any = candidate
+            if idx not in used_spectrum_indices and (best_unused is None or delta < best_unused[3]):
+                best_unused = candidate
+
+        if best_unused is not None:
+            idx, shift, spectrum_peak, delta = best_unused
+            used_spectrum_indices.add(idx)
+            matched_reference_count += 1
+            spectrum_confirmed_reference_count += 1
+            original_integration = spectrum_peak.get("integration_h")
+            updated = {
+                **spectrum_peak,
+                **_reference_shift_payload(assignment),
+                "shift_ppm": shift,
+                "multiplicity": assignment.multiplicity or spectrum_peak.get("multiplicity"),
+                "j_values_hz": list(assignment.j_values_hz),
+                "spectrum_integration_h": original_integration,
+                "integration_h": float(assignment.integration_h),
+                "reference_integration_h": float(assignment.integration_h),
+                "inventory_integration_h": 0.0 if solvent_excluded else float(assignment.integration_h),
+                "integration_source": "nmr_text",
+                "inventory_basis": "nmr_text",
+                "pick_source": "spectrum_and_nmr_text",
+                "spectrum_confirmed": True,
+                "reference_match_delta_ppm": round(float(delta), 4),
+                "inventory_exclude": solvent_excluded,
+                "inventory_exclude_reason": (
+                    "reference solvent/water assignment excluded from adjusted observed H"
+                    if solvent_excluded
+                    else spectrum_peak.get("inventory_exclude_reason")
+                ),
+            }
+            reconciled.append(updated)
+        else:
+            matched_reference_count += 1 if best_any is not None else 0
+            if best_any is not None:
+                spectrum_confirmed_reference_count += 1
+            added_reference_count += 1
+            linked_shift = best_any[1] if best_any is not None else None
+            reconciled.append(
+                _assignment_peak_dict(
+                    assignment,
+                    spectrum_confirmed=best_any is not None,
+                    linked_spectrum_shift_ppm=linked_shift,
+                    used_for_inventory=not solvent_excluded,
+                    solvent_excluded=solvent_excluded,
+                    source=(
+                        "nmr_text_split_from_overlapped_spectrum_peak"
+                        if best_any is not None
+                        else "nmr_text_unconfirmed_by_picker"
+                    ),
+                )
+            )
+
+    unmatched_spectrum_count = 0
+    for idx, _, spectrum_peak in indexed_spectrum:
+        if idx in used_spectrum_indices:
+            continue
+        unmatched_spectrum_count += 1
+        extra = dict(spectrum_peak)
+        extra.setdefault("pick_source", "spectrum_only_unmatched_to_nmr_text")
+        extra.setdefault("integration_source", "spectrum")
+        extra["inventory_exclude"] = True
+        extra["inventory_exclude_reason"] = (
+            "excluded from proton inventory because supplied 1H text is the integration basis"
+        )
+        reconciled.append(extra)
+
+    expected_visible_h: float | None = None
+    if structure is not None:
+        expected_visible_h = (
+            float(structure.non_labile_hydrogens)
+            if solvent and solvent.upper() == "D2O"
+            else float(structure.total_hydrogens)
+        )
+
+    metadata = {
+        "applied": True,
+        "policy": "reference_text_guides_integration; spectrum_only_peaks_preserved_but_excluded_from_proton_inventory",
+        "reference_nmr_text_normalized": normalized_text,
+        "reference_peak_count": len(assignments),
+        "spectrum_peak_count_before": len(source_peaks),
+        "peak_count_after_reconciliation": len(reconciled),
+        "matched_reference_peak_count": matched_reference_count,
+        "spectrum_confirmed_reference_peak_count": spectrum_confirmed_reference_count,
+        "added_reference_peak_count": added_reference_count,
+        "unmatched_spectrum_peak_count": unmatched_spectrum_count,
+        "reference_solvent_peak_count": solvent_reference_count,
+        "observed_total_h": round(reference_total_h, 4),
+        "adjusted_observed_total_h": round(adjusted_reference_total_h, 4),
+        "expected_visible_h": expected_visible_h,
+        "delta_adjusted_observed_vs_expected_h": (
+            round(adjusted_reference_total_h - expected_visible_h, 4)
+            if expected_visible_h is not None
+            else None
+        ),
+    }
+    return reconciled, metadata
 
 
 def build_peak_category_summary(peaks: Iterable[dict[str, Any]]) -> dict[str, int]:
@@ -408,21 +863,33 @@ _ANOMERIC_OR_OLEFINIC_CATEGORIES: frozenset[str] = frozenset(
 _ALDEHYDE_CATEGORIES: frozenset[str] = frozenset({"aldehyde"})
 _CARBOXYL_CATEGORIES: frozenset[str] = frozenset({"carboxylic_acid"})
 _LABILE_CATEGORIES: frozenset[str] = frozenset({"labile_OH_NH_SH"})
+_CARBOHYDRATE_SUGAR_CATEGORIES: frozenset[str] = frozenset({"carbohydrate_sugar"})
 _ALIPHATIC_CATEGORIES: frozenset[str] = frozenset(
-    {"aliphatic", "oxygenated", "nitrogen_adjacent"}
+    {"aliphatic", "oxygenated", "nitrogen_adjacent", "carbohydrate_sugar"}
 )
+
+
+def _inventory_integration(peak: dict[str, Any]) -> float | None:
+    if peak.get("inventory_exclude"):
+        return None
+    integration = peak.get("inventory_integration_h")
+    if not isinstance(integration, (int, float)):
+        integration = peak.get("integration_h")
+    if not isinstance(integration, (int, float)):
+        return None
+    return float(integration)
 
 
 def _sum_integration(peaks: Iterable[dict[str, Any]], categories: frozenset[str]) -> float:
     total = 0.0
     for peak in peaks:
         category = peak.get("category")
-        integration = peak.get("integration_h")
         if not isinstance(category, str) or category not in categories:
             continue
-        if not isinstance(integration, (int, float)):
+        integration = _inventory_integration(peak)
+        if integration is None:
             continue
-        total += float(integration)
+        total += integration
     return total
 
 
@@ -438,13 +905,13 @@ def build_proton_inventory(
     they are float-typed integrations):
 
       observed:
-        aromatic, olefinic_vinylic, aldehyde, carboxylic_acid, labile,
-        aliphatic, total, non_labile
+        aromatic, anomeric_or_olefinic, carbohydrate_sugar, aldehyde,
+        carboxylic_acid, labile, aliphatic, total, non_labile
       expected (only populated when ``structure`` is supplied):
-        aromatic, aliphatic, labile, non_labile, total, oh, nh, sh,
-        labile_subset
+        aromatic, anomeric_or_olefinic, aliphatic, labile, non_labile,
+        total, oh, nh, sh, labile_subset
       deltas (observed − expected; only populated when expected is non-empty):
-        aromatic, aliphatic, labile, non_labile, total
+        aromatic, anomeric_or_olefinic, aliphatic, labile, non_labile, total
       warnings: list[str] — qualitative deviations worth surfacing.
 
     Returns an empty dict for non-proton nuclei so the caller can attach it
@@ -469,15 +936,17 @@ def build_proton_inventory(
     observed_anomeric_olefinic = _sum_integration(peaks, _ANOMERIC_OR_OLEFINIC_CATEGORIES)
     observed_aldehyde = _sum_integration(peaks, _ALDEHYDE_CATEGORIES)
     observed_carboxyl = _sum_integration(peaks, _CARBOXYL_CATEGORIES)
+    observed_carbohydrate_sugar = _sum_integration(peaks, _CARBOHYDRATE_SUGAR_CATEGORIES)
     observed_labile = (
         _sum_integration(peaks, _LABILE_CATEGORIES) + observed_carboxyl
     )  # COOH is labile too
     observed_aliphatic = _sum_integration(peaks, _ALIPHATIC_CATEGORIES)
     observed_total = sum(
-        float(peak.get("integration_h") or 0.0)
+        float(integration)
         for peak in peaks
         if peak.get("category") not in {"solvent", "impurity"}
-        and isinstance(peak.get("integration_h"), (int, float))
+        for integration in [_inventory_integration(peak)]
+        if integration is not None
     )
     observed_non_labile = max(observed_total - observed_labile, 0.0)
 
@@ -491,6 +960,7 @@ def build_proton_inventory(
         # (e.g. tobramycin) have anomeric protons here but no olefinic ones,
         # and the original name was misleading.
         "anomeric_or_olefinic": _round(observed_anomeric_olefinic),
+        "carbohydrate_sugar": _round(observed_carbohydrate_sugar),
         "aldehyde": _round(observed_aldehyde),
         "carboxylic_acid": _round(observed_carboxyl),
         "labile": _round(observed_labile),
@@ -505,6 +975,7 @@ def build_proton_inventory(
     if structure is not None:
         expected_block = {
             "aromatic": int(structure.aromatic_protons),
+            "anomeric_or_olefinic": _expected_anomeric_signal_count(structure),
             "aliphatic": int(structure.aliphatic_protons),
             "labile": int(structure.labile_hydrogens),
             "non_labile": int(structure.non_labile_hydrogens),
@@ -520,6 +991,9 @@ def build_proton_inventory(
         }
         deltas = {
             "aromatic": _round(observed_aromatic - expected_block["aromatic"]),
+            "anomeric_or_olefinic": _round(
+                observed_anomeric_olefinic - expected_block["anomeric_or_olefinic"]
+            ),
             "aliphatic": _round(observed_aliphatic - expected_block["aliphatic"]),
             "labile": _round(observed_labile - expected_block["labile"]),
             "non_labile": _round(observed_non_labile - expected_block["non_labile"]),
@@ -542,8 +1016,15 @@ def build_proton_inventory(
                         "or truncation."
                     )
 
+    integration_basis = (
+        "nmr_text_guided"
+        if any(str(peak.get("inventory_basis") or "") == "nmr_text" for peak in peaks)
+        else "spectrum"
+    )
+
     return {
         "nucleus": "1H",
+        "integration_basis": integration_basis,
         "observed": observed_block,
         "expected": expected_block,
         "deltas": deltas,

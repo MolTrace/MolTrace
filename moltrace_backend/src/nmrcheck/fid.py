@@ -202,6 +202,11 @@ _FID_PRESET_DESCRIPTIONS: dict[FIDPresetId, str] = {
 _RAW_FID_MNOVA_ZERO_FILL_FACTOR = 3
 _RAW_FID_MNOVA_C13_LINE_BROADENING_HZ = 2.0
 _RAW_FID_MNOVA_BASELINE_ORDER = 3
+# Display point budget for raw-FID 1H. Dense 1H multiplets need enough sampled
+# points to show doublets-of-doublets, triplets, quartets, and unresolved
+# multiplets without zooming; lower budgets collapse those splittings into
+# blobs even when the FFT itself was computed correctly.
+_RAW_FID_MNOVA_PROTON_PREVIEW_POINTS = 12000
 # Display point budget for the raw-FID 13C preview. Carbon should stay fast
 # and stick-like; 4000 points is enough for the broad carbon window after
 # peak-preserving downsampling.
@@ -230,7 +235,7 @@ _RAW_FID_CARBON13_SOLVENT_FLOOR_WINDOW = (
     50.2,
     "13C solvent carbon near 49 ppm",
 )
-_RAW_FID_PROCESS_CACHE_VERSION = "raw-fid-inline-preview-v1"
+_RAW_FID_PROCESS_CACHE_VERSION = "raw-fid-mnova-resolution-v2"
 _RAW_FID_PROCESS_CACHE_MAX_ENTRIES = 32
 _RAW_FID_PROCESS_CACHE: OrderedDict[str, FIDPreviewReport] = OrderedDict()
 _RAW_FID_PROCESS_CACHE_LOCK = Lock()
@@ -812,15 +817,52 @@ def _apply_raw_fid_mnova_constraints(
         return constrained, detail, notes
 
     if normalized == "1H":
-        detail.update(
-            {
-                "reason": "proton_raw_fid_uses_selected_preset_or_explicit_settings",
-                "selected_zero_fill_factor": settings.zero_fill_factor,
-                "selected_apodization_mode": settings.apodization_mode,
-                "selected_line_broadening_hz": settings.line_broadening_hz,
+        # MestreNova Advised Processing for 1H (manual p. 106, p. 129):
+        #   Stanning apodization · 3x zero-fill · Regions-Analysis auto phase
+        #   · Bernstein polynomial baseline (order 3). We approximate the
+        #   Stanning/truncation behavior with our trapezoidal window: the
+        #   manual separately names trapezoidal apodization as the way to avoid
+        #   sinc artifacts from FID truncation, while warning that exponential
+        #   line broadening reduces resolution. That is exactly the tradeoff
+        #   needed for raw 1H multiplets: remove truncation tails without
+        #   widening dd/t/q/s/m structure into blobs.
+        constrained = settings.model_copy(
+            update={
+                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "apodization_mode": "trapezoidal",
+                "line_broadening_hz": 0.0,
+                "phase_mode": "auto",
+                "auto_phase": True,
+                "baseline_correction": "bernstein",
+                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
+                "auto_baseline": True,
+                "max_preview_points": max(
+                    int(settings.max_preview_points),
+                    _RAW_FID_MNOVA_PROTON_PREVIEW_POINTS,
+                ),
             }
         )
-        return settings, detail, notes
+        detail.update(
+            {
+                "applied": True,
+                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "apodization_mode": "trapezoidal",
+                "line_broadening_hz": 0.0,
+                "phase_mode": "auto",
+                "phase_reference": "MolTrace automatic 1D phase correction",
+                "baseline_correction": "bernstein",
+                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
+                "first_point_scale": _RAW_FID_MNOVA_FIRST_POINT_SCALE,
+                "max_preview_points": constrained.max_preview_points,
+                "resolution_policy": "multiplet_preserving_no_exponential_line_broadening",
+            }
+        )
+        notes.append(
+            "Raw 1H FID advised processing applied: 3x zero-fill, trapezoidal "
+            "truncation apodization, first-point correction 0.5, auto phase, "
+            "and Bernstein-3 baseline correction."
+        )
+        return constrained, detail, notes
 
     detail["reason"] = "no_raw_fid_constraints_for_nucleus"
     return settings, detail, notes
