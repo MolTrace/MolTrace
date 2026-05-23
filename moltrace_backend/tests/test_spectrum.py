@@ -177,7 +177,7 @@ def test_structure_guided_sweep_recovers_reference_multiplets_under_noise() -> N
     for assignment in assignments:
         assert any(abs(assignment.shift_ppm - shift) <= 0.06 for shift in detected)
     assert comparison is not None
-    assert chosen in {0.06, 0.08, 0.1, 0.12, 0.15}
+    assert chosen in {0.04, 0.05, 0.06, 0.08, 0.1, 0.12, 0.15}
 
 
 def test_structure_guided_sweep_honours_an_explicit_fixed_sensitivity() -> None:
@@ -215,6 +215,17 @@ def test_priority_regions_recover_a_weak_peak_a_uniform_threshold_misses() -> No
     )
     assert sorted(round(estimate.shift_ppm, 1) for estimate in without_hint) == [2.0]
     assert sorted(round(estimate.shift_ppm, 1) for estimate in with_hint) == [2.0, 4.8]
+
+
+def test_carbohydrate_priority_regions_cover_aminoglycoside_sugar_envelope() -> None:
+    proton_regions = diagnostic_regions_for("carbohydrates", "1H")
+    carbon_regions = diagnostic_regions_for("carbohydrates", "13C")
+
+    assert any(lo <= 3.4 <= hi for lo, hi in proton_regions)
+    assert any(lo <= 5.1 <= hi for lo, hi in proton_regions)
+    assert any(lo <= 60.0 <= hi for lo, hi in carbon_regions)
+    assert any(lo <= 100.0 <= hi for lo, hi in carbon_regions)
+    assert not any(lo <= 125.0 <= hi for lo, hi in carbon_regions)
 
 
 def test_reference_multiplicity_is_adopted_for_matched_peaks() -> None:

@@ -48,7 +48,7 @@ export function extractSpectrumXY(payload: unknown): { x: number[]; y: number[] 
       for (const yKey of yk) {
         if (!(yKey in r)) continue
         const yArr = coerceNumArray(r[yKey])
-        if (yArr && yArr.length === xArr.length) return { x: xArr, y: yArr }
+        if (yArr && xArr.length > 0 && yArr.length === xArr.length) return { x: xArr, y: yArr }
       }
     }
     const rowKeys = ["preview_points", "points", "data", "trace"] as const

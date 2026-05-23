@@ -23,6 +23,7 @@ import { SpectrumViewer } from "@/components/science/SpectrumViewer"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import {
   EnrichedPickedPeaksPanel,
+  InferredNmrTextPanel,
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
 import {
@@ -329,6 +330,19 @@ export function SpectraCheckRawFidSection({
     }
   }
 
+  function appendSharedSessionGuidance(fd: FormData) {
+    const ccParam = compoundClassForRequest(compoundClass)
+    if (ccParam) fd.append("compound_class", ccParam)
+    // Shared session inputs — drives peak enrichment + evidence panels on
+    // the response (parity with /nmr/processed/analyze).
+    const cand = candidatesText.trim()
+    if (cand) fd.append("candidates_text", cand)
+    const sharedProton = protonText.trim()
+    if (sharedProton) fd.append("proton_nmr_text", sharedProton)
+    const sharedCarbon = carbonText.trim()
+    if (sharedCarbon) fd.append("carbon13_text", sharedCarbon)
+  }
+
   function buildFormData(file: File, withProcess: boolean) {
     const fd = new FormData()
     fd.append("file", file)
@@ -343,16 +357,7 @@ export function SpectraCheckRawFidSection({
       fd.append("processing_preset", "safe_automatic")
       fd.append("include_spectrum", "true")
     }
-    const ccParam = compoundClassForRequest(compoundClass)
-    if (ccParam) fd.append("compound_class", ccParam)
-    // Shared session inputs — drives peak enrichment + evidence panels on
-    // the response (parity with /nmr/processed/analyze).
-    const cand = candidatesText.trim()
-    if (cand) fd.append("candidates_text", cand)
-    const sharedProton = protonText.trim()
-    if (sharedProton) fd.append("proton_nmr_text", sharedProton)
-    const sharedCarbon = carbonText.trim()
-    if (sharedCarbon) fd.append("carbon13_text", sharedCarbon)
+    appendSharedSessionGuidance(fd)
     return fd
   }
 
@@ -422,6 +427,7 @@ export function SpectraCheckRawFidSection({
         fd.append("selected_preset", "safe_automatic")
         fd.append("processing_preset", "safe_automatic")
         fd.append("save_run", "false")
+        appendSharedSessionGuidance(fd)
         data = await apiFetch<unknown>(`/raw-fid/${encodeURIComponent(safeArchiveId)}/preview`, {
           method: "POST",
           body: fd,
@@ -435,6 +441,7 @@ export function SpectraCheckRawFidSection({
         fd.append("vendor", vendor)
         fd.append("processing_preset", "safe_automatic")
         fd.append("preserve_raw", "true")
+        appendSharedSessionGuidance(fd)
         data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
       }
       pushDev("raw_fid_preview_spectrum", data)
@@ -1483,6 +1490,10 @@ export function SpectraCheckRawFidSection({
                 light up here automatically. */}
             {displayPayload != null ? (
               <>
+                {/* Inferred NMR prose summary — same panel as the processed
+                    1H/13C tab so the deconvolution + reference-guided
+                    multiplicity output is visible on both upload paths. */}
+                <InferredNmrTextPanel payload={displayPayload} />
                 <EnrichedPickedPeaksPanel payload={displayPayload} />
                 <SpectraCheckEvidencePanels payload={displayPayload} />
               </>

@@ -422,6 +422,8 @@ describe("SpectraCheck preview rendering", () => {
     await waitFor(() =>
       expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/analyze", expect.any(Object)),
     )
+    const analyzeCall = apiFetchMock.mock.calls.find(([path]) => path === "/nmr/processed/analyze")
+    expect((analyzeCall?.[1]?.body as FormData).get("include_spectrum")).toBe("false")
     expect(screen.getByText(/Nucleus context/i)).toBeInTheDocument()
 
     // Resolve the analyze; chart updates atomically.

@@ -27,7 +27,16 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { AlertTriangle, Beaker, BookOpen, ListChecks, Sparkles, Tag, Target } from "lucide-react"
+import {
+  AlertTriangle,
+  Beaker,
+  BookOpen,
+  FileText,
+  ListChecks,
+  Sparkles,
+  Tag,
+  Target,
+} from "lucide-react"
 import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 
 type RawPeak = Record<string, unknown>
@@ -97,7 +106,7 @@ function EnrichedPickedPeaksPanelImpl({
   payload: unknown
   fallbackTitle?: string
 }) {
-  const peaks = extractRawPeaks(payload)
+  const peaks = useMemo(() => extractRawPeaks(payload), [payload])
   if (peaks.length === 0) {
     return null
   }
@@ -194,6 +203,82 @@ function EnrichedPickedPeaksPanelImpl({
             </TableBody>
           </Table>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Inferred NMR text — the backend-generated prose summary
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Read the backend-generated NMR string from a loose payload.
+ *
+ * The processed-spectrum analyze endpoint puts the inferred multiplet summary
+ * — e.g. ``"5.23 (d, J = 3.6 Hz, 12.5H), 3.95 (ddd, J = 10.3, 4.6, 2.6 Hz, 9.5H)"``
+ * — on ``preview.inferred_nmr_text`` and ``analysis.inferred_nmr_text``. The
+ * panel accepts either the preview or the analysis payload directly, and also
+ * the legacy shape where the field sits at the top of the object.
+ */
+function readInferredNmrText(payload: unknown): string | null {
+  if (!isRecord(payload)) return null
+  const direct = payload.inferred_nmr_text
+  if (typeof direct === "string" && direct.trim().length > 0) {
+    return direct.trim()
+  }
+  // Some callers hand us the wrapper object that holds the preview and the
+  // analysis blocks side-by-side; reach in and prefer the analysis text.
+  const analysis = isRecord(payload.analysis) ? payload.analysis.inferred_nmr_text : null
+  if (typeof analysis === "string" && analysis.trim().length > 0) {
+    return analysis.trim()
+  }
+  const preview = isRecord(payload.preview) ? payload.preview.inferred_nmr_text : null
+  if (typeof preview === "string" && preview.trim().length > 0) {
+    return preview.trim()
+  }
+  return null
+}
+
+function InferredNmrTextPanelImpl({
+  payload,
+  title = "Inferred NMR (from analysis)",
+}: {
+  payload: unknown
+  title?: string
+}) {
+  const text = useMemo(() => readInferredNmrText(payload), [payload])
+  if (text === null) {
+    // Silent when missing so the panel can be dropped into legacy result
+    // layouts without forcing every backend response to populate it.
+    return null
+  }
+  return (
+    <Card
+      className="overflow-hidden rounded-xl py-0"
+      style={{ borderTop: "3px solid var(--mt-blue, #4c6fae)" }}
+      data-testid="inferred-nmr-text-panel"
+    >
+      <CardContent className="space-y-2 py-3">
+        <div className="flex items-center justify-between">
+          <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            <FileText className="h-3 w-3" aria-hidden />
+            {title}
+          </p>
+          <span className="font-mono text-[10px] text-muted-foreground">
+            backend-generated
+          </span>
+        </div>
+        {/* Wrap so long multiplet strings stay readable on narrow cards. The
+            text is the user-visible product of the deconvolution + reference-
+            guided multiplicity pipeline, so render it verbatim — no
+            truncation, no client-side reformatting. */}
+        <p
+          className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground"
+          data-testid="inferred-nmr-text-body"
+        >
+          {text}
+        </p>
       </CardContent>
     </Card>
   )
@@ -902,4 +987,5 @@ function SpectraCheckEvidencePanelsImpl({ payload }: { payload: unknown }) {
 // invalidating the picked-peaks table, DP4 ranking, predicted-vs-observed
 // table, impurity candidates, references, etc.
 export const EnrichedPickedPeaksPanel = memo(EnrichedPickedPeaksPanelImpl)
+export const InferredNmrTextPanel = memo(InferredNmrTextPanelImpl)
 export const SpectraCheckEvidencePanels = memo(SpectraCheckEvidencePanelsImpl)
