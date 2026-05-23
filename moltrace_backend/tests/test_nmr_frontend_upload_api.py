@@ -145,6 +145,39 @@ def test_nmr_processed_analyze_returns_peaks(tmp_path) -> None:
     assert any("Human review" in item for item in payload["evidence_summary"])
 
 
+def test_nmr_processed_analyze_can_omit_spectrum_points_for_fast_display(tmp_path) -> None:
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "analyze-fast-display",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "include_spectrum": "false",
+                "nmr_text": (
+                    "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), "
+                    "1.26 (t, 3H), 2.10 (br s, 1H)"
+                ),
+                "candidates_text": "ethanol | CCO",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["point_count"] == 3
+    assert payload["peak_count"] == 3
+    assert payload["x"] == []
+    assert payload["y"] == []
+    assert payload["metadata"]["spectrum_points_included"] is False
+    assert (
+        payload["metadata"]["spectrum_points_omitted_reason"]
+        == "frontend_already_has_preview_trace"
+    )
+    assert payload["peaks"][0]["shift_ppm"] == 3.65
+
+
 def test_nmr_processed_analyze_returns_peak_enrichment(tmp_path) -> None:
     """Per-peak categorization, impurity matches, labile-H summary, and
     peak-category counts must be present in the analyze response."""
@@ -310,6 +343,37 @@ def test_nmr_raw_fid_process_preserves_raw_hash(tmp_path) -> None:
     assert len(payload["x"]) == len(payload["y"])
     recipe = payload["processing_parameters"]["processing_recipe"]
     assert recipe["baseline_correction"] == "bernstein"
+
+
+def test_nmr_raw_fid_process_can_omit_spectrum_points_for_fast_display(tmp_path) -> None:
+    content = _build_bruker_zip()
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/raw-fid/process",
+            headers=HEADERS,
+            data={
+                "sample_id": "raw-fast-display",
+                "nucleus": "1H",
+                "vendor": "auto",
+                "processing_preset": "balanced",
+                "include_spectrum": "false",
+                "candidates_text": "ethanol | CCO",
+                "proton_nmr_text": "3.65 (q, 2H), 1.26 (t, 3H)",
+            },
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["point_count"] > 0
+    assert payload["peak_count"] >= 0
+    assert payload["x"] == []
+    assert payload["y"] == []
+    assert payload["metadata"]["spectrum_points_included"] is False
+    assert (
+        payload["metadata"]["spectrum_points_omitted_reason"]
+        == "frontend_already_has_preview_trace"
+    )
 
 
 def test_nmr_processed_accepts_1h_and_13c_nucleus_values(tmp_path) -> None:
@@ -518,6 +582,44 @@ def test_nmr_raw_fid_process_links_13c_text_and_parsed_smiles(tmp_path) -> None:
     assert context_guidance.get("expected_carbon_atoms") == 2
 
 
+def test_nmr_raw_fid_preview_links_13c_text_and_parsed_smiles(tmp_path) -> None:
+    """Preview-mode Raw-FID 13C should use the same SMILES and 13C text
+    guidance as process-mode without adding synthetic reference-only peaks."""
+    content = _build_bruker_zip()
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/raw-fid/preview",
+            headers=HEADERS,
+            data={
+                "sample_id": "raw-fid-carbon-preview-guided",
+                "nucleus": "13C",
+                "vendor": "auto",
+                "solvent": "CDCl3",
+                "processing_preset": "balanced",
+                "candidates_text": "Ethanol | CCO",
+                "proton_nmr_text": "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), 1.26 (t, 3H)",
+                "carbon13_text": "13C NMR (101 MHz, CDCl3) δ 58.2, 18.1",
+            },
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    guidance = payload["metadata"]["raw_fid_peak_guidance"]
+    assert guidance["peak_evidence_policy"] == "detected_peaks_only_no_reference_fabrication"
+    assert guidance["structure_smiles_used_for_peak_picking"] == "CCO"
+    assert guidance["parsed_smiles_supplied_to_raw_fid"] is True
+    assert guidance["carbon13_text_used_for_peak_guidance"] is True
+
+    text_guidance = guidance.get("carbon13_text_guidance") or {}
+    assert text_guidance.get("carbon13_text_guidance_used") is True
+    assert text_guidance.get("reference_peak_count") == 2
+
+    context_guidance = guidance.get("carbon13_context_guidance") or {}
+    assert context_guidance.get("smiles_guidance_used") is True
+    assert context_guidance.get("expected_carbon_atoms") == 2
+
+
 def test_nmr_raw_fid_preview_echoes_compound_class(tmp_path) -> None:
     content = _build_bruker_zip()
     with _client(tmp_path) as client:
@@ -529,6 +631,9 @@ def test_nmr_raw_fid_preview_echoes_compound_class(tmp_path) -> None:
                 "nucleus": "1H",
                 "vendor": "auto",
                 "compound_class": "natural_products",
+                "candidates_text": "Ethanol | CCO",
+                "proton_nmr_text": "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), 1.26 (t, 3H)",
+                "carbon13_text": "13C NMR (101 MHz, CDCl3) δ 58.2, 18.1",
             },
             files={"file": ("ethanol_raw.zip", content, "application/zip")},
         )
@@ -536,6 +641,12 @@ def test_nmr_raw_fid_preview_echoes_compound_class(tmp_path) -> None:
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["metadata"]["compound_class"] == "natural_products"
+    guidance = payload["metadata"]["raw_fid_peak_guidance"]
+    assert guidance["structure_smiles_used_for_peak_picking"] == "CCO"
+    assert guidance["parsed_smiles_supplied_to_raw_fid"] is True
+    assert guidance["proton_nmr_text_supplied_to_raw_fid"] is True
+    assert guidance["carbon13_text_supplied_to_raw_fid"] is True
+    assert guidance["expected_total_h"] == 6
 
 
 def test_nmr_processed_analyze_applies_per_class_prior(tmp_path) -> None:

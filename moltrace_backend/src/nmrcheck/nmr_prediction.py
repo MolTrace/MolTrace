@@ -47,6 +47,27 @@ def _attached_to(atom: Chem.Atom, atomic_nums: set[int]) -> bool:
     return any(neighbor.GetAtomicNum() in atomic_nums for neighbor in _atom_neighbors(atom))
 
 
+def _single_bond_neighbor_count(atom: Chem.Atom, atomic_num: int) -> int:
+    return sum(
+        1
+        for neighbor in _atom_neighbors(atom)
+        if neighbor.GetAtomicNum() == atomic_num and 0.8 <= _bond_order(atom, neighbor) <= 1.2
+    )
+
+
+def _is_saturated_carbon(atom: Chem.Atom) -> bool:
+    return (
+        atom.GetAtomicNum() == 6
+        and not atom.GetIsAromatic()
+        and atom.GetHybridization() == Chem.rdchem.HybridizationType.SP3
+    )
+
+
+def _is_anomeric_or_acetal_carbon(atom: Chem.Atom) -> bool:
+    attached_h = int(atom.GetTotalNumHs(includeNeighbors=False))
+    return _is_saturated_carbon(atom) and attached_h > 0 and _single_bond_neighbor_count(atom, 8) >= 2
+
+
 def _alpha_to_carbonyl(atom: Chem.Atom) -> bool:
     return any(neighbor.GetAtomicNum() == 6 and _is_carbonyl_carbon(neighbor) for neighbor in _atom_neighbors(atom))
 
@@ -62,6 +83,10 @@ def _neighbor_carbon_attached_to(atom: Chem.Atom, atomic_nums: set[int]) -> bool
 
 def _attached_to_aromatic(atom: Chem.Atom) -> bool:
     return any(neighbor.GetIsAromatic() for neighbor in _atom_neighbors(atom))
+
+
+def _has_carbohydrate_like_neighbors(atom: Chem.Atom) -> bool:
+    return _single_bond_neighbor_count(atom, 8) > 1 or _neighbor_carbon_attached_to(atom, {7, 8})
 
 
 def _carbon_type(atom: Chem.Atom) -> str:
@@ -105,10 +130,33 @@ def _predict_carbon_shift(atom: Chem.Atom) -> tuple[float, float, str, list[str]
         return shift, 4.0, "alkene_or_imine_carbon", warnings
     if hybrid == Chem.rdchem.HybridizationType.SP:
         return 78.0, 4.0, "alkyne_or_nitrile_carbon", warnings
-    if _attached_to(atom, {8}):
-        return 58.5 if attached_h >= 2 else 72.0, 2.0, "oxygenated_aliphatic_carbon", warnings
-    if _attached_to(atom, {7}):
-        return 48.0 if attached_h >= 2 else 56.0, 2.5, "nitrogenated_aliphatic_carbon", warnings
+    oxygen_neighbors = _single_bond_neighbor_count(atom, 8)
+    nitrogen_neighbors = _single_bond_neighbor_count(atom, 7)
+    if _is_anomeric_or_acetal_carbon(atom):
+        return 100.0, 2.5, "anomeric_or_acetal_carbon", warnings
+    if oxygen_neighbors and nitrogen_neighbors:
+        return (
+            62.0 if attached_h >= 2 else 70.0,
+            2.5,
+            "aminoglycoside_oxygenated_nitrogenated_carbon",
+            warnings,
+        )
+    if oxygen_neighbors:
+        if not _has_carbohydrate_like_neighbors(atom):
+            return 58.5 if attached_h >= 2 else 72.0, 2.0, "oxygenated_aliphatic_carbon", warnings
+        return (
+            61.5 if attached_h >= 2 else 72.0,
+            2.0,
+            "carbohydrate_oxygenated_aliphatic_carbon",
+            warnings,
+        )
+    if nitrogen_neighbors:
+        return (
+            48.0 if attached_h >= 2 else 56.0,
+            2.5,
+            "aminoglycoside_nitrogenated_aliphatic_carbon",
+            warnings,
+        )
     if _attached_to(atom, {16}):
         return 35.0, 3.0, "sulfur_adjacent_aliphatic_carbon", warnings
     if _attached_to(atom, HALOGENS):
@@ -144,10 +192,36 @@ def _predict_proton_shift_for_carbon(atom: Chem.Atom) -> tuple[float, float, str
         return 5.60, 0.30, "vinylic_proton", "m", warnings
     if hybrid == Chem.rdchem.HybridizationType.SP:
         return 2.20, 0.30, "alkynyl_proton", "s", warnings
-    if _attached_to(atom, {8}):
-        return 3.65 if attached_h >= 2 else 4.10, 0.25, "oxygenated_aliphatic_proton", "m", warnings
-    if _attached_to(atom, {7}):
-        return 2.95 if attached_h >= 2 else 3.40, 0.30, "nitrogenated_aliphatic_proton", "m", warnings
+    oxygen_neighbors = _single_bond_neighbor_count(atom, 8)
+    nitrogen_neighbors = _single_bond_neighbor_count(atom, 7)
+    if _is_anomeric_or_acetal_carbon(atom):
+        return 5.05, 0.30, "anomeric_or_acetal_proton", "d", warnings
+    if oxygen_neighbors and nitrogen_neighbors:
+        return (
+            3.65 if attached_h >= 2 else 3.95,
+            0.28,
+            "aminoglycoside_oxygenated_nitrogenated_proton",
+            "m",
+            warnings,
+        )
+    if oxygen_neighbors:
+        if not _has_carbohydrate_like_neighbors(atom):
+            return 3.65 if attached_h >= 2 else 4.10, 0.25, "oxygenated_aliphatic_proton", "m", warnings
+        return (
+            3.45 if attached_h >= 2 else 3.85,
+            0.25,
+            "carbohydrate_oxygenated_aliphatic_proton",
+            "m",
+            warnings,
+        )
+    if nitrogen_neighbors:
+        return (
+            2.95 if attached_h >= 2 else 3.35,
+            0.30,
+            "aminoglycoside_nitrogenated_aliphatic_proton",
+            "m",
+            warnings,
+        )
     if _attached_to(atom, {16}):
         return 2.65, 0.35, "sulfur_adjacent_proton", "m", warnings
     if _attached_to(atom, HALOGENS):
@@ -279,6 +353,11 @@ def predict_nmr_from_smiles(smiles: str, *, name: str | None = None, solvent: st
         warnings.append("Large candidate: heuristic prediction uncertainty may be high.")
     if any("aromatic" in str(peak.environment or "") for peak in carbon_peaks):
         warnings.append("Aromatic substitution patterns can require ML/DFT prediction for reliable discrimination.")
+    if summary.anomeric_proton_count > 0 and summary.olefinic_proton_count == 0:
+        notes.append(
+            "Structure is saturated with anomeric/acetal protons; carbohydrate and "
+            "aminoglycoside O/N-bearing regions are prioritised over olefinic regions."
+        )
 
     uncertainty_values = [peak.uncertainty_ppm for peak in proton_peaks + carbon_peaks]
     avg_uncertainty = sum(uncertainty_values) / len(uncertainty_values) if uncertainty_values else 0.0
@@ -303,6 +382,8 @@ def predict_nmr_from_smiles(smiles: str, *, name: str | None = None, solvent: st
             "carbon13_prediction_count": len(carbon_peaks),
             "predicted_hsqc_count": len(predicted_hsqc),
             "average_uncertainty_ppm": round(avg_uncertainty, 4),
+            "olefinic_proton_count": summary.olefinic_proton_count,
+            "anomeric_proton_count": summary.anomeric_proton_count,
         },
     )
 

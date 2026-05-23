@@ -5649,11 +5649,13 @@ async def nmr_processed_analyze_route(
     carbon13_text: str | None = Form(default=None),
     candidates_text: str | None = Form(default=None),
     compound_class: str | None = Form(default=None),
+    include_spectrum: bool = Form(default=True),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRProcessedAnalyzeResponse:
     filename = file.filename or "processed_spectrum.dat"
     content = await file.read()
     normalized_compound_class = normalize_compound_class(compound_class)
+    include_spectrum_value = _coerce_optional_form_bool(include_spectrum, default=True)
     shared_proton_text = (proton_nmr_text or "").strip() or None
     shared_carbon_text = (carbon13_text or "").strip() or None
     candidate_smiles_for_targets = _first_smiles_from_candidates(candidates_text)
@@ -5818,6 +5820,9 @@ async def nmr_processed_analyze_route(
         raise _upload_http_400(exc, operation="NMR processed spectrum analysis") from exc
 
     metadata.update(candidate_metadata)
+    metadata["spectrum_points_included"] = include_spectrum_value
+    if not include_spectrum_value:
+        metadata["spectrum_points_omitted_reason"] = "frontend_already_has_preview_trace"
 
     # Per-peak enrichment: category, chemical region, labile hint, impurity match.
     # Adds keys to each peak dict without disturbing the existing shape.
@@ -5985,8 +5990,8 @@ async def nmr_processed_analyze_route(
         filename=filename,
         point_count=point_count,
         peak_count=len(peaks),
-        x=x_values,
-        y=y_values,
+        x=x_values if include_spectrum_value else [],
+        y=y_values if include_spectrum_value else [],
         x_label="ppm",
         y_label="intensity",
         reversed_x_axis=_reversed_x_axis(x_values),
@@ -6023,11 +6028,23 @@ async def nmr_raw_fid_preview_route(
     processing_preset: str | None = Form(default="balanced"),
     include_spectrum: bool = Form(default=True),
     compound_class: str | None = Form(default=None),
+    # Shared session inputs (mirror /nmr/processed/analyze and /nmr/raw-fid/process).
+    candidates_text: str | None = Form(default=None),
+    proton_nmr_text: str | None = Form(default=None),
+    carbon13_text: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRRawFIDPreviewResponse:
     filename = file.filename or "raw_fid_archive.zip"
     content = await file.read()
     normalized_compound_class = normalize_compound_class(compound_class)
+    shared_proton_text = (proton_nmr_text or "").strip() or None
+    shared_carbon_text = (carbon13_text or "").strip() or None
+    candidate_smiles = _first_smiles_from_candidates(candidates_text)
+    raw_expected_total_h, raw_expected_non_labile_h = (
+        _spectrum_structure_targets(candidate_smiles)
+        if nucleus == "1H"
+        else (None, None)
+    )
     provenance = _raw_fid_upload_provenance(
         request,
         filename=filename,
@@ -6088,11 +6105,34 @@ async def nmr_raw_fid_preview_route(
                 solvent=solvent,
                 nucleus=nucleus,
                 settings=settings,
+                reference_nmr_text=shared_proton_text if nucleus == "1H" else None,
+                expected_total_h=raw_expected_total_h,
+                expected_non_labile_h=raw_expected_non_labile_h,
                 compound_class=normalized_compound_class,
                 raw_upload_provenance=raw_upload_provenance,
             )
             x_values, y_values = _xy_from_spectrum_points(spectrum_preview.preview_points)
             peaks = _model_dicts(spectrum_preview.inferred_peaks)
+            if nucleus == "13C":
+                carbon_peaks = carbon13_peaks_from_shift_values(
+                    [(peak.shift_ppm, peak.integration_h) for peak in spectrum_preview.inferred_peaks],
+                    solvent=solvent,
+                )
+                carbon_peaks, text_meta, text_notes = refine_carbon13_peaks_with_text_guidance(
+                    carbon_peaks,
+                    carbon13_text=shared_carbon_text,
+                    solvent=solvent,
+                )
+                carbon_peaks, context_meta, context_notes = refine_carbon13_peaks_with_context(
+                    carbon_peaks,
+                    smiles=candidate_smiles,
+                    proton_nmr_text=shared_proton_text,
+                    solvent=solvent,
+                )
+                peaks = _model_dicts(carbon_peaks)
+                raw_upload_provenance["carbon13_text_guidance"] = text_meta
+                raw_upload_provenance["carbon13_context_guidance"] = context_meta
+                warnings = list(dict.fromkeys([*warnings, *text_notes, *context_notes]))
             point_count = spectrum_preview.point_count
             processing_parameters = _processing_parameters_payload(spectrum_preview)
             resolved_processing_preset = settings.selected_preset
@@ -6122,8 +6162,24 @@ async def nmr_raw_fid_preview_route(
         "requested_vendor": vendor,
         "legacy_route_wrapped": "/raw-fid/upload",
         "compound_class": normalized_compound_class,
+        "candidate_text_supplied": bool((candidates_text or "").strip()),
+        "proton_nmr_text_supplied": shared_proton_text is not None,
+        "carbon13_text_supplied": shared_carbon_text is not None,
         "inline_spectrum_generated": spectrum_generated,
         "processing_preset": resolved_processing_preset,
+        "raw_fid_peak_guidance": {
+            "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
+            "structure_smiles_used_for_peak_picking": candidate_smiles,
+            "structure_guidance_source": "candidates_text" if candidate_smiles else None,
+            "parsed_smiles_supplied_to_raw_fid": candidate_smiles is not None,
+            "proton_nmr_text_supplied_to_raw_fid": shared_proton_text is not None,
+            "carbon13_text_supplied_to_raw_fid": shared_carbon_text is not None,
+            "carbon13_text_used_for_peak_guidance": nucleus == "13C" and shared_carbon_text is not None,
+            "expected_total_h": raw_expected_total_h,
+            "expected_non_labile_h": raw_expected_non_labile_h,
+            "carbon13_text_guidance": raw_upload_provenance.get("carbon13_text_guidance"),
+            "carbon13_context_guidance": raw_upload_provenance.get("carbon13_context_guidance"),
+        },
     }
     _audit_from_context(
         request,
@@ -6179,6 +6235,7 @@ async def nmr_raw_fid_process_route(
     vendor: Literal["auto", "bruker", "agilent_varian"] = Form(default="auto"),
     processing_preset: str | None = Form(default="balanced"),
     preserve_raw: bool = Form(default=True),
+    include_spectrum: bool = Form(default=True),
     compound_class: str | None = Form(default=None),
     # Shared session inputs (mirror /nmr/processed/analyze) — let the Raw FID
     # tab mount the same evidence panels as the Processed tab.
@@ -6190,6 +6247,7 @@ async def nmr_raw_fid_process_route(
     filename = file.filename or "raw_fid_archive.zip"
     content = await file.read()
     normalized_compound_class = normalize_compound_class(compound_class)
+    include_spectrum_value = _coerce_optional_form_bool(include_spectrum, default=True)
     shared_proton_text = (proton_nmr_text or "").strip() or None
     shared_carbon_text = (carbon13_text or "").strip() or None
     candidate_smiles = _first_smiles_from_candidates(candidates_text)
@@ -6365,7 +6423,10 @@ async def nmr_raw_fid_process_route(
         "candidate_text_supplied": bool(candidates_text and candidates_text.strip()),
         "raw_fid_peak_guidance": raw_fid_peak_guidance,
         "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
+        "spectrum_points_included": include_spectrum_value,
     }
+    if not include_spectrum_value:
+        metadata["spectrum_points_omitted_reason"] = "frontend_already_has_preview_trace"
     _audit_from_context(
         request,
         context=context,
@@ -6397,8 +6458,8 @@ async def nmr_raw_fid_process_route(
         labile_hydrogen_summary=labile_hydrogen_summary,
         proton_inventory=proton_inventory,
         impurity_candidates=impurity_candidates,
-        x=x_values,
-        y=y_values,
+        x=x_values if include_spectrum_value else [],
+        y=y_values if include_spectrum_value else [],
         x_label="ppm",
         y_label="intensity",
         reversed_x_axis=_reversed_x_axis(x_values),
@@ -6572,6 +6633,10 @@ def raw_fid_archive_preview(
     reference_ppm: float | None = Form(default=None),
     smiles: str | None = Form(default=None),
     reference_nmr_text: str | None = Form(default=None),
+    compound_class: str | None = Form(default=None),
+    candidates_text: str | None = Form(default=None),
+    proton_nmr_text: str | None = Form(default=None),
+    carbon13_text: str | None = Form(default=None),
     selected_preset: str | None = Form(default="balanced"),
     processing_preset: str | None = Form(default=None),
     zero_fill_factor: int | None = Form(default=None),
@@ -6601,7 +6666,18 @@ def raw_fid_archive_preview(
         archive=archive,
         action="preview",
     )
-    expected_total_h, expected_non_labile_h = _spectrum_structure_targets(smiles)
+    normalized_compound_class = normalize_compound_class(compound_class)
+    shared_proton_text = (proton_nmr_text or "").strip() or None
+    shared_carbon_text = (carbon13_text or "").strip() or None
+    structure_smiles = (smiles or "").strip() or _first_smiles_from_candidates(candidates_text)
+    expected_total_h, expected_non_labile_h = (
+        _spectrum_structure_targets(structure_smiles)
+        if nucleus == "1H"
+        else (None, None)
+    )
+    reference_text_for_detection = (reference_nmr_text or "").strip() or (
+        shared_proton_text if nucleus == "1H" else None
+    )
     settings = _fid_settings_from_form(
         selected_preset=selected_preset,
         processing_preset=processing_preset,
@@ -6630,14 +6706,37 @@ def raw_fid_archive_preview(
             solvent=solvent,
             nucleus=nucleus,
             reference_ppm=reference_ppm,
-            reference_nmr_text=reference_nmr_text,
+            reference_nmr_text=reference_text_for_detection,
             settings=settings,
             expected_total_h=expected_total_h,
             expected_non_labile_h=expected_non_labile_h,
+            compound_class=normalized_compound_class,
             raw_upload_provenance=_raw_fid_archive_provenance_from_record(archive),
         )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="Raw FID vault preview") from exc
+    if nucleus == "13C" and (shared_carbon_text or structure_smiles or shared_proton_text):
+        carbon_peaks = carbon13_peaks_from_shift_values(
+            [(peak.shift_ppm, peak.integration_h) for peak in preview.inferred_peaks],
+            solvent=solvent,
+        )
+        carbon_peaks, _text_meta, text_notes = refine_carbon13_peaks_with_text_guidance(
+            carbon_peaks,
+            carbon13_text=shared_carbon_text,
+            solvent=solvent,
+        )
+        carbon_peaks, _context_meta, context_notes = refine_carbon13_peaks_with_context(
+            carbon_peaks,
+            smiles=structure_smiles,
+            proton_nmr_text=shared_proton_text,
+            solvent=solvent,
+        )
+        preview = preview.model_copy(
+            update={
+                "inferred_peaks": carbon_peaks,
+                "warnings": list(dict.fromkeys([*preview.warnings, *text_notes, *context_notes])),
+            }
+        )
     if save_run:
         fid_run = save_fid_run(
             _state(request).session_factory,

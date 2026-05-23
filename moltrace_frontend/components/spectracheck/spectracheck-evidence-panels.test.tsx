@@ -4,6 +4,7 @@ import {
   DP4RankingPanel,
   EnrichedPickedPeaksPanel,
   ImpurityCandidatesPanel,
+  InferredNmrTextPanel,
   LabileHydrogenPanel,
   PeakCategorySummaryPanel,
   PredictedVsObservedPanel,
@@ -127,6 +128,42 @@ describe("EnrichedPickedPeaksPanel", () => {
   it("renders nothing when there are no peaks", () => {
     const { container } = render(<EnrichedPickedPeaksPanel payload={{ peaks: [] }} />)
     expect(container.firstChild).toBeNull()
+  })
+})
+
+describe("InferredNmrTextPanel", () => {
+  it("renders the backend-generated multiplet summary verbatim", () => {
+    // The full output of the deconvolution + reference-guided multiplicity
+    // pipeline must appear on screen exactly as the backend produced it — no
+    // truncation, no client-side reformatting.
+    const text = "5.23 (d, J = 3.6 Hz, 12.5H), 3.95 (ddd, J = 10.3, 4.6, 2.6 Hz, 9.5H)"
+    render(<InferredNmrTextPanel payload={{ inferred_nmr_text: text }} />)
+    expect(screen.getByTestId("inferred-nmr-text-panel")).toBeInTheDocument()
+    expect(screen.getByTestId("inferred-nmr-text-body").textContent).toBe(text)
+  })
+
+  it("falls through nested preview/analysis wrappers", () => {
+    // The processed-spectrum section sometimes hands the panel a payload
+    // shaped ``{ preview: { inferred_nmr_text }, analysis: { inferred_nmr_text } }``
+    // — prefer the analysis text and otherwise fall back to the preview.
+    render(
+      <InferredNmrTextPanel
+        payload={{
+          analysis: { inferred_nmr_text: "from analysis" },
+          preview: { inferred_nmr_text: "from preview" },
+        }}
+      />,
+    )
+    expect(screen.getByTestId("inferred-nmr-text-body").textContent).toBe("from analysis")
+  })
+
+  it("renders nothing when the field is missing or empty", () => {
+    const { container: empty } = render(<InferredNmrTextPanel payload={{}} />)
+    expect(empty.firstChild).toBeNull()
+    const { container: blank } = render(
+      <InferredNmrTextPanel payload={{ inferred_nmr_text: "   " }} />,
+    )
+    expect(blank.firstChild).toBeNull()
   })
 })
 

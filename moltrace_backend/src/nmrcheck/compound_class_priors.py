@@ -180,13 +180,14 @@ COMPOUND_CLASS_WEIGHT_MULTIPLIERS: Final[Mapping[str, Mapping[str, float]]] = {
 
 # Diagnostic chemical-shift windows per compound class, by nucleus. Peak
 # detection applies a modestly lower (more sensitive) noise factor inside these
-# windows: they hold each class's most diagnostic signals — anomeric
-# carbohydrate resonances, peptide amide NH, steroid angular methyls, olefinic
-# lipid carbons — which are frequently weak or congested and the first lost to a
-# uniform threshold. Windows are ``(lo_ppm, hi_ppm)`` and intentionally broad;
-# they are standard-practice heuristics grounded in the same references as the
-# multiplier table above. Classes without a single tight diagnostic region are
-# omitted (detection then uses its normal uniform noise threshold).
+# windows: they hold each class's most diagnostic signals, including the
+# carbohydrate/aminoglycoside O/N-bearing envelope, anomeric resonances, peptide
+# amide NH, steroid angular methyls, and olefinic lipid carbons. These regions
+# are frequently weak or congested and the first lost to a uniform threshold.
+# Windows are ``(lo_ppm, hi_ppm)`` and intentionally broad; they are
+# standard-practice heuristics grounded in the same references as the multiplier
+# table above. Classes without a single tight diagnostic region are omitted
+# (detection then uses its normal uniform noise threshold).
 COMPOUND_CLASS_DIAGNOSTIC_REGIONS: Final[
     Mapping[str, Mapping[str, tuple[tuple[float, float], ...]]]
 ] = {
@@ -195,8 +196,8 @@ COMPOUND_CLASS_DIAGNOSTIC_REGIONS: Final[
         "13C": ((40.0, 70.0),),
     },
     "carbohydrates": {
-        "1H": ((4.3, 5.6),),  # anomeric protons
-        "13C": ((90.0, 112.0),),  # anomeric carbons
+        "1H": ((3.0, 4.4), (4.3, 5.8)),  # O/N-bearing sugar CH + anomeric H
+        "13C": ((45.0, 90.0), (90.0, 112.0)),  # aminoglycoside/sugar C + anomeric C
     },
     "fatty_acids": {
         "1H": ((5.1, 5.6),),  # olefinic
@@ -207,8 +208,8 @@ COMPOUND_CLASS_DIAGNOSTIC_REGIONS: Final[
         "13C": ((95.0, 165.0),),
     },
     "glycoproteins": {
-        "1H": ((4.3, 5.6), (6.0, 8.8)),
-        "13C": ((90.0, 112.0), (168.0, 182.0)),
+        "1H": ((3.0, 4.4), (4.3, 5.8), (6.0, 8.8)),
+        "13C": ((45.0, 90.0), (90.0, 112.0), (168.0, 182.0)),
     },
     "lipids": {
         "1H": ((5.1, 5.6),),  # olefinic

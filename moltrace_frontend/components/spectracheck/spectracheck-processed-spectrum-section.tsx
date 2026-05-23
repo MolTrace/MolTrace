@@ -22,6 +22,7 @@ import { SpectrumViewer, type SpectrumPeakAnnotation } from "@/components/scienc
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import {
   EnrichedPickedPeaksPanel,
+  InferredNmrTextPanel,
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
@@ -33,6 +34,7 @@ import {
   extractSpectrumXY,
   extractNumericSummary,
   extractWarnings,
+  isRecord,
 } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 import { useStableXY } from "@/components/spectracheck/use-stable-xy"
 import {
@@ -90,6 +92,29 @@ type Props = {
    */
   compoundClass?: CompoundClassValue
   registerDev?: (key: string, value: unknown) => void
+}
+
+function payloadFilename(payload: unknown): string | null {
+  if (!isRecord(payload)) return null
+  const metadata = isRecord(payload.metadata) ? payload.metadata : null
+  const values = [
+    payload.filename,
+    payload.file_name,
+    payload.name,
+    metadata?.filename,
+    metadata?.file_name,
+    metadata?.name,
+  ]
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return null
+}
+
+function payloadMatchesFilename(payload: unknown, filename: string | null | undefined): boolean {
+  const selected = filename?.trim()
+  if (!selected) return false
+  return payloadFilename(payload) === selected
 }
 
 export function SpectraCheckProcessedSpectrumSection({
@@ -392,6 +417,9 @@ export function SpectraCheckProcessedSpectrumSection({
       const fd = buildBaseFormData(file)
       const cand = candidatesOptional.trim() || candidatesText
       if (cand.trim()) fd.append("candidates_text", cand)
+      const canReusePreviewTrace =
+        payloadMatchesFilename(previewResult, file.name) && extractSpectrumXY(previewResult) !== null
+      if (canReusePreviewTrace) fd.append("include_spectrum", "false")
       const data = await apiFetch<unknown>("/nmr/processed/analyze", { method: "POST", body: fd })
       if (foregroundRequestSeqRef.current === requestId) {
         update({ analyzeResult: data, analyzeLoading: false })
@@ -455,7 +483,15 @@ export function SpectraCheckProcessedSpectrumSection({
   // re-render and the SpectrumViewer's expensive percentile / mask
   // computations to re-run. That was the single biggest cause of the
   // "shaky / blinking" chart behaviour.
-  const rawXy = useMemo(() => extractSpectrumXY(displayPayload ?? {}), [displayPayload])
+  const previewXyForSelectedFile = useMemo(() => {
+    if (!payloadMatchesFilename(previewResult, selectedFileName)) return null
+    return extractSpectrumXY(previewResult)
+  }, [previewResult, selectedFileName])
+  const rawXy = useMemo(() => {
+    const direct = extractSpectrumXY(displayPayload ?? {})
+    if (direct) return direct
+    return analyzeResult != null ? previewXyForSelectedFile : null
+  }, [analyzeResult, displayPayload, previewXyForSelectedFile])
   // ``/nmr/processed/preview`` and ``/nmr/processed/analyze`` return the
   // SAME x / y for the same input — analyze just adds peaks / score /
   // evidence layers. Stabilising the xy reference by sampled-content
@@ -1247,6 +1283,13 @@ export function SpectraCheckProcessedSpectrumSection({
                     ) : null}
                   </CardContent>
                 </Card>
+
+                {/* Inferred NMR — the backend-generated multiplet summary
+                    produced by deconvolution + reference-guided multiplicity.
+                    Render above the peaks table so the prose answer leads and
+                    the detailed table reads as supporting evidence. Silent
+                    when the field is missing (legacy responses). */}
+                <InferredNmrTextPanel payload={displayPayload} />
 
                 {/* Picked peaks — enriched with category, region, impurity match.
                     The panels use the same payload as the spectrum so the

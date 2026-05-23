@@ -16,6 +16,12 @@ ETHANOL_1H = (
 )
 ETHANOL_13C = "13C NMR (101 MHz, CDCl3) delta 58.3, 18.2."
 
+TOBRAMYCIN_SMILES = (
+    "O[C@@]1([H])[C@]([C@@H](O)[C@@H](O[C@@]([C@]2(O)[H])([H])"
+    "[C@@H](C([H])[C@H](N)[C@H]2O[C@@H](O[C@]([C@@]3([H])O)([H])CN)"
+    "[C@@H](C3([H])[H])N)N)O[C@@H]1CO)([H])N"
+)
+
 
 def nmr2d_bytes(rows):
     out = io.StringIO()
@@ -32,6 +38,20 @@ def test_predict_ethanol_generates_1h_13c_and_hsqc_peaks():
     assert len(prediction.proton_peaks) >= 2
     assert len(prediction.carbon13_peaks) == 2
     assert prediction.predicted_hsqc_crosspeaks
+
+
+def test_predict_tobramycin_prioritises_carbohydrate_regions_not_alkenes():
+    prediction = predict_nmr_from_smiles(TOBRAMYCIN_SMILES, name="tobramycin derivative", solvent="D2O")
+    proton_envs = [str(peak.environment or "") for peak in prediction.proton_peaks]
+    carbon_envs = [str(peak.environment or "") for peak in prediction.carbon13_peaks]
+
+    assert prediction.metadata["olefinic_proton_count"] == 0
+    assert prediction.metadata["anomeric_proton_count"] > 0
+    assert any("anomeric_or_acetal" in env for env in proton_envs)
+    assert any("carbohydrate" in env or "aminoglycoside" in env for env in proton_envs)
+    assert any("anomeric_or_acetal" in env for env in carbon_envs)
+    assert not any("vinylic" in env or "alkene" in env for env in proton_envs + carbon_envs)
+    assert any(3.0 <= peak.shift_ppm <= 4.4 for peak in prediction.proton_peaks)
 
 
 def test_predicted_ethanol_matches_ethanol_text():

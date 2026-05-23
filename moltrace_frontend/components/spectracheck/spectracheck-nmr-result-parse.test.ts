@@ -13,6 +13,17 @@ describe("extractSpectrumXY", () => {
     })
   })
 
+  it("ignores intentionally omitted spectrum arrays", () => {
+    expect(
+      extractSpectrumXY({
+        point_count: 5000,
+        x: [],
+        y: [],
+        metadata: { spectrum_points_included: false },
+      }),
+    ).toBeNull()
+  })
+
   it("reads backend preview_points rows", () => {
     expect(
       extractSpectrumXY({

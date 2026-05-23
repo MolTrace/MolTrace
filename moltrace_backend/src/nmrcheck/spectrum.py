@@ -2028,13 +2028,22 @@ def _structure_guided_peak_estimates(
     chosen — shared by the processed-upload and Raw-FID paths so both detect
     peaks identically.
     """
+    has_guidance = bool(reference_assignments or reference_peaks or target_total_h is not None or priority_regions)
     sensitivity_candidates = (
         [fixed_sensitivity]
         if fixed_sensitivity is not None
-        else [0.06, 0.08, 0.1, 0.12, 0.15]
+        else (
+            [0.04, 0.05, 0.06, 0.08, 0.1, 0.12, 0.15]
+            if has_guidance
+            else [0.06, 0.08, 0.1, 0.12, 0.15]
+        )
     )
-    max_reasonable_peaks = (
-        max(12, int(target_total_h) + 4) if target_total_h is not None else 18
+    reference_peak_target = max(len(reference_assignments), len(reference_peaks))
+    max_reasonable_peaks = max(
+        12,
+        int(target_total_h) + 4 if target_total_h is not None else 0,
+        reference_peak_target + 6 if reference_peak_target else 0,
+        18 if target_total_h is None and reference_peak_target == 0 else 0,
     )
     best_estimates: list[_PeakEstimate] = []
     best_sensitivity = float(sensitivity_candidates[0])
@@ -2079,7 +2088,7 @@ def _structure_guided_peak_estimates(
             key: tuple[float, ...] = (
                 float(len(reference_assignments) - candidate_reference_coverage),
                 float(candidate_comparison.missing_count),
-                float(candidate_comparison.extra_count),
+                float(candidate_comparison.extra_count) + peak_penalty,
                 candidate_comparison.total_shift_delta_ppm,
                 round(visible_total_error, 4),
                 float(-candidate_comparison.multiplicity_match_count),
