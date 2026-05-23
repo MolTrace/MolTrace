@@ -1630,7 +1630,14 @@ def _build_reference_guided_nmr_text(
     if coverage_ratio < minimum_coverage_ratio:
         return (None, covered_count)
 
-    return (", ".join(assignment.raw_text for assignment, _ in coverage), covered_count)
+    # No-fabrication guard: echo only reference assignments an actual detected
+    # peak covers. A reference peak with no detected signal must never appear
+    # in the analysis text — that would fabricate a peak the spectrum never
+    # showed, violating the detected-peaks-only evidence policy.
+    return (
+        ", ".join(assignment.raw_text for assignment, matches in coverage if matches),
+        covered_count,
+    )
 
 
 def _build_spectrum_comparison(

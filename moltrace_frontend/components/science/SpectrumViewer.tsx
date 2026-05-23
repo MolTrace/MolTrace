@@ -117,6 +117,49 @@ const AROMATIC_BASE_FLOOR_NOISE_MULTIPLIER = 0.55
  */
 const PLOT_MARGIN = { l: 52, r: 16, t: 8, b: 44 } as const
 
+type PlotPointerShift = {
+  crosshairLeft: number
+  ppm: number
+}
+
+export function chemicalShiftFromPlotPointer({
+  pointerX,
+  paneWidth,
+  effectiveXMin,
+  effectiveXMax,
+  reversedXAxis,
+  margin = PLOT_MARGIN,
+}: {
+  pointerX: number
+  paneWidth: number
+  effectiveXMin: number
+  effectiveXMax: number
+  reversedXAxis: boolean
+  margin?: typeof PLOT_MARGIN
+}): PlotPointerShift | null {
+  const plotLeft = margin.l
+  const plotRight = paneWidth - margin.r
+  const plotWidth = plotRight - plotLeft
+  const span = effectiveXMax - effectiveXMin
+  if (
+    plotWidth <= 1 ||
+    !Number.isFinite(pointerX) ||
+    !Number.isFinite(paneWidth) ||
+    !Number.isFinite(effectiveXMin) ||
+    !Number.isFinite(effectiveXMax) ||
+    !Number.isFinite(span) ||
+    span === 0
+  ) {
+    return null
+  }
+  const crosshairLeft = Math.min(Math.max(pointerX, plotLeft), plotRight)
+  const frac = (crosshairLeft - plotLeft) / plotWidth
+  return {
+    crosshairLeft,
+    ppm: reversedXAxis ? effectiveXMax - frac * span : effectiveXMin + frac * span,
+  }
+}
+
 /** Exponential mapping: slider 0..1 → multiplier 1..50000. */
 function gainMultiplier(gainSlider01: number): number {
   return Math.exp(gainSlider01 * Math.log(50001))
@@ -201,7 +244,7 @@ export function smoothRawFidAromaticBaseForDisplay(x: number[], y: number[]): nu
     const strongPeakCutoff = baseline + AROMATIC_BASE_PEAK_NOISE_MULTIPLIER * noise
     const localPeakCutoff = baseline + AROMATIC_BASE_LOCAL_PEAK_NOISE_MULTIPLIER * noise
     const floor = baseline - AROMATIC_BASE_FLOOR_NOISE_MULTIPLIER * noise
-    const target = out ?? y.slice()
+    const target: number[] = out ?? y.slice()
     out = target
 
     const isProtectedPeak = (index: number): boolean => {
@@ -368,6 +411,71 @@ function nearestYAtPpm(x: number[], yDisplay: number[], ppm: number): number {
   return best
 }
 
+export function nearestSourcePointAtPpm(
+  x: number[],
+  yDisplay: number[],
+  ppm: number,
+  maskRange?: { startIndex: number; endIndex: number } | null,
+): { index: number; ppm: number; intensity: number } | null {
+  const n = Math.min(x.length, yDisplay.length)
+  if (n === 0 || !Number.isFinite(ppm)) return null
+
+  let ascending = true
+  let descending = true
+  let allFinite = true
+  for (let i = 1; i < n; i++) {
+    const previous = x[i - 1]
+    const current = x[i]
+    if (!Number.isFinite(previous) || !Number.isFinite(current)) {
+      allFinite = false
+      break
+    }
+    if (current < previous) ascending = false
+    if (current > previous) descending = false
+  }
+
+  let bestIndex = -1
+  if (allFinite && (ascending || descending)) {
+    const target = ascending ? ppm : -ppm
+    let low = 0
+    let high = n
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2)
+      const value = ascending ? x[mid] : -x[mid]
+      if (value < target) low = mid + 1
+      else high = mid
+    }
+    const candidates = [low - 1, low]
+    let bestDistance = Infinity
+    for (const index of candidates) {
+      if (index < 0 || index >= n) continue
+      const distance = Math.abs(x[index] - ppm)
+      if (distance < bestDistance) {
+        bestDistance = distance
+        bestIndex = index
+      }
+    }
+  } else {
+    let bestDistance = Infinity
+    for (let i = 0; i < n; i++) {
+      const xv = x[i]
+      if (!Number.isFinite(xv)) continue
+      const distance = Math.abs(xv - ppm)
+      if (distance < bestDistance) {
+        bestDistance = distance
+        bestIndex = i
+      }
+    }
+  }
+
+  if (bestIndex < 0) return null
+  const intensity =
+    isMaskedIndex(bestIndex, maskRange) || !Number.isFinite(yDisplay[bestIndex])
+      ? Number.NaN
+      : yDisplay[bestIndex]
+  return { index: bestIndex, ppm: x[bestIndex], intensity }
+}
+
 export type SampledSpectrumTrace = {
   x: number[]
   y: number[]
@@ -387,9 +495,9 @@ type HoverReadout = {
   plotBottom: number
   /** Pane width, used to flip the readout chip away from the edge. */
   paneWidth: number
-  /** Chemical shift (ppm) of the snapped sample. */
+  /** Chemical shift (ppm) at the cursor according to the rendered x-axis. */
   ppm: number
-  /** Source intensity of the snapped sample (NaN when masked). */
+  /** Source intensity at the nearest source sample (NaN when masked). */
   intensity: number
 }
 
@@ -1191,10 +1299,11 @@ function SpectrumViewerImpl({
   // Plotly is left fully static (``hovermode:false``, ``staticPlot:true``):
   // re-enabling Plotly's own hover repainted the overlay on every mouse move
   // and was the historical flicker source. Instead the cursor is mapped to a
-  // ppm here, snapped to the nearest sampled point, and surfaced through a
-  // lightweight absolutely-positioned overlay. Because this never mutates
-  // Plotly's ``data``/``layout`` props, Plotly never redraws — the chart
-  // stays perfectly stable while the readout tracks the cursor.
+  // ppm here using the same plot margins and x-axis range Plotly renders,
+  // then surfaced through a lightweight absolutely-positioned overlay.
+  // Because this never mutates Plotly's ``data``/``layout`` props, Plotly
+  // never redraws — the chart stays perfectly stable while the readout
+  // tracks the cursor.
   const hoverRafRef = useRef(0)
   const hoverPointerRef = useRef<{
     width: number
@@ -1212,7 +1321,6 @@ function SpectrumViewerImpl({
     const plotRight = width - PLOT_MARGIN.r
     const plotTop = PLOT_MARGIN.t
     const plotBottom = height - PLOT_MARGIN.b
-    const sampleX = observedSample.x
     if (
       plotRight - plotLeft <= 1 ||
       plotBottom - plotTop <= 1 ||
@@ -1220,44 +1328,46 @@ function SpectrumViewerImpl({
       px > plotRight ||
       py < plotTop ||
       py > plotBottom ||
-      sampleX.length === 0
+      x.length === 0 ||
+      displaySourceY.length === 0
     ) {
       setHoverReadout((current) => (current ? null : current))
       return
     }
-    const span = effectiveXMax - effectiveXMin
-    const frac = (px - plotLeft) / (plotRight - plotLeft)
-    const cursorPpm = reversedXAxis
-      ? effectiveXMax - frac * span
-      : effectiveXMin + frac * span
-    // Snap to the nearest rendered sample so the crosshair sits exactly on the
-    // spectrum line and the readout reflects a real data point.
-    let bestIndex = 0
-    let bestDistance = Infinity
-    for (let i = 0; i < sampleX.length; i++) {
-      const distance = Math.abs(sampleX[i] - cursorPpm)
-      if (distance < bestDistance) {
-        bestDistance = distance
-        bestIndex = i
-      }
+    const shift = chemicalShiftFromPlotPointer({
+      pointerX: px,
+      paneWidth: width,
+      effectiveXMin,
+      effectiveXMax,
+      reversedXAxis,
+    })
+    if (!shift) {
+      setHoverReadout((current) => (current ? null : current))
+      return
     }
-    const snappedPpm = sampleX[bestIndex]
-    const snappedIntensity = observedSample.y[bestIndex]
-    const snappedFrac =
-      span === 0
-        ? 0
-        : reversedXAxis
-          ? (effectiveXMax - snappedPpm) / span
-          : (snappedPpm - effectiveXMin) / span
+    const nearestPoint = nearestSourcePointAtPpm(
+      x,
+      displaySourceY,
+      shift.ppm,
+      maskDominantPeak ? dominantPeakRange : null,
+    )
     setHoverReadout({
-      crosshairLeft: plotLeft + snappedFrac * (plotRight - plotLeft),
+      crosshairLeft: shift.crosshairLeft,
       plotTop,
       plotBottom,
       paneWidth: width,
-      ppm: snappedPpm,
-      intensity: Number.isFinite(snappedIntensity) ? snappedIntensity : Number.NaN,
+      ppm: shift.ppm,
+      intensity: nearestPoint?.intensity ?? Number.NaN,
     })
-  }, [observedSample, effectiveXMin, effectiveXMax, reversedXAxis])
+  }, [
+    x,
+    displaySourceY,
+    effectiveXMin,
+    effectiveXMax,
+    reversedXAxis,
+    maskDominantPeak,
+    dominantPeakRange,
+  ])
 
   const handleChartPointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {

@@ -174,6 +174,35 @@ export function trackUnifiedEvidenceBuilt(payload: WorkflowLifecyclePayload): vo
   trackUsageEvent({ ...payload, event_type: "unified_evidence_built" })
 }
 
+export type CoreAnalyticsModule =
+  | "spectracheck"
+  | "regulatory_hub"
+  | "reactioniq"
+  | "regulatory"
+  | "reactions"
+  | string
+
+export type CoreModuleOpenedPayload = Omit<UsageAnalyticsEventInput, "event_type" | "metadata"> & {
+  surface?: string
+  metadata?: Record<string, unknown>
+}
+
+export function trackCoreModuleOpened(
+  module: CoreAnalyticsModule,
+  payload: CoreModuleOpenedPayload = {},
+): void {
+  const { metadata, surface, ...rest } = payload
+  trackUsageEvent({
+    ...rest,
+    event_type: "core_module_opened",
+    metadata: {
+      ...metadata,
+      module,
+      surface: surface ?? module,
+    },
+  })
+}
+
 /** Connector/interoperability analytics metadata whitelist (privacy-safe categorical/count fields only). */
 export type ConnectorInteropAnalyticsMetadata = {
   connector_type?: string

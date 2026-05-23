@@ -3,6 +3,8 @@ import { render } from "@testing-library/react"
 
 import {
   SpectrumViewer,
+  chemicalShiftFromPlotPointer,
+  nearestSourcePointAtPpm,
   smoothRawFidAromaticBaseForDisplay,
 } from "@/components/science/SpectrumViewer"
 
@@ -209,6 +211,74 @@ describe("SpectrumViewer — picked-peak rendering", () => {
       .filter((t) => t.mode === "markers+text")
       .map((t) => t.name)
     expect(markerNames).toEqual(["Aliphatic", "Aromatic alkene", "Labile OH / NH / SH"])
+  })
+})
+
+describe("SpectrumViewer — hover chemical shift mapping", () => {
+  it("maps pointer position to the exact reversed x-axis ppm scale", () => {
+    const left = chemicalShiftFromPlotPointer({
+      pointerX: 52,
+      paneWidth: 1000,
+      effectiveXMin: 0,
+      effectiveXMax: 10,
+      reversedXAxis: true,
+    })
+    const middle = chemicalShiftFromPlotPointer({
+      pointerX: (52 + 984) / 2,
+      paneWidth: 1000,
+      effectiveXMin: 0,
+      effectiveXMax: 10,
+      reversedXAxis: true,
+    })
+    const right = chemicalShiftFromPlotPointer({
+      pointerX: 984,
+      paneWidth: 1000,
+      effectiveXMin: 0,
+      effectiveXMax: 10,
+      reversedXAxis: true,
+    })
+
+    expect(left?.ppm).toBeCloseTo(10)
+    expect(middle?.ppm).toBeCloseTo(5)
+    expect(right?.ppm).toBeCloseTo(0)
+  })
+
+  it("maps pointer position to the exact normal x-axis ppm scale", () => {
+    const left = chemicalShiftFromPlotPointer({
+      pointerX: 52,
+      paneWidth: 1000,
+      effectiveXMin: 0,
+      effectiveXMax: 10,
+      reversedXAxis: false,
+    })
+    const right = chemicalShiftFromPlotPointer({
+      pointerX: 984,
+      paneWidth: 1000,
+      effectiveXMin: 0,
+      effectiveXMax: 10,
+      reversedXAxis: false,
+    })
+
+    expect(left?.ppm).toBeCloseTo(0)
+    expect(right?.ppm).toBeCloseTo(10)
+  })
+
+  it("uses source data, not downsampled display points, for nearby intensity lookup", () => {
+    const point = nearestSourcePointAtPpm([10, 9, 8, 7], [0, 3, 12, 1], 8.2)
+
+    expect(point).toMatchObject({ index: 2, ppm: 8, intensity: 12 })
+  })
+
+  it("keeps masked solvent-region intensity hidden while leaving ppm exact", () => {
+    const point = nearestSourcePointAtPpm(
+      [60, 50, 49, 48, 40],
+      [1, 10, 100, 10, 1],
+      49.2,
+      { startIndex: 1, endIndex: 3 },
+    )
+
+    expect(point?.ppm).toBe(49)
+    expect(Number.isNaN(point?.intensity)).toBe(true)
   })
 })
 

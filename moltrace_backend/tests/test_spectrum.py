@@ -559,6 +559,32 @@ def test_peak_table_preview_emits_reference_guided_range_text_for_dense_assignme
     assert "2.93 (tdd" in preview.inferred_nmr_text
 
 
+def test_reference_guided_text_excludes_undetected_reference_peaks() -> None:
+    # High coverage triggers the reference-guided analysis text, but a
+    # reference peak with no detected signal must NOT be echoed into it —
+    # fabricating a peak the spectrum never showed would violate the
+    # detected-peaks-only evidence policy.
+    reference = (
+        "1H NMR (500 MHz, CDCl3) 8.10 (s, 1H), 7.50 (d, 2H), 7.20 (t, 2H), "
+        "4.10 (q, 2H), 3.50 (s, 2H), 2.40 (m, 2H), 1.60 (m, 2H), 0.95 (t, 3H)"
+    )
+    _frequency, assignments = parse_reference_nmr_text(reference)
+    # Detected peaks cover every reference shift except 7.20 ppm.
+    detected = [
+        Peak(shift_ppm=shift, multiplicity="s", integration_h=2.0)
+        for shift in (8.10, 7.50, 4.10, 3.50, 2.40, 1.60, 0.95)
+    ]
+    guided_text, covered_count = _build_reference_guided_nmr_text(
+        reference_assignments=assignments,
+        extracted_peaks=detected,
+    )
+    assert covered_count == 7
+    assert guided_text is not None
+    assert "7.20" not in guided_text
+    assert "8.10" in guided_text
+    assert "0.95" in guided_text
+
+
 def test_trace_reference_text_does_not_fabricate_missing_assignments() -> None:
     rows = ["ppm,intensity"]
     for idx in range(401):

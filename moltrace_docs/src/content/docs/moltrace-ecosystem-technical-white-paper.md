@@ -84,7 +84,7 @@ flowchart LR
   AUTH --> LOGS
 ```
 
-The backend is implemented in Python 3.11+ with FastAPI, Pydantic, SQLAlchemy, Alembic, RDKit, optional nmrglue/Numpy for raw FID work, Redis/RQ for queueable execution, and a test suite that covers both scientific modules and platform surfaces [20,22]. The frontend is a Next.js 16 and React 19 application using TypeScript, Radix primitives, Tailwind, React Query, Plotly, uPlot, Recharts, Three.js, generated OpenAPI types, Vitest, and Playwright [24,25].
+The backend is implemented in Python 3.11+ with FastAPI, Pydantic, SQLAlchemy, Alembic, RDKit, optional nmrglue/Numpy for raw FID work, Redis/RQ for queueable execution, and a test suite that covers both scientific modules and platform surfaces [20,22]. The frontend is a Next.js 16 and React 19 application using TypeScript, Radix primitives, Tailwind, React Query, Plotly, Recharts, Three.js, generated OpenAPI types, Vitest, and Playwright [24,25].
 
 The important architectural pattern is not the framework selection. It is the division of responsibility:
 
@@ -353,7 +353,7 @@ The frontend is not merely a shell around API forms. It encodes product structur
 
 - App routes map to platform modules.
 - `AppShell`, topbar, sidebar, mobile navigation, tenant selector, backend status indicator, and AI evidence queue provide cross-cutting context.
-- Science viewers handle domain-specific rendering: SpectrumViewer, SpectrumViewer1D, Nmr2DViewer, ChromatogramViewer, FragmentTreeViewer, MsmsMirrorPlot, UPlotCanvas, evidence cards, and confidence rings.
+- Science viewers handle domain-specific rendering: SpectrumViewer, SpectrumViewer1D, Nmr2DViewer, ChromatogramViewer, FragmentTreeViewer, MsmsMirrorPlot, evidence cards, and confidence rings.
 - The design system provides module accent rules, dashboard sections, KPI cards, alert cards, module cards, tab styling, severity coding, and visual consistency.
 - The generated OpenAPI schema and API client provide type-safe backend integration.
 
