@@ -363,6 +363,7 @@ def test_nmr_processed_analyze_payload_contract_stays_text_guided(
     assert metadata["expected_non_labile_h"] == 5
     assert "raw_fid_peak_guidance" not in metadata
     assert "prompt_pipeline_sidecar" not in metadata
+    assert "prompt_1_2_runtime_contract" not in metadata
 
     peaks = payload["peaks"]
     assert len(peaks) == payload["peak_count"]

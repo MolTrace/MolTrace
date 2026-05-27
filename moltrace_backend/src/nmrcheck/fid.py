@@ -38,6 +38,7 @@ from .models import (
     Peak,
 )
 from .compound_class_priors import diagnostic_regions_for
+from .fid_pipeline_adapter import build_prompt_pipeline_runtime_contract
 from .parser import ReferencePeakAssignment, normalize_nmr_text, parse_reference_nmr_text
 from .raw_vault import RawVaultError, build_raw_upload_provenance, load_raw_archive_bytes
 from .spectrum import (
@@ -977,12 +978,16 @@ def _raw_fid_cached_report_copy(
             "analysis_artifact_policy": analysis_artifact_policy,
         },
     )
-    return copied.model_copy(
+    updated = copied.model_copy(
         update={
             "metadata": metadata,
             "processing_metadata": processing_metadata,
         }
     )
+    metadata["prompt_1_2_runtime_contract"] = build_prompt_pipeline_runtime_contract(
+        updated
+    )
+    return updated.model_copy(update={"metadata": metadata})
 
 
 def _get_raw_fid_process_cache(
@@ -3268,6 +3273,15 @@ def process_bruker_1d_zip(
                 **peak_meta,
             },
             processing_metadata=metadata,
+        )
+        prompt_runtime_contract = build_prompt_pipeline_runtime_contract(report)
+        report = report.model_copy(
+            update={
+                "metadata": {
+                    **dict(report.metadata or {}),
+                    "prompt_1_2_runtime_contract": prompt_runtime_contract,
+                }
+            }
         )
         return _store_raw_fid_process_cache(cache_key, report)
 

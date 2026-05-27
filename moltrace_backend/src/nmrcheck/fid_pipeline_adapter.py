@@ -145,6 +145,170 @@ def attach_prompt_pipeline_sidecar(
     return report.model_copy(update={"metadata": metadata})
 
 
+def build_prompt_pipeline_runtime_contract(report: FIDPreviewReport) -> dict[str, Any]:
+    """Describe how Prompt 1/2 is merged into the active raw-FID layer.
+
+    This contract is intentionally cheap to build: it does not re-read or
+    reprocess the upload.  It records the active SpectraCheck raw-FID settings
+    beside the Prompt 1/2 module locations and acceptance gates so API routes,
+    saved previews, and regression tests have one authoritative integration
+    record while preserving the visible spectrum output.
+    """
+
+    metadata = report.metadata if isinstance(report.metadata, Mapping) else {}
+    zero_filling = _mapping(metadata.get("zero_filling"))
+    line_broadening = _mapping(metadata.get("line_broadening"))
+    phase_settings = _mapping(metadata.get("phase_settings")) or _mapping(
+        metadata.get("phase")
+    )
+    baseline_correction = _mapping(metadata.get("baseline_correction")) or _mapping(
+        metadata.get("baseline")
+    )
+    processing_recipe = _mapping(metadata.get("processing_recipe"))
+    processing_parameters = _mapping(metadata.get("processing_parameters"))
+    acquisition_parameters = _mapping(metadata.get("acquisition_parameters"))
+    artifact_policy = _mapping(metadata.get("analysis_artifact_policy"))
+    provenance = _mapping(metadata.get("raw_upload_provenance"))
+    nucleus = str(_metadata_value(metadata, "nucleus") or "").strip() or None
+    normalized_nucleus = str(nucleus or "").upper()
+    if normalized_nucleus == "13C":
+        prompt_line_broadening = 2.0
+    elif normalized_nucleus == "1H":
+        prompt_line_broadening = 0.5
+    else:
+        prompt_line_broadening = None
+    field_mhz = _safe_float(
+        _first_present(
+            acquisition_parameters.get("field_mhz"),
+            metadata.get("field_mhz"),
+            metadata.get("spectrometer_frequency_mhz"),
+        )
+    )
+    active_line_broadening = _safe_float(
+        _first_present(
+            line_broadening.get("hz"),
+            line_broadening.get("line_broadening_hz"),
+            processing_parameters.get("line_broadening_hz"),
+        )
+    )
+    active_zero_fill = _safe_int(
+        _first_present(
+            zero_filling.get("factor"),
+            zero_filling.get("zero_fill_factor"),
+            processing_parameters.get("zero_fill_factor"),
+        )
+    )
+    raw_sha256 = _first_present(
+        artifact_policy.get("raw_sha256"),
+        provenance.get("sha256"),
+        provenance.get("raw_sha256"),
+    )
+    active_baseline_method = _baseline_method(baseline_correction)
+    active_phase_method = _first_present(
+        phase_settings.get("phase_mode"),
+        phase_settings.get("method"),
+        phase_settings.get("mode"),
+    )
+    return {
+        "version": "raw_fid_prompt_1_2_runtime_contract_v1",
+        "scope": "raw_fid_only",
+        "visibility": "metadata_only",
+        "integration_status": "merged_with_active_raw_fid_layer",
+        "active_visible_pipeline": "legacy_raw_fid_processor",
+        "visible_spectrum_source": "nmrcheck.fid.process_bruker_1d_zip",
+        "visible_spectrum_fields_preserved": True,
+        "processed_uploads_touched": False,
+        "prompt_pipeline_active": False,
+        "used_for_plot": False,
+        "used_for_peak_markers": False,
+        "used_for_phase_or_baseline_swap": False,
+        "sidecar_activation_policy": (
+            "metadata_only_until_fixture_report_is_reviewed_and_explicitly_promoted"
+        ),
+        "prompt_1_fid_reader": {
+            "module": "moltrace.spectroscopy.io.fid_reader.read_fid",
+            "status": "available_for_sidecar_validation",
+            "supported_vendors": ["Bruker", "Varian/Agilent"],
+            "required_output": [
+                "data",
+                "ppm_axis",
+                "metadata",
+                "nucleus",
+                "solvent",
+                "field_mhz",
+                "acquisition_time",
+            ],
+            "zero_fill_points": 65536,
+            "apodization_hz_by_nucleus": {"1H": 0.5, "13C": 2.0},
+        },
+        "prompt_2_phase_baseline": {
+            "module": "moltrace.spectroscopy.preprocess.phase_baseline",
+            "status": "available_for_sidecar_validation",
+            "phase_default_method": "regions_analysis",
+            "baseline_default_method_by_nucleus": {
+                "1H": "bernstein",
+                "13C": "whittaker",
+            },
+            "baseline_default_order": 3,
+        },
+        "active_runtime": {
+            "filename": report.filename,
+            "format_detected": report.format_detected,
+            "nucleus": nucleus,
+            "solvent": _metadata_value(metadata, "solvent"),
+            "vendor": _metadata_value(metadata, "vendor_format_detected")
+            or _metadata_value(metadata, "vendor"),
+            "field_mhz": field_mhz,
+            "point_count": int(report.point_count),
+            "preview_point_count": len(report.preview_points),
+            "peak_count": len(report.inferred_peaks),
+            "zero_fill_factor": active_zero_fill,
+            "line_broadening_hz": active_line_broadening,
+            "prompt_target_line_broadening_hz": prompt_line_broadening,
+            "phase_method": active_phase_method,
+            "phase_zero_order_degrees": _phase_degrees(phase_settings),
+            "phase_correction_applied": phase_settings.get("phase_correction_applied"),
+            "baseline_method": active_baseline_method,
+            "baseline_order": _safe_int(
+                _first_present(
+                    baseline_correction.get("baseline_order"),
+                    baseline_correction.get("order"),
+                    processing_parameters.get("baseline_order"),
+                )
+            ),
+            "baseline_correction_applied": baseline_correction.get("correction_applied"),
+            "processing_recipe_id": processing_recipe.get("id")
+            or processing_recipe.get("selected_preset"),
+            "raw_archive_sha256": raw_sha256,
+            "raw_archive_immutable": bool(
+                _first_present(
+                    artifact_policy.get("raw_data_immutable"),
+                    provenance.get("raw_data_immutable"),
+                    True,
+                )
+            ),
+        },
+        "acceptance_gates": {
+            "ppm_scale_reference_tolerance_ppm": 0.01,
+            "peak_count_tolerance_vs_reference": 2,
+            "phase_angle_tolerance_degrees": 5,
+            "baseline_rmse_fraction_full_scale": 0.005,
+            "generation_target_seconds": [1, 3],
+            "fingerprint_identity_source": (
+                "prompt_reader_fingerprint_hash_when_sidecar_enabled; "
+                "raw_archive_sha256_for_active_immutable_upload_identity"
+            ),
+        },
+        "regression_guard": {
+            "spectracheck_processed_routes_unchanged": True,
+            "spectracheck_raw_preview_process_contract_preserved": True,
+            "regulatory_hub_unchanged": True,
+            "reactioniq_unchanged": True,
+            "no_visual_activation_from_prompt_sidecar": True,
+        },
+    }
+
+
 def build_prompt_pipeline_analysis_guidance(
     report: FIDPreviewReport,
     sidecar: Mapping[str, Any] | None,
@@ -515,6 +679,17 @@ def _compact_mapping(value: Any) -> dict[str, Any]:
         if isinstance(item, (str, int, float, bool)) or item is None:
             compact[str(key)] = item
     return compact
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
 
 
 def _legacy_report_summary(report: FIDPreviewReport) -> dict[str, Any]:

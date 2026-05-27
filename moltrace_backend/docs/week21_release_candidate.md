@@ -52,6 +52,67 @@ promotion phase.
 The manual promotion policy is defined in
 `docs/raw_fid_prompt_manual_promotion_design.md`.
 
+## Cross-stack release-health contract guardrails
+
+```bash
+./scripts/run_release_health_contract_guardrails.sh
+```
+
+This release gate runs the backend release-health contract regression together
+with the frontend release-health parser and Deployment Settings rendering tests.
+It protects the shared `/admin/release-health` diagnostic contract so new CI
+artifacts stay synchronized between backend payloads, the frontend parser, and
+the admin UI. It remains a reporting-only guardrail and does not change
+SpectraCheck spectra, raw-FID processing, processed-spectrum behavior, or
+runtime Prompt 1/2 activation.
+
+## Reviewer guardrail workflow
+
+Run this workflow whenever a change touches raw-FID Prompt 1/2 diagnostics,
+release-health payloads, Deployment Settings health rendering, CI artifact
+names, or the Week 21 release checklist itself:
+
+```bash
+./scripts/run_prompt_sidecar_guardrails.sh
+./scripts/run_release_health_contract_guardrails.sh
+```
+
+The Prompt sidecar guardrail protects SpectraCheck behavior: Prompt 1/2
+diagnostics may remain available as hidden or admin-visible QA metadata, but
+they must not change plotted spectra, peak markers, phase correction, baseline
+correction, legends, processed-spectrum analysis, or raw-FID runtime output.
+
+The release-health guardrail protects the admin/reporting contract: backend
+payload fields, frontend parsing, and Deployment Settings display must stay in
+sync whenever diagnostic artifacts evolve.
+
+Treat failures as follows:
+- Prompt sidecar failure: stop the release review until the diagnostic change is
+  proven metadata-only or a separate manual runtime-promotion phase is opened.
+- Release-health failure: update the backend contract, frontend parser, tests,
+  and docs together so `/admin/release-health` remains coherent.
+- Scientific or spectrum-rendering failure: do not patch around it in this
+  checklist; fix the affected SpectraCheck regression in the owning test suite.
+
+Passing this workflow does not activate Prompt 1/2 for runtime spectra. It only
+confirms the current reporting-only boundary is intact.
+
+## CI artifacts map
+
+Use this map during release review before opening the detailed artifact
+sections below:
+
+| Artifact | Open this when | Primary files | Release decision |
+| --- | --- | --- | --- |
+| `raw-fid-prompt-release-readiness` | You need the fastest one-page Prompt 1/2 readiness summary. | `raw_fid_prompt_release_readiness.md` | Reviewer-facing summary only; runtime activation stays blocked. |
+| `raw-fid-prompt-shadow-comparison` | You need sidecar-vs-legacy fixture deltas. | `raw_fid_prompt_shadow_comparison_summary.json`, `raw_fid_prompt_shadow_comparison_summary.csv` | Read-only comparison evidence; do not use it to drive plotted spectra. |
+| `raw-fid-prompt-provenance-checksums` | You need fixture/report hashes for audit trails. | `raw_fid_prompt_sidecar_provenance_checksums.json`, `raw_fid_prompt_sidecar_provenance_checksums.csv` | Audit evidence only; investigate hash drift before release. |
+| `raw-fid-prompt-manual-promotion-gate` | You need the detailed manual-promotion gate diagnostics. | Raw FID Prompt JSON/CSV fixture reports. | May show `review_required` without failing CI; `activation_allowed=false` must remain in effect. |
+
+All four artifacts are diagnostic release evidence. None of them may activate
+Prompt 1/2 for SpectraCheck runtime spectra, raw-FID plotting, processed
+analysis, peak markers, legends, phase correction, or baseline correction.
+
 ## Raw FID Prompt manual-promotion gate diagnostic
 
 CI also runs a separate non-blocking manual-promotion gate diagnostic:

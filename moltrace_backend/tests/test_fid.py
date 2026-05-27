@@ -58,6 +58,37 @@ from nmrcheck.settings import Settings
 REFERENCE_TEXT = "3.65 (q, 2H), 1.26 (t, 3H), 2.10 (br s, 1H)"
 
 
+def _assert_prompt_runtime_contract(metadata: dict[str, object]) -> dict[str, object]:
+    contract = metadata["prompt_1_2_runtime_contract"]
+    assert isinstance(contract, dict)
+    assert contract["version"] == "raw_fid_prompt_1_2_runtime_contract_v1"
+    assert contract["scope"] == "raw_fid_only"
+    assert contract["visibility"] == "metadata_only"
+    assert contract["integration_status"] == "merged_with_active_raw_fid_layer"
+    assert contract["active_visible_pipeline"] == "legacy_raw_fid_processor"
+    assert contract["visible_spectrum_fields_preserved"] is True
+    assert contract["processed_uploads_touched"] is False
+    assert contract["prompt_pipeline_active"] is False
+    assert contract["used_for_plot"] is False
+    assert contract["used_for_peak_markers"] is False
+    assert contract["used_for_phase_or_baseline_swap"] is False
+    prompt_reader = contract["prompt_1_fid_reader"]
+    assert prompt_reader["module"] == "moltrace.spectroscopy.io.fid_reader.read_fid"
+    assert prompt_reader["zero_fill_points"] == 65536
+    prompt_preprocess = contract["prompt_2_phase_baseline"]
+    assert (
+        prompt_preprocess["module"]
+        == "moltrace.spectroscopy.preprocess.phase_baseline"
+    )
+    assert prompt_preprocess["phase_default_method"] == "regions_analysis"
+    gates = contract["acceptance_gates"]
+    assert gates["ppm_scale_reference_tolerance_ppm"] == 0.01
+    assert gates["peak_count_tolerance_vs_reference"] == 2
+    assert gates["phase_angle_tolerance_degrees"] == 5
+    assert gates["baseline_rmse_fraction_full_scale"] == 0.005
+    return contract
+
+
 def test_fid_processing_recipe_defaults_are_safe_real_spectrum_defaults() -> None:
     recipe = FIDProcessingRecipe()
 
@@ -471,6 +502,13 @@ def test_frontend_raw_fid_preview_sidecar_is_flagged_and_non_disruptive(monkeypa
 
     legacy_preview = asyncio.run(preview_once())
     assert "prompt_pipeline_sidecar" not in legacy_preview.metadata
+    legacy_contract = _assert_prompt_runtime_contract(legacy_preview.metadata)
+    assert (
+        legacy_preview.metadata["raw_fid_peak_guidance"][
+            "prompt_1_2_runtime_contract_status"
+        ]["version"]
+        == legacy_contract["version"]
+    )
 
     monkeypatch.setenv("MOLTRACE_RAW_FID_PIPELINE", HYBRID_METADATA_RAW_FID_PIPELINE)
     hybrid_preview = asyncio.run(preview_once())
@@ -478,6 +516,13 @@ def test_frontend_raw_fid_preview_sidecar_is_flagged_and_non_disruptive(monkeypa
     assert hybrid_preview.x == legacy_preview.x
     assert hybrid_preview.y == legacy_preview.y
     assert hybrid_preview.peaks == legacy_preview.peaks
+    hybrid_contract = _assert_prompt_runtime_contract(hybrid_preview.metadata)
+    assert hybrid_contract["active_runtime"]["point_count"] == legacy_contract[
+        "active_runtime"
+    ]["point_count"]
+    assert hybrid_contract["active_runtime"]["peak_count"] == legacy_contract[
+        "active_runtime"
+    ]["peak_count"]
     sidecar = hybrid_preview.metadata["prompt_pipeline_sidecar"]
     assert sidecar["role"] == "sidecar_metadata_only"
     assert sidecar["active"] is False
@@ -608,6 +653,10 @@ def test_raw_fid_preview_and_process_remain_distinct_with_sidecar_default_off(
     assert sidecar_calls == []
     assert "prompt_pipeline_sidecar" not in preview.metadata
     assert "prompt_pipeline_sidecar" not in process.metadata
+    preview_contract = _assert_prompt_runtime_contract(preview.metadata)
+    process_contract = _assert_prompt_runtime_contract(process.metadata)
+    assert preview_contract["active_runtime"]["peak_count"] == preview.peak_count
+    assert process_contract["active_runtime"]["peak_count"] >= 0
 
     assert preview.metadata["inline_spectrum_generated"] is True
     assert preview.x
@@ -634,6 +683,7 @@ def test_raw_fid_preview_and_process_remain_distinct_with_sidecar_default_off(
         assert guidance["carbon13_text_used_for_peak_guidance"] is False
         assert "prompt_sidecar_guidance" not in guidance
         assert "prompt_sidecar_consistency" not in guidance
+        assert guidance["prompt_1_2_runtime_contract_status"]["used_for_plot"] is False
 
 
 def test_raw_fid_prompt_sidecar_bridge_is_review_only_for_preview_and_process(
