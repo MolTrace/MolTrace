@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Technical White Paper"
 subtitle: "Architecture, Scientific Foundations, and Regulatory Posture for Analytical-Method Validators and Regulatory Reviewers"
-version: "2026-Q2"
+version: "2026-05-27"
 audience: "Analytical-method validators, NMR / MS technical leads, regulatory-affairs reviewers, IT / data-integrity auditors"
 length: "≈7,500 words · Technical variant of the canonical hybrid white paper"
 ---
@@ -85,6 +85,15 @@ The evidence engine is built strictly additively across thirty-nine weekly relea
 | 39 | `lcms_confidence_bridge.py` | LC-MS consensus → unified candidate confidence |
 
 Supporting modules used across multiple layers: `peak_categorization.py` (per-peak category + region + labile hint + impurity match), `compound_class_priors.py` (per-class multiplier table for candidate scoring), `compound_classes.py` (canonical class taxonomy with `normalize_compound_class()`), `chemistry.py` (SMILES → StructureSummary), `dp4_scoring.py` (DP4 Bayesian posterior), `literature_data.py` (citation registry), `solvents.py` (NMR solvent profiles), `impurities.py` (curated impurity reference shifts), `nmr_tables.py` (1H + 13C shift region tables).
+
+### 3.1 Opt-in experimental analysis backend — Prompt 3 GSD
+
+Alongside the default 39-layer chain a separate **Global Spectral Deconvolution** sidecar is available as an opt-in analysis backend, implementing the Mestrenova-style GSD algorithm (single-pass detection with `scipy.signal.find_peaks`, per-peak fitting with `lmfit` Lorentzian / pseudo-Voigt, level-aware overlap resolution via the legacy iterative `nmrcheck.gsd.deconvolve_region` at levels 4-5) followed by expert-system auto-classification into `compound | solvent | impurity | artifact | 13C_satellite` using the Fulmer / Gottlieb residual-solvent reference table (`peak_categorization.find_solvent_or_impurity_hits`) and ¹³C-satellite detection at ±½·J_CH (125 Hz sp³ / 160 Hz sp²).
+
+* **Module:** `src/moltrace/spectroscopy/peaks/gsd.py` (`Peak`, `gsd_peak_pick`, `auto_classify`).
+* **Endpoint:** `POST /spectrum/analyze/gsd` — request `SpectrumGSDAnalyzeRequest { ppm_axis, intensity, nucleus, solvent, field_mhz, level: 1..5 }`, response `SpectrumGSDAnalyzeResult { peaks, category_counts, level, backend, experimental: true, notes }`. The default `/spectrum/analyze` flow is unchanged; tenants opt in per request.
+* **Validation harness:** `src/nmrcheck/gsd_prompt3_validation.py` + CLI `moltrace-gsd-prompt3-sidecar-report` runs the sidecar against the curated NMRShiftDB2 20-fixture bundle (`tests/fixtures/nmrshiftdb2/expected/nmrshiftdb2_bruker_20.json`) and emits versioned CSV + JSON reports. Current baseline: **solvent auto-detect 94.4 %** (17/18 fixtures with a known residual reference; the 1 outlier has a chemical-shift-referencing error in the raw spectrum), **compound peak count within ±5 % of expert reference on 35 %**, median absolute compound-count delta **3** peaks. The promotion-gate test (`tests/test_prompt3_gsd_fixture_validation.py::test_prompt3_gsd_meets_promotion_gate`) carries the strict 95 % / median ≤2 thresholds as `xfail` until the sidecar clears them on this corpus; the regression-floor companion test (`current_state` marker) locks in the current baseline so any change that materially degrades the sidecar fails CI loudly.
+* **Status:** experimental. Surfaced in the API with `experimental: true` and in the (forthcoming) FE backend-selector with an "experimental" badge so tenants understand the maturity. Promotion to a default-on layer awaits clearing the 95 %/median ≤2 gate on a wider corpus (HMDB multiplet-line annotations are the natural next dataset since they count at the same line granularity the legacy `deconvolve_region` resolves).
 
 ---
 

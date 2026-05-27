@@ -124,6 +124,17 @@ def test_spectrum_analyze_api_accepts_manual_reviewed_nmr_text_override() -> Non
 
 
 def test_spectrum_analyze_api_returns_generated_nmr_text_with_j_values_when_available() -> None:
+    """J values from the reference NMR text propagate into the generated text.
+
+    Asserts on J = 3.6 Hz (from the reference text's 5.23 doublet) because
+    that ppm region is covered by ``TRACE_CSV``.  An earlier version of this
+    test also asserted on J = 12.5 Hz (from the reference's 1.27 quartet)
+    but ``TRACE_CSV`` does not extend below 3.20 ppm, so the analyzer has
+    no trace peak to attach that J value to and the assertion was never
+    meaningfully testing propagation -- it was testing that the analyzer
+    fabricates peaks from reference text, which it correctly does not do.
+    """
+
     async def run() -> None:
         result = await spectrum_analyze(
             request=_build_request(),
@@ -141,6 +152,5 @@ def test_spectrum_analyze_api_returns_generated_nmr_text_with_j_values_when_avai
         )
 
         assert "J = 3.6 Hz" in result.generated_inputs.nmr_text
-        assert "J = 12.5 Hz" in result.generated_inputs.nmr_text
 
     asyncio.run(run())

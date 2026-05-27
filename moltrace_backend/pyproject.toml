@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 moltrace-raw-fid-sidecar-report = "nmrcheck.raw_fid_prompt_validation:main"
+moltrace-gsd-prompt3-sidecar-report = "nmrcheck.gsd_prompt3_validation:main"
 
 [project.optional-dependencies]
 fid = [

@@ -7,6 +7,24 @@
       "runtimeArgs": ["dev"],
       "port": 3000,
       "cwd": "moltrace_frontend"
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "python",
+        "-m",
+        "uvicorn",
+        "nmrcheck.main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "port": 8000,
+      "cwd": "moltrace_backend"
     }
   ]
 }
