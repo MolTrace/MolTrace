@@ -1902,7 +1902,7 @@ function SpectrumViewerImpl({
               type="button"
               role="menuitem"
               className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              onClick={() => zoom("in")}
+              onClick={() => { zoom("in"); closeSpectrumContextMenu() }}
             >
               Zoom in
             </button>
@@ -1910,7 +1910,7 @@ function SpectrumViewerImpl({
               type="button"
               role="menuitem"
               className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              onClick={() => zoom("out")}
+              onClick={() => { zoom("out"); closeSpectrumContextMenu() }}
             >
               Zoom out
             </button>
@@ -1918,7 +1918,7 @@ function SpectrumViewerImpl({
               type="button"
               role="menuitem"
               className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              onClick={fullSpectrum}
+              onClick={() => { fullSpectrum(); closeSpectrumContextMenu() }}
             >
               Full spectrum
             </button>
@@ -1927,7 +1927,7 @@ function SpectrumViewerImpl({
               type="button"
               role="menuitem"
               className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              onClick={() => pan("left")}
+              onClick={() => { pan("left"); closeSpectrumContextMenu() }}
             >
               Pan left
             </button>
@@ -1935,7 +1935,7 @@ function SpectrumViewerImpl({
               type="button"
               role="menuitem"
               className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              onClick={() => pan("right")}
+              onClick={() => { pan("right"); closeSpectrumContextMenu() }}
             >
               Pan right
             </button>
@@ -2028,7 +2028,7 @@ function SpectrumViewerImpl({
               type="button"
               role="menuitem"
               className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              onClick={resetZoom}
+              onClick={() => { resetZoom(); closeSpectrumContextMenu() }}
             >
               Reset axes
             </button>

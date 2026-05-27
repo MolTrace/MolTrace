@@ -1289,7 +1289,7 @@ export function DashboardV0() {
         </ModuleCard>
       ) : null}
       {!aiSummaryLoading && aiSummary != null && !aiSummary.available ? (
-        <p className="text-xs text-muted-foreground">AI inference summary unavailable for now.</p>
+        <p className="text-xs text-muted-foreground">Live AI inference data isn't available right now.</p>
       ) : null}
 
       <Card>
@@ -1352,7 +1352,7 @@ export function DashboardV0() {
               <p className="mt-3 text-xs text-muted-foreground">Loading core module activity…</p>
             ) : null}
             {!coreModuleActivityLoading && coreModuleActivity && !coreModuleActivity.available ? (
-              <p className="mt-3 text-xs text-muted-foreground">Core module activity unavailable for now.</p>
+              <p className="mt-3 text-xs text-muted-foreground">Live module activity isn't available right now.</p>
             ) : null}
             {!coreModuleActivityLoading && coreModuleActivity?.available && coreModuleActivity.total === 0 ? (
               <p className="mt-3 text-xs text-muted-foreground">No core module activity has been logged yet.</p>
@@ -1360,11 +1360,11 @@ export function DashboardV0() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-md border bg-card p-3">
-              <p className="text-xs text-muted-foreground">open cross-module action items</p>
+              <p className="text-xs text-muted-foreground">Open cross-module action items</p>
               <p className="text-2xl font-bold tabular-nums">{fmtMlCount(crossModuleDisplay.openCrossModuleActionItems)}</p>
             </div>
             <div className="rounded-md border bg-card p-3">
-              <p className="text-xs text-muted-foreground">next recommended action</p>
+              <p className="text-xs text-muted-foreground">Next recommended action</p>
               <p className="mt-1 text-sm">{crossModuleDisplay.nextRecommendedAction ?? "—"}</p>
             </div>
           </div>
@@ -1384,7 +1384,7 @@ export function DashboardV0() {
             <p className="text-xs text-muted-foreground">Loading cross-module command center summary…</p>
           ) : null}
           {!crossModuleLoading && !crossModuleDisplay.available ? (
-            <p className="text-xs text-muted-foreground">Cross-module command center summary unavailable.</p>
+            <p className="text-xs text-muted-foreground">Live cross-module summary isn't available right now.</p>
           ) : null}
         </CardContent>
       </Card>
@@ -1424,7 +1424,7 @@ export function DashboardV0() {
             </div>
             {crSummary.partial ? (
               <p className="text-xs text-muted-foreground">
-                Batch summary couldn't load — active batch count is unavailable.
+                Batch summary didn't load — active batch count is hidden until it does.
               </p>
             ) : null}
             <p className="flex flex-wrap gap-x-4 gap-y-1">
@@ -1567,7 +1567,7 @@ export function DashboardV0() {
       ) : null}
 
       {!surveillanceLoading && regulatorySurveillanceSummary && !regulatorySurveillanceSummary.available ? (
-        <p className="text-xs text-muted-foreground">Regulatory surveillance summary unavailable.</p>
+        <p className="text-xs text-muted-foreground">Live regulatory surveillance data isn't available right now.</p>
       ) : null}
 
       <RegulatoryNotificationsCompactCard />
@@ -1619,7 +1619,7 @@ export function DashboardV0() {
         ) : null}
         {!roiLoading && !roiLive ? (
           <p className="text-xs text-muted-foreground">
-            Live ROI data couldn't load — hours match the summary card above; task and workflow counts unavailable.
+            Live ROI data didn't load — hours mirror the summary card above; task and workflow counts are hidden until it does.
           </p>
         ) : null}
       </ModuleCard>
@@ -1718,7 +1718,7 @@ export function DashboardV0() {
           ) : null}
           {!connectorSummaryLoading && connectorSummaryBackendUnavailable ? (
             <p className="text-xs text-muted-foreground">
-              Connector and ingestion summary unavailable for now.
+              Live connector and ingestion data isn't available right now.
             </p>
           ) : null}
           {!connectorSummaryLoading && connectorSummaryError && connectorSummaryBackendUnavailable ? (
@@ -1950,7 +1950,7 @@ export function DashboardV0() {
         description={
           overview.jobsDataAvailable
             ? "Latest analysis jobs and their progress."
-            : "Illustrative preview when job telemetry is unavailable."
+            : "Showing example jobs while live data loads."
         }
       >
           <StatusFilterPills

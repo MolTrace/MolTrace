@@ -251,6 +251,34 @@ def build_prompt_pipeline_runtime_contract(report: FIDPreviewReport) -> dict[str
             },
             "baseline_default_order": 3,
         },
+        "prompt_3_gsd_peak_picker": {
+            "module": "moltrace.spectroscopy.peaks.gsd",
+            "status": "available_for_sidecar_validation",
+            "default_level": 2,
+            "fit_models_by_level": {
+                "1": "lorentzian",
+                "2": "pseudo_voigt",
+                "3": "overlap_group_pseudo_voigt",
+                "4": "iterative_pseudo_voigt_metadata_only",
+                "5": "iterative_pseudo_voigt_metadata_only",
+            },
+            "classification_targets": [
+                "compound",
+                "solvent",
+                "impurity",
+                "artifact",
+                "13C_satellite",
+            ],
+            "classification_sources": [
+                "nmrcheck.nmr_tables",
+                "nmrcheck.impurities",
+                "nmrcheck.peak_categorization",
+            ],
+            "prompt_pipeline_active": False,
+            "used_for_plot": False,
+            "used_for_peak_markers": False,
+            "used_for_visible_spectrum": False,
+        },
         "active_runtime": {
             "filename": report.filename,
             "format_detected": report.format_detected,
@@ -293,6 +321,8 @@ def build_prompt_pipeline_runtime_contract(report: FIDPreviewReport) -> dict[str
             "peak_count_tolerance_vs_reference": 2,
             "phase_angle_tolerance_degrees": 5,
             "baseline_rmse_fraction_full_scale": 0.005,
+            "prompt_3_peak_count_tolerance_fraction_vs_expert": 0.05,
+            "prompt_3_solvent_detection_target_fraction": 0.95,
             "generation_target_seconds": [1, 3],
             "fingerprint_identity_source": (
                 "prompt_reader_fingerprint_hash_when_sidecar_enabled; "

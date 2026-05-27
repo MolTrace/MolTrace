@@ -155,7 +155,7 @@ describe("DashboardV0 connector/ingestion fallback", () => {
     await waitFor(() => {
       expect(screen.getByText("Connector and ingestion summary")).toBeInTheDocument()
       expect(
-        screen.getByText("Connector and ingestion summary unavailable for now.")
+        screen.getByText("Live connector and ingestion data isn't available right now.")
       ).toBeInTheDocument()
     })
   })

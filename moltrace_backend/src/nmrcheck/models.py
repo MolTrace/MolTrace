@@ -14370,3 +14370,74 @@ class PilotCustomerDashboard(BaseModel):
     acceptance_protocols: list[dict[str, Any]] = Field(default_factory=list)
     signoffs: list[dict[str, Any]] = Field(default_factory=list)
     warnings_json: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# -----------------------------------------------------------------------------
+# Prompt 3 GSD analysis backend (experimental, opt-in).
+# -----------------------------------------------------------------------------
+
+
+GSDPromptPeakShape = Literal["lorentzian", "voigt"]
+GSDPromptPeakCategory = Literal[
+    "compound",
+    "solvent",
+    "impurity",
+    "artifact",
+    "13C_satellite",
+]
+GSDPromptNucleus = Literal["1H", "13C"]
+GSDPromptBackend = Literal["gsd_prompt3"]
+
+
+class GSDPromptPeak(BaseModel):
+    """Single GSD-resolved peak with auto-classified category.
+
+    Mirrors the dataclass returned by ``moltrace.spectroscopy.peaks.gsd.Peak``
+    so consumers see a stable wire shape regardless of internal refactors.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    position_ppm: float
+    position_hz: float
+    intensity: float = Field(ge=0.0)
+    area: float = Field(ge=0.0)
+    width_hz: float = Field(ge=0.0)
+    shape: GSDPromptPeakShape
+    category: GSDPromptPeakCategory
+    confidence: float = Field(ge=0.0, le=1.0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SpectrumGSDAnalyzeRequest(BaseModel):
+    """Request body for the GSD-Prompt-3 analysis backend.
+
+    The spectrum is sent as paired ``ppm_axis`` + ``intensity`` arrays.
+    Clients are expected to parse their CSV / JCAMP / FID source themselves
+    (the existing ``/spectrum/preview`` and ``/spectrum/analyze`` endpoints
+    already cover trace parsing for legacy workflows; this endpoint is the
+    pure analysis layer for callers who already have arrays in hand).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ppm_axis: list[float] = Field(min_length=16, max_length=524288)
+    intensity: list[float] = Field(min_length=16, max_length=524288)
+    nucleus: GSDPromptNucleus = "1H"
+    solvent: str = Field(default="", max_length=64)
+    field_mhz: float = Field(default=500.0, gt=0.0, le=2000.0)
+    level: int = Field(default=2, ge=1, le=5)
+
+
+class SpectrumGSDAnalyzeResult(BaseModel):
+    """Response from the GSD-Prompt-3 analysis backend."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    peaks: list[GSDPromptPeak]
+    category_counts: dict[str, int] = Field(default_factory=dict)
+    level: int
+    backend: GSDPromptBackend = "gsd_prompt3"
+    experimental: bool = True
+    notes: list[str] = Field(default_factory=list)
+    spectrum_metadata: dict[str, Any] = Field(default_factory=dict)

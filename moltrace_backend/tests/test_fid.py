@@ -81,11 +81,21 @@ def _assert_prompt_runtime_contract(metadata: dict[str, object]) -> dict[str, ob
         == "moltrace.spectroscopy.preprocess.phase_baseline"
     )
     assert prompt_preprocess["phase_default_method"] == "regions_analysis"
+    prompt_gsd = contract["prompt_3_gsd_peak_picker"]
+    assert prompt_gsd["module"] == "moltrace.spectroscopy.peaks.gsd"
+    assert prompt_gsd["status"] == "available_for_sidecar_validation"
+    assert prompt_gsd["default_level"] == 2
+    assert prompt_gsd["prompt_pipeline_active"] is False
+    assert prompt_gsd["used_for_plot"] is False
+    assert prompt_gsd["used_for_peak_markers"] is False
+    assert prompt_gsd["used_for_visible_spectrum"] is False
     gates = contract["acceptance_gates"]
     assert gates["ppm_scale_reference_tolerance_ppm"] == 0.01
     assert gates["peak_count_tolerance_vs_reference"] == 2
     assert gates["phase_angle_tolerance_degrees"] == 5
     assert gates["baseline_rmse_fraction_full_scale"] == 0.005
+    assert gates["prompt_3_peak_count_tolerance_fraction_vs_expert"] == 0.05
+    assert gates["prompt_3_solvent_detection_target_fraction"] == 0.95
     return contract
 
 

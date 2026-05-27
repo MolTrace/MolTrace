@@ -741,6 +741,8 @@ from .models import (
     SpectralSimilarityRequest,
     SpectralSimilarityResult,
     SpectrumAnalyzeResult,
+    SpectrumGSDAnalyzeRequest,
+    SpectrumGSDAnalyzeResult,
     SpectrumPreviewReport,
     StoredAnalysisRecord,
     StoredReportRecord,
@@ -5111,6 +5113,114 @@ async def spectrum_analyze(
     )
     return SpectrumAnalyzeResult(
         preview=preview, generated_inputs=generated_inputs, analysis=report
+    )
+
+
+@router.post(
+    "/spectrum/analyze/gsd",
+    response_model=SpectrumGSDAnalyzeResult,
+    dependencies=[Depends(require_access_context)],
+)
+async def spectrum_analyze_gsd(
+    payload: SpectrumGSDAnalyzeRequest,
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumGSDAnalyzeResult:
+    """Opt-in **experimental** GSD-Prompt-3 peak analysis backend.
+
+    Runs Global Spectral Deconvolution (Mestrenova-style) on a processed
+    spectrum and returns the peak list with auto-classified categories
+    (compound | solvent | impurity | artifact | 13C_satellite).
+
+    Distinct from the default ``POST /spectrum/analyze`` flow:
+      * No SMILES required -- pure spectrum-driven analysis.
+      * No analysis report wrapping -- returns raw GSD output for the
+        caller to consume or merge into a larger analysis.
+      * Marked ``experimental: true`` in the response so the FE shows the
+        backend with an experimental badge until the validation gate
+        clears 95% solvent detect + median compound delta <= 2.
+
+    Current corpus baseline (NMRShiftDB2 20-fixture, see
+    ``moltrace-gsd-prompt3-sidecar-report``): 94.4% solvent detect,
+    35% compound peak count within 5%, median compound peak count
+    delta 3 vs expert reference.
+
+    Request shape: paired ``ppm_axis`` + ``intensity`` arrays.  Clients
+    parse their CSV/JCAMP/FID source themselves -- the existing
+    ``/spectrum/preview`` and ``/spectrum/analyze`` endpoints handle
+    trace parsing for the legacy SpectraCheck workflow; this endpoint
+    is the pure analysis layer for callers who already have arrays.
+    """
+
+    import numpy as np
+
+    from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
+    from moltrace.spectroscopy.peaks.gsd import auto_classify, gsd_peak_pick
+
+    if len(payload.ppm_axis) != len(payload.intensity):
+        raise HTTPException(
+            status_code=400,
+            detail="ppm_axis and intensity must have the same length.",
+        )
+
+    ppm_axis = np.asarray(payload.ppm_axis, dtype=np.float64)
+    intensity = np.asarray(payload.intensity, dtype=np.float64)
+
+    spectrum = NMRSpectrum(
+        data=intensity,
+        ppm_axis=ppm_axis,
+        metadata={"source": "spectrum_analyze_gsd"},
+        nucleus=payload.nucleus,
+        solvent=payload.solvent,
+        field_mhz=payload.field_mhz,
+    )
+
+    raw_peaks = gsd_peak_pick(spectrum, level=payload.level)
+    classified = auto_classify(raw_peaks, spectrum, payload.solvent)
+
+    category_counts: dict[str, int] = {}
+    for peak in classified:
+        category_counts[peak.category] = category_counts.get(peak.category, 0) + 1
+
+    peak_models = [
+        {
+            "position_ppm": peak.position_ppm,
+            "position_hz": peak.position_hz,
+            "intensity": max(peak.intensity, 0.0),
+            "area": max(peak.area, 0.0),
+            "width_hz": max(peak.width_hz, 0.0),
+            "shape": peak.shape,
+            "category": peak.category,
+            "confidence": max(0.0, min(1.0, peak.confidence)),
+            "metadata": dict(peak.metadata),
+        }
+        for peak in classified
+    ]
+
+    notes: list[str] = []
+    if not classified:
+        notes.append(
+            "GSD did not pick any peaks; check spectrum SNR + dynamic range."
+        )
+    if payload.level >= 4:
+        notes.append(
+            "Level 4-5 use the legacy iterative deconvolve_region pass; "
+            "expect higher peak counts than level 2-3 because multiplet "
+            "lines are resolved separately."
+        )
+
+    return SpectrumGSDAnalyzeResult(
+        peaks=peak_models,  # type: ignore[arg-type]
+        category_counts=category_counts,
+        level=payload.level,
+        backend="gsd_prompt3",
+        experimental=True,
+        notes=notes,
+        spectrum_metadata={
+            "nucleus": payload.nucleus,
+            "solvent": payload.solvent,
+            "field_mhz": payload.field_mhz,
+            "input_point_count": len(payload.ppm_axis),
+        },
     )
 
 
