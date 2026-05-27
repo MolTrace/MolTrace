@@ -1,0 +1,115 @@
+##TITLE= Audit trail, TopSpin 4.0.8
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= Rainer
+$$ D:/Rainer/NMR-Spektren/Allyl-glycidyl-ether in CDCl3/601/pdata/1/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2020-04-06 17:50:50.763 +0200>,<Rainer>,<Haustier-W10>,<proc1d>,<TopSpin 4.0.8>,
+      <efp LB = 0.05 FT_mod = 6 PKNL = 1 PHC0 = 200.2 PHC1 = 0 SI = 128K 
+       data hash MD5: 128K
+       64 1D B9 ED A1 2C CB 0A D7 A8 1E B3 B1 12 51 17>)
+(   2,<2020-04-06 17:50:52.323 +0200>,<Rainer>,<Haustier-W10>,<proc1d>,<TopSpin 4.0.8>,
+      <abs ABSG = 5 
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(   3,<2020-04-06 17:50:57.688 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.745 +0200
+       DELETE [7.377;7.139]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(   4,<2020-04-06 17:50:57.701 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.745 +0200
+       DELETE [6.059;5.725]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(   5,<2020-04-06 17:50:57.713 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.745 +0200
+       DELETE [5.433;4.987]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(   6,<2020-04-06 17:50:57.725 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.745 +0200
+       DELETE [4.209;3.803]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(   7,<2020-04-06 17:50:57.738 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.746 +0200
+       DELETE [3.803;3.508]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(   8,<2020-04-06 17:50:57.751 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.746 +0200
+       DELETE [3.508;3.205]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(   9,<2020-04-06 17:50:57.764 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.746 +0200
+       DELETE [3.205;2.958]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  10,<2020-04-06 17:50:57.776 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.746 +0200
+       DELETE [2.911;2.677]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  11,<2020-04-06 17:50:57.788 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.746 +0200
+       DELETE [2.677;2.388]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  12,<2020-04-06 17:50:57.800 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-04-06 17:50:56.746 +0200
+       DELETE [1.871;1.525]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  13,<2020-11-29 17:25:35.162 +0100>,<nes>,<nmr-nesnote2>,<dataserver>,<TopSpin 3.6.0>,
+      <INTEGRAL 2020-11-29 17:25:09.321 +0100
+       DEFINE [5.978;5.805]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  14,<2020-11-29 17:25:35.166 +0100>,<nes>,<nmr-nesnote2>,<dataserver>,<TopSpin 3.6.0>,
+      <INTEGRAL 2020-11-29 17:25:18.783 +0100
+       DEFINE [5.309;5.251]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  15,<2020-11-29 17:25:35.169 +0100>,<nes>,<nmr-nesnote2>,<dataserver>,<TopSpin 3.6.0>,
+      <INTEGRAL 2020-11-29 17:25:20.960 +0100
+       DEFINE [5.208;5.144]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  16,<2020-11-29 17:25:35.172 +0100>,<nes>,<nmr-nesnote2>,<dataserver>,<TopSpin 3.6.0>,
+      <INTEGRAL 2020-11-29 17:25:23.503 +0100
+       DEFINE [4.093;3.949]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  17,<2020-11-29 17:25:35.175 +0100>,<nes>,<nmr-nesnote2>,<dataserver>,<TopSpin 3.6.0>,
+      <INTEGRAL 2020-11-29 17:25:25.423 +0100
+       DEFINE [3.741;3.676]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  18,<2020-11-29 17:25:35.178 +0100>,<nes>,<nmr-nesnote2>,<dataserver>,<TopSpin 3.6.0>,
+      <INTEGRAL 2020-11-29 17:25:27.583 +0100
+       DEFINE [3.431;3.352]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  19,<2020-11-29 17:25:35.182 +0100>,<nes>,<nmr-nesnote2>,<dataserver>,<TopSpin 3.6.0>,
+      <INTEGRAL 2020-11-29 17:25:29.529 +0100
+       DEFINE [3.180;3.093]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  20,<2020-11-29 17:25:35.186 +0100>,<nes>,<nmr-nesnote2>,<dataserver>,<TopSpin 3.6.0>,
+      <INTEGRAL 2020-11-29 17:25:32.033 +0100
+       DEFINE [2.806;2.748]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  21,<2020-11-29 17:25:35.189 +0100>,<nes>,<nmr-nesnote2>,<dataserver>,<TopSpin 3.6.0>,
+      <INTEGRAL 2020-11-29 17:25:33.686 +0100
+       DEFINE [2.619;2.554]
+       data hash MD5: 128K
+       C7 71 75 47 0B A0 D6 66 EA 49 8F DD 23 81 46 AB>)
+(  22,<2020-11-29 17:28:52.552 +0100>,<nes>,<nmr-nesnote2>,<disknew>,<TopSpin 3.6.0>,
+      <processed data deleted>)
+##END=
+
+$$ hash MD5
+$$ 97 79 DF A6 29 14 E7 F5 17 73 7F 0E 00 6B 0C 8A

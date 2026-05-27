@@ -1,0 +1,51 @@
+
+Current Data Parameters
+NAME     b170412lsdk.EGlycol              
+EXPNO                 1              
+PROCNO                1              
+
+F2 - Acquisition Parameters
+Date_          20170413              
+Time               9.29              
+INSTRUM           spect              
+PROBHD   5 mm PATXO 31P              
+PULPROG          zgpg30              
+TD                65536              
+SOLVENT             D2O              
+NS                 1024              
+DS                    4              
+SWH           18832.393 Hz           
+FIDRES         0.287360 Hz           
+AQ            1.7399808 sec          
+RG              18390.4              
+DW               26.550 usec         
+DE                 6.00 usec         
+TE                298.2 K            
+D1           1.00000000 sec          
+d11          0.03000000 sec          
+DELTA        0.89999998 sec          
+TD0                 128              
+
+======== CHANNEL f1 ========
+NUC1                13C              
+P1                10.00 usec         
+PL1               -3.00 dB           
+SFO1         75.4760500 MHz          
+
+======== CHANNEL f2 ========
+CPDPRG[2        waltz65              
+NUC2                 1H              
+PCPD2             80.00 usec         
+PL2               -3.00 dB           
+PL12              16.50 dB           
+PL13              20.00 dB           
+SFO2        300.1312000 MHz          
+
+F2 - Processing parameters
+SI                65536              
+SF           75.4677381 MHz          
+WDW                  EM              
+SSB      0              
+LB                 1.00 Hz           
+GB       0              
+PC                 1.40              

@@ -1,0 +1,18 @@
+##TITLE= Audit trail, TOPSPIN		Version 2.1
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= guest
+$$ /synthy3/data/guest/nmr/1,2-Epoxybutan in CDCl3/251/audita.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2018-07-10 10:08:49.477 +0200>,<guest>,<synthy>,<go>,<TOPSPIN 2.1>,
+      <created by zg
+	started at 2018-07-10 09:59:55.687 +0200,
+	POWCHK enabled, PULCHK disabled,
+       configuration hash MD5:
+       2A 76 C0 FE A7 46 CC 92 D8 CE 60 25 04 BF EB B0
+       data hash MD5: 64K
+       F5 F8 06 D4 F7 79 A5 11 7F 55 D2 7C DB 83 65 45>)
+##END=
+
+$$ hash MD5
+$$ 75 EA E5 CA B3 E4 AE 92 04 4A 9C 4F 6F AF 2F 0D

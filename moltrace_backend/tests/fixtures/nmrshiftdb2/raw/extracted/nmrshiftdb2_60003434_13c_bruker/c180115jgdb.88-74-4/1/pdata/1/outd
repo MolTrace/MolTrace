@@ -1,0 +1,16 @@
+##TITLE= Parameter file, TopSpin 3.5 pl 6
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 1	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= ns
+$$ 2018-01-16 00:14:23.949 +0100  ns@nmr400
+$$ /opt/data_nmr/data/jg/nmr/c180115jgdb.88-74-4/1/pdata/1/outd
+$$ process /opt/topspin3.5pl6/prog/mod/dirdata
+##$CURPLOT= <printer>
+##$CURPRIN= <$printer>
+##$DFORMAT= <normdp>
+##$LAYOUT= <+/1D_X_NMR-OCI.xwp>
+##$LFORMAT= <normlp>
+##$PFORMAT= <normpl>
+##END=

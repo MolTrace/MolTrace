@@ -1,0 +1,5 @@
+   Current data set:
+   NAME =	1-Chlor-3-brom-propan in CDCl3	EXPNO =	252	PROCNO = 1
+   DU   =	D:/Rainer/NMR-Spektren
+
+   Number   Integrated Region     Integral

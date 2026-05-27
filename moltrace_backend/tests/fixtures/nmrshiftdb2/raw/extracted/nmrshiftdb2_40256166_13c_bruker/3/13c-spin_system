@@ -1,0 +1,41 @@
+# optimize=yes
+ autoassign=yes
+ autoignore=yes
+ linewidth=0.100000
+ rmslimit=0.015000
+ iterations=20
+ assignrms=0.100000
+ rmsconverge=0.100000
+ rmsdiverge=0.100000
+ assignmod=3
+ ignorelimit=3.000000
+ assignlimit=2.700000
+
+standard 13C of ethylcrotonate
+
+species=H
+1  3417.850000  name=a
+1  3397.450000  name=b
+1  3077.270000  name=c
+1  2899.400000  name=d
+
+species=C
+1  14949.000000  name=e
+
+
+j(a,c)  1.890000
+j(a,d)  0.370000
+j(a,e)  7.200000
+j(b,c)  1.820000
+j(b,d)  4.780000
+j(b,e)  178.000000
+j(c,d)  7.860000
+j(c,e)  11.000000
+j(d,e)  3.270000
+
+v(e)
+j(a,e)
+j(b,e)
+j(c,e)
+j(d,e)
+

@@ -11,6 +11,7 @@ from pydantic import (
     ConfigDict,
     EmailStr,
     Field,
+    PrivateAttr,
     field_validator,
     model_validator,
 )
@@ -384,6 +385,8 @@ class SpectrumAnalyzeResult(BaseModel):
 
 class FIDProcessingSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    _explicit_overrides: set[str] = PrivateAttr(default_factory=set)
 
     selected_preset: FIDPresetId = "balanced"
     zero_fill_factor: int = Field(default=2, ge=1, le=8)

@@ -15,6 +15,7 @@
     "generate:openapi": "openapi-typescript http://localhost:8000/openapi.json -o src/lib/api/schema.d.ts",
     "generate:pwa-icons": "node scripts/generate-pwa-icons.mjs",
     "test": "vitest",
+    "test:spectracheck-sidecar": "vitest components/spectracheck/spectracheck-preview-rendering.test.tsx --run",
     "test:watch": "vitest --watch",
     "typecheck": "tsc --noEmit",
     "visual:baseline": "tsx tests/visual-baseline/capture.ts",

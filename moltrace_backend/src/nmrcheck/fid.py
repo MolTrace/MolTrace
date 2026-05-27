@@ -406,8 +406,11 @@ def fid_settings_from_preset(
         "vertical_gain": vertical_gain,
         "debug_preview": debug_preview,
     }
+    explicit_overrides = {key for key, value in overrides.items() if value is not None}
     values.update({key: value for key, value in overrides.items() if value is not None})
-    return FIDProcessingSettings(selected_preset=preset_id, **values)
+    settings = FIDProcessingSettings(selected_preset=preset_id, **values)
+    settings._explicit_overrides = explicit_overrides
+    return settings
 
 
 def _is_safe_member_name(name: str) -> bool:
@@ -772,6 +775,7 @@ def _apply_raw_fid_mnova_constraints(
         "processed_uploads_touched": False,
     }
     notes: list[str] = []
+    explicit_overrides = set(getattr(settings, "_explicit_overrides", set()) or set())
 
     if normalized == "13C":
         # MestreNova Advised Processing for 13C (manual p. 106, p. 129):
@@ -817,6 +821,41 @@ def _apply_raw_fid_mnova_constraints(
         return constrained, detail, notes
 
     if normalized == "1H":
+        recipe_overrides = explicit_overrides.intersection(
+            {
+                "zero_fill_factor",
+                "apodization_mode",
+                "line_broadening_hz",
+                "phase_mode",
+                "phase_p0",
+                "phase_p1",
+                "baseline_correction",
+                "baseline_order",
+            }
+        )
+        if recipe_overrides:
+            max_preview_points = max(
+                int(settings.max_preview_points),
+                _RAW_FID_MNOVA_PROTON_PREVIEW_POINTS,
+            )
+            preserved = settings
+            if max_preview_points != int(settings.max_preview_points):
+                preserved = settings.model_copy(update={"max_preview_points": max_preview_points})
+                preserved._explicit_overrides = set(explicit_overrides)
+            detail.update(
+                {
+                    "applied": False,
+                    "reason": "explicit_processing_settings_preserved",
+                    "preserved_explicit_settings": sorted(recipe_overrides),
+                    "display_point_floor_applied": max_preview_points
+                    != int(settings.max_preview_points),
+                    "max_preview_points": max_preview_points,
+                    "first_point_scale": _RAW_FID_MNOVA_FIRST_POINT_SCALE,
+                    "resolution_policy": "caller_recipe_preserved_with_high_resolution_preview_points",
+                }
+            )
+            return preserved, detail, notes
+
         # MestreNova Advised Processing for 1H (manual p. 106, p. 129):
         #   Stanning apodization · 3x zero-fill · Regions-Analysis auto phase
         #   · Bernstein polynomial baseline (order 3). We approximate the

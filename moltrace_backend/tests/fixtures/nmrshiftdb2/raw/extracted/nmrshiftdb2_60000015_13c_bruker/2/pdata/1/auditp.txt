@@ -1,0 +1,27 @@
+##TITLE= Audit trail, TopSpin 3.5 pl 2
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nes
+$$ D:/SciPrograms/Bruker/TopSpin3.1/data/nes/nmr/nesEX9spektren/2/pdata/1/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, WHAT)
+(   1,<2005-01-25 22:06:22.38 +0100>,<nes>,<r115>,
+      <created by zg, POWCHK disabled, PULCHK disabled
+       configuration hash MD5:
+       88 4A 13 F8 B8 29 9F C6 40 D7 77 EF F7 FA D2 45
+       data hash MD5: 64K
+       17 E4 78 FB 23 38 13 2A 44 FB 38 45 A4 03 85 45>)
+(   2,<2016-06-12 12:54:30.672 +0200>,<nes>,<nmr-nesnotebook>,<proc1d>,<TopSpin 3.5.2>,
+      <Start of raw data processing
+       efp BC_mod = 2 LB = 3 FT_mod = 6 PKNL = 1 PHC0 = -150.4858 PHC1 = -7.052109 SI = 16K 
+       data hash MD5: 16K
+       C0 42 5F 59 84 F2 6B A6 13 7B 2E 62 DA 09 50 6E>)
+(   3,<2016-06-12 12:54:32.202 +0200>,<nes>,<nmr-nesnotebook>,<proc1d>,<TopSpin 3.5.2>,
+      <apk 
+       data hash MD5: 16K
+       04 9C B5 CB 94 5B 47 F2 10 1D A7 17 19 A4 45 31>)
+(   4,<2016-07-06 10:29:35.699 +0200>,<nes>,<nmr-nesnotebook>,<disknew>,<TopSpin 3.5.2>,
+      <processed data deleted>)
+##END=
+
+$$ hash MD5
+$$ 5E EE 8A 40 5E DD 37 D7 AF 1D 1B E3 97 8E 55 C2

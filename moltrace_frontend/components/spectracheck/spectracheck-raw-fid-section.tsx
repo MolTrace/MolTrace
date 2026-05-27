@@ -107,6 +107,216 @@ const PRESETS = [
 
 const EMPTY_SPECTRUM_PEAKS: never[] = []
 
+type PromptSidecarConsistencySummary = {
+  status: string
+  message: string | null
+  activePeakCount: number | null
+  activePeakSource: string | null
+  recommendedPeakCount: number | null
+  recommendedPeakCountSource: string | null
+  peakCountDelta: number | null
+  acceptanceTolerance: number | null
+  withinPromptAcceptance: boolean | null
+  usedForPlot: boolean
+  usedForPeakMarkers: boolean
+  usedForPhaseOrBaseline: boolean
+}
+
+type PromptSidecarQaSummary = {
+  consistency: PromptSidecarConsistencySummary | null
+  role: string | null
+  available: boolean | null
+  active: boolean | null
+  activeVisiblePipeline: string | null
+  promptPipelineActive: boolean | null
+  safeToActivate: boolean | null
+  safeToUseForAnalysisMetadata: boolean | null
+  readerDiagnosticsAvailable: boolean
+  preprocessDiagnosticsAvailable: boolean
+  readerSource: string | null
+  preprocessSource: string | null
+  nucleus: string | null
+  solvent: string | null
+  fieldMhz: number | null
+  pointCount: number | null
+  runtimeMs: number | null
+  fingerprintHash: string | null
+  phaseMethod: string | null
+  phaseZeroOrderDegrees: number | null
+  baselineMethod: string | null
+  baselineOrder: number | null
+  baselineRmseFractionFullScale: number | null
+  validationStatus: string | null
+  validationVersion: string | null
+}
+
+function readFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function readStringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+function readBooleanValue(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null
+}
+
+function firstRecordValue(...values: unknown[]): Record<string, unknown> | null {
+  for (const value of values) {
+    if (isRecord(value)) return value
+  }
+  return null
+}
+
+function firstStringValue(...values: unknown[]): string | null {
+  for (const value of values) {
+    const parsed = readStringValue(value)
+    if (parsed) return parsed
+  }
+  return null
+}
+
+function firstNumberValue(...values: unknown[]): number | null {
+  for (const value of values) {
+    const parsed = readFiniteNumber(value)
+    if (parsed != null) return parsed
+  }
+  return null
+}
+
+function firstBooleanValue(...values: unknown[]): boolean | null {
+  for (const value of values) {
+    const parsed = readBooleanValue(value)
+    if (parsed != null) return parsed
+  }
+  return null
+}
+
+function rawFidGuidanceRecord(metadata: Record<string, unknown>): Record<string, unknown> | null {
+  return firstRecordValue(metadata.raw_fid_peak_guidance, metadata.context_guidance)
+}
+
+function getPromptSidecarConsistency(payload: unknown): PromptSidecarConsistencySummary | null {
+  if (!isRecord(payload) || !isRecord(payload.metadata)) return null
+  const metadata = payload.metadata
+  const rawGuidance = rawFidGuidanceRecord(metadata)
+  const consistency =
+    rawGuidance && isRecord(rawGuidance.prompt_sidecar_consistency)
+      ? rawGuidance.prompt_sidecar_consistency
+      : null
+
+  if (!consistency) return null
+
+  return {
+    status: readStringValue(consistency.status) ?? "review",
+    message: readStringValue(consistency.message),
+    activePeakCount: readFiniteNumber(consistency.active_peak_count),
+    activePeakSource: readStringValue(consistency.active_peak_source),
+    recommendedPeakCount: readFiniteNumber(consistency.recommended_peak_count),
+    recommendedPeakCountSource: readStringValue(consistency.recommended_peak_count_source),
+    peakCountDelta: readFiniteNumber(consistency.peak_count_delta),
+    acceptanceTolerance: readFiniteNumber(consistency.acceptance_tolerance),
+    withinPromptAcceptance: readBooleanValue(consistency.within_prompt_acceptance),
+    usedForPlot: readBooleanValue(consistency.used_for_plot) ?? false,
+    usedForPeakMarkers: readBooleanValue(consistency.used_for_peak_markers) ?? false,
+    usedForPhaseOrBaseline: readBooleanValue(consistency.used_for_phase_or_baseline) ?? false,
+  }
+}
+
+function getPromptSidecarQa(payload: unknown): PromptSidecarQaSummary | null {
+  if (!isRecord(payload) || !isRecord(payload.metadata)) return null
+  const metadata = payload.metadata
+  const sidecar = firstRecordValue(metadata.prompt_pipeline_sidecar)
+  const rawGuidance = rawFidGuidanceRecord(metadata)
+  const guidance = firstRecordValue(
+    sidecar?.analysis_guidance,
+    rawGuidance?.prompt_sidecar_guidance,
+  )
+  const validation = firstRecordValue(sidecar?.validation_report)
+  const reader = firstRecordValue(sidecar?.reader_diagnostics)
+  const preprocess = firstRecordValue(sidecar?.preprocess_diagnostics)
+  const phase = firstRecordValue(sidecar?.phase)
+  const baseline = firstRecordValue(sidecar?.baseline)
+  const consistency = getPromptSidecarConsistency(payload)
+
+  if (!sidecar && !guidance && !validation && !consistency) return null
+
+  return {
+    consistency,
+    role: firstStringValue(sidecar?.role),
+    available: firstBooleanValue(sidecar?.available),
+    active: firstBooleanValue(sidecar?.active),
+    activeVisiblePipeline: firstStringValue(
+      guidance?.active_visible_pipeline,
+      validation?.active_visible_pipeline,
+      reader?.active_visible_pipeline,
+      preprocess?.active_visible_pipeline,
+    ),
+    promptPipelineActive: firstBooleanValue(
+      guidance?.prompt_pipeline_active,
+      validation?.prompt_pipeline_active,
+      reader?.prompt_pipeline_active,
+      preprocess?.prompt_pipeline_active,
+      sidecar?.active,
+    ),
+    safeToActivate: firstBooleanValue(validation?.safe_to_activate),
+    safeToUseForAnalysisMetadata: firstBooleanValue(guidance?.safe_to_use_for_analysis_metadata),
+    readerDiagnosticsAvailable:
+      Boolean(reader) || firstBooleanValue(guidance?.reader_diagnostics_available) === true,
+    preprocessDiagnosticsAvailable:
+      Boolean(preprocess) || firstBooleanValue(guidance?.preprocess_diagnostics_available) === true,
+    readerSource: firstStringValue(reader?.source),
+    preprocessSource: firstStringValue(preprocess?.source),
+    nucleus: firstStringValue(guidance?.nucleus, sidecar?.nucleus, reader?.nucleus),
+    solvent: firstStringValue(guidance?.solvent, sidecar?.solvent, reader?.solvent),
+    fieldMhz: firstNumberValue(guidance?.field_mhz, sidecar?.field_mhz, reader?.field_mhz),
+    pointCount: firstNumberValue(guidance?.point_count, sidecar?.point_count, reader?.point_count),
+    runtimeMs: firstNumberValue(guidance?.prompt_runtime_ms, sidecar?.runtime_ms),
+    fingerprintHash: firstStringValue(guidance?.fingerprint_hash, sidecar?.fingerprint_hash, reader?.fingerprint_hash),
+    phaseMethod: firstStringValue(preprocess?.phase_method, phase?.method),
+    phaseZeroOrderDegrees: firstNumberValue(preprocess?.phase_zero_order_degrees),
+    baselineMethod: firstStringValue(preprocess?.baseline_method, sidecar?.baseline_method, baseline?.method),
+    baselineOrder: firstNumberValue(preprocess?.baseline_order, sidecar?.baseline_order, baseline?.order),
+    baselineRmseFractionFullScale: firstNumberValue(preprocess?.baseline_rmse_fraction_full_scale),
+    validationStatus: firstStringValue(validation?.status, guidance?.validation_status),
+    validationVersion: firstStringValue(validation?.version, guidance?.validation_version),
+  }
+}
+
+function humanizePromptSidecarStatus(status: string): string {
+  const labels: Record<string, string> = {
+    consistent: "Consistent",
+    review_peak_count_delta: "Review peak-count delta",
+    prompt_guidance_unavailable: "Prompt guidance unavailable",
+    active_peak_count_unavailable: "Active peak count unavailable",
+    review: "Review",
+  }
+  return labels[status] ?? status.replaceAll("_", " ")
+}
+
+function formatPromptSidecarNumber(value: number | null): string {
+  return value == null ? "—" : Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
+
+function formatPromptSidecarRuntime(value: number | null): string {
+  return value == null ? "—" : `${Math.max(0, value).toFixed(0)} ms`
+}
+
+function formatPromptSidecarPercent(value: number | null): string {
+  return value == null ? "—" : `${(value * 100).toFixed(3)}%`
+}
+
+function shortPromptSidecarHash(value: string | null): string {
+  if (!value) return "—"
+  return value.length > 14 ? `${value.slice(0, 10)}…${value.slice(-4)}` : value
+}
+
 function extractRawArchiveId(payload: unknown): string | null {
   if (!isRecord(payload)) return null
   const meta = isRecord(payload.metadata) ? payload.metadata : null
@@ -542,6 +752,14 @@ export function SpectraCheckRawFidSection({
   const hasResultSurface = resultsMode != null
   const displayPayload =
     resultsMode === "process" ? processResult : resultsMode === "preview" ? previewResult : null
+  const promptSidecarConsistency = useMemo(
+    () => getPromptSidecarConsistency(displayPayload),
+    [displayPayload],
+  )
+  const promptSidecarQa = useMemo(
+    () => getPromptSidecarQa(displayPayload),
+    [displayPayload],
+  )
   const payloadMode = resultsMode
   const resultTitle = resultsMode === "process" ? "Processed FID output" : "Raw archive metadata"
   const resultDescription =
@@ -616,6 +834,20 @@ export function SpectraCheckRawFidSection({
 
   const warnings =
     meta && Array.isArray(meta.warnings) ? meta.warnings.map(String) : meta && typeof meta.warnings === "string" ? [meta.warnings] : []
+  const promptSidecarHasUnexpectedActivation = Boolean(
+    promptSidecarQa &&
+      (promptSidecarQa.active === true ||
+        promptSidecarQa.promptPipelineActive === true ||
+        promptSidecarConsistency?.usedForPlot ||
+        promptSidecarConsistency?.usedForPeakMarkers ||
+        promptSidecarConsistency?.usedForPhaseOrBaseline),
+  )
+  const promptSidecarAccent =
+    promptSidecarConsistency?.withinPromptAcceptance === false ||
+    promptSidecarQa?.safeToActivate === true ||
+    promptSidecarHasUnexpectedActivation
+      ? "var(--mt-amber)"
+      : "var(--mt-teal)"
 
   return (
     <div className="space-y-6">
@@ -1427,6 +1659,160 @@ export function SpectraCheckRawFidSection({
                   field="acquisition_metadata"
                   testId="acquisition-metadata-card"
                 />
+
+                {promptSidecarQa ? (
+                  <Card
+                    className="overflow-hidden rounded-xl py-0"
+                    style={{ borderTop: `3px solid ${promptSidecarAccent}` }}
+                    data-testid="prompt-sidecar-consistency-card"
+                  >
+                    <CardContent className="space-y-3 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p
+                          className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                          style={{ color: promptSidecarAccent }}
+                        >
+                          <ShieldCheck className="h-3 w-3" aria-hidden />
+                          Prompt reader sidecar
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className="font-mono text-[10px]"
+                          style={{ borderColor: promptSidecarAccent, color: promptSidecarAccent }}
+                        >
+                          Review-only metadata
+                        </Badge>
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-4">
+                        <div className="rounded-md border bg-muted/20 px-2 py-1.5">
+                          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Status
+                          </p>
+                          <p className="text-xs font-medium">
+                            {promptSidecarConsistency
+                              ? humanizePromptSidecarStatus(promptSidecarConsistency.status)
+                              : promptSidecarQa.validationStatus
+                                ? humanizePromptSidecarStatus(promptSidecarQa.validationStatus)
+                                : promptSidecarQa.available === false
+                                  ? "Sidecar unavailable"
+                                  : "Metadata available"}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-muted/20 px-2 py-1.5">
+                          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Active peaks
+                          </p>
+                          <p className="font-mono text-xs font-medium tabular-nums">
+                            {formatPromptSidecarNumber(promptSidecarConsistency?.activePeakCount ?? null)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-muted/20 px-2 py-1.5">
+                          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Prompt peaks
+                          </p>
+                          <p className="font-mono text-xs font-medium tabular-nums">
+                            {formatPromptSidecarNumber(promptSidecarConsistency?.recommendedPeakCount ?? null)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-muted/20 px-2 py-1.5">
+                          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Delta
+                          </p>
+                          <p className="font-mono text-xs font-medium tabular-nums">
+                            {formatPromptSidecarNumber(promptSidecarConsistency?.peakCountDelta ?? null)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div
+                        className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+                        data-testid="prompt-sidecar-qa-details"
+                      >
+                        <div className="rounded-md border bg-muted/10 px-2 py-1.5">
+                          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Reader
+                          </p>
+                          <p className="text-xs font-medium">
+                            {promptSidecarQa.readerDiagnosticsAvailable ? "Available" : "Not reported"}
+                          </p>
+                          {promptSidecarQa.nucleus || promptSidecarQa.fieldMhz != null ? (
+                            <p className="font-mono text-[10px] text-muted-foreground">
+                              {promptSidecarQa.nucleus ?? "nucleus —"} ·{" "}
+                              {promptSidecarQa.fieldMhz != null
+                                ? `${promptSidecarQa.fieldMhz.toFixed(1)} MHz`
+                                : "field —"}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="rounded-md border bg-muted/10 px-2 py-1.5">
+                          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Phase
+                          </p>
+                          <p className="text-xs font-medium">{promptSidecarQa.phaseMethod ?? "Not reported"}</p>
+                          <p className="font-mono text-[10px] text-muted-foreground">
+                            P0 {formatPromptSidecarNumber(promptSidecarQa.phaseZeroOrderDegrees)}°
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-muted/10 px-2 py-1.5">
+                          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Baseline
+                          </p>
+                          <p className="text-xs font-medium">{promptSidecarQa.baselineMethod ?? "Not reported"}</p>
+                          <p className="font-mono text-[10px] text-muted-foreground">
+                            order {formatPromptSidecarNumber(promptSidecarQa.baselineOrder)} · RMSE{" "}
+                            {formatPromptSidecarPercent(promptSidecarQa.baselineRmseFractionFullScale)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-muted/10 px-2 py-1.5">
+                          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                            Sidecar runtime
+                          </p>
+                          <p className="font-mono text-xs font-medium tabular-nums">
+                            {formatPromptSidecarRuntime(promptSidecarQa.runtimeMs)}
+                          </p>
+                          <p className="font-mono text-[10px] text-muted-foreground">
+                            {shortPromptSidecarHash(promptSidecarQa.fingerprintHash)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        Legacy spectrum, peak markers, phase, and baseline remain authoritative.
+                      </p>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        Not used for plot · Not used for peak markers · Not used for phase/baseline
+                      </p>
+                      {promptSidecarConsistency?.message ? (
+                        <p className="text-xs text-muted-foreground">{promptSidecarConsistency.message}</p>
+                      ) : null}
+                      {promptSidecarHasUnexpectedActivation ? (
+                        <p className="text-xs font-medium" style={{ color: "var(--mt-amber)" }}>
+                          Unexpected activation flag present; review before enabling any Prompt 1/2 pipeline output.
+                        </p>
+                      ) : null}
+                      {(promptSidecarQa.activeVisiblePipeline ||
+                        promptSidecarQa.validationVersion ||
+                        promptSidecarQa.safeToUseForAnalysisMetadata != null) ? (
+                        <p className="break-words font-mono text-[10px] text-muted-foreground">
+                          Active pipeline: {promptSidecarQa.activeVisiblePipeline ?? "legacy"} · Validation:{" "}
+                          {promptSidecarQa.validationVersion ?? "not reported"} · Analysis metadata:{" "}
+                          {promptSidecarQa.safeToUseForAnalysisMetadata === true ? "available" : "guarded"}
+                        </p>
+                      ) : null}
+                      {promptSidecarConsistency &&
+                      (promptSidecarConsistency.activePeakSource ||
+                        promptSidecarConsistency.recommendedPeakCountSource ||
+                        promptSidecarConsistency.acceptanceTolerance != null) ? (
+                        <p className="break-words font-mono text-[10px] text-muted-foreground">
+                          Source: {promptSidecarConsistency.activePeakSource ?? "legacy"} · Prompt:{" "}
+                          {promptSidecarConsistency.recommendedPeakCountSource ?? "sidecar"} · Tolerance:{" "}
+                          {formatPromptSidecarNumber(promptSidecarConsistency.acceptanceTolerance)}
+                        </p>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 {/* Warnings card */}
                 {warnings.length > 0 && (

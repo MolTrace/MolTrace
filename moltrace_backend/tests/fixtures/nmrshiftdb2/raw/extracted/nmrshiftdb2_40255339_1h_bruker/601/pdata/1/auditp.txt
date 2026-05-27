@@ -1,0 +1,29 @@
+##TITLE= Audit trail, TopSpin 3.6.0
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nes
+$$ C:/Bruker/TopSpin3.6.0/data/nes/nmr/PoM_Oct_2020_Haessner/601/pdata/1/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2017-07-25 20:09:31.489 +0200>,<guest>,<laurel>,<go>,<TOPSPIN 3.2>,
+      <created by zg
+	started at 2017-07-25 20:05:08.012 +0200,
+	POWCHK enabled, PULCHK disabled,
+       configuration hash MD5:
+       BA 24 88 D8 81 2A 09 55 9A AA D1 CB D6 2C 0D C1
+       data hash MD5: 64K
+       C3 07 D4 5E 2D AB B6 8A 58 CD 7F 54 4A 4D 32 D3>)
+(   2,<2020-09-22 14:28:00.541 +0200>,<nes>,<nmr-nesnote2>,<proc1d>,<TopSpin 3.6.0>,
+      <Start of raw data processing
+       efp LB = 0.01 FT_mod = 6 PKNL = 1 PHC0 = 199.8377 PHC1 = -18.84377 SI = 64K 
+       data hash MD5: 64K
+       9E 8D A6 DA 7C BF 3A 8F 6B E5 D7 BE F2 14 74 9E>)
+(   3,<2020-09-22 14:28:00.593 +0200>,<nes>,<nmr-nesnote2>,<proc1d>,<TopSpin 3.6.0>,
+      <abs n ABSG = 5 
+       data hash MD5: 64K
+       A4 F8 67 F6 EE AB 98 AB 19 43 03 26 A0 15 CC A7>)
+(   4,<2022-05-23 06:38:24.946 +0200>,<nes>,<nmr-nesnote2>,<disknew>,<TopSpin 3.6.0>,
+      <processed data deleted>)
+##END=
+
+$$ hash MD5
+$$ 2E 20 D0 BB 99 9D 72 D6 0E 1E 0A 7E D9 51 A1 C9

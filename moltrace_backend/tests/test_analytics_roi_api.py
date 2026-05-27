@@ -208,6 +208,114 @@ def test_analytics_roi_feedback_and_renewal_workflow(tmp_path):
         assert viewer_admin.status_code == 403, viewer_admin.text
 
 
+def test_core_module_events_are_sanitized_filterable_and_admin_only(tmp_path):
+    client = _client(tmp_path)
+    admin_headers = {"x-api-key": "test-key"}
+
+    with client:
+        viewer_headers = _sign_up(client, "viewer@example.com")
+
+        spectracheck_event = client.post(
+            "/analytics/events",
+            headers=admin_headers,
+            json={
+                "event_type": " core_module_opened ",
+                "project_id": 42,
+                "session_id": 9001,
+                "status": "succeeded",
+                "event_source": "frontend",
+                "metadata_json": {
+                    "module": "spectracheck",
+                    "surface": "programs_workspace",
+                    "smiles": "CCOC(=O)C1=CC=CC=C1",
+                    "nmr_text": "1H NMR raw private text",
+                },
+            },
+        )
+        assert spectracheck_event.status_code == 201, spectracheck_event.text
+        spectracheck_payload = spectracheck_event.json()
+        assert spectracheck_payload["event_type"] == "core_module_opened"
+        assert spectracheck_payload["metadata_json"]["module"] == "spectracheck"
+        assert spectracheck_payload["metadata_json"]["surface"] == "programs_workspace"
+        assert spectracheck_payload["metadata_json"]["smiles"] == "[redacted]"
+        assert spectracheck_payload["metadata_json"]["nmr_text"] == "[redacted]"
+        assert "CCOC(=O)" not in spectracheck_event.text
+        assert "raw private text" not in spectracheck_event.text
+
+        for module in ("regulatory_hub", "reactioniq"):
+            created = client.post(
+                "/analytics/events",
+                headers=admin_headers,
+                json={
+                    "event_type": "core_module_opened",
+                    "project_id": 42,
+                    "session_id": 9001,
+                    "status": "succeeded",
+                    "event_source": "frontend",
+                    "metadata_json": {
+                        "module": module,
+                        "surface": "programs_workspace",
+                    },
+                },
+            )
+            assert created.status_code == 201, created.text
+
+        other_event = client.post(
+            "/analytics/events",
+            headers=admin_headers,
+            json={
+                "event_type": "report_composed",
+                "project_id": 42,
+                "session_id": 9001,
+                "status": "succeeded",
+                "event_source": "backend",
+                "metadata_json": {"task_key": "report_composer"},
+            },
+        )
+        assert other_event.status_code == 201, other_event.text
+
+        viewer_list = client.get(
+            "/analytics/events",
+            headers=viewer_headers,
+            params={"event_type": "core_module_opened"},
+        )
+        assert viewer_list.status_code == 403, viewer_list.text
+
+        listed = client.get(
+            "/analytics/events",
+            headers=admin_headers,
+            params={"event_type": "core_module_opened", "limit": 10},
+        )
+        assert listed.status_code == 200, listed.text
+        events = listed.json()
+        assert len(events) == 3
+        assert {event["event_type"] for event in events} == {"core_module_opened"}
+        assert {event["metadata_json"]["module"] for event in events} == {
+            "spectracheck",
+            "regulatory_hub",
+            "reactioniq",
+        }
+        assert "report_composed" not in listed.text
+        assert "CCOC(=O)" not in listed.text
+        assert "raw private text" not in listed.text
+
+        limited = client.get(
+            "/analytics/events",
+            headers=admin_headers,
+            params={"event_type": "core_module_opened", "limit": 2},
+        )
+        assert limited.status_code == 200, limited.text
+        assert len(limited.json()) == 2
+
+        by_status = client.get(
+            "/analytics/events",
+            headers=admin_headers,
+            params={"event_type": "core_module_opened", "status": "succeeded"},
+        )
+        assert by_status.status_code == 200, by_status.text
+        assert len(by_status.json()) == 3
+
+
 def test_analytics_endpoints_appear_in_openapi(tmp_path):
     client = _client(tmp_path)
     with client:
@@ -229,5 +337,6 @@ def test_analytics_endpoints_appear_in_openapi(tmp_path):
     ]:
         assert path in paths
     assert "post" in paths["/analytics/events"]
+    assert "get" in paths["/analytics/events"]
     assert "patch" in paths["/analytics/automation-tasks/{task_id}"]
     assert "post" in paths["/analytics/renewal-report"]

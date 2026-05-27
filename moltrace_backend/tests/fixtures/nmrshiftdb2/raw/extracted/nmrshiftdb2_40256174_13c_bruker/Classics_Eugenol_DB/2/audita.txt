@@ -1,0 +1,20 @@
+##TITLE= Audit trail, TopSpin 3.5 pl 1
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= stb
+$$ C:/Bruker/TopSpin3.5pl1/data/natur/nmr/Eugenol-DB/2/audita.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, WHAT)
+(   1,<2005-05-09 17:28:03.60 +0200>,<stb>,<dachstein>,
+      <created by zg, POWCHK disabled, PULCHK disabled
+       configuration hash MD5:
+       8F BF 6C D0 B0 19 A6 14 58 87 84 AF D8 A5 C1 88
+       data hash MD5: 64K
+       BC FE 1A 4F 49 18 65 68 1F BA CA DC D7 7F AF 9B>)
+(   2,<2017-04-09 12:59:01.083 +0200>,<stb>,<STBHome>,<dirdata>,<TopSpin 3.5.1>,
+      <wrpa from 1 2 "eugenol" "C:/Bruker/TopSpin3.5pl1/data/natur/nmr"
+       data hash MD5: 64K
+       BC FE 1A 4F 49 18 65 68 1F BA CA DC D7 7F AF 9B>)
+##END=
+
+$$ hash MD5
+$$ 37 E3 9D 05 6C 45 67 C4 2E BE 01 0E AE 21 DF A8

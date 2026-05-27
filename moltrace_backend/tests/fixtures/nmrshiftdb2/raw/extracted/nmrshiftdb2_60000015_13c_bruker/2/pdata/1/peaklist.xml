@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList modified="2016-07-06T10:17:27">
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2016-07-06T10:17:27" expNo="2" name="nesEX9spektren" owner="" procNo="1" source="D:\SciPrograms\Bruker\TopSpin3.1\data\nes\nmr">
+      <PeakPickDetails>F1=171.388565ppm, F2=164.240753ppm, MI=5.50cm, MAXI=8.87cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="166.5606" intensity="6.21" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2016-07-06T10:17:27" expNo="2" name="nesEX9spektren" owner="" procNo="1" source="D:\SciPrograms\Bruker\TopSpin3.1\data\nes\nmr">
+      <PeakPickDetails>F1=147.562531ppm, F2=118.812454ppm, MI=13.07cm, MAXI=19.65cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="144.4156" intensity="16.10" type="0"/>
+    <Peak1D F1="122.7465" intensity="17.36" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2016-07-06T10:17:27" expNo="2" name="nesEX9spektren" owner="" procNo="1" source="D:\SciPrograms\Bruker\TopSpin3.1\data\nes\nmr">
+      <PeakPickDetails>F1=63.218391ppm, F2=58.135506ppm, MI=13.95cm, MAXI=19.44cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="60.0580" intensity="18.06" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2016-07-06T10:17:27" expNo="2" name="nesEX9spektren" owner="" procNo="1" source="D:\SciPrograms\Bruker\TopSpin3.1\data\nes\nmr">
+      <PeakPickDetails>F1=22.078785ppm, F2=10.165771ppm, MI=13.24cm, MAXI=20.23cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="17.9050" intensity="17.46" type="0"/>
+    <Peak1D F1="14.2221" intensity="20.00" type="0"/>
+  </PeakList1D>
+</PeakList>

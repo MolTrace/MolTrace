@@ -1,0 +1,23 @@
+##TITLE= Audit trail, TOPSPIN		Version 3.2
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= jg
+$$ C:\NMR_local/c180116jgdb.88-74-4/1/pdata/1/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2018-01-16 03:24:34.971 +0100>,<ns>,<nmr400>,<proc1d>,<TopSpin 3.5.6>,
+      <genfid from       1 1 "c180116jgdb.88-74-4" "/opt/data/jg/nmr"
+       data hash MD5: 98132
+       AF 91 61 4D 38 5E 90 7F B8 22 7D 1B 41 B3 F4 4D>)
+(   2,<2018-01-16 03:24:38.929 +0100>,<ns>,<nmr400>,<dirdata>,<TopSpin 3.5.6>,
+      <wrpa from 1 1 "c180116jgdb.88-74-4" "/opt/data/jg/nmr"
+       data hash MD5: 98132
+       AF 91 61 4D 38 5E 90 7F B8 22 7D 1B 41 B3 F4 4D>)
+(   3,<2018-01-25 10:46:54.084 +0100>,<jg>,<nmr6>,<proc1d>,<TOPSPIN 3.2>,
+      <Start of raw data processing
+       efp ME_mod = 4 NCOEF = 12288 LPBIN = 24K TDoff = -36 LB = 0.7 FT_mod = 6 PKNL = 1 PHC0 = 40.86761 PHC1 = -194.5049 SI = 512K 
+       data hash MD5: 512K
+       E1 23 67 86 15 48 D5 98 94 B2 98 B5 3A 36 8C 1D>)
+##END=
+
+$$ hash MD5
+$$ F9 59 F5 31 A0 45 DF C7 49 CC 4D 0E D7 73 B1 E5

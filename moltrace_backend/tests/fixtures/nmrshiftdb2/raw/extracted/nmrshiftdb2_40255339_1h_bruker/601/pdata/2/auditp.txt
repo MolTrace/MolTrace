@@ -1,0 +1,70 @@
+##TITLE= Audit trail, TopSpin 4.0.8
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= Rainer
+$$ D:/Rainer/NMR-Spektren/Indol/601/pdata/2/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2017-07-25 20:09:31.489 +0200>,<guest>,<laurel>,<go>,<TOPSPIN 3.2>,
+      <created by zg
+	started at 2017-07-25 20:05:08.012 +0200,
+	POWCHK enabled, PULCHK disabled,
+       configuration hash MD5:
+       BA 24 88 D8 81 2A 09 55 9A AA D1 CB D6 2C 0D C1
+       data hash MD5: 64K
+       C3 07 D4 5E 2D AB B6 8A 58 CD 7F 54 4A 4D 32 D3>)
+(   2,<2020-03-30 19:39:58.211 +0200>,<Rainer>,<Haustier-W10>,<proc1d>,<TopSpin 4.0.8>,
+      <Start of raw data processing
+       efp LB = 0.01 FT_mod = 6 PKNL = 1 PHC0 = 199.8377 PHC1 = -18.84377 SI = 64K 
+       data hash MD5: 64K
+       9E 8D A6 DA 7C BF 3A 8F 6B E5 D7 BE F2 14 74 9E>)
+(   3,<2020-03-30 19:40:00.523 +0200>,<Rainer>,<Haustier-W10>,<proc1d>,<TopSpin 4.0.8>,
+      <abs ABSG = 5 
+       data hash MD5: 64K
+       A4 F8 67 F6 EE AB 98 AB 19 43 03 26 A0 15 CC A7>)
+(   4,<2020-03-30 19:40:08.496 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-30 19:40:05.467 +0200
+       DELETE [8.585;7.587]
+       data hash MD5: 64K
+       A4 F8 67 F6 EE AB 98 AB 19 43 03 26 A0 15 CC A7>)
+(   5,<2020-03-30 19:40:08.510 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-30 19:40:05.467 +0200
+       DELETE [7.587;7.357]
+       data hash MD5: 64K
+       A4 F8 67 F6 EE AB 98 AB 19 43 03 26 A0 15 CC A7>)
+(   6,<2020-03-30 19:40:08.522 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-30 19:40:05.467 +0200
+       DELETE [7.357;6.996]
+       data hash MD5: 64K
+       A4 F8 67 F6 EE AB 98 AB 19 43 03 26 A0 15 CC A7>)
+(   7,<2020-03-30 19:40:08.534 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-30 19:40:05.467 +0200
+       DELETE [6.893;6.371]
+       data hash MD5: 64K
+       A4 F8 67 F6 EE AB 98 AB 19 43 03 26 A0 15 CC A7>)
+(   8,<2020-03-30 19:40:08.546 +0200>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-30 19:40:05.468 +0200
+       DELETE [1.744;1.434]
+       data hash MD5: 64K
+       A4 F8 67 F6 EE AB 98 AB 19 43 03 26 A0 15 CC A7>)
+(   9,<2020-04-09 11:52:56.140 +0200>,<Rainer>,<Haustier-W10>,<dirdata>,<TopSpin 4.0.8>,
+      <wrp from 1 601 "Indol" "D:/Rainer/NMR-Spektren"
+       data hash MD5: 64K
+       A4 F8 67 F6 EE AB 98 AB 19 43 03 26 A0 15 CC A7>)
+(  10,<2020-04-09 11:54:07.879 +0200>,<Rainer>,<Haustier-W10>,<proc1d>,<TopSpin 4.0.8>,
+      <sab NZP = 0 
+       data hash MD5: 64K
+       10 96 AE A4 E8 EB E7 BA 09 D4 03 F0 E2 F5 36 D9>)
+(  11,<2020-04-09 11:54:23.745 +0200>,<Rainer>,<Haustier-W10>,<proc1d>,<TopSpin 4.0.8>,
+      <bcm 0 9690 14489 0.000000e+00 0.000000e+00 0.000000e+00 0.000000e+00 0.000000e+00 
+       data hash MD5: 64K
+       10 96 AE A4 E8 EB E7 BA 09 D4 03 F0 E2 F5 36 D9>)
+(  12,<2020-04-09 11:55:17.974 +0200>,<Rainer>,<Haustier-W10>,<proc1d>,<TopSpin 4.0.8>,
+      <sab NZP = 10 
+       data hash MD5: 64K
+       6A 5A 70 16 BA 66 D5 AB 76 55 07 AE 16 71 1D 2A>)
+(  13,<2020-09-22 12:32:33.793 +0200>,<nes>,<nmr-nesnote2>,<disknew>,<TopSpin 3.6.0>,
+      <processed data deleted>)
+##END=
+
+$$ hash MD5
+$$ C7 2F 62 94 FD 8B 4C 1B A1 5F 28 A8 6B 9E 79 9A

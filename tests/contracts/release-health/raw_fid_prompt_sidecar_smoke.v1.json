@@ -1,0 +1,100 @@
+{
+  "raw_fid_prompt_sidecar_smoke": {
+    "status": "ready_to_run_reporting_only_smoke",
+    "policy": "reporting_only_no_runtime_wiring",
+    "active_visible_pipeline": "legacy",
+    "prompt_pipeline_active": false,
+    "failure_scope": "guardrail_only_not_scientific_review_rows",
+    "ci_command": "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report --limit 1 --no-include-varian --quiet --smoke",
+    "admin_report_endpoint": "GET /admin/raw-fid/prompt-sidecar/fixture-report?limit=1&include_varian=false",
+    "manual_promotion_gate": {
+      "status": "ci_diagnostic_non_blocking",
+      "visibility": "ci_artifact_and_admin_release_health_only",
+      "policy": "ci_admin_gate_only_no_runtime_activation",
+      "runtime_activation_allowed": false,
+      "requires_manual_code_change": true,
+      "requires_explicit_runtime_feature_flag": true,
+      "ci_step": "Raw FID Prompt manual promotion gate diagnostic",
+      "ci_artifact": "raw-fid-prompt-manual-promotion-gate",
+      "output_dir": "$RUNNER_TEMP/raw_fid_prompt_manual_promotion_gate",
+      "ci_command": "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report --limit 20 --include-varian --quiet --promotion-gate"
+    },
+    "manual_promotion_design": {
+      "status": "documented_reporting_only",
+      "visibility": "admin_release_health_and_docs",
+      "policy": "design_doc_no_runtime_activation",
+      "runtime_activation_allowed": false,
+      "doc_path": "docs/raw_fid_prompt_manual_promotion_design.md",
+      "doc_title": "Raw FID Prompt 1/2 Manual Promotion Design",
+      "required_guardrail_command": "./scripts/run_prompt_sidecar_guardrails.sh",
+      "required_gates": [
+        "prompt_sidecar_available",
+        "peak_count_reference_tolerance",
+        "ppm_axis_alignment",
+        "processed_peak_ppm_axis_alignment",
+        "phase_delta",
+        "baseline_method",
+        "fingerprint_hash",
+        "runtime_target",
+        "no_runtime_activation"
+      ],
+      "promotion_stages": [
+        "stage_0_metadata_only_current_state",
+        "stage_1_admin_shadow_comparison",
+        "stage_2_explicit_per_session_preview_candidate",
+        "stage_3_limited_internal_canary",
+        "stage_4_default_promotion_after_review"
+      ],
+      "rollback_mode": "MOLTRACE_RAW_FID_PIPELINE=legacy"
+    },
+    "provenance_checksum_artifact": {
+      "status": "ci_diagnostic_non_blocking",
+      "visibility": "ci_artifact_and_admin_release_health_only",
+      "policy": "checksum_export_no_runtime_activation",
+      "runtime_activation_allowed": false,
+      "ci_step": "Raw FID Prompt provenance checksum report",
+      "ci_artifact": "raw-fid-prompt-provenance-checksums",
+      "output_dir": "$RUNNER_TEMP/raw_fid_prompt_provenance_checksums",
+      "ci_command": "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report --limit 20 --include-varian --quiet --output-dir \"$RUNNER_TEMP/raw_fid_prompt_provenance_checksums\"",
+      "files": [
+        "raw_fid_prompt_sidecar_fixture_report.json",
+        "raw_fid_prompt_sidecar_fixture_report.csv",
+        "raw_fid_prompt_sidecar_provenance_checksums.json",
+        "raw_fid_prompt_sidecar_provenance_checksums.csv"
+      ]
+    },
+    "shadow_comparison_artifact": {
+      "status": "ci_diagnostic_non_blocking",
+      "visibility": "ci_artifact_and_admin_release_health_only",
+      "policy": "shadow_comparison_export_no_runtime_activation",
+      "runtime_activation_allowed": false,
+      "ci_step": "Raw FID Prompt shadow comparison summary",
+      "ci_artifact": "raw-fid-prompt-shadow-comparison",
+      "output_dir": "$RUNNER_TEMP/raw_fid_prompt_shadow_comparison",
+      "ci_command": "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report --limit 20 --include-varian --quiet --output-dir \"$RUNNER_TEMP/raw_fid_prompt_shadow_comparison\"",
+      "files": [
+        "raw_fid_prompt_shadow_comparison_summary.json",
+        "raw_fid_prompt_shadow_comparison_summary.csv"
+      ]
+    },
+    "release_readiness_artifact": {
+      "status": "ci_diagnostic_non_blocking",
+      "visibility": "ci_artifact_and_admin_release_health_only",
+      "policy": "release_readiness_markdown_no_runtime_activation",
+      "runtime_activation_allowed": false,
+      "ci_step": "Raw FID Prompt release readiness summary",
+      "ci_artifact": "raw-fid-prompt-release-readiness",
+      "output_dir": "$RUNNER_TEMP/raw_fid_prompt_release_readiness",
+      "ci_command": "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report --limit 20 --include-varian --quiet --output-dir \"$RUNNER_TEMP/raw_fid_prompt_release_readiness\"",
+      "files": [
+        "raw_fid_prompt_release_readiness.md"
+      ]
+    },
+    "runtime_effect": {
+      "spectracheck_visible_pipeline": "unchanged_legacy",
+      "processed_spectrum_pipeline": "unchanged",
+      "raw_fid_plotting": "unchanged",
+      "peak_markers": "unchanged"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+   Current data set:
+   NAME =	nesEX9spektren	EXPNO =	1	PROCNO = 1
+   DU   =	D:/SciPrograms/Bruker/TopSpin3.1/data/nes/nmr
+
+   Number   Integrated Region     Integral
+     1      7.145      6.678         1.00000
+     2      5.965      5.544         1.00279
+     3      4.296      3.898         2.09977
+     4      1.953      1.639         3.27816
+     5      1.378      1.026         3.26582

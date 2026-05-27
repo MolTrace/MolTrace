@@ -1,10 +1,12 @@
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { clearSpectraCheckTabStatePersistence } from "@/components/spectracheck/spectracheck-tab-state-context"
 import { SpectraCheckWorkspace } from "@/components/spectracheck/spectracheck-workspace"
 import {
   SPECTRACHECK_EVIDENCE_SESSION_KEY,
   invalidateSpectraCheckSessionReadCache,
 } from "@/src/lib/spectracheck/spectracheck-evidence-session"
+import { clearSpectraCheckRuntimeState } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/spectracheck",
@@ -15,10 +17,16 @@ vi.mock("next/navigation", () => ({
 describe("spectracheck page", () => {
   beforeEach(() => {
     window.localStorage.clear()
+    window.sessionStorage.clear()
+    clearSpectraCheckRuntimeState()
+    clearSpectraCheckTabStatePersistence()
     invalidateSpectraCheckSessionReadCache()
   })
   afterEach(() => {
     window.localStorage.clear()
+    window.sessionStorage.clear()
+    clearSpectraCheckRuntimeState()
+    clearSpectraCheckTabStatePersistence()
     invalidateSpectraCheckSessionReadCache()
   })
 
@@ -71,5 +79,55 @@ describe("spectracheck page", () => {
     expect(textarea.value).toContain("Ethanol | CCO")
     expect(textarea.value).toContain("Propanol | CCCO")
     expect(textarea.value).not.toContain("WrongMolecule")
+  })
+
+  it("keeps raw FID uploads across page navigation until the user explicitly clears them", () => {
+    const rawFile = new File(["pretend-fid"], "route-raw.zip", { type: "application/zip" })
+    let view = render(<SpectraCheckWorkspace defaultTab="tab-raw-fid" />)
+
+    fireEvent.drop(screen.getByRole("button", { name: /Drop raw FID archive/i }), {
+      dataTransfer: { files: [rawFile], types: ["Files"] },
+    })
+    expect(screen.getAllByText("route-raw.zip").length).toBeGreaterThan(0)
+
+    view.unmount()
+    const away = render(<div>Projects route</div>)
+    expect(screen.getByText("Projects route")).toBeInTheDocument()
+    away.unmount()
+
+    view = render(<SpectraCheckWorkspace defaultTab="tab-raw-fid" />)
+    expect(screen.getAllByText("route-raw.zip").length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole("button", { name: /^Clear$/i }))
+    expect(screen.queryByText("route-raw.zip")).not.toBeInTheDocument()
+
+    view.unmount()
+    render(<SpectraCheckWorkspace defaultTab="tab-raw-fid" />)
+    expect(screen.queryByText("route-raw.zip")).not.toBeInTheDocument()
+  })
+
+  it("keeps processed spectrum uploads across page navigation until the user explicitly clears them", () => {
+    const processedFile = new File(["##TITLE=processed"], "route-processed.jdx", { type: "text/plain" })
+    let view = render(<SpectraCheckWorkspace defaultTab="tab-processed" />)
+
+    fireEvent.drop(screen.getByRole("button", { name: /Drop processed spectrum file/i }), {
+      dataTransfer: { files: [processedFile], types: ["Files"] },
+    })
+    expect(screen.getAllByText("route-processed.jdx").length).toBeGreaterThan(0)
+
+    view.unmount()
+    const away = render(<div>Dashboard route</div>)
+    expect(screen.getByText("Dashboard route")).toBeInTheDocument()
+    away.unmount()
+
+    view = render(<SpectraCheckWorkspace defaultTab="tab-processed" />)
+    expect(screen.getAllByText("route-processed.jdx").length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole("button", { name: /^Clear$/i }))
+    expect(screen.queryByText("route-processed.jdx")).not.toBeInTheDocument()
+
+    view.unmount()
+    render(<SpectraCheckWorkspace defaultTab="tab-processed" />)
+    expect(screen.queryByText("route-processed.jdx")).not.toBeInTheDocument()
   })
 })

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList>
+  <PeakList1D>
+    <PeakList1DHeader creator="Rainer" date="2020-01-01T15:04:34.730+01:00" expNo="251" name="1,2-Epoxybutan in CDCl3" owner="" procNo="1" source="D:/Rainer/NMR-Spektren">
+      <PeakPickDetails>F1=1.236508ppm, F2=0.690739ppm, MI=1.00cm, MAXI=10000.00cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="1.042434" intensity="7.934058e+00" type="0"/>
+    <Peak1D F1="1.012697" intensity="1.500000e+01" type="0"/>
+    <Peak1D F1="0.982603" intensity="6.259992e+00" type="0"/>
+  </PeakList1D>
+</PeakList>

@@ -1,0 +1,16 @@
+##TITLE= Parameter file, TopSpin 4.0.8
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 1	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= Rainer
+$$ 2020-04-09 11:52:56.053 +0200  Rainer@Haustier-W10
+$$ D:/Rainer/NMR-Spektren/Indol/601/pdata/2/outd
+$$ process C:\Bruker\TopSpin4.0.8\prog\mod\dirdata.exe
+##$CURPLOT= <Brother-42101>
+##$CURPRIN= <dconpeaks.txt>
+##$DFORMAT= <normdp>
+##$LAYOUT= <+/1D_H.xwp>
+##$LFORMAT= <normlp>
+##$PFORMAT= <normpl>
+##END=

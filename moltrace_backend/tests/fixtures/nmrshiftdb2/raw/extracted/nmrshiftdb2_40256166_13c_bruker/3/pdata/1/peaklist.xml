@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList modified="2017-05-03T16:36:53">
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T16:36:53" expNo="3" name="Classics_Nicotine" owner="" procNo="1" source="C:\transferNMR">
+      <PeakPickDetails>F1=154.269730ppm, F2=145.601807ppm, MI=4.10cm, MAXI=7.80cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="150.5206" intensity="5.10" type="0"/>
+    <Peak1D F1="150.4665" intensity="4.37" type="0"/>
+    <Peak1D F1="150.4096" intensity="5.03" type="0"/>
+    <Peak1D F1="149.6400" intensity="5.52" type="0"/>
+    <Peak1D F1="149.6079" intensity="5.59" type="0"/>
+    <Peak1D F1="149.5706" intensity="5.58" type="0"/>
+    <Peak1D F1="149.5383" intensity="6.31" type="0"/>
+    <Peak1D F1="149.5306" intensity="6.40" type="0"/>
+    <Peak1D F1="149.4981" intensity="5.71" type="0"/>
+    <Peak1D F1="149.4609" intensity="5.68" type="0"/>
+    <Peak1D F1="149.4288" intensity="5.55" type="0"/>
+    <Peak1D F1="148.7687" intensity="4.73" type="0"/>
+    <Peak1D F1="148.7144" intensity="4.33" type="0"/>
+    <Peak1D F1="148.6575" intensity="4.94" type="0"/>
+    <Peak1D F1="147.8689" intensity="5.05" type="0"/>
+    <Peak1D F1="147.8367" intensity="5.21" type="0"/>
+    <Peak1D F1="147.7996" intensity="5.39" type="0"/>
+    <Peak1D F1="147.7670" intensity="5.87" type="0"/>
+    <Peak1D F1="147.7595" intensity="5.89" type="0"/>
+    <Peak1D F1="147.7270" intensity="5.25" type="0"/>
+    <Peak1D F1="147.6898" intensity="5.18" type="0"/>
+    <Peak1D F1="147.6577" intensity="5.14" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T16:36:53" expNo="3" name="Classics_Nicotine" owner="" procNo="1" source="C:\transferNMR">
+      <PeakPickDetails>F1=140.050430ppm, F2=139.563461ppm, MI=2.02cm, MAXI=2.72cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T16:36:53" expNo="3" name="Classics_Nicotine" owner="" procNo="1" source="C:\transferNMR">
+      <PeakPickDetails>F1=139.563461ppm, F2=138.199966ppm, MI=1.33cm, MAXI=1.88cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="138.8286" intensity="1.52" type="0"/>
+    <Peak1D F1="138.7765" intensity="1.56" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T16:36:53" expNo="3" name="Classics_Nicotine" owner="" procNo="1" source="C:\transferNMR">
+      <PeakPickDetails>F1=138.005188ppm, F2=132.259033ppm, MI=4.74cm, MAXI=7.17cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="135.6457" intensity="5.69" type="0"/>
+    <Peak1D F1="135.6361" intensity="5.93" type="0"/>
+    <Peak1D F1="135.5910" intensity="5.78" type="0"/>
+    <Peak1D F1="135.5814" intensity="5.82" type="0"/>
+    <Peak1D F1="134.0505" intensity="5.45" type="0"/>
+    <Peak1D F1="134.0409" intensity="5.68" type="0"/>
+    <Peak1D F1="133.9958" intensity="5.66" type="0"/>
+    <Peak1D F1="133.9865" intensity="5.56" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T16:36:53" expNo="3" name="Classics_Nicotine" owner="" procNo="1" source="C:\transferNMR">
+      <PeakPickDetails>F1=126.220695ppm, F2=118.526688ppm, MI=3.58cm, MAXI=7.89cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="124.4127" intensity="5.55" type="0"/>
+    <Peak1D F1="124.4042" intensity="6.82" type="0"/>
+    <Peak1D F1="124.3984" intensity="6.82" type="0"/>
+    <Peak1D F1="124.3899" intensity="6.22" type="0"/>
+    <Peak1D F1="124.3277" intensity="5.82" type="0"/>
+    <Peak1D F1="124.3189" intensity="7.03" type="0"/>
+    <Peak1D F1="124.3047" intensity="6.20" type="0"/>
+    <Peak1D F1="122.7965" intensity="5.66" type="0"/>
+    <Peak1D F1="122.7824" intensity="6.77" type="0"/>
+    <Peak1D F1="122.7737" intensity="5.84" type="0"/>
+    <Peak1D F1="122.7111" intensity="5.55" type="0"/>
+    <Peak1D F1="122.7027" intensity="6.70" type="0"/>
+    <Peak1D F1="122.6885" intensity="5.84" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T16:36:53" expNo="3" name="Classics_Nicotine" owner="" procNo="1" source="C:\transferNMR">
+      <PeakPickDetails>F1=71.291321ppm, F2=66.811264ppm, MI=1.42cm, MAXI=3.55cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="69.5090" intensity="2.07" type="0"/>
+    <Peak1D F1="68.2153" intensity="2.13" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T16:36:53" expNo="3" name="Classics_Nicotine" owner="" procNo="1" source="C:\transferNMR">
+      <PeakPickDetails>F1=61.746853ppm, F2=52.884132ppm, MI=1.07cm, MAXI=3.01cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="58.3624" intensity="1.98" type="0"/>
+    <Peak1D F1="57.0711" intensity="2.30" type="0"/>
+    <Peak1D F1="57.0479" intensity="2.28" type="0"/>
+    <Peak1D F1="57.0227" intensity="2.48" type="0"/>
+    <Peak1D F1="56.9731" intensity="2.30" type="0"/>
+    <Peak1D F1="55.6589" intensity="2.15" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T16:36:53" expNo="3" name="Classics_Nicotine" owner="" procNo="1" source="C:\transferNMR">
+      <PeakPickDetails>F1=45.092731ppm, F2=17.822830ppm, MI=1.94cm, MAXI=15.52cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="42.3695" intensity="3.89" type="0"/>
+    <Peak1D F1="42.3237" intensity="2.01" type="0"/>
+    <Peak1D F1="41.0943" intensity="5.96" type="0"/>
+    <Peak1D F1="41.0485" intensity="12.00" type="0"/>
+    <Peak1D F1="41.0027" intensity="6.24" type="0"/>
+    <Peak1D F1="39.7733" intensity="5.93" type="0"/>
+    <Peak1D F1="39.7273" intensity="11.81" type="0"/>
+    <Peak1D F1="39.6814" intensity="6.22" type="0"/>
+    <Peak1D F1="38.4062" intensity="3.84" type="0"/>
+    <Peak1D F1="38.3602" intensity="2.00" type="0"/>
+    <Peak1D F1="36.5773" intensity="2.09" type="0"/>
+    <Peak1D F1="36.5444" intensity="2.26" type="0"/>
+    <Peak1D F1="35.2986" intensity="2.67" type="0"/>
+    <Peak1D F1="35.2671" intensity="4.60" type="0"/>
+    <Peak1D F1="35.2406" intensity="3.56" type="0"/>
+    <Peak1D F1="33.9620" intensity="2.64" type="0"/>
+    <Peak1D F1="33.9235" intensity="2.24" type="0"/>
+    <Peak1D F1="23.9395" intensity="5.09" type="0"/>
+    <Peak1D F1="23.9142" intensity="3.03" type="0"/>
+    <Peak1D F1="22.6370" intensity="5.35" type="0"/>
+    <Peak1D F1="22.6094" intensity="5.14" type="0"/>
+    <Peak1D F1="21.3691" intensity="2.54" type="0"/>
+    <Peak1D F1="21.3353" intensity="3.70" type="0"/>
+    <Peak1D F1="21.3193" intensity="2.47" type="0"/>
+  </PeakList1D>
+</PeakList>

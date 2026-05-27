@@ -1,0 +1,25 @@
+##TITLE= Audit trail, TopSpin 4.0.6
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= Rainer
+$$ D:/Rainer/NMR-Spektren/1,2-Epoxybutan in CDCl3/251/pdata/2/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2018-07-10 10:08:49.477 +0200>,<guest>,<synthy>,<go>,<TOPSPIN 2.1>,
+      <created by zg
+	started at 2018-07-10 09:59:55.687 +0200,
+	POWCHK enabled, PULCHK disabled,
+       configuration hash MD5:
+       2A 76 C0 FE A7 46 CC 92 D8 CE 60 25 04 BF EB B0
+       data hash MD5: 64K
+       F5 F8 06 D4 F7 79 A5 11 7F 55 D2 7C DB 83 65 45>)
+(   2,<2020-01-01 16:53:21.171 +0100>,<Rainer>,<Haustier-W10>,<proc1d>,<TopSpin 4.0.6>,
+      <Start of raw data processing
+       gfp LB = -0.3 GB = 0.3 FT_mod = 6 PKNL = 1 PHC0 = -5.603336 PHC1 = 1.389032 SI = 128K 
+       data hash MD5: 128K
+       BB 46 D9 33 6B 6C CF CB 05 F2 0A FE 3B BB 72 9E>)
+(   3,<2020-01-27 11:34:56.570 +0100>,<nes>,<nmr-nesnotebook>,<disknew>,<TopSpin 3.5.b.91.7>,
+      <processed data deleted>)
+##END=
+
+$$ hash MD5
+$$ D9 03 94 42 7D 68 DE BD C5 11 B1 90 42 5F 23 71

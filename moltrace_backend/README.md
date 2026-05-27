@@ -147,6 +147,10 @@ The test suite now covers a direct route-level workflow that exercises:
 9. export endpoints
 10. FID run review/report actions
 11. E2E API smoke coverage for auth, validation, analysis, workspaces, health, and deployment diagnostics
+12. raw FID Prompt sidecar reporting-only smoke status, with the visible legacy SpectraCheck pipeline unchanged
+13. raw FID Prompt manual-promotion gates reported as CI artifacts without activating the Prompt 1/2 sidecar
+14. raw FID Prompt provenance checksum artifacts for fixture identity, JSON/CSV report hashes, and archived FID hashes
+15. raw FID Prompt manual-promotion design documented in `docs/raw_fid_prompt_manual_promotion_design.md`
 
 ## Week 20 Additions
 
@@ -154,7 +158,7 @@ Varian/Agilent 1D beta detection and nmrglue processing dispatch are now wired i
 
 ## Week 21 Release Candidate
 
-Scientific validation fixtures, regression coverage, `GET /admin/release-health`, local SQLite reset via `python -m nmrcheck.cli reset-dev-db`, GitHub Actions CI, and evidence-confidence reporting are now included. The Raw FID run history is presented as one reviewer table with Open, Select, Report, Approve, and Reject actions.
+Scientific validation fixtures, regression coverage, `GET /admin/release-health`, local SQLite reset via `python -m nmrcheck.cli reset-dev-db`, GitHub Actions CI, and evidence-confidence reporting are now included. The Raw FID run history is presented as one reviewer table with Open, Select, Report, Approve, and Reject actions. CI also runs `moltrace-raw-fid-sidecar-report --limit 1 --no-include-varian --quiet --smoke` to ensure the Prompt 1/2 raw-FID fixture report stays diagnostic-only and does not activate the sidecar path. A separate non-blocking manual-promotion gate job writes JSON/CSV artifacts for the Prompt 1/2 promotion gates while keeping the visible SpectraCheck raw-FID and processed-spectrum pipelines unchanged. CI also uploads a provenance checksum artifact with fixture archive hashes and report export hashes for audit trails.
 
 ## Week 22 Evidence Engine
 

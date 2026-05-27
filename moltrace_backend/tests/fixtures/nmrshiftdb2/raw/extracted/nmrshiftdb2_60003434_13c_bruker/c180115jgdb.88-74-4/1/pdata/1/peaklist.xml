@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList modified="2018-01-25T11:25:27">
+  <PeakList1D>
+    <PeakList1DHeader creator="jg" date="2018-01-25T11:25:27" expNo="1" name="c180115jgdb.88-74-4" owner="" procNo="1" source="C:\NMR_local">
+      <PeakPickDetails>F1=151.691ppm, F2=107.582ppm, MI=0.19cm, MAXI=15.92cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="144.6856" intensity="2.35" type="0"/>
+    <Peak1D F1="135.6545" intensity="15.00" type="0"/>
+    <Peak1D F1="132.3376" intensity="0.45" type="0"/>
+    <Peak1D F1="126.2001" intensity="13.59" type="0"/>
+    <Peak1D F1="118.7759" intensity="12.48" type="0"/>
+    <Peak1D F1="116.9710" intensity="12.58" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="jg" date="2018-01-25T11:25:27" expNo="1" name="c180115jgdb.88-74-4" owner="" procNo="1" source="C:\NMR_local">
+      <PeakPickDetails>F1=93.596ppm, F2=51.101ppm, MI=0.19cm, MAXI=14.83cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="77.3738" intensity="12.49" type="0"/>
+    <Peak1D F1="77.2586" intensity="0.51" type="0"/>
+    <Peak1D F1="77.0563" intensity="12.76" type="0"/>
+    <Peak1D F1="76.7387" intensity="12.56" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="jg" date="2018-01-25T11:25:27" expNo="1" name="c180115jgdb.88-74-4" owner="" procNo="1" source="C:\NMR_local">
+      <PeakPickDetails>F1=6.455ppm, F2=-13.448ppm, MI=0.16cm, MAXI=5.25cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="0.0000" intensity="0.34" type="0"/>
+  </PeakList1D>
+</PeakList>

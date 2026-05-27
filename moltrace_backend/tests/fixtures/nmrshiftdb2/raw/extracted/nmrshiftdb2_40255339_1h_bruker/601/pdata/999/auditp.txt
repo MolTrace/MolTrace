@@ -1,0 +1,18 @@
+##TITLE= Audit trail, TopSpin 4.0.8
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= Rainer
+$$ D:/Rainer/NMR-Spektren/Indol/601/pdata/999/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2020-03-28 14:45:30.516 +0100>,<Rainer>,<Haustier-W10>,<decon>,<TopSpin 4.0.8>,
+      <mdecon of
+	1 601 "Indol" "D:/Rainer/NMR-Spektren"
+	F1P = 6.63410211150336, F2P = 6.61741990275095, MI = 0, MAXI = 10000, ACFW = 0.1
+       data hash MD5: 128K
+       20 F8 17 40 A1 7C 59 C6 46 4B EC 58 A8 55 EA 72>)
+(   2,<2020-09-22 12:32:33.795 +0200>,<nes>,<nmr-nesnote2>,<disknew>,<TopSpin 3.6.0>,
+      <processed data deleted>)
+##END=
+
+$$ hash MD5
+$$ C1 4E C5 BE 57 2A 5D EE 08 35 13 EC 04 6E 81 37

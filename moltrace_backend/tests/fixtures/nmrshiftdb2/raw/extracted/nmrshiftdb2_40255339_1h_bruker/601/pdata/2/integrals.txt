@@ -1,0 +1,5 @@
+   Current data set:
+   NAME =	Indol	EXPNO =	601	PROCNO = 1
+   DU   =	D:/Rainer/NMR-Spektren
+
+   Number   Integrated Region     Integral

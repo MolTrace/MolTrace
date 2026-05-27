@@ -7,6 +7,10 @@ import numpy as np
 from fastapi.testclient import TestClient
 
 from nmrcheck.api import create_app
+from nmrcheck.fid_pipeline_adapter import (
+    HYBRID_METADATA_RAW_FID_PIPELINE,
+    RAW_FID_PIPELINE_ENV,
+)
 from nmrcheck.settings import Settings
 
 HEADERS = {"x-api-key": "test-key"}
@@ -205,7 +209,10 @@ def test_nmr_processed_analyze_reuses_frontend_preview_trace(tmp_path) -> None:
     assert payload["y"] == []
     assert payload["metadata"]["frontend_preview_trace_reused"] is True
     assert payload["metadata"]["frontend_preview_point_count"] == len(preview_trace["x"])
-    assert payload["metadata"]["spectrum_points_omitted_reason"] == "frontend_already_has_preview_trace"
+    assert (
+        payload["metadata"]["spectrum_points_omitted_reason"]
+        == "frontend_already_has_preview_trace"
+    )
 
 
 def test_nmr_processed_analyze_returns_peak_enrichment(tmp_path) -> None:
@@ -268,6 +275,217 @@ def test_nmr_processed_analyze_returns_peak_enrichment(tmp_path) -> None:
     ref_keys = {ref["key"] for ref in references}
     assert "smith_goodman_2010_dp4" in ref_keys
     assert "silverstein_2014_8e" in ref_keys
+
+
+def test_nmr_processed_analyze_payload_contract_stays_text_guided(
+    tmp_path,
+) -> None:
+    """Lock the processed-spectrum contract before raw-FID pipeline upgrades.
+
+    Processed spectra already provide the stable view, peak enrichment, legends,
+    and evidence tables the UI depends on. New FID readers / phase-baseline
+    helpers must not quietly change this response shape or bypass the supplied
+    1H text + SMILES guidance.
+    """
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "processed-contract",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "nmr_text": (
+                    "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), "
+                    "1.26 (t, 3H), 2.10 (br s, 1H)"
+                ),
+                "proton_nmr_text": (
+                    "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), "
+                    "1.26 (t, 3H), 2.10 (br s, 1H)"
+                ),
+                "carbon13_text": "13C NMR (101 MHz, CDCl3) δ 58.2, 18.1",
+                "candidates_text": "Ethanol | CCO",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    required_keys = {
+        "sample_id",
+        "nucleus",
+        "filename",
+        "point_count",
+        "peak_count",
+        "x",
+        "y",
+        "x_label",
+        "y_label",
+        "reversed_x_axis",
+        "peaks",
+        "solvent_warnings",
+        "impurity_warnings",
+        "impurity_candidates",
+        "predicted_vs_observed",
+        "labile_hydrogen_summary",
+        "peak_category_summary",
+        "proton_inventory",
+        "dp4_ranking",
+        "references",
+        "analysis_score",
+        "evidence_summary",
+        "warnings",
+        "notes",
+        "metadata",
+    }
+    assert required_keys <= payload.keys()
+
+    # Processed analysis keeps its own function: it returns the processed trace
+    # and does not expose raw-FID-only guidance or sidecar pipeline state.
+    assert payload["sample_id"] == "processed-contract"
+    assert payload["nucleus"] == "1H"
+    assert payload["filename"] == "peaks.csv"
+    assert payload["point_count"] == 3
+    assert payload["peak_count"] == 3
+    assert payload["x"] == [3.65, 1.26, 2.1]
+    assert len(payload["x"]) == len(payload["y"])
+    assert payload["x_label"] == "ppm"
+    assert payload["y_label"] == "intensity"
+    assert payload["reversed_x_axis"] is True
+
+    metadata = payload["metadata"]
+    assert metadata["peak_inference"] == "enabled"
+    assert metadata["spectrum_points_included"] is True
+    assert metadata["proton_nmr_text_used_for_peak_picking"] is True
+    assert metadata["proton_peak_picking_reference_source"] == "nmr_text"
+    assert metadata["structure_smiles_used_for_peak_picking"] == "CCO"
+    assert metadata["expected_total_h"] == 6
+    assert metadata["expected_non_labile_h"] == 5
+    assert "raw_fid_peak_guidance" not in metadata
+    assert "prompt_pipeline_sidecar" not in metadata
+
+    peaks = payload["peaks"]
+    assert len(peaks) == payload["peak_count"]
+    for peak in peaks:
+        assert {
+            "shift_ppm",
+            "integration_h",
+            "multiplicity",
+            "category",
+            "chemical_region",
+            "labile_hint",
+            "category_reason",
+        } <= peak.keys()
+
+    assert sum(payload["peak_category_summary"].values()) == len(peaks)
+
+    labile = payload["labile_hydrogen_summary"]
+    assert labile["expected_labile_h"] == 1
+    assert labile["labile_subset"] == "OH"
+    assert labile["expected_oh_h"] == 1
+    assert labile["expected_nh_h"] == 0
+    assert labile["expected_sh_h"] == 0
+
+    inventory = payload["proton_inventory"]
+    assert inventory["nucleus"] == "1H"
+    assert inventory["integration_basis"] == "nmr_text_guided"
+    assert inventory["observed"]["total"] == 6.0
+    assert inventory["observed"]["non_labile"] == 5.0
+    assert inventory["expected"]["total"] == 6
+    assert inventory["expected"]["non_labile"] == 5
+    assert inventory["expected"]["labile_subset"] == "OH"
+    assert inventory["deltas"]["total"] == 0.0
+
+    predicted = payload["predicted_vs_observed"]
+    assert predicted
+    matched = [row for row in predicted if row["status"] == "matched"]
+    assert matched
+    assert {
+        "predicted_ppm",
+        "observed_ppm",
+        "delta_ppm",
+        "z_dp4",
+        "tail_probability",
+        "confidence",
+    } <= matched[0].keys()
+
+    assert payload["dp4_ranking"] == []
+    assert payload["analysis_score"] is not None
+    assert any("Human review" in item for item in payload["evidence_summary"])
+
+    ref_keys = {ref["key"] for ref in payload["references"]}
+    assert {
+        "smith_goodman_2010_dp4",
+        "pretsch_2020_tables_5e",
+        "friebolin_2010_5e",
+        "gottlieb_1997_solvent_impurities",
+        "mestrenova_manual",
+    } <= ref_keys
+
+
+def test_nmr_processed_analyze_ignores_raw_fid_sidecar_flag(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Raw-FID Prompt 1/2 sidecars must never take over processed analysis.
+
+    The processed-spectrum endpoint owns the visible trace, picked peaks,
+    predictions, references, and evidence tables. Enabling the raw-FID
+    sidecar flag should not call the raw sidecar builder or expose raw-only
+    metadata in this payload.
+    """
+
+    def forbidden_raw_sidecar(**_kwargs):
+        raise AssertionError("processed analysis must not call raw-FID sidecar builder")
+
+    monkeypatch.setenv("MOLTRACE_RAW_FID_PIPELINE", "hybrid_metadata")
+    monkeypatch.setattr("nmrcheck.api.build_prompt_pipeline_sidecar", forbidden_raw_sidecar)
+
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/nmr/processed/analyze",
+            headers=HEADERS,
+            data={
+                "sample_id": "processed-raw-sidecar-isolation",
+                "nucleus": "1H",
+                "solvent": "CDCl3",
+                "nmr_text": (
+                    "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), "
+                    "1.26 (t, 3H), 2.10 (br s, 1H)"
+                ),
+                "proton_nmr_text": (
+                    "1H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), "
+                    "1.26 (t, 3H), 2.10 (br s, 1H)"
+                ),
+                "carbon13_text": "13C NMR (101 MHz, CDCl3) δ 58.2, 18.1",
+                "candidates_text": "Ethanol | CCO",
+            },
+            files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},
+        )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    metadata = payload["metadata"]
+
+    assert payload["x"] == [3.65, 1.26, 2.1]
+    assert len(payload["x"]) == len(payload["y"])
+    assert payload["peak_count"] == len(payload["peaks"]) == 3
+    assert metadata["peak_inference"] == "enabled"
+    assert metadata["spectrum_points_included"] is True
+    assert metadata["proton_nmr_text_used_for_peak_picking"] is True
+    assert metadata["structure_smiles_used_for_peak_picking"] == "CCO"
+
+    assert "prompt_pipeline_sidecar" not in metadata
+    assert "raw_fid_peak_guidance" not in metadata
+    assert "prompt_sidecar_guidance" not in metadata
+    assert "prompt_sidecar_consistency" not in metadata
+
+    assert payload["predicted_vs_observed"]
+    assert payload["proton_inventory"]["integration_basis"] == "nmr_text_guided"
+    assert payload["labile_hydrogen_summary"]["labile_subset"] == "OH"
+    assert any("Human review" in item for item in payload["evidence_summary"])
+    ref_keys = {ref["key"] for ref in payload["references"]}
+    assert {"smith_goodman_2010_dp4", "mestrenova_manual"} <= ref_keys
 
 
 def test_nmr_processed_analyze_runs_dp4_ranking_for_multiple_candidates(tmp_path) -> None:
@@ -404,6 +622,185 @@ def test_nmr_raw_fid_process_can_omit_spectrum_points_for_fast_display(tmp_path)
         payload["metadata"]["spectrum_points_omitted_reason"]
         == "frontend_already_has_preview_trace"
     )
+
+
+def test_nmr_raw_fid_prompt_sidecar_api_contract_is_metadata_only(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Frontend raw-FID endpoints may expose Prompt 1/2 QA metadata, but the
+    visible spectrum, picked peaks, phase, and baseline stay on the legacy path.
+    """
+
+    content = _build_bruker_zip()
+    preview_data = {
+        "sample_id": "raw-sidecar-preview-contract",
+        "nucleus": "1H",
+        "vendor": "auto",
+        "solvent": "CDCl3",
+        "processing_preset": "balanced",
+        "candidates_text": "Ethanol | CCO",
+        "proton_nmr_text": "3.65 (q, 2H), 1.26 (t, 3H)",
+        "carbon13_text": "13C NMR (101 MHz, CDCl3) δ 58.2, 18.1",
+    }
+    process_data = {
+        **preview_data,
+        "sample_id": "raw-sidecar-process-contract",
+        "preserve_raw": "true",
+    }
+    sidecar_calls: list[dict[str, object]] = []
+
+    def bogus_prompt_sidecar(**kwargs):
+        sidecar_calls.append(dict(kwargs))
+        return {
+            "pipeline": "prompt_1_2",
+            "role": "sidecar_metadata_only",
+            "active": False,
+            "available": True,
+            "nucleus": kwargs.get("nucleus"),
+            "solvent": kwargs.get("solvent"),
+            "point_count": 65536,
+            "peak_count": 999,
+            "fingerprint_hash": "e" * 64,
+            "runtime_ms": 2.0,
+            "preview_points": [{"shift_ppm": 999.0, "intensity": 999.0}],
+            "inferred_peaks": [
+                {
+                    "shift_ppm": 999.0,
+                    "intensity": 999.0,
+                    "category": "sidecar_should_not_render",
+                }
+            ],
+            "plotly_traces": [{"x": [999.0], "y": [999.0]}],
+            "phase": {"method": "bogus_prompt_phase", "zero_order_degrees": 180.0},
+            "baseline": {"method": "bogus_prompt_baseline", "order": 9},
+            "raw_fid_peak_guidance": {
+                "used_for_plot": True,
+                "used_for_peak_markers": True,
+                "used_for_phase_or_baseline": True,
+            },
+        }
+
+    monkeypatch.setattr("nmrcheck.api.build_prompt_pipeline_sidecar", bogus_prompt_sidecar)
+    monkeypatch.delenv(RAW_FID_PIPELINE_ENV, raising=False)
+
+    with _client(tmp_path) as client:
+        legacy_preview = client.post(
+            "/nmr/raw-fid/preview",
+            headers=HEADERS,
+            data=preview_data,
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+        legacy_process = client.post(
+            "/nmr/raw-fid/process",
+            headers=HEADERS,
+            data=process_data,
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+
+        monkeypatch.setenv(RAW_FID_PIPELINE_ENV, HYBRID_METADATA_RAW_FID_PIPELINE)
+
+        hybrid_preview = client.post(
+            "/nmr/raw-fid/preview",
+            headers=HEADERS,
+            data=preview_data,
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+        hybrid_process = client.post(
+            "/nmr/raw-fid/process",
+            headers=HEADERS,
+            data=process_data,
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+        hybrid_process_without_points = client.post(
+            "/nmr/raw-fid/process",
+            headers=HEADERS,
+            data={**process_data, "include_spectrum": "false"},
+            files={"file": ("ethanol_raw.zip", content, "application/zip")},
+        )
+
+    assert legacy_preview.status_code == 200, legacy_preview.text
+    assert legacy_process.status_code == 200, legacy_process.text
+    assert hybrid_preview.status_code == 200, hybrid_preview.text
+    assert hybrid_process.status_code == 200, hybrid_process.text
+    assert hybrid_process_without_points.status_code == 200, (
+        hybrid_process_without_points.text
+    )
+    assert len(sidecar_calls) == 3
+
+    legacy_preview_payload = legacy_preview.json()
+    hybrid_preview_payload = hybrid_preview.json()
+    legacy_process_payload = legacy_process.json()
+    hybrid_process_payload = hybrid_process.json()
+
+    assert "prompt_pipeline_sidecar" not in legacy_preview_payload["metadata"]
+    assert "prompt_pipeline_sidecar" not in legacy_process_payload["metadata"]
+
+    for field in ("x", "y", "peaks", "peak_count", "point_count"):
+        assert hybrid_preview_payload[field] == legacy_preview_payload[field]
+    for field in (
+        "x",
+        "y",
+        "peaks",
+        "peak_count",
+        "point_count",
+        "processing_parameters",
+        "peak_category_summary",
+        "labile_hydrogen_summary",
+        "proton_inventory",
+        "impurity_candidates",
+        "predicted_vs_observed",
+    ):
+        assert hybrid_process_payload[field] == legacy_process_payload[field]
+
+    assert 999.0 not in hybrid_preview_payload["x"]
+    assert 999.0 not in hybrid_process_payload["x"]
+    assert all(peak.get("shift_ppm") != 999.0 for peak in hybrid_preview_payload["peaks"])
+    assert all(peak.get("shift_ppm") != 999.0 for peak in hybrid_process_payload["peaks"])
+
+    preview_sidecar = hybrid_preview_payload["metadata"]["prompt_pipeline_sidecar"]
+    process_sidecar = hybrid_process_payload["metadata"]["prompt_pipeline_sidecar"]
+    assert preview_sidecar["preview_points"][0]["shift_ppm"] == 999.0
+    assert process_sidecar["inferred_peaks"][0]["category"] == "sidecar_should_not_render"
+    for sidecar in (preview_sidecar, process_sidecar):
+        assert sidecar["default_pipeline_preserved"] is True
+        assert sidecar["analysis_guidance"]["visibility"] == "metadata_only"
+        assert sidecar["analysis_guidance"]["used_for_plot"] is False
+        assert sidecar["analysis_guidance"]["used_for_peak_markers"] is False
+        assert sidecar["analysis_guidance"]["used_for_phase_or_baseline"] is False
+        assert (
+            sidecar["validation_report"]["regression_guard"][
+                "activation_policy"
+            ]
+            == "metadata_only_until_fixture_report_is_reviewed"
+        )
+
+    preview_guidance = hybrid_preview_payload["metadata"]["raw_fid_peak_guidance"]
+    process_guidance = hybrid_process_payload["metadata"]["raw_fid_peak_guidance"]
+    assert (
+        preview_guidance["prompt_sidecar_consistency"]["active_peak_source"]
+        == "legacy_raw_fid_preview_peaks"
+    )
+    assert (
+        process_guidance["prompt_sidecar_consistency"]["active_peak_source"]
+        == "legacy_raw_fid_process_enriched_peaks"
+    )
+    for guidance in (preview_guidance, process_guidance):
+        prompt_guidance = guidance["prompt_sidecar_guidance"]
+        consistency = guidance["prompt_sidecar_consistency"]
+        assert prompt_guidance["used_for_plot"] is False
+        assert prompt_guidance["used_for_peak_markers"] is False
+        assert prompt_guidance["used_for_phase_or_baseline"] is False
+        assert consistency["used_for_plot"] is False
+        assert consistency["used_for_peak_markers"] is False
+        assert consistency["used_for_phase_or_baseline"] is False
+        assert consistency["legacy_spectrum_fields_preserved"] is True
+
+    no_points_payload = hybrid_process_without_points.json()
+    assert no_points_payload["x"] == []
+    assert no_points_payload["y"] == []
+    assert no_points_payload["metadata"]["spectrum_points_included"] is False
+    assert "prompt_pipeline_sidecar" in no_points_payload["metadata"]
 
 
 def test_nmr_processed_accepts_1h_and_13c_nucleus_values(tmp_path) -> None:
@@ -945,7 +1342,10 @@ def test_nmr_processed_analyze_uses_shared_proton_text_for_peak_picking(tmp_path
                 "sample_id": "shared-proton-picking",
                 "nucleus": "1H",
                 "solvent": "CDCl3",
-                "proton_nmr_text": "1H NMR (CDCl3) delta 3.65 (q, 2H), 1.26 (t, 3H), 2.10 (br s, 1H)",
+                "proton_nmr_text": (
+                    "1H NMR (CDCl3) delta 3.65 (q, 2H), "
+                    "1.26 (t, 3H), 2.10 (br s, 1H)"
+                ),
                 "candidates_text": "Ethanol | CCO",
             },
             files={"file": ("peaks.csv", PEAK_CSV, "text/csv")},

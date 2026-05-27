@@ -1,0 +1,31 @@
+##TITLE= Audit trail, TopSpin 3.6.0
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nes
+$$ C:\Bruker\TopSpin3.6.0\data\nes\nmr/Classics_Piperine/2/pdata/1/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, WHAT)
+(   1,<2005-06-23 10:18:25.51 +0200>,<stb>,<dachstein>,
+      <created by zg, POWCHK disabled, PULCHK disabled
+       configuration hash MD5:
+       95 53 EE D9 31 43 C2 75 D0 AF 8A 1B EF 0D 29 46
+       data hash MD5: 64K
+       1C 55 AA A0 98 F0 21 CA C2 FE FC BA D7 68 10 BA>)
+(   2,<2017-03-13 15:41:01.813 +0100>,<stb>,<STBHome>,<dirdata>,<TopSpin 3.5.1>,
+      <wrpa from 1 2 "piperin" "C:/Bruker/TopSpin3.5pl1/data/natur/nmr"
+       data hash MD5: 64K
+       1C 55 AA A0 98 F0 21 CA C2 FE FC BA D7 68 10 BA>)
+(   3,<2021-03-06 18:31:57.972 +0100>,<nes>,<nmr-nesnote2>,<proc1d>,<TopSpin 3.6.0>,
+      <Start of raw data processing
+       efp BC_mod = 2 LB = 2 FT_mod = 6 PKNL = 1 PHC0 = -118.7103 PHC1 = 0 SI = 128K 
+       data hash MD5: 128K
+       55 C3 C4 65 B2 1D 76 2E FE 8E D1 1F 91 E8 E1 11>)
+(   4,<2021-03-06 18:31:58.030 +0100>,<nes>,<nmr-nesnote2>,<proc1d>,<TopSpin 3.6.0>,
+      <abs n ABSG = 5 
+       data hash MD5: 128K
+       AE FE CD 0B A4 FD 4C 26 EC 4D 4A E6 13 56 C5 19>)
+(   5,<2021-03-06 18:38:55.745 +0100>,<nes>,<nmr-nesnote2>,<disknew>,<TopSpin 3.6.0>,
+      <processed data deleted>)
+##END=
+
+$$ hash MD5
+$$ DA 72 C5 2F 71 57 77 65 C0 F9 D9 00 C2 72 5C 09

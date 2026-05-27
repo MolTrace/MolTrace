@@ -1,0 +1,30 @@
+##TITLE= Audit trail, TOPSPIN		Version 3.2
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nes
+$$ C:\transferNMR/ChiuZ_Cocaine/6/pdata/1/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2011-09-14 08:40:44.859 +0200>,<stb>,<ALPHUPEL>,<go>,<TOPSPIN 2.1>,
+      <created by zg
+	started at 2011-09-14 00:59:49.351 +0200,
+	POWCHK enabled, PULCHK disabled,
+       terminated by command 'halt'
+       configuration hash MD5:
+       20 02 CD 31 EB 23 BD 4A 04 F8 29 FD CB A9 50 25
+       data hash MD5: 64K
+       14 88 CE D8 76 DC 65 AD F0 BC 85 DF A6 34 99 36>)
+(   2,<2016-05-23 11:19:35.364 +0200>,<stb>,<STBHome>,<dirdata>,<TopSpin 3.5.1>,
+      <wrpa from 1 15 "cocain700" "C:/Bruker/TopSpin3.5pl1/data/natur/nmr"
+       data hash MD5: 64K
+       14 88 CE D8 76 DC 65 AD F0 BC 85 DF A6 34 99 36>)
+(   3,<2016-06-24 09:49:21.042 +0200>,<nes>,<nmr-dd-nes>,<proc1d>,<TOPSPIN 3.2>,
+      <Start of raw data processing
+       efp BC_mod = 2 LB = 2 FT_mod = 6 PKNL = 1 PHC0 = -165.9681 PHC1 = 30.4 SI = 128K 
+       data hash MD5: 128K
+       34 01 04 09 3E D4 68 2C 51 6E 01 20 A0 D8 16 3E>)
+(   4,<2016-06-24 10:23:08.863 +0200>,<nes>,<nmr-dd-nes>,<disknew>,<TOPSPIN 3.2>,
+      <processed data deleted>)
+##END=
+
+$$ hash MD5
+$$ D2 CD 58 B3 66 3B FD 50 C2 4D 39 34 10 CD B5 96

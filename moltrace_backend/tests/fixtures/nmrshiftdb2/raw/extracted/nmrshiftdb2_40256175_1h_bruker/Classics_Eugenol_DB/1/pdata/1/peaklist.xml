@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList modified="2017-05-03T21:30:51">
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T21:30:51" expNo="1" name="Classics_Eugenol" owner="" procNo="1" source="D:/SciPrograms/Bruker/TopSpin3.5.b.91pl7/data/nes/nmr">
+      <PeakPickDetails>F1=7.992123ppm, F2=6.924361ppm, MI=-0.01cm, MAXI=0.18cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="7.5060" intensity="0.00" type="0"/>
+    <Peak1D F1="7.4177" intensity="0.00" type="0"/>
+    <Peak1D F1="7.0565" intensity="0.01" type="0"/>
+    <Peak1D F1="7.0516" intensity="0.01" type="0"/>
+    <Peak1D F1="7.0352" intensity="0.01" type="0"/>
+    <Peak1D F1="7.0305" intensity="0.01" type="0"/>
+    <Peak1D F1="6.9828" intensity="0.00" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T21:30:51" expNo="1" name="Classics_Eugenol" owner="" procNo="1" source="D:/SciPrograms/Bruker/TopSpin3.5.b.91pl7/data/nes/nmr">
+      <PeakPickDetails>F1=6.924351ppm, F2=6.516583ppm, MI=0.60cm, MAXI=3.07cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="6.8553" intensity="1.85" type="0"/>
+    <Peak1D F1="6.8341" intensity="2.39" type="0"/>
+    <Peak1D F1="6.6957" intensity="0.62" type="0"/>
+    <Peak1D F1="6.6910" intensity="1.35" type="0"/>
+    <Peak1D F1="6.6849" intensity="1.80" type="0"/>
+    <Peak1D F1="6.6804" intensity="1.76" type="0"/>
+    <Peak1D F1="6.6748" intensity="1.17" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T21:30:51" expNo="1" name="Classics_Eugenol" owner="" procNo="1" source="D:/SciPrograms/Bruker/TopSpin3.5.b.91pl7/data/nes/nmr">
+      <PeakPickDetails>F1=6.093429ppm, F2=5.754905ppm, MI=0.22cm, MAXI=1.69cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="5.9992" intensity="0.30" type="0"/>
+    <Peak1D F1="5.9825" intensity="0.61" type="0"/>
+    <Peak1D F1="5.9741" intensity="0.32" type="0"/>
+    <Peak1D F1="5.9657" intensity="0.32" type="0"/>
+    <Peak1D F1="5.9572" intensity="0.94" type="0"/>
+    <Peak1D F1="5.9402" intensity="0.96" type="0"/>
+    <Peak1D F1="5.9316" intensity="0.36" type="0"/>
+    <Peak1D F1="5.9234" intensity="0.35" type="0"/>
+    <Peak1D F1="5.9149" intensity="0.73" type="0"/>
+    <Peak1D F1="5.8982" intensity="0.35" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T21:30:51" expNo="1" name="Classics_Eugenol" owner="" procNo="1" source="D:/SciPrograms/Bruker/TopSpin3.5.b.91pl7/data/nes/nmr">
+      <PeakPickDetails>F1=5.593337ppm, F2=5.516399ppm, MI=2.85cm, MAXI=3.22cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="5.5171" intensity="2.89" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T21:30:51" expNo="1" name="Classics_Eugenol" owner="" procNo="1" source="D:/SciPrograms/Bruker/TopSpin3.5.b.91pl7/data/nes/nmr">
+      <PeakPickDetails>F1=5.270200ppm, F2=4.877820ppm, MI=0.47cm, MAXI=2.16cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="5.0949" intensity="0.88" type="0"/>
+    <Peak1D F1="5.0904" intensity="1.06" type="0"/>
+    <Peak1D F1="5.0863" intensity="0.48" type="0"/>
+    <Peak1D F1="5.0682" intensity="0.48" type="0"/>
+    <Peak1D F1="5.0651" intensity="0.98" type="0"/>
+    <Peak1D F1="5.0619" intensity="0.70" type="0"/>
+    <Peak1D F1="5.0604" intensity="0.78" type="0"/>
+    <Peak1D F1="5.0569" intensity="0.60" type="0"/>
+    <Peak1D F1="5.0523" intensity="0.79" type="0"/>
+    <Peak1D F1="5.0480" intensity="1.07" type="0"/>
+    <Peak1D F1="5.0436" intensity="0.89" type="0"/>
+    <Peak1D F1="5.0400" intensity="1.05" type="0"/>
+    <Peak1D F1="5.0368" intensity="0.68" type="0"/>
+    <Peak1D F1="5.0353" intensity="0.65" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T21:30:51" expNo="1" name="Classics_Eugenol" owner="" procNo="1" source="D:/SciPrograms/Bruker/TopSpin3.5.b.91pl7/data/nes/nmr">
+      <PeakPickDetails>F1=3.985348ppm, F2=3.762231ppm, MI=13.42cm, MAXI=15.59cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="3.8664" intensity="15.00" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-03T21:30:51" expNo="1" name="Classics_Eugenol" owner="" procNo="1" source="D:/SciPrograms/Bruker/TopSpin3.5.b.91pl7/data/nes/nmr">
+      <PeakPickDetails>F1=3.362157ppm, F2=3.192895ppm, MI=1.22cm, MAXI=2.07cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="3.3252" intensity="1.70" type="0"/>
+    <Peak1D F1="3.3085" intensity="1.69" type="0"/>
+  </PeakList1D>
+</PeakList>

@@ -1,0 +1,5 @@
+   Current data set:
+   NAME =	Allyl-glycidyl-ether in CDCl3	EXPNO =	606	PROCNO = 1
+   DU   =	D:/Rainer/NMR-Spektren
+
+   Number   Integrated Region     Integral

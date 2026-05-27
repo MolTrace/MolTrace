@@ -17,6 +17,7 @@ import {
   trackCompoundCreated,
   trackCompoundGraphViewed,
   trackCompoundLinkedToReaction,
+  trackCoreModuleOpened,
   trackReactionAnalyticalResultLinked,
   trackReactionCycleDecisionSaved,
   trackReactionExecutionBatchCreated,
@@ -111,18 +112,54 @@ const TENANT_SAAS_METADATA_KEY_SET = new Set([
   "task_type",
 ])
 
-function lastAnalyticsPayload(): { event_source?: string; event_type?: string; metadata?: Record<string, unknown> } {
+const CORE_MODULE_METADATA_KEY_SET = new Set(["module", "surface", "status"])
+
+const BACKEND_USAGE_EVENT_CREATE_KEYS = new Set([
+  "event_type",
+  "project_id",
+  "sample_id",
+  "session_id",
+  "workflow_run_id",
+  "job_id",
+  "artifact_id",
+  "report_id",
+  "user_email",
+  "status",
+  "duration_seconds",
+  "estimated_minutes_saved",
+  "event_source",
+  "metadata_json",
+])
+
+type AnalyticsRequestBody = {
+  event_source?: string
+  event_type?: string
+  metadata?: Record<string, unknown>
+  metadata_json?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+function lastAnalyticsRequestBody(): AnalyticsRequestBody {
   expect(apiFetchMock).toHaveBeenCalled()
   const call = apiFetchMock.mock.calls[apiFetchMock.mock.calls.length - 1] as [string, RequestInit]
   const raw = call[1]?.body
   /** Mock replaces `apiFetch` before stringify — body is usually the POST object envelope. */
   if (typeof raw === "string") {
-    return JSON.parse(raw) as { event_source?: string; event_type?: string; metadata?: Record<string, unknown> }
+    return JSON.parse(raw) as AnalyticsRequestBody
   }
   if (raw != null && typeof raw === "object" && !Array.isArray(raw)) {
-    return raw as { event_source?: string; event_type?: string; metadata?: Record<string, unknown> }
+    return raw as AnalyticsRequestBody
   }
   throw new Error("unexpected analytics request body shape")
+}
+
+function lastAnalyticsPayload(): { event_source?: string; event_type?: string; metadata?: Record<string, unknown> } {
+  const raw = lastAnalyticsRequestBody()
+  return {
+    event_source: raw.event_source,
+    event_type: raw.event_type,
+    metadata: raw.metadata ?? raw.metadata_json,
+  }
 }
 
 afterEach(() => {
@@ -337,6 +374,91 @@ describe("regulatory track* helpers", () => {
     expect(metadata?.question).toBeUndefined()
     expect(metadata?.answer_text).toBeUndefined()
     expect((metadata as { dossier_id: number }).dossier_id).toBe(1)
+  })
+})
+
+describe("core module analytics", () => {
+  it("logs core module open events for the main Programs modules", () => {
+    apiFetchMock.mockResolvedValue(undefined)
+    trackCoreModuleOpened("spectracheck", { surface: "programs_workspace", metadata: { status: "active" } })
+    expect(lastAnalyticsPayload()).toMatchObject({
+      event_source: "frontend",
+      event_type: "core_module_opened",
+      metadata: {
+        module: "spectracheck",
+        surface: "programs_workspace",
+        status: "active",
+      },
+    })
+
+    trackCoreModuleOpened("regulatory_hub", { surface: "programs_workspace" })
+    expect(lastAnalyticsPayload().metadata).toMatchObject({
+      module: "regulatory_hub",
+      surface: "programs_workspace",
+    })
+
+    trackCoreModuleOpened("reactioniq", { surface: "programs_workspace" })
+    expect(lastAnalyticsPayload().metadata).toMatchObject({
+      module: "reactioniq",
+      surface: "programs_workspace",
+    })
+  })
+
+  it("keeps core module metadata privacy-safe", () => {
+    apiFetchMock.mockResolvedValue(undefined)
+    trackCoreModuleOpened("spectracheck", {
+      surface: "programs_workspace",
+      metadata: {
+        status: "active",
+        smiles: "CCO",
+        candidates: "private candidate table",
+        nmrText: "private spectrum text",
+      },
+    })
+    const { metadata } = lastAnalyticsPayload()
+    for (const k of Object.keys(metadata ?? {})) {
+      expect(CORE_MODULE_METADATA_KEY_SET.has(k)).toBe(true)
+    }
+    expect(metadata?.smiles).toBeUndefined()
+    expect(metadata?.candidates).toBeUndefined()
+    expect(metadata?.nmrText).toBeUndefined()
+  })
+
+  it("emits the backend-compatible /analytics/events create shape", () => {
+    apiFetchMock.mockResolvedValue(undefined)
+    trackCoreModuleOpened("spectracheck", {
+      project_id: 42,
+      session_id: 9001,
+      status: "succeeded",
+      surface: "programs_workspace",
+      metadata: {
+        status: "active",
+        smiles: "CCO",
+        nmrText: "private spectrum text",
+      },
+    })
+
+    const call = apiFetchMock.mock.calls[apiFetchMock.mock.calls.length - 1] as [string, RequestInit]
+    const raw = lastAnalyticsRequestBody()
+    expect(call[0]).toBe("/analytics/events")
+    for (const key of Object.keys(raw)) {
+      expect(BACKEND_USAGE_EVENT_CREATE_KEYS.has(key)).toBe(true)
+    }
+    expect(raw).toMatchObject({
+      event_source: "frontend",
+      event_type: "core_module_opened",
+      project_id: 42,
+      session_id: 9001,
+      status: "succeeded",
+      metadata_json: {
+        module: "spectracheck",
+        surface: "programs_workspace",
+        status: "active",
+      },
+    })
+    expect(raw).not.toHaveProperty("metadata")
+    expect(raw.metadata_json?.smiles).toBeUndefined()
+    expect(raw.metadata_json?.nmrText).toBeUndefined()
   })
 })
 

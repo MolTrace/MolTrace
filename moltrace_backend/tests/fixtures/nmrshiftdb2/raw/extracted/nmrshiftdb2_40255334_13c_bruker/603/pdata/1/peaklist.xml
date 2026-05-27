@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList modified="2020-09-22T12:29:41">
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-09-22T12:29:41" expNo="603" name="PoM_Oct_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=142.311005ppm, F2=136.429535ppm, MI=0.00cm, MAXI=10000.00cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-09-22T12:29:41" expNo="603" name="PoM_Oct_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=136.429535ppm, F2=134.988571ppm, MI=1.56cm, MAXI=2.25cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="135.836304" intensity="2.023526" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-09-22T12:29:41" expNo="603" name="PoM_Oct_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=134.988571ppm, F2=69.696114ppm, MI=0.00cm, MAXI=10000.00cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="127.909134" intensity="3.118684" type="0"/>
+    <Peak1D F1="124.172379" intensity="5.55256" type="0"/>
+    <Peak1D F1="122.030174" intensity="8.57445" type="0"/>
+    <Peak1D F1="120.779221" intensity="8.464407" type="0"/>
+    <Peak1D F1="119.865776" intensity="8.585541" type="0"/>
+    <Peak1D F1="111.070663" intensity="8.077178" type="0"/>
+    <Peak1D F1="102.652275" intensity="7.911423" type="0"/>
+    <Peak1D F1="77.292305" intensity="14.6181" type="0"/>
+    <Peak1D F1="77.080765" intensity="15.0" type="0"/>
+    <Peak1D F1="76.869217" intensity="14.72955" type="0"/>
+  </PeakList1D>
+</PeakList>
