@@ -1,0 +1,409 @@
+***  SpinWorks simulation output  ***
+
+       time:  14:59:08
+       date:  06/13/05
+
+
+***  Reading spin system from: spin_system  ***
+
+Options:
+
+   Opimize shifts and couplings? =         1
+   Ignore bad transitions? =               1
+   Auto assign observed peaks? =           1
+   Maximum number of iterations? =        20
+   RMS convergence limit =             0.015
+   RMS below this for autoassign =     0.100
+   Trans. freq. this * RMS ignored =   3.000
+
+
+Groups and chemical shifts:
+
+  #	name	shift		spins	species	spin	sym 
+
+  1	      a	  2379.600	  1	  1	   1	  1 
+  2	      b	  2029.000	  1	  1	   1	  1 
+  3	      c	  2021.000	  1	  1	   1	  1 
+  4	      d	  1327.000	  2	  1	   1	  1 
+
+
+Scalar coupling constants:
+
+   j[ 1, 2] =  	j[a,b] = 	16.900000
+   j[ 1, 3] =  	j[a,c] = 	10.100000
+   j[ 1, 4] =  	j[a,d] = 	6.700000
+   j[ 2, 3] =  	j[b,c] = 	1.000000
+   j[ 2, 4] =  	j[b,d] = 	1.500000
+   j[ 3, 4] =  	j[c,d] = 	1.000000
+
+
+Dipolar coupling constants:
+
+
+Paramaters to vary:
+
+  #	 param.		 range low	  range hi
+
+  1	 v[1]		  1761.975	  3012.375
+  2	 v[2]		  1509.994	  2555.844
+  3	 v[3]		  1508.381	  2538.531
+  4	 v[4]		   990.075	  1667.375
+  5	 j[1][2]	    12.675	    21.125
+  6	 j[1][3]	     7.575	    12.625
+  7	 j[1][4]	     5.025	     8.375
+  8	 j[2][3]	     0.750	     1.250
+  9	 j[2][4]	     1.125	     1.875
+  10	 j[3][4]	     0.750	     1.250
+
+Parameter map:
+   0   0   0   0 
+   1   1   0   0 
+   2   2   0   0 
+   3   3   0   0 
+   4   4   0   0 
+   5   1   2   0 
+   6   1   3   0 
+   7   1   4   0 
+   8   2   3   0 
+   9   2   4   0 
+  10   3   4   0 
+
+Reading assigned transitions
+
+   35 assigned transitions read 
+
+   Observed transitions read =        35
+   Total asigned line numbers =       35
+
+Basis functions generated, transition information:
+
+   Species  1,  up to     128 transitions, intensity      80
+
+   Total size of U3 matrix = 152 double words
+   Total sixe of E3 matrix = 32 double words
+
+ line		 obs. freq.	 calc. freq	 diff.
+
+        1	  1331.537	  1331.577	   -0.039
+        2	  2027.172	  2027.451	   -0.279
+        3	  2039.475	  2039.286	    0.189
+        4	  2399.514	  2400.087	   -0.573
+       10	  1330.050	  1330.574	   -0.524
+       15	  1330.050	  1330.077	   -0.027
+       17	  2392.497	  2393.413	   -0.915
+       23	  2025.922	  2026.442	   -0.519
+       26	  2389.422	  2389.996	   -0.574
+       31	  2382.693	  2383.187	   -0.493
+       47	  2386.058	  2386.696	   -0.638
+       50	  1324.809	  1324.883	   -0.074
+       58	  1328.225	  1329.074	   -0.849
+       62	  2382.790	  2383.320	   -0.531
+       70	  2375.869	  2376.514	   -0.645
+       79	  2372.505	  2373.096	   -0.591
+       81	  2017.176	  2016.351	    0.825
+       82	  2034.573	  2035.274	   -0.701
+       89	  2375.869	  2376.602	   -0.733
+       91	  2015.734	  2015.351	    0.383
+       93	  1323.377	  1323.878	   -0.501
+       97	  2369.141	  2369.799	   -0.658
+      101	  1323.377	  1323.382	   -0.005
+      106	  2365.873	  2366.422	   -0.549
+      110	  2358.953	  2359.705	   -0.753
+      113	  1321.807	  1322.376	   -0.569
+      115	  2037.745	  2037.783	   -0.038
+      116	  2392.786	  2393.370	   -0.584
+      117	  2036.015	  2036.774	   -0.759
+      118	  2023.808	  2025.438	   -1.630
+      120	  2382.790	  2383.278	   -0.488
+      124	  2375.773	  2376.471	   -0.698
+      125	  2020.636	  2020.884	   -0.248
+      126	  2365.873	  2366.379	   -0.506
+      127	  2019.002	  2019.875	   -0.873
+   Largest absolute difference  =     1.630
+   Total assigned intensity     =    43.045
+   RMS deviation of transitions =   0.74015
+
+
+***  Ignored     0 transitions
+
+***   Transitions now assigned =       35
+
+***  Iteration # 1, new parameters are:
+   v[1] = 	v[a]      		  2378.979 change: 	-0.6209
+   v[2] = 	v[b]      		  2028.586 change: 	-0.4138
+   v[3] = 	v[c]      		  2020.701 change: 	-0.2990
+   v[4] = 	v[d]      		  1326.676 change: 	-0.3237
+   j[1][2] = 	j[a][b]		    16.948 change: 	 0.0476
+   j[1][3] = 	j[a][c]		     9.687 change: 	-0.4131
+   j[1][4] = 	j[a][d]		     6.741 change: 	 0.0405
+   j[2][3] = 	j[b][c]		     1.250 change: 	 0.6942
+   j[2][4] = 	j[b][d]		     1.587 change: 	 0.0871
+   j[3][4] = 	j[c][d]		     1.250 change: 	 0.4173
+
+   Largest absolute difference  =     0.991
+   Total assigned intensity     =    43.003
+   RMS deviation of transitions =   0.36580
+   Fractional change of RMS     =  -0.50578
+
+
+***  Ignored     0 transitions
+
+***   Transitions now assigned =       35
+
+***  Iteration # 2, new parameters are:
+   v[1] = 	v[a]      		  2378.983 change: 	 0.0043
+   v[2] = 	v[b]      		  2028.566 change: 	-0.0200
+   v[3] = 	v[c]      		  2020.717 change: 	 0.0156
+   v[4] = 	v[d]      		  1326.677 change: 	 0.0006
+   j[1][2] = 	j[a][b]		    16.961 change: 	 0.0133
+   j[1][3] = 	j[a][c]		     9.674 change: 	-0.0133
+   j[1][4] = 	j[a][d]		     6.741 change: 	-0.0000
+   j[2][3] = 	j[b][c]		     1.250 change: 	 0.4444
+   j[2][4] = 	j[b][d]		     1.588 change: 	 0.0009
+   j[3][4] = 	j[c][d]		     1.250 change: 	 0.1658
+
+   Largest absolute difference  =     1.000
+   Total assigned intensity     =    43.003
+   RMS deviation of transitions =   0.36537
+   Fractional change of RMS     =  -0.00116
+
+
+***  Ignored     0 transitions
+
+***   Transitions now assigned =       35
+
+***  Iteration # 3, new parameters are:
+   v[1] = 	v[a]      		  2378.983 change: 	-0.0001
+   v[2] = 	v[b]      		  2028.566 change: 	 0.0001
+   v[3] = 	v[c]      		  2020.717 change: 	 0.0000
+   v[4] = 	v[d]      		  1326.677 change: 	 0.0000
+   j[1][2] = 	j[a][b]		    16.961 change: 	 0.0004
+   j[1][3] = 	j[a][c]		     9.673 change: 	-0.0004
+   j[1][4] = 	j[a][d]		     6.741 change: 	 0.0000
+   j[2][3] = 	j[b][c]		     1.250 change: 	 0.4444
+   j[2][4] = 	j[b][d]		     1.588 change: 	 0.0000
+   j[3][4] = 	j[c][d]		     1.250 change: 	 0.1657
+
+   Largest absolute difference  =     1.000
+   Total assigned intensity     =    43.003
+   RMS deviation of transitions =   0.36537
+   Fractional change of RMS     =   0.00000
+
+
+***  Ignored     0 transitions
+
+***   Transitions now assigned =       35
+
+***  Iteration # 4, new parameters are:
+   v[1] = 	v[a]      		  2378.983 change: 	-0.0000
+   v[2] = 	v[b]      		  2028.566 change: 	 0.0000
+   v[3] = 	v[c]      		  2020.717 change: 	-0.0000
+   v[4] = 	v[d]      		  1326.677 change: 	 0.0000
+   j[1][2] = 	j[a][b]		    16.961 change: 	 0.0000
+   j[1][3] = 	j[a][c]		     9.673 change: 	-0.0000
+   j[1][4] = 	j[a][d]		     6.741 change: 	 0.0000
+   j[2][3] = 	j[b][c]		     1.250 change: 	 0.4444
+   j[2][4] = 	j[b][d]		     1.588 change: 	-0.0000
+   j[3][4] = 	j[c][d]		     1.250 change: 	 0.1657
+
+   Largest absolute difference  =     1.000
+   Total assigned intensity     =    43.003
+   RMS deviation of transitions =   0.36537
+   Fractional change of RMS     =   0.00000
+
+
+***  Ignored     0 transitions
+
+***   Transitions now assigned =       35
+
+***  Iteration # 5, new parameters are:
+   v[1] = 	v[a]      		  2378.983 change: 	-0.0000
+   v[2] = 	v[b]      		  2028.566 change: 	 0.0000
+   v[3] = 	v[c]      		  2020.717 change: 	-0.0000
+   v[4] = 	v[d]      		  1326.677 change: 	 0.0000
+   j[1][2] = 	j[a][b]		    16.961 change: 	-0.0000
+   j[1][3] = 	j[a][c]		     9.673 change: 	 0.0000
+   j[1][4] = 	j[a][d]		     6.741 change: 	 0.0000
+   j[2][3] = 	j[b][c]		     1.250 change: 	 0.4444
+   j[2][4] = 	j[b][d]		     1.588 change: 	-0.0000
+   j[3][4] = 	j[c][d]		     1.250 change: 	 0.1657
+
+   Largest absolute difference  =     1.000
+   Total assigned intensity     =    43.003
+   RMS deviation of transitions =   0.36537
+   Fractional change of RMS     =   0.00000
+
+
+***  Ignored     0 transitions
+
+***   Transitions now assigned =       35
+
+***  Iteration # 6, new parameters are:
+   v[1] = 	v[a]      		  2378.983 change: 	 0.0000
+   v[2] = 	v[b]      		  2028.566 change: 	 0.0000
+   v[3] = 	v[c]      		  2020.717 change: 	-0.0000
+   v[4] = 	v[d]      		  1326.677 change: 	-0.0000
+   j[1][2] = 	j[a][b]		    16.961 change: 	-0.0000
+   j[1][3] = 	j[a][c]		     9.673 change: 	 0.0000
+   j[1][4] = 	j[a][d]		     6.741 change: 	-0.0000
+   j[2][3] = 	j[b][c]		     1.250 change: 	 0.4444
+   j[2][4] = 	j[b][d]		     1.588 change: 	-0.0000
+   j[3][4] = 	j[c][d]		     1.250 change: 	 0.1657
+
+   Largest absolute difference  =     1.000
+   Total assigned intensity     =    43.003
+   RMS deviation of transitions =   0.36537
+   Fractional change of RMS     =  -0.00000
+
+
+***  Ignored     0 transitions
+
+***   Transitions now assigned =       35
+
+***  Iteration # 7, new parameters are:
+   v[1] = 	v[a]      		  2378.983 change: 	 0.0000
+   v[2] = 	v[b]      		  2028.566 change: 	-0.0000
+   v[3] = 	v[c]      		  2020.717 change: 	 0.0000
+   v[4] = 	v[d]      		  1326.677 change: 	 0.0000
+   j[1][2] = 	j[a][b]		    16.961 change: 	-0.0000
+   j[1][3] = 	j[a][c]		     9.673 change: 	 0.0000
+   j[1][4] = 	j[a][d]		     6.741 change: 	-0.0000
+   j[2][3] = 	j[b][c]		     1.250 change: 	 0.4444
+   j[2][4] = 	j[b][d]		     1.588 change: 	 0.0000
+   j[3][4] = 	j[c][d]		     1.250 change: 	 0.1657
+
+   Largest absolute difference  =     1.000
+   Total assigned intensity     =    43.003
+   RMS deviation of transitions =   0.36537
+   Fractional change of RMS     =  -0.00000
+
+
+***  Ignored     0 transitions
+
+***   Transitions now assigned =       35
+
+***  Iteration # 8, new parameters are:
+   v[1] = 	v[a]      		  2378.983 change: 	 0.0000
+   v[2] = 	v[b]      		  2028.566 change: 	-0.0000
+   v[3] = 	v[c]      		  2020.717 change: 	 0.0000
+   v[4] = 	v[d]      		  1326.677 change: 	 0.0000
+   j[1][2] = 	j[a][b]		    16.961 change: 	-0.0000
+   j[1][3] = 	j[a][c]		     9.673 change: 	 0.0000
+   j[1][4] = 	j[a][d]		     6.741 change: 	 0.0000
+   j[2][3] = 	j[b][c]		     1.250 change: 	 0.4444
+   j[2][4] = 	j[b][d]		     1.588 change: 	-0.0000
+   j[3][4] = 	j[c][d]		     1.250 change: 	 0.1657
+
+   Largest absolute difference  =     1.000
+   Total assigned intensity     =    43.003
+   RMS deviation of transitions =   0.36537
+   Fractional change of RMS     =   0.00000
+
+*** Convergence achieved (Parameters not changing)
+      This could be due to insufficient assigned transitions in a second-order spectrum
+
+***  After final iteration:
+***      current iteration count = 	       8
+***      transitions now assigned = 	      35
+***      current RMS = 			0.365371
+
+***  Final parameters after 8 iterations are:
+   v[1] = 	v[a]      		  2378.983 Hz. +/- 	 0.0914 Hz.
+   v[2] = 	v[b]      		  2028.566 Hz. +/- 	 0.1524 Hz.
+   v[3] = 	v[c]      		  2020.717 Hz. +/- 	 0.1770 Hz.
+   v[4] = 	v[d]      		  1326.677 Hz. +/- 	 0.1292 Hz.
+   j[1][2] = 	j[a][b]		    16.961 Hz. +/- 	 0.1592 Hz.
+   j[1][3] = 	j[a][c]		     9.673 Hz. +/- 	 0.1631 Hz.
+   j[1][4] = 	j[a][d]		     6.741 Hz. +/- 	 0.1156 Hz.
+   j[2][3] = 	j[b][c]		     1.250 Hz. +/- 	 0.2397 Hz.
+   j[2][4] = 	j[b][d]		     1.588 Hz. +/- 	 0.1932 Hz.
+   j[3][4] = 	j[c][d]		     1.250 Hz. +/- 	 0.1673 Hz.
+
+***  Parameter correlation coefficients:
+   1  1.000
+   2 -0.001  1.000
+   3 -0.000 -0.011  1.000
+   4 -0.000 -0.000 -0.000  1.000
+   5  0.000 -0.179  0.007  0.000  1.000
+   6 -0.000  0.006 -0.040 -0.000 -0.011  1.000
+   7 -0.000  0.000  0.000 -0.000 -0.000  0.000  1.000
+   8  0.000 -0.000  0.051 -0.000 -0.000  0.021  0.000  1.000
+   9  0.000 -0.001 -0.012  0.000  0.001 -0.007 -0.001 -0.312  1.000
+  10  0.000  0.003 -0.337  0.000 -0.002 -0.143 -0.000  0.220 -0.079  1.000
+
+
+ Transitions for isotopic species 1
+
+    113   1321.807   1321.863    -0.056    1.97914
+    109              1321.888              1.97929 
+    101   1323.377   1323.121     0.256    1.98603
+     74              1323.142              1.98621 
+     93   1323.377   1323.451    -0.074    1.98778
+     66              1323.473              1.98796 
+     50   1324.809   1324.709     0.100    1.99516
+     20              1324.727              1.99525 
+     58   1328.225   1328.602    -0.377    2.00449
+     85              1328.620              2.00459 
+     15   1330.050   1329.854     0.196    2.01179
+     42              1329.875              2.01190 
+     10   1330.050   1330.190    -0.140    2.01365
+     34              1330.212              2.01378 
+      1   1331.537   1331.442     0.095    2.02101
+      5              1331.466              2.02116 
+    112              2013.870              0.72145 
+    128              2015.126              0.73899 
+    108              2015.128              0.73905 
+     91   2015.734   2015.129     0.605    1.23007
+     81   2017.176   2016.383     0.793    0.75371
+    122              2016.384              1.20687 
+     64              2016.387              1.20680 
+     28              2017.641              1.18645 
+    111              2017.731              1.20725 
+     98              2018.990              0.70271 
+    127   2019.002   2019.315    -0.313    1.18372
+    107              2019.319              1.18365 
+    125   2020.636   2020.574     0.062    0.71975
+     71              2020.578              0.71981 
+     80              2020.904              1.16298 
+     32              2022.162              0.73397 
+     83              2023.556              0.89317 
+    118   2023.808   2024.808    -1.000    0.89411
+     56              2024.810              0.89411 
+     33              2024.815              1.16949 
+     23   2025.922   2026.062    -0.140    0.89478
+    114              2026.067              1.15980 
+      9              2026.069              1.15976 
+      2   2027.172   2027.321    -0.149    1.15045
+     82   2034.573   2034.671    -0.098    1.19441
+     40              2035.930              0.91404 
+    117   2036.015   2036.259    -0.244    1.18318
+     55              2036.262              1.18313 
+    115   2037.745   2037.517     0.227    0.91358
+     13              2037.521              0.91358 
+     22              2037.850              1.17231 
+      3   2039.475   2039.109     0.366    0.91286
+    110   2358.953   2359.227    -0.274    1.09217
+    126   2365.873   2365.941    -0.068    1.07729
+    106   2365.873   2365.984    -0.111    1.07715
+     97   2369.141   2368.912     0.229    1.02827
+     79   2372.505   2372.698    -0.193    1.06259
+    124   2375.773   2375.623     0.150    1.01605
+     70   2375.869   2375.666     0.203    1.01593
+     89   2375.869   2376.167    -0.297    0.98465
+     31   2382.693   2382.378     0.315    1.00366
+    120   2382.790   2382.884    -0.095    0.97343
+     62   2382.790   2382.927    -0.138    0.97331
+     47   2386.058   2385.852     0.205    0.93763
+     26   2389.422   2389.645    -0.223    0.96203
+    116   2392.786   2392.567     0.219    0.92662
+     17   2392.497   2392.610    -0.112    0.92651
+      4   2399.514   2399.324     0.190    0.91568
+
+***  64 transitions for species 1 written to plot file
+
+  RMS deviation of    28 peaks grouped within     0.100 Hz =   0.41202 Hz
+
+
+
+***  Simulation normal exit  ***
+     Calculation time = 0 seconds

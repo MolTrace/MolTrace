@@ -1,0 +1,75 @@
+##TITLE= Audit trail, TOPSPIN		Version 3.2
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= guest
+$$ /opt/topspin/data/guest/nmr/Indol/603/pdata/1/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2017-07-25 17:51:36.976 +0200>,<guest>,<laurel>,<go>,<TOPSPIN 3.2>,
+      <acquisition in progress>)
+(   2,<2017-07-25 18:18:26.557 +0200>,<guest>,<laurel>,<proc1d>,<TOPSPIN 3.2>,
+      <Start of raw data processing
+       efp LB = 0.5 FT_mod = 6 PKNL = 1 PHC0 = -78.08823 PHC1 = -26.38912 SI = 32K 
+       data hash MD5: 32K
+       5C 99 D8 63 F1 3D 17 05 B9 1D CE 6C FC C0 2E D0>)
+$$ D:/Rainer/NMR-Spektren/Indol/603/pdata/1/auditp.txt
+(   3,<2020-03-27 18:09:40.900 +0100>,<Rainer>,<Haustier-W10>,<proc1d>,<TopSpin 4.0.8>,
+      <abs ABSG = 5 
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(   4,<2020-03-27 18:09:48.539 +0100>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-27 18:09:47.509 +0100
+       DELETE [136.472;135.678]
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(   5,<2020-03-27 18:09:48.838 +0100>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-27 18:09:47.509 +0100
+       DELETE [128.038;127.769]
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(   6,<2020-03-27 18:09:48.850 +0100>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-27 18:09:47.509 +0100
+       DELETE [124.337;123.962]
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(   7,<2020-03-27 18:09:48.862 +0100>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-27 18:09:47.509 +0100
+       DELETE [122.225;120.459]
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(   8,<2020-03-27 18:09:49.543 +0100>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-27 18:09:47.509 +0100
+       DELETE [120.111;119.679]
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(   9,<2020-03-27 18:09:49.555 +0100>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-27 18:09:47.509 +0100
+       DELETE [111.453;110.750]
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(  10,<2020-03-27 18:09:49.567 +0100>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-27 18:09:47.509 +0100
+       DELETE [102.841;102.161]
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(  11,<2020-03-27 18:09:49.579 +0100>,<Rainer>,<Haustier-W10>,<dataserver>,<TopSpin 4.0.8>,
+      <INTEGRAL 2020-03-27 18:09:47.509 +0100
+       DELETE [77.457;76.601]
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(  12,<2020-09-22 10:25:05.504 +0200>,<nes>,<nmr-nesnote2>,<audit>,<TopSpin 3.6.0>,
+      <user comment:
+       TITLE=25 uM PK4-011 in H2O/D2O (Kristallisationspuffer) + 0.023% Tween80 + 20 uM MBP-SpsB + 25 uM PK150 / 600 MHzTITLE_END
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(  13,<2020-09-22 12:23:18.291 +0200>,<nes>,<nmr-nesnote2>,<audit>,<TopSpin 3.6.0>,
+      <user comment:
+       TITLE=25 uM PK4-011 in H2O/D2O (Kristallisationspuffer) + 0.023% Tween80 + 20 uM MBP-SpsB + 25 uM PK150 / 600 MHz
+       1H-Indole, 120-72-9, 2,3-BenzopyrroleTITLE_END
+       data hash MD5: 32K
+       9F BF C7 69 81 E6 AD D7 B3 98 30 D9 42 F4 31 AF>)
+(  14,<2020-09-22 12:32:33.808 +0200>,<nes>,<nmr-nesnote2>,<disknew>,<TopSpin 3.6.0>,
+      <processed data deleted>)
+##END=
+
+$$ hash MD5
+$$ C4 12 A5 34 A1 E0 42 87 8F 7F F4 79 67 4D AE FE

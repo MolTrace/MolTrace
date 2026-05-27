@@ -1,0 +1,5 @@
+   Current data set:
+   NAME =	Eugenol-DB	EXPNO =	2	PROCNO = 1
+   DU   =	C:/Bruker/TopSpin3.5pl1/data/natur/nmr
+
+   Number   Integrated Region     Integral

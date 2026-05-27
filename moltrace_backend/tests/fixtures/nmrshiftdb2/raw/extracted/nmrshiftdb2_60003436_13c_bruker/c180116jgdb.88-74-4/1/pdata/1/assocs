@@ -1,0 +1,11 @@
+##TITLE= Parameter file, TOPSPIN		Version 3.2
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 1	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= jg
+$$ 2018-01-25 10:49:10.840 +0100  jg@nmr6
+$$ C:/NMR_local/c180116jgdb.88-74-4/1/pdata/1/assocs
+$$ process C:\Bruker\TopSpin3.2\prog\mod\dataserver.exe
+##$MULTDISP= <C:\NMR_local\c171227jgdb.88-74-4\1\pdata\1>
+##END=

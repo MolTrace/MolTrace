@@ -1,0 +1,19 @@
+# 2020-11-29 17:20:48 +0100 nes@nmr-nesnote2
+# TOPSPIN Daisy Multiplet Table
+# C:\Bruker\TopSpin3.6.0\data\nes\nmr\PoM_Dec_2020_Haessner\601\pdata\1
+
+1D TopSPIN Multiplet Table
+
+----------------------------------------------------------------------
+Number    Shift [ppm]    J [Hz]    M         Connection     Identifier
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+
+
+1D TopSPIN Multiplet Lines Table
+
+--------------------------
+Number      Position [ppm]
+--------------------------
+--------------------------

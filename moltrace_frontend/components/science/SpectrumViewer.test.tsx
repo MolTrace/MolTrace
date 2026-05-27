@@ -30,6 +30,9 @@ type CapturedPlotProps = {
   layout?: {
     uirevision?: unknown
     showlegend?: boolean
+    xaxis?: {
+      showgrid?: boolean
+    }
     shapes?: Array<{
       type?: string
       x0?: number
@@ -50,6 +53,7 @@ type CapturedPlotProps = {
     yaxis?: {
       range?: number[]
       zeroline?: boolean
+      showgrid?: boolean
     }
   }
 }
@@ -104,6 +108,13 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     freshRender(<SpectrumViewer x={[3, 2, 1]} y={[0, 1, 0]} />)
 
     expect(capturedPlotProps?.layout?.uirevision).toBe("spectrum")
+  })
+
+  it("keeps gridlines disabled for clean raw and processed spectrum views", () => {
+    freshRender(<SpectrumViewer x={[3, 2, 1]} y={[0, 1, 0]} />)
+
+    expect(capturedPlotProps?.layout?.xaxis?.showgrid).toBe(false)
+    expect(capturedPlotProps?.layout?.yaxis?.showgrid).toBe(false)
   })
 
   it("uses Plotly WebGL for raw FID render mode without connecting gaps", () => {

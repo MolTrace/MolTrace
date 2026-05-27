@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList>
+  <PeakList1D>
+    <PeakList1DHeader creator="Rainer" date="2019-11-07T19:35:14.346+01:00" expNo="252" name="1-Chlor-3-brom-propan in CDCl3" owner="" procNo="1" source="D:/Rainer/NMR-Spektren">
+      <PeakPickDetails>F1=85.066483ppm, F2=-5.066480ppm, MI=1.00cm, MAXI=10000.00cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="77.555634" intensity="4.480020e+00" type="0"/>
+    <Peak1D F1="77.046852" intensity="4.546164e+00" type="0"/>
+    <Peak1D F1="76.536171" intensity="4.455475e+00" type="0"/>
+    <Peak1D F1="42.589371" intensity="9.578925e+00" type="0"/>
+    <Peak1D F1="42.582535" intensity="3.390128e+00" type="0"/>
+    <Peak1D F1="34.904694" intensity="1.500000e+01" type="0"/>
+    <Peak1D F1="29.923677" intensity="8.401696e+00" type="0"/>
+  </PeakList1D>
+</PeakList>

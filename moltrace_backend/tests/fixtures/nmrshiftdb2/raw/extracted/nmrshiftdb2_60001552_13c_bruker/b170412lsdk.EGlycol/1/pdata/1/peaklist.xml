@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList modified="2017-04-18T18:21:04">
+  <PeakList1D>
+    <PeakList1DHeader creator="jg" date="2017-04-18T13:47:42" expNo="1" name="b170412lsdk.EGlycol" owner="" procNo="1" source="Z:\nmr300\data\ls\nmr">
+      <PeakPickDetails>F1=72.897377ppm, F2=41.957008ppm, MI=5.02cm, MAXI=17.57cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="62.6372" intensity="15.00" type="0"/>
+  </PeakList1D>
+</PeakList>

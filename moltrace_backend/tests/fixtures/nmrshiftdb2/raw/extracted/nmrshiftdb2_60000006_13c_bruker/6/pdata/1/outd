@@ -1,0 +1,16 @@
+##TITLE= Parameter file, TopSpin 3.5 pl 1
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 1	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= stb
+$$ 2016-05-23 11:19:35.383 +0200  stb@STBHome
+$$ C:/Bruker/TopSpin3.5pl1/data/natur/nmr/Cocaine-DB/6/pdata/1/outd
+$$ process C:\Bruker\TopSpin3.5pl1\prog\mod\dirdata.exe
+##$CURPLOT= <hplj1200>
+##$CURPRIN= <$hplj1200>
+##$DFORMAT= <normdp>
+##$LAYOUT= <c:/naturstoffe/cocaine/13c.xwp>
+##$LFORMAT= <normlp>
+##$PFORMAT= <normpl>
+##END=

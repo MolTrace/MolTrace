@@ -1,0 +1,18 @@
+##TITLE= Audit trail, TopSpin 3.5 pl 6
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= ns
+$$ /opt/data_nmr/data/jg/nmr/c180115jgdb.88-74-4/1/audita.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2018-01-16 00:14:20.774 +0100>,<ns>,<nmr400>,<proc1d>,<TopSpin 3.5.6>,
+      <genfid from       1 1 "c180115jgdb.88-74-4" "/opt/data/jg/nmr"
+       data hash MD5: 98132
+       5B D9 43 71 87 F8 E9 34 F0 A6 1F CA 06 65 4C 8B>)
+(   2,<2018-01-16 00:14:23.893 +0100>,<ns>,<nmr400>,<dirdata>,<TopSpin 3.5.6>,
+      <wrpa from 1 1 "c180115jgdb.88-74-4" "/opt/data/jg/nmr"
+       data hash MD5: 98132
+       5B D9 43 71 87 F8 E9 34 F0 A6 1F CA 06 65 4C 8B>)
+##END=
+
+$$ hash MD5
+$$ 6D 5F 50 B2 FA 32 1C 05 0E 26 42 D2 3E 88 AD F7

@@ -1,0 +1,27 @@
+##TITLE= Audit trail, TOPSPIN		Version 1.3
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= ns
+$$ /opt/data_nmr/data/ls/nmr/b170412lsdk.EGlycol/1/audita.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, VERSION, WHAT)
+(   1,<2017-04-13 10:17:02.982 +0200>,<ns>,<nmr300>,<TOPSPIN 1.3>,
+      <created by zg
+	started at 2017-04-13 09:28:57.533 +0200,
+	POWCHK disabled, PULCHK disabled
+       configuration hash MD5:
+       B2 AC C4 1A A9 DC BF 1A 2E BC F2 84 47 CC EE 3E
+       data hash MD5: 64K
+       61 E1 88 71 56 7D 5B 59 69 03 4F 04 2E BE B2 BD>)
+(   2,<2017-04-13 10:17:07.587 +0200>,<ns>,<nmr300>,<TOPSPIN 1.3>,
+      <user comment:
+       ICON-NMR User ID: ls
+       data hash MD5: 64K
+       61 E1 88 71 56 7D 5B 59 69 03 4F 04 2E BE B2 BD>)
+(   3,<2017-04-13 10:17:07.770 +0200>,<ns>,<nmr300>,<TOPSPIN 1.3>,
+      <wrpa from 1 1 "b170412lsdk.EGlycol" "ls" "/opt"
+       data hash MD5: 64K
+       61 E1 88 71 56 7D 5B 59 69 03 4F 04 2E BE B2 BD>)
+##END=
+
+$$ hash MD5
+$$ 46 A2 7E 66 B1 CF 9E 5E 6E 0D 36 91 E0 92 FB 7B

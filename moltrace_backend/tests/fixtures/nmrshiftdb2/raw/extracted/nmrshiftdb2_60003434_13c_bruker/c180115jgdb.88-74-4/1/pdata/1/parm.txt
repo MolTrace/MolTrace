@@ -1,0 +1,46 @@
+
+Current Data Parameters
+NAME     c180115jgdb.88-74-4              
+EXPNO                 1              
+PROCNO                1              
+
+F2 - Acquisition Parameters
+Date_          20180116              
+Time               0.14 h            
+INSTRUM           spect              
+PROBHD   Z130030_0004 (              
+PULPROG          zgpg30              
+TD                98132              
+SOLVENT           CDCl3              
+NS                  512              
+DS                    2              
+SWH           30864.197 Hz           
+FIDRES         0.629034 Hz           
+AQ            1.5897384 sec          
+RG                 2050              
+DW               16.200 usec         
+DE                18.00 usec         
+TE                295.0 K            
+D1           1.50000000 sec          
+D11          0.03000000 sec          
+TD0                  64              
+SFO1        100.6741319 MHz          
+NUC1                13C              
+P1                10.00 usec         
+PLW1        45.00000000 W            
+SFO2        400.3316013 MHz          
+NUC2                 1H              
+CPDPRG[2        waltz65              
+PCPD2             90.00 usec         
+PLW2        10.00000000 W            
+PLW12        0.16327000 W            
+PLW13        0.08212400 W            
+
+F2 - Processing parameters
+SI               524288              
+SF          100.6630583 MHz          
+WDW                  EM              
+SSB      0              
+LB                 0.70 Hz           
+GB       0              
+PC                 1.40              

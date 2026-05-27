@@ -32,3 +32,150 @@ jobs:
           REQUIRE_VERIFIED_EMAIL: "false"
           API_KEY: test-key
         run: uv run pytest
+
+      - name: Raw FID Prompt sidecar smoke report
+        env:
+          PYTHONPATH: src
+        run: uv run moltrace-raw-fid-sidecar-report --limit 1 --no-include-varian --quiet --smoke
+
+      - name: Raw FID Prompt manual promotion gate diagnostic
+        if: always()
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+        run: >
+          uv run moltrace-raw-fid-sidecar-report
+          --limit 20
+          --include-varian
+          --quiet
+          --promotion-gate
+          --output-dir "$RUNNER_TEMP/raw_fid_prompt_manual_promotion_gate"
+
+      - name: Upload Raw FID Prompt manual promotion gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-fid-prompt-manual-promotion-gate
+          path: ${{ runner.temp }}/raw_fid_prompt_manual_promotion_gate
+          if-no-files-found: ignore
+
+      - name: Raw FID Prompt provenance checksum report
+        if: always()
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+        run: >
+          uv run moltrace-raw-fid-sidecar-report
+          --limit 20
+          --include-varian
+          --quiet
+          --output-dir "$RUNNER_TEMP/raw_fid_prompt_provenance_checksums"
+
+      - name: Upload Raw FID Prompt provenance checksum report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-fid-prompt-provenance-checksums
+          path: ${{ runner.temp }}/raw_fid_prompt_provenance_checksums
+          if-no-files-found: ignore
+
+      - name: Raw FID Prompt shadow comparison summary
+        if: always()
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+        run: >
+          uv run moltrace-raw-fid-sidecar-report
+          --limit 20
+          --include-varian
+          --quiet
+          --output-dir "$RUNNER_TEMP/raw_fid_prompt_shadow_comparison"
+
+      - name: Upload Raw FID Prompt shadow comparison summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-fid-prompt-shadow-comparison
+          path: |
+            ${{ runner.temp }}/raw_fid_prompt_shadow_comparison/raw_fid_prompt_shadow_comparison_summary.json
+            ${{ runner.temp }}/raw_fid_prompt_shadow_comparison/raw_fid_prompt_shadow_comparison_summary.csv
+          if-no-files-found: ignore
+
+      - name: Summarize Raw FID Prompt shadow comparison review
+        if: always()
+        run: |
+          {
+            echo "### Raw FID Prompt shadow comparison"
+            echo ""
+            echo "- Artifact: \`raw-fid-prompt-shadow-comparison\`"
+            echo "- Files: \`raw_fid_prompt_shadow_comparison_summary.json\`, \`raw_fid_prompt_shadow_comparison_summary.csv\`"
+            echo "- Scope: read-only release evidence for Prompt 1/2 sidecar-vs-legacy fixture review."
+            echo "- Runtime activation: blocked. A separate manual runtime promotion must be implemented and reviewed before Prompt 1/2 can affect SpectraCheck spectra."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Raw FID Prompt release readiness summary
+        if: always()
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+        run: >
+          uv run moltrace-raw-fid-sidecar-report
+          --limit 20
+          --include-varian
+          --quiet
+          --output-dir "$RUNNER_TEMP/raw_fid_prompt_release_readiness"
+
+      - name: Upload Raw FID Prompt release readiness summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-fid-prompt-release-readiness
+          path: ${{ runner.temp }}/raw_fid_prompt_release_readiness/raw_fid_prompt_release_readiness.md
+          if-no-files-found: ignore
+
+      - name: Summarize Raw FID Prompt release readiness review
+        if: always()
+        run: |
+          {
+            echo "### Raw FID Prompt release readiness"
+            echo ""
+            echo "- Artifact: \`raw-fid-prompt-release-readiness\`"
+            echo "- File: \`raw_fid_prompt_release_readiness.md\`"
+            echo "- Scope: one read-only reviewer summary of manual-promotion gate, provenance, and shadow-comparison status."
+            echo "- Runtime activation: blocked until a separate manual runtime promotion is implemented and reviewed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  prompt-sidecar-guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.3
+
+      - name: Install backend dependencies
+        working-directory: moltrace_backend
+        run: uv sync --extra dev --extra fid
+
+      - name: Install frontend dependencies
+        working-directory: moltrace_frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Prompt sidecar guardrail suite
+        run: scripts/run_prompt_sidecar_guardrails.sh

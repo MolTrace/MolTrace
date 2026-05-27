@@ -1,0 +1,5 @@
+   Current data set:
+   NAME =	1,2-Epoxybutan in CDCl3	EXPNO =	252	PROCNO = 1
+   DU   =	D:/Rainer/NMR-Spektren
+
+   Number   Integrated Region     Integral

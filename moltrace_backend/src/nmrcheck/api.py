@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from html import escape as html_escape
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 
 from fastapi import (
     APIRouter,
@@ -176,6 +176,14 @@ from .fid import (
     fid_settings_from_preset,
     normalize_phase_mode,
     process_bruker_1d_zip,
+)
+from .fid_pipeline_adapter import (
+    attach_prompt_pipeline_sidecar,
+    build_prompt_pipeline_analysis_guidance,
+    build_prompt_pipeline_consistency_check,
+    build_prompt_pipeline_sidecar,
+    resolve_raw_fid_pipeline_mode,
+    should_build_prompt_sidecar,
 )
 from .fragmentation_tree import MSMSFragmentationTreeError, build_msms_fragmentation_tree
 from .hrms import HRMSError, match_hrms_candidates, search_formulas_by_hrms
@@ -736,6 +744,7 @@ from .models import (
     SpectrumPreviewReport,
     StoredAnalysisRecord,
     StoredReportRecord,
+    StructureSummary,
     StructureElucidationReportRequest,
     StructureElucidationReportResult,
     SubscriptionPlan,
@@ -836,6 +845,10 @@ from .raw_vault import (
     load_raw_archive_bytes,
     verify_raw_archive_integrity,
     verify_stored_raw_upload,
+)
+from .raw_fid_prompt_validation import (
+    attach_report_provenance,
+    build_fixture_validation_report,
 )
 from .regulatory_report import StructureElucidationReportError, compose_structure_elucidation_report
 from .settings import Settings, get_settings, validate_startup_settings
@@ -5514,6 +5527,45 @@ def _processing_parameters_payload(preview: FIDPreviewReport) -> dict[str, Any]:
     }
 
 
+def _maybe_attach_prompt_raw_fid_sidecar(
+    preview: FIDPreviewReport,
+    *,
+    filename: str,
+    content: bytes,
+    nucleus: str | None,
+    solvent: str | None,
+) -> FIDPreviewReport:
+    """Attach Prompt 1/2 metadata only when explicitly enabled.
+
+    This keeps the tuned raw-FID preview/process output on the legacy pipeline
+    by default while allowing side-by-side reader/phase/baseline comparison in
+    controlled test or staging runs.
+    """
+
+    mode = resolve_raw_fid_pipeline_mode()
+    if not should_build_prompt_sidecar(mode):
+        return preview
+    sidecar = build_prompt_pipeline_sidecar(
+        filename=filename,
+        content=content,
+        nucleus=nucleus,
+        solvent=solvent,
+    )
+    return attach_prompt_pipeline_sidecar(preview, sidecar, mode=mode)
+
+
+def _prompt_sidecar_guidance(
+    preview: FIDPreviewReport,
+    prompt_pipeline_sidecar: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(prompt_pipeline_sidecar, Mapping):
+        return None
+    guidance = prompt_pipeline_sidecar.get("analysis_guidance")
+    if isinstance(guidance, Mapping):
+        return dict(guidance)
+    return build_prompt_pipeline_analysis_guidance(preview, prompt_pipeline_sidecar)
+
+
 def _fid_settings_from_form(
     *,
     selected_preset: str | None,
@@ -6227,6 +6279,8 @@ async def nmr_raw_fid_preview_route(
     processing_parameters: dict[str, Any] = {}
     resolved_processing_preset: str | None = None
     spectrum_generated = False
+    prompt_pipeline_sidecar: dict[str, Any] | None = None
+    spectrum_preview: FIDPreviewReport | None = None
     include_spectrum = _coerce_optional_form_bool(include_spectrum, default=True)
     if include_spectrum:
         settings = _fid_settings_from_form(
@@ -6263,6 +6317,14 @@ async def nmr_raw_fid_preview_route(
                 compound_class=normalized_compound_class,
                 raw_upload_provenance=raw_upload_provenance,
             )
+            spectrum_preview = _maybe_attach_prompt_raw_fid_sidecar(
+                spectrum_preview,
+                filename=filename,
+                content=content,
+                nucleus=nucleus,
+                solvent=solvent,
+            )
+            prompt_pipeline_sidecar = spectrum_preview.metadata.get("prompt_pipeline_sidecar")
             x_values, y_values = _xy_from_spectrum_points(spectrum_preview.preview_points)
             peaks = _model_dicts(spectrum_preview.inferred_peaks)
             if nucleus == "13C":
@@ -6304,6 +6366,33 @@ async def nmr_raw_fid_preview_route(
         ),
         "Human review remains required for raw FID-derived evidence.",
     ]
+    raw_fid_peak_guidance: dict[str, Any] = {
+        "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
+        "structure_smiles_used_for_peak_picking": candidate_smiles,
+        "structure_guidance_source": "candidates_text" if candidate_smiles else None,
+        "parsed_smiles_supplied_to_raw_fid": candidate_smiles is not None,
+        "proton_nmr_text_supplied_to_raw_fid": shared_proton_text is not None,
+        "carbon13_text_supplied_to_raw_fid": shared_carbon_text is not None,
+        "carbon13_text_used_for_peak_guidance": nucleus == "13C" and shared_carbon_text is not None,
+        "expected_total_h": raw_expected_total_h,
+        "expected_non_labile_h": raw_expected_non_labile_h,
+        "carbon13_text_guidance": raw_upload_provenance.get("carbon13_text_guidance"),
+        "carbon13_context_guidance": raw_upload_provenance.get("carbon13_context_guidance"),
+    }
+    prompt_guidance = (
+        _prompt_sidecar_guidance(spectrum_preview, prompt_pipeline_sidecar)
+        if spectrum_preview is not None and prompt_pipeline_sidecar is not None
+        else None
+    )
+    if prompt_guidance is not None:
+        raw_fid_peak_guidance["prompt_sidecar_guidance"] = prompt_guidance
+        raw_fid_peak_guidance["prompt_sidecar_consistency"] = (
+            build_prompt_pipeline_consistency_check(
+                prompt_guidance,
+                active_peak_count=len(peaks),
+                active_peak_source="legacy_raw_fid_preview_peaks",
+            )
+        )
     metadata = {
         "raw_archive_id": provenance.get("raw_archive_id") or raw_sha256,
         "raw_archive_db_id": provenance.get("raw_archive_db_id"),
@@ -6319,20 +6408,10 @@ async def nmr_raw_fid_preview_route(
         "carbon13_text_supplied": shared_carbon_text is not None,
         "inline_spectrum_generated": spectrum_generated,
         "processing_preset": resolved_processing_preset,
-        "raw_fid_peak_guidance": {
-            "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
-            "structure_smiles_used_for_peak_picking": candidate_smiles,
-            "structure_guidance_source": "candidates_text" if candidate_smiles else None,
-            "parsed_smiles_supplied_to_raw_fid": candidate_smiles is not None,
-            "proton_nmr_text_supplied_to_raw_fid": shared_proton_text is not None,
-            "carbon13_text_supplied_to_raw_fid": shared_carbon_text is not None,
-            "carbon13_text_used_for_peak_guidance": nucleus == "13C" and shared_carbon_text is not None,
-            "expected_total_h": raw_expected_total_h,
-            "expected_non_labile_h": raw_expected_non_labile_h,
-            "carbon13_text_guidance": raw_upload_provenance.get("carbon13_text_guidance"),
-            "carbon13_context_guidance": raw_upload_provenance.get("carbon13_context_guidance"),
-        },
+        "raw_fid_peak_guidance": raw_fid_peak_guidance,
     }
+    if prompt_pipeline_sidecar is not None:
+        metadata["prompt_pipeline_sidecar"] = prompt_pipeline_sidecar
     _audit_from_context(
         request,
         context=context,
@@ -6470,6 +6549,13 @@ async def nmr_raw_fid_process_route(
             expected_non_labile_h=raw_expected_non_labile_h,
             compound_class=normalized_compound_class,
             raw_upload_provenance=raw_upload_provenance,
+        )
+        preview = _maybe_attach_prompt_raw_fid_sidecar(
+            preview,
+            filename=filename,
+            content=content,
+            nucleus=nucleus,
+            solvent=solvent,
         )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="NMR raw FID processing") from exc
@@ -6612,6 +6698,17 @@ async def nmr_raw_fid_process_route(
             ]
         )
     raw_references_block = references_for_keys(list(dict.fromkeys(raw_citation_keys)))
+    prompt_pipeline_sidecar = preview.metadata.get("prompt_pipeline_sidecar")
+    prompt_guidance = _prompt_sidecar_guidance(preview, prompt_pipeline_sidecar)
+    if prompt_guidance is not None:
+        raw_fid_peak_guidance["prompt_sidecar_guidance"] = prompt_guidance
+        raw_fid_peak_guidance["prompt_sidecar_consistency"] = (
+            build_prompt_pipeline_consistency_check(
+                prompt_guidance,
+                active_peak_count=len(fid_peaks),
+                active_peak_source="legacy_raw_fid_process_enriched_peaks",
+            )
+        )
 
     notes = [
         "Raw archive was preserved as immutable source data before processing.",
@@ -6931,6 +7028,13 @@ def raw_fid_archive_preview(
             compound_class=normalized_compound_class,
             raw_upload_provenance=_raw_fid_archive_provenance_from_record(archive),
         )
+        preview = _maybe_attach_prompt_raw_fid_sidecar(
+            preview,
+            filename=archive.filename,
+            content=raw_bytes,
+            nucleus=nucleus,
+            solvent=solvent,
+        )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="Raw FID vault preview") from exc
     if nucleus == "13C" and (shared_carbon_text or structure_smiles or shared_proton_text):
@@ -7053,6 +7157,13 @@ def raw_fid_archive_process(
             expected_total_h=expected_total_h,
             expected_non_labile_h=expected_non_labile_h,
             raw_upload_provenance=_raw_fid_archive_provenance_from_record(archive),
+        )
+        preview = _maybe_attach_prompt_raw_fid_sidecar(
+            preview,
+            filename=archive.filename,
+            content=raw_bytes,
+            nucleus=nucleus,
+            solvent=solvent,
         )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="Raw FID vault processing") from exc
@@ -7266,6 +7377,13 @@ async def fid_preview(
         )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="Raw FID preview") from exc
+    preview = _maybe_attach_prompt_raw_fid_sidecar(
+        preview,
+        filename=filename,
+        content=content,
+        nucleus=nucleus,
+        solvent=solvent,
+    )
     _audit_from_context(
         request,
         context=context,
@@ -7377,6 +7495,13 @@ async def fid_process(
         )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="Raw FID analysis") from exc
+    preview = _maybe_attach_prompt_raw_fid_sidecar(
+        preview,
+        filename=filename,
+        content=content,
+        nucleus=nucleus,
+        solvent=solvent,
+    )
 
     resolved_sample_id = sample_id
     if (
@@ -21432,8 +21557,186 @@ def admin_release_health(request: Request) -> dict[str, object]:
             "POST /carbon13/fid/analyze",
             "POST /spectrum/preview with a processed CSV",
             "POST /fid/preview with Bruker and Varian/Agilent beta fixtures",
+            "GET /admin/raw-fid/prompt-sidecar/fixture-report?limit=1&include_varian=false",
         ],
+        "raw_fid_prompt_sidecar_smoke": {
+            "status": (
+                "ready_to_run_reporting_only_smoke"
+                if optional_fid_ready
+                else "missing_optional_fid_dependencies"
+            ),
+            "policy": "reporting_only_no_runtime_wiring",
+            "active_visible_pipeline": "legacy",
+            "prompt_pipeline_active": False,
+            "failure_scope": "guardrail_only_not_scientific_review_rows",
+            "ci_command": (
+                "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report "
+                "--limit 1 --no-include-varian --quiet --smoke"
+            ),
+            "admin_report_endpoint": (
+                "GET /admin/raw-fid/prompt-sidecar/fixture-report"
+                "?limit=1&include_varian=false"
+            ),
+            "manual_promotion_gate": {
+                "status": "ci_diagnostic_non_blocking",
+                "visibility": "ci_artifact_and_admin_release_health_only",
+                "policy": "ci_admin_gate_only_no_runtime_activation",
+                "runtime_activation_allowed": False,
+                "requires_manual_code_change": True,
+                "requires_explicit_runtime_feature_flag": True,
+                "ci_step": "Raw FID Prompt manual promotion gate diagnostic",
+                "ci_artifact": "raw-fid-prompt-manual-promotion-gate",
+                "output_dir": "$RUNNER_TEMP/raw_fid_prompt_manual_promotion_gate",
+                "ci_command": (
+                    "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report "
+                    "--limit 20 --include-varian --quiet --promotion-gate"
+                ),
+            },
+            "manual_promotion_design": {
+                "status": "documented_reporting_only",
+                "visibility": "admin_release_health_and_docs",
+                "policy": "design_doc_no_runtime_activation",
+                "runtime_activation_allowed": False,
+                "doc_path": "docs/raw_fid_prompt_manual_promotion_design.md",
+                "doc_title": "Raw FID Prompt 1/2 Manual Promotion Design",
+                "required_guardrail_command": "./scripts/run_prompt_sidecar_guardrails.sh",
+                "required_gates": [
+                    "prompt_sidecar_available",
+                    "peak_count_reference_tolerance",
+                    "ppm_axis_alignment",
+                    "processed_peak_ppm_axis_alignment",
+                    "phase_delta",
+                    "baseline_method",
+                    "fingerprint_hash",
+                    "runtime_target",
+                    "no_runtime_activation",
+                ],
+                "promotion_stages": [
+                    "stage_0_metadata_only_current_state",
+                    "stage_1_admin_shadow_comparison",
+                    "stage_2_explicit_per_session_preview_candidate",
+                    "stage_3_limited_internal_canary",
+                    "stage_4_default_promotion_after_review",
+                ],
+                "rollback_mode": "MOLTRACE_RAW_FID_PIPELINE=legacy",
+            },
+            "provenance_checksum_artifact": {
+                "status": "ci_diagnostic_non_blocking",
+                "visibility": "ci_artifact_and_admin_release_health_only",
+                "policy": "checksum_export_no_runtime_activation",
+                "runtime_activation_allowed": False,
+                "ci_step": "Raw FID Prompt provenance checksum report",
+                "ci_artifact": "raw-fid-prompt-provenance-checksums",
+                "output_dir": "$RUNNER_TEMP/raw_fid_prompt_provenance_checksums",
+                "ci_command": (
+                    "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report "
+                    "--limit 20 --include-varian --quiet "
+                    '--output-dir "$RUNNER_TEMP/raw_fid_prompt_provenance_checksums"'
+                ),
+                "files": [
+                    "raw_fid_prompt_sidecar_fixture_report.json",
+                    "raw_fid_prompt_sidecar_fixture_report.csv",
+                    "raw_fid_prompt_sidecar_provenance_checksums.json",
+                    "raw_fid_prompt_sidecar_provenance_checksums.csv",
+                ],
+            },
+            "shadow_comparison_artifact": {
+                "status": "ci_diagnostic_non_blocking",
+                "visibility": "ci_artifact_and_admin_release_health_only",
+                "policy": "shadow_comparison_export_no_runtime_activation",
+                "runtime_activation_allowed": False,
+                "ci_step": "Raw FID Prompt shadow comparison summary",
+                "ci_artifact": "raw-fid-prompt-shadow-comparison",
+                "output_dir": "$RUNNER_TEMP/raw_fid_prompt_shadow_comparison",
+                "ci_command": (
+                    "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report "
+                    "--limit 20 --include-varian --quiet "
+                    '--output-dir "$RUNNER_TEMP/raw_fid_prompt_shadow_comparison"'
+                ),
+                "files": [
+                    "raw_fid_prompt_shadow_comparison_summary.json",
+                    "raw_fid_prompt_shadow_comparison_summary.csv",
+                ],
+            },
+            "release_readiness_artifact": {
+                "status": "ci_diagnostic_non_blocking",
+                "visibility": "ci_artifact_and_admin_release_health_only",
+                "policy": "release_readiness_markdown_no_runtime_activation",
+                "runtime_activation_allowed": False,
+                "ci_step": "Raw FID Prompt release readiness summary",
+                "ci_artifact": "raw-fid-prompt-release-readiness",
+                "output_dir": "$RUNNER_TEMP/raw_fid_prompt_release_readiness",
+                "ci_command": (
+                    "PYTHONPATH=src uv run moltrace-raw-fid-sidecar-report "
+                    "--limit 20 --include-varian --quiet "
+                    '--output-dir "$RUNNER_TEMP/raw_fid_prompt_release_readiness"'
+                ),
+                "files": [
+                    "raw_fid_prompt_release_readiness.md",
+                ],
+            },
+            "runtime_effect": {
+                "spectracheck_visible_pipeline": "unchanged_legacy",
+                "processed_spectrum_pipeline": "unchanged",
+                "raw_fid_plotting": "unchanged",
+                "peak_markers": "unchanged",
+            },
+        },
     }
+
+
+@router.get(
+    "/admin/raw-fid/prompt-sidecar/fixture-report",
+    dependencies=[Depends(require_admin)],
+)
+def admin_raw_fid_prompt_sidecar_fixture_report(
+    limit: int | None = Query(
+        default=5,
+        ge=0,
+        le=20,
+        description=(
+            "Number of NMRShiftDB2 Bruker fixture archives to validate. "
+            "The optional Varian fixture is controlled separately."
+        ),
+    ),
+    include_varian: bool = Query(
+        default=True,
+        description="Include the local nmrglue Varian/Agilent fixture in the report.",
+    ),
+    context: AccessContext = Depends(require_admin),
+) -> dict[str, Any]:
+    """Return a reporting-only Prompt 1/2 raw-FID sidecar validation summary.
+
+    This endpoint is deliberately diagnostic.  It does not activate Prompt 1/2
+    for plotting, peak markers, phase, baseline, or analysis tables.
+    """
+
+    report = build_fixture_validation_report(
+        include_varian=include_varian,
+        limit=limit,
+        progress=False,
+    )
+    actor = _analytics_actor(context)
+    report["route_policy"] = "admin_diagnostic_reporting_only"
+    report["requested_by"] = {
+        "user_id": actor.user_id,
+        "email": actor.email,
+        "system_api_key": actor.system_api_key,
+    }
+    report["runtime_effect"] = {
+        "spectracheck_visible_pipeline": "unchanged_legacy",
+        "processed_spectrum_pipeline": "unchanged",
+        "raw_fid_plotting": "unchanged",
+        "peak_markers": "unchanged",
+    }
+    attach_report_provenance(
+        report,
+        include_varian=include_varian,
+        limit=limit,
+        strict=False,
+        route_policy=report["route_policy"],
+    )
+    return report
 
 
 @router.post(
@@ -24106,6 +24409,13 @@ def _carbon13_raw_fid_preview_from_upload(
         expected_non_labile_h=None,
         raw_upload_provenance=raw_upload_provenance,
     )
+    fid_preview = _maybe_attach_prompt_raw_fid_sidecar(
+        fid_preview,
+        filename=filename,
+        content=content,
+        nucleus="13C",
+        solvent=solvent,
+    )
     peaks = carbon13_peaks_from_shift_values(
         [(peak.shift_ppm, peak.integration_h) for peak in fid_preview.inferred_peaks],
         solvent=solvent,
@@ -24127,39 +24437,53 @@ def _carbon13_raw_fid_preview_from_upload(
     warnings.append(
         "Raw ¹³C FID beta processing reuses the automatic 1D FID transform path; review phasing, baseline, and peak picking before signoff."
     )
+    metadata = {
+        "solvent": solvent,
+        "format_detected": fid_preview.format_detected,
+        "point_count": fid_preview.point_count,
+        "preview_points": [
+            point.model_dump(mode="json") for point in fid_preview.preview_points
+        ],
+        "original_spectrum_state": fid_preview.metadata.get("original_spectrum_state"),
+        "baseline_flatness_qa": fid_preview.metadata.get("baseline_flatness_qa"),
+        "display_preprocessing": fid_preview.metadata.get("display_preprocessing"),
+        "evidence_trace_mode": fid_preview.metadata.get("evidence_trace_mode"),
+        "display_mode": fid_preview.metadata.get("display_mode"),
+        "display_gain": fid_preview.metadata.get("display_gain"),
+        "baseline_lock_visual_only": fid_preview.metadata.get("baseline_lock_visual_only"),
+        "preview_downsampling": fid_preview.metadata.get("preview_downsampling"),
+        "fid_processing": fid_preview.processing_metadata.model_dump(mode="json"),
+        "raw_upload_provenance": fid_preview.processing_metadata.raw_upload_provenance,
+        "analysis_artifact_policy": fid_preview.processing_metadata.analysis_artifact_policy,
+        "fid_quality": fid_preview.metadata.get("fid_quality"),
+        "baseline_qa": fid_preview.metadata.get("baseline_qa"),
+        "display": fid_preview.metadata.get("display"),
+        "context_guidance": {
+            **context_meta,
+            "carbon13_text_guidance": text_guidance_meta,
+        },
+        "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
+    }
+    prompt_pipeline_sidecar = fid_preview.metadata.get("prompt_pipeline_sidecar")
+    if prompt_pipeline_sidecar is not None:
+        metadata["prompt_pipeline_sidecar"] = prompt_pipeline_sidecar
+        prompt_guidance = _prompt_sidecar_guidance(fid_preview, prompt_pipeline_sidecar)
+        if prompt_guidance is not None:
+            metadata["context_guidance"]["prompt_sidecar_guidance"] = prompt_guidance
+            metadata["context_guidance"]["prompt_sidecar_consistency"] = (
+                build_prompt_pipeline_consistency_check(
+                    prompt_guidance,
+                    active_peak_count=len(peaks),
+                    active_peak_source="legacy_carbon13_raw_fid_preview_peaks",
+                )
+            )
     preview = Carbon13UploadPreview(
         filename=filename,
         source_mode="raw_fid",
         observed_signal_count=len(peaks),
         peaks=peaks,
         warnings=warnings,
-        metadata={
-            "solvent": solvent,
-            "format_detected": fid_preview.format_detected,
-            "point_count": fid_preview.point_count,
-            "preview_points": [
-                point.model_dump(mode="json") for point in fid_preview.preview_points
-            ],
-            "original_spectrum_state": fid_preview.metadata.get("original_spectrum_state"),
-            "baseline_flatness_qa": fid_preview.metadata.get("baseline_flatness_qa"),
-            "display_preprocessing": fid_preview.metadata.get("display_preprocessing"),
-            "evidence_trace_mode": fid_preview.metadata.get("evidence_trace_mode"),
-            "display_mode": fid_preview.metadata.get("display_mode"),
-            "display_gain": fid_preview.metadata.get("display_gain"),
-            "baseline_lock_visual_only": fid_preview.metadata.get("baseline_lock_visual_only"),
-            "preview_downsampling": fid_preview.metadata.get("preview_downsampling"),
-            "fid_processing": fid_preview.processing_metadata.model_dump(mode="json"),
-            "raw_upload_provenance": fid_preview.processing_metadata.raw_upload_provenance,
-            "analysis_artifact_policy": fid_preview.processing_metadata.analysis_artifact_policy,
-            "fid_quality": fid_preview.metadata.get("fid_quality"),
-            "baseline_qa": fid_preview.metadata.get("baseline_qa"),
-            "display": fid_preview.metadata.get("display"),
-            "context_guidance": {
-                **context_meta,
-                "carbon13_text_guidance": text_guidance_meta,
-            },
-            "peak_evidence_policy": "detected_peaks_only_no_reference_fabrication",
-        },
+        metadata=metadata,
     )
     return (preview, fid_preview)
 

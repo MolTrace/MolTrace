@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList modified="2020-11-29T16:53:43">
+  <PeakList1D>
+    <PeakList1DHeader creator="Rainer" date="2020-04-02T19:40:07" expNo="606" name="Allyl-glycidyl-ether in CDCl3" owner="" procNo="1" source="D:/Rainer/NMR-Spektren">
+      <PeakPickDetails>F1=154.224396ppm, F2=2.233997ppm, MI=1.00cm, MAXI=10000.00cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="134.309677" intensity="7.860478" type="0"/>
+    <Peak1D F1="117.240417" intensity="11.30989" type="0"/>
+    <Peak1D F1="72.165932" intensity="13.81521" type="0"/>
+    <Peak1D F1="70.684708" intensity="14.82232" type="0"/>
+    <Peak1D F1="50.699329" intensity="11.41841" type="0"/>
+    <Peak1D F1="44.22678" intensity="15.0" type="0"/>
+  </PeakList1D>
+</PeakList>

@@ -1,0 +1,4 @@
+# 2020-11-29 17:20:48 +0100 nes@nmr-nesnote2
+# TOPSPIN Molecule to PPM ranges correlations
+# C:\Bruker\TopSpin3.6.0\data\nes\nmr\PoM_Dec_2020_Haessner\601\pdata\1
+# Start [PPM]     End [PPM]     Atom Numbers

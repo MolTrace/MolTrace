@@ -1,0 +1,11 @@
+##TITLE= Parameter file, TopSpin 3.5.b.91 pl 7
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 1	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nes
+$$ 2017-05-03 16:36:44.474 +0200  nes@nmr-dd-nes
+$$ C:/transferNMR/Classics_Nicotine/3/pdata/1/assocs
+$$ process C:\Bruker\TopSpin3.5.b.91pl7\prog\mod\dataserver.exe
+##$MULTDISP= <C:/transferNMR/Classics_Nicotine/2/pdata/1>
+##END=

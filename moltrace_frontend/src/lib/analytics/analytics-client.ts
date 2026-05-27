@@ -56,7 +56,7 @@ const SENSITIVE_METADATA_KEYS = new Set([
 
 export type AnalyticsId = string | number | undefined
 
-/** Payload POSTed to GET/POST /analytics/events — privacy-safe fields only. */
+/** Payload POSTed to /analytics/events — privacy-safe fields only, matching the backend UsageEventCreate shape. */
 export type UsageAnalyticsEvent = {
   event_type: string
   project_id?: AnalyticsId
@@ -70,7 +70,7 @@ export type UsageAnalyticsEvent = {
   duration_seconds?: number
   estimated_minutes_saved?: number
   event_source: "frontend"
-  metadata?: Record<string, unknown>
+  metadata_json?: Record<string, unknown>
 }
 
 export type UsageAnalyticsEventInput = Omit<UsageAnalyticsEvent, "event_source"> & {
@@ -103,10 +103,11 @@ function sanitizeMetadata(metadata: Record<string, unknown> | undefined): Record
 
 function buildPayload(input: UsageAnalyticsEventInput): UsageAnalyticsEvent {
   const { metadata, ...rest } = input
+  const metadata_json = sanitizeMetadata(metadata)
   return {
     ...rest,
     event_source: "frontend",
-    metadata: sanitizeMetadata(metadata),
+    ...(metadata_json ? { metadata_json } : {}),
   }
 }
 

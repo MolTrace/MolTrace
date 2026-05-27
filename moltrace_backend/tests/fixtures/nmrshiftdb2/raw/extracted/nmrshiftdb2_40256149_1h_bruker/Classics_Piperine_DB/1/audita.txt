@@ -1,0 +1,20 @@
+##TITLE= Audit trail, TopSpin 3.5 pl 1
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= stb
+$$ C:/Bruker/TopSpin3.5pl1/data/natur/nmr/Piperine-DB/1/audita.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, WHAT)
+(   1,<2005-06-23 09:18:24.70 +0200>,<stb>,<dachstein>,
+      <created by zg, POWCHK disabled, PULCHK disabled
+       configuration hash MD5:
+       95 53 EE D9 31 43 C2 75 D0 AF 8A 1B EF 0D 29 46
+       data hash MD5: 32K
+       49 78 27 CF 55 3D BA D4 50 72 E1 34 6D 15 F9 FF>)
+(   2,<2017-03-13 15:40:34.902 +0100>,<stb>,<STBHome>,<dirdata>,<TopSpin 3.5.1>,
+      <wrpa from 1 1 "piperin" "C:/Bruker/TopSpin3.5pl1/data/natur/nmr"
+       data hash MD5: 32K
+       49 78 27 CF 55 3D BA D4 50 72 E1 34 6D 15 F9 FF>)
+##END=
+
+$$ hash MD5
+$$ 98 76 08 91 4F 5C A1 A0 5B BB ED 59 40 F4 D0 C8

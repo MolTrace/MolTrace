@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList modified="2020-11-29T17:13:59">
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=5.964265ppm, F2=5.824935ppm, MI=1.34cm, MAXI=15.33cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="5.91539" intensity="3.680001" type="0"/>
+    <Peak1D F1="5.905962" intensity="7.301946" type="0"/>
+    <Peak1D F1="5.89805" intensity="4.230521" type="0"/>
+    <Peak1D F1="5.897239" intensity="2.739843" type="0"/>
+    <Peak1D F1="5.896564" intensity="4.060191" type="0"/>
+    <Peak1D F1="5.888628" intensity="7.935125" type="0"/>
+    <Peak1D F1="5.886674" intensity="4.395908" type="0"/>
+    <Peak1D F1="5.879212" intensity="4.418361" type="0"/>
+    <Peak1D F1="5.878486" intensity="2.729201" type="0"/>
+    <Peak1D F1="5.877243" intensity="8.263717" type="0"/>
+    <Peak1D F1="5.869328" intensity="4.577131" type="0"/>
+    <Peak1D F1="5.868514" intensity="2.987421" type="0"/>
+    <Peak1D F1="5.867843" intensity="4.52482" type="0"/>
+    <Peak1D F1="5.859909" intensity="8.380136" type="0"/>
+    <Peak1D F1="5.850498" intensity="4.305369" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=5.290321ppm, F2=5.266332ppm, MI=3.36cm, MAXI=14.80cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="5.280793" intensity="4.440176" type="0"/>
+    <Peak1D F1="5.278081" intensity="12.09627" type="0"/>
+    <Peak1D F1="5.275294" intensity="12.37089" type="0"/>
+    <Peak1D F1="5.272588" intensity="4.693527" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=5.257995ppm, F2=5.237238ppm, MI=2.60cm, MAXI=13.10cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="5.252073" intensity="4.090447" type="0"/>
+    <Peak1D F1="5.249363" intensity="11.12457" type="0"/>
+    <Peak1D F1="5.246574" intensity="11.28916" type="0"/>
+    <Peak1D F1="5.243867" intensity="4.266523" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=5.186366ppm, F2=5.167651ppm, MI=2.93cm, MAXI=12.20cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="5.180622" intensity="4.700033" type="0"/>
+    <Peak1D F1="5.179925" intensity="3.123842" type="0"/>
+    <Peak1D F1="5.178524" intensity="10.00524" type="0"/>
+    <Peak1D F1="5.177784" intensity="8.504476" type="0"/>
+    <Peak1D F1="5.176398" intensity="7.116671" type="0"/>
+    <Peak1D F1="5.175659" intensity="10.23853" type="0"/>
+    <Peak1D F1="5.173559" intensity="4.399517" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=5.166460ppm, F2=5.151998ppm, MI=3.07cm, MAXI=10.40cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="5.16329" intensity="4.494186" type="0"/>
+    <Peak1D F1="5.161191" intensity="9.531428" type="0"/>
+    <Peak1D F1="5.16045" intensity="8.157525" type="0"/>
+    <Peak1D F1="5.159065" intensity="6.774512" type="0"/>
+    <Peak1D F1="5.158324" intensity="9.869708" type="0"/>
+    <Peak1D F1="5.156225" intensity="4.20815" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=4.074471ppm, F2=4.002296ppm, MI=-1.37cm, MAXI=11.97cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="4.056926" intensity="2.264231" type="0"/>
+    <Peak1D F1="4.054749" intensity="3.087493" type="0"/>
+    <Peak1D F1="4.054301" intensity="3.288614" type="0"/>
+    <Peak1D F1="4.052176" intensity="2.238731" type="0"/>
+    <Peak1D F1="4.047585" intensity="2.326925" type="0"/>
+    <Peak1D F1="4.045406" intensity="3.118995" type="0"/>
+    <Peak1D F1="4.044957" intensity="3.293961" type="0"/>
+    <Peak1D F1="4.042832" intensity="2.238347" type="0"/>
+    <Peak1D F1="4.035696" intensity="6.181435" type="0"/>
+    <Peak1D F1="4.033494" intensity="8.582683" type="0"/>
+    <Peak1D F1="4.033079" intensity="9.149487" type="0"/>
+    <Peak1D F1="4.030946" intensity="6.189102" type="0"/>
+    <Peak1D F1="4.026353" intensity="6.274035" type="0"/>
+    <Peak1D F1="4.024153" intensity="8.572043" type="0"/>
+    <Peak1D F1="4.023733" intensity="9.074549" type="0"/>
+    <Peak1D F1="4.021603" intensity="6.086568" type="0"/>
+    <Peak1D F1="4.012741" intensity="6.181125" type="0"/>
+    <Peak1D F1="4.01016" intensity="9.160339" type="0"/>
+    <Peak1D F1="4.008031" intensity="6.095565" type="0"/>
+    <Peak1D F1="4.003247" intensity="6.25462" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=4.002296ppm, F2=4.002306ppm, MI=-1.37cm, MAXI=2.00cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=4.002296ppm, F2=3.969352ppm, MI=1.70cm, MAXI=10.12cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="4.001003" intensity="8.65774" type="0"/>
+    <Peak1D F1="4.000666" intensity="9.069046" type="0"/>
+    <Peak1D F1="3.998537" intensity="5.991632" type="0"/>
+    <Peak1D F1="3.991516" intensity="2.30876" type="0"/>
+    <Peak1D F1="3.989311" intensity="3.158365" type="0"/>
+    <Peak1D F1="3.988926" intensity="3.343722" type="0"/>
+    <Peak1D F1="3.986804" intensity="2.262207" type="0"/>
+    <Peak1D F1="3.982022" intensity="2.284855" type="0"/>
+    <Peak1D F1="3.979825" intensity="3.118721" type="0"/>
+    <Peak1D F1="3.979431" intensity="3.276804" type="0"/>
+    <Peak1D F1="3.977309" intensity="2.198615" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=3.732979ppm, F2=3.624192ppm, MI=6.95cm, MAXI=19.82cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="3.712048" intensity="11.738" type="0"/>
+    <Peak1D F1="3.706925" intensity="12.02666" type="0"/>
+    <Peak1D F1="3.692969" intensity="13.21389" type="0"/>
+    <Peak1D F1="3.687848" intensity="13.44419" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=3.407557ppm, F2=3.329718ppm, MI=3.26cm, MAXI=14.61cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="3.389869" intensity="11.75695" type="0"/>
+    <Peak1D F1="3.380151" intensity="12.67033" type="0"/>
+    <Peak1D F1="3.370789" intensity="10.51171" type="0"/>
+    <Peak1D F1="3.36107" intensity="11.41362" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=3.163278ppm, F2=3.092135ppm, MI=2.01cm, MAXI=10.37cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="3.146117" intensity="3.895426" type="0"/>
+    <Peak1D F1="3.141548" intensity="5.582592" type="0"/>
+    <Peak1D F1="3.14101" intensity="6.079711" type="0"/>
+    <Peak1D F1="3.139223" intensity="4.637701" type="0"/>
+    <Peak1D F1="3.136447" intensity="8.135447" type="0"/>
+    <Peak1D F1="3.134655" intensity="6.109533" type="0"/>
+    <Peak1D F1="3.134119" intensity="6.642931" type="0"/>
+    <Peak1D F1="3.131842" intensity="5.709846" type="0"/>
+    <Peak1D F1="3.131288" intensity="6.027236" type="0"/>
+    <Peak1D F1="3.129551" intensity="8.388366" type="0"/>
+    <Peak1D F1="3.126772" intensity="4.283217" type="0"/>
+    <Peak1D F1="3.12605" intensity="2.756064" type="0"/>
+    <Peak1D F1="3.124944" intensity="5.509696" type="0"/>
+    <Peak1D F1="3.124403" intensity="5.800786" type="0"/>
+    <Peak1D F1="3.119879" intensity="3.832709" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2020-11-29T17:09:35" expNo="601" name="PoM_Dec_2020_Haessner" owner="" procNo="1" source="C:\Bruker\TopSpin3.6.0\data\nes\nmr">
+      <PeakPickDetails>F1=2.797669ppm, F2=2.576155ppm, MI=6.43cm, MAXI=18.49cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="2.779374" intensity="12.3538" type="0"/>
+    <Peak1D F1="2.772434" intensity="13.57666" type="0"/>
+    <Peak1D F1="2.764065" intensity="13.12003" type="0"/>
+    <Peak1D F1="2.595718" intensity="12.68314" type="0"/>
+    <Peak1D F1="2.59122" intensity="12.73582" type="0"/>
+    <Peak1D F1="2.587298" intensity="11.91578" type="0"/>
+    <Peak1D F1="2.582799" intensity="11.64217" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes@nmr-nesnote2" date="2020-11-29T17:13:00" expNo="601" name="PoM_Dec_2020_Haessner" owner="nes" procNo="1" source="C:/Bruker/TopSpin3.6.0/data/nes/nmr">
+      <PeakPickDetails>Manually picked peaks
+</PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="2.77100870424363" intensity="14.394833426036765" type="1"/>
+  </PeakList1D>
+</PeakList>

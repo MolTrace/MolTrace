@@ -1,0 +1,27 @@
+##TITLE= Audit trail, TopSpin 3.6.0
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nes
+$$ C:\Bruker\TopSpin3.6.0\data\nes\nmr/PoM_Mar_2020_Haessner/251/pdata/1/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2018-07-10 10:08:49.477 +0200>,<guest>,<synthy>,<go>,<TOPSPIN 2.1>,
+      <created by zg
+	started at 2018-07-10 09:59:55.687 +0200,
+	POWCHK enabled, PULCHK disabled,
+       configuration hash MD5:
+       2A 76 C0 FE A7 46 CC 92 D8 CE 60 25 04 BF EB B0
+       data hash MD5: 64K
+       F5 F8 06 D4 F7 79 A5 11 7F 55 D2 7C DB 83 65 45>)
+(   2,<2024-03-27 16:38:47.342 +0100>,<nes>,<nmr-nesnote2>,<proc1d>,<TopSpin 3.6.0>,
+      <Start of raw data processing
+       efp LB = 0.2 FT_mod = 6 PKNL = 1 PHC0 = -3.468503 PHC1 = -1.010968 SI = 128K 
+       data hash MD5: 128K
+       7A BD 4D 5D 25 86 9A 9C D4 F0 54 BA D3 F9 02 BE>)
+(   3,<2024-03-27 16:38:47.417 +0100>,<nes>,<nmr-nesnote2>,<proc1d>,<TopSpin 3.6.0>,
+      <abs n ABSG = 5 
+       data hash MD5: 128K
+       AB 16 28 FC AB 71 07 76 12 D8 C6 1C 80 E2 9F E6>)
+##END=
+
+$$ hash MD5
+$$ 41 79 00 E5 2F C0 12 24 EB 3F 4D 80 82 BE BC E2

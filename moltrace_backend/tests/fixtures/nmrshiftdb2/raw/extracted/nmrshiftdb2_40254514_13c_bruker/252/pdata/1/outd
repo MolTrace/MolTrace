@@ -1,0 +1,17 @@
+##TITLE= Parameter file, TOPSPIN		Version 2.1
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 2	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= guest
+$$ 2018-07-19 14:35:43.491 +0200  guest@synthy
+$$ /synthy3/data/guest/nmr/1-Chlor-3-brom-propan in CDCl3/252/pdata/1/outd
+$$ process /opt/topspin/prog/mod/edparproc
+##$CURPLOT= <HP1020>
+##$CURPRIN= <$HP1020>
+##$DFORMAT= <normdp>
+##$LAYOUT= <+/1D_X.xwp>
+##$LFORMAT= <normlp>
+##$PFORMAT= <normpl>
+##$SURQMSG= 1
+##END=

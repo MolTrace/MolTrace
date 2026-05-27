@@ -1,0 +1,8 @@
+SpinWorks peak list for:    C:\NILSnotebook\work\research\teaching\Klausuren_Uebungen\Kombi9_\nesEX9spektren\2\
+peak #   freq. (Hz)    freq. (ppm)  intensity  intensity(Absolute)
+0001   20946.444    166.5618     0.5362      2025190339
+0002   18161.166    144.4138     1.2130      4581830120
+0003   15437.331    122.7545     1.0001      3777399118
+0004   7554.046    60.0682     1.2257      4629779024
+0005   2252.758    17.9135     1.4378      5430933837
+0006   1789.205    14.2274     1.6907      6385978580

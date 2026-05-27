@@ -1,0 +1,18 @@
+##TITLE= Audit trail, TOPSPIN		Version 3.2
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= guest
+$$ /opt/topspin/data/guest/nmr/Indol/601/audita.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2017-07-25 20:09:31.489 +0200>,<guest>,<laurel>,<go>,<TOPSPIN 3.2>,
+      <created by zg
+	started at 2017-07-25 20:05:08.012 +0200,
+	POWCHK enabled, PULCHK disabled,
+       configuration hash MD5:
+       BA 24 88 D8 81 2A 09 55 9A AA D1 CB D6 2C 0D C1
+       data hash MD5: 64K
+       C3 07 D4 5E 2D AB B6 8A 58 CD 7F 54 4A 4D 32 D3>)
+##END=
+
+$$ hash MD5
+$$ 84 24 39 BC A1 CF 50 9E 89 EC 0D 3F E0 C5 02 72

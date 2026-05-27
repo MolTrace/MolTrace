@@ -77,6 +77,10 @@ import {
   fetchDashboardCrossModuleCommandCenter,
   type DashboardCrossModuleCommandCenter,
 } from "@/src/lib/dashboard/dashboard-cross-module-command-center"
+import {
+  fetchDashboardCoreModuleActivity,
+  type DashboardCoreModuleActivity,
+} from "@/src/lib/dashboard/dashboard-core-module-activity"
 import { ValidationReadinessDashboardCards } from "@/components/validation/validation-readiness-summary"
 import type { RoiSnapshotData } from "@/src/lib/analytics/roi-dashboard-data"
 import type { DashboardActivityRow, DashboardJobRow } from "@/src/lib/dashboard/overview-metrics"
@@ -140,6 +144,13 @@ function formatApiErr(err: unknown): string {
 
 function formatJobTimeLabel(iso: string | null): string {
   if (!iso) return "—"
+  const d = Date.parse(iso)
+  if (Number.isNaN(d)) return iso
+  return new Date(d).toLocaleString()
+}
+
+function formatCoreModuleActivityTime(iso: string | null): string {
+  if (!iso) return "No activity yet"
   const d = Date.parse(iso)
   if (Number.isNaN(d)) return iso
   return new Date(d).toLocaleString()
@@ -373,6 +384,8 @@ export function DashboardV0() {
   const [aiSummary, setAiSummary] = useState<DashboardAiInferenceSummary | null>(null)
   const [crossModuleLoading, setCrossModuleLoading] = useState(true)
   const [crossModuleSummary, setCrossModuleSummary] = useState<DashboardCrossModuleCommandCenter | null>(null)
+  const [coreModuleActivityLoading, setCoreModuleActivityLoading] = useState(true)
+  const [coreModuleActivity, setCoreModuleActivity] = useState<DashboardCoreModuleActivity | null>(null)
   const [connectorSummaryLoading, setConnectorSummaryLoading] = useState(true)
   const [connectorSummaryBackendUnavailable, setConnectorSummaryBackendUnavailable] = useState(false)
   const [connectorSummaryError, setConnectorSummaryError] = useState("")
@@ -597,6 +610,22 @@ export function DashboardV0() {
       cancelled = true
     }
   }, [overview.sessionsDataAvailable, overview.sessions])
+
+  useEffect(() => {
+    let cancelled = false
+    setCoreModuleActivityLoading(true)
+    void fetchDashboardCoreModuleActivity()
+      .then((activity) => {
+        if (cancelled) return
+        setCoreModuleActivity(activity)
+      })
+      .finally(() => {
+        if (!cancelled) setCoreModuleActivityLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!overview.sessionsDataAvailable) {
@@ -1297,6 +1326,37 @@ export function DashboardV0() {
                 {fmtMlCount(crossModuleDisplay.optimizationRecommendationsAffectedByCompliance)}
               </p>
             </div>
+          </div>
+          <div className="rounded-md border bg-card p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase text-muted-foreground">Core module activity</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Live opens logged from SpectraCheck, Regulatory Hub, and ReactionIQ in this testing phase.
+                </p>
+              </div>
+              <Badge variant="outline" className="w-fit">
+                {coreModuleActivityLoading ? "Loading" : `${coreModuleActivity?.total ?? 0} opens`}
+              </Badge>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              {(coreModuleActivity?.rows ?? []).map((row) => (
+                <div key={row.module} className="rounded-md border bg-muted/20 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{row.label}</p>
+                  <p className="text-2xl font-bold tabular-nums">{row.count}</p>
+                  <p className="text-[11px] text-muted-foreground">{formatCoreModuleActivityTime(row.latestAt)}</p>
+                </div>
+              ))}
+            </div>
+            {coreModuleActivityLoading ? (
+              <p className="mt-3 text-xs text-muted-foreground">Loading core module activity…</p>
+            ) : null}
+            {!coreModuleActivityLoading && coreModuleActivity && !coreModuleActivity.available ? (
+              <p className="mt-3 text-xs text-muted-foreground">Core module activity unavailable for now.</p>
+            ) : null}
+            {!coreModuleActivityLoading && coreModuleActivity?.available && coreModuleActivity.total === 0 ? (
+              <p className="mt-3 text-xs text-muted-foreground">No core module activity has been logged yet.</p>
+            ) : null}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-md border bg-card p-3">

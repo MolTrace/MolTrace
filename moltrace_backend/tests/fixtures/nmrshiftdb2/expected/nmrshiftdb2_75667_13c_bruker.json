@@ -1,0 +1,19 @@
+{
+  "source": "NMRShiftDB2",
+  "source_index": "source/nmrshiftdb2rawdata.nmredata.sd",
+  "source_url": "http://www.nmrshiftdb.org/download/NmrshiftdbServlet/40255414_13C.zip?spectrumid=40255414&nmrshiftdbaction=exportspec&format=rawdata",
+  "db_id": "75667",
+  "spectrum_id": "40255414",
+  "vendor": "Bruker",
+  "nucleus": "13C",
+  "solvent_from_nmredata": "CDCl3",
+  "solvent_from_acqus": "H2O",
+  "field_mhz": 150.89999389648438,
+  "expected_peak_ppm": [44.21, 50.73, 70.7, 72.16, 117.11, 134.15],
+  "reference_peak_count": 6,
+  "ppm_tolerance": 0.01,
+  "peak_count_tolerance": 2,
+  "archive": "raw/nmrshiftdb2_75667_13c.zip",
+  "archive_sha256": "fdf02ef03dafc73ad1521b1d0ca62366d4a85557810e1cfc3a03ba77a77e9fa0",
+  "extracted_path": "raw/extracted/nmrshiftdb2_75667_13c_bruker/PoM_Dec_2020_Haessner/606"
+}

@@ -1,0 +1,17 @@
+do_apk():  9  ref points found
+do_apk(): sort completed, calculating phase, count2 = 4
+# 0    freq = 2085.108544    width = 5    phi = 39.756344   quadrant = 1   phase = 129.756344
+# 1    freq = 2077.938061    width = 7    phi = 39.462216   quadrant = 1   phase = 129.462216
+# 2    freq = 640.112693    width = 4    phi = 42.711713   quadrant = 1   phase = 132.711713
+# 3    freq = 632.942209    width = 7    phi = 44.827978   quadrant = 1   phase = 134.827978
+do_apk(): doing least squares
+   first pass: ph0 = -122.668050;    ph1 = -13.544877
+
+   fine tune: angle = 0.000000    integral = 1188293898.000000
+   fine tune: angle = 10.000000    integral = 1175161526.000000
+   fine tune: angle = -10.000000    integral = 1188293883.000000
+   fine tune: angle = -5.000000    integral = 1181302404.000000
+   fine tune: angle = 2.500000    integral = 1185926872.000000
+   fine tune: angle = 1.250000    integral = 1187392931.000000
+   fine tune: angle = 0.625000    integral = 1187914064.000000
+   fine tune: angle = 0.312500    integral = 1188121625.000000

@@ -1,0 +1,54 @@
+
+Current Data Parameters
+NAME     1-Chlor-3-brom-propan in CDCl3              
+EXPNO               252              
+PROCNO                1              
+
+F2 - Acquisition Parameters
+Date_          20180719              
+Time              14.39              
+INSTRUM           spect              
+PROBHD   5 mm PADUL 13C              
+PULPROG          zgpg30              
+TD               131072              
+SOLVENT           CDCl3              
+NS                  220              
+DS                    0              
+SWH            5668.934 Hz           
+FIDRES         0.043251 Hz           
+AQ           11.5605507 sec          
+RG                 1024              
+DW               88.200 usec         
+DE                 6.50 usec         
+TE                300.0 K            
+D1           2.00000000 sec          
+D11          0.03000000 sec          
+TD0                  64              
+
+======== CHANNEL f1 ========
+NUC1                13C              
+P1                10.00 usec         
+PL1                0.30 dB           
+PL1W        35.16343307 W            
+SFO1         62.8977548 MHz          
+
+======== CHANNEL f2 ========
+CPDPRG[2        waltz16              
+NUC2                 1H              
+PCPD2             80.00 usec         
+PL2               -1.00 dB           
+PL12              18.47 dB           
+PL13              20.00 dB           
+PL2W        18.97366524 W            
+PL12W        0.21436374 W            
+PL13W        0.15071319 W            
+SFO2        250.1310005 MHz          
+
+F2 - Processing parameters
+SI               262144              
+SF           62.8952390 MHz          
+WDW                  EM              
+SSB      0              
+LB                 0.01 Hz           
+GB       0              
+PC                 1.40              

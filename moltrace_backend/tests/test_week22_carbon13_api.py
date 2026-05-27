@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from nmrcheck.api import create_app
 from nmrcheck.fid import fid_settings_from_preset, process_bruker_1d_zip
+from nmrcheck.fid_pipeline_adapter import HYBRID_METADATA_RAW_FID_PIPELINE
 from nmrcheck.models import Carbon13Peak, Peak, SpectrumPoint
 from nmrcheck.settings import Settings
 
@@ -178,7 +179,11 @@ def test_carbon13_processed_shift_intensity_table_does_not_500(tmp_path) -> None
         assert preview.json()["source_mode"] == "peak_table"
 
 
-def test_carbon13_raw_fid_preview_and_analyze_accept_broad_carbon_axis(tmp_path) -> None:
+def test_carbon13_raw_fid_preview_and_analyze_accept_broad_carbon_axis(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("MOLTRACE_RAW_FID_PIPELINE", raising=False)
     app = create_app(
         Settings(
             database_url=f"sqlite:///{tmp_path / 'c13-raw-fid.sqlite3'}",
@@ -217,6 +222,7 @@ def test_carbon13_raw_fid_preview_and_analyze_accept_broad_carbon_axis(tmp_path)
         assert preview.json()["metadata"]["evidence_trace_mode"] == "raw_fid_fft_real_baseline_corrected"
         assert preview.json()["metadata"]["display_mode"] == "real"
         assert preview.json()["metadata"]["baseline_lock_visual_only"] is True
+        assert "prompt_pipeline_sidecar" not in preview.json()["metadata"]
         provenance = preview.json()["metadata"]["raw_upload_provenance"]
         assert provenance["storage_backend"] == "local_raw_vault"
         assert provenance["raw_archive_id"] == provenance["sha256"]
@@ -227,6 +233,43 @@ def test_carbon13_raw_fid_preview_and_analyze_accept_broad_carbon_axis(tmp_path)
         assert original_state["preview_points_omitted"] is True
         assert preview.json()["metadata"]["fid_processing"]["processing_parameters"]["mask_solvent_regions"] is True
 
+        monkeypatch.setenv("MOLTRACE_RAW_FID_PIPELINE", HYBRID_METADATA_RAW_FID_PIPELINE)
+        hybrid_preview = client.post(
+            "/carbon13/fid/preview",
+            headers=headers,
+            data={
+                "smiles": "CCO",
+                "proton_nmr_text": "¹H NMR (400 MHz, CDCl3) δ 3.65 (q, 2H), 1.26 (t, 3H)",
+                "solvent": "CDCl3",
+                "reference_ppm": "77.0",
+            },
+            files={"file": ("ethanol_c13_raw.zip", content, "application/zip")},
+        )
+        assert hybrid_preview.status_code == 200
+        sidecar = hybrid_preview.json()["metadata"]["prompt_pipeline_sidecar"]
+        assert sidecar["role"] == "sidecar_metadata_only"
+        assert sidecar["active"] is False
+        assert sidecar["default_pipeline_preserved"] is True
+        assert sidecar["validation_report"]["visibility"] == "hidden_metadata_only"
+        assert sidecar["validation_report"]["safe_to_activate"] is False
+        guidance = sidecar["analysis_guidance"]
+        assert guidance["visibility"] == "metadata_only"
+        assert guidance["used_for_plot"] is False
+        assert guidance["used_for_peak_markers"] is False
+        assert (
+            hybrid_preview.json()["metadata"]["context_guidance"]["prompt_sidecar_guidance"]
+            == guidance
+        )
+        consistency = hybrid_preview.json()["metadata"]["context_guidance"][
+            "prompt_sidecar_consistency"
+        ]
+        assert consistency["visibility"] == "metadata_only"
+        assert consistency["used_for_plot"] is False
+        assert consistency["used_for_peak_markers"] is False
+        assert consistency["active_peak_count"] == hybrid_preview.json()["observed_signal_count"]
+        assert consistency["active_peak_source"] == "legacy_carbon13_raw_fid_preview_peaks"
+
+        monkeypatch.delenv("MOLTRACE_RAW_FID_PIPELINE", raising=False)
         analyzed = client.post(
             "/carbon13/fid/analyze",
             headers=headers,

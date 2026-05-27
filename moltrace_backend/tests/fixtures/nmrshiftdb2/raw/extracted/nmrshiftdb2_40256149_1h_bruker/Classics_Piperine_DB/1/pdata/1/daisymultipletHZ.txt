@@ -1,0 +1,19 @@
+# 2017-05-04 11:42:49 +0200 nes@nmr-nesnotebook
+# TOPSPIN Daisy Multiplet Table
+# D:\SciPrograms\Bruker\TopSpin3.5.b.91pl7\data\nes\nmr\Classics_Piperine\1\pdata\1
+
+1D TopSPIN Multiplet Table
+
+----------------------------------------------------------------------
+Number     Shift [Hz]    J [Hz]    M         Connection     Identifier
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+
+
+1D TopSPIN Multiplet Lines Table
+
+--------------------------
+Number       Position [Hz]
+--------------------------
+--------------------------

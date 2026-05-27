@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList>
+  <PeakList1D>
+    <PeakList1DHeader creator="stb" date="2011-10-27T08:17:16.002+02:00" expNo="15" name="cocain700" owner="" procNo="1" source="C:/Bruker/TOPSPIN/data/natur/nmr">
+      <PeakPickDetails>F1=176.355ppm, F2=21.276ppm, MI=0.00cm, MAXI=10000.00cm, PC=1.400
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="170.7644" intensity="-4.194514e-001" type="0"/>
+    <Peak1D F1="166.2090" intensity="-1.506322e+000" type="0"/>
+    <Peak1D F1="132.9309" intensity="2.383216e+000" type="0"/>
+    <Peak1D F1="130.3101" intensity="-5.091689e-001" type="0"/>
+    <Peak1D F1="129.7229" intensity="1.250000e+001" type="0"/>
+    <Peak1D F1="128.8370" intensity="3.954384e-001" type="0"/>
+    <Peak1D F1="128.3232" intensity="1.041674e+001" type="0"/>
+    <Peak1D F1="128.1441" intensity="3.714664e-001" type="0"/>
+    <Peak1D F1="127.9733" intensity="9.148678e-001" type="0"/>
+    <Peak1D F1="77.1785" intensity="-1.127987e+002" type="0"/>
+    <Peak1D F1="76.9971" intensity="-1.126054e+002" type="0"/>
+    <Peak1D F1="76.8158" intensity="-1.140606e+002" type="0"/>
+    <Peak1D F1="66.9234" intensity="8.695609e-001" type="0"/>
+    <Peak1D F1="64.8621" intensity="1.774016e+000" type="0"/>
+    <Peak1D F1="61.6009" intensity="1.473003e+000" type="0"/>
+    <Peak1D F1="51.4433" intensity="9.191999e-001" type="0"/>
+    <Peak1D F1="50.2292" intensity="9.213062e-001" type="0"/>
+    <Peak1D F1="41.1683" intensity="2.030605e+000" type="0"/>
+    <Peak1D F1="35.5627" intensity="-9.099717e-001" type="0"/>
+    <Peak1D F1="29.6962" intensity="-3.969433e-001" type="0"/>
+    <Peak1D F1="25.4462" intensity="-4.557480e+000" type="0"/>
+    <Peak1D F1="25.2754" intensity="-1.227049e+000" type="0"/>
+  </PeakList1D>
+</PeakList>

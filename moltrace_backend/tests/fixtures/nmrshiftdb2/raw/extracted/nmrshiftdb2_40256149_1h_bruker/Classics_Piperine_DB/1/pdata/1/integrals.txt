@@ -1,0 +1,16 @@
+   Current data set:
+   NAME =	Classics_Piperine	EXPNO =	1	PROCNO = 1
+   DU   =	D:/SciPrograms/Bruker/TopSpin3.5.b.91pl7/data/nes/nmr
+
+   Number   Integrated Region     Integral
+     1      7.476      7.332         0.92117
+     2      6.990      6.964         0.89963
+     3      6.909      6.869         1.00000
+     4      6.791      6.762         0.89004
+     5      6.759      6.739         1.44208
+     6      6.737      6.721         0.44135
+     7      6.468      6.406         1.02692
+     8      5.986      5.961         1.88454
+     9      3.702      3.458         4.25190
+    10      1.706      1.630         2.15207
+    11      1.626      1.551         4.23589

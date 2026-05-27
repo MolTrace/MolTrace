@@ -96,6 +96,33 @@ vi.mock("@/src/lib/dashboard/dashboard-ai-inference-summary", () => ({
 vi.mock("@/src/lib/dashboard/dashboard-cross-module-command-center", () => ({
   fetchDashboardCrossModuleCommandCenter: vi.fn(async () => ({ available: false, warnings: [], sourceEndpoint: "" })),
 }))
+vi.mock("@/src/lib/dashboard/dashboard-core-module-activity", () => ({
+  fetchDashboardCoreModuleActivity: vi.fn(async () => ({
+    available: true,
+    total: 5,
+    warnings: [],
+    rows: [
+      {
+        module: "spectracheck",
+        label: "SpectraCheck",
+        count: 2,
+        latestAt: "2026-05-20T12:00:00Z",
+      },
+      {
+        module: "regulatory_hub",
+        label: "Regulatory Hub",
+        count: 1,
+        latestAt: "2026-05-20T12:05:00Z",
+      },
+      {
+        module: "reactioniq",
+        label: "ReactionIQ",
+        count: 2,
+        latestAt: "2026-05-20T12:10:00Z",
+      },
+    ],
+  })),
+}))
 
 vi.mock("@/lib/api/client", () => ({
   AUTH_USER_STORAGE_KEY: "moltrace-auth-user",
@@ -137,5 +164,20 @@ describe("DashboardV0 connector/ingestion fallback", () => {
     render(<DashboardV0 />)
 
     expect(screen.queryByText("Mobile Command Center")).not.toBeInTheDocument()
+  })
+
+  it("surfaces testing-phase core module activity in the cross-module command center", async () => {
+    const user = userEvent.setup()
+    render(<DashboardV0 />)
+
+    await user.click(screen.getByRole("button", { name: /Expand Science section/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText("Core module activity")).toBeInTheDocument()
+      expect(screen.getByText("SpectraCheck")).toBeInTheDocument()
+      expect(screen.getByText("Regulatory Hub")).toBeInTheDocument()
+      expect(screen.getByText("ReactionIQ")).toBeInTheDocument()
+      expect(screen.getByText("5 opens")).toBeInTheDocument()
+    })
   })
 })

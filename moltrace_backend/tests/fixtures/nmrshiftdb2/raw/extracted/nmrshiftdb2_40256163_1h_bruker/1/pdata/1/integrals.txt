@@ -1,0 +1,13 @@
+   Current data set:
+   NAME =	nicotin	EXPNO =	1	PROCNO = 1
+   USER =	stb	DU    =	C:/Bruker/TOPSPIN
+
+   Number   Integrated Region     Integral
+     1      8.585      8.459         2.00000
+     2      7.727      7.662         1.05767
+     3      7.281      7.218         1.07122
+     4      3.287      3.042         2.49011
+     5      2.361      2.266         1.31340
+     6      2.264      2.145         5.16171
+     7      2.034      1.893         1.29750
+     8      1.881      1.663         2.53575

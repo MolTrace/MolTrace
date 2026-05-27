@@ -1,0 +1,22 @@
+{
+  "source": {
+    "documentation_url": "https://nmrglue.readthedocs.io/en/latest/examples/separate_1d_varian.html",
+    "archive_url": "https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/nmrglue/example_separate_1d_varian.zip",
+    "archive_sha256": "7f45584e03265f565d809d3140286b11f5797ab0cd182c5318ff537292c3f613"
+  },
+  "dataset_path": "extracted/example_separate_1d_varian/separate_1d_varian/arrayed_data.dir",
+  "expected": {
+    "vendor": "Varian/Agilent",
+    "nucleus": "13C",
+    "solvent": "none",
+    "field_mhz": 125.6811106,
+    "sweep_width_hz": 50000.0,
+    "zero_fill_points": 65536,
+    "input_points": 39000,
+    "ppm_axis_start": 198.91612892860607,
+    "ppm_axis_end": -198.9100584901012,
+    "peak_count": 75,
+    "fingerprint_hash": "5d7cac180948445df58743867c6e8058fabd5756709862ae9bd5254c7e54268c",
+    "acquisition_time": "2010-02-17T13:46:17+00:00"
+  }
+}

@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AiModulePredictionAugmentation } from "@/components/ai/ai-module-prediction-augmentation"
 import { ReactionProgramInterfaceWorkspace } from "@/components/reaction-optimization/reaction-program-interface-workspace"
@@ -8,6 +8,13 @@ import { RegulatoryIntelligenceLanding } from "@/components/regulatory-hub/regul
 import { SpectraCheckWorkspace } from "@/components/spectracheck/spectracheck-workspace"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { MobileSpectraCheckReview } from "@/src/components/mobile/MobileSpectraCheckReview"
+import { trackCoreModuleOpened, type CoreAnalyticsModule } from "@/src/lib/analytics/analytics-client"
+
+const PROGRAM_ANALYTICS_MODULES: Record<string, CoreAnalyticsModule> = {
+  spectracheck: "spectracheck",
+  regulatory_hub: "regulatory_hub",
+  reaction_optimization: "reactioniq",
+}
 
 export function ProgramsInterfaceWorkspace({
   desktopMode = false,
@@ -17,9 +24,16 @@ export function ProgramsInterfaceWorkspace({
   sessionId?: string | null
 }) {
   const isMobile = useIsMobile()
+  const [activeProgram, setActiveProgram] = useState("spectracheck")
+
+  useEffect(() => {
+    trackCoreModuleOpened(PROGRAM_ANALYTICS_MODULES[activeProgram] ?? activeProgram, {
+      surface: "programs_workspace",
+    })
+  }, [activeProgram])
 
   return (
-    <Tabs defaultValue="spectracheck" className="space-y-6">
+    <Tabs value={activeProgram} onValueChange={setActiveProgram} className="space-y-6">
       <TabsList>
         <TabsTrigger
           value="spectracheck"

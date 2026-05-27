@@ -29,6 +29,7 @@ import { useOptionalOverviewData } from "@/components/app/overview-data-context"
 import { apiFetch, AUTH_TOKEN_STORAGE_KEY } from "@/lib/api/client"
 import { fetchAiEvidenceQueue } from "@/lib/api/ai-evidence"
 import { useTenant } from "@/src/lib/tenant/tenant-context"
+import { clearSpectraCheckRuntimeState } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
 import {
   Search,
   Bell,
@@ -248,6 +249,7 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
 
   // ── Sign out: clear auth token + tenant id + push to /sign-in ──
   const handleSignOut = useCallback(() => {
+    clearSpectraCheckRuntimeState()
     if (typeof window !== "undefined") {
       try {
         window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)

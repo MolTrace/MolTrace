@@ -1,0 +1,12 @@
+   Current data set:
+   NAME =	PoM_Oct_2020_Haessner	EXPNO =	601	PROCNO = 1
+   DU   =	C:/Bruker/TopSpin3.6.0/data/nes/nmr
+
+   Number   Integrated Region     Integral
+     1      8.199      7.960         0.93664
+     2      7.748      7.712         1.00566
+     3      7.462      7.415         1.00416
+     4      7.298      7.254         1.02709
+     5      7.239      7.219         0.95685
+     6      7.219      7.176         1.05182
+     7      6.658      6.603         1.00000

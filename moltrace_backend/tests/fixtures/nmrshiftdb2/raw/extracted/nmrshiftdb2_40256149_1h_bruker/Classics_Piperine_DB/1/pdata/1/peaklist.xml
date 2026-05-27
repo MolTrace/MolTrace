@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PeakList modified="2017-05-04T11:04:01">
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-04T11:04:01" expNo="1" name="Classics_Piperine" owner="" procNo="1" source="D:\SciPrograms\Bruker\TopSpin3.5.b.91pl7\data\nes\nmr">
+      <PeakPickDetails>F1=7.458420ppm, F2=7.355637ppm, MI=0.41cm, MAXI=1.23cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="7.4316" intensity="0.68" type="0"/>
+    <Peak1D F1="7.4268" intensity="0.57" type="0"/>
+    <Peak1D F1="7.4107" intensity="0.64" type="0"/>
+    <Peak1D F1="7.4059" intensity="0.76" type="0"/>
+    <Peak1D F1="7.3949" intensity="0.75" type="0"/>
+    <Peak1D F1="7.3891" intensity="0.59" type="0"/>
+    <Peak1D F1="7.3750" intensity="0.68" type="0"/>
+    <Peak1D F1="7.3692" intensity="0.82" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-04T11:04:01" expNo="1" name="Classics_Piperine" owner="" procNo="1" source="D:\SciPrograms\Bruker\TopSpin3.5.b.91pl7\data\nes\nmr">
+      <PeakPickDetails>F1=7.010388ppm, F2=6.964267ppm, MI=2.06cm, MAXI=2.84cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="6.9808" intensity="2.19" type="0"/>
+    <Peak1D F1="6.9767" intensity="2.40" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-04T11:04:01" expNo="1" name="Classics_Piperine" owner="" procNo="1" source="D:\SciPrograms\Bruker\TopSpin3.5.b.91pl7\data\nes\nmr">
+      <PeakPickDetails>F1=6.922100ppm, F2=6.860166ppm, MI=1.00cm, MAXI=2.19cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="6.9017" intensity="1.30" type="0"/>
+    <Peak1D F1="6.8974" intensity="1.16" type="0"/>
+    <Peak1D F1="6.8816" intensity="1.76" type="0"/>
+    <Peak1D F1="6.8773" intensity="1.62" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-04T11:04:01" expNo="1" name="Classics_Piperine" owner="" procNo="1" source="D:\SciPrograms\Bruker\TopSpin3.5.b.91pl7\data\nes\nmr">
+      <PeakPickDetails>F1=6.816680ppm, F2=6.698083ppm, MI=1.65cm, MAXI=6.00cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="6.7859" intensity="2.85" type="0"/>
+    <Peak1D F1="6.7659" intensity="1.85" type="0"/>
+    <Peak1D F1="6.7495" intensity="5.41" type="0"/>
+    <Peak1D F1="6.7449" intensity="1.88" type="0"/>
+    <Peak1D F1="6.7290" intensity="1.92" type="0"/>
+  </PeakList1D>
+  <PeakList1D>
+    <PeakList1DHeader creator="nes" date="2017-05-04T11:04:01" expNo="1" name="Classics_Piperine" owner="" procNo="1" source="D:\SciPrograms\Bruker\TopSpin3.5.b.91pl7\data\nes\nmr">
+      <PeakPickDetails>F1=6.471432ppm, F2=6.400273ppm, MI=1.47cm, MAXI=3.71cm, PC=1.000
+      </PeakPickDetails>
+    </PeakList1DHeader>
+    <Peak1D F1="6.4552" intensity="3.16" type="0"/>
+    <Peak1D F1="6.4185" intensity="2.03" type="0"/>
+  </PeakList1D>
+</PeakList>

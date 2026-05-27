@@ -17,10 +17,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react"
+import { registerSpectraCheckRuntimeReset } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
 
 export type RawFidNucleus = "1H" | "13C"
 export type RawFidVendor = "auto" | "bruker" | "agilent"
@@ -184,6 +186,199 @@ const defaultProcessed: ProcessedTabState = {
   jobActionError: "",
 }
 
+export const SPECTRACHECK_TAB_STATE_STORAGE_KEY =
+  "moltrace:spectracheck:tab-state:v1"
+
+const SPECTRACHECK_TAB_STATE_STORAGE_VERSION = 1
+
+type PersistedSpectraCheckTabState = {
+  version: typeof SPECTRACHECK_TAB_STATE_STORAGE_VERSION
+  rawFid?: Partial<RawFidTabState>
+  processed?: Partial<ProcessedTabState>
+}
+
+let runtimeRawFidState: RawFidTabState | null = null
+let runtimeProcessedState: ProcessedTabState | null = null
+
+function canUseSessionStorage(): boolean {
+  return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined"
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function readPersistedTabState(): PersistedSpectraCheckTabState | null {
+  if (!canUseSessionStorage()) return null
+  try {
+    const raw = window.sessionStorage.getItem(SPECTRACHECK_TAB_STATE_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!isRecord(parsed) || parsed.version !== SPECTRACHECK_TAB_STATE_STORAGE_VERSION) {
+      return null
+    }
+    return parsed as PersistedSpectraCheckTabState
+  } catch {
+    return null
+  }
+}
+
+function serializeRawFid(state: RawFidTabState): Partial<RawFidTabState> {
+  return {
+    linkedFromSource: state.linkedFromSource,
+    nucleus: state.nucleus,
+    vendor: state.vendor,
+    preset: state.preset,
+    selectedFileName: state.selectedFileName,
+    previewResult: state.previewResult,
+    previewError: state.previewError,
+    processResult: state.processResult,
+    processError: state.processError,
+    previewSpectrum: state.previewSpectrum,
+    previewSpectrumError: state.previewSpectrumError,
+    activeResultMode: state.activeResultMode,
+    advancedOpen: state.advancedOpen,
+    sessionRawFileIdChoice: state.sessionRawFileIdChoice,
+    jobActionError: state.jobActionError,
+  }
+}
+
+function serializeProcessed(state: ProcessedTabState): Partial<ProcessedTabState> {
+  return {
+    linkedFromSource: state.linkedFromSource,
+    nucleus: state.nucleus,
+    spectrometerMhz: state.spectrometerMhz,
+    nmrTextOptional: state.nmrTextOptional,
+    candidatesOptional: state.candidatesOptional,
+    selectedFileName: state.selectedFileName,
+    previewResult: state.previewResult,
+    analyzeResult: state.analyzeResult,
+    previewError: state.previewError,
+    analyzeError: state.analyzeError,
+    advancedOpen: state.advancedOpen,
+    sessionFileIdChoice: state.sessionFileIdChoice,
+    jobActionError: state.jobActionError,
+  }
+}
+
+function hasPersistableRawFidState(state: RawFidTabState): boolean {
+  return (
+    state.linkedFromSource !== defaultRawFid.linkedFromSource ||
+    state.nucleus !== defaultRawFid.nucleus ||
+    state.vendor !== defaultRawFid.vendor ||
+    state.preset !== defaultRawFid.preset ||
+    state.selectedFileName !== defaultRawFid.selectedFileName ||
+    state.previewResult != null ||
+    state.previewError !== defaultRawFid.previewError ||
+    state.processResult != null ||
+    state.processError !== defaultRawFid.processError ||
+    state.previewSpectrum != null ||
+    state.previewSpectrumError !== defaultRawFid.previewSpectrumError ||
+    state.activeResultMode !== defaultRawFid.activeResultMode ||
+    state.advancedOpen !== defaultRawFid.advancedOpen ||
+    state.sessionRawFileIdChoice !== defaultRawFid.sessionRawFileIdChoice ||
+    state.jobActionError !== defaultRawFid.jobActionError
+  )
+}
+
+function hasPersistableProcessedState(state: ProcessedTabState): boolean {
+  return (
+    state.linkedFromSource !== defaultProcessed.linkedFromSource ||
+    state.nucleus !== defaultProcessed.nucleus ||
+    state.spectrometerMhz !== defaultProcessed.spectrometerMhz ||
+    state.nmrTextOptional !== defaultProcessed.nmrTextOptional ||
+    state.candidatesOptional !== defaultProcessed.candidatesOptional ||
+    state.selectedFileName !== defaultProcessed.selectedFileName ||
+    state.previewResult != null ||
+    state.analyzeResult != null ||
+    state.previewError !== defaultProcessed.previewError ||
+    state.analyzeError !== defaultProcessed.analyzeError ||
+    state.advancedOpen !== defaultProcessed.advancedOpen ||
+    state.sessionFileIdChoice !== defaultProcessed.sessionFileIdChoice ||
+    state.jobActionError !== defaultProcessed.jobActionError
+  )
+}
+
+function writePersistedTabState(rawFid: RawFidTabState, processed: ProcessedTabState): void {
+  if (!canUseSessionStorage()) return
+  try {
+    if (!hasPersistableRawFidState(rawFid) && !hasPersistableProcessedState(processed)) {
+      window.sessionStorage.removeItem(SPECTRACHECK_TAB_STATE_STORAGE_KEY)
+      return
+    }
+    window.sessionStorage.setItem(
+      SPECTRACHECK_TAB_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: SPECTRACHECK_TAB_STATE_STORAGE_VERSION,
+        rawFid: serializeRawFid(rawFid),
+        processed: serializeProcessed(processed),
+      }),
+    )
+  } catch {
+    // Restricted browsing contexts can disable storage. Runtime cache still
+    // protects ordinary in-app navigation in that case.
+  }
+}
+
+function hydrateRawFidState(state: unknown): RawFidTabState {
+  const patch = isRecord(state) ? (state as Partial<RawFidTabState>) : {}
+  return {
+    ...defaultRawFid,
+    ...patch,
+    selectedFile: null,
+    previewLoading: false,
+    processLoading: false,
+    previewSpectrumLoading: false,
+  }
+}
+
+function hydrateProcessedState(state: unknown): ProcessedTabState {
+  const patch = isRecord(state) ? (state as Partial<ProcessedTabState>) : {}
+  return {
+    ...defaultProcessed,
+    ...patch,
+    selectedFile: null,
+    previewLoading: false,
+    analyzeLoading: false,
+  }
+}
+
+function initialRawFidState(): RawFidTabState {
+  if (runtimeRawFidState) {
+    return {
+      ...runtimeRawFidState,
+      previewLoading: false,
+      processLoading: false,
+      previewSpectrumLoading: false,
+    }
+  }
+  return hydrateRawFidState(readPersistedTabState()?.rawFid)
+}
+
+function initialProcessedState(): ProcessedTabState {
+  if (runtimeProcessedState) {
+    return {
+      ...runtimeProcessedState,
+      previewLoading: false,
+      analyzeLoading: false,
+    }
+  }
+  return hydrateProcessedState(readPersistedTabState()?.processed)
+}
+
+export function clearSpectraCheckTabStatePersistence(): void {
+  runtimeRawFidState = null
+  runtimeProcessedState = null
+  if (!canUseSessionStorage()) return
+  try {
+    window.sessionStorage.removeItem(SPECTRACHECK_TAB_STATE_STORAGE_KEY)
+  } catch {
+    // best-effort cleanup
+  }
+}
+
+registerSpectraCheckRuntimeReset(clearSpectraCheckTabStatePersistence)
+
 export type SpectraCheckTabStateContextValue = {
   rawFid: RawFidTabState
   setRawFid: (patch: Partial<RawFidTabState>) => void
@@ -202,9 +397,26 @@ const SpectraCheckTabStateContext =
   createContext<SpectraCheckTabStateContextValue | null>(null)
 
 export function SpectraCheckTabStateProvider({ children }: { children: ReactNode }) {
-  const [rawFid, setRawFidState] = useState<RawFidTabState>(defaultRawFid)
-  const [processed, setProcessedState] = useState<ProcessedTabState>(defaultProcessed)
+  const [rawFid, setRawFidState] = useState<RawFidTabState>(initialRawFidState)
+  const [processed, setProcessedState] = useState<ProcessedTabState>(initialProcessedState)
   const [pendingLink, setPendingLink] = useState<PendingTabLink | null>(null)
+
+  useEffect(() => {
+    runtimeRawFidState = rawFid
+    runtimeProcessedState = processed
+    writePersistedTabState(rawFid, processed)
+  }, [rawFid, processed])
+
+  useEffect(
+    () =>
+      registerSpectraCheckRuntimeReset(() => {
+        clearSpectraCheckTabStatePersistence()
+        setRawFidState(defaultRawFid)
+        setProcessedState(defaultProcessed)
+        setPendingLink(null)
+      }),
+    [],
+  )
 
   const setRawFid = useCallback((patch: Partial<RawFidTabState>) => {
     setRawFidState((prev) => ({ ...prev, ...patch }))

@@ -1,0 +1,12 @@
+   Current data set:
+   NAME =	eugenol	EXPNO =	1	PROCNO = 1
+   USER =	stb	DU    =	C:/Bruker/TOPSPIN
+
+   Number   Integrated Region     Integral
+     1      6.882      6.807         1.00931
+     2      6.723      6.645         1.98136
+     3      6.022      5.874         0.99741
+     4      5.556      5.472         0.98696
+     5      5.118      5.007         1.99435
+     6      3.912      3.816         3.00000
+     7      3.367      3.269         1.99097

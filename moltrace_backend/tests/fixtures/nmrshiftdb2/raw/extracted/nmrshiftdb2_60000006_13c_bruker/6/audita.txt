@@ -1,0 +1,23 @@
+##TITLE= Audit trail, TopSpin 3.5 pl 1
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= stb
+$$ C:/Bruker/TopSpin3.5pl1/data/natur/nmr/Cocaine-DB/6/audita.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2011-09-14 08:40:44.859 +0200>,<stb>,<ALPHUPEL>,<go>,<TOPSPIN 2.1>,
+      <created by zg
+	started at 2011-09-14 00:59:49.351 +0200,
+	POWCHK enabled, PULCHK disabled,
+       terminated by command 'halt'
+       configuration hash MD5:
+       20 02 CD 31 EB 23 BD 4A 04 F8 29 FD CB A9 50 25
+       data hash MD5: 64K
+       14 88 CE D8 76 DC 65 AD F0 BC 85 DF A6 34 99 36>)
+(   2,<2016-05-23 11:19:35.364 +0200>,<stb>,<STBHome>,<dirdata>,<TopSpin 3.5.1>,
+      <wrpa from 1 15 "cocain700" "C:/Bruker/TopSpin3.5pl1/data/natur/nmr"
+       data hash MD5: 64K
+       14 88 CE D8 76 DC 65 AD F0 BC 85 DF A6 34 99 36>)
+##END=
+
+$$ hash MD5
+$$ ED 7F F9 3B E5 CA 25 1C 4A C3 B3 FC 8C 7E 05 F3
