@@ -6280,6 +6280,7 @@ async def nmr_raw_fid_preview_route(
     resolved_processing_preset: str | None = None
     spectrum_generated = False
     prompt_pipeline_sidecar: dict[str, Any] | None = None
+    prompt_runtime_contract: dict[str, Any] | None = None
     spectrum_preview: FIDPreviewReport | None = None
     include_spectrum = _coerce_optional_form_bool(include_spectrum, default=True)
     if include_spectrum:
@@ -6325,6 +6326,9 @@ async def nmr_raw_fid_preview_route(
                 solvent=solvent,
             )
             prompt_pipeline_sidecar = spectrum_preview.metadata.get("prompt_pipeline_sidecar")
+            prompt_runtime_contract = spectrum_preview.metadata.get(
+                "prompt_1_2_runtime_contract"
+            )
             x_values, y_values = _xy_from_spectrum_points(spectrum_preview.preview_points)
             peaks = _model_dicts(spectrum_preview.inferred_peaks)
             if nucleus == "13C":
@@ -6393,6 +6397,19 @@ async def nmr_raw_fid_preview_route(
                 active_peak_source="legacy_raw_fid_preview_peaks",
             )
         )
+    if prompt_runtime_contract is not None:
+        raw_fid_peak_guidance["prompt_1_2_runtime_contract_status"] = {
+            "version": prompt_runtime_contract.get("version"),
+            "integration_status": prompt_runtime_contract.get("integration_status"),
+            "active_visible_pipeline": prompt_runtime_contract.get(
+                "active_visible_pipeline"
+            ),
+            "used_for_plot": prompt_runtime_contract.get("used_for_plot"),
+            "used_for_peak_markers": prompt_runtime_contract.get("used_for_peak_markers"),
+            "used_for_phase_or_baseline_swap": prompt_runtime_contract.get(
+                "used_for_phase_or_baseline_swap"
+            ),
+        }
     metadata = {
         "raw_archive_id": provenance.get("raw_archive_id") or raw_sha256,
         "raw_archive_db_id": provenance.get("raw_archive_db_id"),
@@ -6410,6 +6427,8 @@ async def nmr_raw_fid_preview_route(
         "processing_preset": resolved_processing_preset,
         "raw_fid_peak_guidance": raw_fid_peak_guidance,
     }
+    if prompt_runtime_contract is not None:
+        metadata["prompt_1_2_runtime_contract"] = prompt_runtime_contract
     if prompt_pipeline_sidecar is not None:
         metadata["prompt_pipeline_sidecar"] = prompt_pipeline_sidecar
     _audit_from_context(
@@ -6699,6 +6718,7 @@ async def nmr_raw_fid_process_route(
         )
     raw_references_block = references_for_keys(list(dict.fromkeys(raw_citation_keys)))
     prompt_pipeline_sidecar = preview.metadata.get("prompt_pipeline_sidecar")
+    prompt_runtime_contract = preview.metadata.get("prompt_1_2_runtime_contract")
     prompt_guidance = _prompt_sidecar_guidance(preview, prompt_pipeline_sidecar)
     if prompt_guidance is not None:
         raw_fid_peak_guidance["prompt_sidecar_guidance"] = prompt_guidance
@@ -6709,6 +6729,19 @@ async def nmr_raw_fid_process_route(
                 active_peak_source="legacy_raw_fid_process_enriched_peaks",
             )
         )
+    if isinstance(prompt_runtime_contract, Mapping):
+        raw_fid_peak_guidance["prompt_1_2_runtime_contract_status"] = {
+            "version": prompt_runtime_contract.get("version"),
+            "integration_status": prompt_runtime_contract.get("integration_status"),
+            "active_visible_pipeline": prompt_runtime_contract.get(
+                "active_visible_pipeline"
+            ),
+            "used_for_plot": prompt_runtime_contract.get("used_for_plot"),
+            "used_for_peak_markers": prompt_runtime_contract.get("used_for_peak_markers"),
+            "used_for_phase_or_baseline_swap": prompt_runtime_contract.get(
+                "used_for_phase_or_baseline_swap"
+            ),
+        }
 
     notes = [
         "Raw archive was preserved as immutable source data before processing.",

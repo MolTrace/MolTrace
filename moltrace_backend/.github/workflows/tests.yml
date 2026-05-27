@@ -145,6 +145,22 @@ jobs:
             echo "- Runtime activation: blocked until a separate manual runtime promotion is implemented and reviewed."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Summarize Raw FID Prompt artifact map
+        if: always()
+        run: |
+          {
+            echo "### Raw FID Prompt artifact map"
+            echo ""
+            echo "| Artifact | Open this when | Release decision |"
+            echo "| --- | --- | --- |"
+            echo "| \`raw-fid-prompt-release-readiness\` | You need the fastest one-page Prompt 1/2 readiness summary. | Reviewer-facing summary only; runtime activation stays blocked. |"
+            echo "| \`raw-fid-prompt-shadow-comparison\` | You need sidecar-vs-legacy fixture deltas. | Read-only comparison evidence; do not use it to drive plotted spectra. |"
+            echo "| \`raw-fid-prompt-provenance-checksums\` | You need fixture/report hashes for audit trails. | Audit evidence only; investigate hash drift before release. |"
+            echo "| \`raw-fid-prompt-manual-promotion-gate\` | You need the detailed manual-promotion gate diagnostics. | May show \`review_required\` without failing CI; \`activation_allowed=false\` must remain in effect. |"
+            echo ""
+            echo "All four artifacts are diagnostic release evidence. None may activate Prompt 1/2 for SpectraCheck runtime spectra, raw-FID plotting, processed analysis, peak markers, legends, phase correction, or baseline correction."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   prompt-sidecar-guardrails:
     runs-on: ubuntu-latest
     steps:
@@ -178,4 +194,32 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Prompt sidecar guardrail suite
+        id: prompt_sidecar_guardrails
         run: scripts/run_prompt_sidecar_guardrails.sh
+
+      - name: Run release-health contract guardrail suite
+        id: release_health_guardrails
+        run: scripts/run_release_health_contract_guardrails.sh
+
+      - name: Summarize reviewer guardrail workflow
+        if: always()
+        run: |
+          {
+            echo "### Reviewer guardrail workflow"
+            echo ""
+            echo "- Prompt sidecar guardrails: \`${{ steps.prompt_sidecar_guardrails.outcome }}\`"
+            echo "- Release-health guardrails: \`${{ steps.release_health_guardrails.outcome }}\`"
+            echo ""
+            echo "Run locally before merging diagnostic-artifact, release-health, Deployment Settings, CI artifact, or release-checklist changes:"
+            echo ""
+            echo "\`\`\`bash"
+            echo "./scripts/run_prompt_sidecar_guardrails.sh"
+            echo "./scripts/run_release_health_contract_guardrails.sh"
+            echo "\`\`\`"
+            echo ""
+            echo "If Prompt sidecar guardrails fail: stop release review until the change is proven metadata-only or a separate manual runtime-promotion phase is opened."
+            echo "If release-health guardrails fail: update backend payloads, frontend parsing, Deployment Settings rendering, tests, and docs together."
+            echo "If scientific or spectrum-rendering tests fail: fix the owning SpectraCheck regression instead of changing this checklist."
+            echo ""
+            echo "Passing these guardrails does not activate Prompt 1/2 for runtime spectra."
+          } >> "$GITHUB_STEP_SUMMARY"
