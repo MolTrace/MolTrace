@@ -34,20 +34,25 @@ const navItems = [
   { label: "Documentation", href: "/platform#docs" },
 ]
 
-type DropdownItem = { label: string; sub: string; icon: LucideIcon }
+type DropdownItem = { label: string; sub: string; icon: LucideIcon; href: string }
 
+// All four Platform module pages are in-app marketing routes. Each
+// lives at a top-level slug matching its dropdown label (slight rename
+// for /reaction-optimization vs ReactionIQ, /regulatory-hub vs Regulatory
+// Intelligence Hub). External docs links are reserved for deeper
+// technical-reference content under moltrace-docs.vercel.app.
 const dropdowns: Record<string, DropdownItem[]> = {
   Platform: [
-    { label: "Spectroscopy Intelligence",   sub: "NMR · MS · Structure elucidation",  icon: Waves        },
-    { label: "Regulatory Intelligence Hub", sub: "ICH · FDA · EMA compliance",        icon: ShieldCheck  },
-    { label: "Reaction Optimization",       sub: "Bayesian · Multi-objective",        icon: FlaskConical },
-    { label: "Integrations",                sub: "Bruker · Agilent · LIMS",           icon: Workflow     },
+    { label: "Spectroscopy Intelligence",   sub: "NMR · MS · Structure elucidation",  icon: Waves,        href: "/spectroscopy" },
+    { label: "Regulatory Intelligence Hub", sub: "ICH · FDA · EMA compliance",        icon: ShieldCheck,  href: "/regulatory-hub" },
+    { label: "Reaction Optimization",       sub: "Bayesian · Multi-objective",        icon: FlaskConical, href: "/reaction-optimization" },
+    { label: "Integrations",                sub: "Bruker · Agilent · LIMS",           icon: Workflow,     href: "/integrations" },
   ],
   Solutions: [
-    { label: "Pharmaceutical R&D",  sub: "Drug discovery & development", icon: Pill           },
-    { label: "Academic Research",   sub: "University & institute labs",  icon: GraduationCap  },
-    { label: "CRO / Analytical",    sub: "Contract research orgs",       icon: Microscope     },
-    { label: "Regulatory Affairs",  sub: "Dossier & submission teams",   icon: FileCheck      },
+    { label: "Pharmaceutical R&D",  sub: "Drug discovery & development", icon: Pill,          href: "/platform#solutions" },
+    { label: "Academic Research",   sub: "University & institute labs",  icon: GraduationCap, href: "/platform#solutions" },
+    { label: "CRO / Analytical",    sub: "Contract research orgs",       icon: Microscope,    href: "/platform#solutions" },
+    { label: "Regulatory Affairs",  sub: "Dossier & submission teams",   icon: FileCheck,     href: "/platform#solutions" },
   ],
 }
 
@@ -113,18 +118,22 @@ export function Header() {
                   {activeDropdown === item.label && (
                     <div className="absolute left-0 top-full z-50 pt-1">
                       <div className="min-w-[260px] overflow-hidden rounded-xl border bg-popover p-2 shadow-lg">
-                        {dropdowns[item.label].map((sub) => (
-                          <a
-                            key={sub.label}
-                            href="#"
-                            className="block rounded-lg px-3 py-2.5 transition-colors hover:bg-muted"
-                          >
-                            <div className="text-sm font-semibold text-foreground">{sub.label}</div>
-                            <div className="mt-0.5 font-mono text-[10px] tracking-wider text-muted-foreground">
-                              {sub.sub}
-                            </div>
-                          </a>
-                        ))}
+                        {dropdowns[item.label].map((sub) => {
+                          const isExternal = /^https?:\/\//i.test(sub.href)
+                          return (
+                            <Link
+                              key={sub.label}
+                              href={sub.href}
+                              className="block rounded-lg px-3 py-2.5 transition-colors hover:bg-muted"
+                              {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : null)}
+                            >
+                              <div className="text-sm font-semibold text-foreground">{sub.label}</div>
+                              <div className="mt-0.5 font-mono text-[10px] tracking-wider text-muted-foreground">
+                                {sub.sub}
+                              </div>
+                            </Link>
+                          )
+                        })}
                       </div>
                     </div>
                   )}
@@ -223,12 +232,14 @@ export function Header() {
                         <div className="space-y-1">
                           {dropdowns[sectionLabel].map((sub) => {
                             const Icon = sub.icon
+                            const isExternal = /^https?:\/\//i.test(sub.href)
                             return (
-                              <a
+                              <Link
                                 key={sub.label}
-                                href="#"
+                                href={sub.href}
                                 onClick={() => setOpen(false)}
                                 className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 transition-all hover:-translate-y-px hover:border-[color:var(--mt-teal)]/30 hover:bg-[color:var(--mt-teal-soft)] active:translate-y-0"
+                                {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : null)}
                               >
                                 <span
                                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors"
@@ -253,7 +264,7 @@ export function Header() {
                                   style={{ color: "var(--mt-teal)" }}
                                   aria-hidden
                                 />
-                              </a>
+                              </Link>
                             )
                           })}
                         </div>

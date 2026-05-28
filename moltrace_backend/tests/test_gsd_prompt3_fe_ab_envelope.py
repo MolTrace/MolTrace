@@ -164,7 +164,10 @@ def test_gsd_live_rerun_within_ab_envelope(fixture_id: str) -> None:
         )
 
     # Use the same input parameters the FE captured.
-    request = SpectrumGSDAnalyzeRequest(
+    # NOTE: renamed from ``request`` to ``payload`` after v0.6.3 added a
+    # ``request: Request`` parameter to ``spectrum_analyze_gsd`` for
+    # telemetry — we pass ``request=None`` below to skip the audit emit.
+    payload = SpectrumGSDAnalyzeRequest(
         ppm_axis=x,
         intensity=y,
         nucleus=run["nucleus"],
@@ -188,7 +191,8 @@ def test_gsd_live_rerun_within_ab_envelope(fixture_id: str) -> None:
 
     async def _run() -> None:
         result = await spectrum_analyze_gsd(
-            payload=request,
+            payload=payload,
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
 

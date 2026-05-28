@@ -11,19 +11,13 @@ const navigation = {
   // most enterprise-foundational integration (applies regardless of
   // instrument vendor). Update when a ``/guides/integrations/`` index ships.
   platform: [
-    { name: "Spectroscopy", href: "https://moltrace-docs.vercel.app/guides/modules/spectracheck/" },
-    {
-      name: "Regulatory Intelligence Hub",
-      href: "https://moltrace-docs.vercel.app/guides/modules/regulatory/",
-    },
-    {
-      name: "Reaction Optimization",
-      href: "https://moltrace-docs.vercel.app/guides/modules/optimization/",
-    },
-    {
-      name: "Integrations",
-      href: "https://moltrace-docs.vercel.app/guides/integrations/lims/",
-    },
+    // All four Platform modules now have in-app marketing overviews.
+    // Deeper technical references stay on moltrace-docs.vercel.app and
+    // are linked from each module page directly.
+    { name: "Spectroscopy", href: "/spectroscopy" },
+    { name: "Regulatory Intelligence Hub", href: "/regulatory-hub" },
+    { name: "Reaction Optimization", href: "/reaction-optimization" },
+    { name: "Integrations", href: "/integrations" },
   ],
   // All four Company links are in-app routes so the manifesto / careers /
   // editorial index / contact form stay inside the product surface

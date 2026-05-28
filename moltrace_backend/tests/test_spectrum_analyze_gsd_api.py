@@ -76,6 +76,7 @@ def test_spectrum_analyze_gsd_returns_classified_peaks() -> None:
                 field_mhz=500.0,
                 level=2,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
 
@@ -108,6 +109,7 @@ def test_spectrum_analyze_gsd_defaults_to_level_2_pseudo_voigt() -> None:
                 solvent="CDCl3",
                 field_mhz=500.0,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
 
@@ -133,6 +135,7 @@ def test_spectrum_analyze_gsd_level_4_emits_iterative_note() -> None:
                 field_mhz=500.0,
                 level=4,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
 
@@ -164,7 +167,8 @@ def test_spectrum_analyze_gsd_rejects_mismatched_array_lengths() -> None:
         asyncio.run(
             spectrum_analyze_gsd(
                 payload=payload,
-                context=AccessContext(system_api_key=True),
+                request=None,  # direct handler call: telemetry skipped
+            context=AccessContext(system_api_key=True),
             )
         )
     except HTTPException as exc:
@@ -212,6 +216,7 @@ def test_synthetic_baseline_does_not_drift() -> None:
     async def _once() -> list[float]:
         result = await spectrum_analyze_gsd(
             payload=payload,
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
         return [round(p.position_ppm, 4) for p in result.peaks]
@@ -256,6 +261,7 @@ def test_spectrum_analyze_gsd_handles_13c_spectrum() -> None:
                 field_mhz=125.0,
                 level=2,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
 
@@ -299,6 +305,7 @@ def test_spectrum_analyze_gsd_handles_realistic_spectrum_size() -> None:
                 field_mhz=500.0,
                 level=2,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
 
@@ -325,6 +332,7 @@ def test_spectrum_analyze_gsd_all_levels_round_trip() -> None:
                 field_mhz=500.0,
                 level=level,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
         return result.level, result.backend, result.experimental
@@ -378,6 +386,7 @@ def test_clustering_collapses_multiplet_into_one_environment() -> None:
                 field_mhz=500.0,
                 level=3,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
 
@@ -423,6 +432,7 @@ def test_clustering_keeps_separate_categories_separate() -> None:
                 field_mhz=500.0,
                 level=2,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
 
@@ -477,6 +487,7 @@ def test_clustering_explicit_j_overrides_nucleus_default() -> None:
                 level=2,
                 cluster_j_hz=cluster_j_hz,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
         return sum(1 for e in result.environments if e.category == "compound")
@@ -515,6 +526,7 @@ def test_spectrum_analyze_gsd_empty_peaks_suggests_level_escalation() -> None:
                 field_mhz=500.0,
                 level=level,
             ),
+            request=None,  # direct handler call: telemetry skipped
             context=AccessContext(system_api_key=True),
         )
         return result.notes

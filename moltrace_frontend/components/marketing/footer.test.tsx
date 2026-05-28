@@ -71,22 +71,14 @@ describe("Marketing Footer", () => {
     // ``footer.tsx`` for which slug was chosen and why.
     const expectedDestinations: Array<[label: string, href: string]> = [
       // ── Platform ────────────────────────────────────────────────────
-      [
-        "Spectroscopy",
-        "https://moltrace-docs.vercel.app/guides/modules/spectracheck/",
-      ],
-      [
-        "Regulatory Intelligence Hub",
-        "https://moltrace-docs.vercel.app/guides/modules/regulatory/",
-      ],
-      [
-        "Reaction Optimization",
-        "https://moltrace-docs.vercel.app/guides/modules/optimization/",
-      ],
-      [
-        "Integrations",
-        "https://moltrace-docs.vercel.app/guides/integrations/lims/",
-      ],
+      // Spectroscopy is in-app at /spectroscopy (the SpectraCheck overview).
+      ["Spectroscopy", "/spectroscopy"],
+      // Regulatory Intelligence Hub is in-app at /regulatory-hub.
+      ["Regulatory Intelligence Hub", "/regulatory-hub"],
+      // Reaction Optimization is in-app at /reaction-optimization.
+      ["Reaction Optimization", "/reaction-optimization"],
+      // Integrations is in-app at /integrations.
+      ["Integrations", "/integrations"],
       // ── Company ─────────────────────────────────────────────────────
       // All four Company links are in-app routes (manifesto / careers /
       // editorial index / contact form). External docs links live in
