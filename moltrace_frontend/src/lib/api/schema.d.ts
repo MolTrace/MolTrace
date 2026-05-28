@@ -21896,6 +21896,16 @@ export interface components {
             impurity_match?: {
                 [key: string]: unknown;
             } | null;
+            /** Fit Redchi */
+            fit_redchi?: number | null;
+            /** Fit Rmse */
+            fit_rmse?: number | null;
+            /** Fwhm Ppm */
+            fwhm_ppm?: number | null;
+            /** Signal To Noise */
+            signal_to_noise?: number | null;
+            /** Baseline Noise Sigma */
+            baseline_noise_sigma?: number | null;
         } & {
             [key: string]: unknown;
         };
@@ -33686,7 +33696,20 @@ export interface components {
             /** Integration Match */
             integration_match: boolean;
         };
-        /** SpectrumPoint */
+        /**
+         * SpectrumPoint
+         * @description One sample of a downsampled spectrum trace (display point).
+         *
+         *     ``shift_ppm`` bounds are intentionally wide: the trace can carry edge
+         *     samples beyond the chemical-shift "claim" range that ``Peak`` enforces
+         *     (e.g., metal-organic ¹³C carbons above 260 ppm, off-referenced spectra
+         *     whose entire ppm window is shifted by tens of ppm, or wrap-around
+         *     artifacts from poorly-phased FFTs).  Earlier strict bounds of ±50/+260
+         *     rejected the whole trace when a single edge sample fell outside,
+         *     causing the legacy ``/nmr/raw-fid/process`` route to return zero peaks
+         *     for real spectra that GSD had no trouble with.  NaN/Inf filtering is
+         *     handled separately by the upstream ``math.isfinite`` checks.
+         */
         SpectrumPoint: {
             /** Shift Ppm */
             shift_ppm: number;
