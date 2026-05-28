@@ -6,7 +6,56 @@ publish to PyPI, but each release marker corresponds to a logically-grouped
 batch of phases shipped in a single working session.
 
 The Prompt 3 GSD (Global Spectral Deconvolution) opt-in analysis backend
-spans v0.4.0 through v0.6.2.
+spans v0.4.0 through v0.6.3.
+
+---
+
+## v0.6.3 — Soak telemetry on the GSD analysis endpoint (2026-05-28)
+
+**Headline:** All three validation corpora are cleared, so the remaining
+gate to flipping `experimental: false` is real-tenant signal. This
+release wires a structured audit event into every `POST
+/spectrum/analyze/gsd` invocation so the operational soak countdown
+starts on data, not gut feel.
+
+### Added
+- **`spectrum.analyze_gsd` audit event** — emitted once per opt-in
+  GSD endpoint invocation via the existing `_audit_from_context` →
+  `audit_event` pipeline. Persists to the `audit_events` Postgres
+  table with the standard `metadata_json` payload shape.
+- **`_emit_gsd_telemetry` helper** in `api.py` — wraps the audit emit
+  with the v0.6.3 payload schema. Surfaces both the request shape
+  (level, nucleus, declared solvent, optional `cluster_j_hz` override,
+  `field_mhz`, `input_point_count`, `wall_ms`) and the outcome shape
+  (peak counts, environment counts, category breakdown, detected
+  solvent labels). The failure path records the same envelope with
+  `error_kind` set and outcome counts zeroed, so bad-request rates
+  are visible alongside happy-path counts during operational soak.
+- Telemetry helper is wrapped in a broad try/except — telemetry is a
+  diagnostic surface and must never break a working analysis call.
+- When the handler is invoked directly (e.g. unit tests passing
+  `request=None`) telemetry is skipped silently.
+
+### Tests
+- `test_spectrum_analyze_gsd_telemetry::test_spectrum_analyze_gsd_emits_telemetry_audit_event`
+  fires the endpoint via `TestClient` and asserts the audit event lands
+  with the canonical payload shape (request shape, outcome counts,
+  category dict, performance fields, `experimental: True`).
+- `test_spectrum_analyze_gsd_telemetry::test_spectrum_analyze_gsd_emits_telemetry_on_validation_error`
+  pins the failure-path contract: `error_kind ==
+  "ppm_axis_length_mismatch"`, outcome counts zeroed, `wall_ms`
+  still recorded.
+- `test_spectrum_analyze_gsd_telemetry::test_spectrum_analyze_gsd_telemetry_does_not_break_handler`
+  smoke-checks that the response payload stays well-formed after the
+  telemetry call returns.
+- Updated the 12 existing direct-handler-call tests in
+  `test_spectrum_analyze_gsd_api.py` to pass `request=None`.
+
+### Changed
+- `spectrum_analyze_gsd(payload, request, context)` — added `request:
+  Request` as the second positional so FastAPI auto-injects the
+  request object. Direct callers (tests, scripts) pass `request=None`
+  to skip telemetry.
 
 ---
 

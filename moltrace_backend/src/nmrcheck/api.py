@@ -1886,6 +1886,123 @@ def _audit_from_context(
     )
 
 
+def _emit_gsd_telemetry(
+    *,
+    request: Request | None,
+    context: AccessContext | None,
+    payload: "SpectrumGSDAnalyzeRequest",
+    classified: list[Any] | None,
+    environments: list[Any] | None,
+    wall_ms: int,
+    input_point_count: int,
+    error_kind: str | None,
+) -> None:
+    """Emit one ``spectrum.analyze_gsd`` audit event per opt-in GSD call.
+
+    Wraps ``_audit_from_context`` with the v0.6.3 telemetry schema:
+      * Request shape (level, nucleus, solvent declared by caller,
+        optional cluster_j_hz override, input_point_count, field_mhz).
+      * Outcome shape on the happy path (peak/environment totals,
+        category breakdown, auto-detected solvent labels — used to
+        score real-tenant solvent-detect rate during operational
+        soak before flipping ``experimental: false``).
+      * Error shape on the failure path (``error_kind`` string with
+        all outcome counts zeroed) so bad-request rates are visible
+        alongside happy-path counts.
+
+    All telemetry failures are swallowed silently — telemetry is a
+    diagnostic surface and must never break a working analysis call.
+    When ``request`` is ``None`` (handler invoked directly in tests,
+    no FastAPI app state available), telemetry is skipped silently.
+    """
+
+    if request is None:
+        return
+    try:
+        peak_count = len(classified) if classified is not None else 0
+        compound_peak_count = (
+            sum(1 for p in classified if getattr(p, "category", None) == "compound")
+            if classified is not None
+            else 0
+        )
+        environment_count = len(environments) if environments is not None else 0
+        compound_environment_count = (
+            sum(1 for env in environments if getattr(env, "category", None) == "compound")
+            if environments is not None
+            else 0
+        )
+        category_counts: dict[str, int] = {}
+        if classified is not None:
+            for peak in classified:
+                cat = getattr(peak, "category", None) or "unknown"
+                category_counts[cat] = category_counts.get(cat, 0) + 1
+
+        # Auto-detected solvent labels from peak metadata ``chemical_detail
+        # .solvent_hit.label`` — the canonical residual-solvent / water /
+        # reference label the classifier matched.  Listing all hits
+        # (deduplicated) lets soak analysis see when the classifier picks
+        # multiple solvent residual windows, which is itself a useful
+        # signal for tuning ``_detail_is_solvent``.
+        solvent_labels: list[str] = []
+        if classified is not None:
+            seen: set[str] = set()
+            for peak in classified:
+                if getattr(peak, "category", None) != "solvent":
+                    continue
+                detail = getattr(peak, "metadata", {}).get("chemical_detail") or {}
+                if not isinstance(detail, dict):
+                    continue
+                hit = detail.get("solvent_hit")
+                if not isinstance(hit, dict):
+                    continue
+                label = hit.get("label")
+                if isinstance(label, str) and label not in seen:
+                    seen.add(label)
+                    solvent_labels.append(label)
+
+        metadata: dict[str, object] = {
+            # Request shape
+            "level": int(payload.level),
+            "nucleus": payload.nucleus,
+            "solvent_declared": payload.solvent,
+            "field_mhz": payload.field_mhz,
+            "cluster_j_hz_override": payload.cluster_j_hz,
+            "input_point_count": int(input_point_count),
+            # Outcome shape
+            "peak_count": int(peak_count),
+            "compound_peak_count": int(compound_peak_count),
+            "environment_count": int(environment_count),
+            "compound_environment_count": int(compound_environment_count),
+            "category_counts": category_counts,
+            "solvent_labels_detected": solvent_labels,
+            # Backend identity + experimental flag (still True at v0.6.3 —
+            # the soak telemetry shipped here is the gate that flips it
+            # to False once a quarter of clean tenant runs lands).
+            "backend": "gsd_prompt3",
+            "experimental": True,
+            "wall_ms": int(wall_ms),
+        }
+        if error_kind is not None:
+            metadata["error_kind"] = error_kind
+
+        _audit_from_context(
+            request,
+            context=context,
+            event_type="spectrum.analyze_gsd",
+            message=(
+                "Opt-in GSD spectrum analysis failed."
+                if error_kind is not None
+                else "Opt-in GSD spectrum analysis completed."
+            ),
+            metadata=metadata,
+        )
+    except Exception:
+        # Never let telemetry break a working analysis call.  Worst case
+        # we drop one event; operational dashboards will see the lower
+        # invocation count and we can investigate offline.
+        pass
+
+
 def _collaboration_actor(
     request: Request, context: AccessContext
 ) -> collab_store.CollaborationActor:
@@ -5125,6 +5242,7 @@ async def spectrum_analyze(
 )
 async def spectrum_analyze_gsd(
     payload: SpectrumGSDAnalyzeRequest,
+    request: Request,  # auto-injected by FastAPI; tests may pass None
     context: AccessContext = Depends(require_access_context),
 ) -> SpectrumGSDAnalyzeResult:
     """Opt-in **experimental** GSD-Prompt-3 peak analysis backend.
@@ -5153,6 +5271,8 @@ async def spectrum_analyze_gsd(
     is the pure analysis layer for callers who already have arrays.
     """
 
+    import time
+
     import numpy as np
 
     from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
@@ -5162,7 +5282,26 @@ async def spectrum_analyze_gsd(
         gsd_peak_pick,
     )
 
+    # Wall-clock start before any work, so the telemetry duration covers the
+    # whole pipeline cost the tenant actually paid (peak pick + classify +
+    # cluster + response build).  Used by the soak-telemetry emission below.
+    _t0 = time.perf_counter()
+    _input_point_count = len(payload.ppm_axis)
+
     if len(payload.ppm_axis) != len(payload.intensity):
+        # Validation failure path: emit a telemetry event so bad-request
+        # rates are visible alongside happy-path counts during operational
+        # soak, then re-raise the original HTTPException.
+        _emit_gsd_telemetry(
+            request=request,
+            context=context,
+            payload=payload,
+            classified=None,
+            environments=None,
+            wall_ms=int((time.perf_counter() - _t0) * 1000),
+            input_point_count=_input_point_count,
+            error_kind="ppm_axis_length_mismatch",
+        )
         raise HTTPException(
             status_code=400,
             detail="ppm_axis and intensity must have the same length.",
@@ -5248,6 +5387,20 @@ async def spectrum_analyze_gsd(
             "expect higher peak counts than level 2-3 because multiplet "
             "lines are resolved separately."
         )
+
+    # Soak telemetry — emit one audit event per invocation so we can flip
+    # ``experimental: false`` on data rather than gut feel.  See Phase 28a
+    # design notes for the field rationale.
+    _emit_gsd_telemetry(
+        request=request,  # may be None when the handler is invoked directly
+        context=context,
+        payload=payload,
+        classified=classified,
+        environments=environments,
+        wall_ms=int((time.perf_counter() - _t0) * 1000),
+        input_point_count=_input_point_count,
+        error_kind=None,
+    )
 
     return SpectrumGSDAnalyzeResult(
         peaks=peak_models,  # type: ignore[arg-type]
