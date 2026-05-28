@@ -31,7 +31,17 @@ from pathlib import Path
 from typing import Any
 
 from moltrace.spectroscopy.io.fid_reader import NMRSpectrum, read_fid
-from moltrace.spectroscopy.peaks.gsd import Peak, auto_classify, gsd_peak_pick
+from moltrace.spectroscopy.peaks.gsd import (
+    Environment,
+    Peak,
+    auto_classify,
+    cluster_into_environments,
+    gsd_peak_pick,
+)
+
+# Default spectrometer frequency for clustering when the FID metadata does
+# not provide one; mirrors moltrace.spectroscopy.peaks.gsd._DEFAULT_FIELD_MHZ.
+_DEFAULT_FIELD_MHZ = 500.0
 
 REPORT_VERSION = "gsd_prompt3_validation_report_v1"
 DEFAULT_OUTPUT_DIRNAME = "gsd_prompt3_validation"
@@ -87,9 +97,13 @@ CSV_COLUMNS = [
     "reference_peak_count",
     "prompt_peak_count",
     "prompt_compound_peak_count",
+    "prompt_environment_count",
+    "prompt_compound_environment_count",
     "compound_peak_count_delta",
     "compound_peak_count_within_5pct",
     "compound_peak_count_within_manifest_tol",
+    "compound_environment_count_delta",
+    "compound_environment_count_within_manifest_tol",
     "peak_count_delta",
     "peak_count_within_5pct",
     "peak_count_within_manifest_tol",
@@ -98,6 +112,8 @@ CSV_COLUMNS = [
     "reference_ppm_max_error",
     "reference_ppm_mean_error",
     "reference_ppm_within_tolerance",
+    "reference_ppm_unmatched_count",
+    "reference_ppm_plausibility_threshold",
     "solvent_reference_ppm",
     "solvent_peak_detected",
     "solvent_peak_ppm",
@@ -177,9 +193,14 @@ def run_fixture(
         peaks = gsd_peak_pick(spectrum, level=level)
         solvent_value = spectrum.solvent or ""
         classified = auto_classify(peaks, spectrum, solvent_value)
+        environments = cluster_into_environments(
+            classified,
+            field_mhz=float(spectrum.field_mhz or _DEFAULT_FIELD_MHZ),
+            nucleus=spec.nucleus,
+        )
     except Exception as exc:  # pragma: no cover - defensive against vendor edge cases
         return _row_error(spec, f"{type(exc).__name__}: {exc}")
-    return _row_success(spec, spectrum, classified)
+    return _row_success(spec, spectrum, classified, environments)
 
 
 def run_all(
@@ -204,6 +225,11 @@ def build_report(rows: list[dict[str, Any]], *, level: int) -> dict[str, Any]:
     within_manifest_total = sum(1 for row in ok_rows if row["peak_count_within_manifest_tol"])
     within_manifest_compound = sum(
         1 for row in ok_rows if row["compound_peak_count_within_manifest_tol"]
+    )
+    within_manifest_compound_env = sum(
+        1
+        for row in ok_rows
+        if row.get("compound_environment_count_within_manifest_tol")
     )
 
     def _median_abs(field: str) -> float | None:
@@ -236,6 +262,15 @@ def build_report(rows: list[dict[str, Any]], *, level: int) -> dict[str, Any]:
             within_manifest_compound / len(ok_rows) if ok_rows else None
         ),
         "median_abs_compound_peak_count_delta": _median_abs("compound_peak_count_delta"),
+        # Environment-count metrics: the semantically correct primary gate
+        # per FE A/B finding (NMRShiftDB2 counts environments, not lines).
+        "compound_environment_count_within_manifest_tol_count": within_manifest_compound_env,
+        "compound_environment_count_within_manifest_tol_rate": (
+            within_manifest_compound_env / len(ok_rows) if ok_rows else None
+        ),
+        "median_abs_compound_environment_count_delta": _median_abs(
+            "compound_environment_count_delta"
+        ),
         "peak_count_within_5pct_count": within_5pct_total,
         "peak_count_within_5pct_rate": within_5pct_total / len(ok_rows) if ok_rows else None,
         "peak_count_within_manifest_tol_count": within_manifest_total,
@@ -276,9 +311,13 @@ def _row_error(spec: FixtureSpec, error: str) -> dict[str, Any]:
         "reference_peak_count": spec.reference_peak_count,
         "prompt_peak_count": 0,
         "prompt_compound_peak_count": 0,
+        "prompt_environment_count": 0,
+        "prompt_compound_environment_count": 0,
         "compound_peak_count_delta": None,
         "compound_peak_count_within_5pct": False,
         "compound_peak_count_within_manifest_tol": False,
+        "compound_environment_count_delta": None,
+        "compound_environment_count_within_manifest_tol": False,
         "peak_count_delta": None,
         "peak_count_within_5pct": False,
         "peak_count_within_manifest_tol": False,
@@ -287,6 +326,8 @@ def _row_error(spec: FixtureSpec, error: str) -> dict[str, Any]:
         "reference_ppm_max_error": None,
         "reference_ppm_mean_error": None,
         "reference_ppm_within_tolerance": False,
+        "reference_ppm_unmatched_count": None,
+        "reference_ppm_plausibility_threshold": None,
         "solvent_reference_ppm": None,
         "solvent_peak_detected": False,
         "solvent_peak_ppm": None,
@@ -296,10 +337,17 @@ def _row_error(spec: FixtureSpec, error: str) -> dict[str, Any]:
 
 
 def _row_success(
-    spec: FixtureSpec, spectrum: NMRSpectrum, peaks: list[Peak]
+    spec: FixtureSpec,
+    spectrum: NMRSpectrum,
+    peaks: list[Peak],
+    environments: list[Environment],
 ) -> dict[str, Any]:
     prompt_count = len(peaks)
     compound_count = sum(1 for peak in peaks if peak.category == "compound")
+    env_total_count = len(environments)
+    env_compound_count = sum(
+        1 for env in environments if env.category == "compound"
+    )
 
     pct_tolerance = max(1, int(math.ceil(spec.reference_peak_count * 0.05)))
 
@@ -311,22 +359,50 @@ def _row_success(
     within_5pct_compound = abs(compound_delta) <= pct_tolerance
     within_manifest_tol_compound = abs(compound_delta) <= spec.peak_count_tolerance
 
+    # Environment-count delta is the semantically correct primary gate:
+    # NMRShiftDB2's reference shift list counts chemical environments (one
+    # entry per H/C atom), not multiplet lines.  An accurate detector
+    # legitimately resolves a doublet as 2 peaks but the reference treats
+    # it as 1 entry.  Clustering peaks back into environments restores the
+    # apples-to-apples comparison.
+    compound_env_delta = env_compound_count - spec.reference_peak_count
+    within_manifest_tol_compound_env = (
+        abs(compound_env_delta) <= spec.peak_count_tolerance
+    )
+
     # Per-reference-ppm match against the compound-category peaks (the
     # curated reference shifts describe molecular peaks).
+    #
+    # Plausibility-bounded matching: when no detected peak sits within a
+    # plausible chemical-window of the reference shift, the reference is
+    # considered un-detected -- recording the distance to the nearest
+    # (potentially whole-spectrum-width) peak inflates max_error into
+    # meaningless territory (e.g., 89 ppm on a 13C trace says "the peak is
+    # missing entirely", not "our position prediction is 89 ppm off").
+    # Plausibility windows: 0.5 ppm for 1H (wider than the typical 0.05 ppm
+    # tolerance but narrow enough to exclude chemical-environment confusion),
+    # 5.0 ppm for 13C (where line widths and referencing drift are larger).
+    plausibility_ppm = 0.5 if (spec.nucleus or "").upper() == "1H" else 5.0
     compound_ppm = sorted(peak.position_ppm for peak in peaks if peak.category == "compound")
     matched = 0
     ppm_errors: list[float] = []
+    unmatched_refs: list[float] = []
     for ref in spec.reference_peak_ppm:
         if not compound_ppm:
-            break
+            unmatched_refs.append(float(ref))
+            continue
         nearest = min(compound_ppm, key=lambda value: abs(value - ref))
         ppm_delta = abs(nearest - ref)
+        if ppm_delta > plausibility_ppm:
+            unmatched_refs.append(float(ref))
+            continue
         ppm_errors.append(ppm_delta)
         if ppm_delta <= spec.ppm_tolerance:
             matched += 1
     max_err = max(ppm_errors) if ppm_errors else None
     mean_err = sum(ppm_errors) / len(ppm_errors) if ppm_errors else None
     ppm_within = matched == len(spec.reference_peak_ppm) if spec.reference_peak_ppm else None
+    unmatched_count = len(unmatched_refs)
 
     solvent_ref_ppm, solvent_detected, solvent_peak_ppm = _resolve_solvent_detection(
         spectrum=spectrum, nucleus=spec.nucleus, peaks=peaks
@@ -345,9 +421,13 @@ def _row_success(
         "reference_peak_count": spec.reference_peak_count,
         "prompt_peak_count": prompt_count,
         "prompt_compound_peak_count": compound_count,
+        "prompt_environment_count": env_total_count,
+        "prompt_compound_environment_count": env_compound_count,
         "compound_peak_count_delta": compound_delta,
         "compound_peak_count_within_5pct": within_5pct_compound,
         "compound_peak_count_within_manifest_tol": within_manifest_tol_compound,
+        "compound_environment_count_delta": compound_env_delta,
+        "compound_environment_count_within_manifest_tol": within_manifest_tol_compound_env,
         "peak_count_delta": total_delta,
         "peak_count_within_5pct": within_5pct_total,
         "peak_count_within_manifest_tol": within_manifest_tol_total,
@@ -356,6 +436,8 @@ def _row_success(
         "reference_ppm_max_error": max_err,
         "reference_ppm_mean_error": mean_err,
         "reference_ppm_within_tolerance": ppm_within,
+        "reference_ppm_unmatched_count": unmatched_count,
+        "reference_ppm_plausibility_threshold": plausibility_ppm,
         "solvent_reference_ppm": solvent_ref_ppm,
         "solvent_peak_detected": solvent_detected,
         "solvent_peak_ppm": solvent_peak_ppm,

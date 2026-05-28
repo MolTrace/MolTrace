@@ -45,6 +45,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import {
+  DetectionResultsPanel,
+  GsdAnalysisControls,
+  GsdResultsPanel,
+  adaptLegacyRawFidResult,
+  type AnalysisBackendChoice,
+  type GSDLevel,
+  type NMRRawFIDPreviewResponse,
+  type SpectrumGSDAnalyzeRequest,
+  type SpectrumGSDAnalyzeResult,
+} from "@/components/spectracheck/gsd-analysis-ui"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -59,6 +70,7 @@ import {
   ChevronDown,
   Eye,
   FileText,
+  FlaskConical,
   Hash,
   Lock,
   PlayCircle,
@@ -392,6 +404,18 @@ export function SpectraCheckRawFidSection({
   )
   const setAdvancedOpen = useCallback((v: boolean) => update({ advancedOpen: v }), [update])
 
+  // ── GSD-Prompt-3 (experimental, opt-in) — additive only. Default must
+  // stay `legacy` so tenants who never touch the selector keep the
+  // existing /nmr/raw-fid/process pipeline unchanged.
+  const [analysisBackend, setAnalysisBackend] = useState<AnalysisBackendChoice>("legacy")
+  const [gsdLevel, setGsdLevel] = useState<GSDLevel>(2)
+  const [gsdResult, setGsdResult] = useState<SpectrumGSDAnalyzeResult | null>(null)
+  const [gsdError, setGsdError] = useState("")
+  const [gsdLoading, setGsdLoading] = useState(false)
+  // GSD-scoped solvent override, initialized from the session-level
+  // solvent prop. Canonicalized against the catalog when it arrives.
+  const [gsdSolvent, setGsdSolvent] = useState(solvent)
+
   const ws = useOptionalSpectraCheckWorkspaceSession()
   const analysisJob = useAnalysisJob()
   const sendTabLink = useSpectraCheckTabLink()
@@ -719,6 +743,88 @@ export function SpectraCheckRawFidSection({
     }
   }
 
+  /**
+   * Safely pull `field_mhz` from a preview/process response payload.
+   * Both NMRRawFIDPreviewResponse and NMRRawFIDProcessResponse carry it
+   * as `number | null | undefined` (set by the backend from vendor
+   * metadata: Bruker SFO1/BF1 or Varian sfrq/reffrq). Returns null when
+   * the field is missing, null, NaN, or non-positive.
+   */
+  function extractFieldMhz(payload: unknown): number | null {
+    if (!isRecord(payload)) return null
+    const v = payload.field_mhz
+    if (typeof v !== "number") return null
+    if (!Number.isFinite(v) || v <= 0) return null
+    return v
+  }
+
+  // ── GSD-Prompt-3 (experimental) analyze path for raw FID ──────────────
+  // Picks the best available ppm/intensity trace in priority order:
+  //   1. processResult (full /nmr/raw-fid/process output — best quality)
+  //   2. previewResult (preview archive payload, may carry an auto-FT trace)
+  //   3. previewSpectrum (cached auto-FT from a prior Preview spectrum click)
+  // If none are available, runs /nmr/raw-fid/preview with the safe-automatic
+  // preset to produce a trace before calling GSD. Leaves the legacy
+  // processResult / previewResult state alone.
+  async function runGSDAnalyze() {
+    const file = fileRef.current?.files?.[0] ?? selectedFile
+    if (!file) {
+      setGsdError("Choose a raw FID archive (.zip / .tar.gz / .tgz).")
+      return
+    }
+    setGsdLoading(true)
+    setGsdError("")
+    try {
+      let trace: { x: number[]; y: number[] } | null = null
+      if (processResult) trace = extractSpectrumXY(processResult)
+      if (!trace && previewResult) trace = extractSpectrumXY(previewResult)
+      if (!trace && previewSpectrum) trace = { x: previewSpectrum.x, y: previewSpectrum.y }
+      if (!trace) {
+        // Auto-fetch a quick preview so the user doesn't need a separate
+        // click. Uses the safe-automatic preset, parity with runPreview().
+        const previewData = await apiFetch<unknown>("/nmr/raw-fid/preview", {
+          method: "POST",
+          body: buildFormData(file, false),
+        })
+        pushDev("raw_fid_gsd_autopreview", previewData)
+        update({ previewResult: previewData, previewError: "" })
+        trace = extractSpectrumXY(previewData)
+      }
+      if (!trace || trace.x.length < 16) {
+        setGsdError(
+          trace == null
+            ? "Could not derive a spectrum trace from the raw FID. Run Preview spectrum or Process FID first."
+            : `GSD requires ≥16 samples; trace has ${trace.x.length}.`,
+        )
+        return
+      }
+      // field_mhz cascade: prefer values the backend FT'd from the actual
+      // FID's vendor metadata (Bruker SFO1/BF1 or Varian sfrq/reffrq),
+      // fall back to 500 only when neither response surfaced a usable
+      // value (unknown vendor or pre-Phase-8 response).
+      const fieldMhz =
+        extractFieldMhz(processResult) ?? extractFieldMhz(previewResult) ?? 500
+      const body: SpectrumGSDAnalyzeRequest = {
+        ppm_axis: trace.x,
+        intensity: trace.y,
+        nucleus,
+        solvent: gsdSolvent.trim(),
+        field_mhz: fieldMhz,
+        level: gsdLevel,
+      }
+      const data = await apiFetch<SpectrumGSDAnalyzeResult>(
+        "/spectrum/analyze/gsd",
+        { method: "POST", body },
+      )
+      setGsdResult(data)
+      pushDev("raw_fid_gsd_analyze", data)
+    } catch (err) {
+      setGsdError(formatApiError(err, "GSD analysis failed"))
+    } finally {
+      setGsdLoading(false)
+    }
+  }
+
   function clearAll() {
     update({
       previewResult: null,
@@ -733,6 +839,9 @@ export function SpectraCheckRawFidSection({
       selectedFileName: null,
     })
     if (fileRef.current) fileRef.current.value = ""
+    setGsdResult(null)
+    setGsdError("")
+    setGsdSolvent(solvent)
   }
 
   const resultsMode =
@@ -752,6 +861,40 @@ export function SpectraCheckRawFidSection({
   const hasResultSurface = resultsMode != null
   const displayPayload =
     resultsMode === "process" ? processResult : resultsMode === "preview" ? previewResult : null
+  /**
+   * Dense 13C heuristic: warn the user up-front when /nmr/raw-fid/process
+   * is going to take several minutes. Empirical threshold from Phase 12
+   * validation: nmrshiftdb2_60000006 (98,304 pts, ¹³C) took 5.5 min;
+   * 13C spectra under 64K points completed in tens of seconds. We read
+   * `point_count` from whichever response we have so the hint persists
+   * after processing finishes too. Backend perf work is tracked in a
+   * separate Phase 12d ticket; this is the user-facing hint only.
+   */
+  const HEAVY_13C_POINT_THRESHOLD = 65536
+  const heavyPointCount = (() => {
+    const src = processResult ?? previewResult
+    if (!src || typeof src !== "object") return null
+    const v = (src as { point_count?: unknown }).point_count
+    return typeof v === "number" && v > 0 ? v : null
+  })()
+  const showHeavy13CWarning =
+    nucleus === "13C" && heavyPointCount != null && heavyPointCount > HEAVY_13C_POINT_THRESHOLD
+
+  /**
+   * Adapt the raw-FID preview/process response (post Phase 11 envelope:
+   * `peaks` + `environments` + `category_counts`) into the unified
+   * detection shape the shared `<DetectionResultsPanel>` consumes. We
+   * defensively guard on `peaks` being an array — older cached
+   * responses from before the parity work may not have the envelope.
+   */
+  const legacyDetectionResult = useMemo(() => {
+    const src = processResult ?? previewResult
+    if (!src || typeof src !== "object") return null
+    const r = src as Partial<NMRRawFIDPreviewResponse>
+    if (!Array.isArray(r.peaks) || r.peaks.length === 0) return null
+    return adaptLegacyRawFidResult(r as NMRRawFIDPreviewResponse, "legacy")
+  }, [processResult, previewResult])
+
   const promptSidecarConsistency = useMemo(
     () => getPromptSidecarConsistency(displayPayload),
     [displayPayload],
@@ -1126,6 +1269,17 @@ export function SpectraCheckRawFidSection({
         className="min-w-0"
       >
         <div className="space-y-4">
+          {/* Analysis backend selector — opt-in experimental GSD-Prompt-3.
+              Default MUST remain `legacy`; do not silently flip tenants. */}
+          <GsdAnalysisControls
+            backend={analysisBackend}
+            onBackendChange={setAnalysisBackend}
+            level={gsdLevel}
+            onLevelChange={setGsdLevel}
+            solvent={gsdSolvent}
+            onSolventChange={setGsdSolvent}
+          />
+
           {/* Two prominent action tiles */}
           <div className="grid gap-3 sm:grid-cols-2">
             {/* Inspect (preview) tile */}
@@ -1171,50 +1325,63 @@ export function SpectraCheckRawFidSection({
               </TooltipContent>
             </Tooltip>
 
-            {/* Process tile (primary) */}
+            {/* Process tile (primary) — routes to legacy or GSD backend
+                based on the Analysis backend selector above. */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  disabled={processLoading}
-                  onClick={runProcess}
+                  disabled={processLoading || gsdLoading}
+                  onClick={analysisBackend === "gsd_prompt3" ? runGSDAnalyze : runProcess}
                   className={cn(
                     "group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
                     "hover:-translate-y-px hover:shadow-md",
-                    processLoading
+                    (processLoading || gsdLoading)
                       ? "cursor-wait opacity-70"
-                      : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
+                      : analysisBackend === "gsd_prompt3"
+                        ? "border-amber-500/40 hover:border-amber-600"
+                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
                   )}
                   style={{
-                    borderTop: "3px solid var(--mt-teal)",
-                    backgroundColor: "var(--mt-teal-soft)",
+                    borderTop: analysisBackend === "gsd_prompt3" ? "3px solid #D97706" : "3px solid var(--mt-teal)",
+                    backgroundColor: analysisBackend === "gsd_prompt3" ? "rgb(254 243 199 / 0.5)" : "var(--mt-teal-soft)",
                   }}
                 >
                   <div className="flex w-full items-center justify-between">
                     <span
                       className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: analysisBackend === "gsd_prompt3" ? "#B45309" : "var(--mt-teal)" }}
                     >
-                      <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                      Process
+                      {analysisBackend === "gsd_prompt3" ? (
+                        <FlaskConical className="h-3.5 w-3.5" aria-hidden />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                      {analysisBackend === "gsd_prompt3" ? "GSD analyze" : "Process"}
                     </span>
                     <span
                       className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: analysisBackend === "gsd_prompt3" ? "#B45309" : "var(--mt-teal)" }}
                     >
-                      Generates spectrum
+                      {analysisBackend === "gsd_prompt3" ? "Experimental" : "Generates spectrum"}
                     </span>
                   </div>
                   <span className="font-mono text-base font-bold leading-tight">
-                    {processLoading ? "Processing…" : "Process FID"}
+                    {analysisBackend === "gsd_prompt3"
+                      ? (gsdLoading ? "Running GSD…" : `Run GSD analysis (level ${gsdLevel})`)
+                      : (processLoading ? "Processing…" : "Process FID")}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    Fourier transform + apodization on a derived copy. Generates the displayable spectrum.
+                    {analysisBackend === "gsd_prompt3"
+                      ? "Mestrenova-style peak detection with auto-classification on the FT-processed spectrum."
+                      : "Fourier transform + apodization on a derived copy. Generates the displayable spectrum."}
                   </span>
                 </button>
               </TooltipTrigger>
               <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                POST /nmr/raw-fid/process
+                {analysisBackend === "gsd_prompt3"
+                  ? "POST /spectrum/analyze/gsd (experimental)"
+                  : "POST /nmr/raw-fid/process"}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -1270,11 +1437,25 @@ export function SpectraCheckRawFidSection({
             />
           ) : null}
 
+          {showHeavy13CWarning && (
+            <AlertCard
+              variant="info"
+              title={processLoading ? "Processing dense ¹³C spectrum…" : "Dense ¹³C spectrum"}
+              description={
+                processLoading
+                  ? `This may take several minutes (${heavyPointCount?.toLocaleString()} points). Backend perf work is in progress.`
+                  : `This spectrum has ${heavyPointCount?.toLocaleString()} points. Running Process FID may take several minutes.`
+              }
+            />
+          )}
           {previewError && (
             <AlertCard variant="error" title="Preview failed" description={previewError} />
           )}
           {processError && (
             <AlertCard variant="error" title="Process failed" description={processError} />
+          )}
+          {gsdError && (
+            <AlertCard variant="error" title="GSD analyze failed" description={gsdError} />
           )}
         </div>
       </ModuleCard>
@@ -1904,6 +2085,24 @@ export function SpectraCheckRawFidSection({
           </ModuleCard>
         </div>
       )}
+
+      {/* ── Step 3b — GSD-Prompt-3 output (experimental) ──────────────────
+          Only renders when the user has run the experimental backend.
+          Lives alongside the legacy Step 3 results without replacing them. */}
+      <GsdResultsPanel result={gsdResult} testId="raw-fid-gsd-results-surface" />
+
+      {/* ── Step 3c — Legacy detection summary (unified panel) ──────────
+          Post-Phase-11 the raw-FID responses expose the same envelope
+          (`peaks` + `environments` + `category_counts`) as GSD. Render
+          them through the same component so users get a consistent
+          summary view regardless of which backend they chose. The
+          existing Step 3 evidence-detail rendering above is untouched. */}
+      {legacyDetectionResult ? (
+        <DetectionResultsPanel
+          result={legacyDetectionResult}
+          testId="raw-fid-legacy-results-surface"
+        />
+      ) : null}
     </div>
   )
 }

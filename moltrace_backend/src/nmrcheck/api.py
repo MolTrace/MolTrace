@@ -744,6 +744,8 @@ from .models import (
     SpectrumGSDAnalyzeRequest,
     SpectrumGSDAnalyzeResult,
     SpectrumPreviewReport,
+    SpectrumSolventCatalog,
+    SpectrumSolventInfo,
     StoredAnalysisRecord,
     StoredReportRecord,
     StructureSummary,
@@ -5154,7 +5156,11 @@ async def spectrum_analyze_gsd(
     import numpy as np
 
     from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
-    from moltrace.spectroscopy.peaks.gsd import auto_classify, gsd_peak_pick
+    from moltrace.spectroscopy.peaks.gsd import (
+        auto_classify,
+        cluster_into_environments,
+        gsd_peak_pick,
+    )
 
     if len(payload.ppm_axis) != len(payload.intensity):
         raise HTTPException(
@@ -5196,11 +5202,46 @@ async def spectrum_analyze_gsd(
         for peak in classified
     ]
 
+    # Multiplet-cluster the peaks into chemical environments for parity
+    # with expert reference shift lists (one entry per distinct H/C
+    # environment, not per multiplet line).  See gsd.cluster_into_environments
+    # for the algorithm + default windows.
+    environments = cluster_into_environments(
+        classified,
+        field_mhz=payload.field_mhz,
+        nucleus=payload.nucleus,
+        cluster_j_hz=payload.cluster_j_hz,
+    )
+    environment_models = [
+        {
+            "centre_ppm": env.centre_ppm,
+            "peak_count": env.peak_count,
+            "total_intensity": env.total_intensity,
+            "total_area": env.total_area,
+            "category": env.category,
+            "multiplicity": env.multiplicity,
+            "constituent_peak_indices": list(env.constituent_indices),
+        }
+        for env in environments
+    ]
+    environment_counts: dict[str, int] = {}
+    for env in environments:
+        environment_counts[env.category] = environment_counts.get(env.category, 0) + 1
+
     notes: list[str] = []
     if not classified:
-        notes.append(
-            "GSD did not pick any peaks; check spectrum SNR + dynamic range."
-        )
+        if payload.level < 5:
+            notes.append(
+                f"GSD did not pick any peaks at level {payload.level}. "
+                f"Try level {payload.level + 1} (lower detection threshold) "
+                "or check spectrum SNR + dynamic range."
+            )
+        else:
+            notes.append(
+                "GSD did not pick any peaks at level 5 (most sensitive). "
+                "Check spectrum SNR + dynamic range; the trace may be empty, "
+                "upside-down (negative peaks), or off-referenced."
+            )
     if payload.level >= 4:
         notes.append(
             "Level 4-5 use the legacy iterative deconvolve_region pass; "
@@ -5211,6 +5252,9 @@ async def spectrum_analyze_gsd(
     return SpectrumGSDAnalyzeResult(
         peaks=peak_models,  # type: ignore[arg-type]
         category_counts=category_counts,
+        environments=environment_models,  # type: ignore[arg-type]
+        environment_count=len(environments),
+        environment_counts=environment_counts,
         level=payload.level,
         backend="gsd_prompt3",
         experimental=True,
@@ -5222,6 +5266,145 @@ async def spectrum_analyze_gsd(
             "input_point_count": len(payload.ppm_axis),
         },
     )
+
+
+@router.get(
+    "/spectrum/solvents/known",
+    response_model=SpectrumSolventCatalog,
+    dependencies=[Depends(require_access_context)],
+)
+async def spectrum_solvents_known(
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumSolventCatalog:
+    """Canonical solvent catalog for the FE's solvent dropdown.
+
+    The auto-classification machinery in ``peak_categorization`` matches
+    solvents by canonical key; free-text input is normalized via the
+    ``canonical_solvent`` helper, but that normalization is best-effort
+    and silently drops unknown values.  This endpoint exposes the exact
+    set of solvent keys the classifier recognizes so the FE can render a
+    validated dropdown and eliminate the typo / casing failure mode.
+
+    Entries include the aliases ``canonical_solvent`` recognizes so FE
+    can pre-fill the dropdown from a legacy free-text value, and the
+    1H + 13C residual-peak centres for tooltip / preview rendering.
+    """
+
+    from .nmr_tables import SOLVENT_IMPURITY_WINDOWS
+    from .solvents import SOLVENT_PROFILES
+
+    profile_lookup = {profile.canonical_name: profile for profile in SOLVENT_PROFILES}
+
+    def _residual_centre(windows: list[Any], kinds: set[str]) -> float | None:
+        for window in windows:
+            if getattr(window, "kind", None) in kinds:
+                low = float(getattr(window, "low"))
+                high = float(getattr(window, "high"))
+                return round((low + high) / 2.0, 4)
+        return None
+
+    # auto_classify treats {"solvent", "water", "residual", "reference"} as
+    # valid solvent-kind labels.  Match the same set here so the catalog
+    # surfaces a residual centre for solvents whose practical residual peak
+    # is a "water" kind (e.g. D2O's HOD line is THE residual reference users
+    # see in 1H spectra, even though its categorisation kind is "water").
+    _SOLVENT_KINDS = {"solvent", "water", "residual", "reference"}
+
+    entries: list[SpectrumSolventInfo] = []
+    for canonical, by_nucleus in SOLVENT_IMPURITY_WINDOWS.items():
+        profile = profile_lookup.get(canonical)
+        proton_windows = by_nucleus.get("1H", [])
+        carbon_windows = by_nucleus.get("13C", [])
+        entries.append(
+            SpectrumSolventInfo(
+                key=canonical,
+                label=canonical,
+                aliases=list(profile.aliases) if profile else [],
+                residual_1h_ppm=_residual_centre(proton_windows, _SOLVENT_KINDS),
+                residual_13c_ppm=_residual_centre(carbon_windows, _SOLVENT_KINDS),
+                notes=list(profile.notes) if profile else [],
+            )
+        )
+
+    entries.sort(key=lambda item: item.key.lower())
+    return SpectrumSolventCatalog(solvents=entries)
+
+
+def _cluster_legacy_peaks_into_environments(
+    peaks: list[dict[str, Any]],
+    *,
+    field_mhz: float | None,
+    nucleus: str,
+) -> tuple[list[dict[str, Any]], int, dict[str, int]]:
+    """Convert legacy enriched-peak dicts -> cluster_into_environments output.
+
+    Returns (environment_dicts, environment_count, environment_counts).
+    Safe on empty input.  Defaults field_mhz to 500 MHz when missing so
+    the helper never raises on FID metadata edge cases (e.g., vendors
+    where SFO1 wasn't parsed); environment grouping just uses the safe
+    default in that case.
+    """
+
+    if not peaks:
+        return [], 0, {}
+
+    from moltrace.spectroscopy.peaks.gsd import (
+        Peak as _GSDPeak,
+        cluster_into_environments as _cluster,
+    )
+
+    converted: list[_GSDPeak] = []
+    for raw in peaks:
+        shift = raw.get("shift_ppm")
+        if not isinstance(shift, (int, float)):
+            continue
+        raw_category = raw.get("category")
+        category = (
+            raw_category
+            if raw_category in {"compound", "solvent", "impurity", "artifact", "13C_satellite"}
+            else "compound"
+        )
+        intensity = raw.get("integration_h")
+        intensity_value = (
+            float(intensity) if isinstance(intensity, (int, float)) and intensity > 0 else 1.0
+        )
+        converted.append(
+            _GSDPeak(
+                position_ppm=float(shift),
+                position_hz=0.0,
+                intensity=intensity_value,
+                area=intensity_value,
+                width_hz=0.0,
+                shape="lorentzian",
+                category=category,  # type: ignore[arg-type]
+                confidence=0.0,
+            )
+        )
+
+    if not converted:
+        return [], 0, {}
+
+    envs = _cluster(
+        converted,
+        field_mhz=float(field_mhz or 500.0),
+        nucleus=nucleus,
+    )
+    env_dicts = [
+        {
+            "centre_ppm": env.centre_ppm,
+            "peak_count": env.peak_count,
+            "total_intensity": env.total_intensity,
+            "total_area": env.total_area,
+            "category": env.category,
+            "multiplicity": env.multiplicity,
+            "constituent_peak_indices": list(env.constituent_indices),
+        }
+        for env in envs
+    ]
+    counts: dict[str, int] = {}
+    for env in envs:
+        counts[env.category] = counts.get(env.category, 0) + 1
+    return env_dicts, len(envs), counts
 
 
 def _unwrap_form_default(value: Any) -> Any:
@@ -6556,6 +6739,34 @@ async def nmr_raw_fid_preview_route(
             "point_count": point_count,
         },
     )
+    _acq_meta = dict(provenance.get("acquisition_metadata") or {})
+    # Normalize vendor-specific spectrometer-frequency keys
+    # (Bruker SFO1/BF1, Varian sfrq/reffrq) to a single field_mhz so the
+    # FE can pass it straight into /spectrum/analyze/gsd without needing
+    # vendor parsing.  Mirror of fid.py's _param_float lookup order.
+    _resolved_field_mhz: float | None = None
+    for _key in ("SFO1", "BF1", "sfrq", "reffrq", "H1reffrq", "dfrq", "SF", "sf"):
+        _val = _acq_meta.get(_key)
+        if isinstance(_val, (int, float)) and float(_val) > 0.0:
+            _resolved_field_mhz = float(_val)
+            break
+
+    # Multiplet-cluster the peaks into chemical environments for parity
+    # with /spectrum/analyze/gsd (FE renders both via one component).
+    # The preview route does not always run enrich_peaks (text-parsed peaks
+    # arrive without category), so the clustering helper treats them as
+    # compound by default and groups by ppm proximity only.
+    _preview_peaks_for_clustering: list[dict[str, Any]] = (
+        list(peaks) if "peaks" in locals() and isinstance(peaks, list) else []
+    )
+    _preview_envs, _preview_env_count, _preview_env_counts = (
+        _cluster_legacy_peaks_into_environments(
+            _preview_peaks_for_clustering,
+            field_mhz=_resolved_field_mhz,
+            nucleus=nucleus,
+        )
+    )
+
     return NMRRawFIDPreviewResponse(
         sample_id=sample_id,
         filename=filename,
@@ -6563,10 +6774,14 @@ async def nmr_raw_fid_preview_route(
         vendor_detected=vendor_detected,
         nucleus=nucleus,
         solvent=solvent,
-        acquisition_parameters=dict(provenance.get("acquisition_metadata") or {}),
+        field_mhz=_resolved_field_mhz,
+        acquisition_parameters=_acq_meta,
         file_inventory=_raw_fid_file_inventory(provenance),
         processing_preset=resolved_processing_preset,
         processing_parameters=processing_parameters,
+        environments=_preview_envs,  # type: ignore[arg-type]
+        environment_count=_preview_env_count,
+        environment_counts=_preview_env_counts,
         point_count=point_count,
         peak_count=len(peaks),
         peaks=peaks,
@@ -6899,17 +7114,45 @@ async def nmr_raw_fid_process_route(
             "processing_preset": settings.selected_preset,
         },
     )
+    # Normalize vendor-specific spectrometer-frequency keys (Bruker SFO1/BF1,
+    # Varian sfrq/reffrq) to a single field_mhz so the FE can plumb it into
+    # /spectrum/analyze/gsd directly.  Same lookup order as the preview route.
+    _process_acq_meta = dict(raw_upload_provenance.get("acquisition_metadata") or {})
+    _process_field_mhz: float | None = None
+    for _process_key in ("SFO1", "BF1", "sfrq", "reffrq", "H1reffrq", "dfrq", "SF", "sf"):
+        _val = _process_acq_meta.get(_process_key)
+        if isinstance(_val, (int, float)) and float(_val) > 0.0:
+            _process_field_mhz = float(_val)
+            break
+
+    # Cluster the enriched peaks into chemical environments.  The process
+    # route runs enrich_peaks (line 6890), so fid_peaks carries category +
+    # solvent_hit + impurity_match etc, and the env grouping respects
+    # category boundaries (compound peaks cluster among themselves, solvent
+    # peaks stay as singletons).
+    _process_envs, _process_env_count, _process_env_counts = (
+        _cluster_legacy_peaks_into_environments(
+            fid_peaks,
+            field_mhz=_process_field_mhz,
+            nucleus=nucleus,
+        )
+    )
+
     return NMRRawFIDProcessResponse(
         sample_id=sample_id,
         filename=filename,
         raw_sha256=raw_sha256,
         vendor_detected=preview.processing_metadata.vendor_format_detected,
         nucleus=nucleus,
+        field_mhz=_process_field_mhz,
         processing_preset=settings.selected_preset,
         processing_parameters=processing_parameters,
         point_count=preview.point_count,
         peak_count=len(fid_peaks),
         peaks=fid_peaks,
+        environments=_process_envs,  # type: ignore[arg-type]
+        environment_count=_process_env_count,
+        environment_counts=_process_env_counts,
         peak_category_summary=peak_category_summary,
         labile_hydrogen_summary=labile_hydrogen_summary,
         proton_inventory=proton_inventory,

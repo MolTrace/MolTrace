@@ -299,9 +299,22 @@ class ValidationReport(BaseModel):
 
 
 class SpectrumPoint(BaseModel):
+    """One sample of a downsampled spectrum trace (display point).
+
+    ``shift_ppm`` bounds are intentionally wide: the trace can carry edge
+    samples beyond the chemical-shift "claim" range that ``Peak`` enforces
+    (e.g., metal-organic ¹³C carbons above 260 ppm, off-referenced spectra
+    whose entire ppm window is shifted by tens of ppm, or wrap-around
+    artifacts from poorly-phased FFTs).  Earlier strict bounds of ±50/+260
+    rejected the whole trace when a single edge sample fell outside,
+    causing the legacy ``/nmr/raw-fid/process`` route to return zero peaks
+    for real spectra that GSD had no trouble with.  NaN/Inf filtering is
+    handled separately by the upstream ``math.isfinite`` checks.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
-    shift_ppm: float = Field(ge=-50.0, le=260.0)
+    shift_ppm: float = Field(ge=-500.0, le=500.0)
     intensity: float
 
 
@@ -565,6 +578,53 @@ class NMRProcessedAnalyzeResponse(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class LegacyEnrichedPeak(BaseModel):
+    """Detected peak with categorization fields surfaced from ``enrich_peaks``.
+
+    The legacy raw-FID + processed-spectrum routes have always run
+    ``enrich_peaks`` over their detected peaks, injecting a ``category``,
+    ``solvent_hit``, ``impurity_match``, ``chemical_region``, etc. into each
+    peak dict at runtime.  Historically those fields existed only in the
+    free-form ``dict[str, Any]`` shape, invisible to the FE's typed
+    schema.d.ts consumer.
+
+    This model surfaces the core enrichment fields in the OpenAPI schema
+    so the FE can type against them (e.g. ``peak.category === "solvent"``)
+    while preserving the dict's long-tail fields via ``extra='allow'`` --
+    nothing downstream that relied on those extras breaks.
+
+    Detector-agnostic by design: both legacy and GSD-derived peak streams
+    can serialize through this model since the field set is a superset of
+    both detectors' minimum output.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    # Base detection / parser fields (always present from the parser-domain Peak).
+    shift_ppm: float
+    multiplicity: str | None = None
+    integration_h: float | None = Field(default=None, ge=0.0)
+    j_values_hz: list[float] = Field(default_factory=list)
+    # Categorization fields injected by enrich_peaks; all optional because
+    # some upstream paths bypass enrichment.  The legacy categorization
+    # machinery emits a richer taxonomy than the 5 GSD detection categories
+    # (compound/solvent/impurity/artifact/13C_satellite): chemical-region
+    # labels like 'aliphatic', 'oxygenated', 'aromatic', 'anomeric',
+    # 'carbohydrate_sugar', 'nitrogen_adjacent', 'labile_OH_NH_SH', etc.
+    # also surface through this field.  Kept open (`str | None`) so the
+    # schema accepts the full set; the FE can still narrow on specific
+    # values via TS string-literal checks.
+    category: str | None = None
+    category_reason: str | None = None
+    chemical_region: str | None = None
+    labile_hint: bool | None = None
+    # Structured solvent / impurity match payloads (for FE tooltip /
+    # explainability rendering).  Loose dict shape because the categorization
+    # module emits varying field sets per match kind.
+    solvent_hit: dict[str, Any] | None = None
+    impurity_match: dict[str, Any] | None = None
+
+
 class NMRRawFIDPreviewResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -574,13 +634,26 @@ class NMRRawFIDPreviewResponse(BaseModel):
     vendor_detected: str
     nucleus: NMRFrontendNucleus
     solvent: str | None = None
+    # Normalized spectrometer frequency in MHz, parsed from acquisition
+    # metadata (Bruker SFO1/BF1 or Varian sfrq/reffrq).  Surfaced as a
+    # first-class field so the FE doesn't need vendor-specific knowledge
+    # to plumb the value into downstream calls like /spectrum/analyze/gsd
+    # (which otherwise defaults to 500 MHz when the FE has no UI input).
+    field_mhz: float | None = Field(default=None, gt=0.0, le=2000.0)
     acquisition_parameters: dict[str, Any] = Field(default_factory=dict)
     file_inventory: dict[str, Any] = Field(default_factory=dict)
     processing_preset: str | None = None
     processing_parameters: dict[str, Any] = Field(default_factory=dict)
     point_count: int = Field(default=0, ge=0)
     peak_count: int = Field(default=0, ge=0)
-    peaks: list[dict[str, Any]] = Field(default_factory=list)
+    peaks: list[LegacyEnrichedPeak] = Field(default_factory=list)
+    # Multiplet-clustered chemical-environment view of ``peaks``, populated
+    # via the same ``cluster_into_environments`` helper that drives the GSD
+    # endpoint.  Reuses ``GSDPromptEnvironment`` for shape parity so the FE
+    # can render both detectors with a single component.
+    environments: list[GSDPromptEnvironment] = Field(default_factory=list)
+    environment_count: int = Field(default=0, ge=0)
+    environment_counts: dict[str, int] = Field(default_factory=dict)
     x: list[float] = Field(default_factory=list)
     y: list[float] = Field(default_factory=list)
     x_label: str = "ppm"
@@ -599,6 +672,11 @@ class NMRRawFIDProcessResponse(BaseModel):
     raw_sha256: str = Field(min_length=64, max_length=64)
     vendor_detected: str
     nucleus: NMRFrontendNucleus
+    # Mirror of NMRRawFIDPreviewResponse.field_mhz so the FE's
+    # `previewResult?.field_mhz ?? processResult?.field_mhz ?? 500`
+    # fallback chain returns a real value regardless of whether the
+    # spectrum sits in the preview or process lifecycle stage.
+    field_mhz: float | None = Field(default=None, gt=0.0, le=2000.0)
     processing_preset: str
     processing_parameters: dict[str, Any] = Field(default_factory=dict)
     point_count: int = Field(ge=0)
@@ -607,8 +685,14 @@ class NMRRawFIDProcessResponse(BaseModel):
     # Raw FID tab can mount the same EnrichedPickedPeaksPanel +
     # SpectraCheckEvidencePanels composite as the Processed tab.
     peak_count: int = Field(default=0, ge=0)
-    peaks: list[dict[str, Any]] = Field(default_factory=list)
+    peaks: list[LegacyEnrichedPeak] = Field(default_factory=list)
     peak_category_summary: dict[str, int] = Field(default_factory=dict)
+    # Multiplet-clustered chemical-environment view of ``peaks``; mirror of
+    # the field on NMRRawFIDPreviewResponse so the FE can treat preview +
+    # process responses uniformly.
+    environments: list[GSDPromptEnvironment] = Field(default_factory=list)
+    environment_count: int = Field(default=0, ge=0)
+    environment_counts: dict[str, int] = Field(default_factory=dict)
     labile_hydrogen_summary: dict[str, Any] = Field(default_factory=dict)
     proton_inventory: dict[str, Any] = Field(default_factory=dict)
     impurity_candidates: list[dict[str, Any]] = Field(default_factory=list)
@@ -14387,6 +14471,7 @@ GSDPromptPeakCategory = Literal[
 ]
 GSDPromptNucleus = Literal["1H", "13C"]
 GSDPromptBackend = Literal["gsd_prompt3"]
+GSDPromptMultiplicity = Literal["s", "d", "t", "q", "quint", "sext", "sept", "m"]
 
 
 class GSDPromptPeak(BaseModel):
@@ -14427,6 +14512,37 @@ class SpectrumGSDAnalyzeRequest(BaseModel):
     solvent: str = Field(default="", max_length=64)
     field_mhz: float = Field(default=500.0, gt=0.0, le=2000.0)
     level: int = Field(default=2, ge=1, le=5)
+    # Multiplet-cluster J-coupling window in Hz; controls how aggressively
+    # adjacent same-category peaks merge into one "environment" entry.
+    # When ``None`` the backend uses a nucleus-aware default (20 Hz for 1H,
+    # 5 Hz for 13C).  Use 5-8 Hz to merge only clear doublet / triplet
+    # partners; 20+ Hz to absorb wider multiplet splittings.
+    cluster_j_hz: float | None = Field(default=None, ge=0.0, le=200.0)
+
+
+class GSDPromptEnvironment(BaseModel):
+    """One chemical environment formed by clustering adjacent same-category peaks.
+
+    NMR reference shift lists (NMRShiftDB2, HMDB, literature tables) count
+    *environments* (one entry per chemically distinct H or C atom), but a
+    real-world detector legitimately resolves multiplet lines (a doublet =
+    2 peaks, a quartet = 4).  This shape lets callers compare on either
+    granularity: ``peaks`` for raw detector output, ``environments`` for
+    semantic parity with reference shift lists.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    centre_ppm: float
+    peak_count: int = Field(ge=1)
+    total_intensity: float = Field(ge=0.0)
+    total_area: float = Field(ge=0.0)
+    category: GSDPromptPeakCategory
+    multiplicity: GSDPromptMultiplicity
+    # Indices into the response's ``peaks`` list of the peaks that make
+    # up this environment; lets the FE highlight the underlying lines
+    # when an environment row is selected.
+    constituent_peak_indices: list[int] = Field(default_factory=list)
 
 
 class SpectrumGSDAnalyzeResult(BaseModel):
@@ -14436,8 +14552,43 @@ class SpectrumGSDAnalyzeResult(BaseModel):
 
     peaks: list[GSDPromptPeak]
     category_counts: dict[str, int] = Field(default_factory=dict)
+    # Multiplet-clustered "chemical environment" view of the same peaks,
+    # for parity with expert reference shift lists (one entry per
+    # chemically distinct H/C atom rather than one entry per multiplet
+    # line).  Length(environments) <= length(peaks): every peak is
+    # accounted for in exactly one environment.
+    environments: list[GSDPromptEnvironment] = Field(default_factory=list)
+    environment_count: int = Field(default=0, ge=0)
+    environment_counts: dict[str, int] = Field(default_factory=dict)
     level: int
     backend: GSDPromptBackend = "gsd_prompt3"
     experimental: bool = True
     notes: list[str] = Field(default_factory=list)
     spectrum_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SpectrumSolventInfo(BaseModel):
+    """One entry in the canonical solvent catalog.
+
+    Returned by ``GET /spectrum/solvents/known`` so the FE can render a
+    validated solvent dropdown (replacing the free-text input that's
+    vulnerable to typo / casing failures when downstream auto-
+    classification rules expect exact canonical keys).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str  # canonical name (what to send back to the backend)
+    label: str  # human-readable name; typically same as key
+    aliases: list[str] = Field(default_factory=list)  # legacy free-text values to accept
+    residual_1h_ppm: float | None = None  # centre of the curated 1H residual-solvent window
+    residual_13c_ppm: float | None = None  # centre of the curated 13C residual-solvent window
+    notes: list[str] = Field(default_factory=list)
+
+
+class SpectrumSolventCatalog(BaseModel):
+    """Catalog of all solvents the auto-classification machinery understands."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    solvents: list[SpectrumSolventInfo] = Field(default_factory=list)

@@ -1821,7 +1821,33 @@ def _build_spectrum_comparison(
 def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float | None = None) -> tuple[list[Peak], dict[str, Any]]:
     if not estimates:
         return ([], {"raw_estimated_total_h": 0.0, "integration_normalized_to_target": False})
-    raw_integrations = _provisional_integrations(estimates)
+    # Pre-filter estimates whose chemical shift falls outside the strict Peak
+    # model bounds (-50.0 .. 260.0 ppm).  Without this filter, a single
+    # off-referenced / wrapped / artifact estimate above 260 ppm (common in
+    # raw 13C spectra) raises a Pydantic ValidationError that propagates as
+    # an HTTP 400 and **drops the entire peak list** -- the legacy
+    # /nmr/raw-fid/process route returns 0 peaks instead of the dozens of
+    # legitimate peaks below 260.  Dropping the out-of-range candidates with
+    # a meta count is much better than losing the whole result.
+    in_range_estimates: list[_PeakEstimate] = []
+    out_of_range_shifts: list[float] = []
+    for est in estimates:
+        shift = est.shift_ppm
+        if shift is None or not (-50.0 <= float(shift) <= 260.0):
+            out_of_range_shifts.append(float(shift) if shift is not None else float("nan"))
+            continue
+        in_range_estimates.append(est)
+    if not in_range_estimates:
+        return (
+            [],
+            {
+                "raw_estimated_total_h": 0.0,
+                "integration_normalized_to_target": False,
+                "out_of_range_dropped_count": len(out_of_range_shifts),
+                "out_of_range_dropped_shifts": [round(s, 3) for s in out_of_range_shifts],
+            },
+        )
+    raw_integrations = _provisional_integrations(in_range_estimates)
     if not raw_integrations:
         return ([], {"raw_estimated_total_h": 0.0, "integration_normalized_to_target": False})
     integrations = _round_half_integrations(raw_integrations, minimum=0.5)
@@ -1833,7 +1859,7 @@ def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float
             integrations = normalized
             normalized_to_target = True
     peaks: list[Peak] = []
-    for est, integration in zip(estimates, integrations):
+    for est, integration in zip(in_range_estimates, integrations):
         peaks.append(
             Peak(
                 shift_ppm=round(est.shift_ppm, 3),
@@ -1842,13 +1868,14 @@ def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float
                 j_values_hz=list(est.j_values_hz),
             )
         )
-    return (
-        peaks,
-        {
-            "raw_estimated_total_h": raw_total_h,
-            "integration_normalized_to_target": normalized_to_target,
-        },
-    )
+    meta: dict[str, Any] = {
+        "raw_estimated_total_h": raw_total_h,
+        "integration_normalized_to_target": normalized_to_target,
+    }
+    if out_of_range_shifts:
+        meta["out_of_range_dropped_count"] = len(out_of_range_shifts)
+        meta["out_of_range_dropped_shifts"] = [round(s, 3) for s in out_of_range_shifts]
+    return (peaks, meta)
 
 
 def _peaks_to_nmr_text(peaks: list[Peak]) -> str:

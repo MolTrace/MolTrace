@@ -46,6 +46,163 @@ class Peak:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+# Default multiplet-cluster window in Hz, applied when ``cluster_j_hz`` is
+# not provided by the caller.  1H windows must accommodate typical
+# J-couplings (vicinal ~6-8 Hz, geminal ~10-15 Hz, occasional 18-20 Hz
+# couplings in cis-alkene / W-coupled systems).  13C spectra are usually
+# 1H-decoupled so multiplet splittings are rare; a small floor catches
+# ¹³C-¹³C couplings and prevents legitimate distinct environments at 5+
+# ppm separation from accidentally merging.
+_DEFAULT_CLUSTER_J_HZ_BY_NUCLEUS: dict[str, float] = {
+    "1H": 20.0,
+    "13C": 5.0,
+}
+# Multiplicity letters for environments containing N constituent peaks.
+# 8+ peaks degenerates to "m" (multiplet / unresolved cluster).
+_MULTIPLICITY_BY_PEAK_COUNT: dict[int, str] = {
+    1: "s",
+    2: "d",
+    3: "t",
+    4: "q",
+    5: "quint",
+    6: "sext",
+    7: "sept",
+}
+
+
+@dataclass(slots=True, frozen=True)
+class Environment:
+    """One chemical environment, formed from one-or-more adjacent peaks of the
+    same category whose ppm separation is within a J-coupling window.
+
+    Exists because expert NMR reference shift lists (e.g., NMRShiftDB2,
+    HMDB, literature ¹H/¹³C tables) count *environments*, not individual
+    multiplet lines.  Without clustering, a real-world detector legitimately
+    resolves a doublet as 2 peaks and a quartet as 4 -- but the curated
+    reference treats each as one entry.  Clustering peaks back into
+    environments lets gate metrics compare on the same unit the reference
+    uses, making "median Δ ≤ 2" a tractable target instead of an artefact
+    of multiplicity inflation.
+    """
+
+    centre_ppm: float
+    peak_count: int
+    total_intensity: float
+    total_area: float
+    category: PeakCategory
+    multiplicity: str  # "s" | "d" | "t" | "q" | "quint" | "sext" | "sept" | "m"
+    constituent_indices: list[int]
+
+
+def cluster_into_environments(
+    peaks: list[Peak],
+    *,
+    field_mhz: float,
+    nucleus: str = "1H",
+    cluster_j_hz: float | None = None,
+) -> list[Environment]:
+    """Group adjacent same-category peaks into chemical-environment clusters.
+
+    Two peaks merge into the same environment when they share a category AND
+    their ppm separation converts (via ``field_mhz``) to ≤ ``cluster_j_hz``.
+    Category isolation prevents a compound peak from absorbing an adjacent
+    solvent / impurity / artifact peak: each non-compound category produces
+    single-peak environments by default (a solvent line stays one
+    environment; an artefact stays one environment).
+
+    Returns one environment per input peak when no clustering applies.
+    Returns a single environment when every input peak shares a category
+    and a tight cluster.  The intensity-weighted centre_ppm is the value
+    the gate metric / FE display should use as the "peak position".
+
+    Args:
+        peaks: list of classified Peak objects (typically the output of
+            ``auto_classify``).  Their order is preserved in ``constituent_indices``.
+        field_mhz: spectrometer frequency in MHz; used to convert the
+            ``cluster_j_hz`` window into a ppm threshold.
+        nucleus: "1H" or "13C"; selects the per-nucleus default window
+            when ``cluster_j_hz`` is None.
+        cluster_j_hz: explicit J-coupling window in Hz; overrides the
+            nucleus-aware default when provided.  Use a smaller value
+            (e.g., 5-8 Hz) to be conservative and only merge clear
+            doublet / triplet partners; use a larger value (e.g., 20 Hz)
+            to absorb wider multiplet splittings.
+    """
+
+    if not peaks:
+        return []
+
+    if cluster_j_hz is None:
+        cluster_j_hz = _DEFAULT_CLUSTER_J_HZ_BY_NUCLEUS.get(
+            _normalise_nucleus(nucleus), 20.0
+        )
+    if field_mhz <= 0 or not math.isfinite(field_mhz):
+        # Fall back to a safe single-peak-per-environment output if the
+        # caller passed a non-physical field.  Better than emitting
+        # nonsense clusters from a divide-by-zero conversion.
+        return [_singleton_environment(idx, peak) for idx, peak in enumerate(peaks)]
+    cluster_j_ppm = float(cluster_j_hz) / float(field_mhz)
+
+    # Sort by ppm (ascending) but track the original index so the FE can
+    # cross-reference environments back to specific peaks in the response.
+    indexed = sorted(enumerate(peaks), key=lambda item: item[1].position_ppm)
+
+    groups: list[list[tuple[int, Peak]]] = [[indexed[0]]]
+    for original_index, peak in indexed[1:]:
+        prev_index, prev_peak = groups[-1][-1]
+        same_category = peak.category == prev_peak.category
+        within_window = (
+            abs(peak.position_ppm - prev_peak.position_ppm) <= cluster_j_ppm
+        )
+        if same_category and within_window:
+            groups[-1].append((original_index, peak))
+        else:
+            groups.append([(original_index, peak)])
+
+    environments: list[Environment] = []
+    for group in groups:
+        if len(group) == 1:
+            idx, peak = group[0]
+            environments.append(_singleton_environment(idx, peak))
+            continue
+        environments.append(_aggregate_environment(group))
+    return environments
+
+
+def _singleton_environment(index: int, peak: Peak) -> Environment:
+    return Environment(
+        centre_ppm=float(peak.position_ppm),
+        peak_count=1,
+        total_intensity=float(max(peak.intensity, 0.0)),
+        total_area=float(max(peak.area, 0.0)),
+        category=peak.category,
+        multiplicity=_MULTIPLICITY_BY_PEAK_COUNT.get(1, "s"),
+        constituent_indices=[int(index)],
+    )
+
+
+def _aggregate_environment(group: list[tuple[int, Peak]]) -> Environment:
+    indices = [int(idx) for idx, _ in group]
+    peaks_only = [peak for _, peak in group]
+    intensities = np.asarray([max(p.intensity, 0.0) for p in peaks_only], dtype=float)
+    positions = np.asarray([float(p.position_ppm) for p in peaks_only], dtype=float)
+    total_intensity = float(intensities.sum())
+    if total_intensity > 0.0:
+        centre_ppm = float(np.sum(positions * intensities) / total_intensity)
+    else:
+        centre_ppm = float(positions.mean())
+    multiplicity = _MULTIPLICITY_BY_PEAK_COUNT.get(len(peaks_only), "m")
+    return Environment(
+        centre_ppm=centre_ppm,
+        peak_count=len(peaks_only),
+        total_intensity=total_intensity,
+        total_area=float(sum(max(p.area, 0.0) for p in peaks_only)),
+        category=peaks_only[0].category,
+        multiplicity=multiplicity,
+        constituent_indices=indices,
+    )
+
+
 def gsd_peak_pick(spectrum: NMRSpectrum, level: int = 2) -> list[Peak]:
     """
     Pick and fit spectrum peaks with a Global Spectral Deconvolution style API.

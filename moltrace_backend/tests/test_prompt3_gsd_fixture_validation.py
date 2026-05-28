@@ -31,14 +31,23 @@ _FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures"
 # we just observed so harmless run-to-run wiggle from any numerical change
 # in scipy/lmfit doesn't break the gate, but a real degradation does.
 # Bumped 2026-05-27 after Phase 3a/3b tuning improved baseline.
+# Bumped again 2026-05-27 after Phase 10 multiplet clustering ship (50% within-
+# tol on environment metric vs 45% on peak metric).
 _MIN_OK_FIXTURES = 20
 _MIN_SOLVENT_DETECT_RATE_FLOOR = 0.92
 _MIN_COMPOUND_WITHIN_MANIFEST_TOL_RATE_FLOOR = 0.40
 _MAX_MEDIAN_ABS_COMPOUND_DELTA_FLOOR = 4.0
+# Environment-based metric is the semantically correct primary gate per the
+# Phase 10 FE A/B finding: NMRShiftDB2 counts environments (one entry per
+# distinct H/C atom), not multiplet lines.  Floor tracks the current 50% /
+# median 3 baseline.
+_MIN_COMPOUND_ENV_WITHIN_MANIFEST_TOL_RATE_FLOOR = 0.45
+_MAX_MEDIAN_ABS_COMPOUND_ENV_DELTA_FLOOR = 4.0
 
 # Strict Prompt 3 promotion targets.
 _PROMOTION_MIN_SOLVENT_DETECT_RATE = 0.95
 _PROMOTION_MAX_MEDIAN_ABS_COMPOUND_DELTA = 2.0
+_PROMOTION_MAX_MEDIAN_ABS_COMPOUND_ENV_DELTA = 2.0
 
 
 @pytest.mark.current_state
@@ -86,17 +95,45 @@ def test_prompt3_gsd_harness_smoke_and_baseline_floor() -> None:
         f"floor {_MAX_MEDIAN_ABS_COMPOUND_DELTA_FLOOR}"
     )
 
+    # Regression floor: environment-based metric (Phase 10 addition).
+    env_within_tol = summary["compound_environment_count_within_manifest_tol_rate"]
+    assert (
+        env_within_tol is not None
+        and env_within_tol >= _MIN_COMPOUND_ENV_WITHIN_MANIFEST_TOL_RATE_FLOOR
+    ), (
+        f"Compound environment-count-within-manifest-tol rate {env_within_tol:.2%} "
+        f"fell below floor {_MIN_COMPOUND_ENV_WITHIN_MANIFEST_TOL_RATE_FLOOR:.0%}"
+    )
+    env_median = summary["median_abs_compound_environment_count_delta"]
+    assert (
+        env_median is not None
+        and env_median <= _MAX_MEDIAN_ABS_COMPOUND_ENV_DELTA_FLOOR
+    ), (
+        f"Median absolute compound environment count delta {env_median} exceeded "
+        f"floor {_MAX_MEDIAN_ABS_COMPOUND_ENV_DELTA_FLOOR}"
+    )
+
 
 @pytest.mark.xfail(
     strict=False,
     reason=(
         "Prompt 3 sidecar promotion gate: 95% solvent detect and median "
-        "compound peak-count delta <= 2 on NMRShiftDB2 corpus. Current "
-        "baseline ~66.7%/median 4 -- requires sidecar tuning before xfail "
-        "is removed and this becomes the SpectraCheck-promotion gate."
+        "compound environment-count delta <= 2 on NMRShiftDB2 corpus. "
+        "Current baseline: 94.4% solvent / median 3 environments -- 0.6pp "
+        "and 1 environment short.  Gate flips green once the gap closes."
     ),
 )
 def test_prompt3_gsd_meets_promotion_gate() -> None:
+    """Strict promotion gate.
+
+    Measured against the *environment-count* metric (one entry per chemical
+    environment) rather than the raw peak count.  Per the Phase 10 FE A/B
+    finding, environment-count is the semantically correct comparison vs
+    NMRShiftDB2's reference shift list (which counts environments, not
+    multiplet lines).  An "accurate detector" legitimately resolves a
+    doublet as 2 peaks, but the gate metric should treat both as 1 entry.
+    """
+
     report = run_all(_FIXTURES_ROOT, level=DEFAULT_LEVEL)
     summary = report["summary"]
 
@@ -109,11 +146,12 @@ def test_prompt3_gsd_meets_promotion_gate() -> None:
         f"{_PROMOTION_MIN_SOLVENT_DETECT_RATE:.0%}"
     )
 
-    median_delta = summary["median_abs_compound_peak_count_delta"]
+    # Primary promotion gate: environment-count delta.
+    env_median = summary["median_abs_compound_environment_count_delta"]
     assert (
-        median_delta is not None
-        and median_delta <= _PROMOTION_MAX_MEDIAN_ABS_COMPOUND_DELTA
+        env_median is not None
+        and env_median <= _PROMOTION_MAX_MEDIAN_ABS_COMPOUND_ENV_DELTA
     ), (
-        f"Median abs compound count delta {median_delta} above promotion "
-        f"gate {_PROMOTION_MAX_MEDIAN_ABS_COMPOUND_DELTA}"
+        f"Median abs compound environment-count delta {env_median} above "
+        f"promotion gate {_PROMOTION_MAX_MEDIAN_ABS_COMPOUND_ENV_DELTA}"
     )
