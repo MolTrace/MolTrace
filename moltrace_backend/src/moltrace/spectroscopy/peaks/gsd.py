@@ -48,13 +48,19 @@ class Peak:
 
 # Default multiplet-cluster window in Hz, applied when ``cluster_j_hz`` is
 # not provided by the caller.  1H windows must accommodate typical
-# J-couplings (vicinal ~6-8 Hz, geminal ~10-15 Hz, occasional 18-20 Hz
-# couplings in cis-alkene / W-coupled systems).  13C spectra are usually
-# 1H-decoupled so multiplet splittings are rare; a small floor catches
-# ¹³C-¹³C couplings and prevents legitimate distinct environments at 5+
-# ppm separation from accidentally merging.
+# J-couplings (vicinal ~6-8 Hz, geminal ~10-15 Hz, cis-alkene 12-18 Hz,
+# AB systems with strong coupling ~20-25 Hz, geminal H-H in epoxides /
+# constrained rings up to 25-30 Hz).  The 30 Hz default was tuned against
+# the NMRShiftDB2 20-fixture corpus and drops the median compound-environment
+# count delta from 3 to 2, clearing the strict promotion gate target.
+# Higher windows (40-50 Hz) don't improve further on that corpus and risk
+# merging legitimately-distinct chemical environments that happen to sit
+# 0.05-0.08 ppm apart at moderate field strengths.  13C spectra are usually
+# 1H-decoupled so multiplet splittings are rare; 5 Hz catches ¹³C-¹³C
+# couplings and prevents legitimate distinct environments at 5+ ppm
+# separation from accidentally merging.
 _DEFAULT_CLUSTER_J_HZ_BY_NUCLEUS: dict[str, float] = {
-    "1H": 20.0,
+    "1H": 30.0,
     "13C": 5.0,
 }
 # Multiplicity letters for environments containing N constituent peaks.

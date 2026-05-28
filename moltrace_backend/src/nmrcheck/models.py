@@ -623,6 +623,17 @@ class LegacyEnrichedPeak(BaseModel):
     # module emits varying field sets per match kind.
     solvent_hit: dict[str, Any] | None = None
     impurity_match: dict[str, Any] | None = None
+    # Per-peak QC fit metrics computed by the legacy route's post-detection
+    # fit pass (`_compute_legacy_peak_qc_metrics`).  These mirror what the
+    # GSD endpoint already publishes in `Peak.metadata` (per Phase 7) and
+    # bring legacy raw-FID responses to the same regulatory-tier per-peak
+    # quality surface.  All optional because some upstream paths bypass
+    # the QC pass (text-parsed peaks, error rows, fits that didn't converge).
+    fit_redchi: float | None = Field(default=None, ge=0.0)
+    fit_rmse: float | None = Field(default=None, ge=0.0)
+    fwhm_ppm: float | None = Field(default=None, ge=0.0)
+    signal_to_noise: float | None = Field(default=None, ge=0.0)
+    baseline_noise_sigma: float | None = Field(default=None, ge=0.0)
 
 
 class NMRRawFIDPreviewResponse(BaseModel):

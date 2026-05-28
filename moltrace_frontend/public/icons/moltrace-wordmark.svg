@@ -103,5 +103,5 @@
     font-weight="700"
     letter-spacing="0"
     text-rendering="geometricPrecision"
-  ><tspan fill="#111827">Mol</tspan><tspan fill="#26C6FF" font-weight="800">Trace</tspan></text>
+  ><tspan fill="#111827">Mol</tspan><tspan fill="#0E7490" font-weight="800">Trace</tspan></text>
 </svg>

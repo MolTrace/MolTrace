@@ -3,29 +3,65 @@ import { moltraceTraceClassName, moltraceWordmark3DStyle } from "@/components/br
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
 
 const navigation = {
+  // Platform links land on the dedicated module overview pages in the
+  // MolTrace docs (Astro Starlight deployment on Vercel). Keep slugs in
+  // sync with ``moltrace_docs/src/content/docs/guides/modules/...`` if the
+  // docs restructure. ``Integrations`` is a category with multiple
+  // vendor-specific sub-pages and no index — landing on LIMS reflects the
+  // most enterprise-foundational integration (applies regardless of
+  // instrument vendor). Update when a ``/guides/integrations/`` index ships.
   platform: [
-    { name: "Spectroscopy", href: "#" },
-    { name: "Regulatory Intelligence Hub", href: "#" },
-    { name: "Reaction Optimization", href: "#" },
-    { name: "Integrations", href: "#" },
+    { name: "Spectroscopy", href: "https://moltrace-docs.vercel.app/guides/modules/spectracheck/" },
+    {
+      name: "Regulatory Intelligence Hub",
+      href: "https://moltrace-docs.vercel.app/guides/modules/regulatory/",
+    },
+    {
+      name: "Reaction Optimization",
+      href: "https://moltrace-docs.vercel.app/guides/modules/optimization/",
+    },
+    {
+      name: "Integrations",
+      href: "https://moltrace-docs.vercel.app/guides/integrations/lims/",
+    },
   ],
+  // Company links land on the dedicated pages under ``guides/company/`` in
+  // the docs. ``Blog`` has no dedicated blog yet — landing on the launch
+  // post (the only announcement-style content available) is the closest
+  // analogue. Update when a proper blog index ships.
   company: [
-    { name: "About", href: "#" },
-    { name: "Careers", href: "#" },
-    { name: "Blog", href: "#" },
-    { name: "Contact", href: "#" },
+    { name: "About", href: "https://moltrace-docs.vercel.app/guides/company/about/" },
+    { name: "Careers", href: "https://moltrace-docs.vercel.app/guides/company/careers/" },
+    { name: "Blog", href: "https://moltrace-docs.vercel.app/guides/resources/launch-post/" },
+    { name: "Contact", href: "https://moltrace-docs.vercel.app/guides/company/contact/" },
   ],
+  // Each resource link points at its dedicated page on the MolTrace docs
+  // site (Astro Starlight deployment on Vercel). Footer is the canonical
+  // discovery surface for these pages — keep the URLs in sync with
+  // ``moltrace_docs/src/content/docs/...`` slugs whenever the docs site
+  // restructures.
   resources: [
-    { name: "Documentation", href: "#" },
-    { name: "API Reference", href: "#" },
-    { name: "Case Studies", href: "#" },
-    { name: "Webinars", href: "#" },
+    { name: "Documentation", href: "https://moltrace-docs.vercel.app/" },
+    { name: "API Reference", href: "https://moltrace-docs.vercel.app/guides/api/" },
+    // ``Case Studies`` is a category with multiple pages and no index page;
+    // landing on the pharma case study reflects the primary persona
+    // (pharma R&D scientists). Update when a case-studies index ships.
+    {
+      name: "Case Studies",
+      href: "https://moltrace-docs.vercel.app/guides/resources/case-study-pharma/",
+    },
+    // Webinars likewise has no index — the "Getting Started" webinar is
+    // the canonical entry point for new viewers. Update when an index ships.
+    {
+      name: "Webinars",
+      href: "https://moltrace-docs.vercel.app/guides/resources/webinar-getting-started/",
+    },
   ],
   legal: [
-    { name: "Privacy", href: "#" },
-    { name: "Terms", href: "#" },
-    { name: "Security", href: "#" },
-    { name: "Compliance", href: "#" },
+    { name: "Privacy", href: "https://moltrace-docs.vercel.app/guides/legal/privacy-policy/" },
+    { name: "Terms", href: "https://moltrace-docs.vercel.app/guides/legal/terms-of-service/" },
+    { name: "Security", href: "https://moltrace-docs.vercel.app/guides/legal/security-policy/" },
+    { name: "Compliance", href: "https://moltrace-docs.vercel.app/guides/legal/compliance/" },
   ],
 }
 const COPYRIGHT_YEAR = new Date().getUTCFullYear()
@@ -296,16 +332,26 @@ export function Footer() {
                 {section.title}
               </h3>
               <ul className="mt-4 space-y-2.5">
-                {section.links.map((item) => (
-                  <li key={item.name}>
-                    <Link
-                      href={item.href}
-                      className="inline-block text-sm leading-snug text-foreground/70 transition-colors hover:text-foreground"
-                    >
-                      {item.name}
-                    </Link>
-                  </li>
-                ))}
+                {section.links.map((item) => {
+                  // External links (full URLs to other domains, e.g. the
+                  // standalone docs site on Vercel) open in a new tab with a
+                  // safe ``rel`` — internal anchors and placeholders ("#")
+                  // keep the in-app navigation.
+                  const isExternal = /^https?:\/\//i.test(item.href)
+                  return (
+                    <li key={item.name}>
+                      <Link
+                        href={item.href}
+                        className="inline-block text-sm leading-snug text-foreground/70 transition-colors hover:text-foreground"
+                        {...(isExternal
+                          ? { target: "_blank", rel: "noopener noreferrer" }
+                          : null)}
+                      >
+                        {item.name}
+                      </Link>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           ))}

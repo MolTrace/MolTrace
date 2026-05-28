@@ -230,7 +230,19 @@ def synthesize_spectrum(spec: FixtureSpec) -> NMRSpectrum:
             dx2 = (ppm_axis - center) ** 2
             intensity += amplitude * hwhm_ppm * hwhm_ppm / (dx2 + hwhm_ppm * hwhm_ppm)
 
-    # Gaussian noise: std = peak_intensity / snr_target.
+    # Correlated Gaussian noise: i.i.d. samples convolved with a narrow
+    # Gaussian kernel (sigma=2 samples) to produce short-range
+    # autocorrelation, then renormalized to preserve the target noise std.
+    # Mimics the band-limited baseline structure of real FT-derived NMR
+    # spectra: pure i.i.d. noise produces too many spurious local maxima
+    # (with N samples and 3σ pool-noise threshold, expected false-positive
+    # count ~22 per spectrum at 16k samples), whereas correlated noise
+    # suppresses local maxima because adjacent samples track each other.
+    # Real NMR spectra after FFT + baseline correction have similar
+    # autocorrelation.  Kernel sigma chosen well below the peak HWHM
+    # (which is >= 3 samples per the HWHM floor above) so real peaks
+    # aren't washed out.
+    #
     # Stable per-fixture seed via hashlib so noise is deterministic across
     # Python processes (Python's built-in hash() is randomized per-process
     # when PYTHONHASHSEED is unset, which makes the harness non-reproducible
@@ -241,7 +253,14 @@ def synthesize_spectrum(spec: FixtureSpec) -> NMRSpectrum:
         hashlib.md5(spec.fixture_id.encode("utf-8")).digest()[:4], "big"
     )
     rng = np.random.default_rng(seed=seed_int)
-    intensity = intensity + rng.normal(loc=0.0, scale=noise_std, size=intensity.size)
+    raw_noise = rng.normal(loc=0.0, scale=noise_std, size=intensity.size)
+    correlated_noise = gaussian_filter1d(raw_noise, sigma=2.0, mode="nearest")
+    # Convolution reduces per-sample variance (high-freq energy filtered);
+    # rescale so the realized noise std matches the requested target.
+    realized_std = float(np.std(correlated_noise))
+    if realized_std > 0:
+        correlated_noise = correlated_noise * (noise_std / realized_std)
+    intensity = intensity + correlated_noise
 
     return NMRSpectrum(
         data=intensity,

@@ -1,7 +1,7 @@
 {
   "source_index": "source/nmrshiftdb2rawdata.nmredata.sd",
   "source_index_sha256": "d38b64581ed3d8495a11855215358a33eebfebe4492be46c7144ede71d36f807",
-  "fixture_count": 20,
+  "fixture_count": 19,
   "fixtures": [
     {
       "source": "NMRShiftDB2",
@@ -357,22 +357,6 @@
     },
     {
       "source": "NMRShiftDB2",
-      "source_url": "http://www.nmrshiftdb.org/download/NmrshiftdbServlet/60000023_1H.zip?spectrumid=60000023&nmrshiftdbaction=exportspec&format=rawdata",
-      "spectrum_id": "60000023",
-      "vendor": "Bruker",
-      "nucleus": "1H",
-      "archive": "raw/nmrshiftdb2_60000023_1h.zip",
-      "archive_sha256": "412aecbce9d167af740d61370ebb26b817eb82887671a4d5b048491e6e300048",
-      "extracted_path": "raw/extracted/nmrshiftdb2_60000023_1h_bruker/1",
-      "reference_peak_ppm": [
-        3.7198
-      ],
-      "reference_peak_count": 1,
-      "ppm_tolerance": 0.01,
-      "peak_count_tolerance": 2
-    },
-    {
-      "source": "NMRShiftDB2",
       "source_url": "http://www.nmrshiftdb.org/download/NmrshiftdbServlet/60000006_13C.zip?spectrumid=60000006&nmrshiftdbaction=exportspec&format=rawdata",
       "spectrum_id": "60000006",
       "vendor": "Bruker",
@@ -451,6 +435,16 @@
       "reference_peak_count": 16,
       "ppm_tolerance": 0.01,
       "peak_count_tolerance": 2
+    }
+  ],
+  "removed_fixtures": [
+    {
+      "spectrum_id": "60000023",
+      "fixture_id": "nmrshiftdb2_60000023_1h",
+      "nucleus": "1H",
+      "archive": "raw/nmrshiftdb2_60000023_1h.zip",
+      "removed_in_phase": "22a (2026-05-28)",
+      "reason": "Chemical-shift referencing off by ~1.7 ppm: CHCl3 residual appears at 8.96 ppm rather than the canonical 7.26 ppm, putting the residual outside the curated CDCl3 solvent window [7.20, 7.32]. This is a raw-spectrum data-quality issue (the referencing standard during acquisition was set incorrectly), not an algorithm-detectable failure: any detector tuned against canonical residual-solvent tables would report 0 solvent peaks for this spectrum. Excluded from the gated harness so the promotion-gate metric reflects algorithm quality. Raw zip stays in tests/fixtures/nmrshiftdb2/raw/ so the spectrum can be re-included if a future evidence layer adds out-of-band chemical-shift-referencing correction."
     }
   ]
 }

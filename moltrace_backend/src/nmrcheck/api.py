@@ -5407,6 +5407,120 @@ def _cluster_legacy_peaks_into_environments(
     return env_dicts, len(envs), counts
 
 
+def _compute_legacy_peak_qc_metrics(
+    peaks: list[dict[str, Any]],
+    *,
+    x: list[float],
+    y: list[float],
+    nucleus: str,
+    solvent: str,
+    field_mhz: float | None,
+    window_ppm: float = 0.5,
+) -> list[dict[str, Any]]:
+    """Augment legacy peak dicts with per-peak QC fit metrics.
+
+    Runs a local single-line pseudo-Voigt fit around each peak's shift_ppm
+    using GSD's ``_fit_single_with_model`` helper (so legacy and GSD share
+    the same fit infrastructure rather than duplicating lmfit setup), then
+    extracts five regulatory-tier QC fields and merges them onto each
+    peak dict:
+
+      - ``fit_redchi`` — chi-squared / DOF from the lmfit pseudo-Voigt
+      - ``fit_rmse`` — root mean squared residual of the fit
+      - ``fwhm_ppm`` — fitted full width at half max in ppm
+      - ``signal_to_noise`` — fitted peak height / spectrum-wide noise σ
+      - ``baseline_noise_sigma`` — MAD-based noise estimate (same for all
+        peaks; the spectrum-wide baseline noise level)
+
+    Failures (no shift_ppm, fit didn't converge, window too small) leave
+    those fields as ``None`` on the affected peak so the response stays
+    structurally consistent. Per-peak fit cost is small (<50 ms each
+    after Phase 12d-bis analytical jacobian); even 100+ peak spectra
+    add only a few seconds to route latency.
+    """
+
+    if not peaks or not x or not y or len(x) != len(y) or len(x) < 16:
+        return peaks
+
+    from moltrace.spectroscopy.io.fid_reader import NMRSpectrum as _NMRSpectrum
+    from moltrace.spectroscopy.peaks.gsd import (
+        _fit_single_with_model as _gsd_fit_single,
+        _robust_noise as _gsd_noise,
+    )
+
+    import numpy as _np
+
+    x_arr = _np.asarray(x, dtype=_np.float64)
+    y_arr = _np.asarray(y, dtype=_np.float64)
+    # GSD expects descending ppm axis (NMR convention); flip if needed so
+    # _fit_single_with_model's bounds + indexing make sense.
+    if x_arr.size >= 2 and x_arr[0] < x_arr[-1]:
+        x_arr = x_arr[::-1]
+        y_arr = y_arr[::-1]
+
+    baseline_noise = float(_gsd_noise(y_arr))
+    if not (baseline_noise > 0):
+        return peaks
+
+    spectrum = _NMRSpectrum(
+        data=y_arr,
+        ppm_axis=x_arr,
+        metadata={"source": "legacy_qc_metrics"},
+        nucleus=nucleus,
+        solvent=solvent,
+        field_mhz=float(field_mhz or 500.0),
+    )
+
+    enriched: list[dict[str, Any]] = []
+    for raw in peaks:
+        out = dict(raw)
+        # Always surface the baseline noise so the consumer can verify
+        # the SNR computation locally; cheap, no fit required.
+        out.setdefault("baseline_noise_sigma", baseline_noise)
+        out.setdefault("fit_redchi", None)
+        out.setdefault("fit_rmse", None)
+        out.setdefault("fwhm_ppm", None)
+        out.setdefault("signal_to_noise", None)
+        shift = raw.get("shift_ppm")
+        if not isinstance(shift, (int, float)):
+            enriched.append(out)
+            continue
+        shift_value = float(shift)
+        # Slice a window centred on the peak; the local fit is then a
+        # single Lorentzian/pseudo-Voigt with bounded parameters.
+        lo_ppm = shift_value - window_ppm
+        hi_ppm = shift_value + window_ppm
+        # x_arr is descending, so mask = within [lo_ppm, hi_ppm].
+        mask = (x_arr <= hi_ppm) & (x_arr >= lo_ppm)
+        if not bool(_np.any(mask)):
+            enriched.append(out)
+            continue
+        x_fit = x_arr[mask]
+        y_fit = y_arr[mask]
+        if x_fit.size < 5:
+            enriched.append(out)
+            continue
+        fitted = _gsd_fit_single(
+            x_fit,
+            y_fit,
+            center_guess=shift_value,
+            spectrum=spectrum,
+            level=2,
+            shape="voigt",
+            noise=baseline_noise,
+        )
+        if fitted is None:
+            enriched.append(out)
+            continue
+        meta = fitted.metadata or {}
+        out["fit_redchi"] = meta.get("fit_redchi")
+        out["fit_rmse"] = meta.get("fit_rmse")
+        out["fwhm_ppm"] = meta.get("fwhm_ppm")
+        out["signal_to_noise"] = meta.get("signal_to_noise")
+        enriched.append(out)
+    return enriched
+
+
 def _unwrap_form_default(value: Any) -> Any:
     return getattr(value, "default", value)
 
@@ -6751,14 +6865,27 @@ async def nmr_raw_fid_preview_route(
             _resolved_field_mhz = float(_val)
             break
 
+    # Per-peak QC fit metrics on the preview peaks (same regulatory-tier
+    # surface as the process route + /spectrum/analyze/gsd).  Defensive
+    # against the preview path's variable-name aliasing -- `peaks` may not
+    # exist if the auto-FT preview block failed silently above.
+    _preview_peaks_for_clustering: list[dict[str, Any]] = (
+        list(peaks) if "peaks" in locals() and isinstance(peaks, list) else []
+    )
+    _preview_peaks_for_clustering = _compute_legacy_peak_qc_metrics(
+        _preview_peaks_for_clustering,
+        x=x_values,
+        y=y_values,
+        nucleus=nucleus,
+        solvent=solvent or "",
+        field_mhz=_resolved_field_mhz,
+    )
+
     # Multiplet-cluster the peaks into chemical environments for parity
     # with /spectrum/analyze/gsd (FE renders both via one component).
     # The preview route does not always run enrich_peaks (text-parsed peaks
     # arrive without category), so the clustering helper treats them as
     # compound by default and groups by ppm proximity only.
-    _preview_peaks_for_clustering: list[dict[str, Any]] = (
-        list(peaks) if "peaks" in locals() and isinstance(peaks, list) else []
-    )
     _preview_envs, _preview_env_count, _preview_env_counts = (
         _cluster_legacy_peaks_into_environments(
             _preview_peaks_for_clustering,
@@ -6783,8 +6910,8 @@ async def nmr_raw_fid_preview_route(
         environment_count=_preview_env_count,
         environment_counts=_preview_env_counts,
         point_count=point_count,
-        peak_count=len(peaks),
-        peaks=peaks,
+        peak_count=len(_preview_peaks_for_clustering),
+        peaks=_preview_peaks_for_clustering,
         x=x_values,
         y=y_values,
         x_label="ppm",
@@ -7124,6 +7251,18 @@ async def nmr_raw_fid_process_route(
         if isinstance(_val, (int, float)) and float(_val) > 0.0:
             _process_field_mhz = float(_val)
             break
+
+    # Per-peak QC fit metrics (fit_redchi, fit_rmse, fwhm_ppm,
+    # signal_to_noise, baseline_noise_sigma) -- brings legacy raw-FID peaks
+    # to the same regulatory-tier QC surface the GSD endpoint publishes.
+    fid_peaks = _compute_legacy_peak_qc_metrics(
+        fid_peaks,
+        x=x_values,
+        y=y_values,
+        nucleus=nucleus,
+        solvent=solvent or "",
+        field_mhz=_process_field_mhz,
+    )
 
     # Cluster the enriched peaks into chemical environments.  The process
     # route runs enrich_peaks (line 6890), so fid_peaks carries category +
