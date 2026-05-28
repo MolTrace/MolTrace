@@ -44,6 +44,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  GsdAnalysisControls,
+  GsdResultsPanel,
+  type AnalysisBackendChoice,
+  type GSDLevel,
+  type SpectrumGSDAnalyzeRequest,
+  type SpectrumGSDAnalyzeResult,
+} from "@/components/spectracheck/gsd-analysis-ui"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
@@ -58,6 +66,7 @@ import {
   ChevronDown,
   Eye,
   FileText,
+  FlaskConical,
   Hash,
   PlayCircle,
   RotateCcw,
@@ -179,6 +188,17 @@ export function SpectraCheckProcessedSpectrumSection({
   const processedPreviewCacheRef = useRef(new Map<string, unknown>())
   const processedAnalyzeCacheRef = useRef(new Map<string, unknown>())
   const [dragOver, setDragOver] = useState(false)
+  // ── GSD-Prompt-3 (experimental, opt-in) — additive only. Default must
+  // stay `legacy` so tenants who never touch the selector keep the
+  // existing /nmr/processed/analyze evidence-match flow unchanged.
+  const [analysisBackend, setAnalysisBackend] = useState<AnalysisBackendChoice>("legacy")
+  const [gsdLevel, setGsdLevel] = useState<GSDLevel>(2)
+  const [gsdResult, setGsdResult] = useState<SpectrumGSDAnalyzeResult | null>(null)
+  const [gsdError, setGsdError] = useState("")
+  const [gsdLoading, setGsdLoading] = useState(false)
+  // GSD-scoped solvent override, initialized from the session-level
+  // solvent prop. Canonicalized against the catalog when it arrives.
+  const [gsdSolvent, setGsdSolvent] = useState(solvent)
 
   useEffect(() => {
     return () => {
@@ -539,6 +559,78 @@ export function SpectraCheckProcessedSpectrumSection({
     }
   }
 
+  // ── GSD-Prompt-3 (experimental) analyze path ──────────────────────────
+  // Hits the new `/spectrum/analyze/gsd` endpoint with the already-parsed
+  // ppm_axis + intensity arrays from the preview (server returns the same
+  // points whether we call it /preview or /analyze, so reusing the cached
+  // preview avoids a second upload). Pure side-channel: leaves the legacy
+  // analyzeResult / previewResult state alone.
+  async function runGSDAnalyze() {
+    const file = getSelectedFile()
+    if (!file) {
+      setGsdError("Choose a processed spectrum file.")
+      return
+    }
+    setGsdLoading(true)
+    setGsdError("")
+    try {
+      // 1) Reuse already-displayed preview trace if it matches the current file.
+      let trace: { x: number[]; y: number[] } | null = null
+      if (payloadMatchesFilename(previewResult, file.name)) {
+        trace = extractSpectrumXY(previewResult)
+      }
+      // 2) Otherwise check the in-memory preview cache (same key the legacy
+      //    analyze flow uses, keyed by file+params).
+      if (!trace) {
+        const previewCacheKey = buildProcessedRequestKey(file, "preview")
+        const cachedPreview = processedPreviewCacheRef.current.get(previewCacheKey)
+        if (cachedPreview !== undefined && payloadMatchesFilename(cachedPreview, file.name)) {
+          trace = extractSpectrumXY(cachedPreview)
+        }
+      }
+      // 3) Fall back to a fresh /nmr/processed/preview call. This also
+      //    populates the cache so a subsequent legacy Analyze stays cheap.
+      if (!trace) {
+        const previewData = await apiFetch<unknown>("/nmr/processed/preview", {
+          method: "POST",
+          body: buildBaseFormData(file),
+        })
+        processedPreviewCacheRef.current.set(buildProcessedRequestKey(file, "preview"), previewData)
+        update({ previewResult: previewData, previewError: "" })
+        pushDev("processed_preview", previewData)
+        if (payloadMatchesFilename(previewData, file.name)) {
+          trace = extractSpectrumXY(previewData)
+        }
+      }
+      if (!trace || trace.x.length < 16) {
+        setGsdError(
+          trace == null
+            ? "Could not load the spectrum trace from preview."
+            : `GSD requires ≥16 samples; preview returned ${trace.x.length}.`,
+        )
+        return
+      }
+      const body: SpectrumGSDAnalyzeRequest = {
+        ppm_axis: trace.x,
+        intensity: trace.y,
+        nucleus,
+        solvent: gsdSolvent.trim(),
+        field_mhz: Number(spectrometerMhz.trim() || "500") || 500,
+        level: gsdLevel,
+      }
+      const data = await apiFetch<SpectrumGSDAnalyzeResult>(
+        "/spectrum/analyze/gsd",
+        { method: "POST", body },
+      )
+      setGsdResult(data)
+      pushDev("processed_gsd_analyze", data)
+    } catch (err) {
+      setGsdError(formatApiError(err, "GSD analysis failed"))
+    } finally {
+      setGsdLoading(false)
+    }
+  }
+
   function clearAll() {
     invalidateForegroundRequest()
     update({
@@ -553,6 +645,9 @@ export function SpectraCheckProcessedSpectrumSection({
       linkedFromSource: null,
     })
     if (fileRef.current) fileRef.current.value = ""
+    setGsdResult(null)
+    setGsdError("")
+    setGsdSolvent(solvent)
   }
 
   const displayPayload = analyzeResult ?? previewResult
@@ -918,6 +1013,17 @@ export function SpectraCheckProcessedSpectrumSection({
         className="min-w-0"
       >
         <div className="space-y-4">
+          {/* Analysis backend selector — opt-in experimental GSD-Prompt-3.
+              Default MUST remain `legacy`; do not silently flip tenants. */}
+          <GsdAnalysisControls
+            backend={analysisBackend}
+            onBackendChange={setAnalysisBackend}
+            level={gsdLevel}
+            onLevelChange={setGsdLevel}
+            solvent={gsdSolvent}
+            onSolventChange={setGsdSolvent}
+          />
+
           {/* Two prominent action cards */}
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Preview card (secondary action) */}
@@ -970,48 +1076,67 @@ export function SpectraCheckProcessedSpectrumSection({
               </TooltipContent>
             </Tooltip>
 
-            {/* Analyze card (primary action) */}
+            {/* Analyze card (primary action) — routes to legacy or GSD
+                backend based on the Analysis backend selector above. */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  disabled={foregroundActionLoading}
-                  onClick={runAnalyze}
+                  disabled={foregroundActionLoading || gsdLoading}
+                  onClick={analysisBackend === "gsd_prompt3" ? runGSDAnalyze : runAnalyze}
                   className={cn(
                     "group relative flex min-h-[148px] flex-col items-start gap-2.5 overflow-hidden rounded-2xl border-2 border-transparent p-5 text-left text-white shadow-lg transition-all duration-200",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--mt-teal)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                    foregroundActionLoading
+                    (foregroundActionLoading || gsdLoading)
                       ? "cursor-wait opacity-70"
                       : "cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[color:var(--mt-teal)]/30 active:translate-y-0 active:shadow-md"
                   )}
                   style={{
                     background:
-                      "linear-gradient(135deg, var(--mt-teal) 0%, #00B884 100%)",
+                      analysisBackend === "gsd_prompt3"
+                        ? "linear-gradient(135deg, #B45309 0%, #D97706 100%)"
+                        : "linear-gradient(135deg, var(--mt-teal) 0%, #00B884 100%)",
                   }}
                 >
                   <div className="flex w-full items-center justify-between">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
-                      <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                      Analyze
+                      {analysisBackend === "gsd_prompt3" ? (
+                        <FlaskConical className="h-3.5 w-3.5" aria-hidden />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                      {analysisBackend === "gsd_prompt3" ? "GSD analyze" : "Analyze"}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] shadow-sm" style={{ color: "var(--mt-teal)" }}>
-                      ★ Recommended
-                    </span>
+                    {analysisBackend === "gsd_prompt3" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] shadow-sm text-amber-700">
+                        Experimental
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] shadow-sm" style={{ color: "var(--mt-teal)" }}>
+                        ★ Recommended
+                      </span>
+                    )}
                   </div>
                   <span className="font-mono text-lg font-bold leading-tight text-white">
-                    {analyzeLoading ? "Analyzing…" : "Run evidence match"}
+                    {analysisBackend === "gsd_prompt3"
+                      ? (gsdLoading ? "Running GSD…" : `Run GSD analysis (level ${gsdLevel})`)
+                      : (analyzeLoading ? "Analyzing…" : "Run evidence match")}
                   </span>
                   <span className="text-sm leading-snug text-white/85">
-                    Detect peaks and match against candidate structures with scoring.
+                    {analysisBackend === "gsd_prompt3"
+                      ? "Mestrenova-style peak detection with auto-classification. Sends the parsed ppm + intensity arrays — no candidate matching."
+                      : "Detect peaks and match against candidate structures with scoring."}
                   </span>
                   <span className="mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-white transition-transform duration-200 group-hover:translate-x-1">
-                    {analyzeLoading ? "Working" : "Click to run analysis"}
+                    {(analysisBackend === "gsd_prompt3" ? gsdLoading : analyzeLoading) ? "Working" : "Click to run analysis"}
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                   </span>
                 </button>
               </TooltipTrigger>
               <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                POST /nmr/processed/analyze
+                {analysisBackend === "gsd_prompt3"
+                  ? "POST /spectrum/analyze/gsd (experimental)"
+                  : "POST /nmr/processed/analyze"}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -1072,6 +1197,9 @@ export function SpectraCheckProcessedSpectrumSection({
           )}
           {analyzeError && (
             <AlertCard variant="error" title="Analyze failed" description={analyzeError} />
+          )}
+          {gsdError && (
+            <AlertCard variant="error" title="GSD analyze failed" description={gsdError} />
           )}
         </div>
       </ModuleCard>
@@ -1408,6 +1536,11 @@ export function SpectraCheckProcessedSpectrumSection({
           </ModuleCard>
         </div>
       )}
+
+      {/* ── Step 3b — GSD-Prompt-3 output (experimental) ──────────────────
+          Only renders when the user has run the experimental backend.
+          Lives alongside the legacy Step 3 results without replacing them. */}
+      <GsdResultsPanel result={gsdResult} />
     </div>
   )
 }
