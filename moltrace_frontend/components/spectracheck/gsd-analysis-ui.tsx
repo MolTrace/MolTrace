@@ -70,6 +70,70 @@ export interface UnifiedPeak {
   impurity_match?: Record<string, unknown> | null
   /** GSD only — 0..1 confidence. */
   confidence?: number
+  // ── Per-peak QC fit metrics (Phase 24) — both detectors now expose ────
+  // these. Backend regulatory-tier numbers. All optional; null when the
+  // peak wasn't fit (e.g. legacy fast-path).
+  fit_redchi?: number | null
+  fit_rmse?: number | null
+  fwhm_ppm?: number | null
+  signal_to_noise?: number | null
+  baseline_noise_sigma?: number | null
+}
+
+/**
+ * Phase 24 QC severity helper. Combines two ratios — signal-to-noise
+ * (S/N) and fit-RMSE over baseline-noise (fit_rmse / baseline_σ) — into
+ * a single green / yellow / red traffic-light. Returns "unknown" when
+ * either input is missing so the renderer can show a muted dot rather
+ * than a misleading green.
+ *
+ * Thresholds (from the Phase 24 packet):
+ *   - S/N: > 10 green · 3-10 yellow · < 3 red
+ *   - fit_rmse / baseline_σ: < 2 green · 2-5 yellow · > 5 red
+ * Combined: worst of the two wins.
+ */
+export type PeakQcSeverity = "green" | "yellow" | "red" | "unknown"
+
+export function peakQcSeverity(peak: UnifiedPeak): PeakQcSeverity {
+  const snr = peak.signal_to_noise
+  const fitRmse = peak.fit_rmse
+  const baseSigma = peak.baseline_noise_sigma
+  if (snr == null && (fitRmse == null || baseSigma == null)) return "unknown"
+  const snrLevel: PeakQcSeverity =
+    snr == null ? "unknown" : snr > 10 ? "green" : snr >= 3 ? "yellow" : "red"
+  const ratio = fitRmse != null && baseSigma != null && baseSigma > 0
+    ? fitRmse / baseSigma
+    : null
+  const fitLevel: PeakQcSeverity =
+    ratio == null ? "unknown" : ratio < 2 ? "green" : ratio <= 5 ? "yellow" : "red"
+  // Worst-of-two; "unknown" yields to a known level so we don't silently
+  // drop a real warning.
+  const ranks: Record<PeakQcSeverity, number> = { green: 0, unknown: 1, yellow: 2, red: 3 }
+  return ranks[snrLevel] >= ranks[fitLevel] ? snrLevel : fitLevel
+}
+
+const PEAK_QC_DOT_STYLE: Record<PeakQcSeverity, string> = {
+  green: "bg-emerald-500",
+  yellow: "bg-amber-500",
+  red: "bg-rose-500",
+  unknown: "bg-muted-foreground/30",
+}
+
+/**
+ * Build a hover-tooltip string showing the five QC metrics. Returns
+ * null when no QC fields are populated (caller hides the cell).
+ */
+export function formatQcTooltip(peak: UnifiedPeak): string | null {
+  const parts: string[] = []
+  const push = (label: string, value: number | null | undefined, format: (v: number) => string) => {
+    if (typeof value === "number" && Number.isFinite(value)) parts.push(`${label}: ${format(value)}`)
+  }
+  push("S/N", peak.signal_to_noise, (v) => v.toFixed(1))
+  push("fit χ²ᵣ", peak.fit_redchi, (v) => v.toExponential(2))
+  push("fit RMSE", peak.fit_rmse, (v) => v.toExponential(2))
+  push("FWHM", peak.fwhm_ppm, (v) => `${v.toFixed(4)} ppm`)
+  push("baseline σ", peak.baseline_noise_sigma, (v) => v.toExponential(2))
+  return parts.length > 0 ? parts.join(" · ") : null
 }
 
 export interface UnifiedDetectionResult {
@@ -87,16 +151,33 @@ export interface UnifiedDetectionResult {
 /** Adapt a `/spectrum/analyze/gsd` response to the unified shape. */
 export function adaptGsdResult(r: SpectrumGSDAnalyzeResult): UnifiedDetectionResult {
   return {
-    peaks: r.peaks.map((p) => ({
-      position_ppm: p.position_ppm,
-      position_hz: p.position_hz,
-      intensity: p.intensity,
-      area: p.area,
-      width_hz: p.width_hz,
-      shape: p.shape,
-      category: p.category,
-      confidence: p.confidence,
-    })),
+    peaks: r.peaks.map((p) => {
+      // GSD currently stores per-peak QC under the open `metadata` dict
+      // (Phase 4 backend), whereas legacy now surfaces them as typed
+      // top-level fields (Phase 24). Read GSD's via safe extraction so
+      // the unified shape matches regardless of where the backend put
+      // them.
+      const md = (p.metadata ?? {}) as Record<string, unknown>
+      const num = (key: string): number | null => {
+        const v = md[key]
+        return typeof v === "number" && Number.isFinite(v) ? v : null
+      }
+      return {
+        position_ppm: p.position_ppm,
+        position_hz: p.position_hz,
+        intensity: p.intensity,
+        area: p.area,
+        width_hz: p.width_hz,
+        shape: p.shape,
+        category: p.category,
+        confidence: p.confidence,
+        fit_redchi: num("fit_redchi"),
+        fit_rmse: num("fit_rmse"),
+        fwhm_ppm: num("fwhm_ppm"),
+        signal_to_noise: num("signal_to_noise"),
+        baseline_noise_sigma: num("baseline_noise_sigma"),
+      }
+    }),
     environments: r.environments,
     environment_count: r.environment_count,
     environment_counts: r.environment_counts,
@@ -130,6 +211,12 @@ export function adaptLegacyRawFidResult(
     labile_hint: p.labile_hint,
     solvent_hit: p.solvent_hit,
     impurity_match: p.impurity_match,
+    // Phase 24: per-peak QC fit metrics surfaced as typed fields.
+    fit_redchi: p.fit_redchi,
+    fit_rmse: p.fit_rmse,
+    fwhm_ppm: p.fwhm_ppm,
+    signal_to_noise: p.signal_to_noise,
+    baseline_noise_sigma: p.baseline_noise_sigma,
   }))
   // Reconstruct category_counts from peak categories when the backend
   // didn't include it (older responses might not). Honor server value
@@ -534,6 +621,17 @@ export function DetectionResultsPanel({
   const showMatches = result.peaks.some(
     (p) => formatMatchTooltip(p.solvent_hit, "solvent") || formatMatchTooltip(p.impurity_match, "impurity"),
   )
+  // Phase 24: show the QC column whenever at least one peak carries any
+  // of the five QC metrics. Keeps the column hidden on pure-legacy
+  // fast-path responses that don't fit per-peak.
+  const showQc = result.peaks.some(
+    (p) =>
+      typeof p.signal_to_noise === "number" ||
+      typeof p.fit_redchi === "number" ||
+      typeof p.fit_rmse === "number" ||
+      typeof p.fwhm_ppm === "number" ||
+      typeof p.baseline_noise_sigma === "number",
+  )
 
   const envCount = result.environment_count ?? result.environments?.length
   const description = (() => {
@@ -632,6 +730,7 @@ export function DetectionResultsPanel({
                     {showIntegration ? <th className="px-3 py-2 text-right">∫H</th> : null}
                     {showJ ? <th className="px-3 py-2 text-right">J (Hz)</th> : null}
                     {showConfidence ? <th className="px-3 py-2 text-right">Conf</th> : null}
+                    {showQc ? <th className="px-3 py-2" title="Per-peak fit-quality indicator: S/N (green > 10, yellow 3-10, red < 3) combined with fit RMSE / baseline σ (green < 2, yellow 2-5, red > 5). Worst-of-two wins.">QC</th> : null}
                     {showMatches ? <th className="px-3 py-2">Matches</th> : null}
                   </tr>
                 </thead>
@@ -672,6 +771,24 @@ export function DetectionResultsPanel({
                           </td>
                         ) : null}
                         {showConfidence ? <td className="px-3 py-1.5 text-right">{peak.confidence != null ? `${(peak.confidence * 100).toFixed(0)}%` : "—"}</td> : null}
+                        {showQc ? (() => {
+                          const severity = peakQcSeverity(peak)
+                          const qcTip = formatQcTooltip(peak)
+                          return (
+                            <td className="px-3 py-1.5">
+                              {qcTip ? (
+                                <span
+                                  className="inline-flex cursor-help items-center gap-1.5"
+                                  title={qcTip}
+                                  aria-label={`Peak QC ${severity}: ${qcTip}`}
+                                >
+                                  <span className={cn("h-2 w-2 rounded-full", PEAK_QC_DOT_STYLE[severity])} aria-hidden />
+                                  <span className="text-[10px] uppercase text-muted-foreground">{severity === "unknown" ? "—" : severity}</span>
+                                </span>
+                              ) : "—"}
+                            </td>
+                          )
+                        })() : null}
                         {showMatches ? (
                           <td className="px-3 py-1.5">
                             {matchTip ? (
