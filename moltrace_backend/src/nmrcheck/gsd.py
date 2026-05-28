@@ -65,24 +65,91 @@ _SIMPLE_MULTIPLICITY: dict[int, str] = {
 
 
 def _pseudo_voigt_sum(x: np.ndarray, params: np.ndarray) -> np.ndarray:
-    """Sum of pseudo-Voigt lineshapes.
+    """Sum of pseudo-Voigt lineshapes (vectorized over lines).
 
     ``params`` is flat ``[amp, centre, hwhm, eta, ...]``. Each line is
     ``amp * (eta * Lorentzian + (1 - eta) * Gaussian)`` with both components
     sharing the same half-width at half-maximum.
+
+    Vectorized via broadcasting: reshape params to ``[N_lines, 4]`` and
+    compute the full ``[N_lines, M_points]`` pseudo-Voigt tensor in one
+    pass.  Paired with ``_pseudo_voigt_jacobian`` (analytical jacobian) to
+    eliminate scipy's finite-difference jacobian iterations -- the prior
+    perf bottleneck in dense 13C deconvolutions like NMRShiftDB2 60000006_13c.
     """
-    total = np.zeros_like(x)
-    for index in range(0, len(params), _PARAMS_PER_LINE):
-        amplitude = params[index]
-        center = params[index + 1]
-        hwhm = params[index + 2]
-        eta = params[index + 3]
-        dx2 = (x - center) ** 2
-        hwhm2 = hwhm * hwhm
-        lorentzian = hwhm2 / (dx2 + hwhm2)
-        gaussian = np.exp(-_LN2 * dx2 / hwhm2)
-        total = total + amplitude * (eta * lorentzian + (1.0 - eta) * gaussian)
-    return total
+
+    n_lines = len(params) // _PARAMS_PER_LINE
+    if n_lines == 0:
+        return np.zeros_like(x)
+    # [N_lines, 4]  -- amp, centre, hwhm, eta
+    p = np.asarray(params, dtype=float).reshape(n_lines, _PARAMS_PER_LINE)
+    amp = p[:, 0:1]
+    center = p[:, 1:2]
+    hwhm = p[:, 2:3]
+    eta = p[:, 3:4]
+    # Broadcast x [M] -> [1, M] -> [N, M] for dx
+    x_bc = np.asarray(x, dtype=float)[np.newaxis, :]
+    dx2 = (x_bc - center) ** 2  # [N, M]
+    hwhm2 = hwhm * hwhm  # [N, 1]
+    lorentzian = hwhm2 / (dx2 + hwhm2)  # [N, M]
+    gaussian = np.exp(-_LN2 * dx2 / hwhm2)  # [N, M]
+    return (amp * (eta * lorentzian + (1.0 - eta) * gaussian)).sum(axis=0)
+
+
+def _pseudo_voigt_jacobian(x: np.ndarray, params: np.ndarray) -> np.ndarray:
+    """Analytical jacobian of ``_pseudo_voigt_sum`` w.r.t. ``params``.
+
+    Returns ``[M_points, 4 * N_lines]`` matrix in column order
+    ``[d/d(amp_0), d/d(center_0), d/d(hwhm_0), d/d(eta_0), d/d(amp_1), ...]``
+    matching the flat ``params`` layout.
+
+    Closed-form derivatives per line (cross-line entries are zero because
+    each line is additive and independent in its own 4 parameters):
+
+      d(pv)/d(amp)    = eta * L + (1 - eta) * G
+      d(pv)/d(center) = 2 * amp * dx / h^2 * (eta * L^2 + (1-eta) * ln2 * G)
+      d(pv)/d(hwhm)   = amp * (eta * 2*L*(1-L)/h + (1-eta) * G * 2*ln2*dx^2/h^3)
+      d(pv)/d(eta)    = amp * (L - G)
+
+    where L = h^2/(dx^2+h^2), G = exp(-ln2 * dx^2 / h^2), dx = x - center, h = hwhm.
+
+    Passing this to ``scipy.optimize.least_squares`` via ``jac=`` eliminates
+    the finite-difference fallback (which previously called
+    ``_pseudo_voigt_sum`` ~643k times for a dense 13C spectrum).
+    """
+
+    n_lines = len(params) // _PARAMS_PER_LINE
+    m_points = int(np.asarray(x).size)
+    if n_lines == 0:
+        return np.zeros((m_points, 0), dtype=float)
+    p = np.asarray(params, dtype=float).reshape(n_lines, _PARAMS_PER_LINE)
+    amp = p[:, 0:1]
+    center = p[:, 1:2]
+    hwhm = p[:, 2:3]
+    eta = p[:, 3:4]
+    x_bc = np.asarray(x, dtype=float)[np.newaxis, :]
+    dx = x_bc - center  # [N, M]
+    dx2 = dx * dx
+    hwhm2 = hwhm * hwhm
+    hwhm3 = hwhm2 * hwhm
+    denom = dx2 + hwhm2
+    L = hwhm2 / denom  # [N, M]
+    G = np.exp(-_LN2 * dx2 / hwhm2)  # [N, M]
+    one_minus_eta = 1.0 - eta
+    one_minus_L = 1.0 - L
+
+    # Per-parameter blocks [N, M].
+    d_amp = eta * L + one_minus_eta * G
+    d_center = 2.0 * amp * dx / hwhm2 * (eta * L * L + one_minus_eta * _LN2 * G)
+    d_hwhm = amp * (
+        eta * 2.0 * L * one_minus_L / hwhm
+        + one_minus_eta * G * 2.0 * _LN2 * dx2 / hwhm3
+    )
+    d_eta = amp * (L - G)
+
+    # Stack as [N, 4, M] then reshape to [N*4, M] then transpose -> [M, N*4].
+    jac_per_line = np.stack([d_amp, d_center, d_hwhm, d_eta], axis=1)
+    return jac_per_line.reshape(n_lines * _PARAMS_PER_LINE, m_points).T
 
 
 def deconvolve_region(
@@ -134,6 +201,10 @@ def deconvolve_region(
     def residual(params: np.ndarray) -> np.ndarray:
         return _pseudo_voigt_sum(x, params) - y
 
+    def jacobian(params: np.ndarray) -> np.ndarray:
+        # dr/dp = d(pv_sum - y)/dp = d(pv_sum)/dp because y is independent of p.
+        return _pseudo_voigt_jacobian(x, params)
+
     def fit_centers(centers: list[float]) -> tuple[np.ndarray | None, float]:
         """Fit pseudo-Voigt lines at ``centers``; return (params, max abs resid)."""
         if not centers:
@@ -146,8 +217,17 @@ def deconvolve_region(
             lower += [0.0, x_lo, min_hwhm, 0.0]
             upper += [height * 1.6, x_hi, max_hwhm, 1.0]
         try:
+            # Supplying the analytical jacobian eliminates scipy's
+            # finite-difference jacobian (which would call ``residual``
+            # ~4*N additional times per iteration to numerically estimate
+            # derivatives).  See _pseudo_voigt_jacobian for the math.
             fit = least_squares(
-                residual, initial, bounds=(lower, upper), method="trf", max_nfev=6000
+                residual,
+                initial,
+                jac=jacobian,
+                bounds=(lower, upper),
+                method="trf",
+                max_nfev=6000,
             )
         except (ValueError, RuntimeError):
             return (None, math.inf)
