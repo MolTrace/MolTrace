@@ -60,6 +60,72 @@ describe("Marketing Footer", () => {
     }
   })
 
+  it("wires every footer link to its specific docs page (and opens in a new tab)", () => {
+    // Every footer item across all four sections (Platform, Company,
+    // Resources, Legal) must land on its dedicated MolTrace docs URL —
+    // the docs site (https://moltrace-docs.vercel.app/) is the canonical
+    // discovery surface for these pages, so the mapping has to be exact,
+    // not approximate. Category items without an index page (Integrations,
+    // Case Studies, Webinars) and stand-ins for not-yet-built pages (Blog)
+    // land on the canonical primary entry — see the comments in
+    // ``footer.tsx`` for which slug was chosen and why.
+    const expectedDestinations: Array<[label: string, href: string]> = [
+      // ── Platform ────────────────────────────────────────────────────
+      [
+        "Spectroscopy",
+        "https://moltrace-docs.vercel.app/guides/modules/spectracheck/",
+      ],
+      [
+        "Regulatory Intelligence Hub",
+        "https://moltrace-docs.vercel.app/guides/modules/regulatory/",
+      ],
+      [
+        "Reaction Optimization",
+        "https://moltrace-docs.vercel.app/guides/modules/optimization/",
+      ],
+      [
+        "Integrations",
+        "https://moltrace-docs.vercel.app/guides/integrations/lims/",
+      ],
+      // ── Company ─────────────────────────────────────────────────────
+      ["About", "https://moltrace-docs.vercel.app/guides/company/about/"],
+      ["Careers", "https://moltrace-docs.vercel.app/guides/company/careers/"],
+      [
+        "Blog",
+        "https://moltrace-docs.vercel.app/guides/resources/launch-post/",
+      ],
+      ["Contact", "https://moltrace-docs.vercel.app/guides/company/contact/"],
+      // ── Resources ───────────────────────────────────────────────────
+      ["Documentation", "https://moltrace-docs.vercel.app/"],
+      ["API Reference", "https://moltrace-docs.vercel.app/guides/api/"],
+      [
+        "Case Studies",
+        "https://moltrace-docs.vercel.app/guides/resources/case-study-pharma/",
+      ],
+      [
+        "Webinars",
+        "https://moltrace-docs.vercel.app/guides/resources/webinar-getting-started/",
+      ],
+      // ── Legal ───────────────────────────────────────────────────────
+      ["Privacy", "https://moltrace-docs.vercel.app/guides/legal/privacy-policy/"],
+      ["Terms", "https://moltrace-docs.vercel.app/guides/legal/terms-of-service/"],
+      ["Security", "https://moltrace-docs.vercel.app/guides/legal/security-policy/"],
+      ["Compliance", "https://moltrace-docs.vercel.app/guides/legal/compliance/"],
+    ]
+    render(<Footer />)
+    for (const [label, expected] of expectedDestinations) {
+      const link = screen.getByText(label).closest("a")
+      expect(link, `${label} link not found`).not.toBeNull()
+      expect(link?.getAttribute("href"), `${label} href`).toBe(expected)
+      // Every docs link must open in a new tab with safe ``rel`` so opener
+      // leaks and stale referrer headers cannot be exploited.
+      expect(link?.getAttribute("target"), `${label} target`).toBe("_blank")
+      const rel = link?.getAttribute("rel") ?? ""
+      expect(rel, `${label} rel`).toContain("noopener")
+      expect(rel, `${label} rel`).toContain("noreferrer")
+    }
+  })
+
   it("renders the nine brand-accurate social icons under a 'Join our Community' eyebrow title", () => {
     render(<Footer />)
     // The eyebrow title sits in the social section above the icon row.

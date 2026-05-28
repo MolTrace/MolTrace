@@ -272,6 +272,69 @@ def test_legacy_peak_model_preserves_long_tail_fields() -> None:
     assert dumped["structure_aware_disambiguation"] == "anomeric"
 
 
+def test_legacy_process_response_populates_per_peak_qc_metrics() -> None:
+    """Phase 24: per-peak QC fit metrics populate via the post-detection fit pass.
+
+    Verifies the FE's deferred regulatory-tier ask: legacy raw-FID peaks
+    now carry ``fit_redchi`` / ``fit_rmse`` / ``fwhm_ppm`` /
+    ``signal_to_noise`` / ``baseline_noise_sigma`` -- the same QC surface
+    the GSD endpoint publishes in ``Peak.metadata``.
+    """
+
+    request = _build_request()
+
+    async def run() -> None:
+        result = await nmr_raw_fid_process_route(
+            request=request,
+            file=_build_upload(),
+            sample_id="legacy-qc-metrics",
+            solvent="CDCl3",
+            nucleus="1H",
+            vendor="auto",
+            processing_preset="balanced",
+            preserve_raw=True,
+            include_spectrum=True,
+            compound_class=None,
+            candidates_text=None,
+            proton_nmr_text=None,
+            carbon13_text=None,
+            context=AccessContext(system_api_key=True),
+        )
+
+        assert result.peaks, "process route returned no peaks"
+        # baseline_noise_sigma should be the same value on every peak
+        # (spectrum-wide noise estimate) and non-None as long as the trace
+        # was non-empty.
+        sigmas = {p.baseline_noise_sigma for p in result.peaks}
+        assert len(sigmas - {None}) <= 1, (
+            f"baseline_noise_sigma should be uniform across peaks; got {sigmas}"
+        )
+        assert any(p.baseline_noise_sigma is not None for p in result.peaks), (
+            "At least one peak should carry baseline_noise_sigma."
+        )
+        # The fit may fail on some peaks (e.g., near spectrum edges) but at
+        # least one should converge and produce a full QC quintuple.
+        fully_fit = [
+            p for p in result.peaks
+            if p.fit_redchi is not None
+            and p.fit_rmse is not None
+            and p.fwhm_ppm is not None
+            and p.signal_to_noise is not None
+            and p.baseline_noise_sigma is not None
+        ]
+        assert fully_fit, (
+            f"At least one peak should produce a complete QC quintuple. "
+            f"Got {[(p.shift_ppm, p.fit_redchi, p.fit_rmse, p.fwhm_ppm, p.signal_to_noise) for p in result.peaks]}"
+        )
+        # Sanity ranges for a real Bruker synthetic spectrum:
+        for p in fully_fit:
+            assert p.fit_rmse >= 0
+            assert p.fwhm_ppm > 0
+            assert p.signal_to_noise > 0
+
+    asyncio.run(run())
+
+
 def test_openapi_schema_includes_legacy_enriched_peak_and_envs() -> None:
     """schema.d.ts will surface the new types after npm run generate:openapi."""
 
