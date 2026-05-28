@@ -241,7 +241,11 @@ def test_nmrshiftdb2_bruker_20_fids_match_processed_references() -> None:
     manifest_path = fixture_root / "expected" / "nmrshiftdb2_bruker_20.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert manifest["fixture_count"] == 20
+    # NMRShiftDB2 manifest started at 20 fixtures; one (`60000023_1h`) was
+    # dropped in v0.6.0 as a documented data-quality outlier (chemical-shift
+    # referencing off by ~1.7 ppm).  See `removed_fixtures` in the manifest
+    # for rationale and the technical white paper § 3.1 for the audit trail.
+    assert manifest["fixture_count"] == 19
     for fixture in manifest["fixtures"]:
         spectrum = read_fid(fixture_root / fixture["archive"])
         repeated = read_fid(fixture_root / fixture["archive"])

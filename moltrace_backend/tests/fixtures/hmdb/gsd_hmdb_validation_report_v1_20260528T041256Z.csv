@@ -1,0 +1,11 @@
+fixture_id,hmdb_id,spectrum_id,nucleus,vendor,solvent_raw,solvent_normalised,frequency,row_status,expected_peak_count,prompt_peak_count,prompt_compound_peak_count,prompt_environment_count,prompt_compound_environment_count,compound_peak_count_delta,compound_environment_count_delta,solvent_reference_ppm,solvent_peak_detected,solvent_peak_ppm,category_counts,error
+hmdb_HMDB0002643_1896_1h,HMDB0002643,1896,1H,Varian,Water,D2O,500 MHz,error,22,0,0,0,0,,,,False,,{},read_fid failed: FIDReaderError: nmrglue could not read the Varian/Agilent FID dataset.
+hmdb_HMDB0000910_1601_1h,HMDB0000910,1601,1H,Varian,Water,D2O,600 MHz,ok,11,6,4,6,4,-7,-7,4.79,True,4.626428763666626,"{""solvent"": 1, ""compound"": 4, ""artifact"": 1}",
+hmdb_HMDB0005035_2021_1h,HMDB0005035,2021,1H,Bruker,CD3OD,CD3OD,600 MHz,ok,95,32,20,21,11,-75,-84,3.31,True,3.265008120536078,"{""compound"": 20, ""impurity"": 2, ""artifact"": 8, ""solvent"": 2}",
+hmdb_HMDB0011628_2049_1h,HMDB0011628,2049,1H,Bruker,100%_DMSO,DMSO-d6,600 MHz,ok,79,27,15,24,13,-64,-66,2.5,True,2.4535122170439956,"{""compound"": 15, ""artifact"": 7, ""impurity"": 4, ""solvent"": 1}",
+hmdb_HMDB0000064_1064_1h,HMDB0000064,1064,1H,Varian,Water,D2O,500 MHz,ok,2,30,21,18,11,19,9,4.79,True,4.6957002871408395,"{""solvent"": 1, ""artifact"": 8, ""compound"": 21}",
+hmdb_HMDB0000866_1574_1h,HMDB0000866,1574,1H,Varian,Water,D2O,500 MHz,ok,22,29,23,16,11,1,-11,4.79,True,4.596100268350235,"{""solvent"": 1, ""impurity"": 2, ""artifact"": 1, ""compound"": 23, ""13C_satellite"": 2}",
+hmdb_HMDB0000161_1120_1h,HMDB0000161,1120,1H,Varian,Water,D2O,500 MHz,ok,6,17,12,9,5,6,-1,4.79,True,4.614235004601239,"{""solvent"": 1, ""artifact"": 4, ""compound"": 12}",
+hmdb_HMDB0002259_1869_1h,HMDB0002259,1869,1H,Bruker,CDCl3,CDCl3,600 MHz,ok,21,14,10,9,5,-11,-16,7.26,True,7.205809828530094,"{""compound"": 10, ""artifact"": 2, ""solvent"": 1, ""impurity"": 1}",
+hmdb_HMDB0000565_1422_1h,HMDB0000565,1422,1H,Bruker,5%_DMSO,DMSO-d6,600 MHz,ok,17,22,17,16,11,0,-6,2.5,True,2.455958774482993,"{""compound"": 17, ""artifact"": 3, ""impurity"": 1, ""solvent"": 1}",
+hmdb_HMDB0000955_1620_1h,HMDB0000955,1620,1H,Varian,Water,D2O,500 MHz,ok,10,19,9,12,6,-1,-4,4.79,True,5.047788748414192,"{""solvent"": 1, ""impurity"": 8, ""compound"": 9, ""artifact"": 1}",

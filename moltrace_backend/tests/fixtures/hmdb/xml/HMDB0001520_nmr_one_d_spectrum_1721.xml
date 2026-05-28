@@ -1,0 +1,900 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmr-one-d>
+  <id>1721</id>
+  <notes>Spectrum doesn't have the nmrML file, unexported by An Chi on Sep 29, 2021.</notes>
+  <sample-concentration nil="true"/>
+  <solvent>Water</solvent>
+  <sample-mass nil="true"/>
+  <sample-assessment>Excellent</sample-assessment>
+  <spectra-assessment>Excellent</spectra-assessment>
+  <sample-source nil="true"/>
+  <collection-date>2005-12-16</collection-date>
+  <instrument-type>Varian</instrument-type>
+  <peak-counter>47</peak-counter>
+  <created-at>2012-12-04T23:01:33Z</created-at>
+  <updated-at>2022-08-03T20:58:48Z</updated-at>
+  <nucleus>1H</nucleus>
+  <frequency>500 MHz</frequency>
+  <sample-ph>7.00</sample-ph>
+  <sample-temperature>25.0</sample-temperature>
+  <chemical-shift-reference>DSS</chemical-shift-reference>
+  <searchable>true</searchable>
+  <sample-concentration-units nil="true"/>
+  <sample-mass-units nil="true"/>
+  <sample-temperature-units>Celsius</sample-temperature-units>
+  <structure-id>11125</structure-id>
+  <genus nil="true"/>
+  <species nil="true"/>
+  <data-source-type nil="true"/>
+  <predicted nil="true"/>
+  <spectrometer-frequency-MHz nil="true"/>
+  <fid-complex-points nil="true"/>
+  <spectrum-real-points nil="true"/>
+  <linewidth nil="true"/>
+  <fid-first-point-multiplier nil="true"/>
+  <center-frequency-ppm nil="true"/>
+  <sweep-width-ppm nil="true"/>
+  <exported>false</exported>
+  <simulated nil="true"/>
+  <distinct-peaks>47</distinct-peaks>
+  <database-id>HMDB0001520</database-id>
+  <references>
+    <reference>
+      <id>11107</id>
+      <spectra-id>1721</spectra-id>
+      <spectra-type>NmrOneD</spectra-type>
+      <pubmed-id>18953024</pubmed-id>
+      <ref-text>Wishart DS, Knox C, Guo AC, Eisner R, Young N, Gautam B, Hau DD, Psychogios N, Dong E, Bouatra S, Mandal R, Sinelnikov I, Xia J, Jia L, Cruz JA, Lim E, Sobsey CA, Shrivastava S, Huang P, Liu P, Fang L, Peng J, Fradette R, Cheng D, Tzur D, Clements M, Lewis A, De Souza A, Zuniga A, Dawe M, Xiong Y, Clive D, Greiner R, Nazyrova A, Shaykhutdinov R, Li L, Vogel HJ, Forsythe I: HMDB: a knowledgebase for the human metabolome. Nucleic Acids Res. 2009 Jan;37(Database issue):D603-10. doi: 10.1093/nar/gkn810. Epub 2008 Oct 25.</ref-text>
+      <database>HMDB</database>
+      <database-id>HMDB01520</database-id>
+    </reference>
+  </references>
+  <nmr-one-d-peaks>
+    <nmr-one-d-peak>
+      <id>48150</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>0.0</chemical-shift>
+      <intensity>100.0</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>0.0</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48151</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>2.39</chemical-shift>
+      <intensity>57.2010366531</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>2.39</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48152</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>2.52</chemical-shift>
+      <intensity>54.4613106257</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>2.52</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48153</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.75</chemical-shift>
+      <intensity>0.7774898186</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.75</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48154</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.76</chemical-shift>
+      <intensity>0.9255831174</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.76</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48155</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.77</chemical-shift>
+      <intensity>0.9626064421</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.77</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48156</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.78</chemical-shift>
+      <intensity>1.0366530914</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.78</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48157</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.84</chemical-shift>
+      <intensity>0.7404664939</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.84</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48158</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.85</chemical-shift>
+      <intensity>0.8145131433</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.85</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48159</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.86</chemical-shift>
+      <intensity>2.4805627545</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.86</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48160</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.87</chemical-shift>
+      <intensity>2.665679378</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.87</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48161</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.87</chemical-shift>
+      <intensity>2.8137726768</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.87</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48162</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.88</chemical-shift>
+      <intensity>3.4061458719</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.88</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48163</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.89</chemical-shift>
+      <intensity>2.665679378</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.89</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48164</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.9</chemical-shift>
+      <intensity>1.9992595335</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.9</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48165</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.91</chemical-shift>
+      <intensity>1.1477230655</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.91</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48166</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.92</chemical-shift>
+      <intensity>1.1106997408</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.92</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48167</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.92</chemical-shift>
+      <intensity>0.8885597927</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.92</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48168</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.94</chemical-shift>
+      <intensity>1.4068863384</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.94</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48169</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.95</chemical-shift>
+      <intensity>1.3698630137</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.95</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48170</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.96</chemical-shift>
+      <intensity>0.8145131433</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.96</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48171</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.97</chemical-shift>
+      <intensity>0.851536468</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.97</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48172</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.97</chemical-shift>
+      <intensity>1.1106997408</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.97</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48173</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.98</chemical-shift>
+      <intensity>1.0736764161</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.98</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48174</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>3.99</chemical-shift>
+      <intensity>0.7404664939</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>3.99</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48175</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.01</chemical-shift>
+      <intensity>1.6660496113</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.01</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48176</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.03</chemical-shift>
+      <intensity>20.3998519067</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.03</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48177</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.05</chemical-shift>
+      <intensity>6.5531284709</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.05</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48178</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.06</chemical-shift>
+      <intensity>7.2565716401</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.06</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48179</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.07</chemical-shift>
+      <intensity>8.6634579785</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.07</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48180</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.08</chemical-shift>
+      <intensity>6.1088485746</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.08</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48181</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.09</chemical-shift>
+      <intensity>3.146982599</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.09</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48182</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.1</chemical-shift>
+      <intensity>2.665679378</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.1</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48183</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.1</chemical-shift>
+      <intensity>2.5175860792</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.1</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48184</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.11</chemical-shift>
+      <intensity>2.0733061829</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.11</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48185</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.25</chemical-shift>
+      <intensity>0.8145131433</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.25</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48186</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.26</chemical-shift>
+      <intensity>1.6660496113</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.26</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48187</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.27</chemical-shift>
+      <intensity>1.6660496113</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.27</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48188</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.28</chemical-shift>
+      <intensity>0.8145131433</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.28</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48189</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.33</chemical-shift>
+      <intensity>0.9996297668</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.33</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48190</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.35</chemical-shift>
+      <intensity>1.0366530914</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.35</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48191</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.35</chemical-shift>
+      <intensity>0.9255831174</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.35</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48192</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.4</chemical-shift>
+      <intensity>5.4424287301</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.4</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48193</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.41</chemical-shift>
+      <intensity>4.5538689374</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.41</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48194</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>4.41</chemical-shift>
+      <intensity>5.0351721585</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>4.41</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48195</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>7.64</chemical-shift>
+      <intensity>23.3246945576</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>7.64</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+    <nmr-one-d-peak>
+      <id>48196</id>
+      <nmr-one-d-id>1721</nmr-one-d-id>
+      <chemical-shift>7.8</chemical-shift>
+      <intensity>19.0670122177</intensity>
+      <atom-id nil="true"/>
+      <atom-symbol nil="true"/>
+      <chemical-shift-pred nil="true"/>
+      <chemical-shift-true nil="true"/>
+      <multiplet-true nil="true"/>
+      <multiplet-pred nil="true"/>
+      <j-coupling-true nil="true"/>
+      <j-coupling-pred nil="true"/>
+      <peak-position-ppm>7.8</peak-position-ppm>
+      <intensity-pred nil="true"/>
+      <structure-id nil="true"/>
+      <nucleus nil="true"/>
+    </nmr-one-d-peak>
+  </nmr-one-d-peaks>
+</nmr-one-d>
