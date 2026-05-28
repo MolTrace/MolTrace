@@ -108,13 +108,16 @@ def test_raw_fid_process_no_longer_zero_peaks(fixture_name: str) -> None:
     )
 
 
-@pytest.mark.slow
 def test_raw_fid_process_recovers_dense_13c_60000006() -> None:
-    """The slow-recovery fixture (was 241s zero-peak) must now return peaks.
+    """The previously-slow fixture (was 241s zero-peak, then 5.5 min) now ~40s.
 
-    Currently takes ~5 minutes due to the structure-guided peak-sensitivity
-    sweep on a dense 13C spectrum; Phase 12d tracks reducing this.  Marked
-    ``slow`` so fast CI skips it but explicit runs catch regressions.
+    Trajectory:
+      * Pre-Phase-12b: 0 peaks (HTTP 400 from SpectrumPoint validation).
+      * Post-Phase-12b: 51 peaks in 331s.
+      * Post-Phase-12d (vectorized _pseudo_voigt_sum): 51 peaks in 215s.
+      * Post-Phase-12d-bis (analytical jacobian): 51 peaks in ~40s.
+
+    Now fast enough to run by default in the regular suite (no slow marker).
     """
 
     fixture_zip = _FIXTURES_ROOT / "nmrshiftdb2_60000006_13c.zip"
@@ -123,6 +126,6 @@ def test_raw_fid_process_recovers_dense_13c_60000006() -> None:
     peak_count = asyncio.run(_process(fixture_zip))
     assert peak_count > 0, (
         "60000006_13c returned 0 peaks via /nmr/raw-fid/process. "
-        "This was the FE-flagged 241s zero-peak case; Phase 12b widened "
-        "SpectrumPoint bounds so the trace no longer rejects."
+        "This was the FE-flagged 241s zero-peak case fixed in Phase 12b; "
+        "perf was dropped from 5.5 min to ~40s by Phase 12d + 12d-bis."
     )

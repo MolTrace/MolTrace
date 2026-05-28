@@ -1,0 +1,135 @@
+{
+  "summary": {
+    "report_version": "gsd_hmdb_style_validation_report_v1",
+    "generated_at": "2026-05-28T01:00:37.184776+00:00",
+    "level": 2,
+    "fixture_count": 5,
+    "ok_count": 5,
+    "error_count": 0,
+    "environment_count_within_tol_count": 1,
+    "environment_count_within_tol_rate": 0.2,
+    "median_abs_environment_count_delta": 4.0,
+    "multiplet_line_count_within_tol_count": 2,
+    "multiplet_line_count_within_tol_rate": 0.4,
+    "median_abs_multiplet_line_count_delta": 4.0
+  },
+  "rows": [
+    {
+      "fixture_id": "ethanol_1h",
+      "compound_name": "Ethanol",
+      "nucleus": "1H",
+      "solvent": "CDCl3",
+      "row_status": "ok",
+      "expected_environment_count": 3,
+      "expected_multiplet_line_count": 8,
+      "prompt_peak_count": 12,
+      "prompt_compound_peak_count": 7,
+      "prompt_environment_count": 8,
+      "prompt_compound_environment_count": 3,
+      "environment_count_delta": 0,
+      "environment_count_within_tol": true,
+      "multiplet_line_count_delta": -1,
+      "multiplet_line_count_within_tol": true,
+      "category_counts": {
+        "compound": 7,
+        "solvent": 2,
+        "impurity": 2,
+        "artifact": 1
+      },
+      "error": null
+    },
+    {
+      "fixture_id": "acetone_1h",
+      "compound_name": "Acetone",
+      "nucleus": "1H",
+      "solvent": "CDCl3",
+      "row_status": "ok",
+      "expected_environment_count": 1,
+      "expected_multiplet_line_count": 1,
+      "prompt_peak_count": 6,
+      "prompt_compound_peak_count": 5,
+      "prompt_environment_count": 6,
+      "prompt_compound_environment_count": 5,
+      "environment_count_delta": 4,
+      "environment_count_within_tol": false,
+      "multiplet_line_count_delta": 4,
+      "multiplet_line_count_within_tol": false,
+      "category_counts": {
+        "solvent": 1,
+        "compound": 5
+      },
+      "error": null
+    },
+    {
+      "fixture_id": "ethyl_acetate_1h",
+      "compound_name": "Ethyl acetate",
+      "nucleus": "1H",
+      "solvent": "CDCl3",
+      "row_status": "ok",
+      "expected_environment_count": 3,
+      "expected_multiplet_line_count": 8,
+      "prompt_peak_count": 11,
+      "prompt_compound_peak_count": 8,
+      "prompt_environment_count": 8,
+      "prompt_compound_environment_count": 5,
+      "environment_count_delta": 2,
+      "environment_count_within_tol": false,
+      "multiplet_line_count_delta": 0,
+      "multiplet_line_count_within_tol": true,
+      "category_counts": {
+        "compound": 8,
+        "solvent": 1,
+        "impurity": 2
+      },
+      "error": null
+    },
+    {
+      "fixture_id": "toluene_13c",
+      "compound_name": "Toluene",
+      "nucleus": "13C",
+      "solvent": "CDCl3",
+      "row_status": "ok",
+      "expected_environment_count": 5,
+      "expected_multiplet_line_count": 5,
+      "prompt_peak_count": 219,
+      "prompt_compound_peak_count": 63,
+      "prompt_environment_count": 219,
+      "prompt_compound_environment_count": 63,
+      "environment_count_delta": 58,
+      "environment_count_within_tol": false,
+      "multiplet_line_count_delta": 58,
+      "multiplet_line_count_within_tol": false,
+      "category_counts": {
+        "compound": 63,
+        "artifact": 142,
+        "impurity": 13,
+        "solvent": 1
+      },
+      "error": null
+    },
+    {
+      "fixture_id": "ethyl_acetate_13c",
+      "compound_name": "Ethyl acetate",
+      "nucleus": "13C",
+      "solvent": "CDCl3",
+      "row_status": "ok",
+      "expected_environment_count": 4,
+      "expected_multiplet_line_count": 4,
+      "prompt_peak_count": 220,
+      "prompt_compound_peak_count": 61,
+      "prompt_environment_count": 220,
+      "prompt_compound_environment_count": 61,
+      "environment_count_delta": 57,
+      "environment_count_within_tol": false,
+      "multiplet_line_count_delta": 57,
+      "multiplet_line_count_within_tol": false,
+      "category_counts": {
+        "artifact": 141,
+        "compound": 61,
+        "impurity": 17,
+        "solvent": 1
+      },
+      "error": null
+    }
+  ]
+}

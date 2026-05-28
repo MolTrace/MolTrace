@@ -863,12 +863,13 @@ export function SpectraCheckRawFidSection({
     resultsMode === "process" ? processResult : resultsMode === "preview" ? previewResult : null
   /**
    * Dense 13C heuristic: warn the user up-front when /nmr/raw-fid/process
-   * is going to take several minutes. Empirical threshold from Phase 12
-   * validation: nmrshiftdb2_60000006 (98,304 pts, ¹³C) took 5.5 min;
-   * 13C spectra under 64K points completed in tens of seconds. We read
-   * `point_count` from whichever response we have so the hint persists
-   * after processing finishes too. Backend perf work is tracked in a
-   * separate Phase 12d ticket; this is the user-facing hint only.
+   * is going to take up to a few minutes. Empirical threshold and
+   * runtime after the Phase 12d backend perf pass:
+   *   - 98,304-pt ¹³C (nmrshiftdb2_60000006) → 3.6 min worst case
+   *   - 64K+ ¹³C generally → <40 s after Phase 12d
+   *   - under 64K → tens of seconds (no warning)
+   * We read `point_count` from whichever response we have so the hint
+   * persists across the whole flow.
    */
   const HEAVY_13C_POINT_THRESHOLD = 65536
   const heavyPointCount = (() => {
@@ -1443,8 +1444,8 @@ export function SpectraCheckRawFidSection({
               title={processLoading ? "Processing dense ¹³C spectrum…" : "Dense ¹³C spectrum"}
               description={
                 processLoading
-                  ? `This may take several minutes (${heavyPointCount?.toLocaleString()} points). Backend perf work is in progress.`
-                  : `This spectrum has ${heavyPointCount?.toLocaleString()} points. Running Process FID may take several minutes.`
+                  ? `This may take up to ~4 minutes (${heavyPointCount?.toLocaleString()} points).`
+                  : `This spectrum has ${heavyPointCount?.toLocaleString()} points. Running Process FID may take up to ~4 minutes.`
               }
             />
           )}

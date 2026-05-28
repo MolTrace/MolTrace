@@ -1,0 +1,6 @@
+fixture_id,compound_name,nucleus,solvent,row_status,expected_environment_count,expected_multiplet_line_count,prompt_peak_count,prompt_compound_peak_count,prompt_environment_count,prompt_compound_environment_count,environment_count_delta,environment_count_within_tol,multiplet_line_count_delta,multiplet_line_count_within_tol,category_counts,error
+ethanol_1h,Ethanol,1H,CDCl3,ok,3,8,12,7,9,4,1,True,-1,True,"{""compound"": 7, ""solvent"": 1, ""artifact"": 2, ""impurity"": 2}",
+acetone_1h,Acetone,1H,CDCl3,ok,1,1,4,2,4,2,1,True,1,True,"{""impurity"": 1, ""solvent"": 1, ""compound"": 2}",
+ethyl_acetate_1h,Ethyl acetate,1H,CDCl3,ok,3,8,11,7,8,4,1,True,-1,True,"{""compound"": 7, ""impurity"": 3, ""solvent"": 1}",
+toluene_13c,Toluene,13C,CDCl3,ok,5,5,6,5,6,5,0,True,0,True,"{""compound"": 5, ""solvent"": 1}",
+ethyl_acetate_13c,Ethyl acetate,13C,CDCl3,ok,4,4,5,4,5,4,0,True,0,True,"{""compound"": 4, ""solvent"": 1}",
