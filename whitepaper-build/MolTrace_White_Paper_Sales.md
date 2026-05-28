@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — AI-Native Scientific Intelligence for Pharmaceutical R&D"
 subtitle: "Sales-Led Variant · The Business Case for Audit-Ready Analytical Chemistry"
-version: "2026-05-28"
+version: "2026-05-28b"
 audience: "Pharma R&D directors, regulatory affairs leads, CRO commercial teams, analytical operations heads"
 length: "≈4,000 words · Hybrid white paper · Sales-led variant of the canonical hybrid white paper"
 ---
@@ -75,7 +75,7 @@ MolTrace is a multi-tenant SaaS application with a FastAPI Python backend, a Nex
 The core of the platform is a **39-layer evidence stack** built incrementally and additively. Each layer is independently usable (a laboratory with only 1H NMR can be productive today) **and** composable into the unified confidence engine when richer inputs are available. Layers include:
 
 - **1H + 13C evidence scoring** against SMILES candidates, with solvent-aware chemical-shift windows sourced from Silverstein, Pretsch, Friebolin, and the Gottlieb/Fulmer residual-solvent tables.
-- **Opt-in Mestrenova-style Global Spectral Deconvolution (GSD)** backend that auto-classifies every detected peak (compound, solvent, impurity, artifact, ¹³C satellite) and clusters multiplet lines back into chemical-environment entries — cleared production promotion against curated NMRShiftDB2 and HMDB-style reference corpora. Tenants opt in per request; the default analysis flow is unchanged.
+- **Opt-in Mestrenova-style Global Spectral Deconvolution (GSD)** backend that auto-classifies every detected peak (compound, solvent, impurity, artifact, ¹³C satellite) and clusters multiplet lines back into chemical-environment entries — cleared production promotion against **three independent reference corpora**: NMRShiftDB2 (100 % solvent auto-detect), an HMDB-style synthetic corpus (95 % / 100 % within tolerance), and a **100-fixture real-instrument HMDB corpus** (95 % parseable, 93 % solvent auto-detect) — closing the literal Prompt 3 acceptance criterion of "100 spectra from NMRShiftDB2 + HMDB" on real instrument data. Tenants opt in per request; the default analysis flow is unchanged.
 - **Processed 2D NMR** support (COSY, HSQC/HMQC, HMBC) — guarded behind a feature flag for controlled rollout.
 - **Raw FID** processing for Bruker `.zip` / `.tar.gz` and Agilent-Varian `.fid` archives, with automatic phase + Bernstein-order-3 baseline correction by default.
 - **Candidate comparison** with DP4 / DP5-class Bayesian scoring and a transparent per-class multiplier table for structural classes (carbohydrates, lipids, peptides, polymers, etc.).

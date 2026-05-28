@@ -25,15 +25,16 @@ const navigation = {
       href: "https://moltrace-docs.vercel.app/guides/integrations/lims/",
     },
   ],
-  // Company links land on the dedicated pages under ``guides/company/`` in
-  // the docs. ``Blog`` has no dedicated blog yet — landing on the launch
-  // post (the only announcement-style content available) is the closest
-  // analogue. Update when a proper blog index ships.
+  // All four Company links are in-app routes so the manifesto / careers /
+  // editorial index / contact form stay inside the product surface
+  // (no external docs jump). Each renders inside the marketing shell
+  // (Header + Footer) and is content-grounded in the white papers + the
+  // shipped Phase work.
   company: [
-    { name: "About", href: "https://moltrace-docs.vercel.app/guides/company/about/" },
-    { name: "Careers", href: "https://moltrace-docs.vercel.app/guides/company/careers/" },
-    { name: "Blog", href: "https://moltrace-docs.vercel.app/guides/resources/launch-post/" },
-    { name: "Contact", href: "https://moltrace-docs.vercel.app/guides/company/contact/" },
+    { name: "About", href: "/about" },
+    { name: "Careers", href: "/careers" },
+    { name: "Blog", href: "/blog" },
+    { name: "Contact", href: "/contact" },
   ],
   // Each resource link points at its dedicated page on the MolTrace docs
   // site (Astro Starlight deployment on Vercel). Footer is the canonical

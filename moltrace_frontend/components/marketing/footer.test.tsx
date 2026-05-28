@@ -88,13 +88,13 @@ describe("Marketing Footer", () => {
         "https://moltrace-docs.vercel.app/guides/integrations/lims/",
       ],
       // ── Company ─────────────────────────────────────────────────────
-      ["About", "https://moltrace-docs.vercel.app/guides/company/about/"],
-      ["Careers", "https://moltrace-docs.vercel.app/guides/company/careers/"],
-      [
-        "Blog",
-        "https://moltrace-docs.vercel.app/guides/resources/launch-post/",
-      ],
-      ["Contact", "https://moltrace-docs.vercel.app/guides/company/contact/"],
+      // All four Company links are in-app routes (manifesto / careers /
+      // editorial index / contact form). External docs links live in
+      // Platform, Resources, and Legal sections.
+      ["About", "/about"],
+      ["Careers", "/careers"],
+      ["Blog", "/blog"],
+      ["Contact", "/contact"],
       // ── Resources ───────────────────────────────────────────────────
       ["Documentation", "https://moltrace-docs.vercel.app/"],
       ["API Reference", "https://moltrace-docs.vercel.app/guides/api/"],
@@ -117,12 +117,19 @@ describe("Marketing Footer", () => {
       const link = screen.getByText(label).closest("a")
       expect(link, `${label} link not found`).not.toBeNull()
       expect(link?.getAttribute("href"), `${label} href`).toBe(expected)
-      // Every docs link must open in a new tab with safe ``rel`` so opener
-      // leaks and stale referrer headers cannot be exploited.
-      expect(link?.getAttribute("target"), `${label} target`).toBe("_blank")
-      const rel = link?.getAttribute("rel") ?? ""
-      expect(rel, `${label} rel`).toContain("noopener")
-      expect(rel, `${label} rel`).toContain("noreferrer")
+      // External docs links must open in a new tab with a safe ``rel`` so
+      // opener leaks and stale referrer headers cannot be exploited.
+      // In-app routes (e.g. ``/contact``) navigate same-tab and have no
+      // ``target``/``rel`` since they don't leave the application origin.
+      const isExternal = /^https?:\/\//i.test(expected)
+      if (isExternal) {
+        expect(link?.getAttribute("target"), `${label} target`).toBe("_blank")
+        const rel = link?.getAttribute("rel") ?? ""
+        expect(rel, `${label} rel`).toContain("noopener")
+        expect(rel, `${label} rel`).toContain("noreferrer")
+      } else {
+        expect(link?.getAttribute("target"), `${label} target`).not.toBe("_blank")
+      }
     }
   })
 

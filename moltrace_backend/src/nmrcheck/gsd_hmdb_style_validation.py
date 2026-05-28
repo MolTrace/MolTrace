@@ -22,7 +22,10 @@ HMDB download into ``tests/fixtures/hmdb_style_minicorpus/`` with the
 same schema and the harness picks it up unchanged.
 
 CLI:
-    moltrace-gsd-hmdb-sidecar-report
+    moltrace-gsd-hmdb-style-sidecar-report
+
+(Distinct from ``moltrace-gsd-hmdb-sidecar-report`` which targets the
+real-instrument HMDB corpus harness in ``gsd_hmdb_validation.py``.)
 """
 
 from __future__ import annotations

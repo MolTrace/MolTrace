@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Executive One-Pager"
 subtitle: "AI-Native Scientific Intelligence for Pharmaceutical R&D"
-version: "2026-05-28"
+version: "2026-05-28b"
 audience: "Pharmaceutical, biotech, CRO, and academic R&D leadership"
 length: "Single page (≈500 words)"
 ---
@@ -24,7 +24,7 @@ A multi-tenant SaaS platform with three integrated programs sharing one evidence
 
 | Program | What it does |
 |---|---|
-| **SpectraCheck** | 39-layer NMR + MS evidence engine: 1H, 13C, 2D NMR, raw FID (Bruker / Agilent-Varian), HRMS, MS/MS, LC-MS features. Categorises peaks against literature-backed shift windows. Ranks candidates with DP4/DP5-class methods. Includes an opt-in Mestrenova-style GSD detector that has cleared its production promotion gate against the NMRShiftDB2 and HMDB-style validation corpora. |
+| **SpectraCheck** | 39-layer NMR + MS evidence engine: 1H, 13C, 2D NMR, raw FID (Bruker / Agilent-Varian), HRMS, MS/MS, LC-MS features. Categorises peaks against literature-backed shift windows. Ranks candidates with DP4/DP5-class methods. Includes an opt-in Mestrenova-style GSD detector that has cleared its production promotion gate against three independent reference corpora — NMRShiftDB2, an HMDB-style synthetic corpus, and a 100-fixture real-instrument HMDB corpus (95 % parseable, 93 % solvent auto-detect). |
 | **Regulatory Intelligence Hub** | Dossier scaffolding, ICH/FDA/EMA-aligned audit packs, human-in-the-loop release gating, AI-supported question/answer routing. |
 | **Reaction Optimization** | Bayesian optimisation, multi-objective response-surface modelling, design-of-experiments under mechanistic constraints, integrated reaction-history provenance. |
 
