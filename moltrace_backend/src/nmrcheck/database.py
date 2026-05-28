@@ -104,6 +104,19 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
         }
+        if "users" in tables:
+            # v0.6.7 per-tenant graduation knob — add the column
+            # idempotently for existing SQLite dev DBs that pre-date
+            # Alembic migration 0011.  Production Postgres picks the
+            # column up via the Alembic migration itself.
+            users_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql("PRAGMA table_info(users)").fetchall()
+            }
+            if "gsd_graduated_at" not in users_existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN gsd_graduated_at TIMESTAMP"
+                )
         if "fid_runs" in tables:
             existing = {
                 str(row[1])
@@ -205,6 +218,7 @@ def _user_to_public(user: UserORM) -> UserPublic:
         is_verified=user.is_verified,
         created_at=user.created_at,
         verified_at=user.verified_at,
+        gsd_graduated_at=user.gsd_graduated_at,
     )
 
 
@@ -1971,19 +1985,40 @@ def list_audit_events(
     limit: int = 100,
     actor_user_id: int | None = None,
     event_type: str | None = None,
+    event_types: list[str] | None = None,
     entity_type: str | None = None,
     entity_id: int | None = None,
+    since: datetime | None = None,
 ) -> list[AuditEventRecord]:
+    """Query the audit-event log with optional filters.
+
+    ``event_type`` (singular) matches one type; ``event_types`` (plural,
+    v0.6.9) matches a set via SQL ``IN`` — used by the graduation
+    history endpoint to fetch ``admin.gsd_graduate_user`` plus
+    ``admin.gsd_ungraduate_user`` in a single query.  If both are
+    supplied, they AND together (event must equal ``event_type`` AND be
+    in ``event_types``); this is intentional so callers can layer
+    filters without one silently overriding the other.
+    """
+
     with session_scope(session_factory) as session:
         stmt = select(AuditEventORM).order_by(AuditEventORM.id.desc()).limit(limit)
         if actor_user_id is not None:
             stmt = stmt.where(AuditEventORM.actor_user_id == actor_user_id)
         if event_type is not None:
             stmt = stmt.where(AuditEventORM.event_type == event_type)
+        if event_types is not None:
+            stmt = stmt.where(AuditEventORM.event_type.in_(event_types))
         if entity_type is not None:
             stmt = stmt.where(AuditEventORM.entity_type == entity_type)
         if entity_id is not None:
             stmt = stmt.where(AuditEventORM.entity_id == entity_id)
+        if since is not None:
+            # ``audit_events.created_at`` is timestamp-with-timezone in
+            # production (Postgres) and naive UTC in the SQLite test
+            # harness; both compare correctly against a tz-aware UTC
+            # ``datetime`` so callers should pass a tz-aware value.
+            stmt = stmt.where(AuditEventORM.created_at >= since)
         rows = list(session.scalars(stmt).all())
         return [_audit_to_record(row) for row in rows]
 
@@ -2224,6 +2259,7 @@ def list_admin_users(session_factory: sessionmaker[Session], *, limit: int = 100
                     created_at=user.created_at,
                     analyses_count=int(analyses_count),
                     jobs_count=int(jobs_count),
+                    gsd_graduated_at=user.gsd_graduated_at,
                 )
             )
         return results
@@ -2238,6 +2274,68 @@ def set_user_admin_status(session_factory: sessionmaker[Session], *, user_id: in
         session.flush()
         session.refresh(user)
         return _user_to_public(user)
+
+
+def count_gsd_graduated_users(
+    session_factory: sessionmaker[Session],
+    *,
+    actor_user_id: int | None = None,
+) -> int:
+    """Count users with ``gsd_graduated_at IS NOT NULL`` (v0.6.8).
+
+    Backs the ``graduated_user_count`` field on
+    ``SpectrumGSDTelemetrySummary``.  When ``actor_user_id`` is set,
+    restricts the count to that one user (returns 0 or 1, cleanly
+    answering "is this tenant graduated?").  Cheap query — single
+    indexed COUNT — so calling it inline from the rollup endpoint
+    does not move latency meaningfully.
+    """
+
+    with session_scope(session_factory) as session:
+        stmt = select(func.count()).select_from(UserORM).where(
+            UserORM.gsd_graduated_at.is_not(None)
+        )
+        if actor_user_id is not None:
+            stmt = stmt.where(UserORM.id == actor_user_id)
+        return int(session.scalar(stmt) or 0)
+
+
+def set_user_gsd_graduation(
+    session_factory: sessionmaker[Session],
+    *,
+    user_id: int,
+    graduated: bool,
+) -> tuple[UserPublic, datetime | None]:
+    """Set or clear the per-tenant GSD graduation flag.
+
+    Returns the updated ``UserPublic`` plus the *previous*
+    ``gsd_graduated_at`` value so the caller can emit a before/after
+    audit event without an extra read.  ``graduated=True`` sets the
+    column to ``utcnow()`` (idempotent: re-setting on an already-
+    graduated user leaves the original timestamp in place); ``False``
+    clears it back to ``None``.
+
+    Idempotent on the "already graduated" path so the admin endpoint
+    can be safely retried without overwriting the original graduation
+    timestamp (which dashboards may already be displaying).
+    """
+
+    with session_scope(session_factory) as session:
+        user = session.get(UserORM, user_id)
+        if user is None:
+            raise ValueError("User not found.")
+        previous = user.gsd_graduated_at
+        if graduated:
+            # Idempotent: if already graduated, keep the original
+            # timestamp so dashboards' "graduated since YYYY-MM-DD"
+            # labels stay stable across admin retries.
+            if previous is None:
+                user.gsd_graduated_at = utcnow()
+        else:
+            user.gsd_graduated_at = None
+        session.flush()
+        session.refresh(user)
+        return _user_to_public(user), previous
 
 
 def get_metrics_summary(session_factory: sessionmaker[Session]) -> MetricsSummary:

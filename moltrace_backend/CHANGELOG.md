@@ -6,7 +6,346 @@ publish to PyPI, but each release marker corresponds to a logically-grouped
 batch of phases shipped in a single working session.
 
 The Prompt 3 GSD (Global Spectral Deconvolution) opt-in analysis backend
-spans v0.4.0 through v0.6.3.
+spans v0.4.0 through v0.6.10. **The v0.6 soak loop is now feature-
+complete** — the full pipeline from per-call telemetry to auditor
+graduation history is shipped and tested end-to-end.
+
+---
+
+## v0.6.10 — Adoption-velocity telemetry on the rollup (2026-05-28)
+
+**Headline:** The rollup gains `newly_graduated_in_window` so adoption-
+velocity charts can render "X tenants graduated this quarter" alongside
+the v0.6.8 "X tenants total are graduated" snapshot. **Closes the v0.6
+GSD soak loop** — the full pipeline now fits in two API calls (rollup
++ per-tenant history) and every contract is pinned by tests.
+
+### Added
+- **`newly_graduated_in_window: int`** field on
+  `SpectrumGSDTelemetrySummary`. Counts *unique users* who had an
+  `admin.gsd_graduate_user` audit event inside the rollup window,
+  restricted to the rollup scope. Multiple graduate events for the
+  same user inside the window count once (Python-side `set` on
+  `entity_id`); ungraduate events do not count toward velocity. Lets
+  the FE render adoption-velocity over time using the same time
+  window the per-call soak metrics already use.
+
+### Tests
+- **`tests/test_spectrum_analyze_gsd_adoption_velocity.py`** — 5
+  tests covering: zero for an empty window, 2 distinct users count
+  as 2, dedup of multiple graduate events for one user, scope
+  isolation across tenants, and the "ungraduate events don't count"
+  invariant.
+
+### Soak-loop closure summary
+With v0.6.10 the full v0.6 pipeline is feature-complete:
+
+| Version | Surface |
+| --- | --- |
+| v0.6.0 | Real-HMDB validation gate cleared (95 % parseable, 93 % solvent) |
+| v0.6.1 | Per-peak QC quintuple on legacy raw-FID peaks |
+| v0.6.2 | 100-fixture real-HMDB corpus (closes literal Prompt 3 spec) |
+| v0.6.3 | Per-call `spectrum.analyze_gsd` audit event |
+| v0.6.4 | Aggregate rollup endpoint with slice breakdowns + verdict policy |
+| v0.6.5 | Flip-readiness verdict (`clear` / `blocked` / `insufficient_data`) |
+| v0.6.6 | Per-tenant scoping via `?actor_user_id` |
+| v0.6.7 | Per-tenant graduation knob + reason-required audit trail |
+| v0.6.8 | Current-state adoption count `graduated_user_count` |
+| v0.6.9 | Per-tenant graduation history endpoint |
+| v0.6.10 | Adoption-velocity field `newly_graduated_in_window` |
+
+The full FE readiness panel can be rendered with **two API calls**:
+- `GET /spectrum/analyze/gsd/telemetry-summary` (per-call metrics +
+  verdict + current adoption + velocity in one shot)
+- `GET /admin/users/{id}/gsd-graduation-history` (per-tenant
+  graduation timeline for the auditor view)
+
+Single source of truth for the flip-the-flag decision, single audit
+trail for graduation, single endpoint for adoption rollup. No FE-
+side aggregation, no hand-coded thresholds, no double round trips.
+
+---
+
+## v0.6.9 — Per-tenant graduation history endpoint (2026-05-28)
+
+**Headline:** Auditors can read the full graduation history of a tenant
+in one call — every graduate / ungraduate decision with the admin's
+documented reason. The v0.6.7 audit events were always written; this
+release adds the dedicated query path so the FE auditor view doesn't
+have to filter the global `/audit/events` stream client-side.
+
+### Added
+- **`GET /admin/users/{user_id}/gsd-graduation-history`** admin-only
+  endpoint returning `list[AuditEventRecord]` for the
+  `admin.gsd_graduate_user` + `admin.gsd_ungraduate_user` events on
+  the targeted user, ordered newest-first. Each event carries the
+  structured before/after `gsd_graduated_at` state plus the
+  admin-documented reason from v0.6.7.
+- **`event_types: list[str] | None`** parameter on `list_audit_events`
+  — SQL `WHERE event_type IN (...)` filter so the history endpoint
+  fetches both event types in a single query. Backwards-compatible
+  with the existing singular `event_type` (they AND together if both
+  supplied).
+
+### Tests
+- **`tests/test_admin_gsd_graduation_history.py`** — 5 tests:
+  - Empty history for a fresh user
+  - Single graduation records the reason + before/after state
+  - Graduate → ungraduate → regraduate yields 3 events in newest-
+    first order with correct reasons
+  - Other users' graduations do not surface (scope isolation)
+  - Admin-only auth contract
+
+### Operational meaning
+- This is the auditor's primary read surface for graduation
+  decisions. Combined with v0.6.4's rollup, v0.6.5's verdict, and
+  v0.6.7's structured event payload, an auditor can reconstruct
+  every graduation decision in the system without a separate
+  reporting pipeline.
+
+---
+
+## v0.6.8 — Adoption telemetry on the rollup (2026-05-28)
+
+**Headline:** The readiness panel can render "X tenants have graduated"
+without round-tripping `/admin/users` and counting in JS. Single new
+field on the rollup; respects the `?actor_user_id` scope so the same
+endpoint answers both the global adoption-rate question and the
+per-tenant "is this tenant graduated?" question.
+
+### Added
+- **`graduated_user_count: int`** field on `SpectrumGSDTelemetrySummary`.
+  Count of users with `users.gsd_graduated_at IS NOT NULL` within
+  the rollup scope:
+  - Global rollup (no `?actor_user_id`): full count across every
+    tenant.
+  - Scoped rollup (`?actor_user_id=<id>`): 0 or 1, cleanly answering
+    "is this one tenant graduated?".
+- **`count_gsd_graduated_users`** helper in `database.py`. Single
+  indexed COUNT, so inlining it from the rollup endpoint adds no
+  meaningful latency.
+
+### Tests
+- **`tests/test_spectrum_analyze_gsd_adoption.py`** — 3 tests:
+  - Global count climbs as admins graduate (0 → 1 → 2) and falls
+    back on ungraduate (2 → 1)
+  - Scoped rollup returns 0 or 1 depending on the targeted tenant's
+    state
+  - Scoped to ungraduated bob shows 0 even when alice is graduated
+    (no leak)
+
+### Operational meaning
+- The full readiness panel can now be rendered from a single API call:
+  one `GET /spectrum/analyze/gsd/telemetry-summary` returns both the
+  per-call soak metrics + the verdict + the adoption count. No FE-side
+  JS aggregation required.
+
+---
+
+## v0.6.7 — Per-tenant graduation knob (2026-05-28)
+
+**Headline:** v0.6.6 made the per-tenant readiness verdict possible;
+this release adds the action the verdict feeds. Admins can graduate
+individual tenants out of `experimental: true` via
+`POST /admin/users/{user_id}/gsd-graduation`. The graduated tenant's
+own `/spectrum/analyze/gsd` responses (and audit events) flip to
+`experimental: false`, closing the loop from telemetry → rollup →
+verdict → graduation action.
+
+### Added
+- **`users.gsd_graduated_at`** nullable timestamp column on the
+  user table. `None` = still on the experimental backend; a timestamp
+  = graduated at that moment. Self-documenting (timestamp instead of
+  bool) so operational dashboards can show "graduated since
+  YYYY-MM-DD" without a separate audit query.
+- **Alembic migration `0011_user_gsd_graduated_at`** plus the
+  matching `_ensure_sqlite_schema` ALTER for dev SQLite DBs that
+  pre-date the migration.
+- **`POST /admin/users/{user_id}/gsd-graduation`** admin endpoint.
+  Body `{"graduated": bool, "reason": str}` (reason required, 1-500
+  chars — regulatory-relevant audit evidence). Writes
+  `admin.gsd_graduate_user` / `admin.gsd_ungraduate_user` audit
+  events with structured before/after state + the reason. Idempotent
+  on repeat-graduate (preserves the original timestamp so dashboards'
+  "since YYYY-MM-DD" labels stay stable).
+- **`set_user_gsd_graduation`** helper in `database.py` — returns
+  `(updated_user, previous_timestamp)` so the endpoint emits the
+  before/after audit event without a second read.
+- **`UserPublic.gsd_graduated_at`** + **`AdminUserRecord.gsd_graduated_at`**
+  fields so the admin UI sees graduation status in user-detail and
+  user-list responses without an extra round trip.
+
+### Changed
+- `spectrum_analyze_gsd` now consults `context.user.gsd_graduated_at`
+  at request time: a graduated tenant gets `experimental: false` in
+  both the response payload and the soak-telemetry audit event.
+  API-key callers stay on `experimental: true` (graduation is a
+  per-user knob and the API-key path has no user attached).
+- `_emit_gsd_telemetry` gains an `experimental: bool` parameter so
+  the audit event's `metadata.experimental` slot reflects the
+  per-call flag instead of always being `True`. Soak dashboards can
+  now cleanly split call counts between graduated and still-
+  experimental tenants.
+
+### Tests
+- **`tests/test_admin_gsd_graduation.py`** — 9 tests across the full
+  pipeline:
+  - Endpoint sets the timestamp + writes an audit event with
+    before/after state + reason
+  - Endpoint clears the timestamp + writes the ungraduate event
+  - Idempotent re-set preserves the original timestamp
+  - 404 on unknown user, 422 on empty reason, 403 on non-admin
+  - Graduated tenant sees `experimental: false` in the response;
+    bob (ungraduated) stays `True`; the telemetry event reflects
+    both
+  - Ungraduating reverts the response to `experimental: true`
+  - API-key caller (no user attached) stays `experimental: true`
+
+---
+
+## v0.6.6 — Per-tenant readiness scoping on the rollup (2026-05-28)
+
+**Headline:** The rollup gains an admin-only `?actor_user_id` query
+param so admins can graduate individual tenants out of `experimental:
+true` ahead of the platform-wide flip. The verdict pipeline from
+v0.6.5 reuses verbatim — same policy, same reason strings, same E2E
+schema — just scoped to one user's slice of the audit stream.
+
+### Added
+- **`?actor_user_id: int | None`** query parameter on
+  `GET /spectrum/analyze/gsd/telemetry-summary` (admin-only, `ge=1`).
+  When set, the rollup is computed against just that user's
+  `spectrum.analyze_gsd` events; when unset, the rollup is global
+  (v0.6.4 behaviour unchanged).
+- **`scope_actor_user_id: int | None`** field on
+  `SpectrumGSDTelemetrySummary` — echoes the query param so cached or
+  replayed responses always carry the scope they were computed
+  against. `None` = global rollup.
+- Endpoint reuses the existing
+  `list_audit_events(..., actor_user_id=…)` WHERE clause; the SQL
+  plan stays at the same `(event_type, created_at)` composite index
+  plus an `actor_user_id` predicate.
+
+### Tests
+- **`tests/test_spectrum_analyze_gsd_telemetry_summary_per_user.py`**
+  — 5 tests covering: per-user filtering returns only the targeted
+  user's events (alice 3 calls + bob 1 call → scope=alice returns 3),
+  empty per-user window returns `insufficient_data` against the
+  *targeted* user's count, unset returns the global rollup
+  (backward compat), `actor_user_id=0` is rejected by the
+  `Query(ge=1)` validator, and a non-admin caller cannot use the
+  scope param (endpoint stays admin-only).
+
+### Operational meaning
+- The "this tenant is ready to graduate from experimental" decision
+  is now a one-call API: `GET /spectrum/analyze/gsd/telemetry-summary
+  ?window_days=90&actor_user_id=<id>` returns the per-tenant verdict
+  using the same policy as the platform-wide flip. Tenant graduation
+  no longer requires a separate dashboard.
+
+---
+
+## v0.6.5 — Flip-readiness verdict in the telemetry rollup (2026-05-28)
+
+**Headline:** v0.6.4 surfaced the raw aggregation; this release adds the
+verdict layer so the backend owns the "ready to flip `experimental:
+false`?" decision and the FE renders the answer as-is. No more
+hand-coded thresholds in the FE.
+
+### Added
+- **`flip_readiness_verdict`** field on `SpectrumGSDTelemetrySummary`
+  — `Literal["insufficient_data", "clear", "blocked"]`. The verdict
+  states map to:
+  - `"insufficient_data"`: `invocations < 500` in the window. FE
+    renders "need more data" instead of a misleading "ready" verdict
+    on a tiny sample.
+  - `"clear"`: above floor + all signals pass. FE shows the
+    "ready to flip" affordance to the operations review.
+  - `"blocked"`: above floor + one or more blockers fire. FE renders
+    the reasons as a bulleted list.
+- **`flip_readiness_reasons`** field — human-readable strings the FE
+  shows verbatim (e.g., `"need >=500 invocations in window (got 412)"`,
+  `"error_rate 6.00% exceeds ceiling 5%"`, `"solvent_detect_rate
+  85.00% below floor 95%"`). One string per failing check.
+- **`flip_readiness_policy`** field — `FlipReadinessPolicy` snapshot
+  with the three thresholds (`min_invocations`, `max_error_rate`,
+  `min_solvent_detect_rate`). Surfaced so the FE renders "X / Y target"
+  progress widgets without hard-coding the policy constants and so a
+  future policy tightening lands as a one-line backend change.
+- **`_compute_flip_readiness_verdict`** pure helper in `api.py` — no
+  DB / request state; takes the relevant aggregated numbers and
+  returns `(verdict, reasons)`. Trivially unit-testable; the policy
+  edge cases (boundary inequalities for invocations / error_rate /
+  solvent_detect_rate) are exhaustively covered.
+
+### Policy defaults
+- `min_invocations = 500` — invocation-volume floor below which the
+  window is treated as statistically uninformative.
+- `max_error_rate = 0.05` — error-rate ceiling above which we treat
+  tenants as hitting a real defect.
+- `min_solvent_detect_rate = 0.95` — matches the literal Prompt 3
+  acceptance criterion on real-tenant data.
+- The solvent check is **skipped** (not failed) when
+  `fixtures_with_solvent_declared == 0` so a window of "no calls
+  declared a solvent" yields `clear` rather than `blocked` on an
+  undefined metric.
+
+### Tests
+- **`tests/test_spectrum_analyze_gsd_flip_readiness.py`** — 10 tests
+  covering: insufficient-data verdict, clear verdict, blocked on
+  error_rate alone, blocked on solvent_detect_rate alone, blocked
+  with both blockers (two reasons), solvent-skip when
+  `fixtures_with_solvent_declared == 0`, three boundary-inequality
+  pins (floor / ceiling / floor), plus an E2E test that fires the
+  endpoint and asserts the policy snapshot is included verbatim in
+  the response.
+
+---
+
+## v0.6.4 — Aggregate telemetry rollup for the readiness panel (2026-05-28)
+
+**Headline:** v0.6.3 shipped one audit event per GSD invocation. This
+release adds the server-side aggregation endpoint the FE readiness
+panel needs to render the "quarter-of-clean-tenant-runs" countdown
+without fetching every event individually and aggregating in the
+browser.
+
+### Added
+- **`GET /spectrum/analyze/gsd/telemetry-summary?window_days=N`** —
+  admin-only endpoint that aggregates `spectrum.analyze_gsd` audit
+  events inside the requested window into a single
+  `SpectrumGSDTelemetrySummary` payload. `window_days` is clamped to
+  `[1, 365]`. Pulls rows via the existing `list_audit_events`
+  database helper and aggregates in Python so the path is
+  cross-dialect-portable (no per-dialect JSON-path SQL needed) and
+  the GSD opt-in's modest call volume keeps the aggregation cheap.
+- **`SpectrumGSDTelemetrySummary` Pydantic model** in `models.py`
+  with `model_config = ConfigDict(extra="forbid")` and the v0.6.4
+  envelope: window/generated_at + invocations + errors + error_rate +
+  median_wall_ms + p95_wall_ms + fixtures_with_solvent_declared +
+  solvent_detected_count + solvent_detect_rate + by_nucleus + by_level
+  + error_kind_counts. Rates are `float | None` (None when the
+  denominator is zero, so the FE renders "no data" instead of "0 %").
+- **`list_audit_events(..., since: datetime | None = None)`** — added
+  a `since` parameter to the database helper so callers can window
+  audit-event queries by `created_at`. Reusable for future telemetry
+  rollups beyond the GSD endpoint.
+
+### Tests
+- **`tests/test_spectrum_analyze_gsd_telemetry_summary.py`** — 5 tests
+  covering: empty-window case, mixed nucleus/level happy-path
+  aggregation, error-event aggregation (incl. error_kind_counts),
+  auth contract (`x-api-key` admin-equivalent, unauth rejected),
+  and `window_days` range clamping (0 → 422, 366 → 422).
+
+### Operational meaning
+- `GET /audit/events?event_type=spectrum.analyze_gsd` remains the
+  raw event stream for tenant-scoped per-event inspection.
+- `GET /spectrum/analyze/gsd/telemetry-summary?window_days=90` is
+  the pre-aggregated rollup for the admin readiness panel. The
+  "quarter-of-clean-tenant-runs" gate to flipping `experimental:
+  false` reads off this endpoint's `invocations` + `error_rate` +
+  `solvent_detect_rate` over a 90-day window.
 
 ---
 

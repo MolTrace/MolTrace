@@ -1720,6 +1720,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spectrum/analyze/gsd/telemetry-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Spectrum Analyze Gsd Telemetry Summary
+         * @description Aggregate ``spectrum.analyze_gsd`` audit events into a soak summary.
+         *
+         *     Backs the FE readiness-panel countdown to flipping the opt-in GSD
+         *     backend's ``experimental`` flag from True to False.  The raw audit
+         *     event stream is too verbose for a dashboard (one event per analysis
+         *     call); this endpoint pre-aggregates the relevant slices server-side
+         *     so the FE renders a single rollup in a single round trip.
+         *
+         *     Auth: admin-only (same audience as ``/metrics/summary``).  Tenants
+         *     can still query their own raw events via ``GET /audit/events``.
+         *
+         *     Aggregation strategy: pull every ``spectrum.analyze_gsd`` event
+         *     inside the window into Python and aggregate row-by-row.  The window
+         *     is hard-capped at 365 days and the GSD backend is opt-in, so the
+         *     row count stays in the low thousands even for the most active
+         *     tenants; cross-dialect-portable Python aggregation is preferred
+         *     over per-dialect JSON path SQL.  If/when a tenant exceeds ~50k
+         *     events per window we can revisit with a materialized view.
+         *
+         *     Scope (v0.6.6): the optional ``actor_user_id`` query param scopes
+         *     the rollup to a single user's events so admins can graduate
+         *     individual tenants out of ``experimental: true`` ahead of the
+         *     platform-wide flip.  ``None`` (default) returns the global rollup
+         *     across every tenant's events; the response's ``scope_actor_user_id``
+         *     field echoes the request scope so the rollup is self-describing.
+         */
+        get: operations["spectrum_analyze_gsd_telemetry_summary_spectrum_analyze_gsd_telemetry_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/nmr/processed/preview": {
         parameters: {
             query?: never;
@@ -9370,6 +9414,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users/{user_id}/gsd-graduation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin User Gsd Graduation
+         * @description Set or clear the per-tenant GSD graduation flag (v0.6.7).
+         *
+         *     Backs the readiness panel's "Graduate this tenant from
+         *     experimental" CTA.  ``graduated=true`` flips the tenant's
+         *     ``/spectrum/analyze/gsd`` responses to ``experimental: false``;
+         *     ``graduated=false`` reverts.  ``reason`` is required so every
+         *     decision lands in the audit trail with documentation
+         *     (regulatory-relevant: the auditor needs to see *why* each tenant
+         *     graduated, not just when).
+         */
+        post: operations["admin_user_gsd_graduation_admin_users__user_id__gsd_graduation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/system": {
         parameters: {
             query?: never;
@@ -10766,6 +10838,22 @@ export interface components {
             /** Redis Configured */
             redis_configured: boolean;
         };
+        /**
+         * AdminUserGSDGraduationRequest
+         * @description Body for ``POST /admin/users/{user_id}/gsd-graduation``.
+         *
+         *     Admin sets ``graduated=true`` to mark a tenant as graduated out
+         *     of ``experimental: true`` on the GSD backend, or
+         *     ``graduated=false`` to ungraduate.  ``reason`` is required because
+         *     the graduation decision is regulatory-relevant — every entry in
+         *     the audit trail must document why.
+         */
+        AdminUserGSDGraduationRequest: {
+            /** Graduated */
+            graduated: boolean;
+            /** Reason */
+            reason: string;
+        };
         /** AdminUserRecord */
         AdminUserRecord: {
             /** Id */
@@ -10796,6 +10884,8 @@ export interface components {
              * @default 0
              */
             jobs_count: number;
+            /** Gsd Graduated At */
+            gsd_graduated_at?: string | null;
         };
         /** AnalysisEvidenceReport */
         AnalysisEvidenceReport: {
@@ -18640,6 +18730,23 @@ export interface components {
             warnings?: string[];
             /** Notes */
             notes?: string[];
+        };
+        /**
+         * FlipReadinessPolicy
+         * @description Snapshot of the verdict thresholds used to compute a rollup.
+         *
+         *     Included in every ``SpectrumGSDTelemetrySummary`` response so the FE
+         *     can render "X / Y target" widgets without hard-coding the policy
+         *     (and so a future tightening of the policy lights up in callers'
+         *     snapshots automatically).
+         */
+        FlipReadinessPolicy: {
+            /** Min Invocations */
+            min_invocations: number;
+            /** Max Error Rate */
+            max_error_rate: number;
+            /** Min Solvent Detect Rate */
+            min_solvent_detect_rate: number;
         };
         /** FragmentationTreeVisualizationData */
         FragmentationTreeVisualizationData: {
@@ -33664,6 +33771,89 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * SpectrumGSDTelemetrySummary
+         * @description Aggregated soak telemetry for the opt-in GSD analysis endpoint.
+         *
+         *     Returned by ``GET /spectrum/analyze/gsd/telemetry-summary?window_days=N``
+         *     so the readiness-panel UI can render the "quarter-of-clean-tenant-runs"
+         *     countdown without fetching every individual audit event and aggregating
+         *     in the browser.  The underlying signal is the ``spectrum.analyze_gsd``
+         *     audit event written by ``_emit_gsd_telemetry`` (v0.6.3).
+         *
+         *     Rates are returned as ``None`` rather than ``0.0`` when their
+         *     denominator is zero so the FE can show "no data" instead of an
+         *     incorrect "0 %" indicator on an empty window.
+         *
+         *     v0.6.5 added the flip-readiness verdict: the backend now owns the
+         *     "ready to flip ``experimental: false``?" decision and exposes both
+         *     the verdict (``insufficient_data | clear | blocked``) and the
+         *     reasons in a single response so the FE renders the verdict as-is.
+         */
+        SpectrumGSDTelemetrySummary: {
+            /** Window Days */
+            window_days: number;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Scope Actor User Id */
+            scope_actor_user_id?: number | null;
+            /**
+             * Invocations
+             * @default 0
+             */
+            invocations: number;
+            /**
+             * Errors
+             * @default 0
+             */
+            errors: number;
+            /** Error Rate */
+            error_rate?: number | null;
+            /** Median Wall Ms */
+            median_wall_ms?: number | null;
+            /** P95 Wall Ms */
+            p95_wall_ms?: number | null;
+            /**
+             * Fixtures With Solvent Declared
+             * @default 0
+             */
+            fixtures_with_solvent_declared: number;
+            /**
+             * Solvent Detected Count
+             * @default 0
+             */
+            solvent_detected_count: number;
+            /** Solvent Detect Rate */
+            solvent_detect_rate?: number | null;
+            /** By Nucleus */
+            by_nucleus?: {
+                [key: string]: number;
+            };
+            /** By Level */
+            by_level?: {
+                [key: string]: number;
+            };
+            /** Error Kind Counts */
+            error_kind_counts?: {
+                [key: string]: number;
+            };
+            /**
+             * Flip Readiness Verdict
+             * @enum {string}
+             */
+            flip_readiness_verdict: "insufficient_data" | "clear" | "blocked";
+            /** Flip Readiness Reasons */
+            flip_readiness_reasons?: string[];
+            flip_readiness_policy: components["schemas"]["FlipReadinessPolicy"];
+            /**
+             * Graduated User Count
+             * @default 0
+             */
+            graduated_user_count: number;
+        };
         /** SpectrumMissingReferencePeak */
         SpectrumMissingReferencePeak: {
             reference_peak: components["schemas"]["Peak"];
@@ -35920,6 +36110,8 @@ export interface components {
             created_at: string;
             /** Verified At */
             verified_at?: string | null;
+            /** Gsd Graduated At */
+            gsd_graduated_at?: string | null;
         };
         /** UserRequirementSpecification */
         UserRequirementSpecification: {
@@ -41518,6 +41710,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpectrumSolventCatalog"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spectrum_analyze_gsd_telemetry_summary_spectrum_analyze_gsd_telemetry_summary_get: {
+        parameters: {
+            query?: {
+                window_days?: number;
+                actor_user_id?: number | null;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumGSDTelemetrySummary"];
                 };
             };
             /** @description Validation Error */
@@ -63554,6 +63781,45 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPublic"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_user_gsd_graduation_admin_users__user_id__gsd_graduation_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserGSDGraduationRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

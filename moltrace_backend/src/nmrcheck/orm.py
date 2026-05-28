@@ -36,6 +36,15 @@ class UserORM(Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # v0.6.7 per-tenant graduation knob for the opt-in GSD analysis
+    # backend.  ``None`` means the tenant still sees ``experimental:
+    # true`` on /spectrum/analyze/gsd; a timestamp means the admin
+    # graduated this tenant out of experimental at that moment.
+    # Self-documenting: the timestamp tells dashboards "when did each
+    # tenant graduate" without a separate audit query.
+    gsd_graduated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     tokens: Mapped[list[SessionTokenORM]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

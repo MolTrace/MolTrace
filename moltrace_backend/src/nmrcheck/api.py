@@ -162,7 +162,9 @@ from .database import (
     save_fid_run,
     save_raw_archive_preview,
     set_job_backend_id,
+    count_gsd_graduated_users,
     set_user_admin_status,
+    set_user_gsd_graduation,
     set_user_password,
     submit_fid_run_review_decision,
     submit_review_decision,
@@ -741,8 +743,12 @@ from .models import (
     SpectralSimilarityRequest,
     SpectralSimilarityResult,
     SpectrumAnalyzeResult,
+    AdminUserGSDGraduationRequest,
+    FlipReadinessPolicy,
+    FlipReadinessVerdict,
     SpectrumGSDAnalyzeRequest,
     SpectrumGSDAnalyzeResult,
+    SpectrumGSDTelemetrySummary,
     SpectrumPreviewReport,
     SpectrumSolventCatalog,
     SpectrumSolventInfo,
@@ -1896,6 +1902,7 @@ def _emit_gsd_telemetry(
     wall_ms: int,
     input_point_count: int,
     error_kind: str | None,
+    experimental: bool = True,
 ) -> None:
     """Emit one ``spectrum.analyze_gsd`` audit event per opt-in GSD call.
 
@@ -1975,11 +1982,13 @@ def _emit_gsd_telemetry(
             "compound_environment_count": int(compound_environment_count),
             "category_counts": category_counts,
             "solvent_labels_detected": solvent_labels,
-            # Backend identity + experimental flag (still True at v0.6.3 —
-            # the soak telemetry shipped here is the gate that flips it
-            # to False once a quarter of clean tenant runs lands).
+            # Backend identity + experimental flag.  v0.6.7 made the
+            # flag per-tenant via ``users.gsd_graduated_at``: a tenant
+            # who has graduated sees ``experimental: false`` on their
+            # response *and* in the audit event, so rollups split
+            # cleanly between still-experimental and graduated calls.
             "backend": "gsd_prompt3",
-            "experimental": True,
+            "experimental": bool(experimental),
             "wall_ms": int(wall_ms),
         }
         if error_kind is not None:
@@ -5288,6 +5297,16 @@ async def spectrum_analyze_gsd(
     _t0 = time.perf_counter()
     _input_point_count = len(payload.ppm_axis)
 
+    # v0.6.7 per-tenant graduation lookup: if the calling user has
+    # ``gsd_graduated_at`` set, the response carries ``experimental:
+    # false`` (the tenant has graduated out of the experimental
+    # backend).  API-key callers and unauthenticated paths have no
+    # user attached and stay on the platform default of ``True``.
+    _is_graduated = bool(
+        context.user is not None and context.user.gsd_graduated_at is not None
+    )
+    _experimental_flag = not _is_graduated
+
     if len(payload.ppm_axis) != len(payload.intensity):
         # Validation failure path: emit a telemetry event so bad-request
         # rates are visible alongside happy-path counts during operational
@@ -5301,6 +5320,7 @@ async def spectrum_analyze_gsd(
             wall_ms=int((time.perf_counter() - _t0) * 1000),
             input_point_count=_input_point_count,
             error_kind="ppm_axis_length_mismatch",
+            experimental=_experimental_flag,
         )
         raise HTTPException(
             status_code=400,
@@ -5400,6 +5420,7 @@ async def spectrum_analyze_gsd(
         wall_ms=int((time.perf_counter() - _t0) * 1000),
         input_point_count=_input_point_count,
         error_kind=None,
+        experimental=_experimental_flag,
     )
 
     return SpectrumGSDAnalyzeResult(
@@ -5410,7 +5431,7 @@ async def spectrum_analyze_gsd(
         environment_counts=environment_counts,
         level=payload.level,
         backend="gsd_prompt3",
-        experimental=True,
+        experimental=_experimental_flag,
         notes=notes,
         spectrum_metadata={
             "nucleus": payload.nucleus,
@@ -5481,6 +5502,281 @@ async def spectrum_solvents_known(
 
     entries.sort(key=lambda item: item.key.lower())
     return SpectrumSolventCatalog(solvents=entries)
+
+
+# Flip-readiness policy — backend owns the "ready to flip ``experimental:
+# false``?" decision so the FE renders the verdict as-is and a future
+# policy tightening lands as a one-line constant change here rather than
+# a coordinated BE+FE deploy.  Defaults reflect Prompt 3's literal spec
+# (95 % solvent auto-detect) plus an invocation-volume floor and an
+# error-rate ceiling that together encode "≥1 quarter of clean tenant
+# runs in production":
+#
+#   - 500 invocations is the floor below which we treat the window as
+#     statistically uninformative, regardless of how good the
+#     percentages look.
+#   - error_rate ≤ 5 % is the maximum tolerable failure rate; anything
+#     higher means tenants are hitting a real defect (bad payloads
+#     OK in low single-digit %, but not 1-in-10).
+#   - solvent_detect_rate ≥ 95 % matches the literal Prompt 3
+#     acceptance criterion on real-tenant data.
+_FLIP_READINESS_POLICY = FlipReadinessPolicy(
+    min_invocations=500,
+    max_error_rate=0.05,
+    min_solvent_detect_rate=0.95,
+)
+
+
+def _compute_flip_readiness_verdict(
+    *,
+    invocations: int,
+    error_rate: float | None,
+    solvent_detect_rate: float | None,
+    fixtures_with_solvent_declared: int,
+) -> tuple[FlipReadinessVerdict, list[str]]:
+    """Return the ``flip_readiness_verdict`` + human-readable reasons.
+
+    Decision tree:
+
+      1. ``invocations < min_invocations``  →  ``"insufficient_data"``
+         (one reason, the FE knows to render "need more data").
+      2. Any blocker fires                    →  ``"blocked"``
+         (one reason per blocker, FE renders them as a bulleted list).
+      3. Otherwise                             →  ``"clear"``
+         (empty reasons; FE shows the "ready to flip" affordance).
+
+    Blockers:
+      * ``error_rate > max_error_rate`` — only fires when ``error_rate``
+        is non-None (i.e. ``invocations > 0``, which is always true on
+        the ``"blocked"`` / ``"clear"`` branch).
+      * ``solvent_detect_rate < min_solvent_detect_rate`` — only fires
+        when the rate is measurable
+        (``fixtures_with_solvent_declared > 0``); if every call in the
+        window declared no solvent we skip the check rather than block
+        on an undefined metric.
+
+    Pure helper — no DB / request state — so the unit tests can
+    exercise every state without spinning up a TestClient.
+    """
+
+    policy = _FLIP_READINESS_POLICY
+
+    if invocations < policy.min_invocations:
+        return (
+            "insufficient_data",
+            [
+                f"need >={policy.min_invocations} invocations in window "
+                f"(got {invocations})"
+            ],
+        )
+
+    reasons: list[str] = []
+    if error_rate is not None and error_rate > policy.max_error_rate:
+        reasons.append(
+            f"error_rate {error_rate:.2%} exceeds ceiling "
+            f"{policy.max_error_rate:.0%}"
+        )
+    if (
+        fixtures_with_solvent_declared > 0
+        and solvent_detect_rate is not None
+        and solvent_detect_rate < policy.min_solvent_detect_rate
+    ):
+        reasons.append(
+            f"solvent_detect_rate {solvent_detect_rate:.2%} below floor "
+            f"{policy.min_solvent_detect_rate:.0%}"
+        )
+
+    if reasons:
+        return "blocked", reasons
+    return "clear", []
+
+
+@router.get(
+    "/spectrum/analyze/gsd/telemetry-summary",
+    response_model=SpectrumGSDTelemetrySummary,
+    dependencies=[Depends(require_admin)],
+)
+def spectrum_analyze_gsd_telemetry_summary(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+    window_days: int = Query(default=90, ge=1, le=365),
+    actor_user_id: int | None = Query(default=None, ge=1),
+) -> SpectrumGSDTelemetrySummary:
+    """Aggregate ``spectrum.analyze_gsd`` audit events into a soak summary.
+
+    Backs the FE readiness-panel countdown to flipping the opt-in GSD
+    backend's ``experimental`` flag from True to False.  The raw audit
+    event stream is too verbose for a dashboard (one event per analysis
+    call); this endpoint pre-aggregates the relevant slices server-side
+    so the FE renders a single rollup in a single round trip.
+
+    Auth: admin-only (same audience as ``/metrics/summary``).  Tenants
+    can still query their own raw events via ``GET /audit/events``.
+
+    Aggregation strategy: pull every ``spectrum.analyze_gsd`` event
+    inside the window into Python and aggregate row-by-row.  The window
+    is hard-capped at 365 days and the GSD backend is opt-in, so the
+    row count stays in the low thousands even for the most active
+    tenants; cross-dialect-portable Python aggregation is preferred
+    over per-dialect JSON path SQL.  If/when a tenant exceeds ~50k
+    events per window we can revisit with a materialized view.
+
+    Scope (v0.6.6): the optional ``actor_user_id`` query param scopes
+    the rollup to a single user's events so admins can graduate
+    individual tenants out of ``experimental: true`` ahead of the
+    platform-wide flip.  ``None`` (default) returns the global rollup
+    across every tenant's events; the response's ``scope_actor_user_id``
+    field echoes the request scope so the rollup is self-describing.
+    """
+
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime.now(UTC)
+    since = now - timedelta(days=window_days)
+
+    # Pull every spectrum.analyze_gsd event in the window.  ``limit`` is
+    # bounded but generous; a single tenant churning the GSD endpoint at
+    # 100 calls/day for 90 days produces 9k events, well below the cap.
+    # When ``actor_user_id`` is set, ``list_audit_events`` adds the
+    # per-actor WHERE clause and the SQL plan stays at the same
+    # (event_type, created_at) index plus an actor_user_id filter.
+    events = list_audit_events(
+        _state(request).session_factory,
+        limit=50_000,
+        event_type="spectrum.analyze_gsd",
+        since=since,
+        actor_user_id=actor_user_id,
+    )
+
+    invocations = len(events)
+    errors = 0
+    by_nucleus: dict[str, int] = {}
+    by_level: dict[str, int] = {}
+    error_kind_counts: dict[str, int] = {}
+    wall_ms_samples: list[float] = []
+    fixtures_with_solvent_declared = 0
+    solvent_detected_count = 0
+
+    for event in events:
+        meta = event.metadata if isinstance(event.metadata, dict) else {}
+
+        # Error counting (the failure-path emission sets error_kind).
+        error_kind = meta.get("error_kind")
+        if isinstance(error_kind, str) and error_kind:
+            errors += 1
+            error_kind_counts[error_kind] = error_kind_counts.get(error_kind, 0) + 1
+
+        # Nucleus slice.
+        nucleus = meta.get("nucleus")
+        if isinstance(nucleus, str) and nucleus:
+            by_nucleus[nucleus] = by_nucleus.get(nucleus, 0) + 1
+
+        # Level slice (stringified for JSON-safe dict key).
+        level = meta.get("level")
+        if isinstance(level, int):
+            level_key = str(level)
+            by_level[level_key] = by_level.get(level_key, 0) + 1
+
+        # Wall-time distribution (skip the negative / non-numeric edge
+        # cases just in case future telemetry shape changes).
+        wall_ms = meta.get("wall_ms")
+        if isinstance(wall_ms, (int, float)) and wall_ms >= 0:
+            wall_ms_samples.append(float(wall_ms))
+
+        # Solvent-detect rate: numerator/denominator are based on calls
+        # that declared a solvent.  A call with ``solvent_declared`` null
+        # / empty cannot be scored (the classifier has no reference
+        # window to look in), so it is excluded from both sides.
+        solvent_declared = meta.get("solvent_declared")
+        if isinstance(solvent_declared, str) and solvent_declared:
+            fixtures_with_solvent_declared += 1
+            solvent_labels = meta.get("solvent_labels_detected")
+            if isinstance(solvent_labels, list) and len(solvent_labels) > 0:
+                solvent_detected_count += 1
+
+    error_rate: float | None = (
+        (errors / invocations) if invocations > 0 else None
+    )
+    solvent_detect_rate: float | None = (
+        (solvent_detected_count / fixtures_with_solvent_declared)
+        if fixtures_with_solvent_declared > 0
+        else None
+    )
+
+    median_wall_ms: float | None = None
+    p95_wall_ms: float | None = None
+    if wall_ms_samples:
+        sorted_samples = sorted(wall_ms_samples)
+        n = len(sorted_samples)
+        # Linear-interpolation-free median: average of two middle values
+        # for even n, middle value for odd n.  Matches statistics.median
+        # behaviour without the import.
+        if n % 2 == 1:
+            median_wall_ms = sorted_samples[n // 2]
+        else:
+            median_wall_ms = 0.5 * (sorted_samples[n // 2 - 1] + sorted_samples[n // 2])
+        # p95 = the value at the 95th percentile rank (nearest-rank).
+        p95_index = max(0, min(n - 1, int(round(0.95 * n)) - 1))
+        p95_wall_ms = sorted_samples[p95_index]
+
+    verdict, reasons = _compute_flip_readiness_verdict(
+        invocations=invocations,
+        error_rate=error_rate,
+        solvent_detect_rate=solvent_detect_rate,
+        fixtures_with_solvent_declared=fixtures_with_solvent_declared,
+    )
+
+    # v0.6.8 adoption telemetry — count of graduated users within the
+    # rollup scope.  Scoped to one user when ``actor_user_id`` is set
+    # (returns 0 or 1); full platform count when unset.
+    graduated_user_count = count_gsd_graduated_users(
+        _state(request).session_factory,
+        actor_user_id=actor_user_id,
+    )
+
+    # v0.6.10 adoption-velocity telemetry — count of unique users who
+    # had an ``admin.gsd_graduate_user`` audit event inside the same
+    # window.  Pulled via the same time-windowed audit query the per-
+    # call telemetry uses (single index path, no extra DB cost).
+    # Filtered by ``entity_type=user`` so only graduation events count,
+    # and (when scoped) by ``entity_id`` so cross-tenant graduations
+    # don't leak.  Multiple graduate events for the same user inside
+    # the window are de-duplicated via a Python set on ``entity_id``.
+    graduation_events_in_window = list_audit_events(
+        _state(request).session_factory,
+        limit=50_000,
+        event_type="admin.gsd_graduate_user",
+        entity_type="user",
+        entity_id=actor_user_id if actor_user_id is not None else None,
+        since=since,
+    )
+    newly_graduated_user_ids = {
+        ev.entity_id for ev in graduation_events_in_window
+        if ev.entity_id is not None
+    }
+    newly_graduated_in_window = len(newly_graduated_user_ids)
+
+    return SpectrumGSDTelemetrySummary(
+        window_days=window_days,
+        generated_at=now,
+        scope_actor_user_id=actor_user_id,
+        invocations=invocations,
+        errors=errors,
+        error_rate=error_rate,
+        median_wall_ms=median_wall_ms,
+        p95_wall_ms=p95_wall_ms,
+        fixtures_with_solvent_declared=fixtures_with_solvent_declared,
+        solvent_detected_count=solvent_detected_count,
+        solvent_detect_rate=solvent_detect_rate,
+        by_nucleus=by_nucleus,
+        by_level=by_level,
+        error_kind_counts=error_kind_counts,
+        flip_readiness_verdict=verdict,
+        flip_readiness_reasons=reasons,
+        flip_readiness_policy=_FLIP_READINESS_POLICY,
+        graduated_user_count=graduated_user_count,
+        newly_graduated_in_window=newly_graduated_in_window,
+    )
 
 
 def _cluster_legacy_peaks_into_environments(
@@ -22154,6 +22450,106 @@ def admin_demote_user(
         message="User demoted from admin.",
         entity_type="user",
         entity_id=user_id,
+    )
+    return updated
+
+
+@router.get(
+    "/admin/users/{user_id}/gsd-graduation-history",
+    response_model=list[AuditEventRecord],
+    dependencies=[Depends(require_admin)],
+)
+def admin_user_gsd_graduation_history(
+    user_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[AuditEventRecord]:
+    """Per-tenant graduation history (v0.6.9).
+
+    Returns the ``admin.gsd_graduate_user`` and
+    ``admin.gsd_ungraduate_user`` audit events for one user, ordered
+    newest-first.  Auditor-friendly: each event carries the
+    ``reason`` the admin documented at decision time plus structured
+    before/after ``gsd_graduated_at`` state, so the full graduation
+    history of a tenant is readable in one call.
+
+    Cheap query — the existing ``(event_type, created_at)`` composite
+    index plus the ``entity_id`` filter narrow the scan to the rows
+    actually relevant to this tenant.
+    """
+    return list_audit_events(
+        _state(request).session_factory,
+        limit=limit,
+        event_types=[
+            "admin.gsd_graduate_user",
+            "admin.gsd_ungraduate_user",
+        ],
+        entity_type="user",
+        entity_id=user_id,
+    )
+
+
+@router.post(
+    "/admin/users/{user_id}/gsd-graduation",
+    response_model=UserPublic,
+    dependencies=[Depends(require_admin)],
+)
+def admin_user_gsd_graduation(
+    user_id: int,
+    payload: AdminUserGSDGraduationRequest,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> UserPublic:
+    """Set or clear the per-tenant GSD graduation flag (v0.6.7).
+
+    Backs the readiness panel's "Graduate this tenant from
+    experimental" CTA.  ``graduated=true`` flips the tenant's
+    ``/spectrum/analyze/gsd`` responses to ``experimental: false``;
+    ``graduated=false`` reverts.  ``reason`` is required so every
+    decision lands in the audit trail with documentation
+    (regulatory-relevant: the auditor needs to see *why* each tenant
+    graduated, not just when).
+    """
+    try:
+        updated, previous = set_user_gsd_graduation(
+            _state(request).session_factory,
+            user_id=user_id,
+            graduated=payload.graduated,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    _audit_from_context(
+        request,
+        context=context,
+        event_type=(
+            "admin.gsd_graduate_user"
+            if payload.graduated
+            else "admin.gsd_ungraduate_user"
+        ),
+        message=(
+            "Tenant graduated from GSD experimental backend."
+            if payload.graduated
+            else "Tenant ungraduated back to GSD experimental backend."
+        ),
+        entity_type="user",
+        entity_id=user_id,
+        metadata={
+            "graduated": payload.graduated,
+            "reason": payload.reason,
+            # Before/after state — auditor can reconstruct the
+            # graduation history without joining audit_events to the
+            # users table.
+            "previous_gsd_graduated_at": (
+                previous.isoformat() if previous is not None else None
+            ),
+            "new_gsd_graduated_at": (
+                updated.gsd_graduated_at.isoformat()
+                if updated.gsd_graduated_at is not None
+                else None
+            ),
+        },
     )
     return updated
 
