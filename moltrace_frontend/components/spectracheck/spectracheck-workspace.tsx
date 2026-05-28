@@ -117,6 +117,7 @@ import { EvidenceCard, type EvidenceRiskLevel, type EvidenceStatus } from "@/com
 import { KpiCard } from "@/components/dashboard/kpi-card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { GsdTelemetryPanel } from "@/components/spectracheck/gsd-telemetry-panel"
 import {
   AlertCircle,
   AlertTriangle,
@@ -1464,6 +1465,33 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               <ArtifactBrowser sessionId={backendSessionId} />
               <RecentAnalysisJobsSection jobIds={recentAnalysisJobIds} />
             </div>
+          </section>
+
+          {/* ── Section · GSD telemetry (Phase 25) ──────────────────────────
+              Per-tenant chart of /spectrum/analyze/gsd invocations sourced
+              from the audit-event ledger. No new contract — uses the
+              existing AuditEventRecord schema and aggregates client-side. */}
+          <section aria-labelledby="spectracheck-gsd-telemetry-heading" className="space-y-3">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-teal)" }}
+              >
+                Spectroscopy · GSD telemetry
+              </p>
+              <h2
+                id="spectracheck-gsd-telemetry-heading"
+                className="font-mono text-xl font-bold tracking-tight"
+              >
+                Experimental backend usage on your spectra
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Live aggregation of every <code className="font-mono">spectrum.analyze_gsd</code>{" "}
+                event for this tenant — useful to size opt-in adoption and verify performance on
+                your own data before the promotion gate clears.
+              </p>
+            </div>
+            <GsdTelemetryPanel mode="tenant" />
           </section>
         </TabsContent>
 

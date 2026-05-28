@@ -19,7 +19,12 @@ import { ModuleCard } from "@/components/dashboard/module-card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { FlaskConical } from "lucide-react"
 import { apiFetch } from "@/lib/api/client"
+import { useGsdTelemetry } from "@/components/spectracheck/gsd-telemetry-panel"
 import type { components } from "@/src/lib/api/schema"
+
+// Quarter-target denominator for the "X / N runs collected" tooltip
+// suffix now comes from the backend's flip_readiness_policy.min_invocations
+// in the SpectrumGSDTelemetrySummary response. No hard-coded constant.
 
 export type GSDPromptPeak = components["schemas"]["GSDPromptPeak"]
 export type GSDPromptEnvironment = components["schemas"]["GSDPromptEnvironment"]
@@ -476,17 +481,11 @@ export function GsdAnalysisControls({ backend, onBackendChange, level, onLevelCh
       </div>
       {backend === "gsd_prompt3" ? (
         <>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="outline" className="cursor-help border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-                <FlaskConical className="mr-1 h-3 w-3" aria-hidden />
-                Experimental
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-              {GSD_EXPERIMENTAL_TOOLTIP}
-            </TooltipContent>
-          </Tooltip>
+          <ExperimentalBadgeWithTelemetry />
+          {/* Telemetry hook fetches /audit/events once on first GSD
+              selection per page-mount; subsequent badges + the
+              SpectraCheck Overview panel + the admin readiness page
+              share the same module-level cache (30s TTL). */}
           <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
             Level
           </span>
@@ -655,19 +654,7 @@ export function DetectionResultsPanel({
         <div className="space-y-4">
           {/* Header row: experimental badge (GSD only) + category-mix chips */}
           <div className="flex flex-wrap items-center gap-2">
-            {result.experimental ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge variant="outline" className="cursor-help border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-                    <FlaskConical className="mr-1 h-3 w-3" aria-hidden />
-                    Experimental
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                  {GSD_EXPERIMENTAL_TOOLTIP}
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
+            {result.experimental ? <ExperimentalBadgeWithTelemetry /> : null}
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
               Category mix
             </span>
@@ -876,5 +863,54 @@ export function GsdResultsPanel({ result, eyebrow, testId = "gsd-results-surface
       eyebrow={eyebrow}
       testId={testId}
     />
+  )
+}
+
+/**
+ * Experimental-status badge that pairs the static promotion-gate
+ * tooltip text with a live "X / N quarter-target runs collected"
+ * suffix sourced from the audit-event telemetry hook.
+ *
+ * Renders identically to the previous static badge when the telemetry
+ * hook is still loading (no layout shift on first paint); the suffix
+ * appears as soon as the cache fills (typically < 1s on a warm page).
+ *
+ * Both the GsdAnalysisControls selector and the DetectionResultsPanel
+ * header use this — the module-level cache in the telemetry hook
+ * dedupes the underlying network call across all mounts.
+ */
+function ExperimentalBadgeWithTelemetry() {
+  const state = useGsdTelemetry(true)
+  const summary = state.status === "ready" ? state.summary : null
+  const invocations = summary?.invocations ?? null
+  const target = summary?.flip_readiness_policy.min_invocations ?? null
+  const verdict = summary?.flip_readiness_verdict
+  const targetSuffix =
+    invocations != null && target != null
+      ? `\n\nQuarter-target runs collected: ${invocations.toLocaleString()} / ${target.toLocaleString()}.${
+          verdict ? `\nReadiness verdict: ${verdict.replace("_", " ")}.` : ""
+        }`
+      : ""
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge
+          variant="outline"
+          className="cursor-help border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
+        >
+          <FlaskConical className="mr-1 h-3 w-3" aria-hidden />
+          Experimental
+          {invocations != null && invocations > 0 ? (
+            <span className="ml-1.5 font-mono text-[10px] font-bold tabular-nums opacity-70">
+              · {invocations >= 1000 ? `${(invocations / 1000).toFixed(1)}k` : invocations}
+            </span>
+          ) : null}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent sideOffset={4} className="max-w-xs whitespace-pre-line text-xs">
+        {GSD_EXPERIMENTAL_TOOLTIP}
+        {targetSuffix}
+      </TooltipContent>
+    </Tooltip>
   )
 }

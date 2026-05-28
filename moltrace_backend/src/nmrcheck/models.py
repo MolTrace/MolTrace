@@ -11597,6 +11597,28 @@ class UserPublic(BaseModel):
     is_verified: bool
     created_at: datetime
     verified_at: datetime | None = None
+    # v0.6.7 per-tenant graduation knob: ``None`` means this tenant
+    # still sees ``experimental: true`` on the opt-in GSD analysis
+    # backend; a timestamp means the admin graduated the tenant out
+    # of experimental at that moment.  Set via
+    # ``POST /admin/users/{user_id}/gsd-graduation``.
+    gsd_graduated_at: datetime | None = None
+
+
+class AdminUserGSDGraduationRequest(BaseModel):
+    """Body for ``POST /admin/users/{user_id}/gsd-graduation``.
+
+    Admin sets ``graduated=true`` to mark a tenant as graduated out
+    of ``experimental: true`` on the GSD backend, or
+    ``graduated=false`` to ungraduate.  ``reason`` is required because
+    the graduation decision is regulatory-relevant — every entry in
+    the audit trail must document why.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    graduated: bool
+    reason: str = Field(min_length=1, max_length=500)
 
 
 class AccessTokenResponse(BaseModel):
@@ -11921,6 +11943,10 @@ class AdminUserRecord(BaseModel):
     created_at: datetime
     analyses_count: int = 0
     jobs_count: int = 0
+    # v0.6.7 graduation status — surfaces in the admin user list so
+    # the FE readiness-panel CTA knows which tenants are already
+    # graduated without an extra round trip.
+    gsd_graduated_at: datetime | None = None
 
 
 class AdminSystemSummary(BaseModel):
@@ -14576,6 +14602,111 @@ class SpectrumGSDAnalyzeResult(BaseModel):
     experimental: bool = True
     notes: list[str] = Field(default_factory=list)
     spectrum_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+FlipReadinessVerdict = Literal["insufficient_data", "clear", "blocked"]
+
+
+class FlipReadinessPolicy(BaseModel):
+    """Snapshot of the verdict thresholds used to compute a rollup.
+
+    Included in every ``SpectrumGSDTelemetrySummary`` response so the FE
+    can render "X / Y target" widgets without hard-coding the policy
+    (and so a future tightening of the policy lights up in callers'
+    snapshots automatically).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_invocations: int = Field(ge=0)
+    max_error_rate: float = Field(ge=0.0, le=1.0)
+    min_solvent_detect_rate: float = Field(ge=0.0, le=1.0)
+
+
+class SpectrumGSDTelemetrySummary(BaseModel):
+    """Aggregated soak telemetry for the opt-in GSD analysis endpoint.
+
+    Returned by ``GET /spectrum/analyze/gsd/telemetry-summary?window_days=N``
+    so the readiness-panel UI can render the "quarter-of-clean-tenant-runs"
+    countdown without fetching every individual audit event and aggregating
+    in the browser.  The underlying signal is the ``spectrum.analyze_gsd``
+    audit event written by ``_emit_gsd_telemetry`` (v0.6.3).
+
+    Rates are returned as ``None`` rather than ``0.0`` when their
+    denominator is zero so the FE can show "no data" instead of an
+    incorrect "0 %" indicator on an empty window.
+
+    v0.6.5 added the flip-readiness verdict: the backend now owns the
+    "ready to flip ``experimental: false``?" decision and exposes both
+    the verdict (``insufficient_data | clear | blocked``) and the
+    reasons in a single response so the FE renders the verdict as-is.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # ----- Window envelope ----------------------------------------------
+    window_days: int = Field(ge=1, le=365)
+    generated_at: datetime
+    # ``scope_actor_user_id`` (v0.6.6) echoes the ``?actor_user_id``
+    # query param so the rollup is self-describing: a cached or replayed
+    # response always carries the scope it was computed against.
+    # ``None`` = global rollup across every tenant's events.
+    scope_actor_user_id: int | None = Field(default=None, ge=1)
+
+    # ----- Invocation totals --------------------------------------------
+    invocations: int = Field(default=0, ge=0)
+    errors: int = Field(default=0, ge=0)
+    error_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    # ----- Performance distribution (ms, computed from ``wall_ms``) -----
+    median_wall_ms: float | None = Field(default=None, ge=0.0)
+    p95_wall_ms: float | None = Field(default=None, ge=0.0)
+
+    # ----- Solvent auto-detect rate -------------------------------------
+    # Numerator/denominator surfaced so the FE can display "53 / 57"
+    # rather than just the rate.
+    fixtures_with_solvent_declared: int = Field(default=0, ge=0)
+    solvent_detected_count: int = Field(default=0, ge=0)
+    solvent_detect_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    # ----- Slice breakdowns ---------------------------------------------
+    # Keys are kept as strings (not Literal["1H"|"13C"] etc.) so a future
+    # detector backend that adds new nuclei / levels does not break the
+    # response model; the FE can render any key it sees.
+    by_nucleus: dict[str, int] = Field(default_factory=dict)
+    by_level: dict[str, int] = Field(default_factory=dict)
+    error_kind_counts: dict[str, int] = Field(default_factory=dict)
+
+    # ----- v0.6.5 flip-readiness verdict --------------------------------
+    # The backend owns the policy so the FE renders the verdict as-is.
+    # Reasons are human-readable strings the FE shows verbatim (e.g.,
+    # "need >=500 invocations in window (got 412)").  Policy snapshot
+    # surfaces the current thresholds so the FE can show "X / Y target"
+    # progress widgets without hard-coding the policy constants.
+    flip_readiness_verdict: FlipReadinessVerdict
+    flip_readiness_reasons: list[str] = Field(default_factory=list)
+    flip_readiness_policy: FlipReadinessPolicy
+
+    # ----- v0.6.8 adoption telemetry ------------------------------------
+    # Count of users with ``users.gsd_graduated_at IS NOT NULL`` in the
+    # rollup scope: ``N`` when the rollup is global (every tenant),
+    # ``0 | 1`` when the rollup is scoped via ``?actor_user_id``
+    # (cleanly answers "is this one tenant graduated?").  Lets the FE
+    # readiness panel render "X tenants have graduated" without
+    # round-tripping ``/admin/users`` and counting in JS.  This is a
+    # snapshot at rollup generation time — orthogonal to the event
+    # window, which only covers ``spectrum.analyze_gsd`` events.
+    graduated_user_count: int = Field(default=0, ge=0)
+
+    # ----- v0.6.10 adoption-velocity telemetry --------------------------
+    # Count of *unique users* who had an ``admin.gsd_graduate_user``
+    # audit event in the rollup window, restricted to the rollup
+    # scope.  Complement to ``graduated_user_count`` (current state):
+    # this is "graduations that occurred during this window".  FE
+    # adoption-velocity charts can show "3 tenants graduated this
+    # quarter" without filtering the global audit stream.  Multiple
+    # graduate events for the same user inside the window count once.
+    newly_graduated_in_window: int = Field(default=0, ge=0)
 
 
 class SpectrumSolventInfo(BaseModel):

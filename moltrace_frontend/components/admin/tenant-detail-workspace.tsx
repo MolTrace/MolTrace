@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { GsdReadinessVerdictCard } from "@/components/spectracheck/gsd-telemetry-panel"
 import {
   trackDataBoundaryCreated,
   trackEntitlementUpdated,
@@ -2920,6 +2921,15 @@ export function TenantDetailWorkspace() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
+          {/*
+            GSD per-tenant readiness verdict (Phase 25d). Backend's
+            telemetry-summary endpoint now scopes by `actor_user_id`; we
+            pass the route's tenant id through as the actor scope per
+            the FE handoff packet. Same component as the platform-wide
+            admin readiness page; the scope chip + CTA copy adapt.
+          */}
+          <TenantGsdReadinessCard tenantId={tenantId} tenantLabel={title || tenantKey || `tenant ${tenantId}`} />
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
             <StatCard title="environments" value={environments.length} />
             <StatCard title="entitlements" value={entitlements.length} />
@@ -3067,5 +3077,42 @@ export function TenantDetailWorkspace() {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+/**
+ * Tenant-scoped GSD readiness verdict.
+ *
+ * Wraps GsdReadinessVerdictCard with the per-tenant scope mapping the
+ * Phase 25d packet specifies. The route's `tenantId` is parsed to a
+ * numeric value and passed as the `actor_user_id` query param — the
+ * backend echoes it back as `scope_actor_user_id` and computes the
+ * verdict against that user's audit-event slice.
+ *
+ * When the route param isn't numeric (e.g., a tenant slug rather than
+ * an integer ID), we render a clarifying placeholder instead of firing
+ * a request the backend can't satisfy.
+ */
+function TenantGsdReadinessCard({
+  tenantId,
+  tenantLabel,
+}: {
+  tenantId: string
+  tenantLabel: string
+}) {
+  const numericId = Number.parseInt(tenantId, 10)
+  if (!Number.isFinite(numericId) || numericId <= 0 || String(numericId) !== tenantId.trim()) {
+    // Non-numeric tenant identifier (likely a slug); the actor_user_id
+    // filter needs an integer. Skip the card instead of issuing a
+    // request the backend will reject. The platform-wide verdict
+    // remains available at /admin/gsd-readiness.
+    return null
+  }
+  return (
+    <GsdReadinessVerdictCard
+      actorUserId={numericId}
+      scopeLabel={tenantLabel}
+      testId="tenant-gsd-verdict"
+    />
   )
 }
