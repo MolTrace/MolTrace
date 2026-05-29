@@ -1689,6 +1689,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spectrum/analyze/multiplets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Spectrum Analyze Multiplets
+         * @description Multiplet analysis with GSD-enhanced J-coupling recovery (Prompt 4).
+         *
+         *     Group a GSD-resolved peak list into multiplets, identify
+         *     multiplicity (s / d / t / q / p / sext / sept / dd / dt / td /
+         *     ddd / m), and recover the underlying J couplings.  The typical
+         *     caller flow is:
+         *
+         *       1. ``POST /spectrum/analyze/gsd`` -> peak list at level 3-4.
+         *       2. Filter to high-S/N peaks (rule of thumb: ``S/N >= 10`` for
+         *          500 MHz data with 1 Hz linewidth).
+         *       3. ``POST /spectrum/analyze/multiplets`` with the filtered list
+         *          -> multiplets + per-multiplet synthetic overlay positions.
+         *
+         *     Field strength is recovered from each peak's
+         *     ``position_hz / position_ppm`` ratio, so callers don't need to
+         *     send ``field_mhz`` separately.  The synthetic-overlay positions
+         *     are the forward-modelled ppm positions
+         *     ``generate_synthetic_multiplet`` would produce for the recovered
+         *     J set; the FE renders them as a light-red overlay so the chemist
+         *     sees "predicted vs observed" at a glance.
+         *
+         *     The audit-event trail is the same shape as the v0.6.3 GSD
+         *     telemetry: one ``spectrum.analyze_multiplets`` event per
+         *     invocation carrying the request shape + outcome counts so the
+         *     operational soak telemetry covers this surface uniformly.
+         */
+        post: operations["spectrum_analyze_multiplets_spectrum_analyze_multiplets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spectrum/solvents/known": {
         parameters: {
             query?: never;
@@ -9414,6 +9458,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users/{user_id}/gsd-graduation-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin User Gsd Graduation History
+         * @description Per-tenant graduation history (v0.6.9).
+         *
+         *     Returns the ``admin.gsd_graduate_user`` and
+         *     ``admin.gsd_ungraduate_user`` audit events for one user, ordered
+         *     newest-first.  Auditor-friendly: each event carries the
+         *     ``reason`` the admin documented at decision time plus structured
+         *     before/after ``gsd_graduated_at`` state, so the full graduation
+         *     history of a tenant is readable in one call.
+         *
+         *     Cheap query — the existing ``(event_type, created_at)`` composite
+         *     index plus the ``entity_id`` filter narrow the scan to the rows
+         *     actually relevant to this tenant.
+         */
+        get: operations["admin_user_gsd_graduation_history_admin_users__user_id__gsd_graduation_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/users/{user_id}/gsd-graduation": {
         parameters: {
             query?: never;
@@ -9629,6 +9704,26 @@ export interface paths {
         put?: never;
         /** Candidate Compare Route */
         post: operations["candidate_compare_route_candidates_compare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/candidates/compare/jcoupling": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Candidate Compare Jcoupling Route
+         * @description Score recovered multiplet J couplings against candidate topology predictions.
+         */
+        post: operations["candidate_compare_jcoupling_route_candidates_compare_jcoupling_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -20135,6 +20230,20 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * JCouplingMatch
+         * @description One matched observed<->predicted J coupling (Hz).
+         */
+        JCouplingMatch: {
+            /** Observed Hz */
+            observed_hz: number;
+            /** Predicted Hz */
+            predicted_hz: number;
+            /** Delta Hz */
+            delta_hz: number;
+            /** Score */
+            score: number;
+        };
         /** JobEventRecord */
         JobEventRecord: {
             /** Id */
@@ -24756,6 +24865,165 @@ export interface components {
             program_order_json: ("spectracheck" | "regulatory_hub" | "reaction_optimization")[];
             /** Metadata Json */
             metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * MultipletDescriptor
+         * @description One detected multiplet (Prompt 4).
+         *
+         *     Mirrors the dataclass returned by
+         *     ``moltrace.spectroscopy.multiplet.detect_multiplets`` so consumers
+         *     see a stable wire shape regardless of internal refactors.
+         */
+        MultipletDescriptor: {
+            /** Name */
+            name: string;
+            /** Center Ppm */
+            center_ppm: number;
+            /** Range Ppm */
+            range_ppm: [
+                number,
+                number
+            ];
+            /**
+             * Multiplicity Label
+             * @enum {string}
+             */
+            multiplicity_label: "s" | "d" | "t" | "q" | "p" | "sext" | "sept" | "dd" | "dt" | "td" | "ddd" | "m";
+            /** J Couplings Hz */
+            j_couplings_hz?: number[];
+            /** Num Nuclides */
+            num_nuclides: number;
+            /** Constituent Peak Indices */
+            constituent_peak_indices?: number[];
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * MultipletJCouplingBridgeRequest
+         * @description Request body for ``POST /candidates/compare/jcoupling``.
+         *
+         *     Scores recovered observed J couplings (typically from
+         *     ``POST /spectrum/analyze/multiplets``) against each candidate's
+         *     topology-predicted coupling set.  Supply observed couplings as whole
+         *     multiplet descriptors, a flat Hz list, or both (they are merged).
+         */
+        MultipletJCouplingBridgeRequest: {
+            /** Sample Id */
+            sample_id?: string | null;
+            /** Compound Class */
+            compound_class?: string | null;
+            /** Candidates */
+            candidates: components["schemas"]["CandidateInput"][];
+            /** Observed Multiplets */
+            observed_multiplets?: components["schemas"]["MultipletDescriptor"][] | null;
+            /** Observed J Couplings Hz */
+            observed_j_couplings_hz?: number[] | null;
+            /**
+             * Sigma Hz
+             * @default 1.6
+             */
+            sigma_hz: number;
+            /**
+             * Contradiction J Hz
+             * @default 12
+             */
+            contradiction_j_hz: number;
+            /**
+             * Min Observed Hz
+             * @default 1
+             */
+            min_observed_hz: number;
+        };
+        /**
+         * MultipletJCouplingBridgeResult
+         * @description Response from ``POST /candidates/compare/jcoupling``.
+         */
+        MultipletJCouplingBridgeResult: {
+            /** Sample Id */
+            sample_id?: string | null;
+            /** Candidate Count */
+            candidate_count: number;
+            /** Observed Coupling Count */
+            observed_coupling_count: number;
+            /** Observed J Couplings Hz */
+            observed_j_couplings_hz?: number[];
+            /** Sigma Hz */
+            sigma_hz: number;
+            /** Contradiction J Hz */
+            contradiction_j_hz: number;
+            best_match?: components["schemas"]["MultipletJCouplingCandidateMatch"] | null;
+            /** Matches */
+            matches?: components["schemas"]["MultipletJCouplingCandidateMatch"][];
+            /**
+             * Evidence Table Text
+             * @default
+             */
+            evidence_table_text: string;
+            /** Warnings */
+            warnings?: string[];
+            /** Notes */
+            notes?: string[];
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * MultipletJCouplingCandidateMatch
+         * @description Per-candidate J-agreement score for the multiplet bridge.
+         */
+        MultipletJCouplingCandidateMatch: {
+            /** Rank */
+            rank: number;
+            /** Name */
+            name?: string | null;
+            /** Role */
+            role?: string | null;
+            /** Smiles */
+            smiles: string;
+            /** Formula */
+            formula?: string | null;
+            /** Predicted J Couplings Hz */
+            predicted_j_couplings_hz?: number[];
+            /** Observed J Couplings Hz */
+            observed_j_couplings_hz?: number[];
+            /** Matched Pairs */
+            matched_pairs?: components["schemas"]["JCouplingMatch"][];
+            /**
+             * Matched Count
+             * @default 0
+             */
+            matched_count: number;
+            /** Unmatched Observed Hz */
+            unmatched_observed_hz?: number[];
+            /** Unmatched Predicted Hz */
+            unmatched_predicted_hz?: number[];
+            /** Max Observed J Hz */
+            max_observed_j_hz?: number | null;
+            /** Max Predicted J Hz */
+            max_predicted_j_hz?: number | null;
+            /** Score */
+            score: number;
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "strong_j_agreement" | "partial_j_agreement" | "weak_j_agreement" | "poor_j_agreement" | "j_coupling_contradiction" | "no_observed_couplings" | "no_predicted_couplings" | "candidate_invalid";
+            /**
+             * Contradiction
+             * @default false
+             */
+            contradiction: boolean;
+            /** Evidence Summary */
+            evidence_summary?: string[];
+            /** Warnings */
+            warnings?: string[];
+            /** Metadata */
+            metadata?: {
                 [key: string]: unknown;
             };
         };
@@ -33853,6 +34121,11 @@ export interface components {
              * @default 0
              */
             graduated_user_count: number;
+            /**
+             * Newly Graduated In Window
+             * @default 0
+             */
+            newly_graduated_in_window: number;
         };
         /** SpectrumMissingReferencePeak */
         SpectrumMissingReferencePeak: {
@@ -33863,6 +34136,56 @@ export interface components {
             reference_shift_start_ppm?: number | null;
             /** Reference Shift End Ppm */
             reference_shift_end_ppm?: number | null;
+        };
+        /**
+         * SpectrumMultipletAnalyzeRequest
+         * @description Request body for ``POST /spectrum/analyze/multiplets``.
+         *
+         *     Caller supplies a peak list (typically obtained from a prior
+         *     ``/spectrum/analyze/gsd`` call) plus an optional residual
+         *     tolerance.  The endpoint does spatial clustering at 30 Hz (fixed
+         *     per the Prompt 4 spec) and runs first-order + complex multiplet
+         *     detection, then returns the recovered J set.
+         *
+         *     Each peak's ``position_ppm`` and ``position_hz`` *must* be
+         *     consistent — the field strength is recovered from the ratio so
+         *     callers don't need to provide ``field_mhz`` separately.
+         */
+        SpectrumMultipletAnalyzeRequest: {
+            /** Peaks */
+            peaks: components["schemas"]["GSDPromptPeak"][];
+            /**
+             * Tolerance Hz
+             * @default 0.5
+             */
+            tolerance_hz: number;
+        };
+        /**
+         * SpectrumMultipletAnalyzeResult
+         * @description Response from ``POST /spectrum/analyze/multiplets``.
+         */
+        SpectrumMultipletAnalyzeResult: {
+            /** Multiplets */
+            multiplets?: components["schemas"]["MultipletDescriptor"][];
+            /** Synthetic Overlays Ppm */
+            synthetic_overlays_ppm?: number[][];
+            /**
+             * Multiplet Count
+             * @default 0
+             */
+            multiplet_count: number;
+            /** Multiplicity Counts */
+            multiplicity_counts?: {
+                [key: string]: number;
+            };
+            /**
+             * Backend
+             * @default multiplet_prompt4
+             * @constant
+             */
+            backend: "multiplet_prompt4";
+            /** Notes */
+            notes?: string[];
         };
         /** SpectrumPeakMatch */
         SpectrumPeakMatch: {
@@ -35774,6 +36097,32 @@ export interface components {
              * @default 0.12
              */
             lcms_layer_weight: number;
+            /** Observed Multiplets */
+            observed_multiplets?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Observed J Couplings Hz */
+            observed_j_couplings_hz?: number[] | null;
+            /**
+             * Multiplet Jcoupling Sigma Hz
+             * @default 1.6
+             */
+            multiplet_jcoupling_sigma_hz: number;
+            /**
+             * Multiplet Jcoupling Contradiction Hz
+             * @default 12
+             */
+            multiplet_jcoupling_contradiction_hz: number;
+            /**
+             * Multiplet Jcoupling Min Observed Hz
+             * @default 1
+             */
+            multiplet_jcoupling_min_observed_hz: number;
+            /**
+             * Multiplet Jcoupling Layer Weight
+             * @default 0.1
+             */
+            multiplet_jcoupling_layer_weight: number;
             /** Layer Weights */
             layer_weights?: {
                 [key: string]: number;
@@ -35888,7 +36237,7 @@ export interface components {
              * Layer
              * @enum {string}
              */
-            layer: "predicted_nmr" | "hrms_exact_mass" | "adduct_isotope" | "msms_annotation" | "fragmentation_tree" | "lcms_feature_family";
+            layer: "predicted_nmr" | "hrms_exact_mass" | "adduct_isotope" | "msms_annotation" | "fragmentation_tree" | "lcms_feature_family" | "multiplet_jcoupling";
             /** Label */
             label: string;
             /**
@@ -41677,6 +42026,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpectrumGSDAnalyzeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spectrum_analyze_multiplets_spectrum_analyze_multiplets_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpectrumMultipletAnalyzeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumMultipletAnalyzeResult"];
                 };
             };
             /** @description Validation Error */
@@ -63802,6 +64188,42 @@ export interface operations {
             };
         };
     };
+    admin_user_gsd_graduation_history_admin_users__user_id__gsd_graduation_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEventRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     admin_user_gsd_graduation_admin_users__user_id__gsd_graduation_post: {
         parameters: {
             query?: {
@@ -64229,6 +64651,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandidateComparisonResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    candidate_compare_jcoupling_route_candidates_compare_jcoupling_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MultipletJCouplingBridgeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MultipletJCouplingBridgeResult"];
                 };
             };
             /** @description Validation Error */

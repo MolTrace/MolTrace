@@ -10,6 +10,298 @@ spans v0.4.0 through v0.6.10. **The v0.6 soak loop is now feature-
 complete** — the full pipeline from per-call telemetry to auditor
 graduation history is shipped and tested end-to-end.
 
+The Prompt 4 multiplet analysis backend opens the v0.7 line.
+
+---
+
+## v0.7.3 — Karplus vicinal-³J validation corpus + measured-accuracy gate (2026-05-28)
+
+**Headline:** The opt-in Karplus refinement shipped in v0.7.2 now has a
+**curated literature validation corpus** and a pytest **accuracy gate** that
+turn its capability claim into a *measured* one. Across 8 reference molecules
+with literature-known vicinal couplings, the conformer-averaged refinement
+tracks the diagnostic vicinal ³J with a **mean absolute error of 0.44 Hz**
+(median 0.26, max 1.41), and — the operative result for candidate
+discrimination — **cleanly separates conformationally locked diaxial systems
+(mean 9.5 Hz, every entry ≥ 8.49 Hz) from mobile / averaged systems
+(mean 6.9 Hz, every entry ≤ 7.14 Hz) with no overlap**. Harness, fixtures,
+test, and CLI only — **no API, model, or predictor-behaviour change**.
+
+### Added
+- **`src/nmrcheck/karplus_validation.py`** — a validation harness mirroring
+  the GSD / HMDB sidecar pattern. Drives
+  `predict_proton_couplings_from_smiles(..., use_karplus=True)` over a JSON
+  corpus, takes each molecule's **maximum** `aliphatic_vicinal_karplus`
+  coupling as its order-independent diagnostic vicinal ³J, compares it to the
+  literature value, and reports MAE / median / max abs error, within-tolerance
+  rate, per-kind means, and the locked-vs-mobile discrimination separation.
+  JSON + CSV report writers; argparse `main()`.
+- **`tests/fixtures/karplus_jcoupling_corpus/karplus_jcoupling_corpus_v1.json`**
+  — 8 hand-curated molecules with literature vicinal couplings and per-entry
+  tolerances (1.5–2.5 Hz, encoding the generic Karplus relation's ~10.26 Hz
+  180° cap and its Haasnoot–Altona electronegativity blind spot): **locked** —
+  trans-decalin, β-D-glucopyranose, myo-inositol, β-D-galactopyranose;
+  **mobile / averaged** — cyclohexane, cis-decalin, n-butane, ethanol.
+- **`moltrace-karplus-jcoupling-report`** CLI sidecar registered in
+  `pyproject.toml`.
+
+### Validation
+- **`tests/test_phase39_karplus_validation.py`** (5 tests): smoke + accuracy
+  floor (within-tol ≥ 75 % [measured 100 %], MAE ≤ 1.5 Hz [0.44], median
+  ≤ 1.0 Hz [0.26], max ≤ 2.5 Hz [1.41]); locked-vs-mobile discrimination
+  (mean locked ≥ 8.5 Hz [9.50], mean mobile ≤ 7.8 Hz [6.90], gap ≥ 1.5 Hz
+  [2.60], clean separation min(locked) 8.49 > max(mobile) 7.14); the
+  **trans-/cis-decalin diastereomer split** (≥ 2 Hz; measured ~3.2 Hz — the
+  rigid trans isomer recovers a diaxial the ring-flipping cis isomer cannot);
+  determinism under the fixed embedding seed; row-shape stability.
+- **Documented limitation (discovered while curating).** Because the
+  refinement averages each H-pair dihedral **unweighted** across the ETKDG
+  ensemble, a *thermodynamically* anchored monocycle (e.g.
+  4-tert-butylcyclohexanol) ring-flips in the ensemble and its diaxial washes
+  out (every individual conformer still contains a ~10 Hz dihedral, but no
+  fixed H-pair stays diaxial across all of them). The corpus therefore anchors
+  "locked" on **covalently / rigidly** locked systems (fused rings, strong-
+  preference pyranose chairs) — which is why trans-decalin (fused; recovers
+  10.05 Hz) is in the corpus and the tert-butyl monocycle is deliberately not.
+- Full backend regression sweep: **882 passed**, 1 deselected, zero failures.
+
+### Compatibility
+- Harness / fixtures / test / CLI only. No change to any API, Pydantic model,
+  or predictor behaviour; v0.7.2's opt-in Karplus path is byte-for-byte
+  unchanged, so `/openapi.json` is unchanged and the frontend needs no
+  `schema.d.ts` regeneration.
+
+---
+
+## v0.7.2 — Opt-in Karplus 3J refinement for Layer 40 vicinal couplings (2026-05-28)
+
+**Headline:** Layer 40's topological J-predictor gains an **opt-in,
+conformer-averaged Karplus refinement** for sp³ vicinal (³J) couplings.
+When enabled, the flat 7.0 Hz `aliphatic_vicinal` placeholder is replaced
+by a geometry-aware estimate: RDKit embeds a 3D conformer ensemble
+(ETKDGv3 + MMFF), each H–C–C–H dihedral is read per conformer, the Karplus
+relation ³J(θ) = A·cos²θ + B·cosθ + C maps it to a coupling, and the
+ensemble mean is reported. This sharpens Layer 40's candidate
+discrimination — a conformationally **locked** diaxial coupling (~10 Hz in
+trans-decalin or the β-D-glucose ⁴C₁ chair) is now predicted as such, so a
+large observed vicinal J is explained by the right candidate rather than
+flattened away. **Default-off and byte-for-byte identical to v0.7.1 when
+the flag is omitted.** Decision-support only: it never asserts identity and
+never releases without human review.
+
+### Added
+- **`src/nmrcheck/jcoupling_prediction.py`** — `karplus_3j(theta_deg)`
+  (three-term Karplus relation, constants A=7.76, B=-1.10, C=1.40;
+  clamped ≥ 0) and four new keyword args on
+  `predict_proton_couplings_from_smiles(..., use_karplus=False,
+  karplus_max_conformers=12, karplus_seed=…)`. With `use_karplus=True`,
+  `aliphatic_vicinal` details are refined into a new
+  `aliphatic_vicinal_karplus` category: `AddHs` → `EmbedMultipleConfs`
+  (ETKDGv3, fixed seed for determinism) → `MMFFOptimizeMoleculeConfs` →
+  per H–C–C–H dihedral Karplus value averaged (unweighted) over the
+  ensemble. Mobile rings (e.g. unsubstituted cyclohexane) correctly
+  average axial/equatorial via ring-flip; only conformationally locked
+  systems retain the large diaxial coupling. Falls back to the flat
+  7.0 Hz topological value with a warning if embedding fails. Alkene and
+  aromatic categories are untouched.
+- **Two new `MultipletJCouplingBridgeRequest` fields** —
+  `use_karplus: bool = False`, `karplus_max_conformers: int = 12` (1–64)
+  — threaded through `score_multiplets_against_candidates` into the
+  predictor; the per-candidate provenance note flips to record whether
+  Karplus was used, and result `metadata` carries `use_karplus` /
+  `karplus_max_conformers`.
+- **Two new `UnifiedCandidateConfidenceRequest` fields** —
+  `multiplet_jcoupling_use_karplus: bool = False`,
+  `multiplet_jcoupling_max_conformers: int = 12` — so the refinement is
+  reachable transparently through the unified `/candidates/compare` flow.
+- **`POST /candidates/compare/jcoupling`** now accepts the two new request
+  fields and echoes them in the response `metadata`.
+
+### Validation
+- **`tests/test_phase38_karplus_jcoupling.py`** (17 tests): Karplus curve
+  shape + 90° minimum; **`use_karplus=False` is byte-identical to the
+  v0.7.1 topological output** across a 9-structure panel (benzene,
+  ethylene, E-/Z-2-butene, ethanol, cyclohexane, tert-butanol,
+  trans-decalin, β-D-glucose) with no `aliphatic_vicinal_karplus`
+  category leaking; locked rings recover a large diaxial (trans-decalin
+  ≥ 8.5 Hz, β-D-glucose ≥ 8.0 Hz) while the off-path stays ≤ 7.0 Hz;
+  mobile acyclic chains average into the 1.5–9.0 Hz band; aromatic-only
+  structures are a no-op; determinism (identical output across repeated
+  calls); invalid structures don't raise; the bridge threads the flag and
+  flips its provenance note; Karplus improves agreement for a locked
+  candidate against an observed diaxial set; the unified engine threads
+  the flag into the bridge request; and the **regression guarantee** —
+  with Karplus defaults and no multiplet input,
+  `component_metadata["layer_weights"]` equals `DEFAULT_LAYER_WEIGHTS`
+  exactly. Endpoint test posts `use_karplus=True` and asserts
+  `metadata.use_karplus is True` with a predicted J > 8 Hz.
+- Full backend regression sweep: **877 passed**, zero failures.
+
+### Compatibility
+- Purely additive and opt-in. With the Karplus flags omitted, the
+  predictor, bridge, endpoint, and unified-confidence denominator are
+  byte-for-byte unchanged from v0.7.1.
+
+---
+
+## v0.7.1 — Multiplet J-coupling → unified-confidence evidence layer (2026-05-28)
+
+**Headline:** The recovered J-couplings from the v0.7.0 multiplet analyser
+now feed the unified candidate-confidence engine as a new, optional
+evidence layer (`multiplet_jcoupling`) — scoring how well each SMILES
+candidate's predicted topological couplings agree with the observed
+coupling constants, and flagging candidates whose connectivity cannot
+produce a large observed J. This is the 40th evidence layer in the
+`/analyze` stack. Decision-support only: it never asserts identity and
+never releases without human review.
+
+### Added
+- **`src/nmrcheck/jcoupling_prediction.py`** —
+  `predict_proton_couplings_from_smiles(smiles)`: topological-empirical
+  ¹H–¹H J prediction read from RDKit bond topology (no Karplus, no 3D
+  geometry). Empirical central magnitudes (vinyl_trans 17.0, vinyl_cis
+  10.8, alkene_trans 16.5, alkene_cis 11.0, aromatic_ortho 7.8,
+  aromatic_meta 2.0, heteroaromatic α,β 4.8, aliphatic_vicinal 7.0 Hz),
+  compacted to a distinct set via single-linkage clustering at 0.75 Hz.
+  Grounded in the Silverstein / Pretsch / Friebolin coupling tables
+  already cited by the categoriser.
+- **`src/nmrcheck/multiplet_jcoupling_bridge.py`** —
+  `score_multiplets_against_candidates(req)`: greedy set-similarity match
+  of observed vs predicted J (`greedy_set_similarity`), per-candidate
+  labels `strong | partial | weak | poor_j_agreement` plus
+  `j_coupling_contradiction`, `no_observed_couplings`,
+  `no_predicted_couplings`, `candidate_invalid`. Observed couplings are
+  collected from `observed_multiplets` and/or `observed_j_couplings_hz`,
+  compacted at 0.6 Hz; a contradiction (observed J above the
+  `contradiction_j_hz` threshold that the candidate topology cannot
+  produce) caps the score at 0.25.
+- **`multiplet_jcoupling` evidence layer** wired into
+  `build_unified_candidate_confidence` as a conditional bridge: its weight
+  (default 0.10) is added to the denominator **only** when multiplet input
+  is present, so existing callers are byte-for-byte unchanged.
+  Contributes per-candidate layer scores, evidence summaries, and
+  contradiction flags into the unified agreement matrix.
+- **`POST /candidates/compare/jcoupling`** endpoint
+  (`MultipletJCouplingBridgeRequest` → `MultipletJCouplingBridgeResult`),
+  audited as `confidence.candidates.multiplet_jcoupling_bridge` with
+  `human_review_required: true`.
+- Six new `UnifiedCandidateConfidenceRequest` fields
+  (`observed_multiplets`, `observed_j_couplings_hz`,
+  `multiplet_jcoupling_sigma_hz`=1.6, `multiplet_jcoupling_contradiction_hz`=12.0,
+  `multiplet_jcoupling_min_observed_hz`=1.0,
+  `multiplet_jcoupling_layer_weight`=0.10) and the `multiplet_jcoupling`
+  member of the `UnifiedEvidenceLayerName` literal. New models:
+  `MultipletJCouplingBridgeRequest`, `MultipletJCouplingBridgeResult`,
+  `MultipletJCouplingCandidateMatch`, `JCouplingMatch`.
+
+### Validation
+- **`tests/test_phase37_multiplet_jcoupling_bridge.py`** (17 tests):
+  predictor (benzene `[7.8, 2.0]`; pyridine includes 4.8; styrene
+  includes 17.0 + 10.8; E-/Z-butene 16.5 / 11.0; ethanol `[7.0]`;
+  tert-butanol `[]` with a warning; quinine recovers the full diagnostic
+  set; invalid SMILES does not raise), bridge (quinine ≫ saturated decoy
+  ranking; no-observed → score 0; contradiction capping on the saturated
+  decoy; mutual-coupling compaction), endpoint contract + audit, and
+  unified-engine integration **including the regression guarantee** — with
+  no multiplet input, `component_metadata["layer_weights"]` equals
+  `DEFAULT_LAYER_WEIGHTS` exactly and no candidate carries a
+  `multiplet_jcoupling` layer.
+- Full backend regression sweep: green, zero failures.
+
+### Compatibility
+- Purely additive and opt-in. No change to any existing request or
+  response when the new multiplet fields are omitted; the unified-engine
+  denominator is provably unchanged in that case.
+
+---
+
+## v0.7.0 — Multiplet analysis with GSD-enhanced J-coupling (2026-05-28)
+
+**Headline:** New capability — multiplet detection and J-coupling
+recovery on GSD-resolved peak lists. Closes the literal Prompt 4 spec:
+
+* Detect all 8 quinine multiplets, J values within 0.3 Hz of literature
+  (acceptance gate `tests/test_multiplet_quinine_reference.py`).
+* Recover the Mnova manual page-251 hidden 11.4 Hz coupling that
+  standard (level-2) peak picking misses (acceptance gate
+  `tests/test_multiplet_mnova_hidden_coupling.py`).
+
+### Added
+- **`src/moltrace/spectroscopy/multiplet/analysis.py`** — new module
+  with `detect_multiplets(peaks, tolerance_hz=0.5)` and
+  `generate_synthetic_multiplet(multiplicity, j_hz, center_ppm,
+  freq_mhz)`.
+- **`Multiplet` dataclass** with the IUPAC-letter `name`, `center_ppm`,
+  `range_ppm`, `multiplicity_label`, `j_couplings_hz` (largest-first),
+  `num_nuclides`, `peaks`, and a `metadata` blob carrying the residual
+  RMS for complex-multiplet fits.
+- **Algorithm pipeline** (per the Prompt 4 spec):
+  1. **Spatial clustering** at 30 Hz (the same width the v0.6 GSD
+     environment clusterer uses for ¹H; matches the widest plausible
+     homonuclear ¹J/²J coupling).
+  2. **First-order Pascal-triangle match** for s / d / t / q / p /
+     sext / sept with equal-spacing tolerance generous enough to
+     ride out the 0.1–0.3 Hz peak-position jitter GSD leaves on
+     real spectra.
+  3. **Symmetric-pair complex multiplet recovery** for dd / dt / td /
+     ddd. ``dd`` uses an analytical inversion (outer + inner pair
+     separations → J₁, J₂); ``dt`` / ``td`` / ``ddd`` enumerate
+     plausible J-set candidates from *pairwise* peak separations
+     (not just centre offsets, which would miss interior J values)
+     and pick the candidate that minimises the position residual.
+  4. **`ddd` refinement** via scipy ``least_squares`` Levenberg-
+     Marquardt so the recovered J values lock in to ~0.1 Hz
+     precision rather than the coarse discrete-search resolution.
+  5. **Inner-pair collapse handling** — when a ddd's inner pair sits
+     closer than the linewidth (the standard hidden-coupling
+     geometry, e.g. J=(17.4, 10.4, 7.5) → ±0.25 Hz inner pair), the
+     predicted positions are collapsed within 1 Hz so the residual
+     match succeeds against the 7 observed peaks rather than failing
+     on a count mismatch.
+- **`POST /spectrum/analyze/multiplets`** FastAPI endpoint mirroring
+  the v0.6.3 audit-event pattern. Request:
+  `SpectrumMultipletAnalyzeRequest { peaks: GSDPromptPeak[],
+  tolerance_hz=0.5 }`. Response: `SpectrumMultipletAnalyzeResult {
+  multiplets: MultipletDescriptor[], synthetic_overlays_ppm:
+  float[][], multiplet_count, multiplicity_counts, backend,
+  notes }`. Each invocation emits a `spectrum.analyze_multiplets`
+  audit event so the soak-telemetry rollup covers this surface
+  uniformly with the GSD endpoint.
+- **`MultipletDescriptor`** wire schema mirrors the dataclass +
+  carries `constituent_peak_indices` so the FE can highlight which
+  request peaks compose each multiplet.
+- **`synthetic_overlays_ppm`** — per-multiplet predicted ppm
+  positions from `generate_synthetic_multiplet`. The FE renders
+  these in a light-red overlay so the chemist sees "predicted vs
+  observed" at a glance — a regulatory-grade visual check that the
+  recovered J set explains the data.
+
+### Tests
+- **`tests/test_multiplet_quinine_reference.py`** (`current_state`) —
+  forward-models a quinine ¹H spectrum at 500 MHz using the new
+  multiplet forward modeller (bypassing the v0.6 `synthesize_spectrum`
+  helper which deliberately simplifies dd/ddd to first-J-only), runs
+  the full GSD-pick + multiplet-detect pipeline, and asserts every
+  one of the 8 quinine multiplets resolves with the correct label
+  and every J within 0.3 Hz of literature.
+- **`tests/test_multiplet_mnova_hidden_coupling.py`** (`current_state`)
+  — synthesises a dd at the Mnova page-251 hidden-coupling geometry
+  (J₁=13.7 Hz, J₂=11.4 Hz, inner pair at 0.85 Hz separation
+  vs 1.5 Hz linewidth), runs the GSD-enhanced level-4 picker, and
+  asserts the 11.4 Hz coupling is recovered within 0.3 Hz. Companion
+  test pins the "naive level-2 picker misses it" half.
+- **`tests/test_spectrum_analyze_multiplets_api.py`** — 7-test wire
+  contract: singlet round-trip, doublet J recovery, A/B naming order,
+  synthetic-overlay generation, audit-event emission, empty-peak
+  rejection, response shape.
+
+### Status
+- Algorithmically complete on both Prompt 4 acceptance gates
+  (quinine + Mnova hidden coupling). No `experimental` flag on this
+  backend — algorithm matches first-order NMR theory exactly for
+  the patterns it claims to detect, and the residual-fit fallback to
+  ``m`` is honest about ambiguous patterns.
+
 ---
 
 ## v0.6.10 — Adoption-velocity telemetry on the rollup (2026-05-28)

@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — AI-Native Scientific Intelligence for Pharmaceutical R&D"
 subtitle: "Sales-Led Variant · The Business Case for Audit-Ready Analytical Chemistry"
-version: "2026-05-28b"
+version: "2026-05-28p"
 audience: "Pharma R&D directors, regulatory affairs leads, CRO commercial teams, analytical operations heads"
 length: "≈4,000 words · Hybrid white paper · Sales-led variant of the canonical hybrid white paper"
 ---
@@ -20,7 +20,7 @@ Pharmaceutical R&D, CRO, and academic analytical teams operate at a paradox: ins
 
 MolTrace is the answer: an end-to-end, AI-native scientific intelligence platform that closes the loop from raw analytical data to audit-ready regulatory decisions. It is composed of three integrated programs sharing one evidence engine, one immutable raw-data vault, and one regulatory-provenance layer:
 
-- **SpectraCheck** — 39-layer NMR + MS evidence engine for 1H, 13C, 2D NMR, raw FID, HRMS, MS/MS, and LC-MS feature data.
+- **SpectraCheck** — 40-layer NMR + MS evidence engine for 1H, 13C, 2D NMR, raw FID, HRMS, MS/MS, and LC-MS feature data.
 - **Regulatory Intelligence Hub** — dossier scaffolding aligned with ICH Q2(R2), the FDA's January 2025 AI Credibility Framework, and the EMA AI reflection paper.
 - **Reaction Optimization** — Bayesian optimisation and ML-guided design-of-experiments, integrated with the same evidence trail.
 
@@ -72,16 +72,17 @@ MolTrace is a multi-tenant SaaS application with a FastAPI Python backend, a Nex
 
 ### 4.1 SpectraCheck — The Evidence Engine
 
-The core of the platform is a **39-layer evidence stack** built incrementally and additively. Each layer is independently usable (a laboratory with only 1H NMR can be productive today) **and** composable into the unified confidence engine when richer inputs are available. Layers include:
+The core of the platform is a **40-layer evidence stack** built incrementally and additively. Each layer is independently usable (a laboratory with only 1H NMR can be productive today) **and** composable into the unified confidence engine when richer inputs are available. Layers include:
 
 - **1H + 13C evidence scoring** against SMILES candidates, with solvent-aware chemical-shift windows sourced from Silverstein, Pretsch, Friebolin, and the Gottlieb/Fulmer residual-solvent tables.
 - **Opt-in Mestrenova-style Global Spectral Deconvolution (GSD)** backend that auto-classifies every detected peak (compound, solvent, impurity, artifact, ¹³C satellite) and clusters multiplet lines back into chemical-environment entries — cleared production promotion against **three independent reference corpora**: NMRShiftDB2 (100 % solvent auto-detect), an HMDB-style synthetic corpus (95 % / 100 % within tolerance), and a **100-fixture real-instrument HMDB corpus** (95 % parseable, 93 % solvent auto-detect) — closing the literal Prompt 3 acceptance criterion of "100 spectra from NMRShiftDB2 + HMDB" on real instrument data. Tenants opt in per request; the default analysis flow is unchanged.
+- **Multiplet analysis with J-coupling recovery** (`POST /spectrum/analyze/multiplets`) — reads the coupling tree behind each GSD-resolved signal, naming the multiplicity (singlet → septet plus dd / dt / td / ddd) and recovering the coupling constants the way an expert reads them by hand. Validated against two reference cases: all eight diagnostic quinine ¹H multiplets within 0.3 Hz of literature J values, and the Mestrenova-manual hidden 11.4 Hz coupling recovered where standard peak picking misses it. A light-red synthetic overlay lets reviewers confirm the recovered couplings explain the observed peaks at a glance.
 - **Processed 2D NMR** support (COSY, HSQC/HMQC, HMBC) — guarded behind a feature flag for controlled rollout.
 - **Raw FID** processing for Bruker `.zip` / `.tar.gz` and Agilent-Varian `.fid` archives, with automatic phase + Bernstein-order-3 baseline correction by default.
 - **Candidate comparison** with DP4 / DP5-class Bayesian scoring and a transparent per-class multiplier table for structural classes (carbohydrates, lipids, peptides, polymers, etc.).
 - **HRMS exact-mass + bounded formula search**, **MS/MS annotation**, **MS1 adduct + isotope inference**, **fragmentation-tree reasoning**.
 - **LC-MS** stack: mzML/mzXML import bridge, feature detection with EIC/XIC and peak purity, feature grouping with blank-subtraction and RT alignment, isotope/adduct consensus, and a bridge into unified confidence.
-- **Unified Candidate Confidence Engine** — cross-modal aggregation with layer-by-layer agreement and contradiction reporting.
+- **Unified Candidate Confidence Engine** — cross-modal aggregation with layer-by-layer agreement and contradiction reporting, now including a **multiplet J-coupling agreement layer** that scores each candidate's predicted topological couplings — with an optional geometry-aware (Karplus) refinement that sharpens vicinal couplings for conformationally locked ring systems — against the recovered experimental J values and flags candidates whose connectivity cannot produce a large observed coupling.
 - **Regulatory-ready report composer** — JSON, HTML, and signed audit-package output.
 
 Every layer's output is a typed contract with stable JSON keys so downstream integrations stay green as new layers land.
@@ -107,7 +108,7 @@ MolTrace's regulatory posture is anchored in three external frameworks and reinf
 | Define the question of interest | Per-tab analyze targets (1H vs. 13C vs. unified confidence) |
 | Define the context of use | `compound_class` selector + audit-trail context |
 | Assess AI model risk | Transparent multiplier tables + DP4/DP5 panel as cross-check |
-| Plan and execute credibility activities | Weekly regression suites (Weeks 22–39) + smoke tests |
+| Plan and execute credibility activities | Weekly regression suites (Weeks 22–40) + smoke tests |
 | Assess model output | Layer-by-layer agreement matrix in unified confidence |
 | Document credibility evidence | Report composer + provenance manifests |
 | Maintain credibility through lifecycle | Recipe-hash-linked reruns + versioned report records |
@@ -186,7 +187,7 @@ All tiers include the immutable raw vault, the evidence engine, the regulatory r
 
 ## 10. Conclusion
 
-The thirty-nine evidence layers, the immutable raw vault, the regulatory-ready report composer, the human-review release gate, and the citation-linked literature scaffold described above are, in aggregate, **one thing**: an end-to-end chain of custody from a raw FID file off a Bruker spectrometer to a sentence in a regulatory submission, with every numerical claim along the way reachable and reproducible.
+The forty evidence layers, the immutable raw vault, the regulatory-ready report composer, the human-review release gate, and the citation-linked literature scaffold described above are, in aggregate, **one thing**: an end-to-end chain of custody from a raw FID file off a Bruker spectrometer to a sentence in a regulatory submission, with every numerical claim along the way reachable and reproducible.
 
 This is the foundation pharmaceutical R&D needs to adopt AI-supported analytical chemistry at scale without forfeiting the inspector's trust. The platform is operational, the architecture is additive, the science is grounded in canonical literature (Silverstein, Pretsch, Friebolin, Smith & Goodman DP4, Howarth DP4-AI / DP5, Kwon graph-NN, CSP5), and the regulatory posture maps directly onto the 2025 FDA AI Credibility Framework and the EMA AI reflection paper.
 

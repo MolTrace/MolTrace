@@ -4,6 +4,8 @@ import hashlib
 import json
 from typing import Any
 
+from pydantic import ValidationError
+
 from .adduct_inference import AdductInferenceError, infer_adducts_and_isotopes
 from .candidate_predicted import match_candidates_with_predicted_nmr
 from .chemistry import structure_summary_from_smiles
@@ -21,6 +23,7 @@ from .models import (
     MS1AdductInferenceRequest,
     MSMSAnnotationRequest,
     MSMSFragmentationTreeRequest,
+    MultipletJCouplingBridgeRequest,
     NMR2DPreviewReport,
     UnifiedCandidateConfidenceItem,
     UnifiedCandidateConfidenceRequest,
@@ -30,6 +33,10 @@ from .models import (
     UnifiedEvidenceLayerScore,
 )
 from .msms import MSMSError, annotate_msms
+from .multiplet_jcoupling_bridge import (
+    MultipletJCouplingBridgeError,
+    score_multiplets_against_candidates,
+)
 from .nmr2d import NMR2DParseError, parse_nmr2d_table
 
 
@@ -52,6 +59,7 @@ LAYER_LABELS = {
     "msms_annotation": "Processed MS/MS annotation",
     "fragmentation_tree": "MS/MS fragmentation tree",
     "lcms_feature_family": "LC-MS feature-family consensus",
+    "multiplet_jcoupling": "Multiplet J-coupling agreement",
 }
 
 BUNDLE_LAYER_ALIASES = {
@@ -266,6 +274,28 @@ def _bridge_lcms_request(
     )
 
 
+def _has_multiplet_jcoupling_input(req: UnifiedCandidateConfidenceRequest) -> bool:
+    return bool(req.observed_multiplets or req.observed_j_couplings_hz)
+
+
+def _bridge_multiplet_jcoupling_request(
+    req: UnifiedCandidateConfidenceRequest,
+) -> MultipletJCouplingBridgeRequest:
+    return MultipletJCouplingBridgeRequest(
+        sample_id=req.sample_id,
+        compound_class=req.compound_class,
+        candidates=req.candidates,
+        observed_multiplets=req.observed_multiplets,
+        observed_j_couplings_hz=req.observed_j_couplings_hz,
+        sigma_hz=req.multiplet_jcoupling_sigma_hz,
+        contradiction_j_hz=req.multiplet_jcoupling_contradiction_hz,
+        min_observed_hz=req.multiplet_jcoupling_min_observed_hz,
+        use_karplus=req.multiplet_jcoupling_use_karplus,
+        karplus_method=req.multiplet_jcoupling_karplus_method,
+        karplus_max_conformers=req.multiplet_jcoupling_max_conformers,
+    )
+
+
 def build_unified_candidate_confidence(req: UnifiedCandidateConfidenceRequest) -> UnifiedCandidateConfidenceResult:
     """Combine available SpectraCheck evidence streams into one candidate ranking."""
     if not req.candidates:
@@ -278,6 +308,12 @@ def build_unified_candidate_confidence(req: UnifiedCandidateConfidenceRequest) -
             if req.layer_weights
             else float(req.lcms_layer_weight)
         )
+    if _has_multiplet_jcoupling_input(req):
+        weights["multiplet_jcoupling"] = (
+            float(req.layer_weights.get("multiplet_jcoupling", req.multiplet_jcoupling_layer_weight))
+            if req.layer_weights
+            else float(req.multiplet_jcoupling_layer_weight)
+        )
     if req.layer_weights:
         for key, value in req.layer_weights.items():
             if key in weights and value is not None and value >= 0:
@@ -285,7 +321,7 @@ def build_unified_candidate_confidence(req: UnifiedCandidateConfidenceRequest) -
 
     warnings: list[str] = []
     notes = [
-        "Unified confidence combines NMR, HRMS, MS1 adduct/isotope, MS/MS annotation, fragmentation-tree evidence, and optional LC-MS feature-family consensus.",
+        "Unified confidence combines NMR, HRMS, MS1 adduct/isotope, MS/MS annotation, fragmentation-tree evidence, optional LC-MS feature-family consensus, and optional multiplet J-coupling agreement.",
         "Scores are transparent decision-support confidence scores, not absolute proof or calibrated DP4/DP5 probabilities.",
         "Human review is required, especially when top candidates are close or evidence streams disagree.",
     ]
@@ -445,11 +481,30 @@ def build_unified_candidate_confidence(req: UnifiedCandidateConfidenceRequest) -
         except (LCMSConfidenceBridgeError, HRMSError, ValueError) as exc:
             warnings.append(f"LC-MS feature-family consensus bridge was skipped: {exc}")
 
+    multiplet_jcoupling_result = None
+    if _has_multiplet_jcoupling_input(req):
+        try:
+            multiplet_jcoupling_result = score_multiplets_against_candidates(
+                _bridge_multiplet_jcoupling_request(req)
+            )
+            component_metadata["multiplet_jcoupling_bridge"] = {
+                "candidate_count": multiplet_jcoupling_result.candidate_count,
+                "observed_coupling_count": multiplet_jcoupling_result.observed_coupling_count,
+                "observed_j_couplings_hz": multiplet_jcoupling_result.observed_j_couplings_hz,
+                "best_match": multiplet_jcoupling_result.best_match.smiles if multiplet_jcoupling_result.best_match else None,
+                "best_match_score": multiplet_jcoupling_result.best_match.score if multiplet_jcoupling_result.best_match else None,
+                "bridge_result_sha256": _canonical_hash(multiplet_jcoupling_result.model_dump(mode="json")),
+            }
+            warnings.extend(multiplet_jcoupling_result.warnings)
+        except (MultipletJCouplingBridgeError, ValidationError, ValueError) as exc:
+            warnings.append(f"Multiplet J-coupling agreement bridge was skipped: {exc}")
+
     nmr_by_key = {_candidate_key(i.smiles): i for i in (predicted_nmr_result.ranked_candidates if predicted_nmr_result else [])}
     hrms_by_key = {_candidate_key(i.smiles): i for i in (hrms_result.ranked_candidates if hrms_result else [])}
     msms_by_key = {_candidate_key(i.smiles): i for i in (msms_result.ranked_candidates if msms_result else [])}
     tree_by_key = {_candidate_key(i.smiles): i for i in (frag_tree_result.ranked_candidates if frag_tree_result else [])}
     lcms_by_key = {_candidate_key(i.smiles): i for i in (lcms_bridge_result.matches if lcms_bridge_result else [])}
+    mj_by_key = {_candidate_key(i.smiles): i for i in (multiplet_jcoupling_result.matches if multiplet_jcoupling_result else [])}
 
     best_adduct = adduct_result.best_adduct_candidate if adduct_result and adduct_result.best_adduct_candidate else None
     best_adduct_top_formulas = {f.formula for f in (best_adduct.top_formulas if best_adduct else [])}
@@ -467,6 +522,7 @@ def build_unified_candidate_confidence(req: UnifiedCandidateConfidenceRequest) -
         msms_item = msms_by_key.get(key)
         tree_item = tree_by_key.get(key)
         lcms_item = lcms_by_key.get(key)
+        mj_item = mj_by_key.get(key)
 
         formula = _candidate_formula(candidate, hrms_item)
         exact_mass = None
@@ -625,6 +681,37 @@ def build_unified_candidate_confidence(req: UnifiedCandidateConfidenceRequest) -
                 )
             )
 
+        if mj_item is not None:
+            mj_used = mj_item.label != "no_observed_couplings"
+            if mj_item.contradiction:
+                contradictions.append(
+                    "Observed J coupling(s) cannot be produced by this candidate's topology "
+                    "(multiplet J-coupling contradiction)."
+                )
+            item_warnings.extend(mj_item.warnings)
+            evidence_summary.extend([f"J-coupling: {x}" for x in mj_item.evidence_summary[:4]])
+            layers.append(
+                _layer(
+                    "multiplet_jcoupling",
+                    used=mj_used,
+                    score=mj_item.score if mj_used else None,
+                    weight=weights.get("multiplet_jcoupling", req.multiplet_jcoupling_layer_weight),
+                    evidence_summary=mj_item.evidence_summary[:5],
+                    warnings=mj_item.warnings,
+                    contradiction=mj_item.contradiction,
+                    metadata={
+                        "rank": mj_item.rank,
+                        "label": mj_item.label,
+                        "matched_count": mj_item.matched_count,
+                        "predicted_j_couplings_hz": mj_item.predicted_j_couplings_hz,
+                        "observed_j_couplings_hz": mj_item.observed_j_couplings_hz,
+                        "unmatched_observed_hz": mj_item.unmatched_observed_hz,
+                        "max_observed_j_hz": mj_item.max_observed_j_hz,
+                        "max_predicted_j_hz": mj_item.max_predicted_j_hz,
+                    },
+                )
+            )
+
         base_score, completeness = _weighted_score(layers, denominator_weight=sum(weights.values()))
         used_layers = [layer for layer in layers if layer.used and layer.score is not None]
         agreement_count = sum(1 for layer in used_layers if layer.agreement)
@@ -669,6 +756,7 @@ def build_unified_candidate_confidence(req: UnifiedCandidateConfidenceRequest) -
                     "used_layer_count": len(used_layers),
                     "candidate_key": key,
                     "lcms_feature_family_match": lcms_item.model_dump(mode="json") if lcms_item is not None else None,
+                    "multiplet_jcoupling_match": mj_item.model_dump(mode="json") if mj_item is not None else None,
                 },
             )
         )
@@ -696,6 +784,8 @@ def build_unified_candidate_confidence(req: UnifiedCandidateConfidenceRequest) -
         global_contradictions.append("Best fragmentation-tree candidate contains contradiction flags.")
     if lcms_bridge_result and any(match.contradiction for match in lcms_bridge_result.matches):
         global_contradictions.append("One or more candidates conflict with promoted LC-MS feature-family m/z/adduct evidence.")
+    if multiplet_jcoupling_result and any(match.contradiction for match in multiplet_jcoupling_result.matches):
+        global_contradictions.append("One or more candidates cannot reproduce a large observed J coupling (multiplet J-coupling contradiction).")
 
     return UnifiedCandidateConfidenceResult(
         sample_id=req.sample_id,
