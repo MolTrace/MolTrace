@@ -1885,6 +1885,7 @@ UnifiedEvidenceLayerName = Literal[
     "msms_annotation",
     "fragmentation_tree",
     "lcms_feature_family",
+    "multiplet_jcoupling",
 ]
 
 
@@ -1966,6 +1967,27 @@ class UnifiedCandidateConfidenceRequest(BaseModel):
     lcms_require_promoted_family: bool = True
     lcms_selected_family_id: str | None = Field(default=None, max_length=100)
     lcms_layer_weight: float = Field(default=0.12, ge=0.0, le=1.0)
+
+    # Optional multiplet -> J-coupling evidence layer.  Supply recovered
+    # observed J couplings (from POST /spectrum/analyze/multiplets) either as
+    # whole multiplet descriptors (dicts validated by the bridge, since
+    # MultipletDescriptor is declared later in this module) or as a flat Hz
+    # list.  Like the LC-MS bridge, this layer is appended only when input is
+    # present, so it does not change the denominator for existing computations.
+    observed_multiplets: list[dict[str, Any]] | None = Field(default=None, max_length=512)
+    observed_j_couplings_hz: list[float] | None = Field(default=None, max_length=2048)
+    multiplet_jcoupling_sigma_hz: float = Field(default=1.6, gt=0.0, le=20.0)
+    multiplet_jcoupling_contradiction_hz: float = Field(default=12.0, gt=0.0, le=40.0)
+    multiplet_jcoupling_min_observed_hz: float = Field(default=1.0, ge=0.0, le=20.0)
+    multiplet_jcoupling_layer_weight: float = Field(default=0.10, ge=0.0, le=1.0)
+    # Opt-in Karplus refinement for the J-coupling layer (see
+    # MultipletJCouplingBridgeRequest); off by default so the topology-only
+    # prediction and the existing layer denominator are unchanged.
+    multiplet_jcoupling_use_karplus: bool = False
+    multiplet_jcoupling_max_conformers: int = Field(default=12, ge=1, le=64)
+    # See MultipletJCouplingBridgeRequest.karplus_method; "generic" (default)
+    # reproduces prior behaviour exactly.
+    multiplet_jcoupling_karplus_method: Literal["generic", "haasnoot_altona"] = "generic"
 
     layer_weights: dict[str, float] = Field(default_factory=dict)
     ambiguity_delta_threshold: float = Field(default=0.05, ge=0.0, le=1.0)
@@ -14602,6 +14624,217 @@ class SpectrumGSDAnalyzeResult(BaseModel):
     experimental: bool = True
     notes: list[str] = Field(default_factory=list)
     spectrum_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+# --- Prompt 4: multiplet analysis ---------------------------------------
+
+MultipletMultiplicityLabel = Literal[
+    "s",
+    "d",
+    "t",
+    "q",
+    "p",
+    "sext",
+    "sept",
+    "dd",
+    "dt",
+    "td",
+    "ddd",
+    "m",
+]
+
+
+class MultipletDescriptor(BaseModel):
+    """One detected multiplet (Prompt 4).
+
+    Mirrors the dataclass returned by
+    ``moltrace.spectroscopy.multiplet.detect_multiplets`` so consumers
+    see a stable wire shape regardless of internal refactors.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # IUPAC letter (A, B, C, ...) assigned newest-first by centre ppm.
+    name: str = Field(min_length=1, max_length=4)
+    center_ppm: float
+    range_ppm: tuple[float, float]
+    multiplicity_label: MultipletMultiplicityLabel
+    # J coupling constants in Hz, largest-first by convention.  Empty
+    # for singlets; one entry for simple multiplets; two or three for
+    # complex (dd / dt / td / ddd) patterns.
+    j_couplings_hz: list[float] = Field(default_factory=list)
+    # Number of neighbouring nuclides coupled (the ``n`` in the n+1
+    # rule for first-order multiplets).
+    num_nuclides: int = Field(ge=0)
+    # Indices into the request's peak list that compose this multiplet.
+    # Lets the FE highlight the same peaks in the spectrum view.
+    constituent_peak_indices: list[int] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SpectrumMultipletAnalyzeRequest(BaseModel):
+    """Request body for ``POST /spectrum/analyze/multiplets``.
+
+    Caller supplies a peak list (typically obtained from a prior
+    ``/spectrum/analyze/gsd`` call) plus an optional residual
+    tolerance.  The endpoint does spatial clustering at 30 Hz (fixed
+    per the Prompt 4 spec) and runs first-order + complex multiplet
+    detection, then returns the recovered J set.
+
+    Each peak's ``position_ppm`` and ``position_hz`` *must* be
+    consistent — the field strength is recovered from the ratio so
+    callers don't need to provide ``field_mhz`` separately.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    peaks: list[GSDPromptPeak] = Field(min_length=1, max_length=4096)
+    # Residual tolerance reserved for the complex-multiplet fit; not
+    # used as the cluster window (which is fixed at 30 Hz).  Default
+    # 0.5 Hz matches the algorithm's internal threshold.
+    tolerance_hz: float = Field(default=0.5, gt=0.0, le=10.0)
+
+
+class SpectrumMultipletAnalyzeResult(BaseModel):
+    """Response from ``POST /spectrum/analyze/multiplets``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    multiplets: list[MultipletDescriptor] = Field(default_factory=list)
+    # Per-multiplet synthetic peak positions in ppm, ordered to match
+    # ``multiplets[i].name``.  The FE renders this as a light-red
+    # overlay so the chemist sees "predicted vs observed" at a glance.
+    synthetic_overlays_ppm: list[list[float]] = Field(default_factory=list)
+    # Total multiplet count, redundant with ``len(multiplets)`` but
+    # surfaced so dashboards can render a single integer without
+    # iterating the list.
+    multiplet_count: int = Field(default=0, ge=0)
+    # Breakdown by multiplicity label, e.g. ``{"s": 1, "d": 3, "dd": 1,
+    # "ddd": 1}`` for quinine.
+    multiplicity_counts: dict[str, int] = Field(default_factory=dict)
+    backend: Literal["multiplet_prompt4"] = "multiplet_prompt4"
+    notes: list[str] = Field(default_factory=list)
+
+
+class JCouplingMatch(BaseModel):
+    """One matched observed<->predicted J coupling (Hz)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    observed_hz: float = Field(ge=0.0)
+    predicted_hz: float = Field(ge=0.0)
+    delta_hz: float = Field(ge=0.0)
+    score: float = Field(ge=0.0, le=1.0)
+
+
+# Outcome of scoring one candidate's predicted couplings against the observed
+# (multiplet-recovered) J set.  ``j_coupling_contradiction`` is reserved for
+# the case where the observed spectrum carries a large coupling (>= the
+# contradiction threshold, e.g. a trans-alkene ~16 Hz) that the candidate's
+# topology cannot produce.
+MultipletJCouplingCandidateLabel = Literal[
+    "strong_j_agreement",
+    "partial_j_agreement",
+    "weak_j_agreement",
+    "poor_j_agreement",
+    "j_coupling_contradiction",
+    "no_observed_couplings",
+    "no_predicted_couplings",
+    "candidate_invalid",
+]
+
+
+class MultipletJCouplingCandidateMatch(BaseModel):
+    """Per-candidate J-agreement score for the multiplet bridge."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rank: int = Field(ge=0)
+    name: str | None = None
+    role: str | None = None
+    smiles: str
+    formula: str | None = None
+    predicted_j_couplings_hz: list[float] = Field(default_factory=list)
+    observed_j_couplings_hz: list[float] = Field(default_factory=list)
+    matched_pairs: list[JCouplingMatch] = Field(default_factory=list)
+    matched_count: int = Field(default=0, ge=0)
+    unmatched_observed_hz: list[float] = Field(default_factory=list)
+    unmatched_predicted_hz: list[float] = Field(default_factory=list)
+    max_observed_j_hz: float | None = None
+    max_predicted_j_hz: float | None = None
+    score: float = Field(ge=0.0, le=1.0)
+    label: MultipletJCouplingCandidateLabel
+    contradiction: bool = False
+    evidence_summary: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MultipletJCouplingBridgeRequest(BaseModel):
+    """Request body for ``POST /candidates/compare/jcoupling``.
+
+    Scores recovered observed J couplings (typically from
+    ``POST /spectrum/analyze/multiplets``) against each candidate's
+    topology-predicted coupling set.  Supply observed couplings as whole
+    multiplet descriptors, a flat Hz list, or both (they are merged).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sample_id: str | None = Field(default=None, max_length=100)
+    compound_class: str | None = Field(default=None, max_length=64)
+    candidates: list[CandidateInput] = Field(min_length=1, max_length=25)
+    observed_multiplets: list[MultipletDescriptor] | None = Field(default=None, max_length=512)
+    observed_j_couplings_hz: list[float] | None = Field(default=None, max_length=2048)
+    # Gaussian kernel width (Hz) for greedy J matching.  1.6 Hz tolerates
+    # routine peak-picking precision while keeping cis/trans alkene couplings
+    # (~10.8 vs ~16.5 Hz) resolvable.
+    sigma_hz: float = Field(default=1.6, gt=0.0, le=20.0)
+    # An unmatched observed coupling at or above this magnitude (Hz) that the
+    # candidate cannot produce is flagged as a contradiction.
+    contradiction_j_hz: float = Field(default=12.0, gt=0.0, le=40.0)
+    # Observed couplings below this magnitude (Hz) are dropped before scoring.
+    min_observed_hz: float = Field(default=1.0, ge=0.0, le=20.0)
+    # Opt-in geometry-aware refinement of aliphatic vicinal 3J: replace the flat
+    # empirical ~7.0 Hz value with a conformer-averaged Karplus 3J read from an
+    # RDKit ETKDG ensemble.  Off by default (topology-only); decision support.
+    use_karplus: bool = False
+    karplus_max_conformers: int = Field(default=12, ge=1, le=64)
+    # Relation applied to each vicinal dihedral when use_karplus is True:
+    # "generic" (default, three-term Karplus) or "haasnoot_altona" (the
+    # electronegativity/orientation-corrected generalized Karplus relation,
+    # Haasnoot-de Leeuw-Altona 1980).  Decision support; "generic" reproduces
+    # prior behaviour exactly.  HLA is more faithful per-conformer but, under
+    # the current unweighted conformer averaging, does not improve the
+    # semi-quantitative locked-vs-mobile discrimination (see CHANGELOG v0.7.4).
+    karplus_method: Literal["generic", "haasnoot_altona"] = "generic"
+
+    @field_validator("sample_id", "compound_class", mode="before")
+    @classmethod
+    def _trim_jcoupling_bridge_strings(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = str(value).strip()
+        return value or None
+
+
+class MultipletJCouplingBridgeResult(BaseModel):
+    """Response from ``POST /candidates/compare/jcoupling``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sample_id: str | None = None
+    candidate_count: int = Field(ge=0)
+    observed_coupling_count: int = Field(ge=0)
+    observed_j_couplings_hz: list[float] = Field(default_factory=list)
+    sigma_hz: float
+    contradiction_j_hz: float
+    best_match: MultipletJCouplingCandidateMatch | None = None
+    matches: list[MultipletJCouplingCandidateMatch] = Field(default_factory=list)
+    evidence_table_text: str = ""
+    warnings: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 FlipReadinessVerdict = Literal["insufficient_data", "clear", "blocked"]

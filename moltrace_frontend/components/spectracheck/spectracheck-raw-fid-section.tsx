@@ -56,6 +56,8 @@ import {
   type SpectrumGSDAnalyzeRequest,
   type SpectrumGSDAnalyzeResult,
 } from "@/components/spectracheck/gsd-analysis-ui"
+import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel"
+import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -2091,6 +2093,23 @@ export function SpectraCheckRawFidSection({
           Only renders when the user has run the experimental backend.
           Lives alongside the legacy Step 3 results without replacing them. */}
       <GsdResultsPanel result={gsdResult} testId="raw-fid-gsd-results-surface" />
+
+      {/* ── Step 3c — Multiplet analysis (Phase 26) ───────────────────────
+          Chained automatically off the GSD result — peaks above S/N>3
+          forwarded to /spectrum/analyze/multiplets for first-order +
+          complex multiplet detection. */}
+      <GsdMultipletPanel gsdResult={gsdResult} testId="raw-fid-multiplet-results-surface" />
+
+      {/* ── Step 3d — Candidate J-agreement (Phase 26b / v0.7.1) ──────────
+          Same panel as the processed section; shares the multiplet
+          WeakMap cache so the multiplet POST fires once per gsdResult. */}
+      <GsdJCouplingPanel
+        gsdResult={gsdResult}
+        candidatesText={candidatesText}
+        sampleId={sampleId}
+        compoundClass={compoundClassForRequest(compoundClass) || undefined}
+        testId="raw-fid-jcoupling-results-surface"
+      />
 
       {/* ── Step 3c — Legacy detection summary (unified panel) ──────────
           Post-Phase-11 the raw-FID responses expose the same envelope

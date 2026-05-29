@@ -52,6 +52,8 @@ import {
   type SpectrumGSDAnalyzeRequest,
   type SpectrumGSDAnalyzeResult,
 } from "@/components/spectracheck/gsd-analysis-ui"
+import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel"
+import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
@@ -1541,6 +1543,25 @@ export function SpectraCheckProcessedSpectrumSection({
           Only renders when the user has run the experimental backend.
           Lives alongside the legacy Step 3 results without replacing them. */}
       <GsdResultsPanel result={gsdResult} />
+
+      {/* ── Step 3c — Multiplet analysis (Phase 26) ───────────────────────
+          Chained automatically off the GSD result — peaks above S/N>3
+          are forwarded to /spectrum/analyze/multiplets for first-order +
+          complex multiplet detection. */}
+      <GsdMultipletPanel gsdResult={gsdResult} testId="processed-multiplet-results-surface" />
+
+      {/* ── Step 3d — Candidate J-agreement (Phase 26b / v0.7.1) ──────────
+          When candidate SMILES are provided, score them against the
+          observed J couplings recovered from the multiplet pass. Shares
+          the multiplet WeakMap cache so the multiplet POST fires once
+          for both panels. */}
+      <GsdJCouplingPanel
+        gsdResult={gsdResult}
+        candidatesText={candidatesOptional.trim() || candidatesText}
+        sampleId={sampleId}
+        compoundClass={compoundClassForRequest(compoundClass) || undefined}
+        testId="processed-jcoupling-results-surface"
+      />
     </div>
   )
 }

@@ -25,6 +25,7 @@ moltrace-raw-fid-sidecar-report = "nmrcheck.raw_fid_prompt_validation:main"
 moltrace-gsd-prompt3-sidecar-report = "nmrcheck.gsd_prompt3_validation:main"
 moltrace-gsd-hmdb-sidecar-report = "nmrcheck.gsd_hmdb_validation:main"
 moltrace-gsd-hmdb-style-sidecar-report = "nmrcheck.gsd_hmdb_style_validation:main"
+moltrace-karplus-jcoupling-report = "nmrcheck.karplus_validation:main"
 
 [project.optional-dependencies]
 fid = [

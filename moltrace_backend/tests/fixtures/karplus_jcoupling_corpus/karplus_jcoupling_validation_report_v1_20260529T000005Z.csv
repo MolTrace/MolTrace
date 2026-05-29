@@ -1,0 +1,9 @@
+fixture_id,compound_name,smiles,kind,row_status,expected_max_vicinal_j_hz,tolerance_hz,predicted_max_vicinal_j_hz,predicted_min_vicinal_j_hz,karplus_coupling_count,abs_error_hz,within_tol,max_predicted_hz,invalid_structure,warnings,error
+trans_decalin,trans-Decalin,C1CC[C@@H]2CCCC[C@H]2C1,locked_diaxial,ok,11.0,2.5,10.05,2.84,33,0.95,True,10.05,False,[],
+beta_d_glucopyranose,beta-D-Glucopyranose,OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O,locked_diaxial,ok,9.5,2.0,9.59,4.6,6,0.09,True,9.59,False,[],
+myo_inositol,myo-Inositol,O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O,locked_diaxial,ok,9.9,2.0,9.85,3.34,6,0.05,True,9.22,False,[],
+beta_d_galactopyranose,beta-D-Galactopyranose,OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@H]1O,locked_diaxial,ok,9.9,2.5,8.49,3.56,6,1.41,True,8.49,False,[],
+cyclohexane,Cyclohexane,C1CCCCC1,mobile_averaged,ok,6.8,1.5,7.14,3.61,24,0.34,True,7.14,False,[],
+cis_decalin,cis-Decalin,C1CC[C@H]2CCCC[C@H]2C1,mobile_averaged,ok,6.8,2.0,6.83,3.84,33,0.03,True,5.34,False,[],
+n_butane,n-Butane,CCCC,acyclic_averaged,ok,7.3,1.5,7.12,4.03,16,0.18,True,5.39,False,[],
+ethanol,Ethanol,CCO,acyclic_averaged,ok,7.0,1.5,6.5,3.99,6,0.5,True,5.88,False,[],

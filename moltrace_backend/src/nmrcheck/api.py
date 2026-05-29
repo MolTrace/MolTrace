@@ -746,9 +746,14 @@ from .models import (
     AdminUserGSDGraduationRequest,
     FlipReadinessPolicy,
     FlipReadinessVerdict,
+    MultipletDescriptor,
+    MultipletJCouplingBridgeRequest,
+    MultipletJCouplingBridgeResult,
     SpectrumGSDAnalyzeRequest,
     SpectrumGSDAnalyzeResult,
     SpectrumGSDTelemetrySummary,
+    SpectrumMultipletAnalyzeRequest,
+    SpectrumMultipletAnalyzeResult,
     SpectrumPreviewReport,
     SpectrumSolventCatalog,
     SpectrumSolventInfo,
@@ -844,6 +849,10 @@ from .models import (
     WorkflowTemplateUpdate,
 )
 from .msms import MSMSError, annotate_msms
+from .multiplet_jcoupling_bridge import (
+    MultipletJCouplingBridgeError,
+    score_multiplets_against_candidates,
+)
 from .nmr2d import NMR2DParseError, analyze_nmr2d_preview, parse_nmr2d_upload
 from .nmr_prediction import predict_nmr_from_smiles_fast
 from .proton import analyze_proton_evidence
@@ -5439,6 +5448,159 @@ async def spectrum_analyze_gsd(
             "field_mhz": payload.field_mhz,
             "input_point_count": len(payload.ppm_axis),
         },
+    )
+
+
+@router.post(
+    "/spectrum/analyze/multiplets",
+    response_model=SpectrumMultipletAnalyzeResult,
+    dependencies=[Depends(require_access_context)],
+)
+async def spectrum_analyze_multiplets(
+    payload: SpectrumMultipletAnalyzeRequest,
+    request: Request,  # auto-injected by FastAPI; tests may pass None
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumMultipletAnalyzeResult:
+    """Multiplet analysis with GSD-enhanced J-coupling recovery (Prompt 4).
+
+    Group a GSD-resolved peak list into multiplets, identify
+    multiplicity (s / d / t / q / p / sext / sept / dd / dt / td /
+    ddd / m), and recover the underlying J couplings.  The typical
+    caller flow is:
+
+      1. ``POST /spectrum/analyze/gsd`` -> peak list at level 3-4.
+      2. Filter to high-S/N peaks (rule of thumb: ``S/N >= 10`` for
+         500 MHz data with 1 Hz linewidth).
+      3. ``POST /spectrum/analyze/multiplets`` with the filtered list
+         -> multiplets + per-multiplet synthetic overlay positions.
+
+    Field strength is recovered from each peak's
+    ``position_hz / position_ppm`` ratio, so callers don't need to
+    send ``field_mhz`` separately.  The synthetic-overlay positions
+    are the forward-modelled ppm positions
+    ``generate_synthetic_multiplet`` would produce for the recovered
+    J set; the FE renders them as a light-red overlay so the chemist
+    sees "predicted vs observed" at a glance.
+
+    The audit-event trail is the same shape as the v0.6.3 GSD
+    telemetry: one ``spectrum.analyze_multiplets`` event per
+    invocation carrying the request shape + outcome counts so the
+    operational soak telemetry covers this surface uniformly.
+    """
+
+    from moltrace.spectroscopy.multiplet import (
+        detect_multiplets,
+        generate_synthetic_multiplet,
+    )
+    from moltrace.spectroscopy.peaks.gsd import Peak
+
+    # Translate the wire-shape ``GSDPromptPeak`` Pydantic models into
+    # the internal ``Peak`` dataclass the analyser consumes.  The two
+    # share the same field layout, so this is a thin remap.
+    internal_peaks = [
+        Peak(
+            position_ppm=p.position_ppm,
+            position_hz=p.position_hz,
+            intensity=p.intensity,
+            area=p.area,
+            width_hz=p.width_hz,
+            shape=p.shape,
+            category=p.category,
+            confidence=p.confidence,
+            metadata=dict(p.metadata),
+        )
+        for p in payload.peaks
+    ]
+    # Stable index from each peak's identity in the input list so the
+    # response can reference back to "the third peak you sent".
+    peak_to_index = {id(internal_peaks[i]): i for i in range(len(internal_peaks))}
+
+    multiplets = detect_multiplets(internal_peaks, tolerance_hz=payload.tolerance_hz)
+
+    multiplet_descriptors: list[MultipletDescriptor] = []
+    synthetic_overlays: list[list[float]] = []
+    multiplicity_counts: dict[str, int] = {}
+    notes: list[str] = []
+
+    for multiplet in multiplets:
+        constituent_indices = [
+            peak_to_index.get(id(p), -1) for p in multiplet.peaks
+        ]
+        # Filter -1s defensively (shouldn't happen in practice but
+        # prevents a leaking index from breaking the response shape).
+        constituent_indices = [i for i in constituent_indices if i >= 0]
+
+        # Forward-model the predicted ppm positions for this
+        # multiplet using the same forward modeller the algorithm
+        # uses internally — the FE overlays these in light red.
+        # Recover field strength from the centre peak's hz/ppm ratio
+        # (intensity-weighted centre may not be at any real peak, so
+        # use the first peak instead).
+        if multiplet.peaks and multiplet.peaks[0].position_ppm != 0:
+            ref_peak = multiplet.peaks[0]
+            field_mhz = ref_peak.position_hz / ref_peak.position_ppm
+        else:
+            field_mhz = 500.0  # safe default for ¹H data
+        try:
+            synthetic_positions = generate_synthetic_multiplet(
+                multiplicity=multiplet.multiplicity_label,
+                j_hz=list(multiplet.j_couplings_hz),
+                center_ppm=multiplet.center_ppm,
+                freq_mhz=field_mhz,
+            ).tolist()
+        except ValueError as exc:
+            # Generic "m" multiplets with too few J values for the
+            # forward-modeller fall through silently — the FE renders
+            # only the observed peaks for those.
+            synthetic_positions = []
+            notes.append(
+                f"Multiplet {multiplet.name} ({multiplet.multiplicity_label}): "
+                f"could not forward-model synthetic overlay — {exc}"
+            )
+
+        multiplet_descriptors.append(
+            MultipletDescriptor(
+                name=multiplet.name,
+                center_ppm=multiplet.center_ppm,
+                range_ppm=multiplet.range_ppm,
+                multiplicity_label=multiplet.multiplicity_label,  # type: ignore[arg-type]
+                j_couplings_hz=list(multiplet.j_couplings_hz),
+                num_nuclides=multiplet.num_nuclides,
+                constituent_peak_indices=constituent_indices,
+                metadata=dict(multiplet.metadata),
+            )
+        )
+        synthetic_overlays.append(synthetic_positions)
+        multiplicity_counts[multiplet.multiplicity_label] = (
+            multiplicity_counts.get(multiplet.multiplicity_label, 0) + 1
+        )
+
+    # v0.6.3-style audit-event emission for operational soak parity.
+    try:
+        if request is not None:
+            _audit_from_context(
+                request,
+                context=context,
+                event_type="spectrum.analyze_multiplets",
+                message="Multiplet analysis completed.",
+                metadata={
+                    "input_peak_count": len(payload.peaks),
+                    "multiplet_count": len(multiplet_descriptors),
+                    "multiplicity_counts": multiplicity_counts,
+                    "tolerance_hz": payload.tolerance_hz,
+                    "backend": "multiplet_prompt4",
+                },
+            )
+    except Exception:
+        pass
+
+    return SpectrumMultipletAnalyzeResult(
+        multiplets=multiplet_descriptors,
+        synthetic_overlays_ppm=synthetic_overlays,
+        multiplet_count=len(multiplet_descriptors),
+        multiplicity_counts=multiplicity_counts,
+        backend="multiplet_prompt4",
+        notes=notes,
     )
 
 
@@ -23029,6 +23191,43 @@ def candidate_compare_route(
             "candidate_count": result.candidate_count,
             "best_candidate": result.best_candidate.smiles if result.best_candidate else None,
             "evidence_layers": result.evidence_layers_used,
+            "human_review_required": True,
+        },
+    )
+    return result
+
+
+@router.post(
+    "/candidates/compare/jcoupling",
+    response_model=MultipletJCouplingBridgeResult,
+    dependencies=[Depends(require_access_context)],
+)
+def candidate_compare_jcoupling_route(
+    payload: MultipletJCouplingBridgeRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> MultipletJCouplingBridgeResult:
+    """Score recovered multiplet J couplings against candidate topology predictions."""
+    try:
+        result = score_multiplets_against_candidates(payload)
+    except (
+        MultipletJCouplingBridgeError,
+        ValueError,
+        PydanticValidationError,
+    ) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="confidence.candidates.multiplet_jcoupling_bridge",
+        message="Multiplet J-coupling agreement bridge scoring completed.",
+        metadata={
+            "candidate_count": result.candidate_count,
+            "observed_coupling_count": result.observed_coupling_count,
+            "best_match": result.best_match.smiles if result.best_match else None,
+            "best_score": result.best_match.score if result.best_match else None,
+            "contradiction_count": sum(1 for match in result.matches if match.contradiction),
+            "compound_class": payload.compound_class,
             "human_review_required": True,
         },
     )

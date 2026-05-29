@@ -23,7 +23,7 @@ MolTrace is an end-to-end, AI-native scientific intelligence platform that close
 - **Regulatory Intelligence Hub** — dossier scaffolding, ICH/FDA/EMA-aligned audit packs, controlled human-in-the-loop release gating, and AI-supported question/answer routing built on the 2025 FDA "Considerations for the Use of Artificial Intelligence to Support Regulatory Decision-Making" framework and the EMA AI reflection paper.
 - **Reaction Optimization** — Bayesian optimisation, multi-objective response surface modelling, mechanistic-insight-guided design-of-experiments, and reaction-condition planning, integrated with the same SMILES candidates and the same evidence trail.
 
-All three programs sit on top of a single **`/analyze` evidence stack** of thirty-nine production-graded layers (Weeks 22–39), an immutable raw FID vault with SHA-256 integrity verification, and a multi-tenant SaaS architecture (FastAPI + Postgres + Next.js + RDKit + nmrglue). The result: any number in a regulatory dossier — a chemical shift, a peak integration, a candidate score — traces back through the platform to a specific spectrum file, a specific processing recipe, a specific literature citation, and a specific human reviewer.
+All three programs sit on top of a single **`/analyze` evidence stack** of forty production-graded layers (Weeks 22–40), an immutable raw FID vault with SHA-256 integrity verification, and a multi-tenant SaaS architecture (FastAPI + Postgres + Next.js + RDKit + nmrglue). The result: any number in a regulatory dossier — a chemical shift, a peak integration, a candidate score — traces back through the platform to a specific spectrum file, a specific processing recipe, a specific literature citation, and a specific human reviewer.
 
 This paper presents the problem, the architectural response, the scientific foundations the platform is calibrated against, the regulatory posture, and a worked technical example.
 
@@ -75,7 +75,7 @@ MolTrace is built on four design commitments that follow from the problems above
 
 ### 4.1 System Overview
 
-The platform consists of a **FastAPI** backend (Python 3.13, ~24 000-line `api.py` plus ~60 domain modules under `nmrcheck/`) and a **Next.js 15** frontend (TypeScript, React 19, shadcn/ui, Plotly for spectra). State is persisted in **PostgreSQL** (SQLite in local dev), raw archives in an immutable file vault, and large-job orchestration in a background-job queue. The build-out follows a strictly additive weekly-release cadence (Weeks 20 → 39 to date) so every existing endpoint and regression test stays green as new evidence layers land.
+The platform consists of a **FastAPI** backend (Python 3.13, ~24 000-line `api.py` plus ~60 domain modules under `nmrcheck/`) and a **Next.js 15** frontend (TypeScript, React 19, shadcn/ui, Plotly for spectra). State is persisted in **PostgreSQL** (SQLite in local dev), raw archives in an immutable file vault, and large-job orchestration in a background-job queue. The build-out follows a strictly additive weekly-release cadence (Weeks 20 → 40 to date) so every existing endpoint and regression test stays green as new evidence layers land.
 
 ```
    ┌──────────────────────────────────────────────────────────────────┐
@@ -85,7 +85,7 @@ The platform consists of a **FastAPI** backend (Python 3.13, ~24 000-line `api.p
               │ /api/backend/*                  │
    ┌──────────▼────────────────────────────────▼─────────────────────┐
    │                    FastAPI Backend (Python)                       │
-   │  Auth · Tenant · 39-layer Evidence Stack · Reports · Audit       │
+   │  Auth · Tenant · 40-layer Evidence Stack · Reports · Audit       │
    └──────────┬────────────────────────────────┬─────────────────────┘
               │                                   │
    ┌──────────▼────────────────┐    ┌────────────▼──────────────────┐
@@ -98,7 +98,7 @@ The platform consists of a **FastAPI** backend (Python 3.13, ~24 000-line `api.p
 
 ### 4.2 The Evidence Engine
 
-The defining feature of MolTrace is the **39-layer evidence engine** built incrementally as Weeks 22 through 39. Each layer is additive — never overwrites a prior layer — and every layer's output is a typed Pydantic model with stable JSON keys so downstream code (and regulators) can rely on the contract.
+The defining feature of MolTrace is the **40-layer evidence engine** built incrementally as Weeks 22 through 40. Each layer is additive — never overwrites a prior layer — and every layer's output is a typed Pydantic model with stable JSON keys so downstream code (and regulators) can rely on the contract.
 
 | Layer | Module | Function |
 |---|---|---|
@@ -120,10 +120,15 @@ The defining feature of MolTrace is the **39-layer evidence engine** built incre
 | 37 | `lcms_grouping.py` | Feature grouping + blank subtraction + RT alignment |
 | 38 | `lcms_consensus.py` | Isotope / adduct consensus + feature-family confidence |
 | 39 | `lcms_confidence_bridge.py` | LC-MS consensus → unified candidate confidence |
+| 40 | `multiplet_jcoupling_bridge.py`, `jcoupling_prediction.py` | Recovered multiplet J-couplings vs. predicted topological couplings → unified candidate confidence |
 
 Critically, **every layer can run on its own** for diagnostic use, **and** is composable into the unified confidence engine when the user has the inputs. A laboratory that has only 1H NMR can use the platform productively today; the same laboratory adding LC-MS next quarter does not need to re-onboard. The same Pydantic models, the same audit pipeline, the same reviewer signoff workflow apply.
 
-Alongside the default 39-layer chain, an **opt-in Mestrenova-style Global Spectral Deconvolution (GSD) analysis backend** is available at the dedicated `POST /spectrum/analyze/gsd` endpoint. GSD performs single-pass peak detection with iterative pseudo-Voigt overlap resolution, classifies every peak into `compound | solvent | impurity | artifact | 13C_satellite` against the curated Fulmer / Gottlieb residual-solvent tables, and clusters multiplet lines into chemical-environment entries so the response can be consumed at either granularity. The GSD backend has cleared its strict production-promotion gate across three independent corpora: the curated NMRShiftDB2 19-fixture corpus (100 % solvent auto-detect, median compound-environment-count delta of 2 vs expert reference), an HMDB-style synthetic 20-fixture multiplet-line corpus (95 % / 100 % within tolerance), and a **real-instrument HMDB 100-fixture corpus** (95 % parseable, 93 % solvent auto-detect) that closes the literal Prompt 3 acceptance criterion of "100 spectra from NMRShiftDB2 + HMDB" on real instrument data. Tenants opt in per request via a frontend toggle; the default `/spectrum/analyze` flow is unchanged so existing pipelines stay green. See the technical white paper §3.1 for the algorithm, validation framework, and per-fixture results.
+Alongside the default 40-layer chain, an **opt-in Mestrenova-style Global Spectral Deconvolution (GSD) analysis backend** is available at the dedicated `POST /spectrum/analyze/gsd` endpoint. GSD performs single-pass peak detection with iterative pseudo-Voigt overlap resolution, classifies every peak into `compound | solvent | impurity | artifact | 13C_satellite` against the curated Fulmer / Gottlieb residual-solvent tables, and clusters multiplet lines into chemical-environment entries so the response can be consumed at either granularity. The GSD backend has cleared its strict production-promotion gate across three independent corpora: the curated NMRShiftDB2 19-fixture corpus (100 % solvent auto-detect, median compound-environment-count delta of 2 vs expert reference), an HMDB-style synthetic 20-fixture multiplet-line corpus (95 % / 100 % within tolerance), and a **real-instrument HMDB 100-fixture corpus** (95 % parseable, 93 % solvent auto-detect) that closes the literal Prompt 3 acceptance criterion of "100 spectra from NMRShiftDB2 + HMDB" on real instrument data. Tenants opt in per request via a frontend toggle; the default `/spectrum/analyze` flow is unchanged so existing pipelines stay green. See the technical white paper §3.1 for the algorithm, validation framework, and per-fixture results.
+
+Building on the GSD-resolved peak list, a **multiplet-analysis backend** (`POST /spectrum/analyze/multiplets`) recovers the J-coupling structure behind each signal — identifying first-order and complex multiplets (singlet through septet, plus dd / dt / td / ddd) and reporting the underlying coupling constants in Hz, the way an expert spectroscopist reads a coupling tree by hand. It clears two literature-grade acceptance gates: all eight diagnostic quinine ¹H multiplets resolved with J values within 0.3 Hz of published reference, and the Mestrenova-manual hidden 11.4 Hz coupling recovered where standard peak picking misses it. A forward-modelled synthetic overlay (rendered in light red over the observed peaks) lets a reviewer visually confirm that the recovered coupling set actually explains the data — a regulatory-grade check rather than an opaque assignment. See the technical white paper §3.2 for the four-stage algorithm and acceptance evidence.
+
+Those recovered couplings are not left as a standalone read-out: a **multiplet J-coupling agreement layer** (Layer 40, `multiplet_jcoupling_bridge.py`) feeds them into the unified confidence engine, scoring how well each candidate SMILES's *predicted* topological couplings — read from RDKit bond topology against empirical literature coupling magnitudes (no 3D geometry required by default, with an optional conformer-averaged Karplus refinement that makes sp³ vicinal couplings geometry-aware, so a conformationally locked ~10 Hz diaxial coupling is recognised as such) — agree with the observed J values, and flagging any candidate whose connectivity simply cannot produce a large observed coupling. Like every cross-modal layer it is opt-in (it contributes only when the request carries observed couplings) and is decision support, never an identity claim. See the technical white paper §3.3.
 
 ### 4.3 Immutable Raw FID Vault
 
@@ -174,7 +179,7 @@ Every applied prior is echoed back in the analyze response under `candidate_comp
 
 ### 4.6 The Unified Confidence Engine
 
-The unified confidence engine (Week 33) is the platform's final decision-support layer. It accepts whatever subset of evidence the laboratory has — predicted NMR matching, HRMS exact mass, MS1 adduct/isotope inference, processed MS/MS annotation, fragmentation-tree reasoning, and LC-MS consensus (via the Week 39 bridge) — and produces:
+The unified confidence engine (Week 33) is the platform's final decision-support layer. It accepts whatever subset of evidence the laboratory has — predicted NMR matching, HRMS exact mass, MS1 adduct/isotope inference, processed MS/MS annotation, fragmentation-tree reasoning, LC-MS consensus (via the Week 39 bridge), and multiplet J-coupling agreement against each candidate's predicted topological couplings (via the Week 40 bridge) — and produces:
 
 - A **ranked candidate list** with normalised confidence scores
 - A **layer-by-layer agreement matrix** showing which evidence layers support which candidate
@@ -219,6 +224,8 @@ A 2024 systematic comparison of NMR predictors (*Magnetic Resonance in Chemistry
 
 The DP4 family of methods (Smith & Goodman 2010,[^smith_goodman_2010] Howarth & Goodman DP4-AI 2020,[^howarth_2020_dp4ai] DP5 2022[^howarth_2022_dp5]) provides Bayesian posteriors over candidate stereochemistry conditioned on observed shifts. The Week 26 candidate-comparison layer uses a transparent heuristic for fast iterative review; the DP4 panel runs in parallel when the user supplies ≥ 2 candidates and observed shifts. The 2024 *DP5 without DFT* paper by Howarth (graph-NN uncertainty calibrated) is referenced in the platform's compute-light DP5 pathway.[^dp5_nodft]
 
+Stereochemistry also enters through coupling constants. The Week 40 multiplet J-coupling layer carries an **optional vicinal-³J refinement** that applies the Karplus relation[^karplus] over an RDKit conformer ensemble, so a candidate whose conformationally locked geometry produces a large antiperiplanar diaxial coupling (≈ 10 Hz) is scored as consistent with a correspondingly large observed J. Validated against a curated corpus of eight literature reference molecules, the refinement reproduces each system's diagnostic vicinal ³J to within ≈ 0.4 Hz on average and cleanly separates the conformationally locked diaxial systems (mean ≈ 9.5 Hz) from mobile, ring-flipping ones (mean ≈ 6.9 Hz) — with no overlap. It is opt-in and decision-support only — geometry-aware discrimination that complements the shift-based DP4 / DP5 panel above, never an identity claim.
+
 ### 5.3 Shift-Window Tables
 
 The categoriser's 1H windows (4.4–6.0 ppm anomeric/vinylic, 6.0–9.0 ppm aromatic/alkene, 9.0–10.0 ppm aldehyde, 10.0–13.5 ppm carboxylic-acid OH) are sourced from the consensus across:
@@ -256,7 +263,7 @@ The FDA's January 2025 *Considerations for the Use of Artificial Intelligence to
 | Define the question of interest | Per-tab analyze targets (1H vs. 13C vs. unified confidence) |
 | Define the context of use | `compound_class` selector + audit-trail context |
 | Assess AI model risk | Transparent multiplier tables + DP4/DP5 panel as fallback |
-| Plan and execute credibility activities | Weekly regression suites (Weeks 22–39) + smoke tests |
+| Plan and execute credibility activities | Weekly regression suites (Weeks 22–40) + smoke tests |
 | Assess model output | Layer-by-layer agreement matrix in unified confidence |
 | Document credibility evidence | Report composer + provenance manifests |
 | Maintain credibility through lifecycle | Recipe-hash-linked reruns + versioned report records |
@@ -346,7 +353,7 @@ Recent LLM-driven assistants[^reasoning_llms][^generative_drug_discovery] offer 
 
 ### 10.2 Conclusion
 
-The thirty-nine evidence layers, the immutable raw vault, the regulatory-ready report composer, the human-review release gate, and the citation-linked literature scaffold described in this paper are, in aggregate, **one thing**: an end-to-end chain of custody from a raw FID file off a Bruker spectrometer to a sentence in a regulatory submission, with every numerical claim along the way reachable and reproducible.
+The forty evidence layers, the immutable raw vault, the regulatory-ready report composer, the human-review release gate, and the citation-linked literature scaffold described in this paper are, in aggregate, **one thing**: an end-to-end chain of custody from a raw FID file off a Bruker spectrometer to a sentence in a regulatory submission, with every numerical claim along the way reachable and reproducible.
 
 This is the foundation pharmaceutical R&D needs to adopt AI-supported analytical chemistry at scale without forfeiting the inspector's trust. The platform is operational, the architecture is additive, the science is grounded in the canonical literature, and the regulatory posture maps directly onto the FDA AI credibility framework and the EMA AI reflection paper. Pharmaceutical R&D, CRO, and academic R&D groups can adopt MolTrace today for routine NMR + MS workflows and grow the platform's role as their multi-modal evidence needs grow.
 
@@ -383,6 +390,8 @@ For information on pilot deployments, integration with Bruker / Agilent instrume
 [^pretsch_2020]: Pretsch E.; Bühlmann P.; Badertscher M. *Structure Determination of Organic Compounds: Tables of Spectral Data*, 5th ed. Springer, 2020. doi:10.1007/978-3-662-62439-5
 
 [^friebolin_2010]: Friebolin H. *Basic One- and Two-Dimensional NMR Spectroscopy*, 5th ed. Wiley-VCH, 2010.
+
+[^karplus]: Karplus M. *Contact Electron-Spin Coupling of Nuclear Magnetic Moments.* J. Chem. Phys. 1959, 30, 11–15. doi:10.1063/1.1729860. See also Karplus M. *Vicinal Proton Coupling in Nuclear Magnetic Resonance.* J. Am. Chem. Soc. 1963, 85, 2870–2871. doi:10.1021/ja00900a059. The three-term form ³J(θ) = A·cos²θ + B·cosθ + C — with the generic constants A = 7.76, B = −1.10, C = 1.40 as tabulated in Pretsch 5e[^pretsch_2020] — underlies Layer 40's opt-in vicinal refinement.
 
 [^gottlieb_1997]: Gottlieb H. E.; Kotlyar V.; Nudelman A. *NMR Chemical Shifts of Common Laboratory Solvents as Trace Impurities.* J. Org. Chem. 1997, 62, 7512. doi:10.1021/jo971176v
 
@@ -430,4 +439,4 @@ For information on pilot deployments, integration with Bruker / Agilent instrume
 
 ---
 
-*© 2026 MolTrace Technologies, Inc. This white paper is intended for informational and evaluation purposes. The platform descriptions reflect the production state as of release 39 (LC-MS Consensus → Unified Confidence Bridge). For pilot evaluation, regulatory-affairs briefings, or technical due-diligence access, contact MolTrace Technologies.*
+*© 2026 MolTrace Technologies, Inc. This white paper is intended for informational and evaluation purposes. The platform descriptions reflect the production state as of release 40 (Multiplet J-Coupling → Unified Confidence Bridge). For pilot evaluation, regulatory-affairs briefings, or technical due-diligence access, contact MolTrace Technologies.*
