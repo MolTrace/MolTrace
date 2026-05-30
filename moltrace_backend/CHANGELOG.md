@@ -14,6 +14,162 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.7.5 — Opt-in Boltzmann conformer-population weighting — the sugar-blind-spot fix (2026-05-30)
+
+**Headline:** v0.7.4 *diagnosed* (and gated) why neither the generic nor the
+HLA Karplus relation recovered the locked sugar diaxials: the unweighted
+conformer mean averages the diagnostic ground-state chair on equal footing
+with high-energy ring-flipped conformers. v0.7.5 ships the **fix** — an opt-in
+**`karplus_conformer_weighting`** field (`'uniform'` | `'boltzmann'`, **default
+`'uniform'`**) that weights each conformer by its MMFF-energy Boltzmann
+population, `wᵢ = exp(-(Eᵢ - E_min)/RT)` at 298.15 K, instead of counting it
+once. The measured corpus effect is decisive and is **locked as a regression
+gate**: it **fixes the β-D-galactose blind spot** (8.49 → **~10.1 Hz**, onto
+its ~9.9 Hz literature value), **widens** the clean locked-vs-mobile separation
+(generic **+1.35 → +2.28 Hz**), and **rescues the HLA collapse** (haasnoot
+**−1.23 → +0.36 Hz**). It also lands a clean scientific result: once
+conformers are population-weighted, the **generic** relation discriminates
+*better* than the electronegativity-corrected HLA one (+2.28 vs +0.36 Hz) — so
+the sugar under-prediction was a conformer-population-weighting gap all along,
+not a Karplus-equation one. Orthogonal to `karplus_method`; **default
+`'uniform'` is byte-for-byte unchanged** (Phase 39/40 gates untouched).
+
+### Added
+- **`haasnoot`-independent Boltzmann weighting in `jcoupling_prediction.py`** —
+  `_boltzmann_weights()` (normalized populations from per-conformer MMFF
+  energies, returns `None` → uniform fallback on missing/non-finite energies),
+  the `BOLTZMANN_RT_KCAL_MOL` / `CONFORMER_WEIGHTING_*` constants, and capture
+  of the energies that `MMFFOptimizeMoleculeConfs` already returns. The
+  per-conformer mean at the heart of the refinement becomes a weighted mean
+  when `'boltzmann'` is selected.
+- **`karplus_conformer_weighting` request field** on
+  `MultipletJCouplingBridgeRequest` and **`multiplet_jcoupling_conformer_weighting`**
+  on `UnifiedCandidateConfidenceRequest` (Pydantic
+  `Literal["uniform","boltzmann"]` default `"uniform"`), threaded through the
+  predictor, the bridge scorer, and the unified forwarder. Both render in
+  `/openapi.json` as string enums.
+- **Weighting axis in the validation harness** — `karplus_validation.py` gains
+  a `weighting=` keyword on `run_fixture`/`run_all`/`build_report`, a
+  `--weighting` CLI flag, and `weighting` in the report summary + per-row
+  output, so the corpus can be graded across the full {method} × {weighting}
+  grid.
+
+### Changed
+- `multiplet_jcoupling_bridge.py` — the provenance note now names the active
+  weighting ("Boltzmann-weighted" vs "unweighted" conformer-averaged), and the
+  metadata dict carries `"karplus_conformer_weighting"`.
+
+### Validation
+- **`tests/test_phase41_boltzmann_weighting.py`** (12 tests) — the weight maths
+  (degenerate energies → uniform; a low-energy conformer dominates; non-finite
+  → `None`), `'uniform'` default-off byte-identity, the sugar-diaxial recovery
+  and the mobile-ring-stays-averaged anchors, determinism, the
+  energies-unavailable uniform fallback with a warning, and bridge / unified /
+  endpoint threading.
+- **`tests/test_phase41_boltzmann_corpus.py`** (6 tests) — the measured corpus
+  recovery across {generic, haasnoot_altona} × {uniform, boltzmann}: galactose
+  fixed, the generic separation widened, the HLA collapse rescued, and
+  generic/boltzmann discriminating better than haasnoot/boltzmann.
+- The **Phase 39 + Phase 40 gates stay byte-identical** (default weighting is
+  `'uniform'`).
+- Full backend regression sweep: **922 passed**, 1 deselected, zero failures
+  (904 v0.7.4 baseline + 18 new Phase 41 tests).
+
+### Compatibility
+- **Contract change — frontend must regenerate `schema.d.ts`.** Two new
+  **optional** request fields (`karplus_conformer_weighting`,
+  `multiplet_jcoupling_conformer_weighting`), each a string enum
+  `["uniform","boltzmann"]` defaulting to `"uniform"`. Callers that omit them
+  are unaffected; the uniform/default predictor path is byte-for-byte
+  unchanged, so every pre-existing response is identical. `npm run
+  generate:openapi` regenerates the typed contract.
+
+---
+
+## v0.7.4 — Opt-in Haasnoot–de Leeuw–Altona generalized Karplus relation + honest negative result (2026-05-30)
+
+**Headline:** The vicinal-³J refinement gains a **second, selectable relation** —
+the Haasnoot–de Leeuw–Altona (HLA) electronegativity/orientation-corrected
+generalization of the Karplus equation (Haasnoot, de Leeuw & Altona,
+*Tetrahedron* 1980) — exposed via a new `karplus_method` field
+(`'generic'` | `'haasnoot_altona'`, **default `'generic'`**). The equation is
+implemented faithfully and unit-tested at known geometries, and **per
+individual conformer it is the more literature-faithful of the two** (it
+recovers the covalently-locked trans-decalin diaxial at **11.64 Hz**, above
+the generic three-term relation's ~10.26 Hz ceiling and on the ~11 Hz
+literature value). **But a candid corpus study — shipped as a regression
+gate — shows HLA does _not_ improve averaged discrimination under the current
+unweighted conformer model**, and we document that openly: its wider dynamic
+range (0→14.7 Hz vs generic 1.4→10.26 Hz) amplifies the unweighted-averaging
+artefact, lifting mobile systems (cyclohexane 7.14→9.17 Hz) and *lowering* the
+very sugar it was meant to fix (β-D-galactose 8.49→**7.94** Hz, away from the
+~9.9 Hz target), so the clean locked-vs-mobile separation **collapses**
+(+1.35 Hz under generic → **−1.23 Hz** under HLA). The diagnosis is the point:
+the sugar blind spot is a **conformer-population-weighting** problem, not a
+Karplus *functional-form* problem — which motivates Boltzmann-weighted
+populations as the next refinement. HLA therefore ships **opt-in and
+default-off**; the generic path is **byte-for-byte unchanged** and remains the
+default.
+
+### Added
+- **`haasnoot_altona_3j(theta_deg, substituents, ...)`** in
+  `src/nmrcheck/jcoupling_prediction.py` — the generalized relation
+  ³J = P₁·cos²φ + P₂·cosφ + P₃ + Σᵢ Δχᵢ·[P₄ + P₅·cos²(ξᵢ·φ + P₆·|Δχᵢ|)] with
+  the six-parameter set (P₁=13.86, P₂=−0.81, P₃=0.0, P₄=0.56, P₅=−2.32,
+  P₆=17.9°). Plus a **Huggins electronegativity table** (`_HUGGINS_ELECTRONEGATIVITY`,
+  Δχ = χ−2.20; unlisted elements degrade safely to Δχ=0.0), the per-conformer
+  ξ orientation sign from 3D geometry, and method/category constants
+  (`KARPLUS_METHOD_*`, `KARPLUS_CATEGORY_HAASNOOT_ALTONA =
+  "aliphatic_vicinal_haasnoot_altona"`).
+- **`karplus_method` request field** on `MultipletJCouplingBridgeRequest` and
+  **`multiplet_jcoupling_karplus_method`** on `UnifiedCandidateConfidenceRequest`
+  (Pydantic `Literal["generic","haasnoot_altona"]` default `"generic"`), threaded
+  through the bridge scorer and the unified forwarder. Both render in
+  `/openapi.json` as string enums.
+- **Method-aware validation harness** — `karplus_validation.py` gains a
+  `method=` keyword on `run_fixture`/`run_all`/`build_report`, a method→category
+  map, a `--method` CLI flag, and `method`/`category` in the report summary +
+  per-row output, so the same corpus can be graded under either relation and
+  the two reports compared head-to-head.
+
+### Changed
+- `multiplet_jcoupling_bridge.py` — the predictor call threads
+  `karplus_method=req.karplus_method`; the provenance note flips to name the
+  active relation ("Haasnoot–Altona generalized Karplus" vs "three-term
+  Karplus"); the metadata dict carries `"karplus_method"`.
+
+### Validation
+- **`tests/test_phase40_haasnoot_altona.py`** (13 tests) — equation correctness
+  at known geometries (curve shape + 13.05/0/14.67 Hz endpoints; sugar-diaxial
+  pulled to ~9.7 Hz; antiperiplanar ξ-sign negligibility), **`karplus_method='generic'`
+  default-off byte-identity**, HLA's own provenance category, determinism under
+  the fixed seed, unknown-method fall-back-to-generic-with-warning, and method
+  threading through bridge / unified / endpoint (asserts
+  `metadata["karplus_method"]=="haasnoot_altona"`).
+- **`tests/test_phase40_haasnoot_altona_corpus.py`** (9 tests) — the HONEST
+  corpus gate. Locks the **win** (trans-decalin recovered above the generic
+  ceiling) AND the measured **negative result**: generic clean-separates but HLA
+  does not; HLA over-predicts mobile systems; HLA amplifies the mobile mean far
+  more than the locked mean; HLA does not fix the β-D-galactose blind spot;
+  HLA within-tol rate (0.75) drops below generic (1.00). Breaking any of these
+  (e.g. by wiring in Boltzmann weighting — the intended Phase 41 change) trips
+  the gate loudly.
+- The **Phase 39 generic gate stays byte-identical** (within-tol 1.00, mean
+  locked 9.50 / mobile 6.90, clean separation +1.35 Hz).
+- Full backend regression sweep: **904 passed**, 1 deselected, zero failures
+  (882 v0.7.3 baseline + 22 new Phase 40 tests).
+
+### Compatibility
+- **Contract change — frontend must regenerate `schema.d.ts`.** Two new
+  **optional** request fields (`karplus_method`,
+  `multiplet_jcoupling_karplus_method`), each a string enum
+  `["generic","haasnoot_altona"]` defaulting to `"generic"`. Existing callers
+  that omit them are unaffected; the generic/default predictor path is
+  byte-for-byte unchanged, so every pre-existing response is identical.
+  `npm run generate:openapi` regenerates the typed contract.
+
+---
+
 ## v0.7.3 — Karplus vicinal-³J validation corpus + measured-accuracy gate (2026-05-28)
 
 **Headline:** The opt-in Karplus refinement shipped in v0.7.2 now has a

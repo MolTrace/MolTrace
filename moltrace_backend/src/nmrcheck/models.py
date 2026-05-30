@@ -1988,6 +1988,10 @@ class UnifiedCandidateConfidenceRequest(BaseModel):
     # See MultipletJCouplingBridgeRequest.karplus_method; "generic" (default)
     # reproduces prior behaviour exactly.
     multiplet_jcoupling_karplus_method: Literal["generic", "haasnoot_altona"] = "generic"
+    # See MultipletJCouplingBridgeRequest.karplus_conformer_weighting; "uniform"
+    # (default) reproduces prior behaviour, "boltzmann" weights conformers by
+    # MMFF energy and recovers diaxial couplings (see CHANGELOG v0.7.5).
+    multiplet_jcoupling_conformer_weighting: Literal["uniform", "boltzmann"] = "uniform"
 
     layer_weights: dict[str, float] = Field(default_factory=dict)
     ambiguity_delta_threshold: float = Field(default=0.05, ge=0.0, le=1.0)
@@ -14808,6 +14812,14 @@ class MultipletJCouplingBridgeRequest(BaseModel):
     # the current unweighted conformer averaging, does not improve the
     # semi-quantitative locked-vs-mobile discrimination (see CHANGELOG v0.7.4).
     karplus_method: Literal["generic", "haasnoot_altona"] = "generic"
+    # How the per-conformer couplings are averaged when use_karplus is True:
+    # "uniform" (default, plain ensemble mean — reproduces prior behaviour) or
+    # "boltzmann" (weight each conformer by exp(-(E-E_min)/RT) from its MMFF
+    # energy so the ground-state geometry dominates).  Boltzmann weighting
+    # recovers the diaxial couplings that unweighted averaging washes out (e.g.
+    # the sugar blind spot); see CHANGELOG v0.7.5.  Falls back to uniform with a
+    # warning when MMFF energies are unavailable.
+    karplus_conformer_weighting: Literal["uniform", "boltzmann"] = "uniform"
 
     @field_validator("sample_id", "compound_class", mode="before")
     @classmethod

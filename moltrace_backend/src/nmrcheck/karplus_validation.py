@@ -49,6 +49,8 @@ from pathlib import Path
 from typing import Any
 
 from nmrcheck.jcoupling_prediction import (
+    CONFORMER_WEIGHTING_DEFAULT,
+    CONFORMER_WEIGHTINGS,
     KARPLUS_CATEGORY_GENERIC,
     KARPLUS_CATEGORY_HAASNOOT_ALTONA,
     KARPLUS_DEFAULT_MAX_CONFORMERS,
@@ -99,6 +101,7 @@ CSV_COLUMNS = [
     "smiles",
     "kind",
     "method",
+    "weighting",
     "row_status",
     "expected_max_vicinal_j_hz",
     "tolerance_hz",
@@ -156,6 +159,7 @@ def run_fixture(
     spec: KarplusFixtureSpec,
     *,
     method: str = KARPLUS_DEFAULT_METHOD,
+    weighting: str = CONFORMER_WEIGHTING_DEFAULT,
     max_conformers: int = KARPLUS_DEFAULT_MAX_CONFORMERS,
     seed: int = KARPLUS_RANDOM_SEED,
 ) -> dict[str, Any]:
@@ -165,15 +169,19 @@ def run_fixture(
             spec.smiles,
             use_karplus=True,
             karplus_method=method,
+            karplus_conformer_weighting=weighting,
             karplus_max_conformers=max_conformers,
             karplus_seed=seed,
         )
     except Exception as exc:  # pragma: no cover - defensive against vendor edge cases
-        return _row_error(spec, f"{type(exc).__name__}: {exc}", method=method)
+        return _row_error(
+            spec, f"{type(exc).__name__}: {exc}", method=method, weighting=weighting
+        )
 
     if result.invalid_structure:
         return _row_error(
-            spec, "invalid_structure", warnings=list(result.warnings), method=method
+            spec, "invalid_structure", warnings=list(result.warnings),
+            method=method, weighting=weighting,
         )
 
     karplus_js = [d.j_hz for d in result.details if d.category == category]
@@ -183,9 +191,10 @@ def run_fixture(
             f"no {category} couplings emitted",
             warnings=list(result.warnings),
             method=method,
+            weighting=weighting,
         )
 
-    return _row_success(spec, result, karplus_js, method=method)
+    return _row_success(spec, result, karplus_js, method=method, weighting=weighting)
 
 
 def _row_success(
@@ -194,6 +203,7 @@ def _row_success(
     karplus_js: list[float],
     *,
     method: str = KARPLUS_DEFAULT_METHOD,
+    weighting: str = CONFORMER_WEIGHTING_DEFAULT,
 ) -> dict[str, Any]:
     predicted_max = max(karplus_js)
     predicted_min = min(karplus_js)
@@ -205,6 +215,7 @@ def _row_success(
         "smiles": spec.smiles,
         "kind": spec.kind,
         "method": method,
+        "weighting": weighting,
         "row_status": "ok",
         "expected_max_vicinal_j_hz": spec.expected_max_vicinal_j_hz,
         "tolerance_hz": spec.tolerance_hz,
@@ -226,6 +237,7 @@ def _row_error(
     *,
     warnings: list[str] | None = None,
     method: str = KARPLUS_DEFAULT_METHOD,
+    weighting: str = CONFORMER_WEIGHTING_DEFAULT,
 ) -> dict[str, Any]:
     return {
         "fixture_id": spec.fixture_id,
@@ -233,6 +245,7 @@ def _row_error(
         "smiles": spec.smiles,
         "kind": spec.kind,
         "method": method,
+        "weighting": weighting,
         "row_status": "error",
         "expected_max_vicinal_j_hz": spec.expected_max_vicinal_j_hz,
         "tolerance_hz": spec.tolerance_hz,
@@ -252,16 +265,23 @@ def run_all(
     fixtures_root: Path,
     *,
     method: str = KARPLUS_DEFAULT_METHOD,
+    weighting: str = CONFORMER_WEIGHTING_DEFAULT,
     max_conformers: int = KARPLUS_DEFAULT_MAX_CONFORMERS,
     seed: int = KARPLUS_RANDOM_SEED,
     bundle_filename: str = DEFAULT_BUNDLE_FILENAME,
 ) -> dict[str, Any]:
     specs = load_fixture_specs(fixtures_root, bundle_filename=bundle_filename)
     rows = [
-        run_fixture(spec, method=method, max_conformers=max_conformers, seed=seed)
+        run_fixture(
+            spec, method=method, weighting=weighting,
+            max_conformers=max_conformers, seed=seed,
+        )
         for spec in specs
     ]
-    return build_report(rows, method=method, max_conformers=max_conformers, seed=seed)
+    return build_report(
+        rows, method=method, weighting=weighting,
+        max_conformers=max_conformers, seed=seed,
+    )
 
 
 def _mean(values: list[float]) -> float | None:
@@ -283,6 +303,7 @@ def build_report(
     rows: list[dict[str, Any]],
     *,
     method: str = KARPLUS_DEFAULT_METHOD,
+    weighting: str = CONFORMER_WEIGHTING_DEFAULT,
     max_conformers: int = KARPLUS_DEFAULT_MAX_CONFORMERS,
     seed: int = KARPLUS_RANDOM_SEED,
 ) -> dict[str, Any]:
@@ -317,6 +338,7 @@ def build_report(
         "report_version": REPORT_VERSION,
         "generated_at": datetime.now(UTC).isoformat(),
         "method": method,
+        "weighting": weighting,
         "category": category_for_method(method),
         "max_conformers": max_conformers,
         "seed": seed,
@@ -391,6 +413,16 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--weighting",
+        type=str,
+        default=CONFORMER_WEIGHTING_DEFAULT,
+        choices=list(CONFORMER_WEIGHTINGS),
+        help=(
+            "Conformer-population weighting: 'uniform' (plain ensemble mean) or "
+            "'boltzmann' (MMFF-energy Boltzmann weights, ground state dominates)."
+        ),
+    )
+    parser.add_argument(
         "--max-conformers",
         type=int,
         default=KARPLUS_DEFAULT_MAX_CONFORMERS,
@@ -414,6 +446,7 @@ def main() -> int:
     report = run_all(
         fixtures_root,
         method=args.method,
+        weighting=args.weighting,
         max_conformers=args.max_conformers,
         seed=args.seed,
         bundle_filename=args.bundle,
