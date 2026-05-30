@@ -24937,6 +24937,28 @@ export interface components {
              * @default 1
              */
             min_observed_hz: number;
+            /**
+             * Use Karplus
+             * @default false
+             */
+            use_karplus: boolean;
+            /**
+             * Karplus Max Conformers
+             * @default 12
+             */
+            karplus_max_conformers: number;
+            /**
+             * Karplus Method
+             * @default generic
+             * @enum {string}
+             */
+            karplus_method: "generic" | "haasnoot_altona";
+            /**
+             * Karplus Conformer Weighting
+             * @default uniform
+             * @enum {string}
+             */
+            karplus_conformer_weighting: "uniform" | "boltzmann";
         };
         /**
          * MultipletJCouplingBridgeResult
@@ -36123,6 +36145,28 @@ export interface components {
              * @default 0.1
              */
             multiplet_jcoupling_layer_weight: number;
+            /**
+             * Multiplet Jcoupling Use Karplus
+             * @default false
+             */
+            multiplet_jcoupling_use_karplus: boolean;
+            /**
+             * Multiplet Jcoupling Max Conformers
+             * @default 12
+             */
+            multiplet_jcoupling_max_conformers: number;
+            /**
+             * Multiplet Jcoupling Karplus Method
+             * @default generic
+             * @enum {string}
+             */
+            multiplet_jcoupling_karplus_method: "generic" | "haasnoot_altona";
+            /**
+             * Multiplet Jcoupling Conformer Weighting
+             * @default uniform
+             * @enum {string}
+             */
+            multiplet_jcoupling_conformer_weighting: "uniform" | "boltzmann";
             /** Layer Weights */
             layer_weights?: {
                 [key: string]: number;

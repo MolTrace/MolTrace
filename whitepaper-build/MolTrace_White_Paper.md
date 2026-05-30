@@ -7,7 +7,7 @@
 ---
 
 **A MolTrace Technologies, Inc. White Paper**
-Document version: 2026-Q2 · Hybrid (business + technical) · Approx. 5,200 words
+Document version: 2026-Q2 · rev 2026-05-30 · Hybrid (business + technical) · Approx. 5,200 words
 
 > *"Scientific intelligence has to be reproducible to be useful, auditable to be acceptable, and integrated to be adopted."*
 
@@ -224,7 +224,7 @@ A 2024 systematic comparison of NMR predictors (*Magnetic Resonance in Chemistry
 
 The DP4 family of methods (Smith & Goodman 2010,[^smith_goodman_2010] Howarth & Goodman DP4-AI 2020,[^howarth_2020_dp4ai] DP5 2022[^howarth_2022_dp5]) provides Bayesian posteriors over candidate stereochemistry conditioned on observed shifts. The Week 26 candidate-comparison layer uses a transparent heuristic for fast iterative review; the DP4 panel runs in parallel when the user supplies ≥ 2 candidates and observed shifts. The 2024 *DP5 without DFT* paper by Howarth (graph-NN uncertainty calibrated) is referenced in the platform's compute-light DP5 pathway.[^dp5_nodft]
 
-Stereochemistry also enters through coupling constants. The Week 40 multiplet J-coupling layer carries an **optional vicinal-³J refinement** that applies the Karplus relation[^karplus] over an RDKit conformer ensemble, so a candidate whose conformationally locked geometry produces a large antiperiplanar diaxial coupling (≈ 10 Hz) is scored as consistent with a correspondingly large observed J. Validated against a curated corpus of eight literature reference molecules, the refinement reproduces each system's diagnostic vicinal ³J to within ≈ 0.4 Hz on average and cleanly separates the conformationally locked diaxial systems (mean ≈ 9.5 Hz) from mobile, ring-flipping ones (mean ≈ 6.9 Hz) — with no overlap. It is opt-in and decision-support only — geometry-aware discrimination that complements the shift-based DP4 / DP5 panel above, never an identity claim.
+Stereochemistry also enters through coupling constants. The Week 40 multiplet J-coupling layer carries an **optional vicinal-³J refinement** that applies the Karplus relation[^karplus] over an RDKit conformer ensemble, so a candidate whose conformationally locked geometry produces a large antiperiplanar diaxial coupling (≈ 10 Hz) is scored as consistent with a correspondingly large observed J. Validated against a curated corpus of eight literature reference molecules, the refinement reproduces each system's diagnostic vicinal ³J to within ≈ 0.4 Hz on average and cleanly separates the conformationally locked diaxial systems (mean ≈ 9.5 Hz) from mobile, ring-flipping ones (mean ≈ 6.9 Hz) — with no overlap. It is opt-in and decision-support only — geometry-aware discrimination that complements the shift-based DP4 / DP5 panel above, never an identity claim. A further opt-in setting offers the Haasnoot–de Leeuw–Altona electronegativity-corrected generalization of the Karplus relation;[^haasnoot] it is more faithful per individual conformer (recovering a covalently locked diaxial coupling above the generic relation's ceiling), but a transparent corpus study showed it does **not** improve the averaged locked-vs-mobile discrimination under the platform's current unweighted conformer model — a candid negative result that ships default-off (the validated generic relation stays the default) and motivated the next refinement. That refinement — an opt-in **Boltzmann conformer-population weighting** that weights each conformer by its MMFF-energy population instead of counting it once — then resolved the underlying problem: it moves the worst-case sugar diaxial (β-D-galactose) from ≈ 8.5 Hz onto its ≈ 9.9 Hz literature value and *widens* the clean locked-vs-mobile separation, confirming the sugar blind spot was a conformer-population-weighting gap, not a Karplus-equation one. It too is opt-in and default-off.
 
 ### 5.3 Shift-Window Tables
 
@@ -392,6 +392,8 @@ For information on pilot deployments, integration with Bruker / Agilent instrume
 [^friebolin_2010]: Friebolin H. *Basic One- and Two-Dimensional NMR Spectroscopy*, 5th ed. Wiley-VCH, 2010.
 
 [^karplus]: Karplus M. *Contact Electron-Spin Coupling of Nuclear Magnetic Moments.* J. Chem. Phys. 1959, 30, 11–15. doi:10.1063/1.1729860. See also Karplus M. *Vicinal Proton Coupling in Nuclear Magnetic Resonance.* J. Am. Chem. Soc. 1963, 85, 2870–2871. doi:10.1021/ja00900a059. The three-term form ³J(θ) = A·cos²θ + B·cosθ + C — with the generic constants A = 7.76, B = −1.10, C = 1.40 as tabulated in Pretsch 5e[^pretsch_2020] — underlies Layer 40's opt-in vicinal refinement.
+
+[^haasnoot]: Haasnoot C. A. G.; de Leeuw F. A. A. M.; Altona C. *The relationship between proton-proton NMR coupling constants and substituent electronegativities — I. An empirical generalization of the Karplus equation.* Tetrahedron 1980, 36, 2783–2792. doi:10.1016/0040-4020(80)80155-4. Adds substituent-electronegativity (Huggins Δχ) and orientation (ξ = ±1) corrections to the bare Karplus cosine series; available in MolTrace as the opt-in, default-off `karplus_method='haasnoot_altona'` vicinal refinement.
 
 [^gottlieb_1997]: Gottlieb H. E.; Kotlyar V.; Nudelman A. *NMR Chemical Shifts of Common Laboratory Solvents as Trace Impurities.* J. Org. Chem. 1997, 62, 7512. doi:10.1021/jo971176v
 

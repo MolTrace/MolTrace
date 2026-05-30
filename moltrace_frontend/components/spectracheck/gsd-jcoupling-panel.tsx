@@ -134,6 +134,29 @@ export function parseCandidatesFromText(text: string): CandidateInput[] {
   return items
 }
 
+/**
+ * Karplus 3D-refinement options (v0.7.2 → v0.7.5). All optional on the
+ * wire (each defaulted server-side); we always send explicit values so
+ * the typed request — where openapi-typescript renders defaulted fields
+ * as required — type-checks. `use_karplus=false` reproduces the
+ * byte-identical topological-empirical prediction; method + weighting
+ * only bite when `use_karplus=true`.
+ */
+type KarplusMethod = MultipletJCouplingBridgeRequest["karplus_method"]
+type KarplusWeighting = MultipletJCouplingBridgeRequest["karplus_conformer_weighting"]
+export type KarplusOptions = {
+  useKarplus: boolean
+  method: KarplusMethod
+  weighting: KarplusWeighting
+  maxConformers: number
+}
+const DEFAULT_KARPLUS: KarplusOptions = {
+  useKarplus: false,
+  method: "generic",
+  weighting: "uniform",
+  maxConformers: 12,
+}
+
 // ── J-coupling bridge hook ─────────────────────────────────────────────
 type JCouplingState =
   | { status: "idle"; result: null; error: null }
@@ -146,6 +169,7 @@ function useJCouplingBridge(
   candidates: CandidateInput[],
   sampleId: string | null,
   compoundClass: string | null,
+  karplus: KarplusOptions,
 ): JCouplingState {
   const [state, setState] = useState<JCouplingState>({
     status: "idle",
@@ -182,6 +206,13 @@ function useJCouplingBridge(
       sigma_hz: 1.6,
       contradiction_j_hz: 12.0,
       min_observed_hz: 1.0,
+      // Karplus 3D refinement (v0.7.2 → v0.7.5). Sent explicitly so the
+      // typed request compiles; `use_karplus=false` is the byte-identical
+      // topological-empirical default.
+      use_karplus: karplus.useKarplus,
+      karplus_max_conformers: karplus.maxConformers,
+      karplus_method: karplus.method,
+      karplus_conformer_weighting: karplus.weighting,
     }
     apiFetch<MultipletJCouplingBridgeResult>("/candidates/compare/jcoupling", {
       method: "POST",
@@ -205,7 +236,17 @@ function useJCouplingBridge(
     // candidatesKey serialises the candidates list; multipletState's
     // .result identity changes per GSD run via the WeakMap cache.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [multipletState.status, multipletState.status === "ready" ? multipletState.result : null, candidatesKey, sampleId, compoundClass])
+  }, [
+    multipletState.status,
+    multipletState.status === "ready" ? multipletState.result : null,
+    candidatesKey,
+    sampleId,
+    compoundClass,
+    karplus.useKarplus,
+    karplus.method,
+    karplus.weighting,
+    karplus.maxConformers,
+  ])
   return state
 }
 
@@ -235,12 +276,14 @@ export function GsdJCouplingPanel({
   testId = "gsd-jcoupling-results-surface",
 }: GsdJCouplingPanelProps) {
   const candidates = useMemo(() => parseCandidatesFromText(candidatesText), [candidatesText])
+  const [karplus, setKarplus] = useState<KarplusOptions>(DEFAULT_KARPLUS)
   const multipletState = useGsdMultipletAnalysis(gsdResult, toleranceHz)
   const bridgeState = useJCouplingBridge(
     multipletState,
     candidates,
     sampleId?.trim() || null,
     compoundClass?.trim() || null,
+    karplus,
   )
 
   if (gsdResult == null) return null
@@ -292,7 +335,8 @@ export function GsdJCouplingPanel({
   if (bridgeState.status === "loading") {
     return (
       <PanelShell title="J-coupling vs candidates" hint={`Scoring ${candidates.length} candidate${candidates.length === 1 ? "" : "s"} against the observed J set…`} testId={`${testId}-loading`}>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <KarplusControls karplus={karplus} onChange={setKarplus} busy />
+        <div className="mt-4 flex items-center gap-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           POST /candidates/compare/jcoupling…
         </div>
@@ -302,7 +346,10 @@ export function GsdJCouplingPanel({
   if (bridgeState.status === "error") {
     return (
       <PanelShell title="J-coupling vs candidates" hint="Bridge endpoint returned an error." testId={`${testId}-error`}>
-        <AlertCard variant="error" title="J-coupling bridge failed" description={bridgeState.error} />
+        <KarplusControls karplus={karplus} onChange={setKarplus} />
+        <div className="mt-4">
+          <AlertCard variant="error" title="J-coupling bridge failed" description={bridgeState.error} />
+        </div>
       </PanelShell>
     )
   }
@@ -324,6 +371,9 @@ export function GsdJCouplingPanel({
         className="min-w-0 overflow-visible shadow-none"
       >
         <div className="space-y-4">
+          {/* J-prediction model controls (v0.7.2 → v0.7.5) */}
+          <KarplusControls karplus={karplus} onChange={setKarplus} />
+
           {/* Banner row — best match + contradiction summary */}
           <div className="flex flex-wrap items-center gap-2">
             {best ? (
@@ -481,6 +531,148 @@ function scoreColorClass(score: number): string {
   if (score >= 0.5) return "text-sky-600 dark:text-sky-400"
   if (score >= 0.25) return "text-amber-600 dark:text-amber-400"
   return "text-rose-600 dark:text-rose-400"
+}
+
+/**
+ * J-prediction model controls — opt into Karplus 3D refinement and pick
+ * the relation + conformer weighting. Default-off reproduces the
+ * byte-identical topological-empirical prediction. Decision-support: the
+ * tooltips spell out the measured corpus trade-offs from v0.7.4/v0.7.5
+ * so a reviewer chooses deliberately, not blindly.
+ */
+function KarplusControls({
+  karplus,
+  onChange,
+  busy = false,
+}: {
+  karplus: KarplusOptions
+  onChange: (next: KarplusOptions) => void
+  busy?: boolean
+}) {
+  const seg = (active: boolean) =>
+    cn(
+      "px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors disabled:cursor-wait disabled:opacity-60",
+      active ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted/40",
+    )
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed bg-muted/20 px-3 py-2 text-sm">
+      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        J prediction model
+      </span>
+      <div role="radiogroup" aria-label="J prediction model" className="inline-flex overflow-hidden rounded-md border bg-card">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={!karplus.useKarplus}
+          disabled={busy}
+          onClick={() => onChange({ ...karplus, useKarplus: false })}
+          className={seg(!karplus.useKarplus)}
+          title="Topological-empirical prediction from RDKit bond topology — fast, no 3D geometry. The byte-identical default."
+        >
+          Topological
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={karplus.useKarplus}
+          disabled={busy}
+          onClick={() =>
+            onChange(
+              // Fresh opt-in lands on the v0.7.5 recommended combo
+              // (generic + Boltzmann); re-clicking while already on
+              // preserves the reviewer's current choices.
+              karplus.useKarplus
+                ? { ...karplus, useKarplus: true }
+                : { ...karplus, useKarplus: true, method: "generic", weighting: "boltzmann" },
+            )
+          }
+          className={cn(seg(karplus.useKarplus), "border-l")}
+          title="Karplus 3D refinement — RDKit embeds a conformer ensemble (ETKDGv3 + MMFF) and reads each H–C–C–H dihedral. Sharper for conformationally locked vicinal couplings. Opt-in lands on the recommended Generic + Boltzmann combo."
+        >
+          Karplus 3D
+        </button>
+      </div>
+
+      {karplus.useKarplus ? (
+        <>
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            Relation
+          </span>
+          <div role="radiogroup" aria-label="Karplus relation" className="inline-flex overflow-hidden rounded-md border bg-card">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={karplus.method === "generic"}
+              disabled={busy}
+              onClick={() => onChange({ ...karplus, method: "generic" })}
+              className={seg(karplus.method === "generic")}
+              title="Three-term Karplus relation ³J = A·cos²θ + B·cosθ + C. Under Boltzmann weighting (v0.7.5) it discriminates locked-vs-mobile better than HLA."
+            >
+              Generic
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={karplus.method === "haasnoot_altona"}
+              disabled={busy}
+              onClick={() => onChange({ ...karplus, method: "haasnoot_altona" })}
+              className={cn(seg(karplus.method === "haasnoot_altona"), "border-l")}
+              title="Haasnoot–de Leeuw–Altona electronegativity/orientation-corrected generalization. More literature-faithful per individual conformer; wider dynamic range."
+            >
+              Haasnoot–Altona
+            </button>
+          </div>
+
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            Weighting
+          </span>
+          <div role="radiogroup" aria-label="Conformer weighting" className="inline-flex overflow-hidden rounded-md border bg-card">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={karplus.weighting === "uniform"}
+              disabled={busy}
+              onClick={() => onChange({ ...karplus, weighting: "uniform" })}
+              className={seg(karplus.weighting === "uniform")}
+              title="Average every embedded conformer equally."
+            >
+              Uniform
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={karplus.weighting === "boltzmann"}
+              disabled={busy}
+              onClick={() => onChange({ ...karplus, weighting: "boltzmann" })}
+              className={cn(seg(karplus.weighting === "boltzmann"), "border-l")}
+              title="Weight each conformer by its MMFF-energy Boltzmann population at 298 K. Fixes the sugar-diaxial blind spot (v0.7.5). Recommended with the Generic relation."
+            >
+              Boltzmann
+              {karplus.method === "generic" ? (
+                <span className="ml-1 opacity-70" aria-hidden>★</span>
+              ) : null}
+            </button>
+          </div>
+          {karplus.method === "generic" && karplus.weighting === "boltzmann" ? (
+            <span
+              className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em]"
+              style={{ color: "var(--mt-teal)" }}
+            >
+              ✓ recommended combo · slower (3D embed)
+            </span>
+          ) : (
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              recommended: Generic + Boltzmann · slower (3D embed)
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          default · byte-identical · fast
+        </span>
+      )}
+    </div>
+  )
 }
 
 function BestMatchBanner({ match }: { match: MultipletJCouplingCandidateMatch }) {

@@ -292,6 +292,7 @@ def _bridge_multiplet_jcoupling_request(
         min_observed_hz=req.multiplet_jcoupling_min_observed_hz,
         use_karplus=req.multiplet_jcoupling_use_karplus,
         karplus_method=req.multiplet_jcoupling_karplus_method,
+        karplus_conformer_weighting=req.multiplet_jcoupling_conformer_weighting,
         karplus_max_conformers=req.multiplet_jcoupling_max_conformers,
     )
 

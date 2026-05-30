@@ -115,6 +115,7 @@ def _score_candidate(
         use_karplus=req.use_karplus,
         karplus_method=req.karplus_method,
         karplus_max_conformers=req.karplus_max_conformers,
+        karplus_conformer_weighting=req.karplus_conformer_weighting,
     )
     max_observed = max(observed) if observed else None
 
@@ -321,9 +322,14 @@ def score_multiplets_against_candidates(
             if req.karplus_method == "haasnoot_altona"
             else "three-term Karplus"
         )
+        weighting_note = (
+            "Boltzmann-weighted"
+            if req.karplus_conformer_weighting == "boltzmann"
+            else "unweighted"
+        )
         jmethod = (
-            f"aliphatic vicinal couplings refined with a conformer-averaged {relation} 3J "
-            "(opt-in); alkene/aromatic categories use empirical regions"
+            f"aliphatic vicinal couplings refined with a {weighting_note} conformer-averaged "
+            f"{relation} 3J (opt-in); alkene/aromatic categories use empirical regions"
         )
     else:
         jmethod = "empirical regions, no Karplus/3D"
@@ -358,6 +364,7 @@ def score_multiplets_against_candidates(
             "min_observed_hz": req.min_observed_hz,
             "use_karplus": req.use_karplus,
             "karplus_method": req.karplus_method,
+            "karplus_conformer_weighting": req.karplus_conformer_weighting,
             "karplus_max_conformers": req.karplus_max_conformers,
             "compound_class": req.compound_class,
         },

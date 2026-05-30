@@ -137,6 +137,23 @@ KARPLUS_DEFAULT_METHOD = KARPLUS_METHOD_GENERIC
 KARPLUS_CATEGORY_GENERIC = "aliphatic_vicinal_karplus"
 KARPLUS_CATEGORY_HAASNOOT_ALTONA = "aliphatic_vicinal_haasnoot_altona"
 
+# --- Opt-in Boltzmann conformer-population weighting -------------------------
+# The refinement above averages each H-C-C-H dihedral *unweighted* across the
+# ETKDG ensemble, which over-weights high-energy ring-flipped conformers and
+# washes out the diagnostic ground-state diaxial of strongly-anchored systems.
+# The opt-in ``conformer_weighting='boltzmann'`` setting replaces the uniform
+# mean with a Boltzmann-weighted one, w_i = exp(-(E_i - E_min)/RT), using the
+# per-conformer MMFF energies (kcal/mol) returned by MMFFOptimizeMoleculeConfs.
+# It is orthogonal to ``karplus_method`` (it weights whichever relation is in
+# use) and degrades safely to uniform averaging when energies are unavailable.
+BOLTZMANN_GAS_CONSTANT_KCAL = 1.987204259e-3  # R, kcal/(mol*K)
+BOLTZMANN_TEMPERATURE_K = 298.15  # standard ambient temperature
+BOLTZMANN_RT_KCAL_MOL = BOLTZMANN_GAS_CONSTANT_KCAL * BOLTZMANN_TEMPERATURE_K  # ~0.5925
+CONFORMER_WEIGHTING_UNIFORM = "uniform"
+CONFORMER_WEIGHTING_BOLTZMANN = "boltzmann"
+CONFORMER_WEIGHTINGS = (CONFORMER_WEIGHTING_UNIFORM, CONFORMER_WEIGHTING_BOLTZMANN)
+CONFORMER_WEIGHTING_DEFAULT = CONFORMER_WEIGHTING_UNIFORM
+
 
 def karplus_3j(
     theta_deg: float,
@@ -364,11 +381,31 @@ def _compact(values: list[float], tolerance: float) -> list[float]:
     return sorted(means, reverse=True)
 
 
+def _boltzmann_weights(
+    energies: list[float], *, rt_kcal_mol: float = BOLTZMANN_RT_KCAL_MOL
+) -> list[float] | None:
+    """Normalized Boltzmann weights from per-conformer MMFF energies (kcal/mol).
+
+    ``w_i = exp(-(E_i - E_min) / RT)`` then normalized to sum to 1.  Returns
+    ``None`` when the energies are unusable (empty or non-finite) so the caller
+    can fall back to uniform averaging rather than crash or silently mis-weight.
+    """
+    if not energies or any(not math.isfinite(e) for e in energies):
+        return None
+    e_min = min(energies)
+    weights = [math.exp(-(e - e_min) / rt_kcal_mol) for e in energies]
+    total = math.fsum(weights)
+    if not math.isfinite(total) or total <= 0.0:
+        return None
+    return [w / total for w in weights]
+
+
 def _refine_vicinal_with_karplus(
     mol: Chem.Mol,
     details: list[PredictedCoupling],
     *,
     method: str = KARPLUS_DEFAULT_METHOD,
+    weighting: str = CONFORMER_WEIGHTING_DEFAULT,
     max_conformers: int,
     seed: int,
     warnings: list[str],
@@ -401,6 +438,13 @@ def _refine_vicinal_with_karplus(
     refined_category = (
         KARPLUS_CATEGORY_HAASNOOT_ALTONA if use_hla else KARPLUS_CATEGORY_GENERIC
     )
+    if weighting not in CONFORMER_WEIGHTINGS:
+        warnings.append(
+            f"Unknown conformer_weighting {weighting!r}; falling back to uniform "
+            "conformer averaging."
+        )
+        weighting = CONFORMER_WEIGHTING_UNIFORM
+    use_boltzmann = weighting == CONFORMER_WEIGHTING_BOLTZMANN
 
     aliphatic = [d for d in details if d.category == "aliphatic_vicinal"]
     if not aliphatic:
@@ -428,10 +472,30 @@ def _refine_vicinal_with_karplus(
             "empirical freely-rotating value (~7.0 Hz)."
         )
         return details
+    opt_res = None
     try:
-        AllChem.MMFFOptimizeMoleculeConfs(mol_h, maxIters=200)
+        opt_res = AllChem.MMFFOptimizeMoleculeConfs(mol_h, maxIters=200)
     except Exception:  # pragma: no cover - best-effort geometry cleanup
         pass
+
+    # Boltzmann population weights (opt-in) from the per-conformer MMFF energies.
+    # MMFFOptimizeMoleculeConfs returns [(converged_flag, energy_kcal_mol), ...]
+    # aligned with the conformer order; a flag of -1 means MMFF could not be set
+    # up for this molecule, so those energies are unreliable -> uniform fallback.
+    weight_by_cid: dict[int, float] | None = None
+    if use_boltzmann:
+        energies: list[float] | None = None
+        if opt_res is not None and len(opt_res) == len(conf_ids):
+            if not any(int(flag) == -1 for flag, _ in opt_res):
+                energies = [float(energy) for _, energy in opt_res]
+        norm = _boltzmann_weights(energies) if energies is not None else None
+        if norm is None:
+            warnings.append(
+                "MMFF conformer energies unavailable; Boltzmann weighting fell back "
+                "to uniform conformer averaging."
+            )
+        else:
+            weight_by_cid = {conf_ids[i]: norm[i] for i in range(len(conf_ids))}
 
     refined: list[PredictedCoupling] = []
     measured_any = False
@@ -486,10 +550,15 @@ def _refine_vicinal_with_karplus(
                         values.append(karplus_3j(phi))
                 if values:
                     measured_any = True
+                    if weight_by_cid is not None:
+                        w = [weight_by_cid[cid] for cid in conf_ids]
+                        mean = math.fsum(wi * vi for wi, vi in zip(w, values)) / math.fsum(w)
+                    else:
+                        mean = sum(values) / len(values)
                     refined.append(
                         PredictedCoupling(
                             refined_category,
-                            round(sum(values) / len(values), 2),
+                            round(mean, 2),
                             (c1, c2),
                         )
                     )
@@ -504,6 +573,7 @@ def predict_proton_couplings_from_smiles(
     use_karplus: bool = False,
     karplus_method: str = KARPLUS_DEFAULT_METHOD,
     karplus_max_conformers: int = KARPLUS_DEFAULT_MAX_CONFORMERS,
+    karplus_conformer_weighting: str = CONFORMER_WEIGHTING_DEFAULT,
     karplus_seed: int = KARPLUS_RANDOM_SEED,
 ) -> PredictedCouplingSet:
     """Predict the compact set of diagnostic 1H-1H couplings (Hz) for a SMILES.
@@ -518,10 +588,15 @@ def predict_proton_couplings_from_smiles(
     ``karplus_seed`` for reproducibility).  ``karplus_method`` selects the
     relation: ``"generic"`` (default) uses the three-term Karplus curve, while
     ``"haasnoot_altona"`` applies the electronegativity/orientation-corrected
-    Haasnoot-de Leeuw-Altona generalized Karplus relation.  This is opt-in
-    decision support: the default (topology-only) path is byte-for-byte
-    unchanged, and ``use_karplus=True`` with the default ``"generic"`` method is
-    identical to prior behaviour.
+    Haasnoot-de Leeuw-Altona generalized Karplus relation.
+    ``karplus_conformer_weighting`` selects how the per-conformer couplings are
+    averaged: ``"uniform"`` (default) takes the plain ensemble mean, while
+    ``"boltzmann"`` weights each conformer by ``exp(-(E-E_min)/RT)`` from its
+    MMFF energy so the ground-state geometry dominates (falling back to uniform
+    with a warning if energies are unavailable).  This is opt-in decision
+    support: the default (topology-only) path is byte-for-byte unchanged, and
+    ``use_karplus=True`` with the default ``"generic"`` method + ``"uniform"``
+    weighting is identical to prior behaviour.
     """
     smiles_key = (smiles or "").strip()
     try:
@@ -538,6 +613,7 @@ def predict_proton_couplings_from_smiles(
             mol,
             details,
             method=karplus_method,
+            weighting=karplus_conformer_weighting,
             max_conformers=karplus_max_conformers,
             seed=karplus_seed,
             warnings=warnings,

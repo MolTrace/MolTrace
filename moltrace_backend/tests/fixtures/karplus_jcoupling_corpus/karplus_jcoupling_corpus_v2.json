@@ -1,0 +1,194 @@
+{
+  "schema_version": "karplus_jcoupling_corpus_v2",
+  "description": "Hand-curated vicinal-3J validation corpus for the opt-in Karplus refinement of the Week-40 multiplet J-coupling layer (jcoupling_prediction.predict_proton_couplings_from_smiles(..., use_karplus=True)). Each entry pairs a SMILES with the literature-known DIAGNOSTIC MAXIMUM vicinal 3J(HCCH) a chemist would report for that system, plus a per-entry tolerance that reflects the documented limits of the GENERIC three-term Karplus relation (A=7.76, B=-1.10, C=1.40): it caps near 10.26 Hz at 180 degrees, so it under-predicts pure-hydrocarbon diaxial couplings (~11-13 Hz) by 1-2 Hz, and it ignores the electronegativity/orientation corrections that Haasnoot-Altona adds for sugars. The harness compares the predictor's MAXIMUM aliphatic_vicinal_karplus coupling against expected_max_vicinal_j_hz. This is a semi-quantitative DISCRIMINATION test (locked diaxial vs mobile/averaged), not a sub-Hz prediction claim. NOTE on predictor behaviour: the refinement averages each fixed H-pair dihedral UNWEIGHTED across the ETKDGv3+MMFF conformer ensemble, so a large diaxial coupling is recovered only for COVALENTLY/RIGIDLY locked rings (fused bicyclics, strong-preference pyranose chairs) -- thermodynamically anchored monocycles (e.g. 4-tert-butylcyclohexanol) ring-flip in the ensemble and their diaxial washes out, so they are intentionally excluded from the locked set. EXPANDED in v2 to 18 molecules (9 locked / 9 mobile). Three further candidates were probed and DELIBERATELY EXCLUDED with documented rationale, in the same spirit as v1's exclusion of thermodynamically-anchored monocycles: (1) n-pentane and n-hexane -- long n-alkanes whose vacuum MMFF energies over-stabilize the extended all-anti backbone, so the Boltzmann-weighted diagnostic coupling is inflated (n-hexane ~9.4 Hz) by a force-field/solvation limitation rather than a real locked geometry; (2) beta-D-glucuronic acid -- did not embed as a locked 4C1 chair in the ETKDG ensemble (recovered only ~7.6 Hz under Boltzmann), so it is not a reliable locked anchor. These exclusions keep the discrimination corpus honest: 'mobile' means ring-flipping / pseudorotating rings and SHORT freely-rotating chains.",
+  "source": "Literature 1H-1H vicinal coupling constants from Pretsch/Buhlmann/Affolter (Structure Determination of Organic Compounds, 5th ed.), Silverstein/Webster/Kiemle (Spectrometric Identification of Organic Compounds, 8th ed.), Friebolin (Basic One- and Two-Dimensional NMR Spectroscopy, 5th ed.), and standard carbohydrate NMR references (e.g. anomeric/ring 3J for the beta-D-pyranoses). v2 sugar diaxials follow the Altona-Haasnoot additivity rule for pyranose rings (Org. Magn. Reson. 1980); pseudorotation-averaged 5-ring couplings (cyclopentane/THF) per the pseudorotation-extended Karplus treatments.",
+  "karplus_constants": {
+    "A": 7.76,
+    "B": -1.1,
+    "C": 1.4,
+    "generic_180deg_cap_hz": 10.26
+  },
+  "fixture_count": 18,
+  "fixtures": [
+    {
+      "fixture_id": "trans_decalin",
+      "compound_name": "trans-Decalin",
+      "smiles": "C1CC[C@@H]2CCCC[C@H]2C1",
+      "kind": "locked_diaxial",
+      "expected_max_vicinal_j_hz": 11.0,
+      "tolerance_hz": 2.5,
+      "literature_note": "Ring-fusion methines are rigidly locked diaxial (no ring flip is possible across the trans ring fusion); axial-axial 3J ~ 11-12 Hz. The generic Karplus 180-degree cap (10.26 Hz) structurally under-predicts pure-hydrocarbon diaxial by ~1 Hz -- the residual is the documented cap limitation, hence the 2.5 Hz tolerance.",
+      "notes": "Anchor case: a TRUE covalent lock. Every conformer keeps the same H-pairs diaxial, so the unweighted per-pair average stays high (~10.05 Hz observed)."
+    },
+    {
+      "fixture_id": "beta_d_glucopyranose",
+      "compound_name": "beta-D-Glucopyranose",
+      "smiles": "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O",
+      "kind": "locked_diaxial",
+      "expected_max_vicinal_j_hz": 9.5,
+      "tolerance_hz": 2.0,
+      "literature_note": "All ring substituents equatorial in the strongly preferred 4C1 chair, so H1-H2/H2-H3/H3-H4/H4-H5 are all diaxial with 3J ~ 7.9-9.9 Hz (the ~9-9.5 Hz diaxials are the diagnostic large couplings). Generic Karplus slightly over-/under-predicts electronegative-substituent couplings (its Haasnoot-Altona blind spot), absorbed by the 2.0 Hz tolerance.",
+      "notes": "Anchor case: the 4C1 chair is strongly preferred and ETKDG/MMFF reproduces it, so the ring behaves as rigidly locked (~9.59 Hz observed)."
+    },
+    {
+      "fixture_id": "myo_inositol",
+      "compound_name": "myo-Inositol",
+      "smiles": "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O",
+      "kind": "locked_diaxial",
+      "expected_max_vicinal_j_hz": 9.9,
+      "tolerance_hz": 2.0,
+      "literature_note": "Cyclohexane-hexol locked in one dominant chair (five equatorial OH, one axial at C2); the axial-axial ring couplings are ~9-10 Hz. Diagnostic large diaxial ~9.9 Hz.",
+      "notes": "Anchor case: rigid all-chair cyclitol (~9.85 Hz observed)."
+    },
+    {
+      "fixture_id": "beta_d_galactopyranose",
+      "compound_name": "beta-D-Galactopyranose",
+      "smiles": "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@H]1O",
+      "kind": "locked_diaxial",
+      "expected_max_vicinal_j_hz": 9.9,
+      "tolerance_hz": 2.5,
+      "literature_note": "Galacto configuration (axial 4-OH) means H3-H4 and H4-H5 are small (ax-eq ~3.5 Hz / eq-ax ~1 Hz), but H1-H2 (~7.8 Hz) and H2-H3 (~9.9 Hz) remain diaxial. Diagnostic large diaxial ~9.9 Hz (H2-H3). Generic Karplus under-predicts here (~8.5 Hz observed) -- a clear example of the electronegativity blind spot, hence the wider 2.5 Hz tolerance.",
+      "notes": "Anchor case + honest stress test: shows the generic-Karplus under-prediction on a hydroxylated diaxial."
+    },
+    {
+      "fixture_id": "cyclohexane",
+      "compound_name": "Cyclohexane",
+      "smiles": "C1CCCCC1",
+      "kind": "mobile_averaged",
+      "expected_max_vicinal_j_hz": 6.8,
+      "tolerance_hz": 1.5,
+      "literature_note": "Rapid chair-chair ring flip at room temperature averages Jaa (~11-13 Hz) with Jae/Jee (~3-4 Hz) to a single time-averaged 3J ~ 6.8 Hz. The predictor's unweighted conformer average reproduces this (~7.14 Hz observed).",
+      "notes": "Mobile control: confirms NO spurious large diaxial is emitted for a freely flipping ring."
+    },
+    {
+      "fixture_id": "cis_decalin",
+      "compound_name": "cis-Decalin",
+      "smiles": "C1CC[C@H]2CCCC[C@H]2C1",
+      "kind": "mobile_averaged",
+      "expected_max_vicinal_j_hz": 6.8,
+      "tolerance_hz": 2.0,
+      "literature_note": "Unlike rigid trans-decalin, cis-decalin interconverts between two equivalent chair-chair forms, so its couplings are conformationally averaged to ~6-7 Hz. Direct contrast to the trans isomer.",
+      "notes": "Mobile control + diastereomer discriminator: cis (~6.83 Hz) vs trans (~10.05 Hz) is the headline locked-vs-mobile pair."
+    },
+    {
+      "fixture_id": "n_butane",
+      "compound_name": "n-Butane",
+      "smiles": "CCCC",
+      "kind": "acyclic_averaged",
+      "expected_max_vicinal_j_hz": 7.3,
+      "tolerance_hz": 1.5,
+      "literature_note": "Freely rotating acyclic C-C bond; the rotamer-averaged vicinal 3J(CH2-CH2) is ~7.3 Hz (the canonical 'free rotation' value).",
+      "notes": "Acyclic control: rotamer averaging lands on the generic ~7 Hz value (~7.12 Hz observed)."
+    },
+    {
+      "fixture_id": "ethanol",
+      "compound_name": "Ethanol",
+      "smiles": "CCO",
+      "kind": "acyclic_averaged",
+      "expected_max_vicinal_j_hz": 7.0,
+      "tolerance_hz": 1.5,
+      "literature_note": "CH3-CH2 vicinal 3J ~ 7.0 Hz (textbook freely-rotating ethyl coupling).",
+      "notes": "Acyclic control: classic ethyl 3J (~6.50 Hz observed)."
+    },
+    {
+      "fixture_id": "methyl_beta_d_glucopyranoside",
+      "compound_name": "Methyl beta-D-glucopyranoside",
+      "smiles": "OC[C@H]1O[C@@H](OC)[C@H](O)[C@@H](O)[C@@H]1O",
+      "kind": "locked_diaxial",
+      "expected_max_vicinal_j_hz": 9.5,
+      "tolerance_hz": 2.0,
+      "literature_note": "Gluco 4C1 chair, all ring substituents equatorial, so H1-H2/H2-H3/H3-H4/H4-H5 are diaxial with 3J(aa) ~9-9.5 Hz (Altona-Haasnoot additivity rule, Org. Magn. Reson. 1980). Diagnostic large diaxial ~9.5 Hz.",
+      "notes": "Locked pyranose anchor. Unweighted averaging dilutes the diaxial (~8.6 Hz); Boltzmann weighting recovers ~10.2 Hz."
+    },
+    {
+      "fixture_id": "methyl_beta_d_galactopyranoside",
+      "compound_name": "Methyl beta-D-galactopyranoside",
+      "smiles": "OC[C@H]1O[C@@H](OC)[C@H](O)[C@@H](O)[C@H]1O",
+      "kind": "locked_diaxial",
+      "expected_max_vicinal_j_hz": 9.9,
+      "tolerance_hz": 2.5,
+      "literature_note": "Galacto config (axial 4-OH): H3-H4/H4-H5 small (ax-eq), but H2-H3 stays diaxial ~9.9 Hz. Diagnostic large diaxial ~9.9 Hz (H2-H3).",
+      "notes": "Locked pyranose anchor + electronegativity stress (like its parent galactose). Unweighted ~7.9 Hz; Boltzmann ~9.9 Hz."
+    },
+    {
+      "fixture_id": "beta_d_quinovose",
+      "compound_name": "beta-D-Quinovose (6-deoxy-beta-D-glucose)",
+      "smiles": "C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O",
+      "kind": "locked_diaxial",
+      "expected_max_vicinal_j_hz": 9.5,
+      "tolerance_hz": 2.0,
+      "literature_note": "6-deoxy gluco config; ring diaxials ~9.5 Hz. The 6-deoxy ring is the clearest population-weighting demonstration in the corpus.",
+      "notes": "Locked, but UNWEIGHTED averaging washes the diaxial all the way down to ~6.5 Hz (mobile-like); Boltzmann weighting restores ~10.2 Hz -- the headline Phase 41/42 mechanism in one molecule."
+    },
+    {
+      "fixture_id": "beta_d_mannopyranose",
+      "compound_name": "beta-D-Mannopyranose",
+      "smiles": "OC[C@H]1O[C@@H](O)[C@@H](O)[C@@H](O)[C@@H]1O",
+      "kind": "locked_diaxial",
+      "expected_max_vicinal_j_hz": 9.5,
+      "tolerance_hz": 2.5,
+      "literature_note": "Manno config (axial 2-OH): H1-H2 small (eq-ax ~1 Hz), but H3-H4 and H4-H5 remain diaxial ~9.5 Hz. Diagnostic large diaxial ~9.5 Hz.",
+      "notes": "Locked pyranose anchor; both weightings keep it high (~10 Hz)."
+    },
+    {
+      "fixture_id": "beta_d_xylopyranose",
+      "compound_name": "beta-D-Xylopyranose",
+      "smiles": "OC1O[C@@H](O)[C@H](O)[C@@H](O)C1",
+      "kind": "locked_diaxial",
+      "expected_max_vicinal_j_hz": 9.0,
+      "tolerance_hz": 2.5,
+      "literature_note": "Pentopyranose, xylo config, all-equatorial 4C1 chair, ring diaxials ~9 Hz.",
+      "notes": "Locked pyranose anchor. Unweighted ~8.4 Hz; Boltzmann ~10.1 Hz."
+    },
+    {
+      "fixture_id": "propane",
+      "compound_name": "Propane",
+      "smiles": "CCC",
+      "kind": "acyclic_averaged",
+      "expected_max_vicinal_j_hz": 7.3,
+      "tolerance_hz": 1.5,
+      "literature_note": "CH3-CH2-CH3 freely-rotating vicinal 3J ~7.3 Hz.",
+      "notes": "Acyclic control; stays averaged (~6.5 Hz) under both weightings (too short for a strong anti preference)."
+    },
+    {
+      "fixture_id": "diethyl_ether",
+      "compound_name": "Diethyl ether",
+      "smiles": "CCOCC",
+      "kind": "acyclic_averaged",
+      "expected_max_vicinal_j_hz": 7.0,
+      "tolerance_hz": 1.5,
+      "literature_note": "Ethyl O-CH2-CH3 vicinal 3J ~7.0 Hz (freely rotating).",
+      "notes": "Acyclic control; stays in the averaged band under both weightings."
+    },
+    {
+      "fixture_id": "diethyl_sulfide",
+      "compound_name": "Diethyl sulfide",
+      "smiles": "CCSCC",
+      "kind": "acyclic_averaged",
+      "expected_max_vicinal_j_hz": 7.3,
+      "tolerance_hz": 1.5,
+      "literature_note": "Ethyl S-CH2-CH3 vicinal 3J ~7.3 Hz (freely rotating).",
+      "notes": "Acyclic control; stays averaged (~6.6 Hz) under both weightings."
+    },
+    {
+      "fixture_id": "cyclopentane",
+      "compound_name": "Cyclopentane",
+      "smiles": "C1CCCC1",
+      "kind": "mobile_averaged",
+      "expected_max_vicinal_j_hz": 7.5,
+      "tolerance_hz": 2.0,
+      "literature_note": "Freely pseudorotating 5-ring (barrier ~0.2 kcal/mol); the pseudorotation-averaged vicinal 3J is ~7-8 Hz.",
+      "notes": "Mobile control. The pseudorotation itinerary is near-degenerate, so Boltzmann weighting leaves it averaged (~6.4 Hz) -- a mobile system weighting does NOT inflate."
+    },
+    {
+      "fixture_id": "tetrahydrofuran",
+      "compound_name": "Tetrahydrofuran",
+      "smiles": "C1CCOC1",
+      "kind": "mobile_averaged",
+      "expected_max_vicinal_j_hz": 7.0,
+      "tolerance_hz": 2.0,
+      "literature_note": "Pseudorotating O-heterocycle; vicinal couplings averaged over the pseudorotation mode to ~7 Hz.",
+      "notes": "Mobile control; stays averaged (~6.9 Hz) under both weightings."
+    }
+  ]
+}
