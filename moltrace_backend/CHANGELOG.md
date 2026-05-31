@@ -14,6 +14,74 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.7.6 — Scaled the Karplus validation corpus to 18 molecules — the Boltzmann win holds, and sharpens (2026-05-31)
+
+**Headline:** Phase 41 (v0.7.5) proved on an eight-molecule corpus that
+Boltzmann conformer-population weighting recovers the locked sugar diaxials and
+restores clean locked-vs-mobile discrimination. v0.7.6 asks whether that result
+survives a larger, harder corpus — and it does, *more* cleanly. A new
+**18-molecule** literature vicinal-³J corpus
+(`karplus_jcoupling_corpus_v2.json`; 9 locked diaxial + 9 mobile/averaged),
+graded across the full {generic, haasnoot_altona} × {uniform, boltzmann} grid,
+shows that **generic/boltzmann is the only one of the four combinations that
+cleanly separates the locked diaxials from the mobile systems** at scale — and
+it does so with the best accuracy (within-tolerance **1.00**, mean absolute
+error **0.57 Hz**, locked-vs-mobile separation **+1.84 Hz**). Unweighted
+averaging now *fails* (within-tol 0.94, separation **−0.64 Hz**; several locked
+sugars — e.g. β-D-quinovose — wash out to a mobile-like ≈ 6.5 Hz), and the HLA
+relation loses even with Boltzmann weighting. **No API or behaviour change** —
+corpus, one harness keyword, and tests only; every pre-existing response is
+byte-for-byte unchanged.
+
+### Added
+- **`tests/fixtures/karplus_jcoupling_corpus/karplus_jcoupling_corpus_v2.json`**
+  — an 18-molecule literature vicinal-³J corpus: **9 covalently/conformationally
+  locked** diaxial systems (including five new pyranosides — methyl
+  β-D-glucopyranoside, methyl β-D-galactopyranoside, β-D-quinovose,
+  β-D-mannopyranose, β-D-xylopyranose) and **9 mobile/averaged** systems
+  (ring-flipping / pseudorotating rings + short freely-rotating chains). Long
+  n-alkanes (n-pentane, n-hexane) are **deliberately excluded** with documented
+  rationale: vacuum MMFF over-stabilises their extended all-anti backbone,
+  inflating the Boltzmann-weighted coupling through a force-field/solvation
+  limitation rather than a real locked geometry.
+- **`bundle_filename=` keyword** on `run_fixture` / `run_all` / `build_report`
+  in `karplus_validation.py`, so the harness can grade either the default v1
+  eight-molecule bundle or the new v2 bundle. **The Phase 39/40/41 gates keep
+  loading the byte-identical v1 bundle** — they are untouched.
+
+### Validation
+- **`tests/test_phase42_expanded_corpus.py`** (8 tests) — the n=18 confirmation:
+  corpus shape (18 = 9 locked / 9 mobile, all run cleanly); generic/boltzmann is
+  **uniquely** clean at scale (the only combination with separation ≥ +1 Hz,
+  measured **+1.84**); unweighted averaging fails (within-tol < 1.0, and
+  Boltzmann restores the separation by **+2.48 Hz**); generic/boltzmann is the
+  most accurate of the four (within-tol 1.00, MAE 0.57 Hz; min-locked **9.92** ≥
+  max-mobile **8.08** Hz — a clean gap); β-D-quinovose as the single-molecule
+  mechanism demo (**6.50 → 10.25 Hz**, uniform → boltzmann); every new locked
+  pyranose recovers ≥ 9 Hz; HLA still loses at scale; reports weighting-tagged +
+  deterministic.
+- The measured grid at n=18:
+
+  | method / weighting      | within-tol | MAE (Hz) | separation (Hz) | clean |
+  |-------------------------|:----------:|:--------:|:---------------:|:-----:|
+  | generic / uniform       |    0.94    |   0.80   |      −0.64      |  no   |
+  | **generic / boltzmann** |  **1.00**  | **0.57** |    **+1.84**    | **yes** |
+  | haasnoot / uniform      |    0.83    |   1.15   |      −2.10      |  no   |
+  | haasnoot / boltzmann    |    0.78    |   1.29   |      −0.07      |  no   |
+
+- The **Phase 39 / 40 / 41 gates stay byte-identical** (they load the v1 bundle;
+  the default method/weighting path is unchanged).
+- Full backend regression sweep: **931 passed**, zero failures, in 16 min
+  (922 v0.7.5 baseline + 8 new Phase 42 tests + the 1 normally-`slow`-deselected
+  test, run here too). Default `-m 'not slow'` scope: **930 passed, 1 deselected**.
+
+### Compatibility
+- **No contract change.** Phase 42 adds a corpus fixture, one harness keyword,
+  and a test suite — no new request/response fields and no predictor or endpoint
+  behaviour change. The frontend does **not** need to regenerate `schema.d.ts`.
+
+---
+
 ## v0.7.5 — Opt-in Boltzmann conformer-population weighting — the sugar-blind-spot fix (2026-05-30)
 
 **Headline:** v0.7.4 *diagnosed* (and gated) why neither the generic nor the
