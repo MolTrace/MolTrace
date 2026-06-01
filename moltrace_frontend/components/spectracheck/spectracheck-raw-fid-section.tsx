@@ -58,6 +58,8 @@ import {
 } from "@/components/spectracheck/gsd-analysis-ui"
 import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel"
 import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
+import { GsdIntegrationPanel } from "@/components/spectracheck/gsd-integration-panel"
+import { ShiftPredictionPanel } from "@/components/spectracheck/shift-prediction-panel"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -2109,6 +2111,27 @@ export function SpectraCheckRawFidSection({
         sampleId={sampleId}
         compoundClass={compoundClassForRequest(compoundClass) || undefined}
         testId="raw-fid-jcoupling-results-surface"
+      />
+
+      {/* ── Step 3e — Region integration (Prompt 5) ───────────────────────
+          Integrate each detected multiplet range on the FT-processed
+          trace. field_mhz pulled from the vendor metadata (same cascade
+          as the GSD call); shares the multiplet WeakMap cache. */}
+      <GsdIntegrationPanel
+        gsdResult={gsdResult}
+        trace={xy}
+        nucleus={nucleus}
+        solvent={solvent}
+        fieldMhz={extractFieldMhz(processResult) ?? extractFieldMhz(previewResult) ?? 500}
+        testId="raw-fid-integration-results-surface"
+      />
+
+      {/* ── Candidate tool — per-atom shift prediction (v0.7.8) ──────────
+          Structure-derived; predicts ¹H/¹³C shifts from a candidate
+          SMILES. Self-gates on the candidate list. */}
+      <ShiftPredictionPanel
+        candidatesText={candidatesText}
+        testId="raw-fid-shift-prediction-surface"
       />
 
       {/* ── Step 3c — Legacy detection summary (unified panel) ──────────

@@ -54,6 +54,8 @@ import {
 } from "@/components/spectracheck/gsd-analysis-ui"
 import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel"
 import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
+import { GsdIntegrationPanel } from "@/components/spectracheck/gsd-integration-panel"
+import { ShiftPredictionPanel } from "@/components/spectracheck/shift-prediction-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
@@ -1561,6 +1563,29 @@ export function SpectraCheckProcessedSpectrumSection({
         sampleId={sampleId}
         compoundClass={compoundClassForRequest(compoundClass) || undefined}
         testId="processed-jcoupling-results-surface"
+      />
+
+      {/* ── Step 3e — Region integration (Prompt 5) ───────────────────────
+          Integrate each detected multiplet range on the displayed trace
+          for the canonical relative proton-ratio readout. Shares the
+          multiplet WeakMap cache; integrates the same xy the
+          SpectrumViewer renders. */}
+      <GsdIntegrationPanel
+        gsdResult={gsdResult}
+        trace={xy}
+        nucleus={nucleus}
+        solvent={solvent}
+        fieldMhz={Number(spectrometerMhz.trim() || "500") || 500}
+        testId="processed-integration-results-surface"
+      />
+
+      {/* ── Candidate tool — per-atom shift prediction (v0.7.8) ──────────
+          Structure-derived (not part of the observed-spectrum chain):
+          predicts ¹H/¹³C shifts from a candidate SMILES. Self-gates on
+          the candidate list; independent of the GSD run. */}
+      <ShiftPredictionPanel
+        candidatesText={candidatesOptional.trim() || candidatesText}
+        testId="processed-shift-prediction-surface"
       />
     </div>
   )

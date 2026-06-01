@@ -1,0 +1,19 @@
+# NMRNet GPU inference service — Python 3.8, CUDA 11.6, Linux x86_64.
+# Versions mirror github.com/Colin-Jay/NMRNet's README; pin to match the
+# checkpoint you download from Zenodo (record 19142375).
+
+# --- NMRNet core stack ---
+torch==1.13.1+cu116           # install with: --extra-index-url https://download.pytorch.org/whl/cu116
+torchvision==0.14.1+cu116
+scikit-learn==1.3.2
+ase==3.22.1
+pandas==2.0.3
+rdkit
+
+# Uni-Core is a prebuilt wheel shipped with the NMRNet repo, e.g.:
+#   pip install ./unicore-0.0.1+cu116torch1.12.0-cp38-cp38-linux_x86_64.whl
+# (build from source for other CUDA/torch combos — see Uni-Core docs)
+
+# --- service ---
+fastapi
+uvicorn[standard]
