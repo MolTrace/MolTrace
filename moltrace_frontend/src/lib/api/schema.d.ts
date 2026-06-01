@@ -1733,6 +1733,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spectrum/analyze/integration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Spectrum Analyze Integration
+         * @description Mnova-equivalent region integration (Prompt 5).
+         *
+         *     Integrate one or more ppm windows of a processed spectrum by one of three
+         *     methods:
+         *
+         *       * ``sum``        -- classical trapezoidal area over the window (everything
+         *         in it, contaminants included).
+         *       * ``edited_sum`` -- *default* -- Mnova's Edited Sum: scales the raw area by
+         *         the compound fraction of total peak height, removing the solvent /
+         *         impurity contribution proportionally.  Exact when a contaminant shares
+         *         the compound linewidth.
+         *       * ``peaks``      -- the sum of fitted areas of the compound peaks only.
+         *
+         *     Typical caller flow: ``POST /spectrum/analyze/gsd`` to obtain the classified
+         *     peak list, then send the same ``ppm_axis`` + ``intensity`` arrays here with
+         *     that peak list and the integration ``regions``.  Each region is integrated
+         *     independently; ``relative_value`` normalises the integrals to the smallest
+         *     positive region (the standard NMR ratio readout, e.g. 1.00 : 2.03 : 3.01).
+         *     ``peaks_used_indices`` / ``excluded_peaks_indices`` point back into the
+         *     request's ``peaks`` list.
+         *
+         *     This is a deterministic quantitation primitive (decision support), not a
+         *     statistical classifier -- there is no ``experimental`` flag.  The
+         *     audit-event trail matches the GSD / multiplet surfaces: one
+         *     ``spectrum.analyze_integration`` event per invocation carrying the request
+         *     shape + outcome counts.
+         */
+        post: operations["spectrum_analyze_integration_spectrum_analyze_integration_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/spectrum/predict/shifts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Spectrum Predict Shifts
+         * @description Predict ¹H / ¹³C chemical shifts for a molecule from SMILES (Prompt 6).
+         *
+         *     Parses the SMILES and predicts a chemical shift (ppm) + uncertainty per atom.
+         *     The backend is **server-configured**: the optional NMRNet GPU service when it
+         *     is wired up (``MOLTRACE_NMRNET_MODULE`` / ``MOLTRACE_NMRNET_SERVICE_URL`` or a
+         *     local checkpoint, building a 3D conformer for the model), otherwise the
+         *     HOSE-code / NMRShiftDB2 topological fallback. The response always names the
+         *     ``backend`` actually used and carries ``notes`` (e.g. why it fell back), so
+         *     the prediction is transparent decision support, never an identity claim.
+         *
+         *     One ``spectrum.predict_shifts`` audit event is emitted per invocation (happy
+         *     + bad-request paths), matching the GSD / multiplet / integration telemetry.
+         */
+        post: operations["spectrum_predict_shifts_spectrum_predict_shifts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spectrum/solvents/known": {
         parameters: {
             query?: never;
@@ -11479,6 +11555,35 @@ export interface components {
              * @enum {string}
              */
             queue_backend: "rq" | "fastapi-background";
+        };
+        /**
+         * AtomShiftPredictionOut
+         * @description One atom's predicted chemical shift (ppm), with provenance.
+         *
+         *     Mirrors ``moltrace.spectroscopy.predict.AtomShiftPrediction`` on the wire.
+         *     ``provenance`` carries backend-specific detail (e.g. the matched HOSE sphere
+         *     and reference count for the fallback, or the model name for NMRNet).
+         */
+        AtomShiftPredictionOut: {
+            /** Atom Index */
+            atom_index: number;
+            /** Element */
+            element: string;
+            /**
+             * Nucleus
+             * @enum {string}
+             */
+            nucleus: "1H" | "13C";
+            /** Predicted Ppm */
+            predicted_ppm: number;
+            /** Uncertainty Ppm */
+            uncertainty_ppm: number;
+            /** Method */
+            method: string;
+            /** Provenance */
+            provenance?: {
+                [key: string]: unknown;
+            };
         };
         /** AuditEventRecord */
         AuditEventRecord: {
@@ -30042,6 +30147,38 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * RegionIntegrationResult
+         * @description Integral of one region with full provenance.
+         *
+         *     Mirrors ``moltrace.spectroscopy.integration.IntegrationResult`` on the
+         *     wire, adding ``relative_value`` (the integral normalised to the smallest
+         *     positive region across the request — the standard NMR ratio readout) and
+         *     expressing ``peaks_used`` / ``excluded_peaks`` as indices into the
+         *     request's ``peaks`` list.
+         */
+        RegionIntegrationResult: {
+            /** Region Ppm */
+            region_ppm: [
+                number,
+                number
+            ];
+            /** Value */
+            value: number;
+            /** Relative Value */
+            relative_value: number;
+            /**
+             * Method Used
+             * @enum {string}
+             */
+            method_used: "sum" | "edited_sum" | "peaks";
+            /** Confidence */
+            confidence: number;
+            /** Peaks Used Indices */
+            peaks_used_indices?: number[];
+            /** Excluded Peaks Indices */
+            excluded_peaks_indices?: number[];
+        };
         /** RegulatoryActionItem */
         RegulatoryActionItem: {
             /** Id */
@@ -34149,6 +34286,86 @@ export interface components {
              */
             newly_graduated_in_window: number;
         };
+        /**
+         * SpectrumIntegrationAnalyzeRequest
+         * @description Request body for ``POST /spectrum/analyze/integration``.
+         *
+         *     Carries the processed spectrum (paired ``ppm_axis`` + ``intensity``
+         *     arrays, the same shape as ``/spectrum/analyze/gsd``), the classified
+         *     ``peaks`` from a prior GSD call, and one or more integration ``regions``.
+         *     Each region is integrated independently by the chosen ``method``
+         *     (Mnova-equivalent Sum / Edited Sum / Peaks).
+         *
+         *     ``edited_sum`` and ``peaks`` use each peak's ``category`` to separate
+         *     compound signal from solvent / impurity / artifact contamination, so a
+         *     representative ``peaks`` list is required for them; ``sum`` ignores the
+         *     peak list (it integrates everything in the window).
+         */
+        SpectrumIntegrationAnalyzeRequest: {
+            /** Ppm Axis */
+            ppm_axis: number[];
+            /** Intensity */
+            intensity: number[];
+            /** Peaks */
+            peaks?: components["schemas"]["GSDPromptPeak"][];
+            /** Regions */
+            regions: [
+                number,
+                number
+            ][];
+            /**
+             * Method
+             * @default edited_sum
+             * @enum {string}
+             */
+            method: "sum" | "edited_sum" | "peaks";
+            /**
+             * Nucleus
+             * @default 1H
+             * @enum {string}
+             */
+            nucleus: "1H" | "13C";
+            /**
+             * Solvent
+             * @default
+             */
+            solvent: string;
+            /**
+             * Field Mhz
+             * @default 500
+             */
+            field_mhz: number;
+        };
+        /**
+         * SpectrumIntegrationAnalyzeResult
+         * @description Response from ``POST /spectrum/analyze/integration``.
+         */
+        SpectrumIntegrationAnalyzeResult: {
+            /** Regions */
+            regions?: components["schemas"]["RegionIntegrationResult"][];
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "sum" | "edited_sum" | "peaks";
+            /**
+             * Region Count
+             * @default 0
+             */
+            region_count: number;
+            /**
+             * Backend
+             * @default integration_prompt5
+             * @constant
+             */
+            backend: "integration_prompt5";
+            /** Notes */
+            notes?: string[];
+            /** Spectrum Metadata */
+            spectrum_metadata?: {
+                [key: string]: unknown;
+            };
+        };
         /** SpectrumMissingReferencePeak */
         SpectrumMissingReferencePeak: {
             reference_peak: components["schemas"]["Peak"];
@@ -34250,6 +34467,42 @@ export interface components {
             shift_ppm: number;
             /** Intensity */
             intensity: number;
+        };
+        /**
+         * SpectrumPredictShiftsRequest
+         * @description Request body for ``POST /spectrum/predict/shifts``.
+         *
+         *     Predict ¹H / ¹³C chemical shifts for a molecule from its SMILES. The active
+         *     backend is **server-configured** (the optional NMRNet GPU service when wired
+         *     up, else the HOSE-code / NMRShiftDB2 fallback) — callers do not select it,
+         *     and the response names the backend actually used.
+         */
+        SpectrumPredictShiftsRequest: {
+            /** Smiles */
+            smiles: string;
+            /** Nuclei */
+            nuclei?: ("1H" | "13C")[];
+        };
+        /**
+         * SpectrumPredictShiftsResult
+         * @description Response from ``POST /spectrum/predict/shifts``.
+         */
+        SpectrumPredictShiftsResult: {
+            /** Smiles */
+            smiles: string;
+            /** Nuclei */
+            nuclei: ("1H" | "13C")[];
+            /** Backend */
+            backend: string;
+            /** Shifts */
+            shifts?: components["schemas"]["AtomShiftPredictionOut"][];
+            /**
+             * Shift Count
+             * @default 0
+             */
+            shift_count: number;
+            /** Notes */
+            notes?: string[];
         };
         /** SpectrumPreviewReport */
         SpectrumPreviewReport: {
@@ -42107,6 +42360,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpectrumMultipletAnalyzeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spectrum_analyze_integration_spectrum_analyze_integration_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpectrumIntegrationAnalyzeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumIntegrationAnalyzeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spectrum_predict_shifts_spectrum_predict_shifts_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpectrumPredictShiftsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumPredictShiftsResult"];
                 };
             };
             /** @description Validation Error */

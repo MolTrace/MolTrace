@@ -23,6 +23,14 @@ except Exception:  # pragma: no cover
     LorentzianModel = None  # type: ignore[assignment]
     PseudoVoigtModel = None  # type: ignore[assignment]
 
+# ``np.trapz`` was renamed to ``np.trapezoid`` in NumPy 2.0 and removed in a
+# later release.  Bind whichever the installed NumPy provides so the fallback
+# peak-area path works across versions.
+try:  # NumPy >= 2.0
+    _np_trapezoid = np.trapezoid
+except AttributeError:  # pragma: no cover - NumPy < 2.0
+    _np_trapezoid = np.trapz  # type: ignore[attr-defined]
+
 PeakShape = Literal["lorentzian", "voigt"]
 PeakCategory = Literal["compound", "solvent", "impurity", "artifact", "13C_satellite"]
 
@@ -948,7 +956,7 @@ def _fallback_peak(
     local_y = y[lo:hi]
     local_x = x[lo:hi]
     intensity = max(float(y[index]), 0.0)
-    area = float(np.trapz(np.maximum(local_y, 0.0), x=local_x))
+    area = float(_np_trapezoid(np.maximum(local_y, 0.0), x=local_x))
     return _make_peak(
         position_ppm=float(x[index]),
         intensity=intensity,

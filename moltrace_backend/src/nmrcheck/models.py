@@ -14720,6 +14720,123 @@ class SpectrumMultipletAnalyzeResult(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+# --- Prompt 5: region integration ---------------------------------------
+
+IntegrationMethod = Literal["sum", "edited_sum", "peaks"]
+IntegrationBackend = Literal["integration_prompt5"]
+
+
+class SpectrumIntegrationAnalyzeRequest(BaseModel):
+    """Request body for ``POST /spectrum/analyze/integration``.
+
+    Carries the processed spectrum (paired ``ppm_axis`` + ``intensity``
+    arrays, the same shape as ``/spectrum/analyze/gsd``), the classified
+    ``peaks`` from a prior GSD call, and one or more integration ``regions``.
+    Each region is integrated independently by the chosen ``method``
+    (Mnova-equivalent Sum / Edited Sum / Peaks).
+
+    ``edited_sum`` and ``peaks`` use each peak's ``category`` to separate
+    compound signal from solvent / impurity / artifact contamination, so a
+    representative ``peaks`` list is required for them; ``sum`` ignores the
+    peak list (it integrates everything in the window).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ppm_axis: list[float] = Field(min_length=16, max_length=524288)
+    intensity: list[float] = Field(min_length=16, max_length=524288)
+    peaks: list[GSDPromptPeak] = Field(default_factory=list, max_length=4096)
+    # One or more integration windows; each ``(a, b)`` is order-insensitive.
+    regions: list[tuple[float, float]] = Field(min_length=1, max_length=256)
+    method: IntegrationMethod = "edited_sum"
+    nucleus: GSDPromptNucleus = "1H"
+    solvent: str = Field(default="", max_length=64)
+    field_mhz: float = Field(default=500.0, gt=0.0, le=2000.0)
+
+
+class RegionIntegrationResult(BaseModel):
+    """Integral of one region with full provenance.
+
+    Mirrors ``moltrace.spectroscopy.integration.IntegrationResult`` on the
+    wire, adding ``relative_value`` (the integral normalised to the smallest
+    positive region across the request — the standard NMR ratio readout) and
+    expressing ``peaks_used`` / ``excluded_peaks`` as indices into the
+    request's ``peaks`` list.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    region_ppm: tuple[float, float]
+    value: float
+    relative_value: float = Field(ge=0.0)
+    method_used: IntegrationMethod
+    confidence: float = Field(ge=0.0, le=1.0)
+    peaks_used_indices: list[int] = Field(default_factory=list)
+    excluded_peaks_indices: list[int] = Field(default_factory=list)
+
+
+class SpectrumIntegrationAnalyzeResult(BaseModel):
+    """Response from ``POST /spectrum/analyze/integration``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    regions: list[RegionIntegrationResult] = Field(default_factory=list)
+    method: IntegrationMethod
+    region_count: int = Field(default=0, ge=0)
+    backend: IntegrationBackend = "integration_prompt5"
+    notes: list[str] = Field(default_factory=list)
+    spectrum_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AtomShiftPredictionOut(BaseModel):
+    """One atom's predicted chemical shift (ppm), with provenance.
+
+    Mirrors ``moltrace.spectroscopy.predict.AtomShiftPrediction`` on the wire.
+    ``provenance`` carries backend-specific detail (e.g. the matched HOSE sphere
+    and reference count for the fallback, or the model name for NMRNet).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    atom_index: int = Field(ge=0)
+    element: str  # "H" | "C"
+    nucleus: GSDPromptNucleus
+    predicted_ppm: float
+    uncertainty_ppm: float = Field(ge=0.0)
+    method: str  # "nmrnet" | "hose_nmrshiftdb2"
+    provenance: dict[str, Any] = Field(default_factory=dict)
+
+
+class SpectrumPredictShiftsRequest(BaseModel):
+    """Request body for ``POST /spectrum/predict/shifts``.
+
+    Predict ¹H / ¹³C chemical shifts for a molecule from its SMILES. The active
+    backend is **server-configured** (the optional NMRNet GPU service when wired
+    up, else the HOSE-code / NMRShiftDB2 fallback) — callers do not select it,
+    and the response names the backend actually used.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    smiles: str = Field(min_length=1, max_length=4096)
+    nuclei: list[GSDPromptNucleus] = Field(
+        default_factory=lambda: ["1H", "13C"], min_length=1, max_length=2
+    )
+
+
+class SpectrumPredictShiftsResult(BaseModel):
+    """Response from ``POST /spectrum/predict/shifts``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    smiles: str
+    nuclei: list[GSDPromptNucleus]
+    backend: str  # "nmrnet" | "hose_nmrshiftdb2"
+    shifts: list[AtomShiftPredictionOut] = Field(default_factory=list)
+    shift_count: int = Field(default=0, ge=0)
+    notes: list[str] = Field(default_factory=list)
+
+
 class JCouplingMatch(BaseModel):
     """One matched observed<->predicted J coupling (Hz)."""
 

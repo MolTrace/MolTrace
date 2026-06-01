@@ -752,7 +752,11 @@ from .models import (
     SpectrumGSDAnalyzeRequest,
     SpectrumGSDAnalyzeResult,
     SpectrumGSDTelemetrySummary,
+    SpectrumIntegrationAnalyzeRequest,
+    SpectrumIntegrationAnalyzeResult,
     SpectrumMultipletAnalyzeRequest,
+    SpectrumPredictShiftsRequest,
+    SpectrumPredictShiftsResult,
     SpectrumMultipletAnalyzeResult,
     SpectrumPreviewReport,
     SpectrumSolventCatalog,
@@ -5601,6 +5605,281 @@ async def spectrum_analyze_multiplets(
         multiplicity_counts=multiplicity_counts,
         backend="multiplet_prompt4",
         notes=notes,
+    )
+
+
+@router.post(
+    "/spectrum/analyze/integration",
+    response_model=SpectrumIntegrationAnalyzeResult,
+    dependencies=[Depends(require_access_context)],
+)
+async def spectrum_analyze_integration(
+    payload: SpectrumIntegrationAnalyzeRequest,
+    request: Request,  # auto-injected by FastAPI; tests may pass None
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumIntegrationAnalyzeResult:
+    """Mnova-equivalent region integration (Prompt 5).
+
+    Integrate one or more ppm windows of a processed spectrum by one of three
+    methods:
+
+      * ``sum``        -- classical trapezoidal area over the window (everything
+        in it, contaminants included).
+      * ``edited_sum`` -- *default* -- Mnova's Edited Sum: scales the raw area by
+        the compound fraction of total peak height, removing the solvent /
+        impurity contribution proportionally.  Exact when a contaminant shares
+        the compound linewidth.
+      * ``peaks``      -- the sum of fitted areas of the compound peaks only.
+
+    Typical caller flow: ``POST /spectrum/analyze/gsd`` to obtain the classified
+    peak list, then send the same ``ppm_axis`` + ``intensity`` arrays here with
+    that peak list and the integration ``regions``.  Each region is integrated
+    independently; ``relative_value`` normalises the integrals to the smallest
+    positive region (the standard NMR ratio readout, e.g. 1.00 : 2.03 : 3.01).
+    ``peaks_used_indices`` / ``excluded_peaks_indices`` point back into the
+    request's ``peaks`` list.
+
+    This is a deterministic quantitation primitive (decision support), not a
+    statistical classifier -- there is no ``experimental`` flag.  The
+    audit-event trail matches the GSD / multiplet surfaces: one
+    ``spectrum.analyze_integration`` event per invocation carrying the request
+    shape + outcome counts.
+    """
+
+    import time
+
+    import numpy as np
+
+    from moltrace.spectroscopy.integration.methods import integrate
+    from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
+    from moltrace.spectroscopy.peaks.gsd import Peak
+
+    _t0 = time.perf_counter()
+    _input_point_count = len(payload.ppm_axis)
+
+    def _emit_integration_telemetry(
+        *,
+        error_kind: str | None,
+        region_count: int,
+        nonzero_region_count: int,
+        total_value: float,
+    ) -> None:
+        # One audit event per invocation (happy + bad-request paths), same
+        # shape as the GSD / multiplet soak telemetry.  Never let a telemetry
+        # failure break the analysis, and skip when invoked directly in tests.
+        try:
+            if request is not None:
+                _audit_from_context(
+                    request,
+                    context=context,
+                    event_type="spectrum.analyze_integration",
+                    message=(
+                        "Region integration failed."
+                        if error_kind is not None
+                        else "Region integration completed."
+                    ),
+                    metadata={
+                        "method": payload.method,
+                        "input_point_count": int(_input_point_count),
+                        "peak_count": int(len(payload.peaks)),
+                        "region_count": int(region_count),
+                        "nonzero_region_count": int(nonzero_region_count),
+                        "total_value": float(total_value),
+                        "nucleus": payload.nucleus,
+                        "solvent_declared": payload.solvent,
+                        "field_mhz": payload.field_mhz,
+                        "error_kind": error_kind,
+                        "wall_ms": int((time.perf_counter() - _t0) * 1000),
+                        "backend": "integration_prompt5",
+                    },
+                )
+        except Exception:
+            pass
+
+    if len(payload.ppm_axis) != len(payload.intensity):
+        _emit_integration_telemetry(
+            error_kind="ppm_axis_length_mismatch",
+            region_count=len(payload.regions),
+            nonzero_region_count=0,
+            total_value=0.0,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="ppm_axis and intensity must have the same length.",
+        )
+
+    ppm_axis = np.asarray(payload.ppm_axis, dtype=np.float64)
+    intensity = np.asarray(payload.intensity, dtype=np.float64)
+    spectrum = NMRSpectrum(
+        data=intensity,
+        ppm_axis=ppm_axis,
+        metadata={"source": "spectrum_analyze_integration"},
+        nucleus=payload.nucleus,
+        solvent=payload.solvent,
+        field_mhz=payload.field_mhz,
+    )
+
+    # Translate the wire-shape ``GSDPromptPeak`` models into the internal
+    # ``Peak`` dataclass (identical field layout); keep a stable index back to
+    # each input peak so the response can reference "the third peak you sent".
+    internal_peaks = [
+        Peak(
+            position_ppm=p.position_ppm,
+            position_hz=p.position_hz,
+            intensity=p.intensity,
+            area=p.area,
+            width_hz=p.width_hz,
+            shape=p.shape,
+            category=p.category,
+            confidence=p.confidence,
+            metadata=dict(p.metadata),
+        )
+        for p in payload.peaks
+    ]
+    peak_to_index = {id(internal_peaks[i]): i for i in range(len(internal_peaks))}
+
+    region_models: list[dict[str, Any]] = []
+    notes: list[str] = []
+    for region in payload.regions:
+        result = integrate(spectrum, region, internal_peaks, method=payload.method)
+        used = [peak_to_index.get(id(p), -1) for p in result.peaks_used]
+        excluded = [peak_to_index.get(id(p), -1) for p in result.excluded_peaks]
+        region_models.append(
+            {
+                "region_ppm": region,
+                "value": result.value,
+                "relative_value": 0.0,  # filled in after the loop
+                "method_used": result.method_used,
+                "confidence": result.confidence,
+                "peaks_used_indices": [i for i in used if i >= 0],
+                "excluded_peaks_indices": [i for i in excluded if i >= 0],
+            }
+        )
+        lo, hi = (
+            (region[0], region[1]) if region[0] <= region[1] else (region[1], region[0])
+        )
+        if not bool(np.any((ppm_axis >= lo) & (ppm_axis <= hi))):
+            notes.append(
+                f"Region ({region[0]}, {region[1]}) ppm captured no spectrum "
+                "points; its integral is 0."
+            )
+
+    # Normalise to the smallest positive integral -- the standard NMR ratio
+    # readout (proton counts like 1.00 : 2.03 : 3.01).
+    positive_values = [m["value"] for m in region_models if m["value"] > 0.0]
+    reference = min(positive_values) if positive_values else 0.0
+    for m in region_models:
+        m["relative_value"] = (m["value"] / reference) if reference > 0.0 else 0.0
+
+    _emit_integration_telemetry(
+        error_kind=None,
+        region_count=len(region_models),
+        nonzero_region_count=len(positive_values),
+        total_value=float(sum(m["value"] for m in region_models)),
+    )
+
+    return SpectrumIntegrationAnalyzeResult(
+        regions=region_models,  # type: ignore[arg-type]
+        method=payload.method,
+        region_count=len(region_models),
+        backend="integration_prompt5",
+        notes=notes,
+        spectrum_metadata={
+            "nucleus": payload.nucleus,
+            "solvent": payload.solvent,
+            "field_mhz": payload.field_mhz,
+            "input_point_count": int(_input_point_count),
+            "peak_count": int(len(payload.peaks)),
+        },
+    )
+
+
+@router.post(
+    "/spectrum/predict/shifts",
+    response_model=SpectrumPredictShiftsResult,
+    dependencies=[Depends(require_access_context)],
+)
+async def spectrum_predict_shifts(
+    payload: SpectrumPredictShiftsRequest,
+    request: Request,  # auto-injected by FastAPI; tests may pass None
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumPredictShiftsResult:
+    """Predict ¹H / ¹³C chemical shifts for a molecule from SMILES (Prompt 6).
+
+    Parses the SMILES and predicts a chemical shift (ppm) + uncertainty per atom.
+    The backend is **server-configured**: the optional NMRNet GPU service when it
+    is wired up (``MOLTRACE_NMRNET_MODULE`` / ``MOLTRACE_NMRNET_SERVICE_URL`` or a
+    local checkpoint, building a 3D conformer for the model), otherwise the
+    HOSE-code / NMRShiftDB2 topological fallback. The response always names the
+    ``backend`` actually used and carries ``notes`` (e.g. why it fell back), so
+    the prediction is transparent decision support, never an identity claim.
+
+    One ``spectrum.predict_shifts`` audit event is emitted per invocation (happy
+    + bad-request paths), matching the GSD / multiplet / integration telemetry.
+    """
+
+    import time
+
+    from moltrace.spectroscopy.predict import predict_shifts
+
+    _t0 = time.perf_counter()
+
+    def _emit_predict_telemetry(
+        *, error_kind: str | None, backend: str, shift_count: int
+    ) -> None:
+        try:
+            if request is not None:
+                _audit_from_context(
+                    request,
+                    context=context,
+                    event_type="spectrum.predict_shifts",
+                    message=(
+                        "Shift prediction failed."
+                        if error_kind is not None
+                        else "Shift prediction completed."
+                    ),
+                    metadata={
+                        "smiles": payload.smiles,
+                        "nuclei": list(payload.nuclei),
+                        "backend": backend,
+                        "shift_count": int(shift_count),
+                        "error_kind": error_kind,
+                        "wall_ms": int((time.perf_counter() - _t0) * 1000),
+                    },
+                )
+        except Exception:
+            pass
+
+    try:
+        prediction = predict_shifts(payload.smiles, list(payload.nuclei))
+    except ValueError as exc:
+        _emit_predict_telemetry(error_kind="invalid_smiles", backend="none", shift_count=0)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    shifts = [
+        {
+            "atom_index": s.atom_index,
+            "element": s.element,
+            "nucleus": s.nucleus,
+            "predicted_ppm": s.predicted_ppm,
+            "uncertainty_ppm": s.uncertainty_ppm,
+            "method": s.method,
+            "provenance": dict(s.provenance),
+        }
+        for s in sorted(prediction.shifts.values(), key=lambda x: x.atom_index)
+    ]
+
+    _emit_predict_telemetry(
+        error_kind=None, backend=prediction.backend, shift_count=len(shifts)
+    )
+
+    return SpectrumPredictShiftsResult(
+        smiles=payload.smiles,
+        nuclei=list(payload.nuclei),
+        backend=prediction.backend,
+        shifts=shifts,  # type: ignore[arg-type]
+        shift_count=len(shifts),
+        notes=list(prediction.notes),
     )
 
 

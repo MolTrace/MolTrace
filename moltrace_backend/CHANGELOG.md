@@ -14,6 +14,142 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.7.8 — NMRNet chemical-shift prediction wrapper (+ HOSE-code fallback) + endpoint (2026-06-01)
+
+**Headline:** A new chemical-shift prediction capability and its endpoint.
+`predict_shifts(smiles, nuclei)` returns predicted ¹H / ¹³C shifts (ppm) with a
+per-atom uncertainty, behind a two-backend design: the **NMRNet**
+SE(3)-equivariant model (Xu et al., *Nat. Comput. Sci.* **5**, 292 (2025)) as an
+**optional, lazily-loaded** backend — in-process *or* a remote GPU microservice —
+and a **HOSE-code / NMRShiftDB2 topological fallback** (spheres 6→1, decreasing
+until a match) as the always-available default. `POST /spectrum/predict/shifts`
+exposes it; the response names the backend actually used and carries notes, so it
+is transparent decision support, never an identity claim. NMRNet is integrated
+honestly — it activates only when its weights + dependencies are configured and
+**never fabricates a prediction**; until then the HOSE fallback serves.
+
+### Added
+- **`src/moltrace/spectroscopy/predict/nmrnet_wrapper.py`** — `predict_shifts(...)`
+  → `ShiftPrediction` (`{atom_index: AtomShiftPrediction}`, each with
+  `predicted_ppm` + `uncertainty_ppm` + provenance). Pipeline: RDKit parse →
+  `AddHs` → 3D embed (`ETKDGv3` + `MMFFOptimizeMolecule`, for the NMRNet path) →
+  atom types + coordinates → NMRNet inference, else fallback. Ships `hose_code()`
+  (a deterministic HOSE-style spherical code — RDKit has none), a curated
+  literature seed KB (109 reference atoms), and `load_knowledge_base()` for a
+  full NMRShiftDB2 assignment export.
+- **Optional remote NMRNet backend** — `predict/nmrnet_client.py` (HTTP client to
+  a GPU microservice; no local torch) and `nmrnet_service/` (the GPU-side FastAPI
+  scaffold + deploy README, with the inference recipe documented and the
+  model-specific calls as integration points that **raise rather than fake**).
+  Select via `MOLTRACE_NMRNET_MODULE` / `MOLTRACE_NMRNET_SERVICE_URL`.
+  `predict/qm9nmr.py` adds the QM9-NMR loader + shielding→shift (σ→δ) converter
+  for the paper-accuracy gate.
+- **`POST /spectrum/predict/shifts`** — request `SpectrumPredictShiftsRequest
+  { smiles, nuclei: ('1H'|'13C')[] (default both) }`, response
+  `SpectrumPredictShiftsResult { smiles, nuclei, backend, shifts:
+  AtomShiftPredictionOut[], shift_count, notes }`. Each `AtomShiftPredictionOut`
+  carries `atom_index, element, nucleus, predicted_ppm, uncertainty_ppm, method,
+  provenance`. Emits one `spectrum.predict_shifts` audit event per call (happy +
+  400 paths).
+
+### Validation
+- **`tests/test_nmrnet_wrapper.py`** (18) — fallback recovers seed-KB chemistry
+  (benzene 128.4 / 7.26, carbonyl 206, nitrile 118); **sphere-decreasing**
+  generalisation (toluene's ring matches benzene's environment at sphere < 6);
+  unknown environment → element prior; HOSE determinism; invalid SMILES; the
+  NMRNet adapter via a conformant stub. The **QM9-NMR "MAE within 30 % of the
+  paper" gate is written but `skipif`-skipped** until a real checkpoint +
+  QM9-NMR are present — no fabricated number is asserted.
+- **`tests/test_nmrnet_client.py`** (3) + **`tests/test_qm9nmr.py`** (4) — the
+  remote backend routed through a mocked service; an unreachable service falls
+  back cleanly to HOSE; the σ→δ conversion.
+- **`tests/test_spectrum_predict_shifts_api.py`** (7) — endpoint backend/shape,
+  default + single-nucleus, invalid-SMILES 400, unknown-nucleus 422, auth, and
+  OpenAPI registration of the path + the three models.
+- Full backend regression sweep: **996 passed, 1 skipped** (the QM9 gate), zero
+  failures (965 v0.7.7 baseline + 31 new Prompt 6 tests).
+
+### Compatibility
+- **Contract change — frontend must regenerate `schema.d.ts`.** One new endpoint
+  (`POST /spectrum/predict/shifts`) and three new models
+  (`SpectrumPredictShiftsRequest`, `SpectrumPredictShiftsResult`,
+  `AtomShiftPredictionOut`). All existing endpoints are unchanged. `npm run
+  generate:openapi` regenerates the typed contract.
+
+---
+
+## v0.7.7 — Mnova-equivalent region integration (Sum / Edited Sum / Peaks) + endpoint (2026-05-31)
+
+**Headline:** A new quantitative-integration capability and its endpoint. The
+`moltrace.spectroscopy.integration` module implements the three Mnova
+integration methods — **Sum** (classical trapezoidal area over a window),
+**Edited Sum** (the default; scales the raw area by the compound fraction of
+total peak *height* to proportionally subtract solvent / impurity), and
+**Peaks** (the sum of the fitted areas of compound peaks only) — behind a single
+`integrate(...)` dispatcher that returns a provenance-rich `IntegrationResult
+{ value, method_used, peaks_used, excluded_peaks, confidence }`. `POST
+/spectrum/analyze/integration` exposes it over the wire, integrating one or more
+ppm windows per call and reporting normalised integral ratios. On synthetic
+spectra with known impurity *area* fractions of **5 % / 10 % / 25 %**, Edited
+Sum recovers the true compound integral to **within 1 %** (exact to machine
+precision when a contaminant shares the compound linewidth; < 1 % under
+realistic correlated baseline noise).
+
+### Added
+- **`src/moltrace/spectroscopy/integration/methods.py`** — `integrate_sum`,
+  `integrate_edited_sum`, `integrate_peaks`, and the `integrate(...)` dispatcher
+  + `IntegrationResult` dataclass. Edited Sum formula `Int(Edited) = Int(Sum) ·
+  (Σ Psᵢ / Σ Pᵢ)` (compound heights over all-peak heights). `confidence ∈
+  [0, 1]` from integrated-area SNR (robust MAD baseline noise) + mean
+  compound-peak fit confidence, discounted by the contaminant fraction for
+  Edited Sum. Descending-ppm axis handled; NumPy-version-robust trapezoid
+  binding.
+- **`POST /spectrum/analyze/integration`** — request
+  `SpectrumIntegrationAnalyzeRequest { ppm_axis, intensity, peaks:
+  GSDPromptPeak[], regions: [float,float][], method: 'sum' |
+  'edited_sum' (default) | 'peaks', nucleus, solvent, field_mhz }`, response
+  `SpectrumIntegrationAnalyzeResult { regions: RegionIntegrationResult[], method,
+  region_count, backend, notes, spectrum_metadata }`. Each
+  `RegionIntegrationResult` carries `value`, `relative_value` (normalised to the
+  smallest positive region — the standard NMR ratio readout),
+  `confidence`, and `peaks_used_indices` / `excluded_peaks_indices` pointing back
+  into the request peak list. Typical flow: `POST /spectrum/analyze/gsd` →
+  integrate the returned peaks here. Emits one `spectrum.analyze_integration`
+  audit event per call (happy + 400 paths), matching the GSD / multiplet soak
+  telemetry.
+
+### Fixed
+- **Latent `np.trapz` crash in the GSD fallback-peak path** —
+  `peaks/gsd.py`'s `_fallback_peak` called `np.trapz`, which was removed in the
+  installed NumPy 2.x and would have raised `AttributeError` the first time the
+  lmfit fit fell back on a real spectrum. Bound the version-robust
+  `np.trapezoid` shim and added `tests/test_gsd_fallback_peak.py` (2 tests)
+  exercising the path directly so it can't regress silently. No behaviour change
+  on the happy path.
+
+### Validation
+- **`tests/test_integration_methods.py`** (23 tests) — Edited Sum within 1 % at
+  5/10/25 % impurity (exact noiseless; < 1 % under SNR-600 correlated noise);
+  Sum over-counts by exactly `1/(1−f)`; Peaks returns the compound area;
+  dispatcher provenance/routing; solvent+impurity exclusion; out-of-window peaks
+  ignored; empty-peaks fallback; graceful degradation under mismatched
+  linewidths; confidence responds to noise + contaminant fraction.
+- **`tests/test_spectrum_analyze_integration_api.py`** (9 tests) — the three
+  methods over HTTP, default `edited_sum`, multi-region ratios, out-of-range
+  note, axis-length-mismatch 400, auth, and OpenAPI registration of the path.
+- Full backend regression sweep: **963 passed**, zero failures (931 v0.7.6
+  baseline + 23 integration-method + 9 endpoint tests); the GSD fallback fix
+  adds 2 more (**965** total), all green.
+
+### Compatibility
+- **Contract change — frontend must regenerate `schema.d.ts`.** One new endpoint
+  (`POST /spectrum/analyze/integration`) and three new request/response models
+  (`SpectrumIntegrationAnalyzeRequest`, `SpectrumIntegrationAnalyzeResult`,
+  `RegionIntegrationResult`). All existing endpoints are unchanged. `npm run
+  generate:openapi` regenerates the typed contract.
+
+---
+
 ## v0.7.6 — Scaled the Karplus validation corpus to 18 molecules — the Boltzmann win holds, and sharpens (2026-05-31)
 
 **Headline:** Phase 41 (v0.7.5) proved on an eight-molecule corpus that
