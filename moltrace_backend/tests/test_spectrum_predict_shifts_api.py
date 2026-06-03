@@ -36,32 +36,27 @@ def _post(client: TestClient, body: dict) -> object:
     )
 
 
-def test_predict_shifts_happy_path_reports_backend_and_shifts(tmp_path) -> None:
+def test_predict_shifts_happy_path_reports_method_and_shifts(tmp_path) -> None:
     client = _client(tmp_path)
     with client:
-        res = _post(client, {"smiles": "c1ccccc1"})  # benzene
+        res = _post(client, {"smiles": "c1ccccc1", "n_conformers": 4})  # benzene
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["smiles"] == "c1ccccc1"
-    assert body["backend"] == "hose_nmrshiftdb2"  # NMRNet deps absent in CI
+    assert body["method"] == "hose_fallback"  # NMRNet deps absent in CI
+    assert body["device"] == "cpu"
+    assert "n_conformers" in body
     assert body["shift_count"] == len(body["shifts"]) > 0
-    # A fallback note explains the backend choice.
-    assert any("fallback" in n.lower() for n in body["notes"])
+    # A warning explains the fallback.
+    assert any("fallback" in w.lower() for w in body["warnings"])
     # Benzene: every carbon recovered near 128.4 ppm.
     carbons = [s for s in body["shifts"] if s["element"] == "C"]
     assert carbons and all(abs(s["predicted_ppm"] - 128.4) < 0.5 for s in carbons)
-    # Each shift carries the documented fields.
+    # Each shift carries the documented fields (no per-atom method/provenance now).
     sample = body["shifts"][0]
-    assert set(sample) >= {
-        "atom_index",
-        "element",
-        "nucleus",
-        "predicted_ppm",
-        "uncertainty_ppm",
-        "method",
-        "provenance",
-    }
-    assert sample["uncertainty_ppm"] >= 0.0
+    assert set(sample) == {"atom_index", "element", "nucleus", "predicted_ppm", "uncertainty_ppm"}
+    # uncertainty is a number (fallback) or null (single NMRNet conformer); never negative.
+    assert sample["uncertainty_ppm"] is None or sample["uncertainty_ppm"] >= 0.0
 
 
 def test_default_nuclei_predicts_both(tmp_path) -> None:

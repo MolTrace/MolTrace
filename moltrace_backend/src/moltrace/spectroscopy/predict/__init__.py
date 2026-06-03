@@ -1,7 +1,7 @@
 """Chemical-shift prediction (NMRNet wrapper + HOSE-code fallback)."""
 
 from .nmrnet_wrapper import (
-    AtomShiftPrediction,
+    AtomShift,
     NMRNetUnavailable,
     ShiftPrediction,
     build_seed_knowledge_base,
@@ -11,7 +11,7 @@ from .nmrnet_wrapper import (
 )
 
 __all__ = [
-    "AtomShiftPrediction",
+    "AtomShift",
     "NMRNetUnavailable",
     "ShiftPrediction",
     "build_seed_knowledge_base",

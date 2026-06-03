@@ -5818,6 +5818,7 @@ async def spectrum_predict_shifts(
     + bad-request paths), matching the GSD / multiplet / integration telemetry.
     """
 
+    import math
     import time
 
     from moltrace.spectroscopy.predict import predict_shifts
@@ -5825,7 +5826,7 @@ async def spectrum_predict_shifts(
     _t0 = time.perf_counter()
 
     def _emit_predict_telemetry(
-        *, error_kind: str | None, backend: str, shift_count: int
+        *, error_kind: str | None, method: str, device: str, shift_count: int
     ) -> None:
         try:
             if request is not None:
@@ -5841,7 +5842,8 @@ async def spectrum_predict_shifts(
                     metadata={
                         "smiles": payload.smiles,
                         "nuclei": list(payload.nuclei),
-                        "backend": backend,
+                        "method": method,
+                        "device": device,
                         "shift_count": int(shift_count),
                         "error_kind": error_kind,
                         "wall_ms": int((time.perf_counter() - _t0) * 1000),
@@ -5851,9 +5853,13 @@ async def spectrum_predict_shifts(
             pass
 
     try:
-        prediction = predict_shifts(payload.smiles, list(payload.nuclei))
+        prediction = predict_shifts(
+            payload.smiles, list(payload.nuclei), n_conformers=payload.n_conformers
+        )
     except ValueError as exc:
-        _emit_predict_telemetry(error_kind="invalid_smiles", backend="none", shift_count=0)
+        _emit_predict_telemetry(
+            error_kind="invalid_smiles", method="none", device="none", shift_count=0
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     shifts = [
@@ -5862,24 +5868,29 @@ async def spectrum_predict_shifts(
             "element": s.element,
             "nucleus": s.nucleus,
             "predicted_ppm": s.predicted_ppm,
-            "uncertainty_ppm": s.uncertainty_ppm,
-            "method": s.method,
-            "provenance": dict(s.provenance),
+            "uncertainty_ppm": (
+                None if math.isnan(s.uncertainty_ppm) else s.uncertainty_ppm
+            ),
         }
-        for s in sorted(prediction.shifts.values(), key=lambda x: x.atom_index)
+        for s in sorted(prediction.shifts, key=lambda x: x.atom_index)
     ]
 
     _emit_predict_telemetry(
-        error_kind=None, backend=prediction.backend, shift_count=len(shifts)
+        error_kind=None,
+        method=prediction.method,
+        device=prediction.device,
+        shift_count=len(shifts),
     )
 
     return SpectrumPredictShiftsResult(
         smiles=payload.smiles,
         nuclei=list(payload.nuclei),
-        backend=prediction.backend,
+        method=prediction.method,
+        device=prediction.device,
+        n_conformers=prediction.n_conformers,
         shifts=shifts,  # type: ignore[arg-type]
         shift_count=len(shifts),
-        notes=list(prediction.notes),
+        warnings=list(prediction.warnings),
     )
 
 
