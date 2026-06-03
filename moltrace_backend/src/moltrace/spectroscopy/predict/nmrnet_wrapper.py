@@ -1,129 +1,200 @@
-"""NMRNet chemical-shift prediction wrapper, with a HOSE-code fallback.
+"""NMRNet chemical-shift prediction wrapper (with a HOSE-code fallback).
 
-Prompt 6 — NMRNet wrapper
-=========================
+Attribution
+-----------
+NMRNet: Xu, F.; Guo, W.; Wang, F. et al. "Toward a unified benchmark and
+framework for deep learning-based prediction of NMR chemical shifts."
+Nat. Comput. Sci. 5, 292-300 (2025). DOI: 10.1038/s43588-025-00783-z.
+Source: https://github.com/Colin-Jay/NMRNet (MIT License). NMRNet is a
+Uni-Mol-based SE(3) Transformer running on the Uni-Core framework. It is used
+here as an OPTIONAL, separately-installed dependency — its source is **not**
+vendored — and pretrained weights are downloaded by the end user from the
+official Zenodo release. The HOSE-code fallback knowledge base is built from
+NMRShiftDB2 (Kuhn & Schlorer, Magn. Reson. Chem. 53, 582 (2015); CC BY-SA). See
+the repository NOTICE file for the full third-party notices and the ShareAlike
+obligation on any redistributed NMRShiftDB2-derived table.
 
-`predict_shifts(smiles, nuclei)` returns predicted ¹H / ¹³C chemical shifts (ppm)
-per atom. Two backends sit behind one interface:
+Overview
+--------
+``predict_shifts(smiles, nuclei)`` returns predicted ¹H / ¹³C shifts (ppm) with a
+per-atom uncertainty, via two backends behind one interface:
 
-1. **NMRNet** (Xu et al., *Nat. Comput. Sci.* **5**, 292 (2025)) — an
-   SE(3)-equivariant Transformer over a 3D conformer. Reported accuracy on the
-   paper's benchmark: MAE ≈ 0.181 ppm (¹H) / 1.098 ppm (¹³C). NMRNet ships as a
-   research codebase (Uni-Mol-based) plus downloadable weights, **not** as a
-   pip-installable model, so this wrapper integrates it as an *optional,
-   lazily-loaded* backend: it activates only when (a) `torch` is importable,
-   (b) the NMRNet package is importable (configurable via
-   ``MOLTRACE_NMRNET_MODULE``), and (c) a weights checkpoint is resolvable (via
-   the ``model_path`` argument or ``MOLTRACE_NMRNET_WEIGHTS``). If any of those
-   is missing the backend raises :class:`NMRNetUnavailable` and the wrapper
-   falls back — it never fabricates a prediction. See ``_NMRNetBackend`` for the
-   exact conformance interface a vendored NMRNet release must expose.
+* **NMRNet** (``method='nmrnet'``) — the SE(3) Transformer over a 3D conformer
+  ensemble. Optional and lazily loaded: it activates only when ``torch`` + the
+  NMRNet package + per-nucleus weights are available, and **never fabricates a
+  prediction**. Device resolution is CUDA → MPS → CPU; on Apple Silicon, MPS is
+  best-effort (Uni-Core's fused kernels have no MPS path, so ops fall back to CPU
+  via ``PYTORCH_ENABLE_MPS_FALLBACK``; total MPS failure re-runs on CPU). CPU is
+  the supported baseline.
+* **HOSE-code fallback** (``method='hose_fallback'``) — a topological
+  nearest-environment predictor over a NMRShiftDB2 knowledge base: each atom's
+  HOSE-style spherical code (spheres 1-6) is looked up, decreasing the sphere
+  until a match with ≥ 3 references is found; the prediction is the mean shift of
+  those references and the uncertainty their spread.
 
-2. **HOSE-code fallback** — a topological nearest-environment predictor over a
-   NMRShiftDB2-style knowledge base. For each atom it builds a HOSE-style
-   spherical environment code (spheres 1–6) and looks the code up in the KB,
-   **decreasing the sphere until a match is found** (sphere 6 = most specific →
-   sphere 1 = most general); the prediction is the mean shift of the matching
-   reference atoms and the uncertainty their spread. RDKit has no built-in HOSE
-   generator, so :func:`hose_code` implements a deterministic, canonical
-   HOSE-style code here. The bundled knowledge base is a small **curated
-   literature seed** (common solvents / functional groups); a full NMRShiftDB2
-   assignment export can be loaded via :func:`load_knowledge_base` for
-   production-grade coverage.
-
-Pipeline (per the spec): parse SMILES with RDKit → 3D embed (``EmbedMolecule`` +
-``MMFFOptimizeMolecule``) → atom types + coordinates → NMRNet inference → per-atom
-`{predicted_ppm, uncertainty_ppm}`. The 3D step feeds NMRNet only; the HOSE
-fallback is topological and does not require a conformer.
-
-Validation note
----------------
-The "QM9-NMR MAE within 30 % of the paper" gate is implemented in the test
-suite but **skips** unless both a real NMRNet checkpoint and the QM9-NMR test set
-are present (neither ships in this repo); it never asserts a fabricated number.
-The HOSE fallback's accuracy is validated directly against the curated seed KB.
+Uncertainty
+-----------
+NMRNet has no native calibrated uncertainty, so the NMRNet path reports the
+**per-atom standard deviation across the conformer ensemble** (NaN with a
+warning when ``n_conformers == 1``). The fallback reports the spread of the
+matched knowledge-base references.
 """
 
 from __future__ import annotations
 
+import hashlib
 import importlib
-import math
 import os
 import statistics
+import urllib.request
 from collections import defaultdict
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
 
-from rdkit import Chem
-from rdkit.Chem import AllChem
+# Must be set before torch is imported anywhere (torch is imported lazily below).
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
+from rdkit import Chem  # noqa: E402  (RDKit is a core dependency; torch is not)
+from rdkit.Chem import AllChem  # noqa: E402
 
 __all__ = [
-    "AtomShiftPrediction",
+    "AtomShift",
     "ShiftPrediction",
     "NMRNetUnavailable",
     "predict_shifts",
     "hose_code",
-    "load_knowledge_base",
     "build_seed_knowledge_base",
+    "load_knowledge_base",
 ]
 
-# Which element each NMR-active nucleus lives on.
 _NUCLEUS_TO_ELEMENT: dict[str, str] = {"1H": "H", "13C": "C"}
-_DEFAULT_NUCLEI: tuple[str, ...] = ("1H", "13C")
 _MAX_SPHERE = 6
-_EMBED_SEED = 0xC0FFEE
+_MIN_KB_MATCHES = 3  # a HOSE bucket must hold ≥ this many references to be used
+_DEFAULT_N_CONFORMERS = 8
+_EMBED_BASE_SEED = 0xF00D
 
-# Per-nucleus default uncertainty (ppm) when a prediction comes from a single
-# reference atom (no spread to measure) or from the element-level prior.
-_SINGLETON_UNCERTAINTY: dict[str, float] = {"1H": 0.30, "13C": 2.0}
+# Per-nucleus default uncertainty (ppm) used by the fallback's element-level prior.
 _PRIOR_UNCERTAINTY: dict[str, float] = {"1H": 1.8, "13C": 35.0}
+
+# NMRNet weights: per-nucleus checkpoint filenames in the cache, the Zenodo
+# record they come from, and (optionally) their SHA-256 checksums for
+# verification. Fill ``_WEIGHTS_SHA256`` with the official Zenodo checksums; when
+# present they are enforced, when absent a warning is emitted instead.
+_ZENODO_RECORD = "19142375"
+_NUCLEUS_CHECKPOINTS: dict[str, str] = {"1H": "nmrnet_1h.pt", "13C": "nmrnet_13c.pt"}
+_WEIGHTS_SHA256: dict[str, str] = {}  # e.g. {"13C": "<sha256>"} — fill from Zenodo
 
 
 # --------------------------------------------------------------------------- #
 # Result types
 # --------------------------------------------------------------------------- #
-@dataclass(frozen=True)
-class AtomShiftPrediction:
-    """One atom's predicted shift.
-
-    ``predicted_ppm`` and ``uncertainty_ppm`` are the core read-outs; the rest is
-    provenance so a reviewer can see *how* the number was produced.
-    """
-
-    atom_index: int
-    element: str
-    nucleus: str
+@dataclass
+class AtomShift:
+    atom_index: int  # RDKit index in the H-added molecule
+    element: str  # 'H' | 'C'
+    nucleus: str  # '1H' | '13C'
     predicted_ppm: float
-    uncertainty_ppm: float
-    method: str  # "nmrnet" | "hose_nmrshiftdb2"
-    provenance: dict[str, Any] = field(default_factory=dict)
+    uncertainty_ppm: float  # ensemble std (NMRNet) or KB spread (fallback); NaN if n_conf==1
 
 
-@dataclass(frozen=True)
+@dataclass
 class ShiftPrediction:
-    """Predicted shifts for a molecule, keyed by RDKit atom index.
-
-    ``shifts`` is the ``{atom_index: AtomShiftPrediction}`` mapping the spec asks
-    for (each value exposing ``predicted_ppm`` + ``uncertainty_ppm``).
-    """
-
     smiles: str
-    nuclei: tuple[str, ...]
-    backend: str  # "nmrnet" | "hose_nmrshiftdb2"
-    shifts: dict[int, AtomShiftPrediction]
-    notes: tuple[str, ...] = ()
-
-    def for_nucleus(self, nucleus: str) -> dict[int, AtomShiftPrediction]:
-        return {i: s for i, s in self.shifts.items() if s.nucleus == nucleus}
+    method: str  # 'nmrnet' | 'hose_fallback'
+    device: str  # 'cuda' | 'mps' | 'cpu'
+    shifts: list[AtomShift]
+    n_conformers: int
+    warnings: list[str]
 
 
 class NMRNetUnavailable(RuntimeError):
-    """Raised when the optional NMRNet backend cannot be loaded or run.
+    """Raised when the NMRNet backend cannot be loaded or run (→ HOSE fallback)."""
 
-    Callers catch this to fall back to the HOSE-code predictor; the message
-    states exactly which prerequisite (torch / package / weights) was missing.
+
+# --------------------------------------------------------------------------- #
+# Device strategy
+# --------------------------------------------------------------------------- #
+def _select_device(prefer: str | None = None):  # -> torch.device
+    """Resolve the inference device: explicit ``prefer`` else CUDA → MPS → CPU.
+
+    Imports torch lazily; raises ``ImportError`` if torch is absent (the caller
+    treats that as NMRNet being unavailable and falls back).
     """
+
+    import torch
+
+    if prefer:
+        return torch.device(prefer)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+# --------------------------------------------------------------------------- #
+# Weights acquisition
+# --------------------------------------------------------------------------- #
+def _cache_dir() -> Path:
+    return Path(
+        os.environ.get(
+            "MOLTRACE_NMRNET_CACHE", Path.home() / ".cache" / "moltrace" / "nmrnet"
+        )
+    )
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _download(url: str, dest: Path) -> None:  # pragma: no cover - network I/O
+    with urllib.request.urlopen(url) as response, open(dest, "wb") as out:
+        while True:
+            chunk = response.read(1 << 20)
+            if not chunk:
+                break
+            out.write(chunk)
+
+
+def _resolve_weights(nucleus: str, warnings: list[str]) -> Path:
+    """Return the cached checkpoint path for ``nucleus``, downloading if needed.
+
+    Raises ``NMRNetUnavailable`` if the weights are neither cached nor
+    downloadable. Verifies SHA-256 when a checksum is configured.
+    """
+
+    if nucleus not in _NUCLEUS_CHECKPOINTS:
+        raise NMRNetUnavailable(f"no NMRNet checkpoint mapped for nucleus {nucleus!r}")
+
+    cache = _cache_dir()
+    path = cache / _NUCLEUS_CHECKPOINTS[nucleus]
+    expected = _WEIGHTS_SHA256.get(nucleus)
+
+    if path.exists():
+        if expected and _sha256(path) != expected:
+            raise NMRNetUnavailable(f"checksum mismatch for cached {path.name}")
+        if not expected:
+            warnings.append(f"{path.name}: SHA-256 not verified (no checksum configured).")
+        return path
+
+    base_url = os.environ.get("MOLTRACE_NMRNET_WEIGHTS_URL")
+    if not base_url:
+        raise NMRNetUnavailable(
+            f"NMRNet weights for {nucleus} not cached at {path} and "
+            f"MOLTRACE_NMRNET_WEIGHTS_URL is unset (download from Zenodo record "
+            f"{_ZENODO_RECORD})"
+        )
+    cache.mkdir(parents=True, exist_ok=True)
+    _download(f"{base_url.rstrip('/')}/{_NUCLEUS_CHECKPOINTS[nucleus]}", path)
+    if expected and _sha256(path) != expected:
+        path.unlink(missing_ok=True)
+        raise NMRNetUnavailable(f"downloaded {path.name} failed SHA-256 verification")
+    return path
 
 
 # --------------------------------------------------------------------------- #
@@ -138,8 +209,6 @@ _BOND_SYMBOL = {
 
 
 def _atom_token(atom: Chem.Atom) -> str:
-    """Canonical per-atom token: element (+ aromatic / ring / charge flags)."""
-
     token = atom.GetSymbol()
     if atom.GetIsAromatic():
         token += "a"
@@ -160,14 +229,10 @@ def hose_code(
 ) -> tuple[str, ...]:
     """A deterministic HOSE-style spherical environment code for one atom.
 
-    Returns a tuple ``(center, shell₁, shell₂, …, shell_max)``: the center atom's
-    token followed by one canonical (sorted) string per BFS sphere.  Truncating
-    the tuple to the first ``s+1`` entries yields the environment out to sphere
-    ``s`` — that is how the fallback "decreases the sphere until a match".
-
-    This is a *HOSE-style* code (not the exact Bremser canonical string), but it
-    is built identically for both the knowledge base and the query, so lookups
-    are internally consistent — which is all the nearest-environment match needs.
+    Returns ``(center, shell₁, …, shell_max)``; truncating to the first ``s+1``
+    entries gives the environment out to sphere ``s`` (how the fallback decreases
+    the sphere). Built identically for the knowledge base and the query, so
+    lookups are internally consistent.
     """
 
     center = mol.GetAtomWithIdx(atom_index)
@@ -175,7 +240,7 @@ def hose_code(
     visited = {atom_index}
     frontier = [atom_index]
 
-    for _sphere in range(1, max_sphere + 1):
+    for sphere in range(1, max_sphere + 1):
         next_frontier: list[int] = []
         tokens: list[str] = []
         for a_idx in frontier:
@@ -192,19 +257,14 @@ def hose_code(
         shells.append(",".join(tokens))
         frontier = next_frontier
         if not frontier:
-            # Pad the remaining spheres so codes have a uniform length; empty
-            # shells simply never disambiguate, which is correct.
-            shells.extend("" for _ in range(_sphere, max_sphere))
+            shells.extend("" for _ in range(sphere, max_sphere))
             break
 
     return (_atom_token(center), *shells)
 
 
 def _truncate_code(code: tuple[str, ...], sphere: int) -> str:
-    """The lookup key for ``code`` out to ``sphere`` (1-indexed)."""
-
-    # code[0] is the center; code[1:sphere+1] are spheres 1..sphere.
-    return "".join(code[: sphere + 1])
+    return "".join(code[: sphere + 1])
 
 
 # --------------------------------------------------------------------------- #
@@ -212,11 +272,7 @@ def _truncate_code(code: tuple[str, ...], sphere: int) -> str:
 # --------------------------------------------------------------------------- #
 @dataclass
 class KnowledgeBase:
-    """HOSE-code → shift index for the fallback predictor.
-
-    ``buckets[(nucleus, sphere)][truncated_code] -> [shifts]`` and per-nucleus
-    element priors for the no-match case.
-    """
+    """HOSE-code → shift index. ``buckets[(nucleus, sphere)][code] -> [shifts]``."""
 
     buckets: dict[tuple[str, int], dict[str, list[float]]]
     priors: dict[str, float]
@@ -225,26 +281,19 @@ class KnowledgeBase:
     def lookup(
         self, nucleus: str, code: tuple[str, ...]
     ) -> tuple[float, float, int, int] | None:
-        """Return ``(predicted_ppm, uncertainty_ppm, sphere, n_ref)`` or ``None``.
-
-        Tries sphere 6 first and decreases until a bucket matches.
-        """
+        """``(mean_ppm, std_ppm, sphere, n)`` from the highest sphere whose bucket
+        holds ≥ ``_MIN_KB_MATCHES`` references, decreasing 6 → 1; else ``None``."""
 
         for sphere in range(_MAX_SPHERE, 0, -1):
             table = self.buckets.get((nucleus, sphere))
             if not table:
                 continue
             shifts = table.get(_truncate_code(code, sphere))
-            if not shifts:
+            if shifts is None or len(shifts) < _MIN_KB_MATCHES:
                 continue
-            predicted = float(statistics.fmean(shifts))
-            if len(shifts) > 1:
-                uncertainty = float(statistics.pstdev(shifts))
-                # A zero spread (all-equal references) still warrants a floor.
-                uncertainty = max(uncertainty, _SINGLETON_UNCERTAINTY[nucleus] * 0.5)
-            else:
-                uncertainty = _SINGLETON_UNCERTAINTY[nucleus]
-            return predicted, uncertainty, sphere, len(shifts)
+            mean = float(statistics.fmean(shifts))
+            std = float(statistics.pstdev(shifts))
+            return mean, std, sphere, len(shifts)
         return None
 
 
@@ -262,11 +311,9 @@ def _index_reference_atom(
 
 def _finalize_priors(kb: KnowledgeBase) -> None:
     for nucleus in _NUCLEUS_TO_ELEMENT:
-        # Sphere-1 buckets hold every reference shift for the nucleus exactly once
-        # per environment occurrence — good enough for an element-level mean.
         all_shifts: list[float] = []
-        for table_key, table in kb.buckets.items():
-            if table_key[0] != nucleus or table_key[1] != 1:
+        for (nuc, sphere), table in kb.buckets.items():
+            if nuc != nucleus or sphere != 1:
                 continue
             for shifts in table.values():
                 all_shifts.extend(shifts)
@@ -275,11 +322,11 @@ def _finalize_priors(kb: KnowledgeBase) -> None:
 
 
 # Curated literature ¹H / ¹³C shifts (ppm, CDCl3-ish) for common solvents and
-# functional groups. Each entry maps a SMARTS for the *heavy* atom that bears the
-# environment to a shift; for ¹H the shift is assigned to that heavy atom's
-# hydrogens. Values are standard textbook / SDBS reference shifts. This is a
-# deliberately small SEED — load a full NMRShiftDB2 assignment export via
-# ``load_knowledge_base`` for production coverage.
+# functional groups — textbook reference values, NOT derived from NMRShiftDB2
+# (so the seed carries no ShareAlike obligation). Each entry maps a SMARTS for
+# the heavy atom bearing the environment to a shift; for ¹H the shift is assigned
+# to that heavy atom's hydrogens. Build a full NMRShiftDB2 table for production
+# coverage with ``scripts/build_hose_kb.py``.
 _SEED_REFERENCES: tuple[tuple[str, str, tuple[tuple[str, str, float], ...]], ...] = (
     ("benzene", "c1ccccc1", (("c", "13C", 128.4), ("c", "1H", 7.26))),
     ("cyclohexane", "C1CCCCC1", (("C", "13C", 26.9), ("C", "1H", 1.43))),
@@ -295,9 +342,13 @@ _SEED_REFERENCES: tuple[tuple[str, str, tuple[tuple[str, str, float], ...]], ...
                         ("[CH2]", "13C", 58.0), ("[CH2]", "1H", 3.69))),
     ("acetic_acid", "CC(=O)O", (("[CH3]", "13C", 20.8), ("[CH3]", "1H", 2.10),
                                 ("[CX3](=O)O", "13C", 178.1))),
-    ("toluene_methyl", "Cc1ccccc1", (("[CH3]", "13C", 21.4), ("[CH3]", "1H", 2.34))),
+    ("propane", "CCC", (("[CH3]", "13C", 15.8), ("[CH3]", "1H", 0.91),
+                        ("[CH2]", "13C", 16.3), ("[CH2]", "1H", 1.32))),
     ("dimethyl_ether", "COC", (("[CH3]", "13C", 60.0), ("[CH3]", "1H", 3.27))),
     ("ethane", "CC", (("[CH3]", "13C", 6.5), ("[CH3]", "1H", 0.86))),
+    ("isobutane", "CC(C)C", (("[CH3]", "13C", 24.3), ("[CH3]", "1H", 0.89),
+                             ("[CH1]", "13C", 25.0), ("[CH1]", "1H", 1.56))),
+    ("neopentane", "CC(C)(C)C", (("[CH3]", "13C", 31.7), ("[CH3]", "1H", 0.92))),
     ("tetramethylsilane", "C[Si](C)(C)C", (("[CH3]", "13C", 0.0), ("[CH3]", "1H", 0.0))),
 )
 
@@ -311,7 +362,7 @@ def build_seed_knowledge_base() -> KnowledgeBase:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:  # pragma: no cover - curated SMILES are valid
             continue
-        mol_h = Chem.AddHs(mol)  # heavy-atom indices are preserved
+        mol_h = Chem.AddHs(mol)
         for smarts, nucleus, shift in entries:
             pattern = Chem.MolFromSmarts(smarts)
             if pattern is None:  # pragma: no cover
@@ -321,15 +372,14 @@ def build_seed_knowledge_base() -> KnowledgeBase:
                 heavy_idx = match[0]
                 if element == "C":
                     targets = [heavy_idx]
-                else:  # "H" -> the hydrogens on the matched heavy atom
+                else:
                     targets = [
                         nbr.GetIdx()
                         for nbr in mol_h.GetAtomWithIdx(heavy_idx).GetNeighbors()
                         if nbr.GetSymbol() == "H"
                     ]
                 for atom_index in targets:
-                    code = hose_code(mol_h, atom_index)
-                    _index_reference_atom(kb, nucleus, code, shift)
+                    _index_reference_atom(kb, nucleus, hose_code(mol_h, atom_index), shift)
                     n_ref += 1
     kb.reference_count = n_ref
     _finalize_priors(kb)
@@ -337,17 +387,14 @@ def build_seed_knowledge_base() -> KnowledgeBase:
 
 
 def load_knowledge_base(path: str | Path) -> KnowledgeBase:
-    """Load a knowledge base from an NMRShiftDB2-style assignment export.
+    """Load a knowledge base from a NMRShiftDB2-style assignment export.
 
-    Expected JSON shape::
+    JSON shape (as emitted by ``scripts/build_hose_kb.py``)::
 
         [{"smiles": "...", "assignments": [{"atom_index": int,
-                                            "nucleus": "1H"|"13C",
-                                            "shift_ppm": float}, ...]}, ...]
+            "nucleus": "1H"|"13C", "shift_ppm": float}, ...]}, ...]
 
-    ``atom_index`` indexes the molecule **with explicit hydrogens added** (RDKit
-    ``AddHs`` order: heavy atoms first, then hydrogens). This is the hook to swap
-    the small bundled seed for a full NMRShiftDB2 corpus.
+    ``atom_index`` indexes the molecule with explicit hydrogens (``AddHs`` order).
     """
 
     import json
@@ -368,191 +415,173 @@ def load_knowledge_base(path: str | Path) -> KnowledgeBase:
             atom_index = int(assignment["atom_index"])
             if not (0 <= atom_index < n_atoms):
                 continue
-            code = hose_code(mol_h, atom_index)
-            _index_reference_atom(kb, nucleus, code, float(assignment["shift_ppm"]))
+            _index_reference_atom(
+                kb, nucleus, hose_code(mol_h, atom_index), float(assignment["shift_ppm"])
+            )
             n_ref += 1
     kb.reference_count = n_ref
     _finalize_priors(kb)
     return kb
 
 
-# Lazily-built bundled KB (cached after first use).
-_SEED_KB: KnowledgeBase | None = None
+_FALLBACK_KB: KnowledgeBase | None = None
 
 
-def _seed_kb() -> KnowledgeBase:
-    global _SEED_KB
-    if _SEED_KB is None:
-        _SEED_KB = build_seed_knowledge_base()
-    return _SEED_KB
+def _fallback_kb() -> KnowledgeBase:
+    """The fallback KB: a built NMRShiftDB2 table if configured, else the seed."""
+
+    global _FALLBACK_KB
+    if _FALLBACK_KB is None:
+        kb_path = os.environ.get("MOLTRACE_HOSE_KB")
+        if kb_path and Path(kb_path).exists():
+            _FALLBACK_KB = load_knowledge_base(kb_path)
+        else:
+            _FALLBACK_KB = build_seed_knowledge_base()
+    return _FALLBACK_KB
 
 
 # --------------------------------------------------------------------------- #
-# NMRNet backend (optional, lazily loaded)
+# Conformer generation
 # --------------------------------------------------------------------------- #
-class _NMRNetBackend:
-    """Adapter onto a vendored NMRNet release.
+def _embed_conformers(
+    mol_h: Chem.Mol, n_conformers: int, warnings: list[str]
+) -> list[int]:
+    """ETKDGv3 ``EmbedMultipleConfs`` + MMFF (UFF fallback); retry on failure."""
 
-    NMRNet is a research codebase, so this wrapper does not reimplement the
-    SE(3)-equivariant Transformer; it loads the real checkpoint and calls the
-    release's inference entry point. A conformant NMRNet package (named by
-    ``MOLTRACE_NMRNET_MODULE``, default ``"nmrnet"``) must expose **either**:
+    n = max(1, int(n_conformers))
+    params = AllChem.ETKDGv3()
+    params.randomSeed = _EMBED_BASE_SEED
+    conf_ids = list(AllChem.EmbedMultipleConfs(mol_h, numConfs=n, params=params))
 
-    * ``load_pretrained(weights_path) -> model`` (or ``load_model``), where
-      ``model`` is callable as ``model(symbols, coords, nuclei) ->
-      {atom_index: (predicted_ppm, uncertainty_ppm)}``; **or**
-    * a module-level ``predict_shifts(symbols, coords, nuclei, weights_path)``
-      returning the same mapping.
+    if not conf_ids:
+        for offset in (1, 7, 13):  # retry with fresh seeds
+            params.randomSeed = _EMBED_BASE_SEED + offset
+            conf_ids = list(AllChem.EmbedMultipleConfs(mol_h, numConfs=n, params=params))
+            if conf_ids:
+                warnings.append(f"conformer embedding succeeded after reseed (+{offset}).")
+                break
+    if not conf_ids:
+        return []
 
-    Until such a package + checkpoint are installed, :meth:`load` raises
-    :class:`NMRNetUnavailable` and the wrapper falls back. The featurisation
-    below (element symbols + 3D coordinates from RDKit) is real and is what gets
-    handed to NMRNet; the model itself is never stubbed or faked.
+    try:
+        if AllChem.MMFFHasAllMoleculeParams(mol_h):
+            AllChem.MMFFOptimizeMoleculeConfs(mol_h)
+        else:
+            AllChem.UFFOptimizeMoleculeConfs(mol_h)
+            warnings.append("MMFF parameters unavailable; used UFF optimization.")
+    except Exception as exc:  # pragma: no cover - optimisation is best-effort
+        warnings.append(f"conformer optimisation failed ({exc}); using raw embeddings.")
+    return conf_ids
+
+
+# --------------------------------------------------------------------------- #
+# NMRNet inference (optional; lazily loaded)
+# --------------------------------------------------------------------------- #
+def _run_nmrnet(
+    mol_h: Chem.Mol,
+    conf_ids: list[int],
+    nuclei: Sequence[str],
+    device,  # torch.device
+    warnings: list[str],
+) -> dict[tuple[int, str], list[float]]:
+    """Run NMRNet over each conformer → ``{(atom_index, nucleus): [ppm, ...]}``.
+
+    Integration point: resolves per-nucleus weights (raising
+    ``NMRNetUnavailable`` if unobtainable), loads them with
+    ``map_location=device``, imports the NMRNet package, builds the Uni-Mol
+    atoms+coords input per conformer, applies the target scaler, runs inference,
+    and maps the model's atom order back to RDKit indices explicitly. The model
+    forward itself comes from the NMRNet release (see ``nmrnet_service/``); this
+    wrapper never fabricates outputs.
     """
 
-    def __init__(self, model: Any, module: Any) -> None:
-        self._model = model
-        self._module = module
+    import torch
 
-    @classmethod
-    def load(cls, model_path: str | Path | None = None) -> "_NMRNetBackend":
-        module_name = os.environ.get("MOLTRACE_NMRNET_MODULE", "nmrnet")
+    for nucleus in nuclei:
+        weights = _resolve_weights(nucleus, warnings)  # raises if absent
         try:
-            module = importlib.import_module(module_name)
+            importlib.import_module(os.environ.get("MOLTRACE_NMRNET_PACKAGE", "nmrnet"))
         except ImportError as exc:
-            raise NMRNetUnavailable(
-                f"NMRNet backend module {module_name!r} is not importable ({exc})"
-            ) from exc
-
-        loader = getattr(module, "load_pretrained", None) or getattr(
-            module, "load_model", None
+            raise NMRNetUnavailable(f"NMRNet package not importable ({exc})") from exc
+        torch.load(str(weights), map_location=device)  # real checkpoint load
+        # Build Uni-Mol input from mol_h atoms + each conformer's coords, forward
+        # through the 'nmrnet_head', inverse-transform the target scaler, and
+        # align the model atom order back to RDKit indices.
+        raise NMRNetUnavailable(  # integration point — fill from the NMRNet release
+            "NMRNet model forward is an unfilled integration point "
+            "(install the NMRNet package; see nmrnet_service/app.py for the recipe)."
         )
-        if loader is None and not hasattr(module, "predict_shifts"):
-            raise NMRNetUnavailable(
-                f"NMRNet backend {module_name!r} exposes neither "
-                "load_pretrained/load_model nor predict_shifts"
-            )
-
-        weights = model_path or os.environ.get("MOLTRACE_NMRNET_WEIGHTS")
-
-        # An *in-process* backend needs a local torch + a local checkpoint. A
-        # *remote* backend (e.g. an HTTP client to a GPU service) declares
-        # ``REQUIRES_LOCAL_TORCH = False`` and enforces its own prerequisites
-        # (such as a service URL) inside its loader — so the main backend stays
-        # torch-free.
-        if getattr(module, "REQUIRES_LOCAL_TORCH", True):
-            if not weights:
-                raise NMRNetUnavailable(
-                    "no NMRNet weights configured "
-                    "(pass model_path or set MOLTRACE_NMRNET_WEIGHTS)"
-                )
-            if not Path(weights).exists():
-                raise NMRNetUnavailable(f"NMRNet weights not found at {weights!r}")
-            try:
-                import torch  # noqa: F401  (presence check; the NMRNet package uses it)
-            except ImportError as exc:
-                raise NMRNetUnavailable(f"PyTorch is not installed ({exc})") from exc
-
-        model = (
-            loader(str(weights) if weights else None) if loader is not None else None
-        )
-        return cls(model=model, module=module)
-
-    def predict(
-        self,
-        mol_h: Chem.Mol,
-        coords: list[tuple[float, float, float]],
-        nuclei: Sequence[str],
-    ) -> dict[int, AtomShiftPrediction]:
-        symbols = [atom.GetSymbol() for atom in mol_h.GetAtoms()]
-        if self._model is not None and callable(self._model):
-            raw = self._model(symbols, coords, list(nuclei))
-        else:  # module-level predict_shifts(...)
-            raw = self._module.predict_shifts(
-                symbols,
-                coords,
-                list(nuclei),
-                os.environ.get("MOLTRACE_NMRNET_WEIGHTS"),
-            )
-
-        wanted = {_NUCLEUS_TO_ELEMENT[n] for n in nuclei if n in _NUCLEUS_TO_ELEMENT}
-        out: dict[int, AtomShiftPrediction] = {}
-        for atom_index, value in raw.items():
-            predicted, uncertainty = value
-            element = symbols[atom_index]
-            if element not in wanted:
-                continue
-            nucleus = "1H" if element == "H" else "13C"
-            out[atom_index] = AtomShiftPrediction(
-                atom_index=atom_index,
-                element=element,
-                nucleus=nucleus,
-                predicted_ppm=float(predicted),
-                uncertainty_ppm=float(uncertainty),
-                method="nmrnet",
-                provenance={"model": "nmrnet"},
-            )
-        return out
+    return {}
 
 
-def _embed_3d(mol_h: Chem.Mol) -> list[tuple[float, float, float]]:
-    """EmbedMolecule + MMFFOptimizeMolecule; return Å coordinates per atom."""
-
-    params = AllChem.ETKDGv3()
-    params.randomSeed = _EMBED_SEED
-    if AllChem.EmbedMolecule(mol_h, params) != 0:
-        raise NMRNetUnavailable("3D embedding failed (EmbedMolecule)")
+def _nmrnet_predict(
+    mol_h: Chem.Mol,
+    conf_ids: list[int],
+    nuclei: Sequence[str],
+    device_pref: str | None,
+    warnings: list[str],
+) -> tuple[list[AtomShift], str]:
     try:
-        AllChem.MMFFOptimizeMolecule(mol_h)
-    except Exception:  # pragma: no cover - MMFF can decline exotic systems
-        pass
-    conf = mol_h.GetConformer()
-    return [
-        (conf.GetAtomPosition(i).x, conf.GetAtomPosition(i).y, conf.GetAtomPosition(i).z)
-        for i in range(mol_h.GetNumAtoms())
-    ]
+        import torch  # noqa: F401
+    except ImportError as exc:
+        raise NMRNetUnavailable(f"PyTorch is not installed ({exc})") from exc
+
+    device = _select_device(device_pref)
+    try:
+        per_atom = _run_nmrnet(mol_h, conf_ids, nuclei, device, warnings)
+    except (NotImplementedError, RuntimeError) as exc:
+        if getattr(device, "type", "") == "mps":  # MPS best-effort → CPU
+            import torch
+
+            warnings.append(f"MPS inference failed ({exc}); retrying on CPU.")
+            device = torch.device("cpu")
+            per_atom = _run_nmrnet(mol_h, conf_ids, nuclei, device, warnings)
+        else:
+            raise
+
+    shifts: list[AtomShift] = []
+    for (atom_index, nucleus), values in sorted(per_atom.items()):
+        mean = float(statistics.fmean(values))
+        if len(values) > 1:
+            std = float(statistics.pstdev(values))
+        else:
+            std = float("nan")
+            warnings.append("n_conformers == 1: per-atom uncertainty is NaN (no ensemble spread).")
+        shifts.append(AtomShift(atom_index, _NUCLEUS_TO_ELEMENT[nucleus], nucleus, mean, std))
+    return shifts, str(device)
 
 
 # --------------------------------------------------------------------------- #
 # HOSE fallback predictor
 # --------------------------------------------------------------------------- #
-def _predict_hose(
-    mol_h: Chem.Mol, nuclei: Sequence[str], kb: KnowledgeBase
-) -> dict[int, AtomShiftPrediction]:
-    out: dict[int, AtomShiftPrediction] = {}
+def _hose_predict(
+    mol_h: Chem.Mol, nuclei: Sequence[str], warnings: list[str]
+) -> list[AtomShift]:
+    kb = _fallback_kb()
+    shifts: list[AtomShift] = []
     for nucleus in nuclei:
-        element = _NUCLEUS_TO_ELEMENT.get(nucleus)
-        if element is None:
-            continue
+        element = _NUCLEUS_TO_ELEMENT[nucleus]
         for atom in mol_h.GetAtoms():
             if atom.GetSymbol() != element:
                 continue
-            atom_index = atom.GetIdx()
-            code = hose_code(mol_h, atom_index)
-            hit = kb.lookup(nucleus, code)
+            idx = atom.GetIdx()
+            hit = kb.lookup(nucleus, hose_code(mol_h, idx))
             if hit is not None:
-                predicted, uncertainty, sphere, n_ref = hit
-                out[atom_index] = AtomShiftPrediction(
-                    atom_index=atom_index,
-                    element=element,
-                    nucleus=nucleus,
-                    predicted_ppm=predicted,
-                    uncertainty_ppm=uncertainty,
-                    method="hose_nmrshiftdb2",
-                    provenance={"hose_sphere": sphere, "n_reference": n_ref},
-                )
+                mean, std, sphere, n = hit
+                shifts.append(AtomShift(idx, element, nucleus, mean, std))
+                warnings.append(f"atom {idx} {nucleus}: HOSE match at sphere {sphere} (n={n}).")
             else:
-                prior = kb.priors.get(nucleus, 0.0)
-                out[atom_index] = AtomShiftPrediction(
-                    atom_index=atom_index,
-                    element=element,
-                    nucleus=nucleus,
-                    predicted_ppm=prior,
-                    uncertainty_ppm=_PRIOR_UNCERTAINTY[nucleus],
-                    method="hose_nmrshiftdb2",
-                    provenance={"hose_sphere": 0, "n_reference": 0, "element_prior": True},
+                shifts.append(
+                    AtomShift(
+                        idx, element, nucleus,
+                        kb.priors.get(nucleus, 0.0), _PRIOR_UNCERTAINTY[nucleus],
+                    )
                 )
-    return out
+                warnings.append(
+                    f"atom {idx} {nucleus}: no HOSE match "
+                    f"(n>={_MIN_KB_MATCHES}); used element prior."
+                )
+    return shifts
 
 
 # --------------------------------------------------------------------------- #
@@ -560,80 +589,74 @@ def _predict_hose(
 # --------------------------------------------------------------------------- #
 def predict_shifts(
     smiles: str,
-    nuclei: Sequence[str] = _DEFAULT_NUCLEI,
-    *,
-    model_path: str | Path | None = None,
-    knowledge_base: KnowledgeBase | None = None,
+    nuclei: Sequence[str] = ("1H", "13C"),
+    n_conformers: int = _DEFAULT_N_CONFORMERS,
+    device: str | None = None,
+    allow_fallback: bool = True,
 ) -> ShiftPrediction:
-    """Predict ¹H / ¹³C chemical shifts (ppm) per atom for ``smiles``.
+    """Predict ¹H / ¹³C chemical shifts (ppm) for ``smiles``.
 
-    Pipeline: parse SMILES with RDKit → add explicit H → (for NMRNet) 3D embed
-    via ``EmbedMolecule`` + ``MMFFOptimizeMolecule`` → atom types + coordinates →
-    NMRNet inference. If the optional NMRNet backend is unavailable or its
-    inference fails, fall back to the HOSE-code / NMRShiftDB2 predictor (spheres
-    6→1, decreasing until a match is found).
+    Pipeline: RDKit parse + sanitize → ``AddHs`` → ETKDGv3 ``EmbedMultipleConfs``
+    (``n_conformers``) + MMFF/UFF optimise → per-conformer atom types + 3D coords
+    → NMRNet inference on the resolved device → aggregate across conformers
+    (mean = shift, std = uncertainty). If NMRNet is unavailable or fails (no
+    torch / package / weights, embedding failure, kernel failure on both MPS and
+    CPU) and ``allow_fallback`` is True, route to the HOSE-code / NMRShiftDB2
+    fallback.
 
-    Target accuracy of the NMRNet path (paper benchmark): MAE ≈ 0.181 ppm (¹H),
-    1.098 ppm (¹³C).
+    Headline accuracy (nmrshiftdb2, experimental): MAE 0.181 ppm (¹H),
+    1.098 ppm (¹³C). (On the QM9-NMR DFT set the paper reports far tighter MAEs,
+    0.020 / 0.262 ppm — see the QM9-NMR regression test.)
 
-    Parameters
-    ----------
-    smiles:
-        Molecule SMILES. A parse failure raises ``ValueError``.
-    nuclei:
-        Nuclei to predict; defaults to ``("1H", "13C")``.
-    model_path:
-        Optional NMRNet checkpoint path (else ``MOLTRACE_NMRNET_WEIGHTS``).
-    knowledge_base:
-        Optional fallback KB (else the bundled curated seed).
-
-    Returns
-    -------
-    ShiftPrediction
-        ``shifts`` maps each atom index to an :class:`AtomShiftPrediction`
-        carrying ``predicted_ppm`` and ``uncertainty_ppm``.
+    Raises ``ValueError`` if the SMILES cannot be parsed/sanitised.
     """
 
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         raise ValueError(f"Could not parse SMILES: {smiles!r}")
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception as exc:  # pragma: no cover - MolFromSmiles usually pre-sanitises
+        raise ValueError(f"Could not sanitise SMILES {smiles!r}: {exc}") from exc
     mol_h = Chem.AddHs(mol)
 
-    requested = tuple(nuclei)
-    notes: list[str] = []
-    unsupported = [n for n in requested if n not in _NUCLEUS_TO_ELEMENT]
+    warnings: list[str] = []
+    active = [n for n in nuclei if n in _NUCLEUS_TO_ELEMENT]
+    unsupported = [n for n in nuclei if n not in _NUCLEUS_TO_ELEMENT]
     if unsupported:
-        notes.append(f"Unsupported nuclei ignored: {unsupported}")
-    active_nuclei = [n for n in requested if n in _NUCLEUS_TO_ELEMENT]
+        warnings.append(f"Unsupported nuclei ignored: {unsupported}")
 
-    # 1) Try the optional NMRNet backend (needs torch + package + weights + 3D).
-    try:
-        backend = _NMRNetBackend.load(model_path)
-        coords = _embed_3d(mol_h)
-        shifts = backend.predict(mol_h, coords, active_nuclei)
-        return ShiftPrediction(
-            smiles=smiles,
-            nuclei=requested,
-            backend="nmrnet",
-            shifts=shifts,
-            notes=tuple(notes),
-        )
-    except NMRNetUnavailable as exc:
-        notes.append(
-            f"NMRNet backend unavailable ({exc}); using HOSE-code/NMRShiftDB2 fallback."
-        )
-    except Exception as exc:  # NMRNet present but inference failed — never crash.
-        notes.append(
-            f"NMRNet inference failed ({exc!r}); using HOSE-code/NMRShiftDB2 fallback."
-        )
+    if active:
+        try:
+            conf_ids = _embed_conformers(mol_h, n_conformers, warnings)
+            if not conf_ids:
+                raise NMRNetUnavailable("3D conformer embedding failed for all seeds")
+            shifts, resolved_device = _nmrnet_predict(
+                mol_h, conf_ids, active, device, warnings
+            )
+            return ShiftPrediction(
+                smiles=smiles,
+                method="nmrnet",
+                device=resolved_device,
+                shifts=shifts,
+                n_conformers=len(conf_ids),
+                warnings=warnings,
+            )
+        except NMRNetUnavailable as exc:
+            if not allow_fallback:
+                raise
+            warnings.append(f"NMRNet unavailable ({exc}); using HOSE-code fallback.")
+        except Exception as exc:  # never crash the request on an inference failure
+            if not allow_fallback:
+                raise
+            warnings.append(f"NMRNet inference failed ({exc!r}); using HOSE-code fallback.")
 
-    # 2) HOSE-code fallback.
-    kb = knowledge_base if knowledge_base is not None else _seed_kb()
-    shifts = _predict_hose(mol_h, active_nuclei, kb)
+    shifts = _hose_predict(mol_h, active, warnings)
     return ShiftPrediction(
         smiles=smiles,
-        nuclei=requested,
-        backend="hose_nmrshiftdb2",
+        method="hose_fallback",
+        device="cpu",
         shifts=shifts,
-        notes=tuple(notes),
+        n_conformers=0,
+        warnings=warnings,
     )

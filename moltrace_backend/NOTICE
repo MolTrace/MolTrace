@@ -1,0 +1,58 @@
+MolTrace — Third-Party Notices
+==============================
+
+This product includes third-party software and data. Their licenses and the
+attributions they require are reproduced below.
+
+-------------------------------------------------------------------------------
+NMRNet  (chemical-shift prediction model)
+-------------------------------------------------------------------------------
+NMRNet: Xu, F.; Guo, W.; Wang, F. et al. "Toward a unified benchmark and
+framework for deep learning-based prediction of nuclear magnetic resonance
+chemical shifts." Nat. Comput. Sci. 5, 292-300 (2025).
+DOI: 10.1038/s43588-025-00783-z
+Source: https://github.com/Colin-Jay/NMRNet
+License: MIT.
+
+NMRNet is used as an OPTIONAL, separately-installed dependency (a pinned package
+or git submodule). Its source is NOT vendored into this repository, so its MIT
+license and copyright remain intact and separate. Pretrained weights are
+downloaded by the end user from the official Zenodo release and are not
+redistributed here.
+
+-------------------------------------------------------------------------------
+Uni-Core / Uni-Mol  (NMRNet's underlying framework)
+-------------------------------------------------------------------------------
+NMRNet is built on Uni-Core and Uni-Mol (DP Technology).
+Source: https://github.com/dptech-corp/Uni-Core
+        https://github.com/dptech-corp/Uni-Mol
+License: MIT.
+Installed transitively as a dependency of NMRNet; not vendored here.
+
+-------------------------------------------------------------------------------
+NMRShiftDB2  (HOSE-code fallback knowledge base)
+-------------------------------------------------------------------------------
+The HOSE-code chemical-shift fallback predictor is built from NMRShiftDB2.
+Kuhn, S.; Schlorer, N. E. "Facilitating quality control for spectra assignments
+of small organic molecules: nmrshiftdb2." Magn. Reson. Chem. 53, 582-589 (2015).
+Source: https://nmrshiftdb.nmr.uni-koeln.de
+License: NMRShiftDB2 data is distributed under CC BY-SA (Creative Commons
+Attribution-ShareAlike).
+
+ShareAlike obligation: any redistributed knowledge-base table DERIVED from
+NMRShiftDB2 -- e.g. the HOSE-code -> shift table produced by
+scripts/build_hose_kb.py -- is a derivative work and must itself be distributed
+under CC BY-SA (with attribution to NMRShiftDB2). The raw NMRShiftDB2 database
+and any table derived from it are NOT committed to this repository; build them
+locally (see scripts/build_hose_kb.py). The small literature seed table embedded
+in nmrnet_wrapper.py is independently sourced from textbook reference shifts and
+is not derived from NMRShiftDB2.
+
+NOTE: verify the exact current NMRShiftDB2 license and version terms before any
+external redistribution of a derived table.
+
+-------------------------------------------------------------------------------
+RDKit  (cheminformatics toolkit)
+-------------------------------------------------------------------------------
+RDKit: Open-source cheminformatics. https://www.rdkit.org
+License: BSD-3-Clause.
