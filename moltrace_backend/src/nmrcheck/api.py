@@ -5618,17 +5618,18 @@ async def spectrum_analyze_integration(
     request: Request,  # auto-injected by FastAPI; tests may pass None
     context: AccessContext = Depends(require_access_context),
 ) -> SpectrumIntegrationAnalyzeResult:
-    """Mnova-equivalent region integration (Prompt 5).
+    """Standard region integration (Prompt 5).
 
     Integrate one or more ppm windows of a processed spectrum by one of three
     methods:
 
       * ``sum``        -- classical trapezoidal area over the window (everything
         in it, contaminants included).
-      * ``edited_sum`` -- *default* -- Mnova's Edited Sum: scales the raw area by
-        the compound fraction of total peak height, removing the solvent /
-        impurity contribution proportionally.  Exact when a contaminant shares
-        the compound linewidth.
+      * ``edited_sum`` -- *default* -- *edited-sum* method: scales the raw area
+        by the compound fraction of total peak height, removing the solvent /
+        impurity contribution proportionally.  A simple arithmetic relationship
+        (``Int(Edited) = Int(Sum) * Sum(Ps_i)/Sum(P_i)``), exact when a
+        contaminant shares the compound linewidth.
       * ``peaks``      -- the sum of fitted areas of the compound peaks only.
 
     Typical caller flow: ``POST /spectrum/analyze/gsd`` to obtain the classified

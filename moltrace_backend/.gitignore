@@ -47,3 +47,10 @@ tmp/
 *.ckpt
 hose_kb*.json
 moltrace_nmrnet_cache/
+
+# FAISS spectrum-similarity indices + embeddings DERIVED from NMRShiftDB2 are
+# CC-BY-SA derivatives (ShareAlike -- see NOTICE); NEVER commit them. Build
+# locally with scripts/build_similarity_index.py.
+*.faiss
+*.faiss.ids.json
+spectrum_similarity_index/
