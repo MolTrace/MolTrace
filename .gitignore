@@ -5,6 +5,8 @@
 *.swo
 .idea/
 .vscode/
+.claude/settings.local.json
+.claude/worktrees/
 
 # Secrets and local environment files
 .env
@@ -30,6 +32,7 @@
 *.sqlite3
 *.db
 /*.zip
+raw_data_vault/
 moltrace_backend/.nmrcheck/
 moltrace_backend/raw_data_vault/
 moltrace_backend/artifacts/
@@ -55,6 +58,9 @@ moltrace_frontend/node_modules/
 moltrace_frontend/.vercel/
 moltrace_frontend/.turbo/
 moltrace_frontend/.vite/
+
+# Docs generated output
+moltrace_docs/.astro/
 
 # v0 / sandbox generated files
 __v0_runtime_loader.js

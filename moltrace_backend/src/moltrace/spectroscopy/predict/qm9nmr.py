@@ -51,12 +51,18 @@ class LinearReference:
     slope: float = 1.0
 
 
-# EXAMPLE constants only — verify against your benchmark's calibration. These are
-# approximate TMS isotropic shieldings near the QM9-NMR DFT level; the real gate
-# should use a per-nucleus linear fit to the reference data.
+# TMS isotropic-shielding references for σ→δ (δ = σ_TMS − σ) at the QM9-NMR level
+# (mPW1PW91/6-311+G(2d,p) @ B3LYP/6-31G(2df,p)).
+#   * ¹³C, Gas phase: σ(TMS) = 186.9704 ppm — published on the QM9-NMR site. Use
+#     the matching-solvent TMS σ from the dataset's SI.pdf for the CCl4 / THF /
+#     Acetone / Methanol / DMSO columns instead of Gas when you convert those.
+#   * ¹H: the QM9-NMR page does not publish a TMS ¹H σ; take it from SI.pdf (the
+#     ~31.5–31.8 ppm value at this level). The ¹H entry below is a PLACEHOLDER.
+# For the most faithful gate, prefer a per-nucleus *linear fit* (intercept, slope)
+# of σ vs experimental δ over plain referencing.
 QM9NMR_EXAMPLE_REFERENCE: dict[str, LinearReference] = {
-    "1H": LinearReference(intercept=31.0, slope=1.0),
-    "13C": LinearReference(intercept=187.0, slope=1.0),
+    "1H": LinearReference(intercept=31.6, slope=1.0),  # PLACEHOLDER — see SI.pdf
+    "13C": LinearReference(intercept=186.9704, slope=1.0),  # Gas-phase TMS (published)
 }
 
 

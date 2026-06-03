@@ -14789,11 +14789,12 @@ class SpectrumIntegrationAnalyzeResult(BaseModel):
 
 
 class AtomShiftPredictionOut(BaseModel):
-    """One atom's predicted chemical shift (ppm), with provenance.
+    """One atom's predicted chemical shift (ppm).
 
-    Mirrors ``moltrace.spectroscopy.predict.AtomShiftPrediction`` on the wire.
-    ``provenance`` carries backend-specific detail (e.g. the matched HOSE sphere
-    and reference count for the fallback, or the model name for NMRNet).
+    Mirrors ``moltrace.spectroscopy.predict.AtomShift`` on the wire.
+    ``uncertainty_ppm`` is the conformer-ensemble spread (NMRNet) or the
+    knowledge-base spread (fallback); it is ``null`` when undefined (a single
+    NMRNet conformer).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -14802,18 +14803,16 @@ class AtomShiftPredictionOut(BaseModel):
     element: str  # "H" | "C"
     nucleus: GSDPromptNucleus
     predicted_ppm: float
-    uncertainty_ppm: float = Field(ge=0.0)
-    method: str  # "nmrnet" | "hose_nmrshiftdb2"
-    provenance: dict[str, Any] = Field(default_factory=dict)
+    uncertainty_ppm: float | None = Field(default=None, ge=0.0)
 
 
 class SpectrumPredictShiftsRequest(BaseModel):
     """Request body for ``POST /spectrum/predict/shifts``.
 
     Predict ¹H / ¹³C chemical shifts for a molecule from its SMILES. The active
-    backend is **server-configured** (the optional NMRNet GPU service when wired
-    up, else the HOSE-code / NMRShiftDB2 fallback) — callers do not select it,
-    and the response names the backend actually used.
+    backend is **server-configured** (the optional NMRNet model when wired up,
+    else the HOSE-code / NMRShiftDB2 fallback) — callers do not select it, and
+    the response names the ``method`` actually used.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -14822,6 +14821,7 @@ class SpectrumPredictShiftsRequest(BaseModel):
     nuclei: list[GSDPromptNucleus] = Field(
         default_factory=lambda: ["1H", "13C"], min_length=1, max_length=2
     )
+    n_conformers: int = Field(default=8, ge=1, le=32)
 
 
 class SpectrumPredictShiftsResult(BaseModel):
@@ -14831,10 +14831,12 @@ class SpectrumPredictShiftsResult(BaseModel):
 
     smiles: str
     nuclei: list[GSDPromptNucleus]
-    backend: str  # "nmrnet" | "hose_nmrshiftdb2"
+    method: str  # "nmrnet" | "hose_fallback"
+    device: str  # "cuda" | "mps" | "cpu"
+    n_conformers: int = Field(default=0, ge=0)
     shifts: list[AtomShiftPredictionOut] = Field(default_factory=list)
     shift_count: int = Field(default=0, ge=0)
-    notes: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class JCouplingMatch(BaseModel):

@@ -16,6 +16,7 @@ __pycache__/
 htmlcov/
 .venv/
 venv/
+torch_env/
 .uv-cache/
 
 # Local databases and runtime state
@@ -37,3 +38,12 @@ tmp/
 *.log
 .DS_Store
 **/.DS_Store
+
+# NMRNet model weights / scalers + NMRShiftDB2-derived KB tables.
+# NEVER commit model weights or any table derived from NMRShiftDB2 (see NOTICE).
+# The default weights cache lives outside the repo (~/.cache/moltrace/nmrnet/).
+*.pt
+*.ss
+*.ckpt
+hose_kb*.json
+moltrace_nmrnet_cache/
