@@ -1,4 +1,4 @@
-"""Region-integration methods (Mnova-equivalent Sum / Edited Sum / Peaks)."""
+"""Region-integration methods (standard Sum / Edited Sum / Peaks)."""
 
 from .methods import (
     IntegrationResult,

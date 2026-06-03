@@ -1,4 +1,4 @@
-"""Prompt 5 — validation of the three Mnova-equivalent integration methods.
+"""Prompt 5 — validation of the three standard integration methods.
 
 Headline gate
 -------------

@@ -14733,7 +14733,7 @@ class SpectrumIntegrationAnalyzeRequest(BaseModel):
     arrays, the same shape as ``/spectrum/analyze/gsd``), the classified
     ``peaks`` from a prior GSD call, and one or more integration ``regions``.
     Each region is integrated independently by the chosen ``method``
-    (Mnova-equivalent Sum / Edited Sum / Peaks).
+    (standard Sum / Edited Sum / Peaks).
 
     ``edited_sum`` and ``peaks`` use each peak's ``category`` to separate
     compound signal from solvent / impurity / artifact contamination, so a

@@ -1326,6 +1326,22 @@ def _classification_confidence(
 
 
 def _detect_13c_satellites(peaks: list[Peak], spectrum: NMRSpectrum) -> set[int]:
+    """Flag the ``±0.5·J_CH`` 13C-satellite pairs around each strong 1H peak.
+
+    The one-bond ¹H–¹³C coupling constants used here are the canonical
+    textbook values, not vendor numbers:
+
+    * ``J_CH ≈ 125 Hz`` for sp³ C–H
+    * ``J_CH ≈ 160 Hz`` for sp² C–H
+
+    See e.g. Silverstein/Webster/Kiemle, *Spectrometric Identification of
+    Organic Compounds* (8th ed., Table 4.20) and Friebolin, *Basic One- and
+    Two-Dimensional NMR Spectroscopy* (Ch. 3). The expected satellite-to-
+    parent intensity ratio is ~0.5–1.1 % (natural abundance of ¹³C ≈ 1.1 %
+    split evenly into the two satellites); we accept a wider 0.3–2.5 %
+    window in ``_MIN_SATELLITE_RATIO`` / ``_MAX_SATELLITE_RATIO`` to allow
+    for SNR-limited or partially overlapped parents.
+    """
     if _normalise_nucleus(spectrum.nucleus) != "1H":
         return set()
     field_mhz = _field_mhz(spectrum)
@@ -1337,6 +1353,7 @@ def _detect_13c_satellites(peaks: list[Peak], spectrum: NMRSpectrum) -> set[int]
         main_intensity = intensities[main_index]
         if not math.isfinite(float(main_intensity)) or main_intensity <= 0:
             continue
+        # J_CH constants per textbook (see _detect_13c_satellites docstring above).
         for j_ch in (125.0, 160.0):
             offset = 0.5 * j_ch / field_mhz
             tolerance = max(0.01, offset * 0.12)

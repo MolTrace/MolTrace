@@ -14,6 +14,161 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.8.1 — Spectrum retrieval: vector + set similarity (FAISS HNSW) (2026-06-03)
+
+**Headline:** A new `moltrace.spectroscopy.similarity` retrieval layer — a
+Gaussian-smoothed 256-D spectral encoding with FAISS HNSW L2 retrieval, plus a
+Kuhn-Munkres set-similarity score — following the NMR-Solver methodology (Jin et
+al., arXiv:2509.00640, 2025; Nat. Commun.), implemented **from the published
+equations**, not from any copyrighted text.
+
+### Added
+- **`similarity/scoring.py`**:
+  - `gaussian_smooth_encode(shifts, range_ppm, sigma=0.05, n_points=128)` — Σ of
+    Gaussians on a uniform ppm grid.
+  - `encode_spectrum(shifts_1h, shifts_13c)` → 256-D `[v_1H(128); v_13C(128)]`;
+    `encode_prediction(ShiftPrediction)` consumes `predict_shifts` (Prompt 6).
+  - `vector_similarity` (L2 Euclidean); `exact_knn` (brute-force validator).
+  - `set_similarity_kuhn_munkres(X, Y, sigma)` = `(1/√(mn))·max_P Σ exp(-(x-y)²/2σ²)`
+    via `scipy.optimize.linear_sum_assignment` — surplus peaks left unmatched, so
+    the score is robust to peak insertion/deletion and shift noise.
+  - `SpectrumIndex` — FAISS **HNSW** L2 index (add / search / save / load);
+    **top-100 from 45k in ≈ 2 ms** (target was < 1 s).
+- **`scripts/build_similarity_index.py`** — builds a FAISS index from a JSONL
+  shift/SMILES corpus (gitignored output).
+- `.gitignore` (`*.faiss`, `*.faiss.ids.json`, `spectrum_similarity_index/`) and
+  **NOTICE**: a FAISS index derived from NMRShiftDB2 is CC-BY-SA (ShareAlike);
+  SimNMR-PubChem (106M, HF `yqj01/SimNMR-PubChem`) is MIT (commercial indexing
+  permitted — re-confirm the card at ship time).
+
+### Validation
+- `tests/spectroscopy/test_similarity_scoring.py` — 33 tests: encoding (peak
+  placement, empty, σ effect, validation), L2 + set-similarity algebra (identical
+  → 1.0, insertion-robust, **optimal-vs-greedy matching**, symmetry), FAISS index
+  (self-retrieval, recall vs exact k-NN, save/load, batch), and a `@slow` 45k
+  acceptance test pinning **< 1 s** top-100 retrieval.
+- ruff clean; full suite collects 1057 tests; spectroscopy regression green. FAISS
+  1.14.2 + scipy 1.17.1 already installed; citation + SimNMR MIT license verified.
+
+### Notes
+- Pure library layer: **no API endpoint or schema change** (FE contract untouched).
+
+---
+
+## v0.8.0 — Multi-test automated structure verification (ASV) scorer (2026-06-03)
+
+**Headline:** A new structure-verification layer — `moltrace.spectroscopy.verification`
+— that scores how well a *proposed* structure (SMILES) explains an experimental
+1-D NMR spectrum by running several independent tests and combining them into a
+single, fully-auditable posterior confidence. Grounded in the published ASV / CASE
+literature (Golotvin & Williams; Elyashberg et al.); it reproduces **no** vendor
+scoring scheme (no formulas, thresholds, weights, or text from any proprietary
+product).
+
+### Added
+- **`verification/scorer.py`** — `verify_structure(spectrum, proposed_smiles,
+  prior_confidence=0.5, tests=None, options=None) -> VerificationResult`.
+  - `TestResult{score ∈ [-1, 1], significance ≥ 0, quality = score·tanh(significance/3),
+    prior_confidence, diagnostic, …}` per test.
+  - **Four tests** — `PredictionBoundsTest` (every predicted shift bounded by an
+    experimental resonance of the right nuclide count; significance from the NMRNet
+    per-atom uncertainty, with the HOSE-KB spread as a match-sphere proxy on
+    fallback), `AssignmentsTest` (spin-system assignment merit; significance falls
+    with impurity %), `HSQC2DRangesTest` (predicted C–H rectangles vs experimental
+    cross-peaks → matched / missing / extra), `MSMoleculeMatchTest` (first-principles
+    isotope envelope vs experimental MS, intensity-weighted cosine; m/z accuracy from
+    the user spec).
+  - **Transparent combination** — a Bayesian log-odds update,
+    `logit(p_post) = logit(prior) + Σ quality_i·ln10`, with a single documented
+    evidence unit (`ln 10` ≈ one order of magnitude of odds per unit quality).
+    Every score, significance, quality, per-test log-likelihood-ratio, and constant
+    is exposed on `VerificationResult.combination` / `.to_audit_dict()` for the audit
+    trail. Verdict: posterior ≥ 0.80 consistent, ≤ 0.20 inconsistent, else
+    inconclusive.
+  - Tests that lack their data (no 2-D / no MS in `options`) **abstain** (quality 0)
+    rather than fabricate evidence; a per-test error degrades to an abstain instead of
+    crashing the run.
+
+### Validation
+- `tests/spectroscopy/test_verification_scorer.py` — 32 tests: the quality / abstain
+  algebra, the Bayesian combination + verdict thresholds, each test's corroborate /
+  refute / abstain behaviour (uncertainty→significance, impurity→significance, HSQC
+  matched/missing/extra, MS isotope envelope + molecular-ion match), and end-to-end
+  `verify_structure` via the deterministic HOSE fallback (no torch), including
+  determinism + audit round-trip.
+- ruff clean; the full suite collects 1024 tests; scoped predict / multiplet /
+  verification regression green. **No measured verification accuracy is claimed** —
+  this release ships the *mechanism*, validated by construction.
+
+### Notes
+- Pure scoring layer: **no API endpoint or schema change** in this release (the FE
+  contract is untouched). The endpoint + audit-event wiring is a later prompt.
+
+---
+
+## v0.7.9 — NMRNet wrapper reworked: local-first (Apple-Silicon) device strategy, conformer-ensemble uncertainty, formal attribution (2026-06-01)
+
+**Headline:** A revised, production wrapper for NMRNet (Xu et al., *Nat. Comput.
+Sci.* **5**, 292 (2025); MIT, repo Colin-Jay/NMRNet) replacing the v0.7.8
+microservice-first design with a **local-first** one tuned for Apple-Silicon
+dev: device resolution CUDA → MPS → CPU (CPU the supported baseline; MPS
+best-effort with a clean CPU fallback, since Uni-Core's fused kernels have no MPS
+path), lazy torch so the main backend stays import-clean, per-atom **uncertainty
+from the conformer ensemble** (std across `n_conformers`; NaN + warning at n=1),
+and weights acquisition (Zenodo / HF-mirror, `~/.cache/moltrace/nmrnet/`,
+SHA-256, per-nucleus checkpoint map). The HOSE fallback now requires **≥ 3
+references** per matched sphere and records the matched sphere. **NMRNet is never
+vendored and never fabricates a prediction.**
+
+### Added
+- **NOTICE** file — third-party attribution: NMRNet (MIT, DOI
+  10.1038/s43588-025-00783-z), Uni-Core / Uni-Mol (MIT), NMRShiftDB2 (CC BY-SA,
+  with the ShareAlike obligation on any derived HOSE table), RDKit (BSD-3).
+- **`scripts/build_hose_kb.py`** — builds the HOSE-code → shift knowledge base
+  from a NMRShiftDB2 SDF export (a CC-BY-SA derivative; gitignored, never
+  committed). Point the predictor at it with `MOLTRACE_HOSE_KB`.
+- `.gitignore` entries for model weights / scalers / derived tables
+  (`*.pt`, `*.ss`, `*.ckpt`, `hose_kb*.json`).
+
+### Changed
+- **`predict/nmrnet_wrapper.py` rewritten** — `predict_shifts(smiles, nuclei,
+  n_conformers=8, device=None, allow_fallback=True) -> ShiftPrediction`
+  (`{smiles, method, device, shifts: AtomShift[], n_conformers, warnings}`).
+  Pipeline: parse + sanitise → AddHs → ETKDGv3 `EmbedMultipleConfs` (+ MMFF/UFF,
+  reseed on failure) → per-conformer atoms+coords → NMRNet on the resolved device
+  → ensemble mean/std. Atom-index alignment is explicit (no identity assumption).
+- **Contract change — `POST /spectrum/predict/shifts`** response now reports
+  `method` (`'nmrnet'` | `'hose_fallback'`), `device`, `n_conformers`,
+  `warnings`, and per-atom `{atom_index, element, nucleus, predicted_ppm,
+  uncertainty_ppm}` (uncertainty **nullable** for a single NMRNet conformer);
+  request gains `n_conformers`. (Supersedes the v0.7.8
+  `backend`/`notes`/`provenance` shape.)
+- The optional remote NMRNet microservice (v0.7.8 `nmrnet_client`) is superseded
+  by the local-first design and was removed; the GPU `nmrnet_service/` scaffold
+  remains as an optional deployment.
+
+### Validation
+- **`tests/spectroscopy/test_nmrnet_wrapper.py`** — parse failures, salts /
+  charged species, stereochemistry, AddHs, conformer-failure → fallback,
+  atom-index alignment, determinism, device resolution + ensemble aggregation +
+  single-conformer NaN + MPS→CPU retry (via a fake torch, since torch has no
+  Python-3.14 wheel here), and seed-KB recovery (benzene 128.4 / 7.26).
+- The **QM9-NMR accuracy gate** targets the paper's **QM9NMR** MAE
+  (**0.020 ppm ¹H, 0.262 ppm ¹³C**; arXiv:2408.15681 vs DetaNet) — *not* the
+  0.181 / 1.098 nmrshiftdb2 headline — `@slow` + `skipif` until real weights +
+  the QM9-NMR set are present (no fabricated number).
+- ruff clean; predict + spectrum-API scoped regression green; full suite
+  collects clean (992 tests). The full HMDB-heavy sweep was deferred (the dev
+  volume was at capacity); the change's blast radius is the predict + spectrum
+  endpoints, all green.
+
+### Compatibility
+- **Contract change — frontend must regenerate `schema.d.ts`.** `POST
+  /spectrum/predict/shifts` request/response shapes changed (see Changed); no
+  other endpoint affected. `npm run generate:openapi`.
+
+---
+
 ## v0.7.8 — NMRNet chemical-shift prediction wrapper (+ HOSE-code fallback) + endpoint (2026-06-01)
 
 **Headline:** A new chemical-shift prediction capability and its endpoint.

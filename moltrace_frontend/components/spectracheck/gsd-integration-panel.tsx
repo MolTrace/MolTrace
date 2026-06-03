@@ -70,7 +70,7 @@ const METHOD_LABEL: Record<IntegrationMethod, string> = {
 const METHOD_HINT: Record<IntegrationMethod, string> = {
   edited_sum:
     "Sum the window but use peak categories to exclude solvent / impurity / artifact contamination. The recommended default.",
-  sum: "Integrate everything in the window (peak list ignored). Closest to a raw Mnova manual integral.",
+  sum: "Integrate everything in the window (peak list ignored). Closest to a raw manual integral.",
   peaks: "Integrate only the fitted compound peaks inside the window.",
 }
 
@@ -349,7 +349,7 @@ export function GsdIntegrationPanel({
       <ModuleCard
         accent="teal"
         eyebrow="Step 3e · Region integration"
-        title="Region integrals (Mnova-equivalent)"
+        title="Region integrals"
         icon={Sigma}
         description={`Backend: ${result.backend} · ${result.region_count} region${
           result.region_count === 1 ? "" : "s"
@@ -457,7 +457,7 @@ function Shell({
       <ModuleCard
         accent="teal"
         eyebrow="Step 3e · Region integration"
-        title="Region integrals (Mnova-equivalent)"
+        title="Region integrals"
         icon={Sigma}
         description={hint}
         className="min-w-0 overflow-visible shadow-none"
