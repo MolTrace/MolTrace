@@ -14,6 +14,37 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.8.2 — POST /spectrum/retrieve endpoint (similarity retrieval contract) (2026-06-03)
+
+**Headline:** Exposes the v0.8.1 similarity layer as a typed API. `POST
+/spectrum/retrieve` matches a query spectrum (¹H/¹³C shift lists or a SMILES)
+against the server-configured FAISS index and returns the top-k nearest reference
+spectra by L2 distance.
+
+### Added
+- **`POST /spectrum/retrieve`** (`SpectrumRetrieveRequest` → `SpectrumRetrieveResult`):
+  - Request `{ smiles?, shifts_1h[], shifts_13c[], top_k=100 (1..1000) }` — supply a
+    SMILES (predicted via `predict_shifts` then encoded) **or** explicit shift lists.
+    The Gaussian-smoothing σ is fixed to the index encoding and is deliberately not a
+    request field (a mismatched σ would corrupt the L2 distances).
+  - Response `{ query_source, method:"vector_l2", index_available, index_size, top_k,
+    results:[{id, l2_distance}], warnings }`.
+  - Server-configured index via `MOLTRACE_SIMILARITY_INDEX`; when unset the response is
+    `index_available=false` with no results (graceful, like the server-configured
+    NMRNet pattern). One `spectrum.retrieve` audit event per call.
+
+### Validation
+- `tests/test_spectrum_retrieve_api.py` — 8 tests: graceful-unconfigured,
+  configured-index hit (benzene→benzene, d≈0, distance-sorted), SMILES mode,
+  empty-query 400, invalid-SMILES 400, top_k bounds 422, auth, OpenAPI registration.
+- ruff clean (new code); full suite collects 1065.
+
+### Compatibility
+- **New endpoint — the frontend must regenerate `schema.d.ts`** (`npm run
+  generate:openapi`). No existing endpoint changed.
+
+---
+
 ## v0.8.1 — Spectrum retrieval: vector + set similarity (FAISS HNSW) (2026-06-03)
 
 **Headline:** A new `moltrace.spectroscopy.similarity` retrieval layer — a
