@@ -11558,11 +11558,12 @@ export interface components {
         };
         /**
          * AtomShiftPredictionOut
-         * @description One atom's predicted chemical shift (ppm), with provenance.
+         * @description One atom's predicted chemical shift (ppm).
          *
-         *     Mirrors ``moltrace.spectroscopy.predict.AtomShiftPrediction`` on the wire.
-         *     ``provenance`` carries backend-specific detail (e.g. the matched HOSE sphere
-         *     and reference count for the fallback, or the model name for NMRNet).
+         *     Mirrors ``moltrace.spectroscopy.predict.AtomShift`` on the wire.
+         *     ``uncertainty_ppm`` is the conformer-ensemble spread (NMRNet) or the
+         *     knowledge-base spread (fallback); it is ``null`` when undefined (a single
+         *     NMRNet conformer).
          */
         AtomShiftPredictionOut: {
             /** Atom Index */
@@ -11577,13 +11578,7 @@ export interface components {
             /** Predicted Ppm */
             predicted_ppm: number;
             /** Uncertainty Ppm */
-            uncertainty_ppm: number;
-            /** Method */
-            method: string;
-            /** Provenance */
-            provenance?: {
-                [key: string]: unknown;
-            };
+            uncertainty_ppm?: number | null;
         };
         /** AuditEventRecord */
         AuditEventRecord: {
@@ -34473,15 +34468,20 @@ export interface components {
          * @description Request body for ``POST /spectrum/predict/shifts``.
          *
          *     Predict ¹H / ¹³C chemical shifts for a molecule from its SMILES. The active
-         *     backend is **server-configured** (the optional NMRNet GPU service when wired
-         *     up, else the HOSE-code / NMRShiftDB2 fallback) — callers do not select it,
-         *     and the response names the backend actually used.
+         *     backend is **server-configured** (the optional NMRNet model when wired up,
+         *     else the HOSE-code / NMRShiftDB2 fallback) — callers do not select it, and
+         *     the response names the ``method`` actually used.
          */
         SpectrumPredictShiftsRequest: {
             /** Smiles */
             smiles: string;
             /** Nuclei */
             nuclei?: ("1H" | "13C")[];
+            /**
+             * N Conformers
+             * @default 8
+             */
+            n_conformers: number;
         };
         /**
          * SpectrumPredictShiftsResult
@@ -34492,8 +34492,15 @@ export interface components {
             smiles: string;
             /** Nuclei */
             nuclei: ("1H" | "13C")[];
-            /** Backend */
-            backend: string;
+            /** Method */
+            method: string;
+            /** Device */
+            device: string;
+            /**
+             * N Conformers
+             * @default 0
+             */
+            n_conformers: number;
             /** Shifts */
             shifts?: components["schemas"]["AtomShiftPredictionOut"][];
             /**
@@ -34501,8 +34508,8 @@ export interface components {
              * @default 0
              */
             shift_count: number;
-            /** Notes */
-            notes?: string[];
+            /** Warnings */
+            warnings?: string[];
         };
         /** SpectrumPreviewReport */
         SpectrumPreviewReport: {

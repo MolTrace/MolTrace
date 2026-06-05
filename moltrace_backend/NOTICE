@@ -41,7 +41,9 @@ Attribution-ShareAlike).
 
 ShareAlike obligation: any redistributed knowledge-base table DERIVED from
 NMRShiftDB2 -- e.g. the HOSE-code -> shift table produced by
-scripts/build_hose_kb.py -- is a derivative work and must itself be distributed
+scripts/build_hose_kb.py (and likewise a FAISS spectrum-similarity index or
+embedding table produced by scripts/build_similarity_index.py) -- is a
+derivative work and must itself be distributed
 under CC BY-SA (with attribution to NMRShiftDB2). The raw NMRShiftDB2 database
 and any table derived from it are NOT committed to this repository; build them
 locally (see scripts/build_hose_kb.py). The small literature seed table embedded
@@ -52,7 +54,95 @@ NOTE: verify the exact current NMRShiftDB2 license and version terms before any
 external redistribution of a derived table.
 
 -------------------------------------------------------------------------------
+NMR-Solver (retrieval methodology) + SimNMR-PubChem (optional index corpus)
+-------------------------------------------------------------------------------
+The spectrum-similarity retrieval in moltrace.spectroscopy.similarity follows the
+methodology of NMR-Solver: Jin, Y.; Wang, J.-J.; Xu, F.; Ji, X.; Gao, Z.;
+Zhang, L.; Ke, G.; Zhu, R.; E, W. "NMR-Solver: Automated Structure Elucidation
+via Large-Scale Spectral Matching and Physics-Guided Fragment Optimization."
+arXiv:2509.00640 (2025); Nat. Commun. The Gaussian-smoothed encoding and the
+Kuhn-Munkres set-similarity score are implemented from the published equations,
+not from any copyrighted text.
+
+SimNMR-PubChem (optional large-scale index corpus): Hugging Face dataset
+yqj01/SimNMR-PubChem (~106M PubChem-derived simulated spectra), distributed under
+the MIT license, which permits commercial indexing. Re-confirm the dataset card
+terms before distributing a derived index. Underlying PubChem records are
+produced by the U.S. National Library of Medicine (public domain in the U.S.).
+
+-------------------------------------------------------------------------------
 RDKit  (cheminformatics toolkit)
 -------------------------------------------------------------------------------
 RDKit: Open-source cheminformatics. https://www.rdkit.org
 License: BSD-3-Clause.
+
+-------------------------------------------------------------------------------
+nmrglue  (vendor FID file I/O)
+-------------------------------------------------------------------------------
+nmrglue: Helmus, J. J.; Jaroniec, C. P. "Nmrglue: an open source Python package
+for the analysis of multidimensional NMR data." J. Biomol. NMR 55, 355-367 (2013).
+DOI: 10.1007/s10858-013-9718-x
+Source: https://github.com/jjhelmus/nmrglue
+License: BSD-3-Clause.
+
+nmrglue is an OPTIONAL dependency installed via the ``fid`` extra
+(``pip install nmrcheck[fid]``). It is used solely for reading vendor-native
+raw-FID file formats -- Bruker (``fid`` + ``acqus`` + ``procs``) and
+Varian/Agilent (``fid`` + ``procpar``) -- and for the universal-dictionary
+(``udic``) ppm-axis scaling used by ``moltrace.spectroscopy.io.fid_reader`` and
+``nmrcheck.fid``. Reading vendor file formats for interoperability is
+descriptive use; vendor trademarks (Bruker, Varian, Agilent) appear in this
+product only as format-identifier strings and are not used in product branding.
+
+nmrglue is not vendored; the dependency is pinned in ``pyproject.toml`` and
+installed from PyPI, so its BSD-3-Clause copyright and license notice remain
+intact at the package source.
+
+-------------------------------------------------------------------------------
+NumPy  (array math)
+-------------------------------------------------------------------------------
+NumPy: Harris, C. R.; Millman, K. J.; van der Walt, S. J. et al. "Array
+programming with NumPy." Nature 585, 357-362 (2020).
+DOI: 10.1038/s41586-020-2649-2
+Source: https://numpy.org
+License: BSD-3-Clause.
+
+Used as the foundational array library across the spectrum processing,
+peak-detection, deconvolution, and FID pipelines. Not vendored; installed
+from PyPI per ``pyproject.toml``.
+
+-------------------------------------------------------------------------------
+SciPy  (signal processing, optimisation, sparse linear algebra, interpolation)
+-------------------------------------------------------------------------------
+SciPy: Virtanen, P.; Gommers, R.; Oliphant, T. E. et al. "SciPy 1.0:
+fundamental algorithms for scientific computing in Python." Nat. Methods 17,
+261-272 (2020).
+DOI: 10.1038/s41592-019-0686-2
+Source: https://scipy.org
+License: BSD-3-Clause.
+
+Used for:
+
+* ``scipy.signal.find_peaks`` / ``peak_widths`` -- initial peak detection in
+  ``moltrace.spectroscopy.peaks.gsd``;
+* ``scipy.optimize.least_squares`` -- pseudo-Voigt deconvolution in
+  ``nmrcheck.gsd``;
+* ``scipy.sparse`` -- Whittaker asymmetric-least-squares baseline solver in
+  ``moltrace.spectroscopy.preprocess.phase_baseline``;
+* ``scipy.interpolate`` -- cubic-spline baseline interpolation.
+
+Not vendored; installed from PyPI.
+
+-------------------------------------------------------------------------------
+lmfit  (non-linear least-squares model fitting)
+-------------------------------------------------------------------------------
+lmfit: Newville, M.; Stensitzki, T.; Allen, D. B.; Ingargiola, A. "LMFIT:
+non-linear least-square minimization and curve-fitting for Python." (2014).
+DOI: 10.5281/zenodo.11813
+Source: https://lmfit.github.io/lmfit-py/
+License: BSD-3-Clause.
+
+Used by ``moltrace.spectroscopy.peaks.gsd`` for Lorentzian and pseudo-Voigt
+line-shape fitting (single-peak refinement at levels 1-2, composite-overlap
+refinement at level 3). Not vendored; installed from PyPI per
+``pyproject.toml``.
