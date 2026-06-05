@@ -1,4 +1,4 @@
-"""Three Mnova-equivalent region-integration methods for 1D NMR.
+"""Three standard region-integration methods for 1D NMR.
 
 Prompt 5 — Integration methods
 ==============================
@@ -7,17 +7,21 @@ Quantitative NMR reports the *integral* of a resonance — the area under the
 peak — which is proportional to the number of nuclei that give rise to it.
 When an integration window is contaminated by solvent, residual water, or
 impurity signals, a naive area sum over-counts.  This module exposes the three
-integration strategies Mnova provides, plus a dispatcher that returns a
+standard integration strategies, plus a dispatcher that returns a
 provenance-rich :class:`IntegrationResult`:
 
 1. :func:`integrate_sum`        — classical trapezoidal area over the whole
                                   window (everything in it, contaminants
-                                  included).  Mnova's *Sum*.
-2. :func:`integrate_edited_sum` — Mnova's *Edited Sum*: scales the raw
+                                  included).  Equivalent terminology in the
+                                  literature and in common NMR processing
+                                  software: *Sum*.
+2. :func:`integrate_edited_sum` — *edited-sum* method: scales the raw
                                   trapezoidal area by the fraction of total
                                   peak *height* that belongs to compound peaks,
                                   proportionally removing the solvent / impurity
-                                  contribution.
+                                  contribution.  A simple arithmetic
+                                  relationship -- not proprietary; see the
+                                  derivation below.
 3. :func:`integrate_peaks`      — the sum of the *fitted* areas of the compound
                                   peaks only.  Most accurate when the GSD
                                   deconvolution fit is good and every
@@ -243,7 +247,7 @@ def integrate_edited_sum(
     region_ppm: tuple[float, float],
     classified_peaks: list[Peak],
 ) -> float:
-    """Mnova's Edited Sum formula.
+    """Edited-sum formula -- a simple arithmetic relationship, not proprietary.
 
         Int(Edited) = Int(Sum) · ( Σ Ps_i / Σ P_i )
 

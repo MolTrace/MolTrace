@@ -16,3 +16,12 @@ Archive SHA-256:
 The fixture is intentionally used as a vendor-format regression rather than a
 curated chemical-shift reference: the nmrglue example is designed to exercise
 Varian/Agilent `procpar` parsing and arrayed FID handling.
+
+## License
+
+This fixture is distributed with the [nmrglue](https://github.com/jjhelmus/nmrglue)
+project, which is licensed under **BSD-3-Clause**. The fixture inherits that
+license; redistribution as part of MolTrace tests is permitted under the
+BSD-3-Clause terms, which are reproduced (with full attribution) in
+`moltrace_backend/NOTICE`. The Varian/Agilent format identifiers are used here
+solely for interoperability — descriptive use, not branding.

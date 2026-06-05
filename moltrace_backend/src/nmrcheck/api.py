@@ -759,6 +759,9 @@ from .models import (
     SpectrumPredictShiftsResult,
     SpectrumMultipletAnalyzeResult,
     SpectrumPreviewReport,
+    SpectrumRetrieveHit,
+    SpectrumRetrieveRequest,
+    SpectrumRetrieveResult,
     SpectrumSolventCatalog,
     SpectrumSolventInfo,
     StoredAnalysisRecord,
@@ -5618,17 +5621,18 @@ async def spectrum_analyze_integration(
     request: Request,  # auto-injected by FastAPI; tests may pass None
     context: AccessContext = Depends(require_access_context),
 ) -> SpectrumIntegrationAnalyzeResult:
-    """Mnova-equivalent region integration (Prompt 5).
+    """Standard region integration (Prompt 5).
 
     Integrate one or more ppm windows of a processed spectrum by one of three
     methods:
 
       * ``sum``        -- classical trapezoidal area over the window (everything
         in it, contaminants included).
-      * ``edited_sum`` -- *default* -- Mnova's Edited Sum: scales the raw area by
-        the compound fraction of total peak height, removing the solvent /
-        impurity contribution proportionally.  Exact when a contaminant shares
-        the compound linewidth.
+      * ``edited_sum`` -- *default* -- *edited-sum* method: scales the raw area
+        by the compound fraction of total peak height, removing the solvent /
+        impurity contribution proportionally.  A simple arithmetic relationship
+        (``Int(Edited) = Int(Sum) * Sum(Ps_i)/Sum(P_i)``), exact when a
+        contaminant shares the compound linewidth.
       * ``peaks``      -- the sum of fitted areas of the compound peaks only.
 
     Typical caller flow: ``POST /spectrum/analyze/gsd`` to obtain the classified
@@ -5891,6 +5895,177 @@ async def spectrum_predict_shifts(
         shifts=shifts,  # type: ignore[arg-type]
         shift_count=len(shifts),
         warnings=list(prediction.warnings),
+    )
+
+
+_SIMILARITY_INDEX_CACHE: dict = {}
+
+
+def _load_similarity_index():
+    """Load the server-configured FAISS similarity index (cached by path+mtime).
+
+    Returns ``None`` when ``MOLTRACE_SIMILARITY_INDEX`` is unset or the file is
+    absent — the endpoint then reports ``index_available=false`` instead of
+    failing, mirroring the server-configured NMRNet pattern.
+    """
+
+    import os
+
+    path = os.environ.get("MOLTRACE_SIMILARITY_INDEX")
+    if not path or not os.path.exists(path):
+        return None
+    key = (path, os.path.getmtime(path))
+    cached = _SIMILARITY_INDEX_CACHE.get(key)
+    if cached is not None:
+        return cached
+    from moltrace.spectroscopy.similarity import SpectrumIndex
+
+    index = SpectrumIndex.load(path)
+    _SIMILARITY_INDEX_CACHE[key] = index
+    return index
+
+
+@router.post(
+    "/spectrum/retrieve",
+    response_model=SpectrumRetrieveResult,
+    dependencies=[Depends(require_access_context)],
+)
+async def spectrum_retrieve(
+    payload: SpectrumRetrieveRequest,
+    request: Request,  # auto-injected by FastAPI; tests may pass None
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumRetrieveResult:
+    """Retrieve the most similar reference spectra from the similarity index (Prompt 8).
+
+    The query is given either as explicit ¹H / ¹³C shift lists or as a SMILES
+    (predicted via ``predict_shifts`` then encoded), encoded with the canonical
+    Gaussian-smoothed 256-D scheme and matched by L2 distance against the
+    **server-configured** FAISS HNSW index (``MOLTRACE_SIMILARITY_INDEX``). When
+    no index is configured the response reports ``index_available=false`` with no
+    results rather than failing. One ``spectrum.retrieve`` audit event is emitted
+    per invocation.
+    """
+
+    import time
+
+    from moltrace.spectroscopy.similarity import encode_spectrum
+
+    _t0 = time.perf_counter()
+    warnings: list[str] = []
+
+    def _emit(
+        *,
+        error_kind: str | None,
+        query_source: str,
+        index_available: bool,
+        index_size: int,
+        result_count: int,
+    ) -> None:
+        try:
+            if request is not None:
+                _audit_from_context(
+                    request,
+                    context=context,
+                    event_type="spectrum.retrieve",
+                    message=(
+                        "Spectrum retrieval failed."
+                        if error_kind is not None
+                        else "Spectrum retrieval completed."
+                    ),
+                    metadata={
+                        "query_source": query_source,
+                        "smiles": payload.smiles,
+                        "n_shifts_1h": len(payload.shifts_1h),
+                        "n_shifts_13c": len(payload.shifts_13c),
+                        "top_k": payload.top_k,
+                        "index_available": index_available,
+                        "index_size": index_size,
+                        "result_count": result_count,
+                        "error_kind": error_kind,
+                        "wall_ms": int((time.perf_counter() - _t0) * 1000),
+                    },
+                )
+        except Exception:
+            pass
+
+    # 1. Encode the query spectrum.
+    if payload.smiles:
+        query_source = "smiles"
+        from moltrace.spectroscopy.predict import predict_shifts
+        from moltrace.spectroscopy.similarity import encode_prediction
+
+        try:
+            prediction = predict_shifts(payload.smiles)
+        except ValueError as exc:
+            _emit(
+                error_kind="invalid_smiles",
+                query_source=query_source,
+                index_available=False,
+                index_size=0,
+                result_count=0,
+            )
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        query = encode_prediction(prediction)
+        warnings.extend(prediction.warnings)
+    elif payload.shifts_1h or payload.shifts_13c:
+        query_source = "shifts"
+        query = encode_spectrum(payload.shifts_1h, payload.shifts_13c)
+    else:
+        _emit(
+            error_kind="empty_query",
+            query_source="none",
+            index_available=False,
+            index_size=0,
+            result_count=0,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either 'smiles' or at least one of 'shifts_1h' / 'shifts_13c'.",
+        )
+
+    # 2. Retrieve against the server-configured index (graceful if unconfigured).
+    index = _load_similarity_index()
+    if index is None:
+        warnings.append(
+            "Retrieval index not configured (set MOLTRACE_SIMILARITY_INDEX); no results."
+        )
+        _emit(
+            error_kind=None,
+            query_source=query_source,
+            index_available=False,
+            index_size=0,
+            result_count=0,
+        )
+        return SpectrumRetrieveResult(
+            query_source=query_source,
+            method="vector_l2",
+            index_available=False,
+            index_size=0,
+            top_k=payload.top_k,
+            results=[],
+            warnings=warnings,
+        )
+
+    hits = index.search(query, k=payload.top_k)
+    results = [
+        SpectrumRetrieveHit(id=str(identifier), l2_distance=float(distance))
+        for identifier, distance in hits
+    ]
+    _emit(
+        error_kind=None,
+        query_source=query_source,
+        index_available=True,
+        index_size=len(index),
+        result_count=len(results),
+    )
+    return SpectrumRetrieveResult(
+        query_source=query_source,
+        method="vector_l2",
+        index_available=True,
+        index_size=len(index),
+        top_k=payload.top_k,
+        results=results,
+        warnings=warnings,
     )
 
 

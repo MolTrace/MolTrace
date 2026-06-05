@@ -14733,7 +14733,7 @@ class SpectrumIntegrationAnalyzeRequest(BaseModel):
     arrays, the same shape as ``/spectrum/analyze/gsd``), the classified
     ``peaks`` from a prior GSD call, and one or more integration ``regions``.
     Each region is integrated independently by the chosen ``method``
-    (Mnova-equivalent Sum / Edited Sum / Peaks).
+    (standard Sum / Edited Sum / Peaks).
 
     ``edited_sum`` and ``peaks`` use each peak's ``category`` to separate
     compound signal from solvent / impurity / artifact contamination, so a
@@ -14836,6 +14836,48 @@ class SpectrumPredictShiftsResult(BaseModel):
     n_conformers: int = Field(default=0, ge=0)
     shifts: list[AtomShiftPredictionOut] = Field(default_factory=list)
     shift_count: int = Field(default=0, ge=0)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class SpectrumRetrieveRequest(BaseModel):
+    """Request body for ``POST /spectrum/retrieve``.
+
+    Provide the query spectrum either as explicit ¹H / ¹³C shift lists or as a
+    ``smiles`` (predicted via ``predict_shifts`` then encoded). Retrieval runs
+    against the server-configured FAISS similarity index
+    (``MOLTRACE_SIMILARITY_INDEX``). The Gaussian-smoothing σ is fixed to match
+    the index's encoding and is intentionally **not** a request parameter — a
+    mismatched σ would make the L2 distances meaningless.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    smiles: str | None = Field(default=None, min_length=1, max_length=4096)
+    shifts_1h: list[float] = Field(default_factory=list, max_length=4096)
+    shifts_13c: list[float] = Field(default_factory=list, max_length=4096)
+    top_k: int = Field(default=100, ge=1, le=1000)
+
+
+class SpectrumRetrieveHit(BaseModel):
+    """One retrieved reference spectrum (id + L2 distance, lower = more similar)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    l2_distance: float = Field(ge=0.0)
+
+
+class SpectrumRetrieveResult(BaseModel):
+    """Response from ``POST /spectrum/retrieve``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    query_source: str  # "shifts" | "smiles"
+    method: str  # "vector_l2"
+    index_available: bool
+    index_size: int = Field(default=0, ge=0)
+    top_k: int = Field(default=0, ge=0)
+    results: list[SpectrumRetrieveHit] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 
