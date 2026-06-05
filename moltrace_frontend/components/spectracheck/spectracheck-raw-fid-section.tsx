@@ -60,6 +60,7 @@ import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel
 import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
 import { GsdIntegrationPanel } from "@/components/spectracheck/gsd-integration-panel"
 import { ShiftPredictionPanel } from "@/components/spectracheck/shift-prediction-panel"
+import { SpectrumRetrievePanel } from "@/components/spectracheck/spectrum-retrieve-panel"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -2132,6 +2133,15 @@ export function SpectraCheckRawFidSection({
       <ShiftPredictionPanel
         candidatesText={candidatesText}
         testId="raw-fid-shift-prediction-surface"
+      />
+
+      {/* ── Candidate tool — spectral-similarity retrieval ──────────────
+          Encodes a candidate SMILES and queries the server-configured
+          similarity index for nearest reference spectra. Self-gates on
+          the candidate list. */}
+      <SpectrumRetrievePanel
+        candidatesText={candidatesText}
+        testId="raw-fid-spectrum-retrieve-surface"
       />
 
       {/* ── Step 3c — Legacy detection summary (unified panel) ──────────

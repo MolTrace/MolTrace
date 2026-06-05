@@ -56,6 +56,7 @@ import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel
 import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
 import { GsdIntegrationPanel } from "@/components/spectracheck/gsd-integration-panel"
 import { ShiftPredictionPanel } from "@/components/spectracheck/shift-prediction-panel"
+import { SpectrumRetrievePanel } from "@/components/spectracheck/spectrum-retrieve-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
@@ -1586,6 +1587,15 @@ export function SpectraCheckProcessedSpectrumSection({
       <ShiftPredictionPanel
         candidatesText={candidatesOptional.trim() || candidatesText}
         testId="processed-shift-prediction-surface"
+      />
+
+      {/* ── Candidate tool — spectral-similarity retrieval ──────────────
+          Encodes a candidate SMILES and queries the server-configured
+          FAISS similarity index for nearest reference spectra. Self-gates
+          on the candidate list; independent of the GSD run. */}
+      <SpectrumRetrievePanel
+        candidatesText={candidatesOptional.trim() || candidatesText}
+        testId="processed-spectrum-retrieve-surface"
       />
     </div>
   )
