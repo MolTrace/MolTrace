@@ -1744,17 +1744,18 @@ export interface paths {
         put?: never;
         /**
          * Spectrum Analyze Integration
-         * @description Mnova-equivalent region integration (Prompt 5).
+         * @description Standard region integration (Prompt 5).
          *
          *     Integrate one or more ppm windows of a processed spectrum by one of three
          *     methods:
          *
          *       * ``sum``        -- classical trapezoidal area over the window (everything
          *         in it, contaminants included).
-         *       * ``edited_sum`` -- *default* -- Mnova's Edited Sum: scales the raw area by
-         *         the compound fraction of total peak height, removing the solvent /
-         *         impurity contribution proportionally.  Exact when a contaminant shares
-         *         the compound linewidth.
+         *       * ``edited_sum`` -- *default* -- *edited-sum* method: scales the raw area
+         *         by the compound fraction of total peak height, removing the solvent /
+         *         impurity contribution proportionally.  A simple arithmetic relationship
+         *         (``Int(Edited) = Int(Sum) * Sum(Ps_i)/Sum(P_i)``), exact when a
+         *         contaminant shares the compound linewidth.
          *       * ``peaks``      -- the sum of fitted areas of the compound peaks only.
          *
          *     Typical caller flow: ``POST /spectrum/analyze/gsd`` to obtain the classified
@@ -1803,6 +1804,34 @@ export interface paths {
          *     + bad-request paths), matching the GSD / multiplet / integration telemetry.
          */
         post: operations["spectrum_predict_shifts_spectrum_predict_shifts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/spectrum/retrieve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Spectrum Retrieve
+         * @description Retrieve the most similar reference spectra from the similarity index (Prompt 8).
+         *
+         *     The query is given either as explicit ¹H / ¹³C shift lists or as a SMILES
+         *     (predicted via ``predict_shifts`` then encoded), encoded with the canonical
+         *     Gaussian-smoothed 256-D scheme and matched by L2 distance against the
+         *     **server-configured** FAISS HNSW index (``MOLTRACE_SIMILARITY_INDEX``). When
+         *     no index is configured the response reports ``index_available=false`` with no
+         *     results rather than failing. One ``spectrum.retrieve`` audit event is emitted
+         *     per invocation.
+         */
+        post: operations["spectrum_retrieve_spectrum_retrieve_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -34289,7 +34318,7 @@ export interface components {
          *     arrays, the same shape as ``/spectrum/analyze/gsd``), the classified
          *     ``peaks`` from a prior GSD call, and one or more integration ``regions``.
          *     Each region is integrated independently by the chosen ``method``
-         *     (Mnova-equivalent Sum / Edited Sum / Peaks).
+         *     (standard Sum / Edited Sum / Peaks).
          *
          *     ``edited_sum`` and ``peaks`` use each peak's ``category`` to separate
          *     compound signal from solvent / impurity / artifact contamination, so a
@@ -34544,6 +34573,66 @@ export interface components {
             metadata?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * SpectrumRetrieveHit
+         * @description One retrieved reference spectrum (id + L2 distance, lower = more similar).
+         */
+        SpectrumRetrieveHit: {
+            /** Id */
+            id: string;
+            /** L2 Distance */
+            l2_distance: number;
+        };
+        /**
+         * SpectrumRetrieveRequest
+         * @description Request body for ``POST /spectrum/retrieve``.
+         *
+         *     Provide the query spectrum either as explicit ¹H / ¹³C shift lists or as a
+         *     ``smiles`` (predicted via ``predict_shifts`` then encoded). Retrieval runs
+         *     against the server-configured FAISS similarity index
+         *     (``MOLTRACE_SIMILARITY_INDEX``). The Gaussian-smoothing σ is fixed to match
+         *     the index's encoding and is intentionally **not** a request parameter — a
+         *     mismatched σ would make the L2 distances meaningless.
+         */
+        SpectrumRetrieveRequest: {
+            /** Smiles */
+            smiles?: string | null;
+            /** Shifts 1H */
+            shifts_1h?: number[];
+            /** Shifts 13C */
+            shifts_13c?: number[];
+            /**
+             * Top K
+             * @default 100
+             */
+            top_k: number;
+        };
+        /**
+         * SpectrumRetrieveResult
+         * @description Response from ``POST /spectrum/retrieve``.
+         */
+        SpectrumRetrieveResult: {
+            /** Query Source */
+            query_source: string;
+            /** Method */
+            method: string;
+            /** Index Available */
+            index_available: boolean;
+            /**
+             * Index Size
+             * @default 0
+             */
+            index_size: number;
+            /**
+             * Top K
+             * @default 0
+             */
+            top_k: number;
+            /** Results */
+            results?: components["schemas"]["SpectrumRetrieveHit"][];
+            /** Warnings */
+            warnings?: string[];
         };
         /**
          * SpectrumSolventCatalog
@@ -42441,6 +42530,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpectrumPredictShiftsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spectrum_retrieve_spectrum_retrieve_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpectrumRetrieveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumRetrieveResult"];
                 };
             };
             /** @description Validation Error */
