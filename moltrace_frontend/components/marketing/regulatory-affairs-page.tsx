@@ -5,7 +5,6 @@ import {
   BadgeCheck,
   BookOpenCheck,
   CheckCircle2,
-  ClipboardCheck,
   Database,
   FileCheck,
   FileSignature,

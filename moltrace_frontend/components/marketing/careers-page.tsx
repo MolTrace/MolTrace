@@ -1,7 +1,6 @@
 import Link from "next/link"
 import {
   ArrowRight,
-  Beaker,
   Briefcase,
   CalendarCheck2,
   Compass,

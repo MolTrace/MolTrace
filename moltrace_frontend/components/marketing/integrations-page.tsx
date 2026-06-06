@@ -1,13 +1,10 @@
 import Link from "next/link"
 import {
-  Activity,
   AlertCircle,
   ArrowRight,
   BadgeCheck,
   Building2,
   CheckCircle2,
-  Cloud,
-  Cog,
   Database,
   FileCheck,
   FileText,
@@ -18,17 +15,12 @@ import {
   Lock,
   Microscope,
   Network,
-  PlayCircle,
   Plug,
-  RefreshCw,
   Server,
   ShieldCheck,
   Sparkles,
-  Wand2,
   Webhook,
-  Workflow,
   XCircle,
-  Zap,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

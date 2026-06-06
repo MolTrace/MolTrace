@@ -1,23 +1,15 @@
 import Link from "next/link"
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
-  AtomIcon,
   BadgeCheck,
-  Brain,
   CheckCircle2,
-  Compass,
-  Cpu,
   Database,
   DollarSign,
   FileText,
   FlaskConical,
   GitBranch,
   History,
-  Layers,
-  Lightbulb,
-  LineChart,
   Microscope,
   PlayCircle,
   Repeat,
@@ -26,9 +18,7 @@ import {
   Target,
   Thermometer,
   TrendingUp,
-  Workflow,
   XCircle,
-  Zap,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
