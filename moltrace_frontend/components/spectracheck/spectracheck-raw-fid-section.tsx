@@ -31,6 +31,7 @@ import {
   ProcessingParametersCard,
 } from "@/components/spectracheck/spectracheck-processing-parameters-card"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
+import { RawFidSpectrumFullscreenView } from "@/components/spectracheck/spectracheck-raw-fid-fullscreen-view"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
   extractPeaksFromPayload,
@@ -78,6 +79,7 @@ import {
   FlaskConical,
   Hash,
   Lock,
+  Maximize2,
   PlayCircle,
   RotateCcw,
   Settings2,
@@ -431,6 +433,9 @@ export function SpectraCheckRawFidSection({
   // bottom of the results. Reference data the reviewer only opens when they
   // need to audit the FID processing knobs, so the default is closed.
   const [processingParamsOpen, setProcessingParamsOpen] = useState(false)
+  // Opt-in, default-closed: opens the in-app full-screen spectrum + tables view.
+  // Closed by default so the inline view and all existing behavior are untouched.
+  const [rawFullscreenOpen, setRawFullscreenOpen] = useState(false)
 
   // Re-attach the persisted File to the (possibly remounted) <input> via DataTransfer
   // so existing fileRef.current?.files?.[0] callsites continue to work after tab switches.
@@ -1601,6 +1606,27 @@ export function SpectraCheckRawFidSection({
               </div>
             )}
 
+            {/* Spectrum toolbar — opt-in full-screen trigger. Inline view below
+                is unchanged; this only opens a presentational overlay. */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Spectrum
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setRawFullscreenOpen(true)}
+                disabled={!xy}
+                data-testid="raw-fid-open-fullscreen"
+                aria-haspopup="dialog"
+                className="gap-1.5"
+              >
+                <Maximize2 className="h-4 w-4" aria-hidden />
+                Full screen
+              </Button>
+            </div>
+
             {/* Spectrum — full page width */}
             <div className="min-w-0 space-y-2">
               {xyIsAutoPreview ? (
@@ -2156,6 +2182,37 @@ export function SpectraCheckRawFidSection({
           testId="raw-fid-legacy-results-surface"
         />
       ) : null}
+
+      {/* Full-screen, in-app spectrum + tables view. Presentational overlay;
+          closed by default so the inline view and all flows are untouched. */}
+      <RawFidSpectrumFullscreenView
+        open={rawFullscreenOpen}
+        onClose={() => setRawFullscreenOpen(false)}
+        nucleus={resolvedNucleus}
+        xy={xy}
+        viewerPeaks={viewerPeaks}
+        displayPayload={displayPayload}
+        gsdResult={gsdResult}
+        legacyDetectionResult={legacyDetectionResult}
+        loading={previewLoading || processLoading}
+        payloadMode={payloadMode}
+        title={resultTitle}
+        fileName={selectedFileName}
+        sampleId={sampleId.trim() || undefined}
+        vendorDetected={vendorDetected}
+        nucleusMeta={nucleusMeta}
+        sw={sw}
+        td={td}
+        sha={sha}
+        warnings={warnings}
+        unifiedEvidenceMeta={{
+          layer: nucleus === "1H" ? "raw_fid_1h" : "raw_fid_13c",
+          sourceTab: "Raw FID upload",
+          title: payloadMode === "process" ? "Raw FID process" : "Raw FID preview",
+          endpoint: payloadMode === "process" ? "/nmr/raw-fid/process" : "/nmr/raw-fid/preview",
+          sampleId: sampleId.trim() || undefined,
+        }}
+      />
     </div>
   )
 }
