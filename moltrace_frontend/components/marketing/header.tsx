@@ -49,7 +49,7 @@ const dropdowns: Record<string, DropdownItem[]> = {
     { label: "Integrations",                sub: "Bruker · Agilent · LIMS",           icon: Workflow,     href: "/integrations" },
   ],
   Solutions: [
-    { label: "Pharmaceutical R&D",  sub: "Drug discovery & development", icon: Pill,          href: "/platform#solutions" },
+    { label: "Pharmaceutical R&D",  sub: "Drug discovery & development", icon: Pill,          href: "/pharmaceutical-rd" },
     { label: "Academic Research",   sub: "University & institute labs",  icon: GraduationCap, href: "/platform#solutions" },
     { label: "CRO / Analytical",    sub: "Contract research orgs",       icon: Microscope,    href: "/platform#solutions" },
     { label: "Regulatory Affairs",  sub: "Dossier & submission teams",   icon: FileCheck,     href: "/platform#solutions" },
