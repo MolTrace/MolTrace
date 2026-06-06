@@ -33,6 +33,21 @@ jobs:
           API_KEY: test-key
         run: uv run pytest
 
+      # Phase 0 foundation (Prompt 19): lint the new infra package + its tests
+      # (ruff non-regression, scoped so it cannot trip on unrelated legacy code),
+      # then run the end-to-end smoke + 10x byte-identical determinism gate as an
+      # explicit, named CI check. The infra unit tests already run in `uv run
+      # pytest` above; this re-runs only the e2e file for a visible determinism
+      # signal. Uses the always-on core only -- the optional MLflow/DVC/GE paths
+      # stay `importorskip`-skipped here by design (install the `infra` extra to
+      # exercise them).
+      - name: Phase 0 foundation gate (infra lint + e2e determinism)
+        env:
+          PYTHONPATH: src
+        run: |
+          uv run ruff check src/moltrace/spectroscopy/infra tests/test_infra_*.py tests/test_e2e.py
+          uv run pytest tests/test_e2e.py -q
+
       - name: Raw FID Prompt sidecar smoke report
         env:
           PYTHONPATH: src
