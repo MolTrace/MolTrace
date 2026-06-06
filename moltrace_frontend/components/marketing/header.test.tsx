@@ -78,6 +78,36 @@ describe("Marketing Header — mobile sidebar refresh", () => {
     expect(within(sidebar).getByText("Documentation")).toBeInTheDocument()
   })
 
+  it("lets long Solutions/Platform item text wrap instead of truncating on mobile", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    render(<Header />)
+    await user.click(screen.getByRole("button", { name: /toggle menu/i }))
+    const sidebar = await screen.findByTestId("marketing-mobile-sidebar")
+
+    // The longest item descriptions used to be clipped by `truncate`
+    // (white-space: nowrap + ellipsis) in the narrow mobile sheet. They must
+    // now wrap so the full text stays legible on small/legacy viewports + PWA.
+    const longDescriptions = [
+      "Drug discovery & development", // Solutions · Pharmaceutical R&D
+      "University & institute labs", //  Solutions · Academic Research
+      "Dossier & submission teams", //   Solutions · Regulatory Affairs
+      "ICH · FDA · EMA compliance", //   Platform · Regulatory Intelligence Hub
+    ]
+    for (const text of longDescriptions) {
+      const node = within(sidebar).getByText(text)
+      expect(node.className).not.toContain("truncate")
+      expect(node.className).toContain("break-words")
+    }
+
+    // Item titles must not be clipped either.
+    for (const text of ["Pharmaceutical R&D", "Regulatory Intelligence Hub"]) {
+      const node = within(sidebar).getByText(text)
+      expect(node.className).not.toContain("truncate")
+      expect(node.className).toContain("break-words")
+    }
+  })
+
   it("renders three CTAs in the pinned footer, with Request Demo as the gradient primary", async () => {
     const { default: userEvent } = await import("@testing-library/user-event")
     const user = userEvent.setup()

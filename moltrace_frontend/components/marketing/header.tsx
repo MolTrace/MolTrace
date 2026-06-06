@@ -252,10 +252,16 @@ export function Header() {
                                   />
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                  <span className="block truncate text-sm font-semibold text-foreground">
+                                  {/* Wrap rather than truncate: the narrow mobile
+                                      sheet (and smaller/legacy viewports) can't fit
+                                      the longer item titles + descriptions on one
+                                      line, and `truncate` clipped them with an
+                                      ellipsis. `break-words` lets the full text flow
+                                      onto multiple lines so every item stays legible. */}
+                                  <span className="block break-words text-sm font-semibold text-foreground">
                                     {sub.label}
                                   </span>
-                                  <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                                  <span className="mt-0.5 block break-words font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                                     {sub.sub}
                                   </span>
                                 </span>
