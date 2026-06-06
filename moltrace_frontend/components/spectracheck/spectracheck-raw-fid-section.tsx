@@ -31,7 +31,7 @@ import {
   ProcessingParametersCard,
 } from "@/components/spectracheck/spectracheck-processing-parameters-card"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
-import { RawFidSpectrumFullscreenView } from "@/components/spectracheck/spectracheck-raw-fid-fullscreen-view"
+import { SpectrumResultsFullscreen } from "@/components/spectracheck/spectracheck-fullscreen-results"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
   extractPeaksFromPayload,
@@ -1471,6 +1471,20 @@ export function SpectraCheckRawFidSection({
         </div>
       </ModuleCard>
 
+      {/* In-place full-screen view of the ENTIRE results region (spectrum +
+          every analysis panel below — GSD, multiplets, J-couplings, region
+          integrals, shift prediction, legacy detector peak picks). The same
+          live subtree renders inline when closed and full-screen when open, so
+          nothing re-fetches and the spectrum keeps its exact shape/state. */}
+      <SpectrumResultsFullscreen
+        open={rawFullscreenOpen}
+        onClose={() => setRawFullscreenOpen(false)}
+        eyebrow={`Full screen · Raw FID ${resolvedNucleus}`}
+        title={resultTitle}
+        subtitle={selectedFileName ?? undefined}
+        tag={sampleId.trim() || undefined}
+        testId="raw-fid-fullscreen-view"
+      >
       {/* ── Step 3 — Results ──────────────────────────────────────────── */}
       {/*
         Show this surface as soon as Preview or Process starts. The result
@@ -1612,19 +1626,21 @@ export function SpectraCheckRawFidSection({
               <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 Spectrum
               </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setRawFullscreenOpen(true)}
-                disabled={!xy}
-                data-testid="raw-fid-open-fullscreen"
-                aria-haspopup="dialog"
-                className="gap-1.5"
-              >
-                <Maximize2 className="h-4 w-4" aria-hidden />
-                Full screen
-              </Button>
+              {!rawFullscreenOpen ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRawFullscreenOpen(true)}
+                  disabled={!xy}
+                  data-testid="raw-fid-open-fullscreen"
+                  aria-haspopup="dialog"
+                  className="gap-1.5"
+                >
+                  <Maximize2 className="h-4 w-4" aria-hidden />
+                  Full screen
+                </Button>
+              ) : null}
             </div>
 
             {/* Spectrum — full page width */}
@@ -2182,37 +2198,7 @@ export function SpectraCheckRawFidSection({
           testId="raw-fid-legacy-results-surface"
         />
       ) : null}
-
-      {/* Full-screen, in-app spectrum + tables view. Presentational overlay;
-          closed by default so the inline view and all flows are untouched. */}
-      <RawFidSpectrumFullscreenView
-        open={rawFullscreenOpen}
-        onClose={() => setRawFullscreenOpen(false)}
-        nucleus={resolvedNucleus}
-        xy={xy}
-        viewerPeaks={viewerPeaks}
-        displayPayload={displayPayload}
-        gsdResult={gsdResult}
-        legacyDetectionResult={legacyDetectionResult}
-        loading={previewLoading || processLoading}
-        payloadMode={payloadMode}
-        title={resultTitle}
-        fileName={selectedFileName}
-        sampleId={sampleId.trim() || undefined}
-        vendorDetected={vendorDetected}
-        nucleusMeta={nucleusMeta}
-        sw={sw}
-        td={td}
-        sha={sha}
-        warnings={warnings}
-        unifiedEvidenceMeta={{
-          layer: nucleus === "1H" ? "raw_fid_1h" : "raw_fid_13c",
-          sourceTab: "Raw FID upload",
-          title: payloadMode === "process" ? "Raw FID process" : "Raw FID preview",
-          endpoint: payloadMode === "process" ? "/nmr/raw-fid/process" : "/nmr/raw-fid/preview",
-          sampleId: sampleId.trim() || undefined,
-        }}
-      />
+      </SpectrumResultsFullscreen>
     </div>
   )
 }
