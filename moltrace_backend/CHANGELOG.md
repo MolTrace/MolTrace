@@ -14,6 +14,73 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.11.0 — Audit trail + GxP controls supporting 21 CFR Part 11 (Prompt 12) (2026-06-06)
+
+**Headline:** Adds `moltrace.spectroscopy.audit` — software controls that SUPPORT
+21 CFR Part 11 workflows (audit trail, electronic signatures, access control):
+a tamper-evident, cryptographically chained audit trail, e-signature primitives
+designed per 21 CFR Part 11.50/.70, append-only log sinks, periodic chain
+verification, a 7-year retention floor, and capture of AI model-weight checksums
+(Prompt 6 NMRNet + Prompt 11 JTF-Net) so any AI-assisted result is reproducible
+and traceable. These controls *help customers meet* 21 CFR Part 11; MolTrace does
+not claim the product is itself compliant — full computerized-system validation
+remains the customer's responsibility. Pure backend library — no API/UI/contract
+change.
+
+### Added
+- **`moltrace.spectroscopy.audit.trail`**:
+  - `AuditEntry` — frozen record: UTC timestamp, user, operation, SHA-256 of
+    input + output, all method parameters, software + model-weight versions,
+    `previous_entry_hash` (chain of custody), and an HMAC-SHA256 `signature`
+    keyed by an organisation secret. Every field except the signature is signed.
+  - `with_audit(operation_name, ...)` — decorator wrapping any analysis function;
+    hashes inputs/outputs, captures parameters + the model-checksum snapshot, and
+    appends a signed, chained entry to an append-only `AuditLog`. Records both
+    successful and failed operations; passes through (warning once) when auditing
+    is not configured, so it is safe to apply across the Prompt 1-11 functions
+    before production. `audited(func, name)` is the programmatic form.
+  - `verify_chain` / `assert_chain_integrity` — periodic tamper detection: the
+    keyless SHA-256 chain check catches insertion / deletion / reordering, and
+    the keyed HMAC check catches any content tampering (and authenticity).
+  - `ElectronicSignature` + `sign_record` / `verify_signature` — e-signatures
+    whose manifestation carries the signer's printed name, date/time, and meaning
+    (§11.50) and that are cryptographically bound to one record so they cannot be
+    transferred to another (§11.70). `SignatureMeaning` = authorship | review |
+    approval | responsibility.
+  - `InMemoryAuditLog` + `JsonlAuditLog` (durable append-only JSON-Lines) backends
+    behind the `AuditLog` ABC; production backends (PostgreSQL append-only table
+    with row-level integrity, or AWS QLDB) implement the same interface.
+  - `RetentionPolicy` — a configurable retention floor (default **7 years**).
+  - `ModelRegistry` / `register_model_checksum` / `register_model_weights` — the
+    AI model-weight checksum registry snapshotted into every entry.
+  - `render_audit_report_text` / `render_audit_report_html` — deterministic
+    archival report (chain verdict, model checksums, signatures, disclaimer);
+    `export_pdfa` renders PDF/A-2b when the optional `reportlab` renderer is
+    installed (else `PdfExportUnavailable`).
+  - `configure_audit` / `audit_context` — process-wide recorder + the
+    authenticated-operator context; `Operation` vocabulary maps the audited
+    surfaces of Prompts 1-11.
+- **Prompt 6 / Prompt 11 wiring**: `predict.nmrnet_wrapper` and `nus.reconstruct`
+  now register each resolved checkpoint's SHA-256 in the audit model registry
+  (best-effort, guarded — never breaks inference).
+
+### Compliance framing
+- No user-facing string claims the product itself meets 21 CFR Part 11; the
+  rendered report and module text frame the controls as *supporting* the rule
+  with an explicit customer-responsibility disclaimer (guarded by a test).
+
+### Validation
+- `tests/spectroscopy/test_audit_trail.py` (28 tests): hash-chain + HMAC tamper
+  detection (content edit, deletion, reorder), the decorator (input/result
+  hashing, parameter + model-checksum capture, failure recording, user
+  attribution, un-configured passthrough), e-signatures (§11.50 manifestation,
+  §11.70 record-linking), JSONL persistence + verification across reopen, the
+  7-year retention floor (incl. leap-day), deterministic report rendering, the
+  "no compliance claim" guard, and key providers. ruff clean; full
+  `tests/spectroscopy/` suite green.
+
+---
+
 ## v0.10.0 — NUS reconstruction: IST baseline + JTF-Net (Prompt 11) (2026-06-06)
 
 **Headline:** Adds non-uniform-sampling (NUS) reconstruction

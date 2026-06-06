@@ -161,6 +161,22 @@ def _download(url: str, dest: Path) -> None:  # pragma: no cover - network I/O
             out.write(chunk)
 
 
+def _register_audit_checksum(name: str, path: Path) -> None:
+    """Best-effort: record the weight checksum for audit reproducibility (Prompt 12).
+
+    Captures the exact NMRNet checkpoint SHA-256 in the audit model registry so
+    any NMRNet-assisted prediction is reproducible and traceable. Never breaks
+    inference.
+    """
+
+    try:
+        from moltrace.spectroscopy.audit.trail import register_model_weights
+
+        register_model_weights(name, path)
+    except Exception:  # audit capture must never break prediction
+        pass
+
+
 def _resolve_weights(nucleus: str, warnings: list[str]) -> Path:
     """Return the cached checkpoint path for ``nucleus``, downloading if needed.
 
@@ -180,6 +196,7 @@ def _resolve_weights(nucleus: str, warnings: list[str]) -> Path:
             raise NMRNetUnavailable(f"checksum mismatch for cached {path.name}")
         if not expected:
             warnings.append(f"{path.name}: SHA-256 not verified (no checksum configured).")
+        _register_audit_checksum(f"nmrnet:{nucleus}", path)
         return path
 
     base_url = os.environ.get("MOLTRACE_NMRNET_WEIGHTS_URL")
@@ -194,6 +211,7 @@ def _resolve_weights(nucleus: str, warnings: list[str]) -> Path:
     if expected and _sha256(path) != expected:
         path.unlink(missing_ok=True)
         raise NMRNetUnavailable(f"downloaded {path.name} failed SHA-256 verification")
+    _register_audit_checksum(f"nmrnet:{nucleus}", path)
     return path
 
 

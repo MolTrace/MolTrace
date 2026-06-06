@@ -405,6 +405,21 @@ def _download(url: str, dest: Path) -> None:  # pragma: no cover - network I/O
             out.write(chunk)
 
 
+def _register_audit_checksum(name: str, path: Path) -> None:
+    """Best-effort: record the weight checksum for audit reproducibility (Prompt 12).
+
+    Captures the exact checkpoint SHA-256 in the audit model registry so any
+    JTF-Net-assisted result is reproducible and traceable. Never breaks inference.
+    """
+
+    try:
+        from moltrace.spectroscopy.audit.trail import register_model_weights
+
+        register_model_weights(name, path)
+    except Exception:  # audit capture must never break reconstruction
+        pass
+
+
 def _resolve_weights(warnings: list[str]) -> Path:
     """Return the cached JTF-Net checkpoint path, downloading if configured.
 
@@ -420,6 +435,7 @@ def _resolve_weights(warnings: list[str]) -> Path:
             raise JTFNetUnavailable(f"checksum mismatch for cached {path.name}")
         if not _JTFNET_WEIGHTS_SHA256:
             warnings.append(f"{path.name}: SHA-256 not verified (no checksum configured).")
+        _register_audit_checksum("jtfnet", path)
         return path
 
     base_url = os.environ.get("MOLTRACE_JTFNET_WEIGHTS_URL")
@@ -433,6 +449,7 @@ def _resolve_weights(warnings: list[str]) -> Path:
     if _JTFNET_WEIGHTS_SHA256 and _sha256(path) != _JTFNET_WEIGHTS_SHA256:
         path.unlink(missing_ok=True)
         raise JTFNetUnavailable(f"downloaded {path.name} failed SHA-256 verification")
+    _register_audit_checksum("jtfnet", path)
     return path
 
 
