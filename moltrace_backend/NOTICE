@@ -71,6 +71,28 @@ terms before distributing a derived index. Underlying PubChem records are
 produced by the U.S. National Library of Medicine (public domain in the U.S.).
 
 -------------------------------------------------------------------------------
+AIST SDBS (qNMR purity validation reference -- NOT redistributed)
+-------------------------------------------------------------------------------
+The qNMR purity calculators in moltrace.spectroscopy.qnmr were validated against
+the Spectral Database for Organic Compounds (SDBS), National Institute of
+Advanced Industrial Science and Technology (AIST), Japan
+(https://sdbs.db.aist.go.jp). SDBS spectra of certified-purity compounds were
+used for INTERNAL validation only (to confirm the published internal-standard
+and PULCON equations recover certified purities to within 0.5 % absolute).
+
+SDBS terms restrict redistribution: NO SDBS spectrum, table, or derived data
+file is bundled with MolTrace or committed to this repository. The shipped
+test-suite (tests/spectroscopy/test_qnmr_purity.py) validates the math with
+documented worked examples and closed-loop synthetic spectra instead. The two
+purity equations themselves are textbook metrology (see the qNMR references
+below) and carry no SDBS-derived obligation.
+
+qNMR purity methods: Pauli, G. F. et al. J. Med. Chem. 57, 9220 (2014),
+doi:10.1021/jm500734a (internal-standard qNMR); Wider, G.; Dreier, L.
+J. Am. Chem. Soc. 128, 2571 (2006), doi:10.1021/ja055336t (PULCON). Implemented
+from the published equations, not from any copyrighted text.
+
+-------------------------------------------------------------------------------
 RDKit  (cheminformatics toolkit)
 -------------------------------------------------------------------------------
 RDKit: Open-source cheminformatics. https://www.rdkit.org

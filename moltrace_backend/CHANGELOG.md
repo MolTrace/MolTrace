@@ -14,6 +14,56 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.8.3 — qNMR purity calculator (internal-standard + PULCON) (2026-06-05)
+
+**Headline:** Adds a quantitative-NMR purity layer (`moltrace.spectroscopy.qnmr`)
+that turns a resonance integral into a mass-fraction purity by the two standard,
+non-proprietary qNMR methods, with full provenance and GUM-propagated
+uncertainties. Pure backend library — no API/UI/contract change.
+
+### Added
+- **`moltrace.spectroscopy.qnmr.purity`**:
+  - `rank_multiplets_for_qnmr(multiplets, classified_peaks)` — scores each
+    candidate analyte multiplet for integration fitness on a transparent additive
+    scale (max 13): **+5** no solvent/impurity line in the window, **+3** clean
+    baseline (no artifact / ¹³C-satellite line or broad background hump in the
+    window ± margin), **+2** narrow lines (FWHM ≤ 5 Hz), **+2** determinate
+    multiplicity (proton count known), **+1** not exchange-broadened. Writes the
+    per-criterion breakdown to a *copy* of each multiplet's `metadata["qnmr"]`
+    (inputs never mutated); stable best-first sort.
+  - `calculate_purity_internal_standard(...)` —
+    `P_x = (I_x/I_std)·(N_std/N_x)·(M_x/M_std)·(m_std/m_x)·P_std`.
+  - `calculate_purity_pulcon(...)` — reciprocity-principle external-standard
+    quantitation (signal per spin ∝ 1/90°-pulse-width) with documented
+    temperature / receiver-gain / scan corrections that default to matched
+    conditions; purity = `100·c_meas/c_nominal`.
+  - Both return a frozen `PurityResult{purity_percent, uncertainty_percent,
+    method, relative_uncertainty, inputs, intermediates, warnings}` — every
+    intermediate ratio preserved for the audit trail; combined standard
+    uncertainty by GUM quadrature (exact proton counts contribute nothing).
+  - `molar_mass_from_smiles` (RDKit average `MolWt` — the correct gravimetric
+    mass) and `total_proton_count_from_smiles` convenience helpers (RDKit
+    lazy-imported; the calculators themselves are pure arithmetic).
+
+### Validation
+- `tests/spectroscopy/test_qnmr_purity.py` — 47 tests: ranking criteria, both
+  equations vs hand-computed worked examples, **closed-loop synthetic recovery
+  < 0.5 % absolute** (the SDBS acceptance target), GUM quadrature, the
+  validation / warning paths, and the SMILES helpers. ruff clean (new code);
+  full `tests/spectroscopy/` suite 126 passed.
+
+### Notes
+- AIST **SDBS** reference spectra used for **internal validation only** —
+  redistribution-restricted, never bundled or committed (see `NOTICE`). No new
+  tracked artifacts; no third-party data committed.
+- No FE/contract change — pure backend quantitation library (no endpoint
+  requested), consistent with the §3.6 verification and §3.7 similarity layers.
+- White papers updated (Trigger 1 + 7): canonical §5.2 (qNMR purity note +
+  `[^qnmr_purity]` / `[^pulcon]`), Technical §3.8 (new layer) + §8.2 (foundations
+  paragraph + footnotes).
+
+---
+
 ## v0.8.2 — POST /spectrum/retrieve endpoint (similarity retrieval contract) (2026-06-03)
 
 **Headline:** Exposes the v0.8.1 similarity layer as a typed API. `POST
