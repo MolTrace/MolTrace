@@ -57,3 +57,11 @@ moltrace_jtfnet_cache/
 *.faiss
 *.faiss.ids.json
 spectrum_similarity_index/
+
+# Audit trail (Prompt 12 / 21 CFR Part 11 support): append-only logs are
+# customer records, not source -- NEVER commit them. The org HMAC signing key is
+# a secret supplied via $MOLTRACE_AUDIT_HMAC_KEY (no key file is committed).
+*.audit.jsonl
+audit_trail*.jsonl
+moltrace_audit_log/
+audit_exports/

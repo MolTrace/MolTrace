@@ -198,3 +198,38 @@ Used by ``moltrace.spectroscopy.peaks.gsd`` for Lorentzian and pseudo-Voigt
 line-shape fitting (single-peak refinement at levels 1-2, composite-overlap
 refinement at level 3). Not vendored; installed from PyPI per
 ``pyproject.toml``.
+
+-------------------------------------------------------------------------------
+Audit trail / 21 CFR Part 11 support  (regulatory basis -- NOT third-party code)
+-------------------------------------------------------------------------------
+The audit-trail and electronic-signature controls in
+``moltrace.spectroscopy.audit`` are implemented from first principles against the
+publicly available U.S. regulation and FDA guidance below; no third-party code or
+data is vendored for them. The hash chain, HMAC-SHA256 signatures, and PDF/A
+report are built on the Python standard library (``hashlib``, ``hmac``, ``json``)
+and NumPy (noted above).
+
+* U.S. FDA. 21 CFR Part 11 -- Electronic Records; Electronic Signatures
+  (esp. §11.10 controls for closed systems, §11.50 signature manifestations,
+  §11.70 signature/record linking). U.S. Government work, public domain.
+* U.S. FDA. "Data Integrity and Compliance With Drug CGMP: Questions and
+  Answers -- Guidance for Industry" (December 2018) -- ALCOA+ data-integrity
+  attributes. U.S. Government work, public domain.
+
+These controls are provided to SUPPORT 21 CFR Part 11 workflows and help
+customers meet the rule; MolTrace does not claim the product is itself compliant
+with 21 CFR Part 11. Full computerized-system validation and the overall
+compliance determination remain the customer's responsibility.
+
+-------------------------------------------------------------------------------
+ReportLab  (OPTIONAL PDF/A renderer for audit-report export -- NOT vendored)
+-------------------------------------------------------------------------------
+ReportLab Toolkit (open-source edition). Source: https://www.reportlab.com ;
+https://pypi.org/project/reportlab/ . License: BSD-3-Clause.
+
+Used only by the optional ``moltrace.spectroscopy.audit.trail.export_pdfa`` path
+to render the audit-trail report to a PDF targeting PDF/A-2b. ReportLab is NOT a
+declared dependency and is NOT vendored; when it is absent ``export_pdfa`` raises
+``PdfExportUnavailable`` and the always-available HTML/text report is used
+instead. PDF/A conformance should be validated (e.g. veraPDF) as part of the
+customer's computerized-system validation.

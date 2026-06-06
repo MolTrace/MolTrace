@@ -290,6 +290,10 @@ The FDA's guidance on the *Control of Nitrosamine Impurities in Human Drugs*[^fd
 
 Every architectural decision in §4 maps to a GxP-aligned data-integrity primitive: the SHA-256-verified raw vault (Attributable + Enduring), the typed Pydantic models (Legible + Consistent), the audit-event ledger (Contemporaneous + Available), the immutable derivation chain from raw to report (Original + Accurate). The result is that a "data integrity" inspection question — *"Show me the raw bytes that produced this number"* — is a single click in the UI and a single SQL query in the database.
 
+### 6.6 Audit Trail & Electronic Signatures — Controls Supporting 21 CFR Part 11
+
+MolTrace provides software controls that **support** 21 CFR Part 11 workflows[^cfr_part11] — a cryptographic audit trail, electronic signatures, and access control — layered over the §6.5 data-integrity primitives. A decorator can wrap any analysis layer so each result is written as an immutable, signed audit record capturing the operator, the UTC timestamp, the SHA-256 of the input and output, every method parameter, the software version, and — for AI-assisted layers — the **exact model-weight checksum** that produced it, so the result is reproducible and traceable. Each record is cryptographically chained to the one before it (a SHA-256 hash chain sealed with an organisation-keyed HMAC), so any tampering, deletion, or reordering is caught by a periodic integrity check. Electronic signatures are designed per 21 CFR Part 11.50 (the signature manifestation carries the signer's name, the date and time, and the meaning — authorship, review, approval, or responsibility) and 11.70 (each signature is bound to its specific record so it cannot be copied or transferred). Records carry a configurable retention floor (default seven years) and export to a deterministic, submission-ready report (PDF/A). **Critically, these controls *help customers meet* 21 CFR Part 11 — MolTrace does not claim the product is itself compliant. Full computerized-system validation, SOPs, and identity management remain the customer's responsibility**, and the data-integrity basis follows the FDA's ALCOA+ guidance.[^fda_data_integrity]
+
 ---
 
 ## 7. Workflow Walkthrough: Tobramycin from FID to Report
@@ -406,6 +410,10 @@ For information on pilot deployments, integration with Bruker / Agilent instrume
 [^ema_ai_reflection]: European Medicines Agency. *Reflection paper on the use of Artificial Intelligence (AI) in the medicinal product lifecycle.* 2024.
 
 [^ich_q2r2]: International Council for Harmonisation. *ICH Q2(R2): Validation of Analytical Procedures.* 2023.
+
+[^cfr_part11]: U.S. Food and Drug Administration. *21 CFR Part 11 — Electronic Records; Electronic Signatures* (esp. §11.50 signature manifestations, §11.70 signature/record linking). U.S. Government work, public domain. MolTrace's §6.6 audit-trail and electronic-signature controls are built to SUPPORT these requirements; MolTrace does not claim the product is itself compliant with the rule — computerized-system validation remains the customer's responsibility.
+
+[^fda_data_integrity]: U.S. Food and Drug Administration. *Data Integrity and Compliance With Drug CGMP: Questions and Answers — Guidance for Industry* (December 2018) — the ALCOA+ data-integrity attributes. U.S. Government work, public domain.
 
 [^ai_ms_market]: *AI in Mass Spectrometry Software Market Size, Dynamics and Opportunities.* 2024 industry report.
 
