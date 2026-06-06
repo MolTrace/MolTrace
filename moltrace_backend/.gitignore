@@ -65,3 +65,19 @@ spectrum_similarity_index/
 audit_trail*.jsonl
 moltrace_audit_log/
 audit_exports/
+
+# Phase 0 foundation (Prompt 19) infra artifacts -- run stores, dataset caches,
+# and DVC remotes are reproducible outputs / large blobs, NEVER source.
+# MLflow (and the native run store) local run directories.
+mlruns/
+mlartifacts/
+moltrace_runs/
+# DVC: this repo never tracks data blobs; the local cache, scratch tmp, and any
+# throwaway local remote used by tests/restore are artifacts.
+/.dvc/cache/
+/.dvc/tmp/
+.dvc_tmp_remote/
+moltrace_data_store/
+# Great Expectations scratch (uncommitted validations / data docs).
+gx/uncommitted/
+great_expectations/uncommitted/
