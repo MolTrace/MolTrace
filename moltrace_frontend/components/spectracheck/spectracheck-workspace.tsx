@@ -14,7 +14,7 @@ import { FeedbackButton, toFeedbackProjectId, toFeedbackSessionId } from "@/src/
 import { useRouter, useSearchParams } from "next/navigation"
 import { apiFetch, ApiError } from "@/lib/api/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
