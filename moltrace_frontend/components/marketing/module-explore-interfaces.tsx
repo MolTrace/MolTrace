@@ -269,7 +269,6 @@ function LcmsChromatogramSvg() {
           // Gaussian → down → baseline → next peak → ... so the fill reads
           // as one TIC trace (not 5 disconnected polygons).
           let d = `M 20 ${BASE}`
-          let cursor = 20
           for (const [x, h, , , w] of PEAKS) {
             // baseline up to ~half-width-before peak
             d += ` L ${x - w} ${BASE}`
@@ -277,7 +276,6 @@ function LcmsChromatogramSvg() {
             d += ` C ${x - w + 4} ${BASE}, ${x - 4} ${BASE - h}, ${x} ${BASE - h}`
             // and down again to baseline
             d += ` C ${x + 4} ${BASE - h}, ${x + w - 4} ${BASE}, ${x + w} ${BASE}`
-            cursor = x + w
           }
           d += ` L 980 ${BASE} L 980 ${BASE} L 20 ${BASE} Z`
           return d
