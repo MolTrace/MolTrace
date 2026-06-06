@@ -26,6 +26,7 @@ import {
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
+import { ProcessedSpectrumFullscreenView } from "@/components/spectracheck/spectracheck-processed-fullscreen-view"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
   extractNotes,
@@ -73,6 +74,7 @@ import {
   FileText,
   FlaskConical,
   Hash,
+  Maximize2,
   PlayCircle,
   RotateCcw,
   Settings2,
@@ -193,6 +195,9 @@ export function SpectraCheckProcessedSpectrumSection({
   const processedPreviewCacheRef = useRef(new Map<string, unknown>())
   const processedAnalyzeCacheRef = useRef(new Map<string, unknown>())
   const [dragOver, setDragOver] = useState(false)
+  // Full-screen, in-app spectrum + tables view. Opt-in (a toolbar button by the
+  // spectrum); the inline Step-3 surface stays mounted and unchanged underneath.
+  const [fullscreenOpen, setFullscreenOpen] = useState(false)
   // ── GSD-Prompt-3 (experimental, opt-in) — additive only. Default must
   // stay `legacy` so tenants who never touch the selector keep the
   // existing /nmr/processed/analyze evidence-match flow unchanged.
@@ -1343,7 +1348,28 @@ export function SpectraCheckProcessedSpectrumSection({
               </div>
             )}
 
-            {/* Spectrum — full page width */}
+            {/* Spectrum — full page width, with a Full screen entry point so
+                the spectrum + analysis tables can be viewed on the whole
+                screen (opens an in-app overlay; this inline view is untouched). */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Spectrum
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setFullscreenOpen(true)}
+                disabled={!xy}
+                className="gap-1.5"
+                data-testid="processed-open-fullscreen"
+                aria-haspopup="dialog"
+                title="View the spectrum and analysis tables on the entire screen"
+              >
+                <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+                Full screen
+              </Button>
+            </div>
             <div className="min-w-0">
               {xy ? (
                 <SpectrumViewer
@@ -1596,6 +1622,36 @@ export function SpectraCheckProcessedSpectrumSection({
       <SpectrumRetrievePanel
         candidatesText={candidatesOptional.trim() || candidatesText}
         testId="processed-spectrum-retrieve-surface"
+      />
+
+      {/* Full-screen, in-app view of the spectrum + analysis tables. Portals to
+          document.body so the app-shell width never constrains it. Reuses the
+          same SpectrumViewer + result panels and the already-computed display
+          data — opening it cannot alter the spectrum, results, or tables. */}
+      <ProcessedSpectrumFullscreenView
+        open={fullscreenOpen}
+        onClose={() => setFullscreenOpen(false)}
+        nucleus={nucleus}
+        xy={xy}
+        peaks={peaks}
+        overlays={overlays}
+        displayPayload={displayPayload}
+        peakCount={peakCount}
+        score={score}
+        warnings={warnings}
+        notes={notes}
+        loading={foregroundActionLoading}
+        title={resultTitle}
+        payloadMode={payloadMode}
+        sampleId={sampleId.trim() || undefined}
+        fileName={selectedFileName ?? payloadFilename(displayPayload)}
+        unifiedEvidenceMeta={{
+          layer: nucleus === "1H" ? "processed_1h" : "processed_13c",
+          sourceTab: "Processed 1H / 13C upload",
+          title: payloadMode === "analyze" ? "Processed spectrum analyze" : "Processed spectrum preview",
+          endpoint: payloadMode === "analyze" ? "/nmr/processed/analyze" : "/nmr/processed/preview",
+          sampleId: sampleId.trim() || undefined,
+        }}
       />
     </div>
   )

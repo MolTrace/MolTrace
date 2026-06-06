@@ -97,6 +97,14 @@ export type SpectrumViewerProps = {
   /** Initial visibility for Mnova-style vertical peak guides and ppm labels. */
   defaultShowPeakGuides?: boolean
   className?: string
+  /**
+   * Optional Tailwind height class for the chart container. When provided it
+   * OVERRIDES the built-in compact/expanded heights — used by the full-screen
+   * spectrum view to let the chart fill the viewport. Omitting it preserves the
+   * exact default behaviour (compact `h-[360px]`, toolbar-expanded 70vh), so no
+   * existing call site or rendering is affected.
+   */
+  heightClassName?: string
 }
 
 const DISPLAY_Y_CAP = 1e120
@@ -889,6 +897,7 @@ function SpectrumViewerImpl({
   defaultShowPeaks = false,
   defaultShowPeakGuides = false,
   className,
+  heightClassName,
 }: SpectrumViewerProps) {
   // Default gain01 = 0 → multiplier 1×, so the entire spectrum fits within the
   // chart's baseline y-axis on initial render and after a Full-spectrum reset.
@@ -1787,7 +1796,9 @@ function SpectrumViewerImpl({
       <div
         className={cn(
           "group flex w-full min-w-0 flex-col overflow-hidden rounded-lg border bg-card",
-          expanded ? "h-[min(640px,70vh)]" : "h-[360px]",
+          // A caller-supplied height (full-screen view) wins; otherwise keep the
+          // built-in compact / toolbar-expanded heights unchanged.
+          heightClassName ?? (expanded ? "h-[min(640px,70vh)]" : "h-[360px]"),
         )}
       >
         {/*
