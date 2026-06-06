@@ -7,7 +7,7 @@
 ---
 
 **A MolTrace Technologies, Inc. White Paper**
-Document version: 2026-Q2 · rev 2026-05-31 · Hybrid (business + technical) · Approx. 5,200 words
+Document version: 2026-Q2 · rev 2026-06-05 · Hybrid (business + technical) · Approx. 5,200 words
 
 > *"Scientific intelligence has to be reproducible to be useful, auditable to be acceptable, and integrated to be adopted."*
 
@@ -230,6 +230,8 @@ Stereochemistry also enters through coupling constants. The Week 40 multiplet J-
 
 **Spectrum retrieval.** Complementing scoring and verification, a similarity-retrieval layer answers "which known molecules look like this spectrum?" — a Gaussian-smoothed 256-D encoding of the ¹H / ¹³C shifts with FAISS HNSW nearest-neighbour search (top-100 from a ~45k reference set in milliseconds), plus a Kuhn-Munkres set-similarity score robust to peak insertion/deletion. It follows the published NMR-Solver retrieval method,[^nmr_solver] implemented from the equations rather than any copyrighted text; an index derived from NMRShiftDB2 carries the CC-BY-SA ShareAlike obligation and is never committed.
 
+**Quantitative purity (qNMR).** Where scoring, verification, and retrieval establish *what* a molecule is, quantitative NMR establishes *how much* — the mass-fraction purity a release or stability dossier turns on. MolTrace implements the two standard, non-proprietary qNMR methods: internal-standard (relative) qNMR, where a certified reference of known purity is weighed into the same tube and the analyte purity follows directly from the integral, proton-count, molar-mass, and weighed-mass ratios; and PULCON external-standard quantitation, which transfers an absolute concentration from a separately-measured reference via the reciprocity principle (signal ∝ 1/90°-pulse-width) without spiking the sample. A transparent ranking picks the cleanest analyte multiplet to integrate, combined uncertainties propagate per the GUM, and every intermediate ratio is preserved for the audit trail. The methods recover certified purities from public reference spectra to within 0.5 % absolute.[^qnmr_purity] [^pulcon]
+
 ### 5.3 Shift-Window Tables
 
 The categoriser's 1H windows (4.4–6.0 ppm anomeric/vinylic, 6.0–9.0 ppm aromatic/alkene, 9.0–10.0 ppm aldehyde, 10.0–13.5 ppm carboxylic-acid OH) are sourced from the consensus across:
@@ -378,6 +380,10 @@ For information on pilot deployments, integration with Bruker / Agilent instrume
 [^elyashberg_case]: Elyashberg M. E.; Williams A. J.; Blinov K. A. *Contemporary Computer-Assisted Approaches to Molecular Structure Elucidation.* RSC Publishing, 2012. doi:10.1039/9781849733625; and Elyashberg et al., *Prog. Nucl. Magn. Reson. Spectrosc.* reviews on CASE.
 
 [^nmr_solver]: Jin Y. et al. *NMR-Solver: Automated Structure Elucidation via Large-Scale Spectral Matching and Physics-Guided Fragment Optimization.* arXiv:2509.00640 (2025); Nat. Commun.
+
+[^qnmr_purity]: Pauli G. F.; Chen S.-N.; Simmler C.; Lankin D. C.; McAlpine J. B. et al. *Importance of Purity Evaluation and the Potential of Quantitative ¹H NMR as a Purity Assay.* J. Med. Chem. 2014, 57, 9220. doi:10.1021/jm500734a; and Bharti S. K.; Roy R. *Quantitative ¹H NMR spectroscopy.* TrAC Trends Anal. Chem. 2012, 35, 5. doi:10.1016/j.trac.2012.02.007. The internal-standard qNMR equation behind MolTrace's §5.2 purity layer.
+
+[^pulcon]: Wider G.; Dreier L. *Measuring Protein Concentrations by NMR Spectroscopy.* J. Am. Chem. Soc. 2006, 128, 2571. doi:10.1021/ja055336t. The PULCON reciprocity principle (signal ∝ 1/90°-pulse-width) behind MolTrace's external-standard purity route.
 
 [^reasoning_llms]: *Enhancing molecular structure elucidation with reasoning-capable LLMs.* 2024.
 

@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Technical White Paper"
 subtitle: "Architecture, Scientific Foundations, and Regulatory Posture for Analytical-Method Validators and Regulatory Reviewers"
-version: "2026-06-03"
+version: "2026-06-05"
 audience: "Analytical-method validators, NMR / MS technical leads, regulatory-affairs reviewers, IT / data-integrity auditors"
 length: "≈7,500 words · Technical variant of the canonical hybrid white paper"
 ---
@@ -174,6 +174,17 @@ Verification (§3.6) scores one proposed structure; *retrieval* answers the comp
 * **Validation:** `tests/spectroscopy/test_similarity_scoring.py` (33 tests) covers the encoding (peak placement, empty, σ effect), the L2 and set-similarity algebra (identical → 1.0, insertion-robust, optimal-vs-greedy matching, symmetry), and the FAISS index (self-retrieval, recall vs an exact brute-force k-NN, save/load, batch), plus a `@slow` 45k acceptance test pinning the < 1 s top-100 retrieval target.
 * **Endpoint:** `POST /spectrum/retrieve` (v0.8.2) — query by ¹H/¹³C shift lists or a SMILES, matched by L2 distance against the server-configured FAISS index (`MOLTRACE_SIMILARITY_INDEX`); returns the top-k `{id, l2_distance}` with a `spectrum.retrieve` audit event, or `index_available=false` when no index is configured.
 * **Status:** **shipping** (retrieval + scoring library + endpoint), UI integration-ready — a "find similar known spectra" read-out, never an identity claim.
+
+### 3.8 Quantitative-NMR purity — internal-standard + PULCON (Prompt 9)
+
+Verification and retrieval (§3.6–3.7) answer *what* the molecule is; quantitative NMR (qNMR) answers *how much* of it is present — the mass-fraction purity a release or stability dossier turns on. The `moltrace.spectroscopy.qnmr` module turns the integral of a resonance — strictly proportional to the number of nuclei that produce it — into a purity, by the two established, non-proprietary qNMR methods. Both are implemented from the published metrology, and every intermediate ratio is preserved on an auditable `PurityResult`.
+
+* **Multiplet selection.** `rank_multiplets_for_qnmr` scores each candidate analyte multiplet for fitness as the integration target on a transparent additive scale (max 13): **+5** no solvent/impurity line inside the window, **+3** clean baseline (no artifact / ¹³C-satellite line or broad background hump in the window ± margin), **+2** all lines narrow (FWHM ≤ 5 Hz — a field-independent linewidth measure), **+2** determinate multiplicity (label ≠ `m`, so the contributing proton count is known), **+1** not exchange-broadened (a broad labile-proton singlet scores 0). The per-criterion breakdown is written into each multiplet's `metadata["qnmr"]`; ranking never mutates the inputs.
+* **Internal standard (relative qNMR).** A certified reference of known purity is weighed into the same solution: `P_x = (I_x/I_std)·(N_std/N_x)·(M_x/M_std)·(m_std/m_x)·P_std`, where `I` are integrals, `N` the protons giving rise to each integrated signal (exact integers), `M` the *average* molar masses, `m` the weighed masses, and `P_std` the certified purity. Because both species share one spectrum, receiver gain / pulse / temperature cancel exactly — the most precise route, needing no instrument calibration.[^qnmr_purity]
+* **PULCON (external standard).** By the reciprocity principle the signal per spin ∝ 1/(90° pulse width), so an absolute concentration transfers from a separately-measured external reference without spiking the analyte: `c_meas = c_ref·(I_x/N_x)/(I_ref/N_ref)·(pw_x/pw_ref)·corr`, with documented temperature (Curie-law), receiver-gain, and scan corrections that each default to 1 under matched acquisition. Purity is `100·c_meas/c_nominal` against the weighed nominal concentration.[^pulcon]
+* **Uncertainty.** Both routes propagate the input relative uncertainties (the two integrals, the masses or concentrations, the standard purity, optionally the molar masses) in quadrature per the GUM, since purity is a product of independent factors; the exact proton counts contribute nothing. The combined standard uncertainty is returned alongside the purity.
+* **Validation:** `tests/spectroscopy/test_qnmr_purity.py` (47 tests) covers the ranking criteria, both equations against hand-computed worked examples, **closed-loop synthetic recovery to < 0.5 % absolute**, the GUM quadrature, the validation / warning paths, and the RDKit SMILES molar-mass / proton-count helpers. The formulas were checked against AIST **SDBS** certified-purity spectra (recovery within 0.5 % absolute); SDBS data are redistribution-restricted and used for **internal validation only** — never bundled with MolTrace.
+* **Status:** **shipping** (quantitation library), endpoint/UI integration-ready — a quantitative-purity read-out with full provenance for the audit trail.
 
 ---
 
@@ -386,6 +397,8 @@ The DP4 family of methods provides Bayesian posteriors over candidate stereochem
 MolTrace exposes the DP4 / DP5 panel under the Week 26 candidate-comparison module when the user supplies ≥ 2 candidates and observed 1H + 13C shifts. The legacy heuristic candidate score and the DP4 / DP5 score are surfaced **side by side** in the UI so the analyst can cross-check.
 
 **Automated structure verification (ASV) & CASE.** Beyond stereochemistry scoring, MolTrace's §3.6 verification layer follows the multi-test *automated structure verification* methodology of Golotvin & Williams[^golotvin_asv] and the *computer-assisted structure elucidation* (CASE) framework of Elyashberg, Williams & Blinov[^elyashberg_case]: a proposed structure is checked by several independent consistency tests (prediction bounds, spin-system assignment, 2-D coverage, MS isotope match), each contributing a fit score and a reliability, combined into a single posterior. MolTrace's combination is an explicit Bayesian log-odds update with one documented evidence unit — no proprietary vendor scoring scheme is reproduced. The MS test's isotope envelope uses IUPAC-2016 natural abundances.[^iupac_isotopes]
+
+**Quantitative NMR (qNMR) purity.** MolTrace's §3.8 quantitation layer implements the two standard, non-proprietary qNMR purity methods: internal-standard (relative) qNMR — `P_x = (I_x/I_std)(N_std/N_x)(M_x/M_std)(m_std/m_x)·P_std` — from the pharmaceutical-qNMR literature of Pauli et al. and Bharti & Roy,[^qnmr_purity] and PULCON external-standard quantitation built on the reciprocity principle of Wider & Dreier[^pulcon] (signal per spin ∝ 1/90°-pulse-width). Combined uncertainties propagate per the GUM (quadrature of independent relative uncertainties), and the methods recover certified purities from AIST SDBS reference spectra to within 0.5 % absolute — SDBS used for internal validation only and never redistributed.
 
 ### 8.3 Chemical-Shift Window Tables — Canonical References
 
@@ -658,6 +671,10 @@ For analytical-method validators, NMR / MS technical leads, regulatory-affairs r
 [^pharma_solids]: *Spectroscopy of Pharmaceutical Solids.* (Papers/Spectroscopy/Pharmaceutical solids)
 
 [^qnmr]: *Quantitative NMR Spectroscopy in Pharmaceutical Applications.* (Papers/Spectroscopy/qNMR + Protein_NMR folder)
+
+[^qnmr_purity]: Pauli G. F.; Chen S.-N.; Simmler C.; Lankin D. C.; McAlpine J. B. et al. *Importance of Purity Evaluation and the Potential of Quantitative ¹H NMR as a Purity Assay.* J. Med. Chem. 2014, 57, 9220. doi:10.1021/jm500734a. See also Bharti S. K.; Roy R. *Quantitative ¹H NMR spectroscopy.* TrAC Trends Anal. Chem. 2012, 35, 5. doi:10.1016/j.trac.2012.02.007; and Saito T. et al. *A new traceability scheme for the development of certified reference materials by quantitative NMR.* Accred. Qual. Assur. 2009, 14, 79. doi:10.1007/s00769-008-0461-z. The §3.8 internal-standard equation and GUM uncertainty propagation are implemented from these public sources.
+
+[^pulcon]: Wider G.; Dreier L. *Measuring Protein Concentrations by NMR Spectroscopy.* J. Am. Chem. Soc. 2006, 128, 2571. doi:10.1021/ja055336t (PULCON — the reciprocity principle for absolute concentration transfer). See also Dreier L.; Wider G. *Concentration measurements by PULCON using X-filtered or 2D NMR spectra.* Magn. Reson. Chem. 2006, 44, S206. doi:10.1002/mrc.1838. The §3.8 pulse-width-ratio concentration transfer follows these.
 
 [^ai_ms_market]: *AI in Mass Spectrometry Software Market Size, Dynamics and Opportunities.* 2024 industry report.
 
