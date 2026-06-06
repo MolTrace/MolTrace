@@ -7,11 +7,12 @@ import tarfile
 import tempfile
 import warnings
 import zipfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 from xml.etree import ElementTree
 
 import numpy as np
@@ -70,11 +71,17 @@ def read_fid(path: Path) -> NMRSpectrum:
         field_mhz = _extract_field_mhz(params)
         sw_hz = _extract_sweep_width_hz(params)
         if not math.isfinite(sw_hz) or sw_hz <= 0:
-            raise FIDReaderError("The FID acquisition parameters do not include a valid sweep width.")
+            raise FIDReaderError(
+                "The FID acquisition parameters do not include a valid sweep width."
+            )
 
         line_broadening_hz = _line_broadening_hz(nucleus)
         windowed = _apply_exponential_apodization(fid_1d, sw_hz, line_broadening_hz)
-        fft_size = _ZERO_FILL_POINTS if windowed.size <= _ZERO_FILL_POINTS else _next_power_of_two(windowed.size)
+        fft_size = (
+            _ZERO_FILL_POINTS
+            if windowed.size <= _ZERO_FILL_POINTS
+            else _next_power_of_two(windowed.size)
+        )
         complex_spectrum = np.fft.fftshift(np.fft.fft(windowed, n=fft_size))
         complex_spectrum = _phase_largest_peak_positive(complex_spectrum)
         real_spectrum = np.real(complex_spectrum).astype(np.float64, copy=False)
@@ -170,14 +177,18 @@ def _prepared_dataset_root(path: Path) -> Iterator[Path]:
                 _safe_extract_zip(archive, root)
             yield root
         return
-    if path.is_file() and (tarfile.is_tarfile(path) or suffixes.endswith((".tar.gz", ".tgz", ".tar"))):
+    if path.is_file() and (
+        tarfile.is_tarfile(path) or suffixes.endswith((".tar.gz", ".tgz", ".tar"))
+    ):
         with tempfile.TemporaryDirectory(prefix="moltrace-fid-") as tmp:
             root = Path(tmp)
             with tarfile.open(path) as archive:
                 _safe_extract_tar(archive, root)
             yield root
         return
-    raise FIDReaderError("Expected a Bruker/Varian dataset directory, fid file, zip, or tar archive.")
+    raise FIDReaderError(
+        "Expected a Bruker/Varian dataset directory, fid file, zip, or tar archive."
+    )
 
 
 def _safe_extract_zip(archive: zipfile.ZipFile, root: Path) -> None:
@@ -228,7 +239,8 @@ def _require_nmrglue() -> Any:
         import nmrglue as ng  # type: ignore[import-not-found]
     except Exception as exc:  # pragma: no cover - exercised only without optional extra.
         raise FIDReaderError(
-            "Raw FID reading requires nmrglue. Install it with: cd moltrace_backend && uv sync --extra fid"
+            "Raw FID reading requires nmrglue. "
+            "Install it with: cd moltrace_backend && uv sync --extra fid"
         ) from exc
     return ng
 
@@ -283,7 +295,9 @@ def _flatten_1d_fid(data: np.ndarray) -> np.ndarray:
     return fid.astype(np.complex128, copy=False)
 
 
-def _apply_exponential_apodization(fid: np.ndarray, sw_hz: float, line_broadening_hz: float) -> np.ndarray:
+def _apply_exponential_apodization(
+    fid: np.ndarray, sw_hz: float, line_broadening_hz: float
+) -> np.ndarray:
     if line_broadening_hz <= 0:
         return np.asarray(fid, dtype=np.complex128)
     dwell_time = 1.0 / float(sw_hz)
@@ -411,7 +425,9 @@ def _processed_peaklist_ppm(dataset_root: Path, *, nucleus: str) -> list[float]:
         block_peaks: list[tuple[float, float]] = []
         for peak in block.findall("Peak1D"):
             try:
-                block_peaks.append((float(peak.attrib["F1"]), float(peak.attrib.get("intensity", "0"))))
+                block_peaks.append(
+                (float(peak.attrib["F1"]), float(peak.attrib.get("intensity", "0")))
+            )
             except (KeyError, ValueError):
                 continue
         if block_peaks:

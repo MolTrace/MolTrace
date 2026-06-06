@@ -579,7 +579,9 @@ def _fit_single_peak(
     x_fit = x[lo:hi]
     y_fit = y[lo:hi]
     if x_fit.size < 5:
-        return _fallback_peak(x, y, index, width_points, spectrum=spectrum, level=level, noise=noise)
+        return _fallback_peak(
+            x, y, index, width_points, spectrum=spectrum, level=level, noise=noise
+        )
     if level == 1:
         return _fit_single_with_model(
             x_fit,
