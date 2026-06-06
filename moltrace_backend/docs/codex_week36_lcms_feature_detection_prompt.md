@@ -22,7 +22,7 @@ Scientific/product rule:
 LC-MS feature detection and peak purity are chromatographic evidence layers. They can support whether a target m/z is associated with a coherent chromatographic feature and whether the feature is locally clean, but they do not prove molecular formula, connectivity, stereochemistry, or identity. Human review is mandatory before using feature purity as candidate-confirmation evidence.
 
 Literature/source takeaways to use:
-- MestreNova MS plugin includes new mass chromatograms, trace baseline correction, retention-time alignment, peak purity, chromatography export, MS tables, and live MS spectrum previews. Use these concepts as workflow inspiration, not as copied UI.
+- Established MS desktop software includes mass chromatograms, trace baseline correction, retention-time alignment, peak purity, chromatography export, MS tables, and live MS spectrum previews. Use these concepts as workflow inspiration, not as copied UI.
 - MS/AI literature emphasizes raw-data access difficulty, metadata complexity, isolated pipelines, scalability, and the need for iterative extraction from raw MS data.
 - Combined NMR/MS/MS workflows note that LC retention time can add selectivity but is condition-dependent; accurate mass, MS/MS, and NMR remain orthogonal evidence streams.
 - Defensive programming sources emphasize modular programs, validation, unit checks, and reproducible reports.

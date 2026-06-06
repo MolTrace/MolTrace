@@ -2,9 +2,9 @@
 
 Pins the request/response shape + happy-path + telemetry-emission +
 synthetic-overlay generation for the Prompt 4 endpoint.  Acceptance-
-level coverage (quinine + Mnova hidden coupling) lives in
+level coverage (quinine + hidden-coupling benchmark) lives in
 ``test_multiplet_quinine_reference`` and
-``test_multiplet_mnova_hidden_coupling``; this file covers the
+``test_multiplet_hidden_coupling``; this file covers the
 HTTP/Pydantic surface.
 """
 

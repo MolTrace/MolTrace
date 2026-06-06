@@ -508,11 +508,11 @@ honestly — it activates only when its weights + dependencies are configured an
 
 ---
 
-## v0.7.7 — Mnova-equivalent region integration (Sum / Edited Sum / Peaks) + endpoint (2026-05-31)
+## v0.7.7 — Quantitative region integration (Sum / Edited Sum / Peaks) + endpoint (2026-05-31)
 
 **Headline:** A new quantitative-integration capability and its endpoint. The
-`moltrace.spectroscopy.integration` module implements the three Mnova
-integration methods — **Sum** (classical trapezoidal area over a window),
+`moltrace.spectroscopy.integration` module implements the three industry-standard
+NMR-integration methods — **Sum** (classical trapezoidal area over a window),
 **Edited Sum** (the default; scales the raw area by the compound fraction of
 total peak *height* to proportionally subtract solvent / impurity), and
 **Peaks** (the sum of the fitted areas of compound peaks only) — behind a single
@@ -1012,9 +1012,9 @@ recovery on GSD-resolved peak lists. Closes the literal Prompt 4 spec:
 
 * Detect all 8 quinine multiplets, J values within 0.3 Hz of literature
   (acceptance gate `tests/test_multiplet_quinine_reference.py`).
-* Recover the Mnova manual page-251 hidden 11.4 Hz coupling that
+* Recover a known hidden 11.4 Hz coupling benchmark that
   standard (level-2) peak picking misses (acceptance gate
-  `tests/test_multiplet_mnova_hidden_coupling.py`).
+  `tests/test_multiplet_hidden_coupling.py`).
 
 ### Added
 - **`src/moltrace/spectroscopy/multiplet/analysis.py`** — new module
@@ -1074,8 +1074,8 @@ recovery on GSD-resolved peak lists. Closes the literal Prompt 4 spec:
   the full GSD-pick + multiplet-detect pipeline, and asserts every
   one of the 8 quinine multiplets resolves with the correct label
   and every J within 0.3 Hz of literature.
-- **`tests/test_multiplet_mnova_hidden_coupling.py`** (`current_state`)
-  — synthesises a dd at the Mnova page-251 hidden-coupling geometry
+- **`tests/test_multiplet_hidden_coupling.py`** (`current_state`)
+  — synthesises a dd at a known hidden-coupling benchmark geometry
   (J₁=13.7 Hz, J₂=11.4 Hz, inner pair at 0.85 Hz separation
   vs 1.5 Hz linewidth), runs the GSD-enhanced level-4 picker, and
   asserts the 11.4 Hz coupling is recovered within 0.3 Hz. Companion
@@ -1087,7 +1087,7 @@ recovery on GSD-resolved peak lists. Closes the literal Prompt 4 spec:
 
 ### Status
 - Algorithmically complete on both Prompt 4 acceptance gates
-  (quinine + Mnova hidden coupling). No `experimental` flag on this
+  (quinine + hidden-coupling benchmark). No `experimental` flag on this
   backend — algorithm matches first-order NMR theory exactly for
   the patterns it claims to detect, and the residual-fit fallback to
   ``m`` is honest about ambiguous patterns.
@@ -1688,7 +1688,7 @@ algorithm as an opt-in experimental SpectraCheck analysis backend,
 with a validated 20-fixture NMRShiftDB2 harness + FE handoff packet.
 
 ### Added
-- **`POST /spectrum/analyze/gsd`** endpoint — opt-in Mestrenova-style
+- **`POST /spectrum/analyze/gsd`** endpoint — opt-in industry-standard
   GSD analysis backend. Request: `ppm_axis` + `intensity` arrays +
   `nucleus` + `solvent` + `field_mhz` + `level: 1..5`. Response:
   classified peak list + category counts + experimental flag + notes.

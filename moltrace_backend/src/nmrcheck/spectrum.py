@@ -15,7 +15,7 @@ from .baseline import (
     evaluate_baseline_flatness,
     normalize_baseline_mode,
 )
-from .mnova_view import weak_peak_magnifier_view
+from .display_view import weak_peak_magnifier_view
 from .models import (
     Peak,
     SpectrumComparisonReport,
@@ -1311,8 +1311,8 @@ def _sensitivity_to_noise_factor(sensitivity: float) -> float:
     """Map the ``sensitivity`` knob onto an SNR (noise-factor) multiplier.
 
     Detection rejects anything that does not rise at least noise_factor·σ
-    above the baseline — the directly noise-referenced criterion Mnova calls
-    the "noise factor". A larger ``sensitivity`` yields a larger multiplier
+    above the baseline — the directly noise-referenced criterion commonly
+    called the "noise factor". A larger ``sensitivity`` yields a larger multiplier
     (fewer, higher-confidence peaks), preserving the direction of the legacy
     knob so the structure-guided tuning sweep keeps its ordering.
     """
@@ -2223,10 +2223,6 @@ def parse_processed_spectrum(
         str(display_mode or "real").strip().lower().replace("-", "_").replace(" ", "_")
     )
     deprecated_display_modes = {
-        "mnova",
-        "mnova_locked",
-        "mnova-style",
-        "mnova_style",
         "asinh",
         "locked",
         "baseline_locked",

@@ -9,7 +9,7 @@ from .baseline import evaluate_baseline_flatness
 
 
 @dataclass(frozen=True)
-class MnovaViewResult:
+class DisplayViewResult:
     points: list[tuple[float, float]]
     metadata: dict[str, Any]
     warnings: list[str]
@@ -34,7 +34,7 @@ def weak_peak_magnifier_view(
     points: list[tuple[float, float]],
     *,
     visual_gain: float = 12.0,
-) -> MnovaViewResult:
+) -> DisplayViewResult:
     """Build an optional display-only weak-peak inset trace.
 
     This helper intentionally does not replace the evidence trace. It only emits
@@ -44,7 +44,7 @@ def weak_peak_magnifier_view(
 
     clean = _clean_points(points)
     if not clean:
-        return MnovaViewResult(
+        return DisplayViewResult(
             points=[],
             metadata={
                 "enabled": False,
@@ -68,7 +68,7 @@ def weak_peak_magnifier_view(
         for (x, _), delta in zip(clean, centered, strict=False)
     ]
     qa = evaluate_baseline_flatness(clean, mode="evidence").as_dict()
-    return MnovaViewResult(
+    return DisplayViewResult(
         points=display,
         metadata={
             "enabled": True,
@@ -85,14 +85,14 @@ def weak_peak_magnifier_view(
     )
 
 
-def make_mnova_locked_view(
+def make_locked_display_view(
     points: list[tuple[float, float]],
     *,
     enabled: bool = False,
     baseline_lock: bool = True,
     visual_gain: float = 1.0,
-) -> MnovaViewResult:
-    """Compatibility wrapper for the retired Mnova-style transform.
+) -> DisplayViewResult:
+    """Compatibility wrapper for the retired locked-display intensity transform.
 
     The previous implementation subtracted a fitted baseline and asinh-scaled
     intensities. That made spectra look warped and made peak-height controls
@@ -103,7 +103,7 @@ def make_mnova_locked_view(
 
     clean = _clean_points(points)
     qa = evaluate_baseline_flatness(clean, mode="evidence").as_dict() if clean else {}
-    return MnovaViewResult(
+    return DisplayViewResult(
         points=clean,
         metadata={
             "enabled": False,
@@ -114,13 +114,14 @@ def make_mnova_locked_view(
             "evidence_trace_preserved": True,
             "baseline_qa": qa,
             "note": (
-                "Legacy fitted-baseline/asinh Mnova display transform is disabled; "
+                "Legacy fitted-baseline/asinh display transform is disabled; "
                 "the main spectrum uses real evidence intensities."
             ),
         },
         warnings=(
             [
-                "Legacy Mnova-style intensity transform was requested but is disabled; the real spectrum was preserved."
+                "Legacy locked-display intensity transform was requested but is "
+                "disabled; the real spectrum was preserved."
             ]
             if enabled
             else []

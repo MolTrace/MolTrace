@@ -5272,9 +5272,9 @@ async def spectrum_analyze_gsd(
 ) -> SpectrumGSDAnalyzeResult:
     """Opt-in **experimental** GSD-Prompt-3 peak analysis backend.
 
-    Runs Global Spectral Deconvolution (Mestrenova-style) on a processed
-    spectrum and returns the peak list with auto-classified categories
-    (compound | solvent | impurity | artifact | 13C_satellite).
+    Runs Global Spectral Deconvolution (industry-standard peak detection) on
+    a processed spectrum and returns the peak list with auto-classified
+    categories (compound | solvent | impurity | artifact | 13C_satellite).
 
     Distinct from the default ``POST /spectrum/analyze`` flow:
       * No SMILES required -- pure spectrum-driven analysis.
@@ -7620,7 +7620,6 @@ async def nmr_processed_analyze_route(
         "gottlieb_1997_solvent_impurities",
         "fulmer_2010_solvent_impurities",
         "reich_nmr_resources",
-        "mestrenova_manual",
     ]
     if dp4_ranking_rows:
         citation_keys.append("howarth_goodman_2020_dp4ai")
@@ -8231,7 +8230,6 @@ async def nmr_raw_fid_process_route(
         "gottlieb_1997_solvent_impurities",
         "fulmer_2010_solvent_impurities",
         "reich_nmr_resources",
-        "mestrenova_manual",
     ]
     if (
         (structure_summary is not None and is_aminoglycoside_like_structure(structure_summary))

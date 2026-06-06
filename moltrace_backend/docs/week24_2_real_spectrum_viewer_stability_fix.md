@@ -2,7 +2,7 @@
 
 ## Problem Fixed
 
-The previous Mnova-style display patch could make spectra look unrealistic by
+The previous locked-display patch could make spectra look unrealistic by
 applying display transformations such as fitted-baseline subtraction and signed
 asinh compression to the plotted main trace. That made peaks look warped and
 made gain changes feel like they were changing the underlying spectrum.
@@ -20,8 +20,8 @@ viewer gain = y-axis range only
 
 ## What Changed
 
-- Mnova/asinh display transforms are disabled by default.
-- Deprecated `display_mode=mnova_locked` maps back to `real`.
+- Locked/asinh display transforms are disabled by default.
+- Deprecated `display_mode=locked` maps back to `real`.
 - `raw_preview_points` is returned only when `debug_preview=true`.
 - Downsampling uses min/max buckets to preserve narrow peaks.
 - Viewer vertical gain changes only the y-axis range.

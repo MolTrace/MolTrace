@@ -76,20 +76,20 @@ SEARCH_INITIAL_WIDTH_PPM: Final[float] = 1.0
 SEARCH_SPLIT_MARGIN_PPM: Final[float] = 0.01
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Processing defaults — MestreNova "Advised" + NMRPipe community standards.
+# Processing defaults — community "advised" practice + NMRPipe standards.
 # ─────────────────────────────────────────────────────────────────────────────
 
-#: Zero-fill factor for 1H 1D spectra (MestreNova advised).
+#: Zero-fill factor for 1H 1D spectra (community advised).
 ZERO_FILL_1H: Final[int] = 3
 #: Zero-fill factor for F2 of 2D spectra.
 ZERO_FILL_2D_F2: Final[int] = 2
 #: Zero-fill factor for F1 of 2D spectra.
 ZERO_FILL_2D_F1: Final[int] = 3
-#: Exponential line-broadening for 13C (Hz), MestreNova advised.
+#: Exponential line-broadening for 13C (Hz), community advised.
 LINE_BROADENING_13C_HZ: Final[float] = 2.0
-#: Exponential line-broadening for 1H (Hz), MestreNova advised (0 = Stanning only).
+#: Exponential line-broadening for 1H (Hz), community advised (0 = truncation-smoothing only).
 LINE_BROADENING_1H_HZ: Final[float] = 0.0
-#: Baseline polynomial order (Bernstein), MestreNova advised.
+#: Baseline polynomial order (Bernstein), community advised.
 BASELINE_POLY_ORDER: Final[int] = 3
 #: Phase correction PH0 search range (degrees), Nanalysis Phase Correction blog.
 PH0_RANGE_DEG: Final[tuple[float, float]] = (-180.0, 180.0)
@@ -133,9 +133,9 @@ CDCL3_CENTRE_13C_PPM: Final[float] = 77.16
 TMS_REFERENCE_PPM: Final[float] = 0.0
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Display stability constants — Mnova-style "anti-shake" rules.
-# Source: MestreNova Manual §3 (Mouse Scroll & Mass Preferences) +
-# §7.4 (Phase Correction dialog) — see /tmp/nmr_display_data.md §15.
+# Display stability constants — industry-standard "anti-shake" display rules.
+# Source: standard NMR-display conventions (scroll/zoom preferences and the
+# phase-correction dialog behaviour) — see /tmp/nmr_display_data.md §15.
 # These are FRONTEND defaults the SpectrumViewer should honour.
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -319,13 +319,6 @@ REFERENCES: Final[dict[str, dict[str, str | int | None]]] = {
         venue="University of Wisconsin–Madison",
         year=2024,
         url="https://organicchemistrydata.org/hansreich/resources/nmr/",
-    ),
-    "mestrenova_manual": _ref(
-        title="MestReNova User Manual",
-        authors="Mestrelab Research",
-        venue="Mestrelab Research S.L.",
-        year=2024,
-        url="https://mestrelab.com",
     ),
     "alkhzem_2020_tobramycin_multinuclear_nmr": _ref(
         title=(

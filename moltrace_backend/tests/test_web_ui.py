@@ -233,7 +233,6 @@ def test_2d_ui_disables_subfeature_controls(monkeypatch) -> None:
     assert 'scaleSpectrumIntensityForDisplay(value, baseline, scale, lockBand=0)' not in html
     assert 'formData.append("display_mode", displayMode);' in html
     assert 'formData.append("display_mode", el("processedDisplayMode")?.value || "real");' in html
-    assert 'formData.append("mnova_view"' not in html
     assert 'state.spectrumPreviewContexts[plotId]' in html
     assert 'renderInteractiveSpectrumPlot(context.data, activeId);' in html
     assert 'refreshSpectrumReviewUi(activeId);' in html

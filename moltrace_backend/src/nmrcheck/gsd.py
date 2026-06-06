@@ -6,10 +6,10 @@ module fits each detected multiplet region to a sum of analytic lineshapes
 and so recovers the resolved transition list. From that list the coupling
 pattern (multiplicity) and J-couplings are read by first-order rules.
 
-Grounded in the Mestrenova GSD chapter (manual Section 8.2.2): "every peak in
-a 1H-NMR spectrum is basically an envelope of a large number of transitions";
-GSD applies an automatic deconvolution of the spectrum into a list of
-fully-characterised peaks (centre, height, width).
+Grounded in the established GSD principle: every peak in a 1H-NMR spectrum is
+basically an envelope of a large number of transitions; GSD applies an
+automatic deconvolution of the spectrum into a list of fully-characterised
+peaks (centre, height, width).
 
 Each line is modelled as a **pseudo-Voigt** — a mix ``eta * Lorentzian +
 (1 - eta) * Gaussian``. A real NMR line is Lorentzian from T2 relaxation but
