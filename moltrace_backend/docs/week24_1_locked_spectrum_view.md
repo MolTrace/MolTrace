@@ -1,4 +1,4 @@
-# Week 24.1: Retired MestReNova-Style Locked Spectrum View
+# Week 24.1: Retired Locked Spectrum View
 
 The original Week 24.1 display layer has been retired for the main spectrum
 preview. Processed spectra and raw-FID-derived ¹H/¹³C spectra now render the

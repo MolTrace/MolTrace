@@ -39,8 +39,8 @@ For each list of input peaks:
 
 The recovered J values match published literature to within ~0.3 Hz on
 the quinine reference dataset (8 multiplets, validated in the test
-suite) and recover the 11.4 Hz hidden coupling on the Mnova manual
-page-251 example where two dd inner lines visually overlap.
+suite) and recover the 11.4 Hz hidden coupling on a known benchmark
+example where two dd inner lines visually overlap.
 
 See the technical white paper § 3.x for the algorithmic background and
 the validation results.
@@ -470,8 +470,8 @@ def _try_complex_multiplet(
        scipy ``least_squares`` refinement seeded from the discrete
        best so the recovered J values reach 0.1 Hz precision.
 
-    The pairwise-separation candidate set is key for the Mnova
-    page-251 hidden coupling case: even when one J coupling collapses
+    The pairwise-separation candidate set is key for the known
+    hidden-coupling benchmark case: even when one J coupling collapses
     two inner lines into a single peak, the other J value still
     appears as a non-adjacent pair separation and is discoverable.
     """

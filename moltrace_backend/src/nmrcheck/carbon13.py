@@ -17,7 +17,7 @@ from .evidence import ratio_score
 from .exceptions import StructureParseError
 from .impurities import match_c13_impurity_shifts
 from .baseline import evaluate_baseline_flatness, normalize_baseline_mode
-from .mnova_view import weak_peak_magnifier_view
+from .display_view import weak_peak_magnifier_view
 from .models import (
     Carbon13AnalysisReport,
     Carbon13Peak,
@@ -564,10 +564,6 @@ def parse_carbon13_processed_spectrum(
         str(display_mode or "real").strip().lower().replace("-", "_").replace(" ", "_")
     )
     deprecated_display_modes = {
-        "mnova",
-        "mnova_locked",
-        "mnova-style",
-        "mnova_style",
         "asinh",
         "locked",
         "baseline_locked",

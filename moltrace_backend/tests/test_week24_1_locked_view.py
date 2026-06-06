@@ -1,11 +1,11 @@
 import csv
 import io
 
-from nmrcheck.mnova_view import make_mnova_locked_view, weak_peak_magnifier_view
+from nmrcheck.display_view import make_locked_display_view, weak_peak_magnifier_view
 from nmrcheck.spectrum import parse_processed_spectrum
 
 
-def test_legacy_mnova_transform_is_disabled_and_preserves_points() -> None:
+def test_legacy_locked_display_transform_is_disabled_and_preserves_points() -> None:
     points = []
     for i in range(500):
         ppm = 10.0 - i * 0.02
@@ -16,7 +16,7 @@ def test_legacy_mnova_transform_is_disabled_and_preserves_points() -> None:
             signal += 50.0
         points.append((ppm, signal))
 
-    result = make_mnova_locked_view(
+    result = make_locked_display_view(
         points,
         enabled=True,
         baseline_lock=True,
@@ -68,7 +68,7 @@ def test_processed_spectrum_defaults_to_real_display_metadata() -> None:
         solvent="CDCl3",
     )
 
-    assert "mnova_view" not in preview.metadata
+    assert "legacy_view" not in preview.metadata
     assert preview.metadata["display_mode"] == "real"
     assert preview.metadata["display_gain"] == 1.0
     assert preview.metadata["baseline_lock_visual_only"] is True

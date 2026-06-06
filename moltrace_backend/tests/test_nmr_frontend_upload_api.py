@@ -420,7 +420,6 @@ def test_nmr_processed_analyze_payload_contract_stays_text_guided(
         "pretsch_2020_tables_5e",
         "friebolin_2010_5e",
         "gottlieb_1997_solvent_impurities",
-        "mestrenova_manual",
     } <= ref_keys
 
 
@@ -486,7 +485,7 @@ def test_nmr_processed_analyze_ignores_raw_fid_sidecar_flag(
     assert payload["labile_hydrogen_summary"]["labile_subset"] == "OH"
     assert any("Human review" in item for item in payload["evidence_summary"])
     ref_keys = {ref["key"] for ref in payload["references"]}
-    assert {"smith_goodman_2010_dp4", "mestrenova_manual"} <= ref_keys
+    assert {"smith_goodman_2010_dp4"} <= ref_keys
 
 
 def test_nmr_processed_analyze_runs_dp4_ranking_for_multiple_candidates(tmp_path) -> None:

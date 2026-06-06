@@ -1,10 +1,10 @@
-"""Mnova manual page-251 hidden 11.4 Hz coupling — Prompt 4 gate.
+"""Hidden 11.4 Hz coupling benchmark — Prompt 4 gate.
 
-The Mnova manual's page-251 worked example shows a dd cluster where
-the inner pair of lines sits closer than the spectrometer's natural
-linewidth, so a naive peak picker (level-2 single-pass detection on a
-crude grid) reports only 3 peaks and assigns "t".  The hidden 11.4 Hz
-coupling is invisible to that naive picker.
+A well-known worked example shows a dd cluster where the inner pair of
+lines sits closer than the spectrometer's natural linewidth, so a naive
+peak picker (level-2 single-pass detection on a crude grid) reports only
+3 peaks and assigns "t".  The hidden 11.4 Hz coupling is invisible to
+that naive picker.
 
 GSD-enhanced picking (level 4 iterative ``deconvolve_region``) resolves
 the inner pair into two distinct lines, the new ``detect_multiplets``
@@ -40,14 +40,14 @@ from moltrace.spectroscopy.peaks.gsd import gsd_peak_pick
 # (J_large - J_small) / 2 = 0.85 Hz at 500 MHz, just below the
 # realistic 1.5 Hz linewidth — the classic "hidden coupling" geometry.
 # Outer pair offset = (J_large + J_small) / 2 = 12.55 Hz, easily
-# resolved.  The Mnova manual uses 11.4 Hz as the hidden coupling;
+# resolved.  The benchmark uses 11.4 Hz as the hidden coupling;
 # the partner J=13.7 here is chosen so the inner pair collapses
 # cleanly under typical linewidth.
 J_LARGE_HZ = 13.7
 J_SMALL_HZ = 11.4
 FIELD_MHZ = 500.0
 CENTRE_PPM = 6.50
-# Wider linewidth than the quinine test (the Mnova page-251 example
+# Wider linewidth than the quinine test (the benchmark example
 # explicitly assumes the inner pair is unresolved under coarse
 # resolution); choose 1.5 Hz so the inner ddd pair at 0.85 Hz
 # separation cleanly merges into a single envelope before
@@ -60,7 +60,7 @@ def _synthesize_dd_spectrum(
     n_points: int = 65536,
     snr_target: float = 1000.0,
 ) -> NMRSpectrum:
-    """Build a single dd cluster spectrum at the Mnova geometry."""
+    """Build a single dd cluster spectrum at the benchmark geometry."""
     ppm_high = 7.5
     ppm_low = 5.5
     ppm_axis = np.linspace(ppm_high, ppm_low, n_points)
@@ -81,7 +81,7 @@ def _synthesize_dd_spectrum(
     peak_intensity = float(np.max(intensity))
     noise_std = peak_intensity / max(snr_target, 1.0)
     seed = int.from_bytes(
-        hashlib.md5(b"mnova_p251_hidden_11_4_hz").digest()[:4], "big"
+        hashlib.md5(b"hidden_coupling_11_4_hz_benchmark").digest()[:4], "big"
     )
     rng = np.random.default_rng(seed=seed)
     raw_noise = rng.normal(loc=0.0, scale=noise_std, size=intensity.size)
@@ -94,7 +94,7 @@ def _synthesize_dd_spectrum(
     return NMRSpectrum(
         data=intensity,
         ppm_axis=ppm_axis,
-        metadata={"source": "test_multiplet_mnova_hidden_coupling"},
+        metadata={"source": "test_multiplet_hidden_coupling"},
         nucleus="1H",
         solvent="CDCl3",
         field_mhz=FIELD_MHZ,
@@ -102,7 +102,7 @@ def _synthesize_dd_spectrum(
 
 
 @pytest.mark.current_state
-def test_mnova_hidden_coupling_recovered_by_gsd_level_4() -> None:
+def test_hidden_coupling_recovered_by_gsd_level_4() -> None:
     """GSD-enhanced detection recovers the 11.4 Hz hidden coupling."""
 
     spectrum = _synthesize_dd_spectrum()
@@ -152,7 +152,7 @@ def test_mnova_hidden_coupling_recovered_by_gsd_level_4() -> None:
 def test_naive_level_2_misses_the_hidden_coupling() -> None:
     """Baseline: level-2 single-pass picking misses the 11.4 Hz J.
 
-    This pins the "naive picker fails" half of the Mnova worked
+    This pins the "naive picker fails" half of the benchmark worked
     example.  Without GSD's iterative ``deconvolve_region``, the
     inner pair of dd lines (~0.85 Hz apart at the J set chosen here)
     merges under the 1.5 Hz linewidth and the picker sees only 3
@@ -187,7 +187,7 @@ def test_naive_level_2_misses_the_hidden_coupling() -> None:
             ), (
                 "Naive level-2 picker unexpectedly recovered the 11.4 Hz "
                 "hidden coupling.  The level-3-vs-4 distinction in the "
-                "Mnova page-251 worked example may no longer hold with "
-                "the synthesis parameters chosen here — either tighten "
+                "hidden-coupling benchmark worked example may no longer hold "
+                "with the synthesis parameters chosen here — either tighten "
                 f"the linewidth or update the test geometry.  Got J={js_sorted}"
             )

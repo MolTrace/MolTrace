@@ -23,7 +23,7 @@ This layer is an import bridge, not a final identification engine. It must prese
 
 Deep research requirement:
 Use the attached/source literature and summarize implementation-relevant takeaways in your final response. Prioritize:
-- MestreNova Manual: LC/GC/MS formats, TIC/MS browser, scan selection, peak detection, elemental composition, molecular match, MS tables, and provenance/raw-file handling.
+- Established LC/MS desktop software: LC/GC/MS formats, TIC/MS browser, scan selection, peak detection, elemental composition, molecular match, MS tables, and provenance/raw-file handling.
 - Silverstein: MS instrumentation, high-resolution exact mass, isotope evidence, molecular formula, DBE/IHD, tandem MS parent/daughter ion interpretation, and electrospray/adduct behavior.
 - AI-powered MS/multiomics perspective: proprietary raw-data access difficulties, metadata complexity, open-format needs, and vendor-library constraints.
 - Data Scientist's Handbook: README documentation, defensive programming, modular programs, data validation, unit checks, and reproducible reports.

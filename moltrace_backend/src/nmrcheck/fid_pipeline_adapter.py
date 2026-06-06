@@ -688,7 +688,7 @@ def _preprocess_diagnostics_from_metadata(
         "phase_method": phase.get("method"),
         "phase_zero_order_degrees": _phase_degrees(phase),
         "phase_correction_applied": phase.get("phase_correction_applied"),
-        "phase_acceptance": "within_5_degrees_against_mnova_reference",
+        "phase_acceptance": "within_5_degrees_against_reference",
         "baseline_method": baseline.get("method") or baseline_method,
         "baseline_order": _safe_int(baseline.get("order")) or int(baseline_order),
         "baseline_model": baseline.get("baseline_model"),
@@ -837,7 +837,7 @@ def _validation_comparisons(
         },
         "phase_delta_degrees": {
             "value": _abs_delta(legacy_phase, prompt_phase),
-            "acceptance": "within_5_degrees_against_mnova_reference",
+            "acceptance": "within_5_degrees_against_reference",
         },
         "baseline": {
             "legacy_method": _baseline_method(legacy.get("baseline")),

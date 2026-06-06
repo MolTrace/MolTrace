@@ -84,7 +84,7 @@ For NMR/MS modules, prioritize evidence from:
 - NMR-Solver and spectral matching papers;
 - NMR chemical-shift prediction literature;
 - NMR-Challenge/Silverstein for practical interpretation;
-- MestreNova for workflow/UI expectations;
+- established NMR desktop software for workflow/UI expectations;
 - Data Scientist's Handbook for regression, defensive programming, and modularity.
 
 

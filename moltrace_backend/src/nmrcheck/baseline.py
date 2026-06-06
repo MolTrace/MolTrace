@@ -443,8 +443,9 @@ def apply_signal_free_smooth_baseline_polish(
     """Remove residual rolling baseline using signal-free regions and smoothing.
 
     This is a post-polish for already transformed FID spectra. It mirrors the
-    Mnova-style sequence of phase correction, Bernstein baseline correction, and
-    signal-free smoother cleanup for broad rolling baseline topographies.
+    industry-standard sequence of phase correction, Bernstein baseline
+    correction, and signal-free smoother cleanup for broad rolling baseline
+    topographies.
     """
 
     warnings: list[str] = []

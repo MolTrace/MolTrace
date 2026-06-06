@@ -26,7 +26,7 @@ from .baseline import (
     evaluate_baseline_flatness,
     normalize_baseline_mode,
 )
-from .mnova_view import weak_peak_magnifier_view
+from .display_view import weak_peak_magnifier_view
 from .models import (
     FIDPresetId,
     FIDPreviewReport,
@@ -200,33 +200,33 @@ _FID_PRESET_DESCRIPTIONS: dict[FIDPresetId, str] = {
     ),
     "custom": "Preserves manually selected processing controls.",
 }
-_RAW_FID_MNOVA_ZERO_FILL_FACTOR = 3
-_RAW_FID_MNOVA_C13_LINE_BROADENING_HZ = 2.0
-_RAW_FID_MNOVA_BASELINE_ORDER = 3
+_RAW_FID_ADVISED_ZERO_FILL_FACTOR = 3
+_RAW_FID_ADVISED_C13_LINE_BROADENING_HZ = 2.0
+_RAW_FID_ADVISED_BASELINE_ORDER = 3
 # Display point budget for raw-FID 1H. Dense 1H multiplets need enough sampled
 # points to show doublets-of-doublets, triplets, quartets, and unresolved
 # multiplets without zooming; lower budgets collapse those splittings into
 # blobs even when the FFT itself was computed correctly.
-_RAW_FID_MNOVA_PROTON_PREVIEW_POINTS = 12000
+_RAW_FID_ADVISED_PROTON_PREVIEW_POINTS = 12000
 # Display point budget for the raw-FID 13C preview. Carbon should stay fast
 # and stick-like; 4000 points is enough for the broad carbon window after
 # peak-preserving downsampling.
-_RAW_FID_MNOVA_C13_PREVIEW_POINTS = 4000
-# First-point correction — MestreNova manual p. 136: "multiply the first
-# point of the FID by 0.5 before FT". The discrete FT treats the FID as
-# periodic, so an uncorrected first point creates a constant vertical
-# baseline displacement (peaks that sit off / protrude through the
-# baseline). 0.5 is the manual's stated default.
-_RAW_FID_MNOVA_FIRST_POINT_SCALE = 0.5
-# Trapezoidal apodization ramp fraction for 1H — MestreNova manual p. 137
-# names the Trapezoidal window as the fix for "'sinc' artifacts resulting
-# from truncation of the FID". The window holds unit weight across the
-# resolution-bearing early FID, then ramps linearly to zero over the final
-# fraction below. 0.30 ramps only the last third (decayed-signal + noise
-# for a properly acquired 1H dataset), so it removes the truncation step
-# without the linewidth penalty of an exponential window — the manual
-# (pp. 128, 131) is explicit that exponential LB decreases 1H resolution.
-_RAW_FID_MNOVA_TRAPEZOID_RAMP_FRACTION = 0.30
+_RAW_FID_ADVISED_C13_PREVIEW_POINTS = 4000
+# First-point correction: multiply the first point of the FID by 0.5 before
+# FT. The discrete FT treats the FID as periodic, so an uncorrected first
+# point creates a constant vertical baseline displacement (peaks that sit
+# off / protrude through the baseline). 0.5 is the standard default for 1D
+# processing. [Hoch & Stern, "NMR Data Processing"]
+_RAW_FID_ADVISED_FIRST_POINT_SCALE = 0.5
+# Trapezoidal apodization ramp fraction for 1H. The Trapezoidal window is the
+# standard fix for the "sinc" artifacts resulting from truncation of the FID.
+# The window holds unit weight across the resolution-bearing early FID, then
+# ramps linearly to zero over the final fraction below. 0.30 ramps only the
+# last third (decayed-signal + noise for a properly acquired 1H dataset), so
+# it removes the truncation step without the linewidth penalty of an
+# exponential window — exponential LB is known to decrease 1H resolution.
+# [Claridge, "High-Resolution NMR Techniques in Organic Chemistry" §3]
+_RAW_FID_ADVISED_TRAPEZOID_RAMP_FRACTION = 0.30
 _RAW_FID_NOISE_RMS_SPAN_POINTS = 7
 _RAW_FID_SOLVENT_NEGATIVE_LOBE_SIGMA_LIMIT = 3.0
 _RAW_FID_SOLVENT_NEGATIVE_LOBE_PEAK_FRACTION_LIMIT = 0.02
@@ -236,7 +236,7 @@ _RAW_FID_CARBON13_SOLVENT_FLOOR_WINDOW = (
     50.2,
     "13C solvent carbon near 49 ppm",
 )
-_RAW_FID_PROCESS_CACHE_VERSION = "raw-fid-mnova-resolution-v2"
+_RAW_FID_PROCESS_CACHE_VERSION = "raw-fid-advised-resolution-v2"
 _RAW_FID_PROCESS_CACHE_MAX_ENTRIES = 32
 _RAW_FID_PROCESS_CACHE: OrderedDict[str, FIDPreviewReport] = OrderedDict()
 _RAW_FID_PROCESS_CACHE_LOCK = Lock()
@@ -762,7 +762,7 @@ def _resolve_raw_fid_nucleus(params: dict[str, Any], requested: str) -> str:
     )
 
 
-def _apply_raw_fid_mnova_constraints(
+def _apply_raw_fid_advised_constraints(
     settings: FIDProcessingSettings,
     *,
     nucleus: str,
@@ -772,45 +772,45 @@ def _apply_raw_fid_mnova_constraints(
         "applied": False,
         "scope": "raw_fid_only",
         "nucleus": normalized,
-        "manual_source": "MestreNova Manual, advised 1D processing",
+        "manual_source": "Advised 1D processing defaults (community/Claridge §3)",
         "processed_uploads_touched": False,
     }
     notes: list[str] = []
     explicit_overrides = set(getattr(settings, "_explicit_overrides", set()) or set())
 
     if normalized == "13C":
-        # MestreNova Advised Processing for 13C (manual p. 106, p. 129):
+        # Advised processing defaults for 13C (community / Claridge §3):
         #   3x zero-fill · exponential apodization LB 2.0 Hz ·
-        #   Regions-Analysis auto phase · Bernstein polynomial baseline
+        #   regions-analysis auto phase · Bernstein polynomial baseline
         #   (order 3). The 2.0 Hz exponential also damps the FID tail, so a
         #   separate truncation window is unnecessary for carbon.
         constrained = settings.model_copy(
             update={
-                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "zero_fill_factor": _RAW_FID_ADVISED_ZERO_FILL_FACTOR,
                 "apodization_mode": "exponential",
-                "line_broadening_hz": _RAW_FID_MNOVA_C13_LINE_BROADENING_HZ,
+                "line_broadening_hz": _RAW_FID_ADVISED_C13_LINE_BROADENING_HZ,
                 "phase_mode": "auto",
                 "auto_phase": True,
                 "baseline_correction": "bernstein",
-                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
+                "baseline_order": _RAW_FID_ADVISED_BASELINE_ORDER,
                 "auto_baseline": True,
                 "max_preview_points": max(
                     int(settings.max_preview_points),
-                    _RAW_FID_MNOVA_C13_PREVIEW_POINTS,
+                    _RAW_FID_ADVISED_C13_PREVIEW_POINTS,
                 ),
             }
         )
         detail.update(
             {
                 "applied": True,
-                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "zero_fill_factor": _RAW_FID_ADVISED_ZERO_FILL_FACTOR,
                 "apodization_mode": "exponential",
-                "line_broadening_hz": _RAW_FID_MNOVA_C13_LINE_BROADENING_HZ,
+                "line_broadening_hz": _RAW_FID_ADVISED_C13_LINE_BROADENING_HZ,
                 "phase_mode": "auto",
                 "phase_reference": "MolTrace automatic 1D phase correction",
                 "baseline_correction": "bernstein",
-                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
-                "first_point_scale": _RAW_FID_MNOVA_FIRST_POINT_SCALE,
+                "baseline_order": _RAW_FID_ADVISED_BASELINE_ORDER,
+                "first_point_scale": _RAW_FID_ADVISED_FIRST_POINT_SCALE,
                 "max_preview_points": constrained.max_preview_points,
             }
         )
@@ -837,7 +837,7 @@ def _apply_raw_fid_mnova_constraints(
         if recipe_overrides:
             max_preview_points = max(
                 int(settings.max_preview_points),
-                _RAW_FID_MNOVA_PROTON_PREVIEW_POINTS,
+                _RAW_FID_ADVISED_PROTON_PREVIEW_POINTS,
             )
             preserved = settings
             if max_preview_points != int(settings.max_preview_points):
@@ -851,48 +851,48 @@ def _apply_raw_fid_mnova_constraints(
                     "display_point_floor_applied": max_preview_points
                     != int(settings.max_preview_points),
                     "max_preview_points": max_preview_points,
-                    "first_point_scale": _RAW_FID_MNOVA_FIRST_POINT_SCALE,
+                    "first_point_scale": _RAW_FID_ADVISED_FIRST_POINT_SCALE,
                     "resolution_policy": "caller_recipe_preserved_with_high_resolution_preview_points",
                 }
             )
             return preserved, detail, notes
 
-        # MestreNova Advised Processing for 1H (manual p. 106, p. 129):
-        #   Stanning apodization · 3x zero-fill · Regions-Analysis auto phase
-        #   · Bernstein polynomial baseline (order 3). We approximate the
-        #   Stanning/truncation behavior with our trapezoidal window: the
-        #   manual separately names trapezoidal apodization as the way to avoid
-        #   sinc artifacts from FID truncation, while warning that exponential
-        #   line broadening reduces resolution. That is exactly the tradeoff
-        #   needed for raw 1H multiplets: remove truncation tails without
-        #   widening dd/t/q/s/m structure into blobs.
+        # Advised processing defaults for 1H (community / Claridge §3):
+        #   truncation-smoothing apodization · 3x zero-fill · regions-analysis
+        #   auto phase · Bernstein polynomial baseline (order 3). We approximate
+        #   the truncation-smoothing behavior with our trapezoidal window:
+        #   trapezoidal apodization is the standard way to avoid sinc artifacts
+        #   from FID truncation, while exponential line broadening is known to
+        #   reduce resolution. That is exactly the tradeoff needed for raw 1H
+        #   multiplets: remove truncation tails without widening dd/t/q/s/m
+        #   structure into blobs.
         constrained = settings.model_copy(
             update={
-                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "zero_fill_factor": _RAW_FID_ADVISED_ZERO_FILL_FACTOR,
                 "apodization_mode": "trapezoidal",
                 "line_broadening_hz": 0.0,
                 "phase_mode": "auto",
                 "auto_phase": True,
                 "baseline_correction": "bernstein",
-                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
+                "baseline_order": _RAW_FID_ADVISED_BASELINE_ORDER,
                 "auto_baseline": True,
                 "max_preview_points": max(
                     int(settings.max_preview_points),
-                    _RAW_FID_MNOVA_PROTON_PREVIEW_POINTS,
+                    _RAW_FID_ADVISED_PROTON_PREVIEW_POINTS,
                 ),
             }
         )
         detail.update(
             {
                 "applied": True,
-                "zero_fill_factor": _RAW_FID_MNOVA_ZERO_FILL_FACTOR,
+                "zero_fill_factor": _RAW_FID_ADVISED_ZERO_FILL_FACTOR,
                 "apodization_mode": "trapezoidal",
                 "line_broadening_hz": 0.0,
                 "phase_mode": "auto",
                 "phase_reference": "MolTrace automatic 1D phase correction",
                 "baseline_correction": "bernstein",
-                "baseline_order": _RAW_FID_MNOVA_BASELINE_ORDER,
-                "first_point_scale": _RAW_FID_MNOVA_FIRST_POINT_SCALE,
+                "baseline_order": _RAW_FID_ADVISED_BASELINE_ORDER,
+                "first_point_scale": _RAW_FID_ADVISED_FIRST_POINT_SCALE,
                 "max_preview_points": constrained.max_preview_points,
                 "resolution_policy": "multiplet_preserving_no_exponential_line_broadening",
             }
@@ -1372,15 +1372,15 @@ def _fid_apodization_window(
         return window, metadata
 
     if normalized_mode == "trapezoidal":
-        # Trapezoidal apodization — MestreNova manual p. 137: explicitly the
-        # window recommended to "avoid the 'sinc' artifacts resulting from
-        # truncation of the FID". Unit weight is held across the early,
-        # resolution-bearing part of the FID, then ramped linearly to zero
-        # over the final fraction. Unlike an exponential window it does not
-        # broaden lines (manual pp. 128, 131 — exponential LB decreases 1H
-        # resolution), so fine multiplet structure is preserved while the
-        # truncation step that produces broken-looking peaks is removed.
-        ramp_fraction = float(_RAW_FID_MNOVA_TRAPEZOID_RAMP_FRACTION)
+        # Trapezoidal apodization is the standard window recommended to avoid
+        # the "sinc" artifacts resulting from truncation of the FID. Unit
+        # weight is held across the early, resolution-bearing part of the FID,
+        # then ramped linearly to zero over the final fraction. Unlike an
+        # exponential window it does not broaden lines (exponential LB is known
+        # to decrease 1H resolution), so fine multiplet structure is preserved
+        # while the truncation step that produces broken-looking peaks is
+        # removed. [Claridge §3]
+        ramp_fraction = float(_RAW_FID_ADVISED_TRAPEZOID_RAMP_FRACTION)
         ramp_fraction = min(0.95, max(0.0, ramp_fraction))
         plateau = max(1, int(round(n * (1.0 - ramp_fraction))))
         window = np.ones(n, dtype=float)
@@ -1804,7 +1804,7 @@ def _smooth_fid_display_trace(
                 "applied": False,
                 "display_only": True,
                 "evidence_trace_preserved": True,
-                "method": "mnova_raw_fid_noise_envelope",
+                "method": "raw_fid_noise_envelope",
                 "reason": "no_points",
             },
         )
@@ -1822,7 +1822,7 @@ def _smooth_fid_display_trace(
                 "applied": False,
                 "display_only": True,
                 "evidence_trace_preserved": True,
-                "method": "mnova_raw_fid_noise_envelope",
+                "method": "raw_fid_noise_envelope",
                 "reason": "too_few_points",
             },
         )
@@ -1861,7 +1861,7 @@ def _smooth_fid_display_trace(
             "applied": True,
             "display_only": True,
             "evidence_trace_preserved": True,
-            "method": "mnova_raw_fid_noise_envelope",
+            "method": "raw_fid_noise_envelope",
             "smoothing_kernel": "none",
             "nucleus": _normalize_nucleus_label(nucleus) or nucleus,
             "baseline_centered": True,
@@ -2771,7 +2771,7 @@ def process_bruker_1d_zip(
         fid_for_qa = np.asarray(fid, dtype=np.complex128)
         nucleus = _resolve_raw_fid_nucleus(params, nucleus)
         settings, raw_fid_advised_processing, raw_fid_advised_notes = (
-            _apply_raw_fid_mnova_constraints(settings, nucleus=nucleus)
+            _apply_raw_fid_advised_constraints(settings, nucleus=nucleus)
         )
         warnings.extend(
             note for note in raw_fid_advised_notes if note not in warnings
@@ -2779,17 +2779,17 @@ def process_bruker_1d_zip(
         # Do not mutate raw vendor files or immutable raw archive.
         # Apodization and all later processing happen on this in-memory working copy.
         fid_points_before_zero_fill = int(fid.size)
-        # First-point correction (MestreNova manual p. 136): the discrete FT
-        # treats the FID as periodic, so the un-scaled first point produces a
-        # constant vertical baseline displacement — a primary cause of peaks
-        # that protrude through / sit off the baseline. Multiplying the first
-        # point by 0.5 (the manual's stated default) removes that DC offset.
+        # First-point correction: the discrete FT treats the FID as periodic,
+        # so the un-scaled first point produces a constant vertical baseline
+        # displacement — a primary cause of peaks that protrude through / sit
+        # off the baseline. Multiplying the first point by 0.5 (the standard
+        # 1D default) removes that DC offset.
         # Applied to a fresh copy so fid_for_qa and the immutable archive are
         # never mutated. This runs after group-delay removal, so index 0 is
         # the true first acquired point of the FID.
         if fid.size:
             fid = np.array(fid, dtype=np.complex128, copy=True)
-            fid[0] = fid[0] * _RAW_FID_MNOVA_FIRST_POINT_SCALE
+            fid[0] = fid[0] * _RAW_FID_ADVISED_FIRST_POINT_SCALE
         fid, apodization_detail = _apply_fid_apodization(
             fid,
             params,

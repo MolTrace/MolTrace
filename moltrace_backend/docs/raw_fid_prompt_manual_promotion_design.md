@@ -16,7 +16,7 @@ processed-spectrum pipelines remain authoritative.
   derived metadata, but it must never rewrite uploaded archives.
 - Regulatory Hub and ReactionIQ behavior must not change as a side effect of
   SpectraCheck raw-FID work.
-- The existing Mnova-like visible raw-FID spectrum remains the fallback at every
+- The existing industry-standard visible raw-FID spectrum remains the fallback at every
   stage.
 - Unknown or misspelled runtime modes must resolve to `legacy`.
 - Prompt 1/2 sidecar output may not drive visible `x/y`, peak markers, legends,
@@ -65,7 +65,7 @@ Promotion review must include:
 
 - At least 20 Bruker NMRShiftDB2 FIDs with processed sidecars when available.
 - Varian/Agilent fixture coverage from the nmrglue example set.
-- A 100-spectrum Mnova-processed reference set for phase and baseline
+- A 100-spectrum externally-processed reference set for phase and baseline
   comparison before any visible phase/baseline change is considered.
 - Representative in-house carbohydrate and aminoglycoside spectra, including
   tobramycin derivative examples, so the peak-picking and proton/carbon

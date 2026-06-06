@@ -67,7 +67,7 @@ def test_carbon13_upload_models_accept_realistic_axis_margins() -> None:
     Carbon13Peak(shift_ppm=-10.1448)
 
 
-def test_raw_carbon13_fid_uses_mnova_advised_processing_constraints() -> None:
+def test_raw_carbon13_fid_uses_advised_processing_constraints() -> None:
     report = process_bruker_1d_zip(
         filename="ethanol_13c_raw.zip",
         content=_build_carbon13_bruker_zip(),
@@ -91,7 +91,7 @@ def test_raw_carbon13_fid_uses_mnova_advised_processing_constraints() -> None:
     assert report.metadata["baseline"]["order"] == 3
     assert report.metadata["preview_downsampling"]["point_limit"] == 4000
     trace_display = report.metadata["display_preprocessing"]["trace_smoothing"]
-    assert trace_display["method"] == "mnova_raw_fid_noise_envelope"
+    assert trace_display["method"] == "raw_fid_noise_envelope"
     assert trace_display["smoothing_kernel"] == "none"
     assert trace_display["baseline_noise_preserved"] is True
     assert not any("tuned for Bruker 1D 1H" in warning for warning in report.warnings)

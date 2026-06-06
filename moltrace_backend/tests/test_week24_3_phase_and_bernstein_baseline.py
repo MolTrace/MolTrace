@@ -11,7 +11,7 @@ from nmrcheck.baseline import (
     fit_bernstein_baseline,
 )
 from nmrcheck.fid import (
-    _apply_raw_fid_mnova_constraints,
+    _apply_raw_fid_advised_constraints,
     _auto_phase_spectrum,
     _fine_tune_solvent_display_regions,
     _smooth_fid_display_trace,
@@ -32,10 +32,10 @@ def _csv_trace(points: list[tuple[float, float]]) -> bytes:
     return out.getvalue().encode()
 
 
-def test_raw_fid_proton_mnova_constraints_preserve_multiplet_resolution() -> None:
+def test_raw_fid_proton_advised_constraints_preserve_multiplet_resolution() -> None:
     settings = fid_settings_from_preset(selected_preset="balanced")
 
-    constrained, detail, notes = _apply_raw_fid_mnova_constraints(settings, nucleus="1H")
+    constrained, detail, notes = _apply_raw_fid_advised_constraints(settings, nucleus="1H")
 
     assert detail["applied"] is True
     assert detail["scope"] == "raw_fid_only"
@@ -246,7 +246,7 @@ def test_raw_fid_display_envelope_preserves_noise_and_limits_negative_lobes() ->
 
     assert metadata["applied"] is True
     assert metadata["display_only"] is True
-    assert metadata["method"] == "mnova_raw_fid_noise_envelope"
+    assert metadata["method"] == "raw_fid_noise_envelope"
     assert metadata["smoothing_kernel"] == "none"
     assert metadata["baseline_noise_preserved"] is True
     assert metadata["negative_lobes_limited"] == 0

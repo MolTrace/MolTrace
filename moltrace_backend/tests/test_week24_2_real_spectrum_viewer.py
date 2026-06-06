@@ -90,13 +90,13 @@ def test_default_processed_preview_preserves_exact_uploaded_intensities() -> Non
     assert preview.metadata["baseline_lock_visual_only"] is True
 
 
-def test_deprecated_mnova_locked_display_mode_maps_to_real_without_changing_intensities() -> None:
+def test_deprecated_locked_display_mode_maps_to_real_without_changing_intensities() -> None:
     points = [(5.0, 0.0), (4.0, 1.0), (3.0, 20.0), (2.0, 0.5)]
 
     preview = parse_processed_spectrum(
         filename="deprecated.csv",
         content=_csv_trace(points),
-        display_mode="mnova_locked",
+        display_mode="locked",
         vertical_gain=100,
     )
 
@@ -104,7 +104,7 @@ def test_deprecated_mnova_locked_display_mode_maps_to_real_without_changing_inte
     assert preview.metadata["display_mode"] == "real"
     assert preview.metadata["display_gain"] == 100.0
     assert preview.metadata["display"]["vertical_gain"] == 100.0
-    assert any("Deprecated display_mode='mnova_locked'" in warning for warning in preview.warnings)
+    assert any("Deprecated display_mode='locked'" in warning for warning in preview.warnings)
 
 
 def test_vertical_gain_does_not_change_preview_points_or_inferred_peaks() -> None:
@@ -233,12 +233,9 @@ def test_fid_form_accepts_package_aliases_without_baseline_subtraction() -> None
     assert settings.vertical_gain == 25.0
 
 
-def test_web_defaults_do_not_submit_legacy_mnova_parameters_or_old_transform_language() -> None:
+def test_web_defaults_do_not_submit_legacy_view_parameters_or_old_transform_language() -> None:
     html = index()
 
-    assert 'formData.append("mnova_view"' not in html
-    assert 'mnova_baseline' not in html
-    assert 'mnova_display' not in html
     assert 'baseline-flattened' not in html
     assert 'weak-peak compression' not in html
     assert 'Real spectrum — original intensity' in html

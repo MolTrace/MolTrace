@@ -110,10 +110,10 @@ class TestReferenceRegistry:
             assert "venue" in entry and entry["venue"], f"{key} missing venue"
             assert isinstance(entry["year"], int), f"{key} year must be int"
 
-    def test_claridge_and_mnova_references_present(self) -> None:
+    def test_claridge_and_processing_references_present(self) -> None:
         # Phase-correction + apodization defaults trace back to these.
         assert reference("claridge_hr_nmr_techniques") is not None
-        assert reference("mestrenova_manual") is not None
+        assert reference("nmrpipe") is not None
         assert reference("nanalysis_phase_correction") is not None
         assert reference("nanalysis_data_processing") is not None
 
@@ -147,7 +147,7 @@ class TestBrukerDefaults:
 
 
 class TestDisplayConstants:
-    def test_display_constants_align_with_mnova(self) -> None:
+    def test_display_constants_align_with_viewer_defaults(self) -> None:
         from nmrcheck.literature_data import (
             DISPLAY_HEIGHT_COMPACT_PX,
             DISPLAY_HEIGHT_EXPANDED_PX,
@@ -159,7 +159,7 @@ class TestDisplayConstants:
             DISPLAY_Y_ROBUST_MAX_PERCENTILE,
         )
 
-        # Mnova preferences §3 / our viewer defaults.
+        # Industry-standard NMR display preferences / our viewer defaults.
         assert DISPLAY_POINT_MARKER_THRESHOLD == 128
         assert DISPLAY_Y_ROBUST_MAX_PERCENTILE == pytest.approx(0.99)
         assert DISPLAY_Y_HEADROOM_FACTOR == pytest.approx(1.20)
