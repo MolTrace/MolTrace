@@ -12,7 +12,7 @@ const navigation = {
   // instrument vendor). Update when a ``/guides/integrations/`` index ships.
   platform: [
     // All four Platform modules now have in-app marketing overviews.
-    // Deeper technical references stay on moltrace-docs.vercel.app and
+    // Deeper technical references stay on docs.moltrace.co and
     // are linked from each module page directly.
     { name: "Spectroscopy", href: "/spectroscopy" },
     { name: "Regulatory Intelligence Hub", href: "/regulatory-hub" },
@@ -36,27 +36,27 @@ const navigation = {
   // ``moltrace_docs/src/content/docs/...`` slugs whenever the docs site
   // restructures.
   resources: [
-    { name: "Documentation", href: "https://moltrace-docs.vercel.app/" },
-    { name: "API Reference", href: "https://moltrace-docs.vercel.app/guides/api/" },
+    { name: "Documentation", href: "https://docs.moltrace.co/" },
+    { name: "API Reference", href: "https://docs.moltrace.co/guides/api/" },
     // ``Case Studies`` is a category with multiple pages and no index page;
     // landing on the pharma case study reflects the primary persona
     // (pharma R&D scientists). Update when a case-studies index ships.
     {
       name: "Case Studies",
-      href: "https://moltrace-docs.vercel.app/guides/resources/case-study-pharma/",
+      href: "https://docs.moltrace.co/guides/resources/case-study-pharma/",
     },
     // Webinars likewise has no index — the "Getting Started" webinar is
     // the canonical entry point for new viewers. Update when an index ships.
     {
       name: "Webinars",
-      href: "https://moltrace-docs.vercel.app/guides/resources/webinar-getting-started/",
+      href: "https://docs.moltrace.co/guides/resources/webinar-getting-started/",
     },
   ],
   legal: [
-    { name: "Privacy", href: "https://moltrace-docs.vercel.app/guides/legal/privacy-policy/" },
-    { name: "Terms", href: "https://moltrace-docs.vercel.app/guides/legal/terms-of-service/" },
-    { name: "Security", href: "https://moltrace-docs.vercel.app/guides/legal/security-policy/" },
-    { name: "Compliance", href: "https://moltrace-docs.vercel.app/guides/legal/compliance/" },
+    { name: "Privacy", href: "https://docs.moltrace.co/guides/legal/privacy-policy/" },
+    { name: "Terms", href: "https://docs.moltrace.co/guides/legal/terms-of-service/" },
+    { name: "Security", href: "https://docs.moltrace.co/guides/legal/security-policy/" },
+    { name: "Compliance", href: "https://docs.moltrace.co/guides/legal/compliance/" },
   ],
 }
 const COPYRIGHT_YEAR = new Date().getUTCFullYear()

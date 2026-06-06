@@ -40,7 +40,7 @@ type DropdownItem = { label: string; sub: string; icon: LucideIcon; href: string
 // lives at a top-level slug matching its dropdown label (slight rename
 // for /reaction-optimization vs ReactionIQ, /regulatory-hub vs Regulatory
 // Intelligence Hub). External docs links are reserved for deeper
-// technical-reference content under moltrace-docs.vercel.app.
+// technical-reference content under docs.moltrace.co.
 const dropdowns: Record<string, DropdownItem[]> = {
   Platform: [
     { label: "Spectroscopy Intelligence",   sub: "NMR · MS · Structure elucidation",  icon: Waves,        href: "/spectroscopy" },

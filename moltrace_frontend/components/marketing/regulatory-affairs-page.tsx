@@ -983,7 +983,7 @@ export function RegulatoryAffairsPage() {
                 </Button>
                 <Button asChild size="lg" variant="ghost" className="gap-2">
                   <Link
-                    href="https://moltrace-docs.vercel.app/guides/modules/regulatory/"
+                    href="https://docs.moltrace.co/guides/modules/regulatory/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

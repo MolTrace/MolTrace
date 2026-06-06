@@ -926,7 +926,7 @@ export function RegulatoryHubPage() {
                 />
               </Link>
               <Link
-                href="https://moltrace-docs.vercel.app/guides/modules/optimization/"
+                href="https://docs.moltrace.co/guides/modules/optimization/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-center justify-between gap-4 rounded-2xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
@@ -1029,7 +1029,7 @@ export function RegulatoryHubPage() {
                 </Button>
                 <Button asChild size="lg" variant="ghost" className="gap-2">
                   <Link
-                    href="https://moltrace-docs.vercel.app/guides/modules/regulatory/"
+                    href="https://docs.moltrace.co/guides/modules/regulatory/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

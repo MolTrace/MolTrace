@@ -1110,7 +1110,7 @@ export function ReactionOptimizationPage() {
                 </Button>
                 <Button asChild size="lg" variant="ghost" className="gap-2">
                   <Link
-                    href="https://moltrace-docs.vercel.app/guides/modules/optimization/"
+                    href="https://docs.moltrace.co/guides/modules/optimization/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

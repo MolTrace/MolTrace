@@ -115,21 +115,21 @@ const PILLARS: Pillar[] = [
     name: "SpectraCheck",
     blurb:
       "Spectroscopy evidence engine. Raw FID → processed spectrum → peaks classified by category, with audit-grade fit metrics per peak.",
-    href: "https://moltrace-docs.vercel.app/guides/modules/spectracheck/",
+    href: "https://docs.moltrace.co/guides/modules/spectracheck/",
   },
   {
     icon: ShieldCheck,
     name: "Regulatory Intelligence Hub",
     blurb:
       "Closes the loop between spectroscopy evidence and regulatory action. Dossiers, traceability, ALCOA+ audit ledger, ICH Q2(R2) alignment.",
-    href: "https://moltrace-docs.vercel.app/guides/modules/regulatory/",
+    href: "https://docs.moltrace.co/guides/modules/regulatory/",
   },
   {
     icon: Beaker,
     name: "ReactionIQ",
     blurb:
       "Turns regulatory action items into reaction-optimization constraints. Bayesian + ML-guided next-experiment recommendations under impurity limits.",
-    href: "https://moltrace-docs.vercel.app/guides/modules/optimization/",
+    href: "https://docs.moltrace.co/guides/modules/optimization/",
   },
 ]
 
@@ -288,7 +288,7 @@ export function AboutPage() {
               </Button>
               <Button asChild size="lg" variant="outline" className="gap-2">
                 <Link
-                  href="https://moltrace-docs.vercel.app/guides/resources/white-papers/"
+                  href="https://docs.moltrace.co/guides/resources/white-papers/"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -757,7 +757,7 @@ export function AboutPage() {
                 </Button>
                 <Button asChild size="lg" variant="outline" className="gap-2">
                   <Link
-                    href="https://moltrace-docs.vercel.app/"
+                    href="https://docs.moltrace.co/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -767,7 +767,7 @@ export function AboutPage() {
                 </Button>
                 <Button asChild size="lg" variant="ghost" className="gap-2">
                   <Link
-                    href="https://moltrace-docs.vercel.app/guides/company/careers/"
+                    href="https://docs.moltrace.co/guides/company/careers/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
