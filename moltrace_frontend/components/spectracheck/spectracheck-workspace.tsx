@@ -47,6 +47,7 @@ import {
 } from "@/components/spectracheck/spectracheck-result-panels"
 import { SpectraCheckProcessedSpectrumSection } from "@/components/spectracheck/spectracheck-processed-spectrum-section"
 import { SpectraCheckRawFidSection } from "@/components/spectracheck/spectracheck-raw-fid-section"
+import { SpectrumResultsFullscreen } from "@/components/spectracheck/spectracheck-fullscreen-results"
 import { SessionValidateCard } from "@/components/spectracheck/spectracheck-session-validate-card"
 import { ResetToExampleButton } from "@/components/spectracheck/spectracheck-reset-to-example-button"
 import { SpectraCheckBenchmarkSection } from "@/components/spectracheck/spectracheck-benchmark-section"
@@ -126,6 +127,7 @@ import {
   ChevronDown,
   Eye,
   FileText,
+  Maximize2,
   Network,
   Settings2,
   Sparkles,
@@ -329,6 +331,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   const [deptAnalyzeResult, setDeptAnalyzeResult] = useState<unknown>(null)
   const [deptAnalyzeError, setDeptAnalyzeError] = useState("")
   const [deptAnalyzeLoading, setDeptAnalyzeLoading] = useState(false)
+  const [deptFullscreenOpen, setDeptFullscreenOpen] = useState(false)
 
   const nmr2dFileRef = useRef<HTMLInputElement>(null)
   const nmr2dDeptFileRef = useRef<HTMLInputElement>(null)
@@ -339,6 +342,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   const [nmr2dResult, setNmr2dResult] = useState<unknown>(null)
   const [nmr2dError, setNmr2dError] = useState("")
   const [nmr2dLoading, setNmr2dLoading] = useState(false)
+  const [nmr2dFullscreenOpen, setNmr2dFullscreenOpen] = useState(false)
 
   // ── Drop-zone state for DEPT/2D file inputs (mirrors processed/raw FID pattern) ─────
   const [deptDragOver, setDeptDragOver] = useState(false)
@@ -2314,9 +2318,22 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             )}
 
             {/* Step 3 — Results (DEPT) */}
+            {/* In-place full-screen of the DEPT/APT carbon-typing tables. The
+                SAME ModuleCard renders inline when closed and full-screen when
+                open — the result subtree is never duplicated, so the analysis
+                panels keep their state and never re-fetch on toggle. */}
             {(deptPreviewResult != null || deptAnalyzeResult != null) &&
               !deptPreviewLoading &&
               !deptAnalyzeLoading && (
+                <SpectrumResultsFullscreen
+                  open={deptFullscreenOpen}
+                  onClose={() => setDeptFullscreenOpen(false)}
+                  eyebrow="Full screen · DEPT/APT"
+                  title={deptAnalyzeResult != null ? "DEPT/APT analysis output" : "DEPT/APT preview output"}
+                  subtitle={deptSelectedFileName ?? undefined}
+                  tag={sampleId.trim() || undefined}
+                  testId="dept-fullscreen-view"
+                >
                 <ModuleCard
                   accent="teal"
                   eyebrow="DEPT · Step 3 · Results"
@@ -2330,6 +2347,26 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   className="min-w-0"
                 >
                   <div className="space-y-4">
+                    {/* Full screen entry point — opens the in-app overlay so the
+                        DEPT/APT tables fill the screen (this inline view is
+                        untouched). Hidden while full screen (use Exit instead). */}
+                    {!deptFullscreenOpen ? (
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeptFullscreenOpen(true)}
+                          className="gap-1.5"
+                          data-testid="dept-open-fullscreen"
+                          aria-haspopup="dialog"
+                          title="View the DEPT/APT analysis tables on the entire screen"
+                        >
+                          <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+                          Full screen
+                        </Button>
+                      </div>
+                    ) : null}
                     {deptAnalyzeResult != null && (
                       <SummarizedEvidenceView
                         result={deptAnalyzeResult}
@@ -2356,6 +2393,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     )}
                   </div>
                 </ModuleCard>
+                </SpectrumResultsFullscreen>
               )}
           </section>
 
@@ -2707,7 +2745,21 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             </ModuleCard>
 
             {/* Step 3 — Results (2D NMR) */}
+            {/* In-place full-screen of the 2D correlation tables. Same
+                ModuleCard inline ↔ full-screen; the subtree is never
+                duplicated, so it keeps its state and never re-fetches on
+                toggle. `open` is guarded on a settled result so a loading
+                pass can't promote an empty surface to full screen. */}
             {(nmr2dResult != null || nmr2dLoading) && (
+              <SpectrumResultsFullscreen
+                open={nmr2dFullscreenOpen && nmr2dResult != null && !nmr2dLoading}
+                onClose={() => setNmr2dFullscreenOpen(false)}
+                eyebrow="Full screen · 2D NMR"
+                title="2D correlation output"
+                subtitle={nmr2dSelectedFileName ?? undefined}
+                tag={sampleId.trim() || undefined}
+                testId="nmr2d-fullscreen-view"
+              >
               <ModuleCard
                 accent="teal"
                 eyebrow="2D NMR · Step 3 · Results"
@@ -2716,6 +2768,25 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 description={`Correlation evidence from /nmr2d/analyze (${nmr2dExperiment}).`}
                 className="min-w-0"
               >
+                {/* Full screen entry point — only once a settled result exists
+                    (not mid-load). Hidden while full screen (use Exit). */}
+                {!nmr2dFullscreenOpen && nmr2dResult != null && !nmr2dLoading ? (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNmr2dFullscreenOpen(true)}
+                      className="gap-1.5"
+                      data-testid="nmr2d-open-fullscreen"
+                      aria-haspopup="dialog"
+                      title="View the 2D NMR correlation tables on the entire screen"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+                      Full screen
+                    </Button>
+                  </div>
+                ) : null}
                 <TabResultSection
                   error={nmr2dError}
                   loading={nmr2dLoading}
@@ -2732,6 +2803,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   }}
                 />
               </ModuleCard>
+              </SpectrumResultsFullscreen>
             )}
           </section>
         </TabsContent>
