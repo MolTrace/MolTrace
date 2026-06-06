@@ -14,6 +14,71 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.9.0 — Solvent/impurity expert system (Prompt 10) (2026-06-05)
+
+**Headline:** Adds the source-of-truth classifier for *non-analyte* signals
+(`moltrace.spectroscopy.classify.solvent_impurity`), built on the Fulmer (2010)
+and Gottlieb (1997) residual-solvent + trace-impurity reference tables. Sorts
+every peak into one of six categories and is integration-ready with the Prompt 3
+`auto_classify` categoriser. Pure backend library — no API/UI/contract change.
+
+### Added
+- **`moltrace.spectroscopy.classify.solvent_impurity`**:
+  - `DEUTERATED_SOLVENTS` — fourteen deuterated solvents (CDCl₃, DMSO-d₆,
+    CD₃OD, D₂O, acetone-d₆, CD₃CN, C₆D₆, pyridine-d₅, THF-d₈, toluene-d₈,
+    CD₂Cl₂, DMF-d₇, dioxane-d₈, C₂D₂Cl₄) with residual ¹H / ¹³C and water
+    shifts + aliases.
+  - `COMMON_IMPURITIES` — the Fulmer common-organic-impurity table (~30
+    impurities: water, TMS, acetone, acetonitrile, EtOAc, hexane, DCM, ethanol,
+    methanol, THF, DMF, dioxane, toluene, …) tabulated across the seven Fulmer
+    solvent columns (CDCl₃, acetone-d₆, DMSO-d₆, C₆D₆, CD₃CN, CD₃OD, D₂O), plus
+    a solvent-agnostic ¹³C impurity table. Water/TMS/BHT/grease/silicone tagged
+    `impurity`; volatile organics tagged `residual_solvent`.
+  - `detect_solvent(spectrum, peaks) -> str` — most likely deuterated solvent
+    from the observed peak pattern.
+  - `classify_peak(peak, spectrum_solvent, all_peaks) -> (category, confidence)`
+    — sorts each peak into `compound | solvent | residual_solvent | impurity |
+    13C_satellite | artifact` by a transparent additive evidence scheme:
+    **high** solvent-table position match or out-of-range shift; **medium**
+    ¹³C-satellite pair at ±½·J_CH (125 Hz sp³ / 160 Hz sp²) or line-width
+    anomaly; **low** sub-noise intensity. An intensity-prominence gate keeps a
+    dominant analyte resonance from being captured by a colliding impurity
+    window (solvent exempt); nucleus + field-MHz are inferred from the peak set
+    when not supplied.
+  - `classify_peaks(...)` — batch entry point returning per-peak
+    `(category, confidence)`.
+  - `SolventImpurityCategory` six-value `Literal`; frozen slotted
+    `DeuteratedSolvent` / `ImpurityShift` reference dataclasses.
+
+### Validation
+- `tests/spectroscopy/test_solvent_impurity.py` — 36 tests: reference-table
+  coverage (14 solvents, core shifts, impurity kinds, ¹³C table, Fulmer
+  citation), solvent-name normalisation, `detect_solvent` (¹H / ¹³C), every
+  category route, the additive scoring scheme, batch classification, and
+  nucleus inference. ruff clean (new code); full `tests/spectroscopy/` suite
+  green.
+
+### Notes
+- Source-of-truth for solvent/impurity identity; **integration-ready** with the
+  Prompt 3 `auto_classify` categoriser — its six-category scheme adds the
+  explicit `residual_solvent` label that separates leftover process solvents
+  from the bulk deuterated-solvent line — but intentionally **not** wired into
+  `gsd.py` in this change to avoid hot-file churn. It stands as a consumable
+  library with a `classify_peaks` batch entry point.
+- Fulmer et al., *Organometallics* **29**, 2176 (2010) and Gottlieb et al.,
+  *J. Org. Chem.* **62**, 7512 (1997) chemical-shift values are
+  non-copyrightable facts; cited in the module docstring as scientific good
+  practice (no `NOTICE` entry — no redistribution obligation, unlike SDBS /
+  NMRShiftDB2 derived tables).
+- White papers updated (Trigger 1): canonical §5.2 (solvent/impurity
+  expert-system paragraph, reusing `[^fulmer_2010]` / `[^gottlieb_1997]`) +
+  Technical §3.1 (module + six-category scheme).
+- No FE/contract change — pure backend classification library (no endpoint
+  requested), consistent with the §3.6 verification, §3.7 similarity, and
+  v0.8.3 qNMR layers.
+
+---
+
 ## v0.8.3 — qNMR purity calculator (internal-standard + PULCON) (2026-06-05)
 
 **Headline:** Adds a quantitative-NMR purity layer (`moltrace.spectroscopy.qnmr`)
