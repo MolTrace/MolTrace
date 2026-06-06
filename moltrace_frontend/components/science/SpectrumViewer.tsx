@@ -94,7 +94,7 @@ export type SpectrumViewerProps = {
   observedPointsPerPixel?: number
   /** Initial visibility for peak category markers and their legend. */
   defaultShowPeaks?: boolean
-  /** Initial visibility for Mnova-style vertical peak guides and ppm labels. */
+  /** Initial visibility for vertical peak guides and ppm labels (industry-standard NMR display). */
   defaultShowPeakGuides?: boolean
   className?: string
 }
@@ -301,8 +301,8 @@ function robustNoiseFromResiduals(values: number[], center: number): number {
  * floor reliably across NMR uploads of any size or dynamic range.
  *
  * Scaled by 1/Φ⁻¹(3/4) ≈ 0.7413 so the returned value is the σ of an
- * equivalent Gaussian noise process, matching the convention used by
- * Mestrenova's noise-factor peak threshold (manual §8.2.1).
+ * equivalent Gaussian noise process, matching the industry-standard
+ * noise-factor peak threshold convention used by NMR-processing software.
  */
 function estimateBaselineNoiseSigma(values: ArrayLike<number>): number {
   if (values.length < 4) return 0
@@ -324,7 +324,7 @@ function estimateBaselineNoiseSigma(values: ArrayLike<number>): number {
 }
 
 /**
- * Mnova-style local display cleanup for raw FID aromatic regions.
+ * Local display cleanup for raw FID aromatic regions (industry-standard NMR display).
  *
  * Constraints:
  * - only acts inside aromatic windows (1H: 6.45-8.65 ppm; 13C: 105-165 ppm);
@@ -1009,8 +1009,8 @@ function SpectrumViewerImpl({
     // can clamp the visible bottom near ``-4σ`` — honest noise stays
     // visible, but big negative dispersion lobes around saturated solvent
     // / aromatic peaks fall below the frame instead of cutting through the
-    // baseline. Matches Mestrenova's "Only Positive" display convention
-    // (manual §8.2.2 GSD, §7.4 phase correction alternatives).
+    // baseline. Matches the industry-standard "Only Positive" display
+    // convention used by NMR-processing software.
     const baselineNoiseSigma = estimateBaselineNoiseSigma(baselineY)
     const ranges = [
       robustSpectrumYRange(baselineY, { noiseFloor: baselineNoiseSigma }),
@@ -1153,14 +1153,14 @@ function SpectrumViewerImpl({
   )
 
   /**
-   * Mestrenova-style apex ticks + rotated ppm labels.
+   * Industry-standard apex ticks + rotated ppm labels.
    *
-   * Mestrenova draws a thin vertical "stick" above each picked peak's apex
-   * and writes the chemical shift rotated 90° at the top (manual §8.2 figures,
-   * pp. 202, 252). Even when several lines of a multiplet visually merge into
-   * a single envelope at the chart's zoom level (a "blob"), the row of apex
-   * ticks above the trace makes the underlying line count — and therefore
-   * the multiplicity — immediately obvious to the eye.
+   * Standard NMR-display software draws a thin vertical "stick" above each
+   * picked peak's apex and writes the chemical shift rotated 90° at the top.
+   * Even when several lines of a multiplet visually merge into a single
+   * envelope at the chart's zoom level (a "blob"), the row of apex ticks
+   * above the trace makes the underlying line count — and therefore the
+   * multiplicity — immediately obvious to the eye.
    *
    * The tick endpoints share a common ``labelRowY`` near the top of the
    * frame so the labels align in a horizontal row. ``apexClampY`` cannot
@@ -1295,7 +1295,7 @@ function SpectrumViewerImpl({
         traces.push({
           type: "scatter",
           // ``markers`` only: the per-peak ppm labels live in layout
-          // annotations (Mnova-style rotated stick labels, see
+          // annotations (industry-standard rotated stick labels, see
           // ``peakApexLabelLayout`` above) so they survive Plotly's
           // marker-overlap collision avoidance and align in a horizontal
           // row across the top of the frame. The full multiplicity label
@@ -1325,16 +1325,16 @@ function SpectrumViewerImpl({
   ])
 
   /**
-   * Plotly layout. Two Mnova-spec'd anti-shake rules implemented here:
+   * Plotly layout. Two NMR-display anti-shake rules implemented here:
    *
    *   1. ``uirevision: "spectrum"`` — Plotly keeps pan/zoom/drag state
    *      across data updates instead of resetting to autorange every
-   *      time. [Mnova §3 Mouse Scroll]
+   *      time. (Standard mouse-scroll behavior.)
    *   2. Y-axis ``range`` is anchored to a stable robust source-data range
    *      with bottom padding. Gain/yZoom ticks therefore do NOT change the
    *      axis range, only ``data`` trace values and lightweight guide-line
    *      shapes — i.e. "vertical-zoom does NOT re-trigger Fit to height"
-   *      [Mnova §3 Mass Preferences].
+   *      (industry-standard NMR-display behavior).
    *
    * Layout deps deliberately depend on primitives plus the precomputed
    * shape overlay, so a sibling re-render that hands us a fresh-but-equal
@@ -1388,11 +1388,10 @@ function SpectrumViewerImpl({
       // overlay each frame. That was the visible flicker.
       hovermode: false,
       // Layout shapes = (a) drop-line guides from baseline up to each apex
-      // and (b) Mnova-style apex ticks from each apex up to the common
+      // and (b) industry-standard apex ticks from each apex up to the common
       // label row near the top of the frame. The drop-line gives the eye a
       // direct mapping from peak → ppm axis; the apex tick + rotated label
-      // makes the multiplicity readable at any zoom level (manual §8.2,
-      // pp. 202, 252).
+      // makes the multiplicity readable at any zoom level.
       shapes: [...peakGuideShapes, ...peakApexLabelLayout.shapes],
       annotations: peakApexLabelLayout.annotations,
       transition: { duration: 0 },
@@ -1831,7 +1830,7 @@ function SpectrumViewerImpl({
               // Plotly's internal ResizeObserver also fires. Keeping only
               // ``useResizeHandler`` means the chart resizes when its own
               // container changes size, not when an unrelated sibling
-              // mutates the DOM below it. [Mnova anti-shake §3]
+              // mutates the DOM below it. (NMR-display anti-shake convention.)
               responsive: false,
               scrollZoom: false,
               staticPlot: true,

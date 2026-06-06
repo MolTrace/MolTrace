@@ -29,7 +29,6 @@ export const SPECTRACHECK_VENDOR_NMR_SPECTRUM_ACCEPT = [
   ".1i",
   ".2rr",
   ".2ri",
-  ".mnova",
 ].join(",")
 
 export const SPECTRACHECK_NMR_SPECTRUM_ACCEPT = [
@@ -67,7 +66,7 @@ export const SPECTRACHECK_ALL_SPECTRUM_ACCEPT = [
 
 const TEXT_SPECTRUM_RE = /\.(csv|tsv|txt|json|jcamp|jdx|dx|xy|asc|dat)$/i
 const RAW_FID_ARCHIVE_RE = /\.(zip|tar\.gz|tgz)$/i
-const RAW_FID_RE = /\.(zip|tar\.gz|tgz|fid|ser|1r|1i|2rr|2ri|mnova)$/i
+const RAW_FID_RE = /\.(zip|tar\.gz|tgz|fid|ser|1r|1i|2rr|2ri)$/i
 const MS_SPECTRUM_RE = /\.(mzml|mzxml|mzdata|imzml|mgf|cdf|netcdf|raw|wiff2?|d|yep|baf|tdf|tsf|xml)$/i
 
 export function isTextSpectrumFilename(filename: string) {

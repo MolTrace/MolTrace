@@ -13,9 +13,9 @@ import { Settings2 } from "lucide-react"
  *   - Baseline correction (mode / order / lock)
  *   - Digital-filter / group-delay corrections (Bruker FID acquisition)
  *
- * Designed to mirror Mestrenova's "Processing Parameters" dialog so reviewers
- * recognise the layout at a glance. Unknown / forward-compatible keys are
- * rendered in an "Other parameters" group so future backend additions
+ * Designed to mirror the industry-standard NMR "Processing Parameters" dialog
+ * layout so reviewers recognise it at a glance. Unknown / forward-compatible
+ * keys are rendered in an "Other parameters" group so future backend additions
  * surface without a frontend change.
  */
 
@@ -84,8 +84,8 @@ type Group = {
   picks: { key: string; label?: string }[]
 }
 
-/** Group definitions matching Mestrenova's Processing Parameters dialog
- * panes. Keys not picked by any group flow into "Other parameters". */
+/** Group definitions matching the industry-standard NMR Processing Parameters
+ * dialog panes. Keys not picked by any group flow into "Other parameters". */
 const GROUPS: Group[] = [
   {
     id: "spectrum",

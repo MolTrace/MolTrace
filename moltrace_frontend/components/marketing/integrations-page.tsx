@@ -135,7 +135,6 @@ const CONNECTORS: ConnectorCategory[] = [
       "LabWare LIMS · bidirectional sample + result sync",
       "STARLIMS · STARLIMS Connector + project lineage",
       "Benchling ELN · experiment handoff + protocol mapping",
-      "Mestrelab Mnova ELN · spectrum-backed-by-FID handoff",
       "IDBS E-WorkBook · result + audit-event push",
       "BIOVIA OneLab · workflow trigger + result push",
     ],
@@ -187,7 +186,7 @@ const USE_CASES: UseCase[] = [
   },
   {
     icon: FlaskConical,
-    name: "ELN handoff (Benchling, Mnova, IDBS)",
+    name: "ELN handoff (Benchling, IDBS)",
     blurb:
       "Experiment metadata from the ELN auto-binds to incoming spectra. Reverse: result + interpretation push back into the ELN as a structured attachment.",
     inputs: "ELN experiment ID · field mapping template",
@@ -816,7 +815,7 @@ export function IntegrationsPage() {
      ┌──────────────────────┐                                │                      │   ──── webhook ───►  Customer apps
      │  LIMS · ELN          │  ◄──── bidirectional sync ────►│      MolTrace        │
      │  LabWare · Benchling │                                │  ────────────────    │   ──── eCTD ───────►  Regulatory submission
-     │  Mnova · IDBS        │                                │  · connector ledger  │
+     │  STARLIMS · BIOVIA   │                                │  · connector ledger  │
      └──────────────────────┘                                │  · audit ledger      │   ──── push ───────►  Downstream LIMS
                                                              │  · raw vault         │
      ┌──────────────────────┐                                │  · interoperability  │

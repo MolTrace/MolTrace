@@ -15,9 +15,9 @@ type SpectrumYRangeOptions = {
    * peaks fall *below* the visible frame instead of protruding through the
    * baseline.
    *
-   * This mirrors Mestrenova's display convention: the GSD peak picker defaults
-   * to ``Peaks Type: Only Positive`` (MNova manual §8.2.2) and the displayed
-   * frame floors near the noise envelope so dispersion artefacts never appear
+   * This mirrors the industry-standard NMR display convention: the GSD peak
+   * picker defaults to ``Peaks Type: Only Positive`` and the displayed frame
+   * floors near the noise envelope so dispersion artefacts never appear
    * as negative peaks under the baseline. Honest baseline noise (a few × σ)
    * stays visible because it sits inside the clamp.
    */
@@ -42,7 +42,7 @@ type SpectrumYRangeOptions = {
  * When a ``noiseFloor`` (baseline σ) is supplied, the lower bound is *also*
  * clamped at ``-noiseFloorSigmas × noiseFloor`` so that large negative
  * dispersion lobes near saturated solvent / aromatic peaks do not push the
- * visible frame down with them — Mestrenova-style "Only Positive" display.
+ * visible frame down with them — the industry-standard "Only Positive" display.
  */
 export function robustSpectrumYRange(
   values: ArrayLike<number>,
@@ -108,7 +108,7 @@ export function robustSpectrumYRange(
   // Noise-floor clamp. With ``noiseFloor`` supplied we keep yMin *no deeper*
   // than ``-noiseFloorSigmas × noiseFloor`` so a few-σ noise envelope stays
   // visible (honest baseline) while solvent/aromatic dispersion lobes that
-  // dip far below get clipped off the bottom of the frame — Mnova convention.
+  // dip far below get clipped off the bottom of the frame — standard NMR-display convention.
   if (
     typeof noiseFloor === "number" &&
     Number.isFinite(noiseFloor) &&

@@ -91,7 +91,7 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     expect(traces).toHaveLength(1)
     expect(traces[0].name).toMatch(/Observed/)
     expect(capturedPlotProps?.layout?.shapes).toHaveLength(0)
-    // No peaks → no Mnova-style apex tick annotations either.
+    // No peaks → no apex tick annotations either.
     expect(capturedPlotProps?.layout?.annotations ?? []).toHaveLength(0)
   })
 
@@ -158,13 +158,14 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     expect(yRange?.[1]).toBeGreaterThan(1)
   })
 
-  it("clips pathological negative dispersion lobes below the visible frame (Mnova-style)", () => {
+  it("clips pathological negative dispersion lobes below the visible frame", () => {
     // Synthetic baseline noise on [-0.05, +0.05] plus a single deep
     // dispersion lobe at index 4 — the kind of artefact that haunts the
     // solvent/aromatic windows when a Bruker FID is processed without
-    // careful phase correction. Mestrenova clips such lobes below the
-    // frame (manual §8.2.2: "Peaks Type: Only Positive") so the displayed
-    // baseline stays flat instead of being punched through.
+    // careful phase correction. Standard NMR-display software clips such
+    // lobes below the frame (the "Peaks Type: Only Positive" display
+    // convention) so the displayed baseline stays flat instead of being
+    // punched through.
     const xs = Array.from({ length: 200 }, (_, i) => 10 - i * 0.05)
     const ys = Array.from({ length: 200 }, (_, i) =>
       i === 4 ? -8 : ((i * 9301 + 49297) % 233 - 116) / 2000,
@@ -205,11 +206,11 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     // Layout shapes per peak = drop-line (below the apex) + apex tick
     // (above the apex, up to the common label row). 4 peaks → 8 shapes.
     expect(capturedPlotProps?.layout?.shapes).toHaveLength(8)
-    // One rotated ppm annotation per peak (Mestrenova-style stick label).
+    // One rotated ppm annotation per peak (industry-standard stick label).
     expect(capturedPlotProps?.layout?.annotations).toHaveLength(4)
   })
 
-  it("draws drop-line guides from y=0 to each peak apex (Mnova-style under-the-trace cue)", () => {
+  it("draws drop-line guides from y=0 to each peak apex (industry-standard under-the-trace cue)", () => {
     freshRender(
       <SpectrumViewer
         {...baseProps}
@@ -307,7 +308,7 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight })
   })
 
-  it("renders Mnova-style apex ticks + rotated ppm labels for each picked peak", () => {
+  it("renders industry-standard apex ticks + rotated ppm labels for each picked peak", () => {
     // Spectrum y range must encompass both peak apices so the apex ticks
     // have meaningful length up to the common label row — mimics a real
     // 1H spectrum where peaks sit comfortably below the chart's top edge.
@@ -344,7 +345,7 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     const annB = annotations.find((a) => a.x === 1.26)
     expect(annA?.text).toBe("7.26")
     expect(annB?.text).toBe("1.26")
-    // Mnova writes the stick label rotated 90° (vertical).
+    // Standard NMR display writes the stick label rotated 90° (vertical).
     expect(annA?.textangle).toBe(-90)
     expect(annB?.textangle).toBe(-90)
     expect(annA?.showarrow).toBe(false)
@@ -401,7 +402,7 @@ describe("SpectrumViewer — picked-peak rendering", () => {
     const traces = capturedPlotProps?.data ?? []
     // Filter to just the marker traces (skip the observed line) and
     // check their order is alphabetical: Aliphatic < Aromatic alkene < Labile.
-    // The per-peak labels now live in layout annotations (Mnova-style
+    // The per-peak labels now live in layout annotations (industry-standard
     // rotated stick labels), so the marker traces themselves are pure
     // ``markers`` rather than ``markers+text``.
     const markerNames = traces

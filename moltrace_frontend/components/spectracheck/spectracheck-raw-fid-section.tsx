@@ -693,7 +693,7 @@ export function SpectraCheckRawFidSection({
     // spectrum…" but the SpectrumViewer is not unmounted. Clearing
     // previewSpectrum/processResult here is what produced the analyze-mode
     // flash. The user sees the OLD chart smoothly replaced by the new one
-    // when data arrives. [Mnova anti-shake §3]
+    // when data arrives. (NMR-display anti-shake convention.)
     update({ previewSpectrumError: "", previewSpectrumLoading: true, activeResultMode: "preview" })
     let shouldGenerateSpectrum = false
     let previewArchiveId: string | null = null
@@ -948,7 +948,7 @@ export function SpectraCheckRawFidSection({
   // back-to-back responses (e.g. re-running ``process`` with the same
   // preset); reusing the previous reference keeps SpectrumViewer's expensive
   // percentile / mask / sampling memos cached and prevents Plotly from
-  // redrawing an already-painted line. [Mnova anti-shake §3]
+  // redrawing an already-painted line. (NMR-display anti-shake convention.)
   const xyResolved =
     resultsMode === "process"
       ? processResult
@@ -1384,7 +1384,7 @@ export function SpectraCheckRawFidSection({
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {analysisBackend === "gsd_prompt3"
-                      ? "Mestrenova-style peak detection with auto-classification on the FT-processed spectrum."
+                      ? "Industry-standard peak detection with auto-classification on the FT-processed spectrum."
                       : "Fourier transform + apodization on a derived copy. Generates the displayable spectrum."}
                   </span>
                 </button>

@@ -423,7 +423,7 @@ export function SpectraCheckProcessedSpectrumSection({
     // chart while the new fetch runs avoids the hard unmount/remount of
     // ``SpectrumViewer`` that the user sees as a flash. ``previewLoading``
     // drives the inline loading badge; the chart updates atomically when
-    // the new data lands. [Mnova anti-shake §3 Mass Preferences]
+    // the new data lands. (NMR-display anti-shake convention.)
     try {
       const previewCacheKey = buildProcessedRequestKey(file, "preview")
       const cachedPreview = processedPreviewCacheRef.current.get(previewCacheKey)
@@ -1134,7 +1134,7 @@ export function SpectraCheckProcessedSpectrumSection({
                   </span>
                   <span className="text-sm leading-snug text-white/85">
                     {analysisBackend === "gsd_prompt3"
-                      ? "Mestrenova-style peak detection with auto-classification. Sends the parsed ppm + intensity arrays — no candidate matching."
+                      ? "Industry-standard peak detection with auto-classification. Sends the parsed ppm + intensity arrays — no candidate matching."
                       : "Detect peaks and match against candidate structures with scoring."}
                   </span>
                   <span className="mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-white transition-transform duration-200 group-hover:translate-x-1">
