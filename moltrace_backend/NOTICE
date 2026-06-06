@@ -30,6 +30,36 @@ License: MIT.
 Installed transitively as a dependency of NMRNet; not vendored here.
 
 -------------------------------------------------------------------------------
+JTF-Net  (NUS reconstruction model)
+-------------------------------------------------------------------------------
+JTF-Net: Luo, Y.; Su, Z.; Chen, W. et al. "Deep learning network for NMR
+spectra reconstruction in time-frequency domain and quality assessment."
+Nat. Commun. 16, 2342 (2025). DOI: 10.1038/s41467-025-57721-w
+Source: the authors' code/weights release accompanying the paper (see the
+article's Code Availability / Data Availability statement).
+
+JTF-Net is used as an OPTIONAL, separately-installed dependency (a research
+codebase plus author-released pretrained weights), loaded lazily and local-first
+by moltrace.spectroscopy.nus.reconstruct -- the SAME pattern as the NMRNet
+wrapper above. Its source is NOT vendored into this repository. The pretrained
+weights are downloaded by the end user from the authors' official release and
+are NOT redistributed here; the default cache lives outside the repository
+(~/.cache/moltrace/jtfnet/).
+
+LICENSE / WEIGHTS CAVEAT: verify the exact JTF-Net repository license and the
+weight-release terms BEFORE bundling or redistributing any weights. The released
+weights were trained/validated on PROTEIN multidimensional spectra; MolTrace
+treats them as out-of-domain for small-molecule 2-D spectra and defaults to the
+classical IST baseline (below) until JTF-Net is re-validated or fine-tuned.
+
+The always-available fallback reconstructor is iterative soft thresholding
+(IST-S), a classical, weights-free, numpy-only routine that carries no
+third-party-data obligation: Stern, A. S.; Donoho, D. L.; Hoch, J. C.
+J. Magn. Reson. 188, 295 (2007); Hyberts, S. G.; Milbradt, A. G.; Wagner, A. B.;
+Arthanari, H.; Wagner, G. J. Biomol. NMR 52, 315 (2012),
+doi:10.1007/s10858-012-9611-z. Implemented from the published equations.
+
+-------------------------------------------------------------------------------
 NMRShiftDB2  (HOSE-code fallback knowledge base)
 -------------------------------------------------------------------------------
 The HOSE-code chemical-shift fallback predictor is built from NMRShiftDB2.

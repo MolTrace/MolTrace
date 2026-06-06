@@ -14,6 +14,68 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.10.0 — NUS reconstruction: IST baseline + JTF-Net (Prompt 11) (2026-06-06)
+
+**Headline:** Adds non-uniform-sampling (NUS) reconstruction
+(`moltrace.spectroscopy.nus.reconstruct`): the classical, always-available
+iterative soft-thresholding (IST-S) baseline plus an optional, lazily-loaded
+JTF-Net joint time-frequency backend, and the reference-free REQUIRER quality
+ratio. JTF-Net follows the SAME local-first, weights-cached-out-of-git device
+pattern as the Prompt 6 NMRNet wrapper. Pure backend library — no
+API/UI/contract change.
+
+### Added
+- **`moltrace.spectroscopy.nus.reconstruct`**:
+  - `reconstruct_ist(nus_fid, sampling_schedule, iterations=200, threshold=0.97)`
+    — Iterative Soft Thresholding (Stern–Donoho–Hoch, *J. Magn. Reson.* 2007;
+    Hyberts et al., *J. Biomol. NMR* 52, 315, 2012). Weights-free, numpy-only,
+    deterministic IST-S: each pass FFTs the time-domain residual, soft-thresholds
+    at `threshold·max(|S|)` to peel the strongest surviving spectral stratum,
+    accumulates it, and re-derives the residual against the measured data at the
+    sampled increments only. The robust default for small-molecule 2-D spectra.
+  - `reconstruct_jtfnet(nus_fid, sampling_schedule, device=None,
+    allow_fallback=True, …)` — optional JTF-Net backend (Luo et al.,
+    *Nat. Commun.* 16, 2342, 2025). Lazy `torch`; device resolves CUDA → MPS →
+    CPU with `PYTORCH_ENABLE_MPS_FALLBACK=1` and an MPS→CPU retry;
+    `torch.load(map_location=device)`; weights cached at
+    `~/.cache/moltrace/jtfnet/` (env `MOLTRACE_JTFNET_CACHE` /
+    `…_WEIGHTS_URL` / `…_PACKAGE`), never vendored. Never fabricates a
+    reconstruction: when torch / package / weights are absent it raises
+    `JTFNetUnavailable` and (by default) falls back to IST with a warning.
+  - `assess_reconstruction_quality(reconstructed, original_nus_fid) -> float`
+    — REQUIRER (LCR in the preprint): the reference-free quality ratio in
+    `[0, 1]` (1 = best), scoring the reconstruction against the *measured* NUS
+    data (no fully-sampled reference needed). Accepts a `ReconstructionResult`
+    or a bare full-grid FID.
+  - `ReconstructionResult` dataclass (`reconstructed_fid`, `method`, `device`,
+    `sampling_fraction`, `iterations`, `requirer`, `warnings`);
+    `JTFNetUnavailable(RuntimeError)`. Robust input normalisation accepts the
+    measured FID as a full Nyquist-grid array or a compact value list, with a
+    boolean-mask or integer-index `sampling_schedule`.
+
+### Domain caveat
+- JTF-Net's released weights were trained/validated on **protein**
+  multidimensional spectra (e.g. 3D HNCA). They are treated as out-of-domain for
+  MolTrace's small-molecule 2-D spectra (HSQC/HMBC): `reconstruct_jtfnet`
+  defaults to the IST baseline until JTF-Net is re-validated or fine-tuned on
+  small-molecule data. JTF-Net source is not vendored; protein-domain weights are
+  downloaded by the user (verify the repository license before bundling — see
+  `NOTICE`).
+
+### Validation
+- `tests/spectroscopy/test_nus_reconstruct.py` — 27 tests: IST peak-position and
+  intensity recovery on synthetic NUS FIDs, REQUIRER ∈ [0, 1] rising
+  monotonically with sampling density and separating good from zero/noise
+  reconstructions, all four input-normalisation forms + guards, device
+  resolution (CUDA→MPS→CPU) and the MPS→CPU retry via a fake torch, the
+  weights-absent and unfilled-model-forward guards, and the JTF-Net→IST fallback
+  (plus `allow_fallback=False` raising `JTFNetUnavailable`). The strict
+  protein-domain JTF-Net accuracy gate (peaks < 0.05 ppm, intensity < 10 %) is
+  documented but not asserted — it requires the authors' weights. ruff clean;
+  full `tests/spectroscopy/` suite green.
+
+---
+
 ## v0.9.0 — Solvent/impurity expert system (Prompt 10) (2026-06-05)
 
 **Headline:** Adds the source-of-truth classifier for *non-analyte* signals

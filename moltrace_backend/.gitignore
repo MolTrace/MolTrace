@@ -39,14 +39,17 @@ tmp/
 .DS_Store
 **/.DS_Store
 
-# NMRNet model weights / scalers + NMRShiftDB2-derived KB tables.
+# NMRNet / JTF-Net model weights / scalers + NMRShiftDB2-derived KB tables.
 # NEVER commit model weights or any table derived from NMRShiftDB2 (see NOTICE).
-# The default weights cache lives outside the repo (~/.cache/moltrace/nmrnet/).
+# Default weight caches live outside the repo (~/.cache/moltrace/nmrnet/ and
+# ~/.cache/moltrace/jtfnet/); JTF-Net protein-domain weights are downloaded by
+# the end user from the authors' Nat. Commun. 2025 release, not redistributed.
 *.pt
 *.ss
 *.ckpt
 hose_kb*.json
 moltrace_nmrnet_cache/
+moltrace_jtfnet_cache/
 
 # FAISS spectrum-similarity indices + embeddings DERIVED from NMRShiftDB2 are
 # CC-BY-SA derivatives (ShareAlike -- see NOTICE); NEVER commit them. Build
