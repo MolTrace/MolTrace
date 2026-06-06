@@ -22,10 +22,12 @@ from nmrcheck.api import (
     sample_reports,
     sample_timeline,
     spectrum_analyze,
-    validate as validate_endpoint,
     workspace_create_project,
     workspace_create_project_sample,
     workspace_link_project_sample_analysis,
+)
+from nmrcheck.api import (
+    validate as validate_endpoint,
 )
 from nmrcheck.database import init_db
 from nmrcheck.models import (

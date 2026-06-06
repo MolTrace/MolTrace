@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
 
 from nmrcheck.dp4_scoring import (
-    DP4_NU_13C,
     DP4_NU_1H,
-    DP4_SIGMA_13C,
+    DP4_NU_13C,
     DP4_SIGMA_1H,
+    DP4_SIGMA_13C,
     _student_t_cdf,
     dp4_probabilities,
     pair_residual_dp4_score,

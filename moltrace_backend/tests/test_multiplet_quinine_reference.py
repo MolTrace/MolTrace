@@ -50,7 +50,6 @@ from moltrace.spectroscopy.multiplet import (
 )
 from moltrace.spectroscopy.peaks.gsd import gsd_peak_pick
 
-
 # Literature quinine reference, ordered by ppm ascending so the
 # A, B, C, ... labelling ``detect_multiplets`` produces matches the
 # expected left-to-right order in the FE peak table.
@@ -99,7 +98,7 @@ def _synthesize_quinine_spectrum(
     sample_step_ppm = abs(ppm_high - ppm_low) / float(n_points - 1)
     hwhm_ppm = max((linewidth_hz / field_mhz) / 2.0, 3.0 * sample_step_ppm)
 
-    for name, centre_ppm, multiplicity, j_set in QUININE_REFERENCE:
+    for _name, centre_ppm, multiplicity, j_set in QUININE_REFERENCE:
         positions = generate_synthetic_multiplet(
             multiplicity=multiplicity,
             j_hz=list(j_set),
@@ -217,7 +216,7 @@ def test_quinine_all_eight_multiplets_detected_with_correct_J() -> None:
             f"Reference {ref_name} ({ref_mult}) needs "
             f"{len(ref_sorted)} J values, got {got_sorted}"
         )
-        for got, expected in zip(got_sorted, ref_sorted):
+        for got, expected in zip(got_sorted, ref_sorted, strict=True):
             delta = abs(got - expected)
             assert delta <= 0.3, (
                 f"Reference {ref_name} ({ref_mult}) at {ref_ppm}: "

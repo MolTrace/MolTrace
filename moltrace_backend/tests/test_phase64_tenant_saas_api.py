@@ -7,7 +7,6 @@ from nmrcheck import tenant_saas_store as tenant_store
 from nmrcheck.api import create_app
 from nmrcheck.settings import Settings
 
-
 PRODUCT_ORDER = ["SpectraCheck", "Regulatory Hub", "Reaction Optimization"]
 PRODUCT_PROGRAMS = ["spectracheck", "regulatory_hub", "reaction_optimization"]
 

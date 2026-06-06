@@ -39,7 +39,6 @@ import pytest
 from nmrcheck.api import AccessContext, spectrum_analyze_gsd
 from nmrcheck.models import SpectrumGSDAnalyzeRequest
 
-
 # Latest FE A/B dump.  Bump when the FE drops a refreshed envelope.
 _AB_JSON_FILENAME = "fe_ab_legacy_vs_gsd_20260527.json"
 _AB_JSON_PATH = (

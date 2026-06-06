@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 from nmrcheck.api import create_app
 from nmrcheck.settings import Settings
 
-
 RELEASE_HEALTH_CONTRACT = (
     Path(__file__).resolve().parents[2]
     / "tests"

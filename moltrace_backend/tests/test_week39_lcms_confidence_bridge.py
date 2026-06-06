@@ -8,7 +8,6 @@ from nmrcheck.models import (
 from nmrcheck.regulatory_report import compose_structure_elucidation_report
 from nmrcheck.unified_confidence import build_unified_candidate_confidence
 
-
 ETHANOL_FAMILY_TABLE = """family_id,anchor_group_id,anchor_mz,anchor_rt_min,label,consensus_score,promoted,relationship_count,member_count
 F001,G001,47.049141,1.250000,moderate_confidence_feature_family,0.8300,true,2,3
 """

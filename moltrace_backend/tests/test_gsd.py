@@ -38,7 +38,7 @@ def test_deconvolution_resolves_an_overlapped_quartet() -> None:
     j_ppm = 7.0 / freq
     lines = [
         (2.40 + k * j_ppm, amp, 0.0090)
-        for k, amp in zip((1.5, 0.5, -0.5, -1.5), (1.0, 3.0, 3.0, 1.0))
+        for k, amp in zip((1.5, 0.5, -0.5, -1.5), (1.0, 3.0, 3.0, 1.0), strict=True)
     ]
     xs, ys = _synth_region(lines, noise=0.02, seed=1)
     resolved = deconvolve_region(

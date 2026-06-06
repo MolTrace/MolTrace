@@ -1,10 +1,19 @@
 import random
 
-from nmrcheck.spectrum import SpectrumParseError
+from nmrcheck.compound_class_priors import diagnostic_regions_for
 from nmrcheck.models import Peak
 from nmrcheck.parser import parse_reference_nmr_text
-from nmrcheck.compound_class_priors import diagnostic_regions_for
-from nmrcheck.spectrum import _apply_reference_multiplicity, _build_reference_guided_nmr_text, _classify_multiplicity, _downsample_points, _infer_peak_estimates, _round_half_integrations, _structure_guided_peak_estimates, parse_processed_spectrum
+from nmrcheck.spectrum import (
+    SpectrumParseError,
+    _apply_reference_multiplicity,
+    _build_reference_guided_nmr_text,
+    _classify_multiplicity,
+    _downsample_points,
+    _infer_peak_estimates,
+    _round_half_integrations,
+    _structure_guided_peak_estimates,
+    parse_processed_spectrum,
+)
 
 TOBRAMYCIN_REFERENCE_TEXT = """'H NMR (500 MHz, D2O) 8 5.23 (d, J = 3.6 Hz, 1H), 5.08 (d, J = 3.9 Hz, 1H), 3.95 (ddd,
 J= 10.3, 4.6, 2.6 Hz, 1H), 3.80 (dd, J = 6.6, 3.6 Hz, 2H), 3.68 (tdd, J = 9.2, 5.6, 3.1 Hz,
@@ -265,7 +274,7 @@ def test_gsd_resolves_an_overlapped_quartet_through_the_full_pipeline() -> None:
     j_ppm = 7.0 / frequency
     quartet = [
         (2.40 + k * j_ppm, amp)
-        for k, amp in zip((1.5, 0.5, -0.5, -1.5), (50.0, 150.0, 150.0, 50.0))
+        for k, amp in zip((1.5, 0.5, -0.5, -1.5), (50.0, 150.0, 150.0, 50.0), strict=True)
     ]
     rng = random.Random(7)
     rows = ["ppm,intensity"]

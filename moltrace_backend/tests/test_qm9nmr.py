@@ -8,8 +8,8 @@ import pytest
 
 from moltrace.spectroscopy.predict.qm9nmr import (
     LinearReference,
-    shielding_to_shift,
     load_qm9nmr_json,
+    shielding_to_shift,
 )
 
 

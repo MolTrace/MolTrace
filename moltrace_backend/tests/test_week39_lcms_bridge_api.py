@@ -3,7 +3,6 @@ from fastapi.testclient import TestClient
 from nmrcheck.api import create_app
 from nmrcheck.settings import Settings
 
-
 FAMILY_TABLE = """family_id,anchor_group_id,anchor_mz,anchor_rt_min,label,consensus_score,promoted,relationship_count,member_count
 F001,G001,47.049141,1.250000,moderate_confidence_feature_family,0.8300,true,2,3
 """
