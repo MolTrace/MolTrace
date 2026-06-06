@@ -30,6 +30,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { cn } from "@/lib/utils"
 import { TabResultSection } from "@/components/spectracheck/spectracheck-result-panels"
+import { SpectrumResultsFullscreen } from "@/components/spectracheck/spectracheck-fullscreen-results"
 import {
   SPECTRACHECK_MS_SPECTRUM_ACCEPT,
   SPECTRACHECK_TEXT_SPECTRUM_ACCEPT,
@@ -43,9 +44,8 @@ import {
 import {
   Atom,
   BarChart3,
-  Eye,
+  Maximize2,
   Network,
-  Settings2,
   Sparkles,
   Zap,
 } from "lucide-react"
@@ -1735,6 +1735,82 @@ type Props = {
   onLcmsHashForReport?: (sha256: string) => void
 }
 
+/**
+ * Results ModuleCard with in-place full-screen, shared by every MS analyzer
+ * sub-tab. The SAME card renders inline when closed and full-screen when open
+ * (via SpectrumResultsFullscreen), so the live TabResultSection + detail tables
+ * keep their state and never re-fetch on toggle. A single `activeKey` in the
+ * parent means only one analyzer is full-screen at a time — which is correct,
+ * since only one sub-tab is ever mounted/visible. The Full screen button only
+ * appears once a settled result exists, and is hidden while full screen (the
+ * overlay's Exit control takes over).
+ */
+function MsResultsFullscreenCard({
+  fullscreenKey,
+  activeKey,
+  setActiveKey,
+  ready,
+  eyebrow,
+  fullscreenLabel,
+  title,
+  description,
+  tag,
+  children,
+}: {
+  fullscreenKey: string
+  activeKey: string | null
+  setActiveKey: (key: string | null) => void
+  ready: boolean
+  eyebrow: string
+  fullscreenLabel: string
+  title: string
+  description: string
+  tag?: string
+  children: ReactNode
+}) {
+  const open = activeKey === fullscreenKey && ready
+  return (
+    <SpectrumResultsFullscreen
+      open={open}
+      onClose={() => setActiveKey(null)}
+      eyebrow={`Full screen · ${fullscreenLabel}`}
+      title={title}
+      tag={tag}
+      testId={`ms-${fullscreenKey}-fullscreen-view`}
+    >
+      <ModuleCard
+        accent="teal"
+        eyebrow={eyebrow}
+        title={title}
+        icon={BarChart3}
+        description={description}
+        className="min-w-0"
+      >
+        {/* Full screen entry point — only once a settled result exists. Hidden
+            while full screen (use the overlay's Exit control instead). */}
+        {ready && !open ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setActiveKey(fullscreenKey)}
+              className="gap-1.5"
+              data-testid={`ms-${fullscreenKey}-open-fullscreen`}
+              aria-haspopup="dialog"
+              title="View these results on the entire screen"
+            >
+              <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+              Full screen
+            </Button>
+          </div>
+        ) : null}
+        {children}
+      </ModuleCard>
+    </SpectrumResultsFullscreen>
+  )
+}
+
 export function SpectraCheckMsEvidence({
   sampleId,
   candidatesText,
@@ -1747,6 +1823,10 @@ export function SpectraCheckMsEvidence({
   function appendCompoundClass(fd: FormData) {
     if (compoundClassParam) fd.append("compound_class", compoundClassParam)
   }
+
+  // Which analyzer's results are currently shown full screen (one at a time —
+  // only one sub-tab is ever visible). `null` ⇒ everything inline.
+  const [msFullscreenKey, setMsFullscreenKey] = useState<string | null>(null)
 
   const [hrmsObservedMz, setHrmsObservedMz] = useState("47.04914")
   const [hrmsAdduct, setHrmsAdduct] = useState<string>("[M+H]+")
@@ -2749,13 +2829,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(hrmsMatchResult != null || hrmsMatchLoading || hrmsMatchError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="hrms"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!hrmsMatchLoading && hrmsMatchResult != null}
               eyebrow="HRMS · Step 3 · Results"
+              fullscreenLabel="HRMS"
               title="HRMS candidate match output"
-              icon={BarChart3}
               description="Per-candidate exact-mass evidence + detail tables from /ms/hrms/candidates/match/evidence."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -2778,7 +2861,7 @@ export function SpectraCheckMsEvidence({
                   <HrmsMatchDetailTables result={hrmsMatchResult} />
                 )}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -2897,13 +2980,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(formulaResult != null || formulaLoading || formulaError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="formula"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!formulaLoading && formulaResult != null}
               eyebrow="Formula · Step 3 · Results"
+              fullscreenLabel="Formula"
               title="Formula search output"
-              icon={BarChart3}
               description="Candidate formulas + detail tables from /ms/hrms/formulas/search."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -2924,7 +3010,7 @@ export function SpectraCheckMsEvidence({
                 />
                 {!formulaLoading && formulaResult != null && <FormulaSearchDetailTables result={formulaResult} />}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -3116,13 +3202,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(adductResult != null || adductLoading || adductError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="adduct"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!adductLoading && adductResult != null}
               eyebrow="Adduct · Step 3 · Results"
+              fullscreenLabel="Adduct"
               title="Adduct + isotope inference output"
-              icon={BarChart3}
               description="Per-adduct hypotheses, charge state, halogen signature, and detail tables from /ms/adducts/infer/evidence."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -3143,7 +3232,7 @@ export function SpectraCheckMsEvidence({
                 />
                 {!adductLoading && adductResult != null && <AdductInferenceDetailTables result={adductResult} />}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -3317,13 +3406,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(msmsResult != null || msmsLoading || msmsError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="msms"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!msmsLoading && msmsResult != null}
               eyebrow="MS/MS · Step 3 · Results"
+              fullscreenLabel="MS/MS"
               title="MS/MS annotation output"
-              icon={BarChart3}
               description="Per-fragment annotations + detail tables from /ms/msms/annotate/evidence."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -3344,7 +3436,7 @@ export function SpectraCheckMsEvidence({
                 />
                 {!msmsLoading && msmsResult != null && <MsmsAnnotationDetailTables result={msmsResult} />}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -3492,13 +3584,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(fragResult != null || fragLoading || fragError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="frag-tree"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!fragLoading && fragResult != null}
               eyebrow="Frag Tree · Step 3 · Results"
+              fullscreenLabel="Frag Tree"
               title="Fragmentation tree output"
-              icon={BarChart3}
               description="Tree node detail + diagnostic-loss tables from /ms/msms/fragmentation-tree/evidence."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -3519,7 +3614,7 @@ export function SpectraCheckMsEvidence({
                 />
                 {!fragLoading && fragResult != null && <FragmentationTreeDetailTables result={fragResult} />}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -3697,13 +3792,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(lcmsImportResult != null || lcmsImportLoading || lcmsImportError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="lcms-import"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!lcmsImportLoading && lcmsImportResult != null}
               eyebrow="LC-MS Import · Step 3 · Results"
+              fullscreenLabel="LC-MS Import"
               title="LC-MS import bridge output"
-              icon={BarChart3}
               description="Source hashes, scan summary, MS1/MS2 peak lists from /ms/lcms/import/bridge/upload."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -3726,7 +3824,7 @@ export function SpectraCheckMsEvidence({
                   <LcmsImportBridgeDetailTables result={lcmsImportResult} />
                 )}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -3908,13 +4006,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(lcmsFeatureResult != null || lcmsFeatureLoading || lcmsFeatureError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="lcms-features"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!lcmsFeatureLoading && lcmsFeatureResult != null}
               eyebrow="LC-MS Features · Step 3 · Results"
+              fullscreenLabel="LC-MS Features"
               title="LC-MS feature detection output"
-              icon={BarChart3}
               description="Per-feature evidence + EIC/XIC + purity + detail tables from /ms/lcms/features/detect/upload."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -3937,7 +4038,7 @@ export function SpectraCheckMsEvidence({
                   <LcmsFeatureDetectionDetailTables result={lcmsFeatureResult} />
                 )}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -4093,13 +4194,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(lcmsGrpResult != null || lcmsGrpLoading || lcmsGrpError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="lcms-group"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!lcmsGrpLoading && lcmsGrpResult != null}
               eyebrow="LC-MS Grouping · Step 3 · Results"
+              fullscreenLabel="LC-MS Grouping"
               title="LC-MS grouping output"
-              icon={BarChart3}
               description="Per-group evidence + detail tables from /ms/lcms/features/group/evidence."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -4120,7 +4224,7 @@ export function SpectraCheckMsEvidence({
                 />
                 {!lcmsGrpLoading && lcmsGrpResult != null && <LcmsAdvGroupingDetailTables result={lcmsGrpResult} />}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -4281,13 +4385,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(lcmsConResult != null || lcmsConLoading || lcmsConError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="lcms-consensus"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!lcmsConLoading && lcmsConResult != null}
               eyebrow="LC-MS Consensus · Step 3 · Results"
+              fullscreenLabel="LC-MS Consensus"
               title="Feature-family consensus output"
-              icon={BarChart3}
               description="Per-family confidence + detail tables from /ms/lcms/features/consensus/evidence."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -4308,7 +4415,7 @@ export function SpectraCheckMsEvidence({
                 />
                 {!lcmsConLoading && lcmsConResult != null && <LcmsAdvConsensusDetailTables result={lcmsConResult} />}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -4497,13 +4604,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(lcmsDerResult != null || lcmsDerLoading || lcmsDerError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="lcms-derep"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!lcmsDerLoading && lcmsDerResult != null}
               eyebrow="LC-MS Derep · Step 3 · Results"
+              fullscreenLabel="LC-MS Derep"
               title="LC-MS dereplication output"
-              icon={BarChart3}
               description="Per-candidate ranks + detail tables from /ms/lcms/dereplication/evidence."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -4524,7 +4634,7 @@ export function SpectraCheckMsEvidence({
                 />
                 {!lcmsDerLoading && lcmsDerResult != null && <LcmsAdvDereplicationDetailTables result={lcmsDerResult} />}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
 
@@ -4681,13 +4791,16 @@ export function SpectraCheckMsEvidence({
 
           {/* Step 3 — Results */}
           {(lcmsBridgeResult != null || lcmsBridgeLoading || lcmsBridgeError) && (
-            <ModuleCard
-              accent="teal"
+            <MsResultsFullscreenCard
+              fullscreenKey="lcms-bridge"
+              activeKey={msFullscreenKey}
+              setActiveKey={setMsFullscreenKey}
+              ready={!lcmsBridgeLoading && lcmsBridgeResult != null}
               eyebrow="LC-MS Bridge · Step 3 · Results"
+              fullscreenLabel="LC-MS Bridge"
               title="LC-MS confidence bridge output"
-              icon={BarChart3}
               description="Per-candidate consensus anchors + detail tables from /confidence/candidates/lcms-consensus-bridge."
-              className="min-w-0"
+              tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
                 <TabResultSection
@@ -4708,7 +4821,7 @@ export function SpectraCheckMsEvidence({
                 />
                 {!lcmsBridgeLoading && lcmsBridgeResult != null && <LcmsAdvBridgeDetailTables result={lcmsBridgeResult} />}
               </div>
-            </ModuleCard>
+            </MsResultsFullscreenCard>
           )}
         </TabsContent>
       </Tabs>
