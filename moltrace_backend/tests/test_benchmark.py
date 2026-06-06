@@ -62,7 +62,7 @@ class TestEvaluateCase:
 
     def test_explainability_is_perfect_when_all_peaks_have_reasoning(self) -> None:
         result = evaluate_case(ETHANOL_CASE)
-        explain = next(l for l in result.layers if l.name == "explainability")
+        explain = next(layer for layer in result.layers if layer.name == "explainability")
         # The categorization module fills category/region/reason on every
         # parseable peak, so this should be 1.0.
         assert explain.score == 1.0
@@ -70,7 +70,7 @@ class TestEvaluateCase:
 
     def test_regulatory_evidence_perfect_when_all_provenance_present(self) -> None:
         result = evaluate_case(ETHANOL_CASE)
-        reg = next(l for l in result.layers if l.name == "regulatory_evidence")
+        reg = next(layer for layer in result.layers if layer.name == "regulatory_evidence")
         assert reg.score == 1.0
         components = reg.components
         assert components["has_sample_id"] is True
@@ -87,7 +87,7 @@ class TestEvaluateCase:
             observed_nmr_text=ETHANOL_CASE.observed_nmr_text,
         )
         result = evaluate_case(bare_case)
-        reg = next(l for l in result.layers if l.name == "regulatory_evidence")
+        reg = next(layer for layer in result.layers if layer.name == "regulatory_evidence")
         # Provenance is missing for sample_id / sha256 / operator+instrument — only
         # the peak reasoning trace contributes (0.25).
         assert reg.score == 0.25
@@ -96,7 +96,7 @@ class TestEvaluateCase:
 
     def test_structural_ranking_is_top1_when_true_smiles_is_first(self) -> None:
         result = evaluate_case(ETHANOL_CASE)
-        ranking = next(l for l in result.layers if l.name == "structural_ranking")
+        ranking = next(layer for layer in result.layers if layer.name == "structural_ranking")
         assert ranking.score == 1.0
         assert ranking.components["rank_of_true_structure"] == 1
 
@@ -105,7 +105,7 @@ class TestEvaluateCase:
             update={"candidate_block": "Methanol | CO\nEthanol | CCO\nPropanol | CCCO"}
         )
         result = evaluate_case(case)
-        ranking = next(l for l in result.layers if l.name == "structural_ranking")
+        ranking = next(layer for layer in result.layers if layer.name == "structural_ranking")
         # When the true SMILES is in candidates but not necessarily rank 1, the
         # score should be at most the top-3 reward (0.7).
         assert ranking.score <= 1.0
@@ -122,7 +122,7 @@ class TestEvaluateCase:
 
     def test_robustness_drops_when_top_peak_removed(self) -> None:
         result = evaluate_case(ETHANOL_CASE, robustness_drop_peaks=1)
-        robust = next(l for l in result.layers if l.name == "robustness")
+        robust = next(layer for layer in result.layers if layer.name == "robustness")
         assert 0.0 <= robust.score <= 1.0
         components = robust.components
         assert components["drop_peaks"] == 1

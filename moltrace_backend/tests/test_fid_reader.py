@@ -13,7 +13,6 @@ from moltrace.spectroscopy.io.fid_reader import NMRSpectrum, read_fid
 ng = pytest.importorskip("nmrglue")
 from nmrglue.fileio.varian import create_pdic_param  # noqa: E402
 
-
 REFERENCE_1H_PEAKS = ((3.65, 1.0), (1.26, 0.65), (2.10, 0.30))
 REFERENCE_13C_PEAKS = ((77.10, 1.0), (120.40, 0.85), (39.50, 0.55))
 

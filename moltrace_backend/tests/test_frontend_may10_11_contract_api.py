@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 from nmrcheck.api import create_app
 from nmrcheck.settings import Settings
 
-
 REQUIRED_FRONTEND_CONTRACT_OPERATIONS = {
     "/system/health": {"get"},
     "/system/status": {"get"},

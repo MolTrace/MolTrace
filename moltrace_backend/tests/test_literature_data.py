@@ -5,21 +5,21 @@ from __future__ import annotations
 import pytest
 
 from nmrcheck.literature_data import (
-    DP4_NU_13C,
     DP4_NU_1H,
-    DP4_SIGMA_13C,
+    DP4_NU_13C,
     DP4_SIGMA_1H,
-    HSQC_TOL_13C_PPM,
+    DP4_SIGMA_13C,
     HSQC_TOL_1H_PPM,
+    HSQC_TOL_13C_PPM,
     LABILE_1H_WINDOWS,
-    PROTON_GROUP_WINDOWS_1H,
-    PREDICTOR_RMSE_13C_PPM,
     PREDICTOR_RMSE_1H_PPM,
+    PREDICTOR_RMSE_13C_PPM,
+    PROTON_GROUP_WINDOWS_1H,
     REFERENCES,
-    TOL_13C_LOOSE_PPM,
-    TOL_13C_STRICT_PPM,
     TOL_1H_LOOSE_PPM,
     TOL_1H_STRICT_PPM,
+    TOL_13C_LOOSE_PPM,
+    TOL_13C_STRICT_PPM,
     dp4_nu,
     dp4_sigma,
     predictor_rmse,
@@ -74,10 +74,10 @@ class TestFunctionalGroupWindows:
 
     def test_labile_windows_present(self) -> None:
         labels = [label for _, _, label in LABILE_1H_WINDOWS]
-        assert any("amide" in l for l in labels)
-        assert any("alcohol" in l for l in labels)
-        assert any("carboxylic acid" in l for l in labels)
-        assert any("thiol" in l for l in labels)
+        assert any("amide" in label for label in labels)
+        assert any("alcohol" in label for label in labels)
+        assert any("carboxylic acid" in label for label in labels)
+        assert any("thiol" in label for label in labels)
 
 
 class TestReferenceRegistry:
@@ -128,11 +128,11 @@ class TestReferenceRegistry:
 class TestBrukerDefaults:
     def test_bruker_lb_defaults_match_claridge(self) -> None:
         from nmrcheck.literature_data import (
+            BRUKER_LB_1H_HZ,
+            BRUKER_LB_1H_RANGE,
             BRUKER_LB_13C_HZ,
             BRUKER_LB_13C_RANGE,
             BRUKER_LB_19F_HZ,
-            BRUKER_LB_1H_HZ,
-            BRUKER_LB_1H_RANGE,
             MATCHED_FILTER_LINE_WIDTH_FRACTION,
         )
 

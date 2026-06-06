@@ -27,7 +27,6 @@ from nmrcheck.api import (
 )
 from nmrcheck.settings import Settings
 
-
 # ---------------------------------------------------------------------------
 # Unit tests against the pure helper.
 # ---------------------------------------------------------------------------

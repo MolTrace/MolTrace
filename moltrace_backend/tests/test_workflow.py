@@ -23,10 +23,18 @@ from nmrcheck.api import (
     spectrum_analyze,
     spectrum_preview,
     submit_job,
+)
+from nmrcheck.api import (
     validate as validate_endpoint,
 )
 from nmrcheck.database import init_db
-from nmrcheck.models import AnalysisInputs, BatchAnalysisInputs, ReviewDecisionCreate, UserCreate, UserLogin
+from nmrcheck.models import (
+    AnalysisInputs,
+    BatchAnalysisInputs,
+    ReviewDecisionCreate,
+    UserCreate,
+    UserLogin,
+)
 from nmrcheck.settings import Settings
 
 TOBRAMYCIN_SMILES = "O[C@@]1([H])[C@]([C@@H](O)[C@@H](O[C@@]([C@]2(O)[H])([H])[C@@H](C([H])[C@H](N)[C@H]2O[C@@H](O[C@]([C@@]3([H])O)([H])CN)[C@@H](C3([H])[H])N)N)O[C@@H]1CO)([H])N"

@@ -3,21 +3,22 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-
-from nmrcheck.baseline import apply_bernstein_baseline_correction
-from nmrcheck.fid import _auto_phase_spectrum, apply_phase
-
 from test_current_state_guard import (
     CARBON13_ANALYZE_KEYS,
     FID_PROCESS_KEYS,
     PROTON_EVIDENCE_KEYS,
     SPECTRUM_PREVIEW_KEYS,
-    FIXTURES as STATE_FIXTURES,
     _client,
     _fid_form,
     _load_json,
     _synthetic_bruker_zip,
 )
+from test_current_state_guard import (
+    FIXTURES as STATE_FIXTURES,
+)
+
+from nmrcheck.baseline import apply_bernstein_baseline_correction
+from nmrcheck.fid import _auto_phase_spectrum, apply_phase
 
 NMR2D_FIXTURES = Path(__file__).parent / "fixtures" / "nmr2d"
 

@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 from nmrcheck.api import create_app
 from nmrcheck.settings import Settings
 
-
 PRODUCT_ORDER = ["SpectraCheck", "Regulatory Hub", "Reaction Optimization"]
 
 

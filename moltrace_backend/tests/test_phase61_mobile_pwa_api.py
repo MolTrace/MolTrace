@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 from nmrcheck.api import create_app
 from nmrcheck.settings import Settings
 
-
 DEFAULT_PROGRAM_ORDER = ["spectracheck", "regulatory_hub", "reaction_optimization"]
 REQUIRED_MOBILE_PATHS = [
     "/mobile/config",

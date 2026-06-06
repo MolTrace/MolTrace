@@ -49,9 +49,19 @@ packages = ["src/nmrcheck", "src/moltrace"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Vendored sample datasets (e.g. nmrglue's Python-2 example scripts) are not
+# our source and must not be linted.
+extend-exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+# Test modules embed long literal data -- reference NMR/MS strings, deep JSON
+# response assertions, and parametrize tables -- where the 100-column limit
+# hurts readability more than it helps. Line-length is relaxed for tests only;
+# src/ remains strictly enforced.
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"
