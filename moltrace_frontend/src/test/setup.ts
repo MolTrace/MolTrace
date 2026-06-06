@@ -9,6 +9,13 @@ class ResizeObserverStub {
 globalThis.ResizeObserver =
   globalThis.ResizeObserver ?? (ResizeObserverStub as unknown as typeof ResizeObserver)
 
+// jsdom does not implement Element.prototype.scrollTo; some scroll-snap
+// components (e.g. the spectrum carousel) call it from mount effects. Stub a
+// no-op so those components can mount under test without throwing.
+if (typeof Element !== "undefined" && typeof Element.prototype.scrollTo !== "function") {
+  Element.prototype.scrollTo = function scrollTo() {}
+}
+
 // Several responsive client components read matchMedia in effects; jsdom
 // does not provide it by default.
 if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
