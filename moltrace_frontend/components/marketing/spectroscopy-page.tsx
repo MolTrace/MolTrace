@@ -658,7 +658,7 @@ export function SpectroscopyPage() {
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 We ship a stable, evidence-pipeline legacy detector as the default. The experimental
-                GSD-Prompt-3 backend (Mestrenova-style peak detection with auto-classification)
+                GSD-Prompt-3 backend (industry-standard peak detection with auto-classification)
                 ships as opt-in until it clears a published validation gate. Both return the same{" "}
                 <code className="font-mono text-foreground">{`{ peaks, environments, category_counts }`}</code>{" "}
                 envelope so consumer code is detector-agnostic.

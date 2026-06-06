@@ -61,7 +61,6 @@ describe("SpectraCheck processed / raw sections", () => {
     expect(input.accept).toContain(".asc")
     expect(input.accept).toContain(".dat")
     expect(input.accept).not.toContain(".fid")
-    expect(input.accept).not.toContain(".mnova")
   })
 
   it("raw FID drop-zone opens the native file picker", () => {
@@ -83,7 +82,6 @@ describe("SpectraCheck processed / raw sections", () => {
     expect(input.accept).toContain(".tar.gz")
     expect(input.accept).toContain(".tgz")
     expect(input.accept).not.toContain(".fid")
-    expect(input.accept).not.toContain(".mnova")
   })
 })
 

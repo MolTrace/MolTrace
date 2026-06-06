@@ -322,7 +322,7 @@ export function canonicalizeSolvent(
 }
 
 export const GSD_EXPERIMENTAL_TOOLTIP =
-  "Mestrenova-style GSD with auto-classification. Validation baseline (20-fixture NMRShiftDB2 corpus): 94.4% solvent detect, median compound count delta 3. Promotion to default-on awaits clearing the 95% solvent / median ≤2 gate."
+  "Global Spectral Deconvolution with auto-classification (industry-standard peak detection). Validation baseline (20-fixture NMRShiftDB2 corpus): 94.4% solvent detect, median compound count delta 3. Promotion to default-on awaits clearing the 95% solvent / median ≤2 gate."
 
 export const GSD_CATEGORY_STYLES: Record<GSDPromptPeak["category"], { label: string; chip: string; dot: string }> = {
   compound: { label: "Compound", chip: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900", dot: "bg-emerald-500" },
