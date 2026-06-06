@@ -474,7 +474,7 @@ export function IntegrationsPage() {
                   </Button>
                   <Button asChild size="lg" variant="outline" className="gap-2">
                     <Link
-                      href="https://moltrace-docs.vercel.app/guides/integrations/lims/"
+                      href="https://docs.moltrace.co/guides/integrations/lims/"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -1091,7 +1091,7 @@ export function IntegrationsPage() {
                 </Button>
                 <Button asChild size="lg" variant="outline" className="gap-2">
                   <Link
-                    href="https://moltrace-docs.vercel.app/guides/integrations/lims/"
+                    href="https://docs.moltrace.co/guides/integrations/lims/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

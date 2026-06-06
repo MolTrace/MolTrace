@@ -63,7 +63,7 @@ describe("Marketing Footer", () => {
   it("wires every footer link to its specific docs page (and opens in a new tab)", () => {
     // Every footer item across all four sections (Platform, Company,
     // Resources, Legal) must land on its dedicated MolTrace docs URL —
-    // the docs site (https://moltrace-docs.vercel.app/) is the canonical
+    // the docs site (https://docs.moltrace.co/) is the canonical
     // discovery surface for these pages, so the mapping has to be exact,
     // not approximate. Category items without an index page (Integrations,
     // Case Studies, Webinars) and stand-ins for not-yet-built pages (Blog)
@@ -88,21 +88,21 @@ describe("Marketing Footer", () => {
       ["Blog", "/blog"],
       ["Contact", "/contact"],
       // ── Resources ───────────────────────────────────────────────────
-      ["Documentation", "https://moltrace-docs.vercel.app/"],
-      ["API Reference", "https://moltrace-docs.vercel.app/guides/api/"],
+      ["Documentation", "https://docs.moltrace.co/"],
+      ["API Reference", "https://docs.moltrace.co/guides/api/"],
       [
         "Case Studies",
-        "https://moltrace-docs.vercel.app/guides/resources/case-study-pharma/",
+        "https://docs.moltrace.co/guides/resources/case-study-pharma/",
       ],
       [
         "Webinars",
-        "https://moltrace-docs.vercel.app/guides/resources/webinar-getting-started/",
+        "https://docs.moltrace.co/guides/resources/webinar-getting-started/",
       ],
       // ── Legal ───────────────────────────────────────────────────────
-      ["Privacy", "https://moltrace-docs.vercel.app/guides/legal/privacy-policy/"],
-      ["Terms", "https://moltrace-docs.vercel.app/guides/legal/terms-of-service/"],
-      ["Security", "https://moltrace-docs.vercel.app/guides/legal/security-policy/"],
-      ["Compliance", "https://moltrace-docs.vercel.app/guides/legal/compliance/"],
+      ["Privacy", "https://docs.moltrace.co/guides/legal/privacy-policy/"],
+      ["Terms", "https://docs.moltrace.co/guides/legal/terms-of-service/"],
+      ["Security", "https://docs.moltrace.co/guides/legal/security-policy/"],
+      ["Compliance", "https://docs.moltrace.co/guides/legal/compliance/"],
     ]
     render(<Footer />)
     for (const [label, expected] of expectedDestinations) {

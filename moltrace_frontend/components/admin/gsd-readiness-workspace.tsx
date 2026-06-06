@@ -71,7 +71,7 @@ export function GsdReadinessWorkspace() {
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline" size="sm" className="gap-1.5">
             <Link
-              href="https://moltrace-docs.vercel.app/guides/resources/white-papers/"
+              href="https://docs.moltrace.co/guides/resources/white-papers/"
               target="_blank"
               rel="noopener noreferrer"
             >

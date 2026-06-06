@@ -980,7 +980,7 @@ function ReadyToFlip({
                 </Button>
                 <Button asChild variant="outline" size="lg" className="gap-2">
                   <Link
-                    href="https://moltrace-docs.vercel.app/guides/resources/white-papers/"
+                    href="https://docs.moltrace.co/guides/resources/white-papers/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -1023,7 +1023,7 @@ function UserGraduationForm({
         </Button>
         <Button asChild variant="outline" size="lg" className="gap-2">
           <Link
-            href="https://moltrace-docs.vercel.app/guides/resources/white-papers/"
+            href="https://docs.moltrace.co/guides/resources/white-papers/"
             target="_blank"
             rel="noopener noreferrer"
           >

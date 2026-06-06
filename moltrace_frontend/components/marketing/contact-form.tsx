@@ -275,7 +275,7 @@ export function ContactForm() {
           I agree to MolTrace contacting me about my inquiry. We never share your information with
           third parties. See our{" "}
           <a
-            href="https://moltrace-docs.vercel.app/guides/legal/privacy-policy/"
+            href="https://docs.moltrace.co/guides/legal/privacy-policy/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-foreground underline-offset-4 hover:underline"

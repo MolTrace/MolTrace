@@ -845,7 +845,7 @@ export function AcademicResearchPage() {
                 />
               </Link>
               <Link
-                href="https://moltrace-docs.vercel.app/guides/quickstart/"
+                href="https://docs.moltrace.co/guides/quickstart/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-center justify-between gap-4 rounded-2xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
@@ -948,7 +948,7 @@ export function AcademicResearchPage() {
                 </Button>
                 <Button asChild size="lg" variant="ghost" className="gap-2">
                   <Link
-                    href="https://moltrace-docs.vercel.app/guides/quickstart/"
+                    href="https://docs.moltrace.co/guides/quickstart/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

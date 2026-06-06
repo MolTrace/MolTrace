@@ -965,7 +965,7 @@ export function PharmaRdPage() {
                 </Button>
                 <Button asChild size="lg" variant="ghost" className="gap-2">
                   <Link
-                    href="https://moltrace-docs.vercel.app/guides/quickstart/"
+                    href="https://docs.moltrace.co/guides/quickstart/"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

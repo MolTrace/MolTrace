@@ -261,7 +261,7 @@ export function ContactPage() {
                 <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
                   We never share contact-form data with third parties. See our{" "}
                   <Link
-                    href="https://moltrace-docs.vercel.app/guides/legal/privacy-policy/"
+                    href="https://docs.moltrace.co/guides/legal/privacy-policy/"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-foreground underline-offset-4 hover:underline"
@@ -284,7 +284,7 @@ export function ContactPage() {
                   <li className="flex items-center gap-2.5">
                     <Briefcase className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <Link
-                      href="https://moltrace-docs.vercel.app/guides/company/careers/"
+                      href="https://docs.moltrace.co/guides/company/careers/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-foreground transition-colors hover:text-[color:var(--mt-teal)]"
@@ -295,7 +295,7 @@ export function ContactPage() {
                   <li className="flex items-center gap-2.5">
                     <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <Link
-                      href="https://moltrace-docs.vercel.app/guides/company/about/"
+                      href="https://docs.moltrace.co/guides/company/about/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-foreground transition-colors hover:text-[color:var(--mt-teal)]"
@@ -306,7 +306,7 @@ export function ContactPage() {
                   <li className="flex items-center gap-2.5">
                     <Globe2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <Link
-                      href="https://moltrace-docs.vercel.app/"
+                      href="https://docs.moltrace.co/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-foreground transition-colors hover:text-[color:var(--mt-teal)]"
