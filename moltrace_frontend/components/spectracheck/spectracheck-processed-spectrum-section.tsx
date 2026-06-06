@@ -26,7 +26,7 @@ import {
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
-import { ProcessedSpectrumFullscreenView } from "@/components/spectracheck/spectracheck-processed-fullscreen-view"
+import { SpectrumResultsFullscreen } from "@/components/spectracheck/spectracheck-fullscreen-results"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
   extractNotes,
@@ -1214,6 +1214,19 @@ export function SpectraCheckProcessedSpectrumSection({
         </div>
       </ModuleCard>
 
+      {/* In-place full-screen view of the ENTIRE results region (spectrum +
+          every analysis panel below). The same live subtree renders inline
+          when closed and full-screen when open — nothing is duplicated, so no
+          panel re-fetches and the spectrum keeps its exact shape/state. */}
+      <SpectrumResultsFullscreen
+        open={fullscreenOpen}
+        onClose={() => setFullscreenOpen(false)}
+        eyebrow={`Full screen · Processed ${nucleus}`}
+        title={resultTitle}
+        subtitle={selectedFileName ?? payloadFilename(displayPayload) ?? undefined}
+        tag={sampleId.trim() || undefined}
+        testId="processed-fullscreen-view"
+      >
       {/* ── Step 3 — Results ──────────────────────────────────────────── */}
       {/*
         Show the Step-3 surface as soon as a foreground run starts, even on
@@ -1355,20 +1368,22 @@ export function SpectraCheckProcessedSpectrumSection({
               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 Spectrum
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setFullscreenOpen(true)}
-                disabled={!xy}
-                className="gap-1.5"
-                data-testid="processed-open-fullscreen"
-                aria-haspopup="dialog"
-                title="View the spectrum and analysis tables on the entire screen"
-              >
-                <Maximize2 className="h-3.5 w-3.5" aria-hidden />
-                Full screen
-              </Button>
+              {!fullscreenOpen ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFullscreenOpen(true)}
+                  disabled={!xy}
+                  className="gap-1.5"
+                  data-testid="processed-open-fullscreen"
+                  aria-haspopup="dialog"
+                  title="View the spectrum and analysis tables on the entire screen"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+                  Full screen
+                </Button>
+              ) : null}
             </div>
             <div className="min-w-0">
               {xy ? (
@@ -1623,36 +1638,7 @@ export function SpectraCheckProcessedSpectrumSection({
         candidatesText={candidatesOptional.trim() || candidatesText}
         testId="processed-spectrum-retrieve-surface"
       />
-
-      {/* Full-screen, in-app view of the spectrum + analysis tables. Portals to
-          document.body so the app-shell width never constrains it. Reuses the
-          same SpectrumViewer + result panels and the already-computed display
-          data — opening it cannot alter the spectrum, results, or tables. */}
-      <ProcessedSpectrumFullscreenView
-        open={fullscreenOpen}
-        onClose={() => setFullscreenOpen(false)}
-        nucleus={nucleus}
-        xy={xy}
-        peaks={peaks}
-        overlays={overlays}
-        displayPayload={displayPayload}
-        peakCount={peakCount}
-        score={score}
-        warnings={warnings}
-        notes={notes}
-        loading={foregroundActionLoading}
-        title={resultTitle}
-        payloadMode={payloadMode}
-        sampleId={sampleId.trim() || undefined}
-        fileName={selectedFileName ?? payloadFilename(displayPayload)}
-        unifiedEvidenceMeta={{
-          layer: nucleus === "1H" ? "processed_1h" : "processed_13c",
-          sourceTab: "Processed 1H / 13C upload",
-          title: payloadMode === "analyze" ? "Processed spectrum analyze" : "Processed spectrum preview",
-          endpoint: payloadMode === "analyze" ? "/nmr/processed/analyze" : "/nmr/processed/preview",
-          sampleId: sampleId.trim() || undefined,
-        }}
-      />
+      </SpectrumResultsFullscreen>
     </div>
   )
 }
