@@ -358,7 +358,7 @@ export function CroAnalyticalPage() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-6 lg:px-8 lg:py-24">
             <div className="grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:items-center">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge
                     variant="outline"
                     className="border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300"
@@ -739,7 +739,7 @@ export function CroAnalyticalPage() {
                 provenance.
               </p>
             </div>
-            <div className="mt-12 overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <div className="mt-12 overflow-x-auto rounded-2xl border bg-card shadow-sm">
               <table className="w-full text-left text-sm">
                 <thead className="bg-muted/40 font-mono uppercase tracking-[0.12em] text-[10px] text-muted-foreground">
                   <tr>

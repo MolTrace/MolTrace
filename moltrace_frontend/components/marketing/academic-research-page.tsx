@@ -358,7 +358,7 @@ export function AcademicResearchPage() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-6 lg:px-8 lg:py-24">
             <div className="grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:items-center">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge
                     variant="outline"
                     className="border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
@@ -714,7 +714,7 @@ export function AcademicResearchPage() {
                 — travels with the result.
               </p>
             </div>
-            <div className="mt-12 overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <div className="mt-12 overflow-x-auto rounded-2xl border bg-card shadow-sm">
               <table className="w-full text-left text-sm">
                 <thead className="bg-muted/40 font-mono uppercase tracking-[0.12em] text-[10px] text-muted-foreground">
                   <tr>
