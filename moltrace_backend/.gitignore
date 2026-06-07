@@ -51,6 +51,14 @@ hose_kb*.json
 moltrace_nmrnet_cache/
 moltrace_jtfnet_cache/
 
+# LoRA domain-adapter weights (Prompt 15 fine-tuning pipeline). Adapters are
+# trained on reviewer-validated in-house spectra and cached out of git (default
+# ~/.cache/moltrace/lora/, overridable via $MOLTRACE_LORA_CACHE). The registry
+# (Prompt 13) tracks only their SHA-256 + lineage -- NEVER the weight blobs.
+*.safetensors
+adapter_model.bin
+adapter_config.json
+moltrace_lora_cache/
 # FAISS spectrum-similarity indices + embeddings DERIVED from NMRShiftDB2 are
 # CC-BY-SA derivatives (ShareAlike -- see NOTICE); NEVER commit them. Build
 # locally with scripts/build_similarity_index.py.
