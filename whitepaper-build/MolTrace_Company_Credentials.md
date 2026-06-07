@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Company Credentials"
 subtitle: "Partner / Customer Logo Bar · About MolTrace · Trust Seals · Press"
-version: "2026-Q2"
+version: "2026-06-06"
 audience: "Procurement, due-diligence reviewers, partnership leads, press"
 length: "Drop-in front-matter block for white papers, decks, and gated downloads"
 ---
@@ -85,6 +85,7 @@ MolTrace was founded to build **one platform** where the layers know about each 
 2. **Human-in-the-loop, never autonomous.** AI accelerates; humans decide.
 3. **Open-science under the hood.** RDKit, nmrglue, mzML, FastAPI — no proprietary file-format lock-in.
 4. **Multi-modal by default.** NMR + LC-MS + HRMS + MS/MS are one evidence stack, not separate apps.
+5. **Reproducible by construction.** Datasets and model runs are versioned by content hash; every analysis carries a content-hashed output contract that a continuous-integration determinism gate proves regenerates byte-for-byte.
 
 ### Leadership
 
@@ -121,6 +122,7 @@ MolTrace was founded to build **one platform** where the layers know about each 
 | Authentication | Tenant-aware JWT + role-based access |
 | Hosting | Vercel (frontend) · Render / Railway (backend) · S3-compatible raw vault |
 | Observability | Audit-event ledger · request-trace IDs · per-tenant dashboards |
+| Reproducibility & MLOps | Content-addressed dataset versioning · experiment / run tracking (params, metrics, dataset-version tag, git SHA, model checksum) · fail-loud data-validation gates (optional DVC · MLflow · Great Expectations) |
 
 ### Open-source contributions
 
@@ -135,7 +137,8 @@ MolTrace's posture is *build on open science where it exists, contribute back wh
 ### Compliance & audit posture
 
 - **SOC 2 Type II** — independent audit on a 12-month cycle (auditor: [Auditor Name])
-- **ICH Q2(R2)** — analytical-procedures validation aligned, including the audit-event ledger, immutable raw vault, and ALCOA+ data-integrity primitives
+- **ICH Q2(R2)** — analytical-procedures validation aligned, including the audit-event ledger, immutable raw vault, and ALCOA+ data-integrity primitives; the platform also generates a deterministic, content-hash-keyed ICH Q2(R2) report stub per analysis
+- **GAMP 5 (Appendix D11)** — the platform generates a versioned, byte-reproducible Computerised System Validation document skeleton (intended use, GxP-risk class, requirements-traceability matrix, IQ/OQ/PQ evidence slots) to accelerate customer CSV; the overall compliance determination remains the regulated user's responsibility
 - **GDPR** — tenant-private data segregation, right-to-erasure tooling, EU-region data residency
 - **GxP Validated** — Computer System Validation (CSV) documentation available under NDA
 - **HIPAA-aligned (US)** — for tenants handling protected health information

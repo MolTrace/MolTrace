@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — AI-Native Scientific Intelligence for Pharmaceutical R&D"
 subtitle: "Sales-Led Variant · The Business Case for Audit-Ready Analytical Chemistry"
-version: "2026-05-28p"
+version: "2026-06-06"
 audience: "Pharma R&D directors, regulatory affairs leads, CRO commercial teams, analytical operations heads"
 length: "≈4,000 words · Hybrid white paper · Sales-led variant of the canonical hybrid white paper"
 ---
@@ -115,7 +115,11 @@ MolTrace's regulatory posture is anchored in three external frameworks and reinf
 
 **EMA Reflection Paper on AI.** Reproducibility, human-in-the-loop, version control — all satisfied through MolTrace's human-review release gate, immutable raw archive, and versioned report records.
 
-**ICH Q2(R2) Validation of Analytical Procedures.** Expanded data-integrity acceptance criteria map onto MolTrace's `audit_events` ledger, immutable raw vault, recipe-hash-linked processing runs, and ALCOA+ data-integrity primitives.
+**ICH Q2(R2) Validation of Analytical Procedures.** Expanded data-integrity acceptance criteria map onto MolTrace's `audit_events` ledger, immutable raw vault, recipe-hash-linked processing runs, and ALCOA+ data-integrity primitives. Each analysis also produces a deterministic ICH Q2(R2) report stub — keyed to the analysis's content hash — as the evidence handoff to the Regulatory Intelligence Hub.
+
+**GAMP 5 (Appendix D11) validation acceleration.** For teams running a risk-based Computerised System Validation, MolTrace generates a versioned, byte-reproducible GAMP 5 Appendix D11 CSV document skeleton (intended use, GxP-risk class, requirements-traceability matrix, IQ/OQ/PQ evidence slots). It accelerates the customer's validation; the overall compliance determination stays with the regulated user.
+
+**Reproducible by construction.** Datasets and model runs are versioned by content hash, every result carries its dataset-version tag and git commit, and a continuous-integration determinism gate proves the full pipeline regenerates byte-identical output — the technical backbone of the > 98 % reproducibility figure in §6.
 
 **Operational compliance posture.** SOC 2 Type II · ICH Compliant · GDPR Ready · GxP Validated.
 
