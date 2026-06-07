@@ -14,6 +14,56 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.13.0 — Phase 3 public-datasets pipeline: ingestion, versioning & frozen splits (Prompt 20) (2026-06-07)
+
+**Headline:** Adds `moltrace.spectroscopy.data.datasets_pipeline` — a licence-aware
+ingestion + normalization + validation pipeline that turns the canonical public
+scientific datasets into a deduplicated, version-pinned corpus with **frozen,
+seeded train/val/test splits** whose **test** set is the sacred Prompt 17 holdout:
+experimental-only, checksummed, and hash-excluded from any Prompt 15 training
+snapshot. Pure backend library — no API/UI/contract change.
+
+### Added
+- **Source registry + licences** — `SOURCES` for NMRShiftDB2 (CC-BY-SA,
+  share-alike), HMDB, BMRB, MassBank EU, GNPS, METLIN, QM9-NMR (**computed**),
+  2DNMRGym, and AIST SDBS. Non-redistributable sources (SDBS, METLIN) are flagged
+  `redistributable=False` and are never written into a redistributable corpus.
+- **`ingest(source, version=, records=/loader=, expected_content_hash=)`** — a
+  per-source adapter that pins the upstream version, records the licence +
+  provenance kind, and content-hashes the payload (order-independent). A changed
+  upstream hash raises `UpstreamChangedError` instead of being silently accepted;
+  there is intentionally no built-in silent auto-download.
+- **`normalize(...)`** — RDKit standardised SMILES + InChIKey, deterministic
+  spectral normalization (native; optional matchms for MS peaks), dedup by
+  `(InChIKey, spectral-hash)` within and across sources, and provenance tagging.
+- **`validate(...)`** — the Prompt 19 gate (native always; Great Expectations when
+  the optional `infra` extra is installed): unparseable structures, out-of-range
+  shifts, and missing fields are **quarantined** with reasons, not dropped.
+- **`build_corpus(...)`** — ingest→normalize→validate→**enforce licences**
+  (non-redistributable sources excluded by default).
+- **`freeze_splits(corpus, seed, ratios)`** — deterministic, leakage-free splits
+  (grouped by InChIKey skeleton so a molecule never straddles splits). The test
+  split is experimental-only + checksummed, with its record hashes returned as a
+  hash-exclusion set; computed (QM9) records are train-only and are dropped from
+  training when they share a molecule with the eval set.
+  `assert_training_excludes_holdout(...)` is the guard Prompt 15 must call.
+- **`version_splits(splits, remote, workdir)`** — pin each split into a
+  content-addressed / DVC remote (Prompt 19). No dataset blobs are committed to
+  git; matchms is optional + lazily imported (native fallback), so the corpus
+  hash never depends on it.
+
+### Tests
+- `test_data_datasets_pipeline.py` — version-pin + licence + content-hash
+  (`UpstreamChangedError`); InChIKey dedup (within + cross-source); QM9 computed
+  flag; validation quarantine (structure / ppm-range / field-range); SDBS + METLIN
+  licence exclusion; split determinism, no cross-split leakage, experimental-only
+  holdout, computed-overlap exclusion, checksum + holdout guard; and a
+  `LocalDatasetRemote` versioning round-trip.
+
+Note: matchms is an optional, lazily-imported enhancement (native fallback). It
+is intentionally **not** added to the locked dependency set, so environments
+without a prebuilt scipy wheel are not forced to build a Fortran toolchain.
+
 ## v0.12.0 — Model registry + 5-layer inference router (Prompt 13) (2026-06-07)
 
 **Headline:** Adds `moltrace.spectroscopy.ai` — a versioned, **append-only model
