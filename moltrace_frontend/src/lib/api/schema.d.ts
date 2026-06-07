@@ -1838,6 +1838,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spectrum/reason": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Spectrum Reason
+         * @description Retrieval-augmented structure reasoning over the spectral index (Prompt 14).
+         *
+         *     Encodes the query spectrum (``ppm_axis`` + ``intensity``), retrieves the
+         *     ``top_k`` nearest known spectra from the **server-configured** similarity
+         *     index (``MOLTRACE_SIMILARITY_INDEX``) as precedent, then asks Anthropic Claude
+         *     to propose **retrieval-grounded** candidate structures. Each candidate must
+         *     cite a real retrieved analogue (or structurally match one) — ungrounded
+         *     proposals are dropped by the hallucination guard — and every survivor is
+         *     scored by the Prompt 7 verifier, which is the sole authority on pass/fail; the
+         *     model's self-confidence is advisory and is never used as the verifier prior.
+         *
+         *     Graceful degradation: retrieval runs whenever the index is configured, and
+         *     reasoning runs only when the model backend is available (``anthropic``
+         *     installed + ``ANTHROPIC_API_KEY`` set). With no index the response is
+         *     ``index_available=false``; with no reasoner it is ``reasoner_available=false``
+         *     and returns retrieval only. One ``spectrum.reason`` audit event per call.
+         */
+        post: operations["spectrum_reason_spectrum_reason_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spectrum/solvents/known": {
         parameters: {
             query?: never;
@@ -34575,6 +34610,197 @@ export interface components {
             };
         };
         /**
+         * SpectrumReasonAnalogue
+         * @description One retrieved precedent spectrum that grounds the reasoner.
+         */
+        SpectrumReasonAnalogue: {
+            /** Analogue Id */
+            analogue_id: string;
+            /** Smiles */
+            smiles: string;
+            /** Similarity */
+            similarity: number;
+            /** L2 Distance */
+            l2_distance: number;
+            /** Rank */
+            rank: number;
+            /**
+             * License
+             * @default unknown
+             */
+            license: string;
+            /** Shift Summary */
+            shift_summary?: string | null;
+            /** Multiplet Summary */
+            multiplet_summary?: string | null;
+            /** Source */
+            source?: string | null;
+        };
+        /**
+         * SpectrumReasonAudit
+         * @description Compact Prompt 12 audit summary for the reasoning call.
+         *
+         *     The full system + user prompt and raw completion(s) are captured server-side
+         *     in the library ``RAGAudit`` / audit log; this summary surfaces the
+         *     traceable essentials (model, retrieved ids, retry, counts) to the caller.
+         */
+        SpectrumReasonAudit: {
+            /** Model */
+            model: string;
+            /** Retrieved Ids */
+            retrieved_ids?: string[];
+            /**
+             * Retry Used
+             * @default false
+             */
+            retry_used: boolean;
+            /**
+             * Parsed Candidate Count
+             * @default 0
+             */
+            parsed_candidate_count: number;
+            /**
+             * Dropped Candidate Count
+             * @default 0
+             */
+            dropped_candidate_count: number;
+            /**
+             * Accepted Candidate Count
+             * @default 0
+             */
+            accepted_candidate_count: number;
+        };
+        /**
+         * SpectrumReasonCandidate
+         * @description One proposed structure after the hallucination guard + Prompt 7 verifier.
+         *
+         *     ``self_confidence`` is the model's own advisory estimate; it is **never** used
+         *     as the verifier prior. ``posterior_confidence`` / ``verdict`` / ``accepted``
+         *     come from the verifier and are authoritative. ``dropped_reason`` is set when
+         *     the candidate was rejected before or by verification (e.g.
+         *     ``"hallucination_guard"`` / ``"invalid_smiles"``).
+         */
+        SpectrumReasonCandidate: {
+            /** Smiles */
+            smiles: string;
+            /** Rationale */
+            rationale: string;
+            /** Cited Analogue Ids */
+            cited_analogue_ids?: string[];
+            /** Cited Valid Ids */
+            cited_valid_ids?: string[];
+            /** Self Confidence */
+            self_confidence: number;
+            /**
+             * Retrieval Supported
+             * @default false
+             */
+            retrieval_supported: boolean;
+            /** Posterior Confidence */
+            posterior_confidence?: number | null;
+            /** Verdict */
+            verdict?: string | null;
+            /**
+             * Accepted
+             * @default false
+             */
+            accepted: boolean;
+            /** Dropped Reason */
+            dropped_reason?: string | null;
+        };
+        /**
+         * SpectrumReasonRequest
+         * @description Request body for ``POST /spectrum/reason`` (Prompt 14 RAG reasoner).
+         *
+         *     The query spectrum is sent as paired ``ppm_axis`` + ``intensity`` arrays
+         *     (same shape as ``/spectrum/analyze/gsd``) — a *real* spectrum is required
+         *     because the Prompt 7 verifier scores each proposed structure against it. The
+         *     spectrum is encoded and matched against the server-configured similarity index
+         *     (``MOLTRACE_SIMILARITY_INDEX``) to retrieve precedent, then Anthropic Claude
+         *     proposes retrieval-grounded candidate structures that the verifier arbitrates.
+         */
+        SpectrumReasonRequest: {
+            /** Ppm Axis */
+            ppm_axis: number[];
+            /** Intensity */
+            intensity: number[];
+            /**
+             * Nucleus
+             * @default 1H
+             * @enum {string}
+             */
+            nucleus: "1H" | "13C";
+            /**
+             * Solvent
+             * @default
+             */
+            solvent: string;
+            /**
+             * Field Mhz
+             * @default 500
+             */
+            field_mhz: number;
+            /**
+             * Top K
+             * @default 50
+             */
+            top_k: number;
+            /**
+             * Max Candidates
+             * @default 5
+             */
+            max_candidates: number;
+            /** Allowed Licenses */
+            allowed_licenses?: string[] | null;
+        };
+        /**
+         * SpectrumReasonResult
+         * @description Response from ``POST /spectrum/reason``.
+         *
+         *     Retrieval (``retrieved``) runs whenever the index is configured; reasoning
+         *     (``candidates`` / ``rejected``) runs only when the reasoning model backend is
+         *     available. ``candidates`` are verifier-accepted structures ranked by posterior
+         *     confidence (desc); ``rejected`` carries every guard-dropped / verifier-rejected
+         *     candidate with its reason, for transparency and audit.
+         */
+        SpectrumReasonResult: {
+            /** Query Nucleus */
+            query_nucleus: string;
+            /** Index Available */
+            index_available: boolean;
+            /** Reasoner Available */
+            reasoner_available: boolean;
+            /**
+             * Index Size
+             * @default 0
+             */
+            index_size: number;
+            /**
+             * Top K
+             * @default 0
+             */
+            top_k: number;
+            /**
+             * Max Candidates
+             * @default 0
+             */
+            max_candidates: number;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+            /** Retrieved */
+            retrieved?: components["schemas"]["SpectrumReasonAnalogue"][];
+            /** Candidates */
+            candidates?: components["schemas"]["SpectrumReasonCandidate"][];
+            /** Rejected */
+            rejected?: components["schemas"]["SpectrumReasonCandidate"][];
+            audit?: components["schemas"]["SpectrumReasonAudit"] | null;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /**
          * SpectrumRetrieveHit
          * @description One retrieved reference spectrum (id + L2 distance, lower = more similar).
          */
@@ -42567,6 +42793,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpectrumRetrieveResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spectrum_reason_spectrum_reason_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpectrumReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumReasonResult"];
                 };
             };
             /** @description Validation Error */
