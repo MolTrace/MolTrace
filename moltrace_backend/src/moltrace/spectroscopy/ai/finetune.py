@@ -57,11 +57,14 @@ import importlib
 import os
 import re
 import statistics
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+import numpy as np
+from scipy.optimize import minimize_scalar
 
 from moltrace.spectroscopy.ai.registry import (
     ModelRegistry,
@@ -83,11 +86,27 @@ from moltrace.spectroscopy.eval.harness import (
     evaluate,
 )
 from moltrace.spectroscopy.infra.contract import content_hash
+from moltrace.spectroscopy.infra.eval import expected_calibration_error, f1_score
 from moltrace.spectroscopy.infra.versioning import current_git_sha
+
+if TYPE_CHECKING:
+    from moltrace.spectroscopy.infra.tracking import ExperimentTracker
+    from moltrace.spectroscopy.verification import VerificationResult
 
 __all__ = [
     "DEFAULT_LORA_TARGET_MODULES",
     "DEFAULT_MODAL_GPU_USD_PER_HOUR",
+    "ActiveLearningItem",
+    "ActiveLearningQueue",
+    "CalibratedBundle",
+    "CalibrationHead",
+    "ContradictionExample",
+    "ContradictionFoldMetrics",
+    "ContradictionModel",
+    "ContradictionModelRun",
+    "ContradictionReport",
+    "ContradictionSignal",
+    "CrossModalEvidence",
     "FineTuneError",
     "FineTuneRun",
     "FineTuneUnavailable",
@@ -95,13 +114,26 @@ __all__ = [
     "FoldMetrics",
     "FoldResult",
     "FoldTrainer",
+    "HPOSampler",
+    "HPOSearchSpace",
+    "HPOStudy",
+    "HPOTrial",
+    "InMemoryActiveLearningQueue",
+    "IntraSpectralEvidence",
     "LoRAConfig",
     "Snapshot",
     "TrainingExample",
     "adapter_cache_dir",
     "build_training_snapshot",
+    "calibration_report",
+    "default_hpo_search_space",
+    "detect_contradictions",
     "finetune_lora",
+    "fit_platt_scaling",
+    "fit_temperature_scaling",
+    "optimize_hyperparameters",
     "register_if_eligible",
+    "train_contradiction_detector",
 ]
 
 # Modal A100-40GB on-demand rate (USD/GPU-hour); override per deployment. With the
@@ -306,11 +338,18 @@ def build_training_snapshot(
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class LoRAConfig:
-    """LoRA hyper-parameters. Low rank; train only the adapter, freeze the base."""
+    """LoRA hyper-parameters. Low rank; train only the adapter, freeze the base.
+
+    ``r`` / ``alpha`` / ``dropout`` / ``learning_rate`` / ``epochs`` are the five
+    knobs the Prompt 22 Bayesian HPO (:func:`optimize_hyperparameters`) searches;
+    the best config it finds is what :func:`finetune_lora` then trains.
+    """
 
     r: int = 8  # low rank (8-16)
     alpha: int = 16
     dropout: float = 0.05
+    learning_rate: float = 2e-4
+    epochs: int = 3
     target_modules: tuple[str, ...] = DEFAULT_LORA_TARGET_MODULES
 
     def as_dict(self) -> dict[str, Any]:
@@ -318,6 +357,8 @@ class LoRAConfig:
             "r": self.r,
             "alpha": self.alpha,
             "dropout": self.dropout,
+            "learning_rate": self.learning_rate,
+            "epochs": self.epochs,
             "target_modules": list(self.target_modules),
         }
 
@@ -526,6 +567,7 @@ def finetune_lora(
     target_modules: Sequence[str] | None = None,
     *,
     lora_config: LoRAConfig | None = None,
+    hpo_study: HPOStudy | None = None,
     splits: Splits | None = None,
     trainer: FoldTrainer | None = None,
     seed: int = 0,
@@ -551,6 +593,12 @@ def finetune_lora(
     with ``peft`` + ``torch`` and raises :class:`FineTuneUnavailable` when those
     are absent. Passing ``splits`` re-asserts the holdout exclusion on the frozen
     snapshot before any training starts (so a hand-built snapshot cannot leak).
+
+    Hyper-parameters come from (in priority order) an explicit ``lora_config``,
+    else the best config of a Prompt 22 ``hpo_study`` (:func:`optimize_hyperparameters`),
+    else the defaults. When an ``hpo_study`` is supplied its identity + best
+    trial are recorded in the manifest, so the run is traceable back to the search
+    that produced its hyper-parameters.
     """
 
     if k_folds < 2:
@@ -560,7 +608,12 @@ def finetune_lora(
     if splits is not None:
         assert_training_excludes_holdout(snapshot.record_hashes, splits)
 
-    cfg = lora_config or LoRAConfig()
+    if lora_config is not None:
+        cfg = lora_config
+    elif hpo_study is not None:  # the best config the Bayesian HPO selected
+        cfg = hpo_study.best_config
+    else:
+        cfg = LoRAConfig()
     if target_modules is not None:
         cfg = replace(cfg, target_modules=tuple(target_modules))
     if not (8 <= cfg.r <= 16):  # low-rank discipline (spec: r = 8-16)
@@ -658,6 +711,18 @@ def finetune_lora(
         # recorded in the registry ``extra``.
         "adapter_sha256": adapter_sha256,
         "confidence_band_ppm": confidence_band_ppm,
+        "hpo": (
+            {
+                "study_id": hpo_study.study_id,
+                "sampler": hpo_study.sampler,
+                "n_trials": hpo_study.n_trials,
+                "objective": hpo_study.objective,
+                "best_params": dict(hpo_study.best_params),
+                "best_value": hpo_study.best_value,
+            }
+            if hpo_study is not None
+            else None
+        ),
         "gold_checksum": snapshot.gold_checksum,
         "git_sha": resolved_git_sha,
     }
@@ -735,6 +800,8 @@ def register_if_eligible(
     incumbent_metrics: GoldMetricVector | None = None,
     incumbent_bundle: ModelBundle | None = None,
     tolerances: Mapping[str, float] | None = None,
+    max_ece: float | None = None,
+    calibration_head: CalibrationHead | None = None,
     k: int = 5,
     dataset_tag: str | None = None,
     source: str | None = None,
@@ -748,8 +815,17 @@ def register_if_eligible(
     * registers the adapter as ``candidate`` **always** (with full lineage:
       snapshot hash, per-fold metrics, code git SHA — hard rule 2),
     * promotes it to ``shadow`` **only if** it dominates the incumbent (no
-      regression, strict gain on >=1 metric, zero safety-critical regression),
+      regression, strict gain on >=1 metric, zero safety-critical regression)
+      **and** passes the absolute calibration gate,
     * **never** auto-promotes to ``production`` (human sign-off required).
+
+    **Calibration is a first-class acceptance gate (Prompt 22).** If ``max_ece``
+    is given, an adapter whose gold-set Expected Calibration Error exceeds it is
+    **not promotable even if it dominates on accuracy** — a model that is "more
+    accurate" but lies about its confidence is never shadowed. When a
+    ``calibration_head`` (:func:`fit_temperature_scaling` / :func:`fit_platt_scaling`)
+    is supplied, the candidate's per-record confidences are calibrated through it
+    *before* the gold-set ECE is measured, so the gate sees the calibrated model.
 
     Returns ``None`` (registers nothing) only if the run produced no adapter
     artifact. The ``candidate_bundle`` is injected because building it requires
@@ -767,7 +843,12 @@ def register_if_eligible(
             "validated against a different holdout — refusing to register"
         )
 
-    candidate = evaluate(candidate_bundle, gold_set, k=k)
+    # Calibration head (if any) rewrites the per-record confidence so the gold-set
+    # ECE below reflects the *calibrated* model — calibration is gated, not cosmetic.
+    bundle = candidate_bundle if calibration_head is None else CalibratedBundle(
+        candidate_bundle, calibration_head
+    )
+    candidate = evaluate(bundle, gold_set, k=k)
     incumbent = _resolve_incumbent(
         registry,
         nucleus=run.nucleus,
@@ -776,7 +857,10 @@ def register_if_eligible(
         gold_set=gold_set,
         k=k,
     )
-    passed = True if incumbent is None else dominates(candidate, incumbent, tolerances)[0]
+    dominated = True if incumbent is None else dominates(candidate, incumbent, tolerances)[0]
+    # Absolute calibration gate: miscalibrated => not promotable, regardless of accuracy.
+    ece_gate_passed = max_ece is None or candidate.ece <= max_ece
+    passed = dominated and ece_gate_passed
 
     lineage = TrainingDataLineage(
         dataset_snapshot_hash=run.snapshot_hash,
@@ -808,6 +892,12 @@ def register_if_eligible(
             "run_id": run.run_id,
             "adapter_path": run.adapter_path,
             "cv_aggregate": run.manifest.get("aggregate", {}),
+            "dominated_incumbent": dominated,
+            "ece": candidate.ece,
+            "max_ece": max_ece,
+            "ece_gate_passed": ece_gate_passed,
+            "calibrated": calibration_head is not None,
+            "calibration": calibration_head.as_dict() if calibration_head is not None else None,
             "promotable": passed,
         },
     )
@@ -816,7 +906,1181 @@ def register_if_eligible(
         registry.set_status(
             entry.model_id,
             ModelStatus.SHADOW,
-            reason="passed Prompt 17 dominance gate; shadow pending human production sign-off",
+            reason=(
+                "passed Prompt 17 dominance + calibration gates; "
+                "shadow pending human production sign-off"
+            ),
         )
 
     return entry.model_id
+
+
+# --------------------------------------------------------------------------- #
+# Bayesian hyper-parameter optimization (Prompt 22, Optuna)
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class HPOSearchSpace:
+    """The bounded search space for the five LoRA knobs the HPO tunes.
+
+    Ranges are deliberately conservative: ``r`` stays inside the [8, 16] low-rank
+    discipline :func:`finetune_lora` enforces, and the rest cover the usual LoRA
+    operating band. Override per base model / dataset.
+    """
+
+    r: tuple[int, int] = (8, 16)
+    alpha: tuple[int, int] = (8, 64)
+    dropout: tuple[float, float] = (0.0, 0.2)
+    learning_rate: tuple[float, float] = (1e-5, 1e-3)  # sampled log-uniform
+    epochs: tuple[int, int] = (1, 5)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "r": list(self.r),
+            "alpha": list(self.alpha),
+            "dropout": list(self.dropout),
+            "learning_rate": list(self.learning_rate),
+            "epochs": list(self.epochs),
+        }
+
+
+def default_hpo_search_space() -> HPOSearchSpace:
+    """The default LoRA HPO search space (see :class:`HPOSearchSpace`)."""
+
+    return HPOSearchSpace()
+
+
+@dataclass(frozen=True)
+class HPOTrial:
+    """One evaluated HPO trial: the sampled params and the objective value."""
+
+    number: int
+    params: dict[str, Any]
+    value: float
+    state: str = "complete"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "number": self.number,
+            "params": dict(self.params),
+            "value": self.value,
+            "state": self.state,
+        }
+
+
+@runtime_checkable
+class HPOSampler(Protocol):
+    """The optimizer seam. The default is Optuna TPE; inject your own for tests.
+
+    ``optimize`` proposes up to ``n_trials`` parameter dicts (drawn from
+    ``search_space``), calls ``objective`` on each (lower is better), and returns
+    the evaluated :class:`HPOTrial` records in trial order.
+    """
+
+    def optimize(
+        self,
+        objective: Callable[[Mapping[str, Any]], float],
+        *,
+        search_space: HPOSearchSpace,
+        n_trials: int,
+        seed: int,
+    ) -> list[HPOTrial]: ...
+
+
+class _OptunaSampler:
+    """Default HPO sampler: Optuna Bayesian optimization with a seeded TPE sampler.
+
+    ``optuna`` is imported lazily (mirroring :class:`_ModalLoRATrainer`); when it
+    is absent this raises :class:`FineTuneUnavailable` rather than silently falling
+    back to a grid — the Prompt 22 mandate is Bayesian search, not a sweep. Seeding
+    ``TPESampler`` makes the study reproducible.
+    """
+
+    name = "optuna-tpe"
+
+    def _require(self) -> Any:
+        if importlib.util.find_spec("optuna") is None:
+            raise FineTuneUnavailable(
+                "Bayesian HPO requires optuna (missing). Install the training extra, "
+                "or inject an HPOSampler. See the Roadmap Phase 4 runbook."
+            )
+        import optuna
+
+        return optuna
+
+    def optimize(
+        self,
+        objective: Callable[[Mapping[str, Any]], float],
+        *,
+        search_space: HPOSearchSpace,
+        n_trials: int,
+        seed: int,
+    ) -> list[HPOTrial]:
+        optuna = self._require()
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+        study = optuna.create_study(
+            direction="minimize", sampler=optuna.samplers.TPESampler(seed=seed)
+        )
+
+        def _optuna_objective(trial: Any) -> float:
+            params = {
+                "r": trial.suggest_int("r", *search_space.r),
+                "alpha": trial.suggest_int("alpha", *search_space.alpha),
+                "dropout": trial.suggest_float("dropout", *search_space.dropout),
+                "learning_rate": trial.suggest_float(
+                    "learning_rate", *search_space.learning_rate, log=True
+                ),
+                "epochs": trial.suggest_int("epochs", *search_space.epochs),
+            }
+            return objective(params)
+
+        study.optimize(_optuna_objective, n_trials=n_trials)
+        return [
+            HPOTrial(
+                number=int(t.number),
+                params=dict(t.params),
+                value=float(t.value),
+                state=str(t.state.name).lower(),
+            )
+            for t in study.trials
+            if t.value is not None
+        ]
+
+
+@dataclass(frozen=True)
+class HPOStudy:
+    """The reproducible record of one Bayesian HPO study (Prompt 22).
+
+    Carries every trial, the best config, the sampler + seed + search space, and a
+    content-addressed ``study_id`` so the search that produced
+    :func:`finetune_lora`'s hyper-parameters is auditable and re-runnable.
+    """
+
+    study_name: str
+    base_model_id: str
+    snapshot_hash: str
+    nucleus: str | None
+    sampler: str
+    direction: str
+    objective: str
+    seed: int
+    n_trials: int
+    trials: tuple[HPOTrial, ...]
+    best_trial: HPOTrial
+    best_params: dict[str, Any]
+    best_config: LoRAConfig
+    best_value: float
+    search_space: dict[str, Any]
+    git_sha: str
+    created_utc: str
+    manifest: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def study_id(self) -> str:
+        """Deterministic content address of the study (excludes wall-clock time)."""
+
+        return content_hash(self.manifest)
+
+    def as_dict(self) -> dict[str, Any]:
+        return dict(self.manifest)
+
+
+def _config_from_params(params: Mapping[str, Any], target_modules: tuple[str, ...]) -> LoRAConfig:
+    """Build a LoRAConfig from a sampled params dict (rank clamped to [8, 16])."""
+
+    r = min(16, max(8, int(params["r"])))  # respect the low-rank discipline
+    return LoRAConfig(
+        r=r,
+        alpha=int(params["alpha"]),
+        dropout=float(params["dropout"]),
+        learning_rate=float(params["learning_rate"]),
+        epochs=int(params["epochs"]),
+        target_modules=target_modules,
+    )
+
+
+def _cv_fold_aggregate(
+    trainer: FoldTrainer,
+    folds: Sequence[Sequence[str]],
+    *,
+    base_model_id: str,
+    lora_config: LoRAConfig,
+    snapshot: Snapshot,
+) -> dict[str, float]:
+    """Run K-fold CV for one config and return the aggregate metrics (mean ± std)."""
+
+    k = len(folds)
+    results: list[FoldResult] = []
+    for i in range(k):
+        eval_hashes = tuple(folds[i])
+        train_hashes = tuple(h for j, fold in enumerate(folds) if j != i for h in fold)
+        results.append(
+            trainer.train_and_eval(
+                fold=i,
+                train_hashes=train_hashes,
+                eval_hashes=eval_hashes,
+                base_model_id=base_model_id,
+                lora_config=lora_config,
+                snapshot=snapshot,
+            )
+        )
+    mae_1h_mean, mae_1h_std = _mean_std([r.mae_1h for r in results])
+    mae_13c_mean, mae_13c_std = _mean_std([r.mae_13c for r in results])
+    cal_mean, cal_std = _mean_std([r.calibration for r in results])
+    cov_mean, cov_std = _mean_std([r.coverage for r in results])
+    return {
+        "mae_1h_mean": mae_1h_mean,
+        "mae_1h_std": mae_1h_std,
+        "mae_13c_mean": mae_13c_mean,
+        "mae_13c_std": mae_13c_std,
+        "calibration_mean": cal_mean,
+        "calibration_std": cal_std,
+        "coverage_mean": cov_mean,
+        "coverage_std": cov_std,
+    }
+
+
+def optimize_hyperparameters(
+    snapshot: Snapshot,
+    base_model_id: str,
+    *,
+    trainer: FoldTrainer | None = None,
+    k_folds: int = 5,
+    n_trials: int = 10,
+    search_space: HPOSearchSpace | None = None,
+    sampler: HPOSampler | None = None,
+    tracker: ExperimentTracker | None = None,
+    target_modules: Sequence[str] | None = None,
+    splits: Splits | None = None,
+    nucleus: str | None = None,
+    seed: int = 0,
+    study_name: str = "lora-hpo",
+    git_sha: str | None = None,
+    created_utc: str | None = None,
+) -> HPOStudy:
+    """Bayesian-optimize the LoRA hyper-parameters; return a reproducible study.
+
+    Replaces grid search with **Optuna Bayesian HPO** (default) over rank, alpha,
+    dropout, learning-rate, and epochs, budgeted to ``n_trials`` (~10, not a
+    sweep). Each trial trains a ``k_folds`` K-fold CV with the injected ``trainer``
+    and is scored by a mean-CV-error + calibration objective (lower is better).
+    **Every trial is logged to the Prompt 19 tracker** when one is given, and the
+    full study (all trials, best config, sampler, seed, search space) is returned
+    as a content-addressed :class:`HPOStudy` so it is reproducible. The best config
+    is what :func:`finetune_lora` then trains and registers.
+
+    The same hard rules as :func:`finetune_lora` hold: K-fold CV, and — when
+    ``splits`` is given — the holdout exclusion is re-asserted before any trial.
+    """
+
+    if k_folds < 2:
+        raise FineTuneError("k_folds must be >= 2 for cross-validation")
+    if n_trials < 1:
+        raise FineTuneError("n_trials must be >= 1")
+    if splits is not None:  # hard rule 1: never search against the holdout
+        assert_training_excludes_holdout(snapshot.record_hashes, splits)
+
+    space = search_space or default_hpo_search_space()
+    sampler = sampler or _OptunaSampler()
+    trainer = trainer or _ModalLoRATrainer()
+    resolved_git_sha = git_sha if git_sha is not None else current_git_sha()
+    modules = tuple(target_modules) if target_modules is not None else DEFAULT_LORA_TARGET_MODULES
+    folds = _assign_folds(snapshot.record_hashes, k_folds, seed)
+    sampler_name = getattr(sampler, "name", sampler.__class__.__name__)
+    objective_desc = "mean_cv_mae_plus_calibration"
+
+    counter = {"n": 0}
+
+    def _objective(params: Mapping[str, Any]) -> float:
+        cfg = _config_from_params(params, modules)
+        agg = _cv_fold_aggregate(
+            trainer, folds, base_model_id=base_model_id, lora_config=cfg, snapshot=snapshot
+        )
+        score = 0.5 * (agg["mae_1h_mean"] + agg["mae_13c_mean"]) + agg["calibration_mean"]
+        idx = counter["n"]
+        counter["n"] += 1
+        if tracker is not None:  # Prompt 19: log every trial
+            with tracker.start_run(
+                run_name=f"{study_name}-trial-{idx}",
+                params={**cfg.as_dict(), "k_folds": k_folds, "seed": seed},
+                tags={"kind": "lora-hpo", "study": study_name, "base_model_id": base_model_id},
+            ) as handle:
+                handle.set_dataset_version(snapshot.snapshot_hash)
+                handle.log_metrics({**agg, "cv_score": score})
+        return score
+
+    trials = sampler.optimize(_objective, search_space=space, n_trials=n_trials, seed=seed)
+    if not trials:  # pragma: no cover - a sampler must evaluate at least one trial
+        raise FineTuneError("HPO produced no completed trials")
+
+    best = min(trials, key=lambda t: (t.value, t.number))
+    best_config = _config_from_params(best.params, modules)
+
+    manifest: dict[str, Any] = {
+        "study_name": study_name,
+        "base_model_id": base_model_id,
+        "snapshot_hash": snapshot.snapshot_hash,
+        "nucleus": nucleus,
+        "sampler": sampler_name,
+        "direction": "minimize",
+        "objective": objective_desc,
+        "seed": seed,
+        "n_trials": len(trials),
+        "k_folds": k_folds,
+        "search_space": space.as_dict(),
+        "trials": [t.as_dict() for t in trials],
+        "best_trial": best.as_dict(),
+        "best_params": dict(best.params),
+        "best_config": best_config.as_dict(),
+        "best_value": best.value,
+        "gold_checksum": snapshot.gold_checksum,
+        "git_sha": resolved_git_sha,
+    }
+
+    return HPOStudy(
+        study_name=study_name,
+        base_model_id=base_model_id,
+        snapshot_hash=snapshot.snapshot_hash,
+        nucleus=nucleus,
+        sampler=sampler_name,
+        direction="minimize",
+        objective=objective_desc,
+        seed=seed,
+        n_trials=len(trials),
+        trials=tuple(trials),
+        best_trial=best,
+        best_params=dict(best.params),
+        best_config=best_config,
+        best_value=best.value,
+        search_space=space.as_dict(),
+        git_sha=resolved_git_sha,
+        created_utc=created_utc if created_utc is not None else datetime.now(UTC).isoformat(),
+        manifest=manifest,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Confidence-calibration head (Prompt 22)
+# --------------------------------------------------------------------------- #
+_CAL_EPS = 1e-6
+
+
+def _logit(p: np.ndarray) -> np.ndarray:
+    clipped = np.clip(p, _CAL_EPS, 1.0 - _CAL_EPS)
+    return np.log(clipped / (1.0 - clipped))
+
+
+def _sigmoid(z: np.ndarray) -> np.ndarray:
+    return 1.0 / (1.0 + np.exp(-np.clip(z, -60.0, 60.0)))
+
+
+def _fit_logistic_regression(
+    features: np.ndarray,
+    labels: np.ndarray,
+    *,
+    l2: float = 1.0,
+    iters: int = 2000,
+    lr: float = 0.5,
+) -> tuple[np.ndarray, float]:
+    """Deterministic full-batch logistic-regression fit (numpy GD with L2).
+
+    Returns ``(weights, bias)``. No randomness — reproducible by construction.
+    """
+
+    x = np.asarray(features, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if x.ndim != 2:
+        x = x.reshape(len(y), -1)
+    n, d = x.shape
+    weights = np.zeros(d)
+    bias = 0.0
+    for _ in range(iters):
+        prob = _sigmoid(x @ weights + bias)
+        error = prob - y
+        weights = weights - lr * (x.T @ error / n + l2 * weights / n)
+        bias = bias - lr * float(np.mean(error))
+    return weights, bias
+
+
+@dataclass(frozen=True)
+class CalibrationHead:
+    """A learned post-hoc confidence calibrator (Prompt 22).
+
+    Maps a raw model confidence ``p`` in [0, 1] to a calibrated confidence so that
+    a stated 80% corresponds to ~80% empirical accuracy. Three forms:
+
+    * ``temperature`` — single-parameter temperature scaling on the logit
+      (``sigmoid(logit(p) / T)``; Guo et al., ICML 2017);
+    * ``platt`` — two-parameter Platt scaling (``sigmoid(a * logit(p) + b)``);
+    * ``identity`` — pass-through (no calibration).
+
+    Fit with :func:`fit_temperature_scaling` / :func:`fit_platt_scaling`; validate
+    against ECE with :func:`calibration_report`.
+    """
+
+    method: str
+    temperature: float = 1.0
+    a: float = 1.0
+    b: float = 0.0
+
+    def calibrate(self, confidences: Sequence[float]) -> list[float]:
+        p = np.asarray(list(confidences), dtype=float)
+        if p.size == 0:
+            return []
+        if self.method == "identity":
+            out = np.clip(p, 0.0, 1.0)
+        elif self.method == "temperature":
+            out = _sigmoid(_logit(p) / self.temperature)
+        elif self.method == "platt":
+            out = _sigmoid(self.a * _logit(p) + self.b)
+        else:  # pragma: no cover - guarded by the fit functions
+            raise FineTuneError(f"unknown calibration method {self.method!r}")
+        return [float(x) for x in np.clip(out, 0.0, 1.0)]
+
+    def tag(self) -> str:
+        if self.method == "temperature":
+            return f"temperature:T={self.temperature:.4g}"
+        if self.method == "platt":
+            return f"platt:a={self.a:.4g},b={self.b:.4g}"
+        return self.method
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"method": self.method, "temperature": self.temperature, "a": self.a, "b": self.b}
+
+
+@dataclass(frozen=True)
+class CalibratedBundle:
+    """Wrap a :class:`ModelBundle`, rewriting each prediction's confidence via a head.
+
+    Used by :func:`register_if_eligible` so the gold-set ECE measures the
+    *calibrated* model. Everything else about each prediction is untouched.
+    """
+
+    inner: ModelBundle
+    head: CalibrationHead
+
+    @property
+    def model_versions(self) -> Mapping[str, str]:
+        return {**dict(self.inner.model_versions), "calibration": self.head.tag()}
+
+    def predict(self, record: Any) -> Any:
+        pred = self.inner.predict(record)
+        calibrated = self.head.calibrate([pred.confidence])[0]
+        return replace(pred, confidence=calibrated)
+
+
+def fit_temperature_scaling(
+    confidences: Sequence[float], correct: Sequence[bool]
+) -> CalibrationHead:
+    """Fit temperature scaling (minimise NLL of correctness over the temperature).
+
+    A single scalar ``T`` is optimised by bounded scalar minimisation
+    (deterministic). ``T > 1`` softens over-confident predictions; ``T < 1``
+    sharpens under-confident ones.
+    """
+
+    conf = np.asarray(list(confidences), dtype=float)
+    corr = np.asarray(list(correct), dtype=float)
+    if conf.shape != corr.shape:
+        raise FineTuneError("confidences and correct must be the same length")
+    if conf.size == 0:
+        raise FineTuneError("calibration requires at least one prediction")
+    z = _logit(conf)
+
+    def _nll(temp: float) -> float:
+        q = np.clip(_sigmoid(z / temp), _CAL_EPS, 1.0 - _CAL_EPS)
+        return float(-np.mean(corr * np.log(q) + (1.0 - corr) * np.log(1.0 - q)))
+
+    res = minimize_scalar(_nll, bounds=(0.05, 100.0), method="bounded")
+    return CalibrationHead(method="temperature", temperature=float(res.x))
+
+
+def fit_platt_scaling(confidences: Sequence[float], correct: Sequence[bool]) -> CalibrationHead:
+    """Fit two-parameter Platt scaling (logistic regression on the logit of ``p``)."""
+
+    conf = np.asarray(list(confidences), dtype=float)
+    corr = np.asarray(list(correct), dtype=float)
+    if conf.shape != corr.shape:
+        raise FineTuneError("confidences and correct must be the same length")
+    if conf.size == 0:
+        raise FineTuneError("calibration requires at least one prediction")
+    z = _logit(conf).reshape(-1, 1)
+    weights, bias = _fit_logistic_regression(z, corr, l2=1e-3)
+    return CalibrationHead(method="platt", a=float(weights[0]), b=float(bias))
+
+
+def calibration_report(
+    head: CalibrationHead,
+    confidences: Sequence[float],
+    correct: Sequence[bool],
+    *,
+    n_bins: int = 10,
+) -> dict[str, Any]:
+    """ECE before vs after applying ``head`` — the calibration acceptance evidence."""
+
+    corr = [bool(c) for c in correct]
+    before = expected_calibration_error(list(confidences), corr, n_bins=n_bins)
+    after = expected_calibration_error(head.calibrate(confidences), corr, n_bins=n_bins)
+    return {
+        "method": head.method,
+        "ece_before": float(before),
+        "ece_after": float(after),
+        "n": len(corr),
+        "head": head.as_dict(),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Contradiction detection (Prompt 22) — complements the Prompt 7 verifier
+# --------------------------------------------------------------------------- #
+# First-order multiplicity -> implied number of coupling partners (the n+1 rule).
+_MULTIPLICITY_NEIGHBORS: dict[str, int] = {
+    "s": 0,
+    "singlet": 0,
+    "d": 1,
+    "doublet": 1,
+    "t": 2,
+    "triplet": 2,
+    "q": 3,
+    "quartet": 3,
+    "p": 4,
+    "quint": 4,
+    "quintet": 4,
+    "pentet": 4,
+    "sext": 5,
+    "sextet": 5,
+    "sept": 6,
+    "septet": 6,
+    "heptet": 6,
+}
+
+
+@dataclass(frozen=True)
+class IntraSpectralEvidence:
+    """Within-one-spectrum observables used to flag internal inconsistencies."""
+
+    proton_integration_sum: float | None = None
+    expected_proton_count: int | None = None
+    multiplicity: str | None = None
+    n_coupling_neighbors: int | None = None
+    shift_ppm: float | None = None
+    nucleus: str | None = None
+    shift_window: tuple[float, float] | None = None
+
+    def features(self) -> dict[str, float]:
+        """A numeric feature vector for the learned contradiction model."""
+
+        feats: dict[str, float] = {}
+        if self.proton_integration_sum is not None and self.expected_proton_count is not None:
+            denom = max(abs(float(self.expected_proton_count)), 1.0)
+            abs_err = abs(float(self.proton_integration_sum) - float(self.expected_proton_count))
+            feats["integration_abs_error"] = abs_err
+            feats["integration_rel_error"] = abs_err / denom
+        if self.multiplicity is not None and self.n_coupling_neighbors is not None:
+            implied = _MULTIPLICITY_NEIGHBORS.get(self.multiplicity.strip().lower())
+            if implied is not None:
+                feats["multiplicity_neighbor_mismatch"] = float(
+                    abs(implied - int(self.n_coupling_neighbors))
+                )
+        if self.shift_ppm is not None and self.shift_window is not None:
+            lo, hi = self.shift_window
+            below = max(0.0, float(lo) - float(self.shift_ppm))
+            above = max(0.0, float(self.shift_ppm) - float(hi))
+            feats["shift_window_excess"] = below + above
+        return feats
+
+
+@dataclass(frozen=True)
+class CrossModalEvidence:
+    """Cross-modality agreement (NMR vs MS vs RT — Prompt 21)."""
+
+    nmr_top_id: str | None = None
+    ms_top_id: str | None = None
+    rt_corroborated: bool | None = None
+    notes: str = ""
+
+    def features(self) -> dict[str, float]:
+        feats: dict[str, float] = {}
+        if self.nmr_top_id is not None and self.ms_top_id is not None:
+            feats["nmr_ms_disagree"] = 0.0 if self.nmr_top_id == self.ms_top_id else 1.0
+        if self.rt_corroborated is not None:
+            feats["rt_disagree"] = 0.0 if self.rt_corroborated else 1.0
+        return feats
+
+
+@dataclass(frozen=True)
+class ContradictionSignal:
+    """One flagged inconsistency: what kind, how severe (0..1), and why."""
+
+    kind: str
+    severity: float
+    detail: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"kind": self.kind, "severity": self.severity, "detail": self.detail}
+
+
+@dataclass(frozen=True)
+class ContradictionReport:
+    """The contradiction signals for one record + the reviewer/active-learning view."""
+
+    record_hash: str | None
+    signals: tuple[ContradictionSignal, ...]
+    contradiction_threshold: float = 0.5
+
+    @property
+    def max_severity(self) -> float:
+        return max((s.severity for s in self.signals), default=0.0)
+
+    @property
+    def is_contradiction(self) -> bool:
+        return self.max_severity >= self.contradiction_threshold
+
+    @property
+    def kinds(self) -> tuple[str, ...]:
+        return tuple(s.kind for s in self.signals)
+
+    def to_reviewer_dict(self) -> dict[str, Any]:
+        """A compact, human-facing summary to surface to the reviewer."""
+
+        return {
+            "record_hash": self.record_hash,
+            "is_contradiction": self.is_contradiction,
+            "max_severity": self.max_severity,
+            "signals": [s.as_dict() for s in self.signals],
+        }
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "record_hash": self.record_hash,
+            "contradiction_threshold": self.contradiction_threshold,
+            "is_contradiction": self.is_contradiction,
+            "max_severity": self.max_severity,
+            "signals": [s.as_dict() for s in self.signals],
+        }
+
+
+@dataclass(frozen=True)
+class ActiveLearningItem:
+    """A hard case routed to the Prompt 16 active-learning queue."""
+
+    record_hash: str
+    reason: str
+    severity: float
+    kinds: tuple[str, ...]
+    created_utc: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "record_hash": self.record_hash,
+            "reason": self.reason,
+            "severity": self.severity,
+            "kinds": list(self.kinds),
+            "created_utc": self.created_utc,
+        }
+
+
+@runtime_checkable
+class ActiveLearningQueue(Protocol):
+    """The Prompt 16 active-learning sink. Inject your own; default is in-memory."""
+
+    def enqueue(self, item: ActiveLearningItem) -> None: ...
+
+
+class InMemoryActiveLearningQueue:
+    """A simple de-duplicating queue (keeps the highest-severity item per record)."""
+
+    def __init__(self) -> None:
+        self._items: dict[str, ActiveLearningItem] = {}
+
+    def enqueue(self, item: ActiveLearningItem) -> None:
+        current = self._items.get(item.record_hash)
+        if current is None or item.severity > current.severity:
+            self._items[item.record_hash] = item
+
+    @property
+    def items(self) -> list[ActiveLearningItem]:
+        return sorted(self._items.values(), key=lambda it: (-it.severity, it.record_hash))
+
+
+def _clip01(value: float) -> float:
+    return float(min(1.0, max(0.0, value)))
+
+
+def detect_contradictions(
+    *,
+    record_hash: str | None = None,
+    verification_results: Sequence[VerificationResult] | None = None,
+    cross_modal: CrossModalEvidence | None = None,
+    intra_spectral: IntraSpectralEvidence | None = None,
+    model: ContradictionModel | None = None,
+    queue: ActiveLearningQueue | None = None,
+    contradiction_threshold: float = 0.5,
+    integration_tolerance: float = 0.5,
+    created_utc: str | None = None,
+) -> ContradictionReport:
+    """Flag internal spectral inconsistencies — complementing the Prompt 7 verifier.
+
+    Deterministic rules surface (a) **no single structure explains the data** (no
+    Prompt 7 verdict is ``consistent``), (b) **cross-modal disagreement** (NMR vs
+    MS top candidate, or RT not corroborated — Prompt 21), and (c) **intra-spectral**
+    impossibilities (integration vs proton count, multiplicity vs coupling
+    neighbors, shift outside its plausible window). An optional trained
+    :class:`ContradictionModel` adds a learned signal. This does **not** replace
+    the deterministic verifier; it complements it, surfaces contradictions to the
+    reviewer (:meth:`ContradictionReport.to_reviewer_dict`), and feeds hard cases
+    to the Prompt 16 active-learning ``queue``.
+    """
+
+    signals: list[ContradictionSignal] = []
+
+    # (a) No single structure explains the spectra (Prompt 7 verdicts).
+    if verification_results:
+        verdicts = [vr.verdict for vr in verification_results]
+        if verdicts and not any(v == "consistent" for v in verdicts):
+            n_incon = sum(1 for v in verdicts if v == "inconsistent")
+            severity = _clip01(0.6 + 0.4 * (n_incon / len(verdicts)))
+            signals.append(
+                ContradictionSignal(
+                    kind="no_consistent_structure",
+                    severity=severity,
+                    detail=(
+                        f"{len(verdicts)} candidate structure(s) evaluated; none consistent "
+                        f"({n_incon} inconsistent). No single structure explains the data."
+                    ),
+                )
+            )
+
+    # (b) Cross-modal disagreement (NMR vs MS vs RT, Prompt 21).
+    if cross_modal is not None:
+        if (
+            cross_modal.nmr_top_id is not None
+            and cross_modal.ms_top_id is not None
+            and cross_modal.nmr_top_id != cross_modal.ms_top_id
+        ):
+            signals.append(
+                ContradictionSignal(
+                    kind="nmr_ms_disagreement",
+                    severity=0.8,
+                    detail=(
+                        f"NMR best candidate {cross_modal.nmr_top_id!r} != "
+                        f"MS best candidate {cross_modal.ms_top_id!r}."
+                    ),
+                )
+            )
+        if cross_modal.rt_corroborated is False:
+            signals.append(
+                ContradictionSignal(
+                    kind="rt_disagreement",
+                    severity=0.6,
+                    detail="Retention time does not corroborate the proposed structure.",
+                )
+            )
+
+    # (c) Intra-spectral impossibilities.
+    if intra_spectral is not None:
+        ev = intra_spectral
+        if ev.proton_integration_sum is not None and ev.expected_proton_count is not None:
+            denom = max(abs(float(ev.expected_proton_count)), 1.0)
+            rel = abs(float(ev.proton_integration_sum) - float(ev.expected_proton_count)) / denom
+            if rel > integration_tolerance:
+                signals.append(
+                    ContradictionSignal(
+                        kind="integration_mismatch",
+                        severity=_clip01(rel),
+                        detail=(
+                            f"Integration sum {ev.proton_integration_sum} vs expected "
+                            f"{ev.expected_proton_count} H (rel. error {rel:.2f})."
+                        ),
+                    )
+                )
+        if ev.multiplicity is not None and ev.n_coupling_neighbors is not None:
+            implied = _MULTIPLICITY_NEIGHBORS.get(ev.multiplicity.strip().lower())
+            if implied is not None and implied != int(ev.n_coupling_neighbors):
+                signals.append(
+                    ContradictionSignal(
+                        kind="multiplicity_mismatch",
+                        severity=_clip01(0.5 + 0.1 * abs(implied - int(ev.n_coupling_neighbors))),
+                        detail=(
+                            f"Multiplicity {ev.multiplicity!r} implies {implied} coupling "
+                            f"neighbor(s) but {ev.n_coupling_neighbors} are present."
+                        ),
+                    )
+                )
+        if ev.shift_ppm is not None and ev.shift_window is not None:
+            lo, hi = ev.shift_window
+            if float(ev.shift_ppm) < float(lo) or float(ev.shift_ppm) > float(hi):
+                excess = max(float(lo) - float(ev.shift_ppm), float(ev.shift_ppm) - float(hi))
+                span = max(float(hi) - float(lo), 1e-6)
+                signals.append(
+                    ContradictionSignal(
+                        kind="shift_out_of_range",
+                        severity=_clip01(0.5 + 0.5 * (excess / span)),
+                        detail=(
+                            f"Shift {ev.shift_ppm} ppm outside the plausible window "
+                            f"[{lo}, {hi}] for {ev.nucleus or 'this nucleus'}."
+                        ),
+                    )
+                )
+
+    # (d) Learned signal from the trained contradiction model (optional).
+    if model is not None:
+        feats: dict[str, float] = {}
+        if intra_spectral is not None:
+            feats.update(intra_spectral.features())
+        if cross_modal is not None:
+            feats.update(cross_modal.features())
+        if feats:
+            prob = model.predict_proba(feats)
+            if prob >= contradiction_threshold:
+                signals.append(
+                    ContradictionSignal(
+                        kind="learned_contradiction",
+                        severity=_clip01(prob),
+                        detail=f"Trained contradiction model probability {prob:.2f}.",
+                    )
+                )
+
+    signals.sort(key=lambda s: (-s.severity, s.kind))
+    report = ContradictionReport(
+        record_hash=record_hash,
+        signals=tuple(signals),
+        contradiction_threshold=contradiction_threshold,
+    )
+
+    if queue is not None and report.is_contradiction and record_hash is not None:
+        queue.enqueue(
+            ActiveLearningItem(
+                record_hash=record_hash,
+                reason=report.signals[0].kind,
+                severity=report.max_severity,
+                kinds=report.kinds,
+                created_utc=(
+                    created_utc if created_utc is not None else datetime.now(UTC).isoformat()
+                ),
+            )
+        )
+
+    return report
+
+
+@runtime_checkable
+class ContradictionExample(Protocol):
+    """A labeled training example for the contradiction model.
+
+    ``features`` is a ``{name: value}`` map (e.g. from
+    :meth:`IntraSpectralEvidence.features` merged with
+    :meth:`CrossModalEvidence.features`); ``label`` is ``True`` iff the case is a
+    genuine internal contradiction; ``record_hash`` is its dataset identity (used
+    for fold assignment + holdout exclusion).
+    """
+
+    record_hash: str
+    label: bool
+    features: Mapping[str, float]
+
+
+def _standardizer(x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Per-feature mean + scale (std with a floor) for standardization."""
+
+    means = x.mean(axis=0)
+    scales = x.std(axis=0)
+    scales = np.where(scales < 1e-8, 1.0, scales)
+    return means, scales
+
+
+def _feature_matrix(
+    by_hash: Mapping[str, ContradictionExample],
+    hashes: Sequence[str],
+    names: Sequence[str],
+) -> np.ndarray:
+    return np.array([[float(by_hash[h].features.get(n, 0.0)) for n in names] for h in hashes])
+
+
+def _label_vector(by_hash: Mapping[str, ContradictionExample], hashes: Sequence[str]) -> np.ndarray:
+    return np.array([1.0 if by_hash[h].label else 0.0 for h in hashes])
+
+
+@dataclass(frozen=True)
+class ContradictionModel:
+    """A calibrated logistic contradiction classifier (Prompt 22).
+
+    Operates on a fixed, sorted ``feature_names`` vector (standardized internally);
+    :meth:`predict_proba` returns a temperature-calibrated probability that the
+    case is internally contradictory.
+    """
+
+    feature_names: tuple[str, ...]
+    weights: tuple[float, ...]
+    bias: float
+    feature_means: tuple[float, ...]
+    feature_scales: tuple[float, ...]
+    calibration: CalibrationHead
+    threshold: float = 0.5
+
+    def _vector(self, features: Mapping[str, float]) -> np.ndarray:
+        raw = np.array([float(features.get(name, 0.0)) for name in self.feature_names])
+        return (raw - np.array(self.feature_means)) / np.array(self.feature_scales)
+
+    def predict_proba(self, features: Mapping[str, float]) -> float:
+        if not self.feature_names:
+            return 0.0
+        z = float(self._vector(features) @ np.array(self.weights) + self.bias)
+        raw = float(_sigmoid(np.array([z]))[0])
+        return float(self.calibration.calibrate([raw])[0])
+
+    def flag(self, features: Mapping[str, float], *, threshold: float | None = None) -> bool:
+        gate = self.threshold if threshold is None else threshold
+        return self.predict_proba(features) >= gate
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "feature_names": list(self.feature_names),
+            "weights": list(self.weights),
+            "bias": self.bias,
+            "feature_means": list(self.feature_means),
+            "feature_scales": list(self.feature_scales),
+            "calibration": self.calibration.as_dict(),
+            "threshold": self.threshold,
+        }
+
+
+@dataclass(frozen=True)
+class ContradictionFoldMetrics:
+    """One CV fold's classification metrics for the contradiction model."""
+
+    fold: int
+    n_train: int
+    n_eval: int
+    precision: float
+    recall: float
+    f1: float
+    ece: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "fold": self.fold,
+            "n_train": self.n_train,
+            "n_eval": self.n_eval,
+            "precision": self.precision,
+            "recall": self.recall,
+            "f1": self.f1,
+            "ece": self.ece,
+        }
+
+
+@dataclass(frozen=True)
+class ContradictionModelRun:
+    """The reproducible record of training the contradiction model (Prompt 22)."""
+
+    snapshot_hash: str
+    feature_names: tuple[str, ...]
+    k_folds: int
+    seed: int
+    row_count: int
+    n_positive: int
+    fold_metrics: tuple[ContradictionFoldMetrics, ...]
+    precision_mean: float
+    recall_mean: float
+    f1_mean: float
+    f1_std: float
+    ece_oof: float
+    ece_calibrated: float
+    max_ece: float
+    calibration_passed: bool
+    model: ContradictionModel
+    gold_checksum: str | None
+    git_sha: str
+    created_utc: str
+    manifest: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def run_id(self) -> str:
+        """Deterministic content address of the full training manifest."""
+
+        return content_hash(self.manifest)
+
+
+def train_contradiction_detector(
+    examples: Sequence[ContradictionExample],
+    *,
+    feature_names: Sequence[str] | None = None,
+    k_folds: int = 5,
+    seed: int = 0,
+    l2: float = 1.0,
+    iters: int = 2000,
+    lr: float = 0.5,
+    threshold: float = 0.5,
+    max_ece: float = 0.1,
+    snapshot: Snapshot | None = None,
+    splits: Splits | None = None,
+    holdout_exclusion_hashes: Iterable[str] | None = None,
+    gold_checksum: str | None = None,
+    git_sha: str | None = None,
+    created_utc: str | None = None,
+) -> ContradictionModelRun:
+    """Train the contradiction classifier with K-fold CV, calibration, and lineage.
+
+    A calibrated logistic model over the contradiction features, trained under the
+    same Prompt 15 hard rules: **K-fold CV** (k=5) for honest metrics, **gold/holdout
+    hash-exclusion** (the model never trains on the frozen holdout), and **full
+    lineage** (feature set, per-fold precision/recall/F1/ECE, code git SHA, dataset
+    hash). Out-of-fold predictions are temperature-calibrated and the calibrated
+    ECE is an acceptance gate (``max_ece``): a contradiction model that lies about
+    its confidence is not acceptable.
+    """
+
+    if k_folds < 2:
+        raise FineTuneError("k_folds must be >= 2 for cross-validation")
+
+    # Hard rule 1: exclude the holdout by record hash.
+    exclusion: set[str] = set()
+    if splits is not None:
+        exclusion |= set(splits.holdout_exclusion_hashes)
+    if holdout_exclusion_hashes is not None:
+        exclusion |= set(holdout_exclusion_hashes)
+    retained = [ex for ex in examples if ex.record_hash not in exclusion]
+    if splits is not None:
+        assert_training_excludes_holdout([ex.record_hash for ex in retained], splits)
+    if len(retained) < k_folds:
+        raise FineTuneError(
+            f"need >= k_folds ({k_folds}) examples after holdout exclusion; got {len(retained)}"
+        )
+
+    if feature_names is not None:
+        names = tuple(feature_names)
+    else:
+        keys: set[str] = set()
+        for ex in retained:
+            keys |= set(ex.features.keys())
+        names = tuple(sorted(keys))
+    if not names:
+        raise FineTuneError("contradiction examples expose no features")
+
+    record_hashes = [ex.record_hash for ex in retained]
+    by_hash = {ex.record_hash: ex for ex in retained}
+    x_all = _feature_matrix(by_hash, record_hashes, names)
+    y_all = _label_vector(by_hash, record_hashes)
+
+    folds = _assign_folds(record_hashes, k_folds, seed)
+    fold_metrics: list[ContradictionFoldMetrics] = []
+    oof_conf: list[float] = []
+    oof_correct: list[bool] = []
+    for i, fold in enumerate(folds):
+        eval_hashes = list(fold)
+        train_hashes = [h for j, f in enumerate(folds) if j != i for h in f]
+        if not eval_hashes or not train_hashes:
+            continue
+        x_tr = _feature_matrix(by_hash, train_hashes, names)
+        y_tr = _label_vector(by_hash, train_hashes)
+        means, scales = _standardizer(x_tr)
+        w, b = _fit_logistic_regression((x_tr - means) / scales, y_tr, l2=l2, iters=iters, lr=lr)
+        x_ev = _feature_matrix(by_hash, eval_hashes, names)
+        y_ev = _label_vector(by_hash, eval_hashes)
+        prob = _sigmoid(((x_ev - means) / scales) @ w + b)
+        pred = (prob >= 0.5).astype(float)
+        tp = int(np.sum((pred == 1) & (y_ev == 1)))
+        fp = int(np.sum((pred == 1) & (y_ev == 0)))
+        fn = int(np.sum((pred == 0) & (y_ev == 1)))
+        prf = f1_score(tp, fp, fn)
+        conf = np.where(pred == 1, prob, 1.0 - prob)  # predicted-class confidence
+        correct = pred == y_ev
+        for c, ok in zip(conf, correct, strict=True):
+            oof_conf.append(float(c))
+            oof_correct.append(bool(ok))
+        ece = float(
+            expected_calibration_error([float(c) for c in conf], [bool(o) for o in correct])
+        )
+        fold_metrics.append(
+            ContradictionFoldMetrics(
+                fold=i,
+                n_train=len(train_hashes),
+                n_eval=len(eval_hashes),
+                precision=prf.precision,
+                recall=prf.recall,
+                f1=prf.f1,
+                ece=ece,
+            )
+        )
+
+    # Calibrate on pooled out-of-fold predictions; the calibrated ECE is the gate.
+    head = fit_temperature_scaling(oof_conf, oof_correct)
+    ece_oof = float(expected_calibration_error(oof_conf, oof_correct))
+    ece_calibrated = float(expected_calibration_error(head.calibrate(oof_conf), oof_correct))
+
+    # Final model: fit on all retained data, standardized.
+    means_all, scales_all = _standardizer(x_all)
+    w_all, b_all = _fit_logistic_regression(
+        (x_all - means_all) / scales_all, y_all, l2=l2, iters=iters, lr=lr
+    )
+    model = ContradictionModel(
+        feature_names=names,
+        weights=tuple(float(v) for v in w_all),
+        bias=float(b_all),
+        feature_means=tuple(float(v) for v in means_all),
+        feature_scales=tuple(float(v) for v in scales_all),
+        calibration=head,
+        threshold=threshold,
+    )
+
+    precision_mean, _ = _mean_std([f.precision for f in fold_metrics])
+    recall_mean, _ = _mean_std([f.recall for f in fold_metrics])
+    f1_mean, f1_std = _mean_std([f.f1 for f in fold_metrics])
+    calibration_passed = ece_calibrated <= max_ece
+    resolved_git_sha = git_sha if git_sha is not None else current_git_sha()
+    resolved_snapshot_hash = (
+        snapshot.snapshot_hash
+        if snapshot is not None
+        else content_hash({"record_hashes": sorted(record_hashes), "features": list(names)})
+    )
+    resolved_gold = gold_checksum
+    if resolved_gold is None and snapshot is not None:
+        resolved_gold = snapshot.gold_checksum
+
+    manifest: dict[str, Any] = {
+        "kind": "contradiction_detector",
+        "snapshot_hash": resolved_snapshot_hash,
+        "feature_names": list(names),
+        "k_folds": k_folds,
+        "seed": seed,
+        "row_count": len(retained),
+        "n_positive": int(y_all.sum()),
+        "hyperparams": {"l2": l2, "iters": iters, "lr": lr, "threshold": threshold},
+        "fold_metrics": [f.as_dict() for f in fold_metrics],
+        "aggregate": {
+            "precision_mean": precision_mean,
+            "recall_mean": recall_mean,
+            "f1_mean": f1_mean,
+            "f1_std": f1_std,
+        },
+        "ece_oof": ece_oof,
+        "ece_calibrated": ece_calibrated,
+        "max_ece": max_ece,
+        "calibration_passed": calibration_passed,
+        "calibration": head.as_dict(),
+        "model": model.as_dict(),
+        "gold_checksum": resolved_gold,
+        "git_sha": resolved_git_sha,
+    }
+
+    return ContradictionModelRun(
+        snapshot_hash=resolved_snapshot_hash,
+        feature_names=names,
+        k_folds=k_folds,
+        seed=seed,
+        row_count=len(retained),
+        n_positive=int(y_all.sum()),
+        fold_metrics=tuple(fold_metrics),
+        precision_mean=precision_mean,
+        recall_mean=recall_mean,
+        f1_mean=f1_mean,
+        f1_std=f1_std,
+        ece_oof=ece_oof,
+        ece_calibrated=ece_calibrated,
+        max_ece=max_ece,
+        calibration_passed=calibration_passed,
+        model=model,
+        gold_checksum=resolved_gold,
+        git_sha=resolved_git_sha,
+        created_utc=created_utc if created_utc is not None else datetime.now(UTC).isoformat(),
+        manifest=manifest,
+    )

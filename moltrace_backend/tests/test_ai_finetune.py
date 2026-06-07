@@ -22,14 +22,24 @@ from pathlib import Path
 import pytest
 
 from moltrace.spectroscopy.ai.finetune import (
+    CrossModalEvidence,
     FinalAdapter,
     FineTuneError,
     FineTuneUnavailable,
     FoldResult,
+    HPOTrial,
+    InMemoryActiveLearningQueue,
+    IntraSpectralEvidence,
     Snapshot,
     build_training_snapshot,
+    calibration_report,
+    detect_contradictions,
     finetune_lora,
+    fit_platt_scaling,
+    fit_temperature_scaling,
+    optimize_hyperparameters,
     register_if_eligible,
+    train_contradiction_detector,
 )
 from moltrace.spectroscopy.ai.registry import (
     InMemoryRegistryStore,
@@ -418,3 +428,475 @@ def test_no_adapter_artifact_registers_nothing(tmp_path) -> None:
     )
     assert model_id is None
     assert registry.list_entries() == []
+
+
+# --------------------------------------------------------------------------- #
+# Prompt 22 — Bayesian HPO (Optuna): test doubles
+# --------------------------------------------------------------------------- #
+class _ConfigSensitiveTrainer:
+    """Trainer whose CV error depends on LoRA rank, giving HPO a clear optimum (r=12)."""
+
+    def __init__(self) -> None:
+        self.ranks_seen: list[int] = []
+
+    def train_and_eval(self, *, fold, train_hashes, eval_hashes, base_model_id, lora_config, snapshot):
+        self.ranks_seen.append(lora_config.r)
+        penalty = abs(lora_config.r - 12) * 0.05  # minimised at r = 12
+        return FoldResult(
+            mae_1h=0.10 + penalty,
+            mae_13c=1.00 + penalty,
+            calibration=0.03,
+            coverage=0.97,
+            gpu_hours=1.0,
+        )
+
+    def fit_final(self, *, train_hashes, base_model_id, lora_config, snapshot, out_dir):
+        return FinalAdapter(path="", sha256="sha256:cfg", gpu_hours=1.0)
+
+
+class _GridSampler:
+    """A deterministic ``HPOSampler`` test double (evaluates a fixed param grid).
+
+    Stands in for Optuna so the orchestration is unit-testable without the dep.
+    """
+
+    name = "grid-test"
+
+    def __init__(self, grid: list[dict]) -> None:
+        self.grid = grid
+        self.seen_seed: int | None = None
+
+    def optimize(self, objective, *, search_space, n_trials, seed):
+        self.seen_seed = seed
+        return [
+            HPOTrial(number=i, params=dict(params), value=objective(params))
+            for i, params in enumerate(self.grid[:n_trials])
+        ]
+
+
+def _hpo_grid() -> list[dict]:
+    """Ten candidate configs; only one has the optimal rank (r=12)."""
+
+    rs = [8, 9, 10, 11, 12, 13, 14, 15, 16, 11]
+    return [
+        {"r": r, "alpha": 16, "dropout": 0.05, "learning_rate": 2e-4, "epochs": 3} for r in rs
+    ]
+
+
+class _RunHandle:
+    """Records what a single tracked run captured (Prompt 19 tracker double)."""
+
+    def __init__(self, recorder, run_name, params, tags) -> None:
+        self.recorder = recorder
+        self.run_name = run_name
+        self.params = params
+        self.tags = tags
+        self.metrics: dict = {}
+        self.dataset_version: str | None = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        self.recorder.runs.append(self)
+        return False
+
+    def set_dataset_version(self, version) -> None:
+        self.dataset_version = version
+
+    def log_metrics(self, metrics, *, step=None) -> None:
+        self.metrics.update(dict(metrics))
+
+    def log_params(self, params) -> None:
+        self.params.update(dict(params))
+
+
+class _FakeTracker:
+    """An ExperimentTracker double that records each ``start_run`` block."""
+
+    def __init__(self) -> None:
+        self.runs: list[_RunHandle] = []
+
+    def start_run(self, run_name=None, *, params=None, tags=None):
+        return _RunHandle(self, run_name, dict(params or {}), dict(tags or {}))
+
+
+# --------------------------------------------------------------------------- #
+# Prompt 22 — Bayesian HPO: behaviour
+# --------------------------------------------------------------------------- #
+def test_hpo_runs_budget_logs_every_trial_and_picks_best() -> None:
+    snap = build_training_snapshot(_examples(12), gold_checksum=_gold().checksum())
+    tracker = _FakeTracker()
+    trainer = _ConfigSensitiveTrainer()
+
+    study = optimize_hyperparameters(
+        snap,
+        _BASE_ID,
+        trainer=trainer,
+        sampler=_GridSampler(_hpo_grid()),
+        n_trials=10,
+        k_folds=5,
+        tracker=tracker,
+        git_sha="abc1234",
+    )
+
+    # ~10 trials (a budget, not a sweep) — every trial recorded in the study
+    assert study.n_trials == 10
+    assert len(study.trials) == 10
+    # Bayesian search selects the optimum the trainer encodes
+    assert study.best_config.r == 12
+    assert study.best_params["r"] == 12
+    assert study.sampler == "grid-test"
+    # every trial logged to the Prompt 19 tracker, bound to the dataset snapshot
+    assert len(tracker.runs) == 10
+    assert all(r.dataset_version == snap.snapshot_hash for r in tracker.runs)
+    assert all("cv_score" in r.metrics for r in tracker.runs)
+    assert all("r" in r.params for r in tracker.runs)
+    # 5-fold CV ran for each of the 10 trials (GAMP 5 D11)
+    assert len(trainer.ranks_seen) == 10 * 5
+
+
+def test_hpo_study_is_reproducible() -> None:
+    snap = build_training_snapshot(_examples(12), gold_checksum=_gold().checksum())
+    common = dict(n_trials=10, k_folds=5, git_sha="abc1234")
+    s1 = optimize_hyperparameters(
+        snap, _BASE_ID, trainer=_ConfigSensitiveTrainer(),
+        sampler=_GridSampler(_hpo_grid()), created_utc="t1", **common,
+    )
+    s2 = optimize_hyperparameters(
+        snap, _BASE_ID, trainer=_ConfigSensitiveTrainer(),
+        sampler=_GridSampler(_hpo_grid()), created_utc="t2", **common,
+    )
+    # content-addressed + time-independent => the search is reproducible
+    assert s1.study_id == s2.study_id
+    assert s1.as_dict()["best_config"]["r"] == 12
+    assert len(s1.as_dict()["trials"]) == 10
+
+
+def test_hpo_best_config_feeds_finetune_lora(tmp_path) -> None:
+    snap = build_training_snapshot(_examples(12), gold_checksum=_gold().checksum())
+    study = optimize_hyperparameters(
+        snap, _BASE_ID, trainer=_ConfigSensitiveTrainer(),
+        sampler=_GridSampler(_hpo_grid()), n_trials=10, k_folds=5, git_sha="abc1234",
+    )
+
+    run = finetune_lora(
+        snap, _BASE_ID, k_folds=2, hpo_study=study, trainer=_FakeTrainer(),
+        adapter_cache_dir_override=tmp_path, git_sha="abc1234",
+    )
+    # Prompt 15 trains and registers exactly the HPO-selected best config
+    assert run.lora_config.r == 12
+    # the run is traceable back to the search that produced its hyper-parameters
+    assert run.manifest["hpo"]["study_id"] == study.study_id
+    assert run.manifest["hpo"]["best_params"]["r"] == 12
+    assert run.manifest["hpo"]["sampler"] == "grid-test"
+
+
+def test_hpo_requires_optuna_when_no_sampler_injected() -> None:
+    snap = build_training_snapshot(_examples(6), gold_checksum=_gold().checksum())
+    # the default sampler is Optuna; absent it raises (no silent grid fallback)
+    with pytest.raises(FineTuneUnavailable):
+        optimize_hyperparameters(snap, _BASE_ID, trainer=_FakeTrainer(), n_trials=2, k_folds=2)
+
+
+def test_hpo_validates_kfolds_and_trials() -> None:
+    snap = build_training_snapshot(_examples(6), gold_checksum=_gold().checksum())
+    with pytest.raises(FineTuneError):
+        optimize_hyperparameters(
+            snap, _BASE_ID, trainer=_FakeTrainer(), sampler=_GridSampler(_hpo_grid()), k_folds=1
+        )
+    with pytest.raises(FineTuneError):
+        optimize_hyperparameters(
+            snap, _BASE_ID, trainer=_FakeTrainer(), sampler=_GridSampler(_hpo_grid()), n_trials=0
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Prompt 22 — confidence-calibration head
+# --------------------------------------------------------------------------- #
+def test_temperature_and_platt_scaling_reduce_ece() -> None:
+    # Overconfident: a stated 0.9 confidence but only 7/12 are actually correct.
+    confidences = [0.9] * 12
+    correct = [True] * 7 + [False] * 5
+
+    temp = fit_temperature_scaling(confidences, correct)
+    rep_t = calibration_report(temp, confidences, correct, n_bins=10)
+    assert rep_t["method"] == "temperature"
+    assert rep_t["ece_before"] > 0.2  # badly miscalibrated to start
+    assert rep_t["ece_after"] < rep_t["ece_before"]
+    assert rep_t["ece_after"] < 0.1  # 0.9 -> ~0.58 (the empirical accuracy)
+
+    platt = fit_platt_scaling(confidences, correct)
+    rep_p = calibration_report(platt, confidences, correct, n_bins=10)
+    assert rep_p["method"] == "platt"
+    assert rep_p["ece_after"] <= rep_p["ece_before"] + 1e-9
+    # the head maps a raw confidence into [0, 1]
+    assert 0.0 <= temp.calibrate([0.9])[0] <= 1.0
+
+
+def test_calibration_length_mismatch_and_empty_raise() -> None:
+    with pytest.raises(FineTuneError):
+        fit_temperature_scaling([0.9, 0.8], [True])
+    with pytest.raises(FineTuneError):
+        fit_platt_scaling([], [])
+
+
+# --------------------------------------------------------------------------- #
+# Prompt 22 — calibration is a first-class promotion gate
+# --------------------------------------------------------------------------- #
+def test_miscalibrated_candidate_is_not_promotable_even_if_dominant(tmp_path) -> None:
+    registry = ModelRegistry(InMemoryRegistryStore())
+    run = _make_run(tmp_path, gold_checksum=_gold().checksum())
+
+    # perfect_bundle is always top1-correct (dominates with no incumbent) but states
+    # 0.9 confidence => gold ECE = |1.0 - 0.9| = 0.1, which fails a 0.05 gate.
+    model_id = register_if_eligible(
+        run,
+        registry=registry,
+        gold_set=_gold(),
+        candidate_bundle=_perfect_bundle(),
+        max_ece=0.05,
+    )
+    entry = registry.get(model_id)
+    assert entry.extra["ece"] == pytest.approx(0.1)
+    assert entry.extra["dominated_incumbent"] is True  # it IS more accurate
+    assert entry.extra["ece_gate_passed"] is False
+    assert entry.extra["promotable"] is False
+    # miscalibrated => stays CANDIDATE, never shadowed
+    assert registry.current_status(model_id) is ModelStatus.CANDIDATE
+
+
+def test_calibrated_candidate_passes_the_ece_gate(tmp_path) -> None:
+    registry = ModelRegistry(InMemoryRegistryStore())
+    run = _make_run(tmp_path, gold_checksum=_gold().checksum())
+
+    # a looser absolute gate the raw 0.1 ECE clears -> promotable
+    model_id = register_if_eligible(
+        run,
+        registry=registry,
+        gold_set=_gold(),
+        candidate_bundle=_perfect_bundle(),
+        max_ece=0.2,
+    )
+    entry = registry.get(model_id)
+    assert entry.extra["ece_gate_passed"] is True
+    assert entry.extra["promotable"] is True
+    assert registry.current_status(model_id) is ModelStatus.SHADOW
+
+
+def test_calibration_head_rewrites_confidence_for_the_gate(tmp_path) -> None:
+    registry = ModelRegistry(InMemoryRegistryStore())
+    run = _make_run(tmp_path, gold_checksum=_gold().checksum())
+
+    # The model is perfectly accurate (accuracy 1.0) but under-confident at 0.9.
+    # A head fit on (0.9 -> all correct) sharpens confidence toward 1.0, so the
+    # calibrated gold ECE drops below a strict 0.05 gate the raw model would fail.
+    head = fit_temperature_scaling([0.9, 0.9, 0.9, 0.9], [True, True, True, True])
+    model_id = register_if_eligible(
+        run,
+        registry=registry,
+        gold_set=_gold(),
+        candidate_bundle=_perfect_bundle(),
+        calibration_head=head,
+        max_ece=0.05,
+    )
+    entry = registry.get(model_id)
+    assert entry.extra["calibrated"] is True
+    assert entry.extra["calibration"]["method"] == "temperature"
+    assert entry.extra["ece"] < 0.05  # measured on the calibrated model
+    assert entry.extra["ece_gate_passed"] is True
+    assert registry.current_status(model_id) is ModelStatus.SHADOW
+
+
+# --------------------------------------------------------------------------- #
+# Prompt 22 — contradiction detection: test doubles
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class _VR:
+    """A VerificationResult duck type (the detector reads only ``verdict``)."""
+
+    verdict: str
+
+
+@dataclass(frozen=True)
+class _CEx:
+    """A ContradictionExample duck type."""
+
+    record_hash: str
+    label: bool
+    features: dict
+
+
+def _contradiction_examples(n_pos: int = 20, n_neg: int = 20) -> list[_CEx]:
+    """A separable labelled set: contradictions disagree across modality + over-integrate."""
+
+    out: list[_CEx] = []
+    for i in range(n_pos):
+        out.append(
+            _CEx(
+                f"sha256:pos{i:03d}",
+                True,
+                {"nmr_ms_disagree": 1.0, "integration_rel_error": 0.80 + 0.01 * i},
+            )
+        )
+    for i in range(n_neg):
+        out.append(
+            _CEx(
+                f"sha256:neg{i:03d}",
+                False,
+                {"nmr_ms_disagree": 0.0, "integration_rel_error": 0.02 * i},
+            )
+        )
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Prompt 22 — deterministic contradiction rules (complement the Prompt 7 verifier)
+# --------------------------------------------------------------------------- #
+def test_detect_contradictions_flags_each_kind() -> None:
+    # (a) no single structure is consistent
+    r = detect_contradictions(verification_results=[_VR("inconsistent"), _VR("inconclusive")])
+    assert "no_consistent_structure" in r.kinds
+    # ...but a single consistent verdict clears it
+    r = detect_contradictions(verification_results=[_VR("consistent"), _VR("inconsistent")])
+    assert "no_consistent_structure" not in r.kinds
+
+    # (b) cross-modal: NMR top != MS top
+    r = detect_contradictions(cross_modal=CrossModalEvidence(nmr_top_id="A", ms_top_id="B"))
+    assert "nmr_ms_disagreement" in r.kinds
+    # (b) cross-modal: retention time does not corroborate
+    r = detect_contradictions(cross_modal=CrossModalEvidence(rt_corroborated=False))
+    assert "rt_disagreement" in r.kinds
+
+    # (c) intra-spectral: integration vs proton count
+    r = detect_contradictions(
+        intra_spectral=IntraSpectralEvidence(proton_integration_sum=4.0, expected_proton_count=12)
+    )
+    assert "integration_mismatch" in r.kinds
+    # (c) intra-spectral: multiplicity (triplet => 2 neighbours) vs reality (3)
+    r = detect_contradictions(
+        intra_spectral=IntraSpectralEvidence(multiplicity="t", n_coupling_neighbors=3)
+    )
+    assert "multiplicity_mismatch" in r.kinds
+    # (c) intra-spectral: shift outside its plausible window
+    r = detect_contradictions(
+        intra_spectral=IntraSpectralEvidence(
+            shift_ppm=15.0, shift_window=(0.0, 12.0), nucleus="1H"
+        )
+    )
+    assert "shift_out_of_range" in r.kinds
+
+
+def test_detect_contradictions_surfaces_to_reviewer_and_active_learning_queue() -> None:
+    queue = InMemoryActiveLearningQueue()
+    report = detect_contradictions(
+        record_hash="sha256:recX",
+        cross_modal=CrossModalEvidence(nmr_top_id="A", ms_top_id="B"),
+        queue=queue,
+        created_utc="2026-06-07T00:00:00+00:00",
+    )
+    # severity 0.8 >= 0.5 -> a contradiction
+    assert report.is_contradiction is True
+    rd = report.to_reviewer_dict()
+    assert rd["record_hash"] == "sha256:recX"
+    assert rd["is_contradiction"] is True
+    assert any(s["kind"] == "nmr_ms_disagreement" for s in rd["signals"])
+    # the hard case is fed to the Prompt 16 active-learning queue
+    assert len(queue.items) == 1
+    item = queue.items[0]
+    assert item.record_hash == "sha256:recX"
+    assert item.severity == pytest.approx(0.8)
+    assert "nmr_ms_disagreement" in item.kinds
+
+
+def test_detect_contradictions_below_threshold_is_not_queued() -> None:
+    queue = InMemoryActiveLearningQueue()
+    report = detect_contradictions(
+        record_hash="sha256:recY",
+        # rel error 1/12 ~ 0.083 < 0.5 tolerance -> no signal at all
+        intra_spectral=IntraSpectralEvidence(proton_integration_sum=11.0, expected_proton_count=12),
+        queue=queue,
+    )
+    assert report.is_contradiction is False
+    assert report.signals == ()
+    assert queue.items == []
+
+
+# --------------------------------------------------------------------------- #
+# Prompt 22 — the trained contradiction model (K-fold CV + calibration + lineage)
+# --------------------------------------------------------------------------- #
+def test_train_contradiction_detector_cv_calibration_and_lineage() -> None:
+    examples = _contradiction_examples(20, 20)
+    run = train_contradiction_detector(
+        examples, k_folds=5, seed=0, git_sha="abc1234", created_utc="t1", gold_checksum="sha256:gold"
+    )
+
+    # K-fold CV (GAMP 5 D11) with honest per-fold metrics
+    assert run.k_folds == 5
+    assert len(run.fold_metrics) == 5
+    assert run.row_count == 40
+    assert run.n_positive == 20
+    assert run.feature_names == ("integration_rel_error", "nmr_ms_disagree")  # sorted
+    assert run.f1_mean > 0.8  # learns the separation
+
+    # calibrated ECE is a first-class acceptance gate
+    assert run.calibration_passed is True
+    assert run.ece_calibrated <= run.max_ece
+
+    # full lineage (hard rule 2)
+    m = run.manifest
+    assert m["kind"] == "contradiction_detector"
+    assert m["git_sha"] == "abc1234"
+    assert m["gold_checksum"] == "sha256:gold"
+    assert m["feature_names"] == ["integration_rel_error", "nmr_ms_disagree"]
+    assert len(m["fold_metrics"]) == 5
+
+    # reproducible identity (created_utc is provenance, not part of run_id)
+    run2 = train_contradiction_detector(
+        examples, k_folds=5, seed=0, git_sha="abc1234", created_utc="t2", gold_checksum="sha256:gold"
+    )
+    assert run.run_id == run2.run_id
+
+    # the trained model discriminates clear cases
+    assert run.model.flag({"nmr_ms_disagree": 1.0, "integration_rel_error": 0.9}) is True
+    assert run.model.flag({"nmr_ms_disagree": 0.0, "integration_rel_error": 0.0}) is False
+
+
+def test_train_contradiction_detector_excludes_holdout() -> None:
+    examples = _contradiction_examples(20, 20)
+    holdout = [examples[0].record_hash, examples[1].record_hash, examples[20].record_hash]
+    run = train_contradiction_detector(
+        examples, k_folds=5, holdout_exclusion_hashes=holdout, git_sha="x", created_utc="t"
+    )
+    # the holdout never enters training (hard rule 1)
+    assert run.row_count == 40 - 3
+
+
+def test_train_contradiction_detector_validates_inputs() -> None:
+    with pytest.raises(FineTuneError):  # fewer than k_folds examples
+        train_contradiction_detector(_contradiction_examples(2, 1), k_folds=5)
+    with pytest.raises(FineTuneError):  # examples expose no features
+        train_contradiction_detector(
+            [_CEx(f"sha256:e{i}", i % 2 == 0, {}) for i in range(6)], k_folds=5
+        )
+
+
+def test_detect_contradictions_adds_learned_model_signal() -> None:
+    run = train_contradiction_detector(_contradiction_examples(20, 20), k_folds=5)
+
+    # a clear positive by the trained model's features -> a learned signal appears
+    report = detect_contradictions(
+        record_hash="sha256:hardcase",
+        cross_modal=CrossModalEvidence(nmr_top_id="A", ms_top_id="B"),
+        intra_spectral=IntraSpectralEvidence(proton_integration_sum=2.0, expected_proton_count=12),
+        model=run.model,
+    )
+    assert "learned_contradiction" in report.kinds  # only the model can emit this
+
+    # a clear negative -> the model adds nothing
+    report_neg = detect_contradictions(
+        cross_modal=CrossModalEvidence(nmr_top_id="A", ms_top_id="A"),
+        intra_spectral=IntraSpectralEvidence(proton_integration_sum=12.0, expected_proton_count=12),
+        model=run.model,
+    )
+    assert "learned_contradiction" not in report_neg.kinds
