@@ -76,6 +76,9 @@ class ModelRole(StrEnum):
     HOSE_KB = "hose_kb"  # deterministic fallback (Prompt 6)
     LORA_ADAPTER = "lora_adapter"  # Layer 3 fine-tuned (Prompt 15)
     EMBEDDING_MODEL = "embedding_model"  # spectral embedding (Prompt 8)
+    CSI_FINGERID = "csi_fingerid"  # MS/MS -> structure (Prompt 21, SIRIUS / CSI:FingerID)
+    RT_PREDICTOR = "rt_predictor"  # retention-time corroboration (Prompt 21, METLIN)
+    DP4_RANKER = "dp4_ranker"  # NMR DP4-AI candidate ranking (Prompt 21, reuses dp4_scoring)
 
 
 class ModelStatus(StrEnum):
