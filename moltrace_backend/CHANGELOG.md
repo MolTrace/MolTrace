@@ -14,6 +14,47 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.15.0 — MS models: CSI:FingerID, METLIN RT & DP4-AI candidate fusion (Prompt 21) (2026-06-07)
+
+**Headline:** Adds `moltrace.spectroscopy.ai.ms_models` — the MS / structure side of
+SpectraCheck's pretrained layer. CSI:FingerID (MS/MS -> structure), a METLIN-style
+retention-time corroboration signal, and the **reused** in-house DP4 ranking are
+fused into one calibrated candidate ranking; the output is candidates + scores
+only — the deterministic Prompt 7 verifier remains the arbiter. Pure backend
+library — no API/UI/contract change.
+
+### Added
+- **CSI:FingerID wrapper** — `predict_msms_candidates()` wraps SIRIUS / CSI:FingerID
+  through its *documented* interface (env-configured REST service or CLI binary;
+  injectable backend), returning ranked candidate structures (+ fingerprint). It
+  does not reimplement or bundle SIRIUS and is licence-respecting; on a host with
+  no configured backend it returns `available=False` (graceful on a CPU-only host).
+- **METLIN retention-time corroboration** — `predict_retention_times()` (pluggable
+  predictor) + `rt_corroboration()`: a Gaussian down-weight in the RT residual, so
+  an RT-inconsistent candidate is demoted, never hard-filtered.
+- **DP4-AI posterior** — `dp4_candidate_posterior()` **reuses** the validated
+  in-house `nmrcheck.dp4_scoring` (Smith & Goodman 2010 σ/ν) for a calibrated
+  posterior over NMR candidates (integrated, not reimplemented).
+- **Calibrated fusion** — `fuse_candidates()` combines NMR (DP4) + MS/MS (CSI) + RT
+  into one ranking summing to 1.0 (RT as a multiplicative down-weight; signal
+  weights renormalise when a signal is missing). Decision-support only.
+- **`arbitrate()`** — hands the top candidate to the Prompt 7 `verify_structure`
+  (the arbiter of pass/fail; injectable).
+- **`register_ms_models()`** — registers CSI:FingerID / METLIN-RT / DP4-AI in the
+  Prompt 13 registry with version + SHA-256. Device parity with Prompt 6
+  (`PYTORCH_ENABLE_MPS_FALLBACK`).
+
+### Changed
+- `ai/registry.py` `ModelRole` gains `CSI_FINGERID` / `RT_PREDICTOR` / `DP4_RANKER`
+  (additive).
+
+### Tests
+- `test_ai_ms_models.py` — CSI wrapper (injected backend + graceful unavailable +
+  top-k / ranking / InChIKey); DP4 posterior reuse (matching candidate wins, sums
+  to 1.0); RT corroboration down-weighting + abstention; calibrated fusion + RT
+  demotion + missing-signal renormalisation + signal-required guard; registration
+  of the three roles with version+sha; verifier-handoff delegation (arbiter).
+
 ## v0.14.0 — Evaluation harness: the ten metrics + dominance gate (Prompt 17) (2026-06-07)
 
 **Headline:** Adds `moltrace.spectroscopy.eval.harness` — model governance that
