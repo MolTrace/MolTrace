@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 
+// Browser -> Vercel -> backend proxy. Every authed/app request goes through
+// here as a same-origin call to `/api/backend/*`, which this catch-all forwards
+// to the FastAPI backend. It MUST deploy as a dynamic Node serverless function
+// (hence `force-dynamic`); if it is ever served as a static/missing route the
+// client only sees a 404 HTML page and surfaces a generic "Request could not be
+// completed" error.
+//
+// DEPLOY NOTE: this is a bracketed catch-all (`[...path]`). After renaming or
+// moving this folder, redeploy on Vercel with the build cache CLEARED
+// ("Redeploy" -> uncheck "Use existing Build Cache", or `vercel --prod
+// --force`). Vercel reuses `.next/cache` across deploys keyed on file content,
+// so a folder move can leave a stale/missing function output that normal pushes
+// will not refresh until this file's content changes.
 export const dynamic = "force-dynamic"
 
 type RouteContext = {
@@ -104,6 +117,7 @@ export function OPTIONS() {
 }
 
 export const GET = proxy
+export const HEAD = proxy
 export const POST = proxy
 export const PUT = proxy
 export const PATCH = proxy
