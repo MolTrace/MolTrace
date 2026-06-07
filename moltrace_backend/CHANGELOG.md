@@ -14,6 +14,57 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.16.0 — Retrieval-augmented reasoning over the spectral index (Prompt 14) (2026-06-07)
+
+**Headline:** Adds `moltrace.spectroscopy.ai.rag` — Anthropic Claude wrapped in a
+**retrieval layer** over the Prompt 8 similarity index. Proposed structures are
+*grounded in retrieved precedent* (a cite-or-drop hallucination guard), and the
+Prompt 7 verifier — **never** the LLM — decides pass/fail; the model's
+self-confidence is advisory and is never used as the verifier prior. The full
+prompt + raw completion + retrieved ids are captured for the Prompt 12 audit
+trail. Pure backend library — no API/UI/contract change.
+
+### Added
+- **`build_reasoning_context(spectrum, *, index, resolver=…, top_k=50, …)`** —
+  retrieves the `top_k` nearest known spectra from the (duck-typed, injectable)
+  Prompt 8 index, joins each hit to its metadata via an injectable resolver
+  (SMILES / shift summary / multiplet summary / license), converts L2 distance to
+  a bounded `similarity` (1.0 at distance 0), applies an optional **license
+  allow-list** (licence-aware retrieval), and packs a **token-bounded**
+  `RAGContext` (greedy include to a token budget; `truncated` flagged).
+- **`propose_structures(spectrum, context, max_candidates=5, …)`** — renders the
+  context, asks an **injectable** LLM for strict-JSON
+  `{smiles, rationale, cited_analogue_ids, self_confidence}` candidates,
+  **schema-validates with exactly one retry**, drops candidates that neither cite
+  a real retrieved analogue nor structurally match one (the **hallucination
+  guard**, applied *before* verification), and scores each survivor with the
+  Prompt 7 `verify_structure` (the arbiter). `self_confidence` is advisory and is
+  **never** fed to the verifier as the prior — a fixed neutral prior is used — so
+  LLM confidence can never override the evidence-based posterior. Returns a
+  `ProposalResult` (`candidates` including dropped + flags, `accepted` ranked by
+  the verifier posterior, and the `RAGAudit`).
+- **Guarded / optional Claude backend** — the default LLM wrapper lazy-imports
+  `anthropic`, calls Claude (`claude-opus-4-8`) via the Messages API with adaptive
+  thinking + `output_config.format` structured outputs, and raises
+  `RAGLLMUnavailable` when the package is absent. `anthropic` is intentionally
+  **not** a declared dependency (the same posture as `matchms`) — every backend
+  (LLM, index, resolver, verifier, support check, audit recorder) is injectable,
+  so the whole pipeline runs deterministically on a CPU-only host with no network,
+  no FAISS, and no `anthropic`.
+- **Prompt 12 audit handoff** — `RAGAudit` captures the model id, retrieved ids,
+  the exact system + user prompt, and the raw completion(s); an optional
+  duck-typed `audit_recorder` (the Prompt 12 `AuditRecorder` contract) writes them
+  to the signed audit chain under operation `spectrum.rag.propose`.
+
+### Tests
+- `test_ai_rag.py` (26 tests, CPU-only; fakes for index / resolver / llm /
+  verifier): `top_k` with structures + scores + license; license allow-list
+  filter; token-budget truncation; strict-JSON parse + single retry (and
+  malformed-on-both-attempts → empty); **adversarial** hallucination guard drops
+  the uncited + unsupported candidate *before* verification; the verifier (not the
+  LLM) decides accepted/posterior and `self_confidence` is never the prior; full
+  prompt + completion + retrieved ids captured + recorder-hook invocation.
+
 ## v0.15.0 — MS models: CSI:FingerID, METLIN RT & DP4-AI candidate fusion (Prompt 21) (2026-06-07)
 
 **Headline:** Adds `moltrace.spectroscopy.ai.ms_models` — the MS / structure side of

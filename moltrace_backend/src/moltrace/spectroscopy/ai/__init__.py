@@ -13,6 +13,12 @@
   CSI:FingerID (MS/MS -> structure), METLIN retention-time corroboration, and
   DP4-AI candidate ranking (reusing the in-house ``dp4_scoring``), fused into one
   calibrated candidate ranking that the Prompt 7 verifier arbitrates.
+* :mod:`.rag` -- retrieval-augmented reasoning (Prompt 14): Anthropic Claude
+  wrapped in a retrieval layer over the Prompt 8 similarity index. Candidate
+  structures are grounded in retrieved precedent (cite-or-drop hallucination
+  guard) and arbitrated by the Prompt 7 verifier — the LLM proposes, the
+  verifier decides; full prompt/completion/retrieval is captured for the Prompt
+  12 audit trail.
 """
 
 from __future__ import annotations
@@ -33,6 +39,18 @@ from moltrace.spectroscopy.ai.ms_models import (
     predict_retention_times,
     register_ms_models,
     rt_corroboration,
+)
+from moltrace.spectroscopy.ai.rag import (
+    Candidate,
+    ProposalResult,
+    RAGAudit,
+    RAGContext,
+    RAGError,
+    RAGLLMUnavailable,
+    RAGSchemaError,
+    RetrievedAnalogue,
+    build_reasoning_context,
+    propose_structures,
 )
 from moltrace.spectroscopy.ai.registry import (
     AppendOnlyViolation,
@@ -60,6 +78,7 @@ from moltrace.spectroscopy.ai.router import (
 __all__ = [
     "AppendOnlyViolation",
     "CSIFingerIDUnavailable",
+    "Candidate",
     "CandidatePosterior",
     "FingerIDResult",
     "InMemoryRegistryStore",
@@ -75,9 +94,16 @@ __all__ = [
     "ModelRole",
     "ModelStatus",
     "NMRCandidate",
+    "ProposalResult",
+    "RAGAudit",
+    "RAGContext",
+    "RAGError",
+    "RAGLLMUnavailable",
+    "RAGSchemaError",
     "RankedCandidate",
     "RegistryError",
     "RegistryStore",
+    "RetrievedAnalogue",
     "RoutedAtomPrediction",
     "RoutedPrediction",
     "SqlAlchemyRegistryStore",
@@ -85,10 +111,12 @@ __all__ = [
     "TrainingDataLineage",
     "arbitrate",
     "build_model_entry",
+    "build_reasoning_context",
     "dp4_candidate_posterior",
     "fuse_candidates",
     "predict_msms_candidates",
     "predict_retention_times",
+    "propose_structures",
     "register_ms_models",
     "rt_corroboration",
 ]
