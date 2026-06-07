@@ -1659,9 +1659,9 @@ export interface paths {
          * Spectrum Analyze Gsd
          * @description Opt-in **experimental** GSD-Prompt-3 peak analysis backend.
          *
-         *     Runs Global Spectral Deconvolution (Mestrenova-style) on a processed
-         *     spectrum and returns the peak list with auto-classified categories
-         *     (compound | solvent | impurity | artifact | 13C_satellite).
+         *     Runs Global Spectral Deconvolution (industry-standard peak detection) on
+         *     a processed spectrum and returns the peak list with auto-classified
+         *     categories (compound | solvent | impurity | artifact | 13C_satellite).
          *
          *     Distinct from the default ``POST /spectrum/analyze`` flow:
          *       * No SMILES required -- pure spectrum-driven analysis.

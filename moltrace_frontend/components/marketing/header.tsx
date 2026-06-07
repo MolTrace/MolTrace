@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { moltraceTraceClassName, moltraceWordmark3DStyle } from "@/components/branding/moltrace-wordmark"
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
-import { useIsMobile } from "@/hooks/use-mobile"
 import {
   ArrowRight,
   BookOpen,
@@ -67,7 +66,6 @@ const topLevelIcons: Record<string, LucideIcon> = {
 export function Header() {
   const [open, setOpen] = useState(false)
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
-  const isMobile = useIsMobile()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 md:backdrop-blur md:supports-[backdrop-filter]:bg-background/60">
@@ -84,7 +82,7 @@ export function Header() {
             </span>
           </Link>
 
-          <nav className={`${isMobile ? "hidden" : "flex"} items-center gap-1`}>
+          <nav className="hidden items-center gap-1 md:flex">
             {navItems.map((item) => {
               const hasDropdown = item.label in dropdowns
               if (!hasDropdown) {
@@ -145,7 +143,7 @@ export function Header() {
 
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <div className={`${isMobile ? "hidden" : "flex"} items-center gap-2`}>
+          <div className="hidden items-center gap-2 md:flex">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/sign-in">Sign In</Link>
             </Button>
@@ -157,7 +155,7 @@ export function Header() {
             </Button>
           </div>
 
-          {isMobile ? (
+          <div className="md:hidden">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -371,7 +369,7 @@ export function Header() {
                 </div>
               </SheetContent>
             </Sheet>
-          ) : null}
+          </div>
         </div>
       </div>
     </header>
