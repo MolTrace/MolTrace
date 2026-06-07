@@ -14,6 +14,80 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.17.0 — LoRA domain fine-tuning pipeline (Prompt 15) (2026-06-07)
+
+**Headline:** Adds `moltrace.spectroscopy.ai.finetune` — Roadmap Layer 3
+(Domain Fine-Tuning). Once ≥1,000 reviewer-validated in-house spectra have
+accumulated (Prompts 16/20), this trains a **LoRA domain adapter** on top of the
+pretrained shift predictor/embedding head (Prompt 6), validates it with **K-fold
+cross-validation** (GAMP 5 Appendix D11), and registers it in the Model Registry
+(Prompt 13) with full lineage. Promotion is gated by the Evaluation Harness
+(Prompt 17) dominance check and **never** auto-promotes to production. Pure
+backend library — no API/UI/contract change.
+
+### Added
+- **`build_training_snapshot(examples, *, splits=…, holdout_exclusion_hashes=…,
+  gold_checksum=…)`** — freezes the validated-example set into an **immutable,
+  content-addressed `Snapshot`**: a deterministic `snapshot_hash` (the
+  `training_data_lineage` recorded in the registry), row count, sorted record
+  hashes, per-class counts, and nucleus / field / solvent / source
+  distributions. The hash is computed over **data identity only** (record hashes
+  + composition + gold checksum), excluding `git_sha`/`created_utc` provenance,
+  so re-freezing the same examples yields the same hash. **Hard rule — never
+  train on the holdout:** the snapshot subtracts `Splits.holdout_exclusion_hashes`
+  (plus any explicit set) and calls the Prompt 20 `assert_training_excludes_holdout`
+  guard, so a leaked record raises `HoldoutLeakageError` at freeze time.
+- **`finetune_lora(snapshot, base_model_id, k_folds=5, target_modules=None, …)`**
+  — LoRA config (low rank **r=8–16**, alpha, dropout; **train only the adapter,
+  freeze the base**; rank validated). For each of *k* deterministic, seeded,
+  complete-and-disjoint folds it trains on *k−1* and evaluates on the held-out
+  fold, recording per-fold **MAE (¹H/¹³C)**, calibration, and coverage; the
+  aggregate is reported as **mean ± std**. A final adapter is fit on the full
+  corpus. **Cost is logged** (summed GPU-hours × Modal rate → `cost_usd`; ~$200
+  target). Returns a `FineTuneRun` whose `run_id` is a path-independent content
+  address of the **full manifest** (hyperparameters, per-fold + aggregate
+  metrics, snapshot hash, base id, code **git sha**, adapter SHA-256). The
+  confidence band defaults to the validated CV band for the nucleus when the
+  trainer does not supply one.
+- **`register_if_eligible(run, *, registry, gold_set, candidate_bundle,
+  incumbent_…)`** — evaluates the Prompt 17 metric vector on the **frozen gold
+  set**, calls the **dominance gate**, and registers the adapter as
+  **`candidate` always**; promotes to **`shadow` only if it does not regress**
+  the incumbent, and **never** auto-promotes to `production` (human sign-off
+  required). **Hard rule — gold-set binding:** registration refuses if the
+  snapshot's `gold_checksum` disagrees with the live `gold_set.checksum()`. The
+  registry entry carries the full **`TrainingDataLineage`** (snapshot hash + row
+  count) plus the per-fold metrics, gold checksum, code git sha, GPU-hours, cost,
+  and `run_id` — **no adapter is registered without complete lineage.**
+- **Guarded / optional Modal trainer** — the default `FoldTrainer` lazy-imports
+  `modal` / `torch` / `peft` and raises **`FineTuneUnavailable`** when any is
+  absent (the same optional-dependency posture as `rag` / `nmrnet_wrapper`). The
+  trainer is **injectable**, so the entire pipeline — snapshot → k-fold loop →
+  aggregate → gated registration — runs deterministically on a CPU-only host with
+  none of the heavy deps installed.
+- **Adapter weights cached out of git** — adapters live under
+  `~/.cache/moltrace/lora/` (overridable via `$MOLTRACE_LORA_CACHE`), reusing the
+  Prompt 6 cache policy; `*.safetensors` / `adapter_model.bin` /
+  `adapter_config.json` / `moltrace_lora_cache/` are gitignored. The registry
+  persists only the SHA-256 + lineage, never the weight blobs.
+
+### Tests
+- `test_ai_finetune.py` (12 tests, CPU-only; fakes for the trainer + eval
+  bundles): snapshot excludes the holdout and records composition; snapshot hash
+  is data-identity not provenance; the k-fold partition is complete, disjoint,
+  and **reproducible** (same seed → identical folds + `run_id`); aggregates and
+  cost are logged; freezing/finetuning **refuses** a holdout-touching snapshot;
+  `k_folds`/rank validation; the default trainer raises `FineTuneUnavailable`
+  without `torch`/`peft`/`modal`; no-incumbent registers `candidate`→`shadow`; a
+  dominating candidate is promoted to `shadow`; a regressing candidate registers
+  `candidate`-only (never production); gold-checksum mismatch refuses
+  registration; a run with no adapter artifact registers nothing.
+
+### Compatibility
+- **Pure library addition — no endpoint, no contract change.** The frontend does
+  **not** need to regenerate `schema.d.ts`. New public names are re-exported from
+  `moltrace.spectroscopy.ai`.
+
 ## v0.16.1 — POST /spectrum/reason endpoint (retrieval-augmented reasoning contract) (2026-06-07)
 
 **Headline:** Exposes the v0.16.0 Prompt 14 RAG reasoner as a typed API. `POST
