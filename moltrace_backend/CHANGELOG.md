@@ -14,6 +14,45 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.14.0 — Evaluation harness: the ten metrics + dominance gate (Prompt 17) (2026-06-07)
+
+**Headline:** Adds `moltrace.spectroscopy.eval.harness` — model governance that
+promotes a model version only when its *full* metric vector **dominates** the
+incumbent on a frozen, checksum-locked gold set. No model ships on a single
+improved number, and the safety-critical metrics (false-confirmation rate,
+calibration) may never regress. Pure backend library — no API/UI/contract change.
+
+### Added
+- **`GoldSet`** — a frozen gold set (100 hand-validated spectra: 60 NMRShiftDB2 +
+  20 HMDB + 20 in-house) with a SHA-256 over the records. `assert_integrity()`
+  aborts the run if the size or checksum drifts, so the holdout can never be
+  silently contaminated.
+- **`evaluate(bundle, gold_set) -> GoldMetricVector`** — the ten metrics: top-1 &
+  top-3 structure accuracy; shift MAE (1H / 13C separately); ECE (reuses the
+  Prompt 19 `expected_calibration_error`); false-confirmation rate; retrieval
+  recall@k; error-vs-uncertainty AUROC; robustness to a noise / line-broadening
+  perturbation; reviewer-agreement rate; and end-to-end latency p50 / p95.
+  Returns the metrics + metadata (`model_versions`, gold-set checksum, timestamp).
+- **`dominates(candidate, incumbent, tolerances) -> (passed, deltas)`** —
+  promotable iff >= incumbent within tolerance on every metric, strictly better on
+  at least one, and **no regression** on the safety-critical metrics
+  (false-confirmation rate, ECE; tolerance 0). Returns per-metric deltas for the
+  promotion record.
+- **`gate_for_ci(candidate_bundle) -> int`** — wraps evaluate + dominates against
+  the production incumbent; exit `0` promotable / `1` not promotable / `2`
+  gold-set checksum drift. The gate Prompt 18 enforces.
+- **`persist_metric_vector(...)`** — persists the vector (with `model_versions` +
+  gold checksum) as canonical JSON and, optionally, to the Prompt 19 run store.
+- Model-agnostic `ModelBundle` protocol (`model_versions` + `predict`), so the
+  harness composes with the Prompt 13 inference router without importing it.
+
+### Tests
+- `test_eval_harness.py` — all ten metrics hand-computed on a tiny fixture; gold-
+  set checksum + size drift abort; dominance pass, safety-critical regression
+  block (false-confirmation / ECE), no-strict-improvement block, tolerance
+  behaviour; CI gate exit codes 0 / 1 / 2; metric-vector persistence round-trip
+  (`model_versions` + checksum).
+
 ## v0.13.0 — Phase 3 public-datasets pipeline: ingestion, versioning & frozen splits (Prompt 20) (2026-06-07)
 
 **Headline:** Adds `moltrace.spectroscopy.data.datasets_pipeline` — a licence-aware
