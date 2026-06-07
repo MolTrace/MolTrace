@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Company Credentials"
 subtitle: "Partner / Customer Logo Bar · About MolTrace · Trust Seals · Press"
-version: "2026-06-06"
+version: "2026-06-07"
 audience: "Procurement, due-diligence reviewers, partnership leads, press"
 length: "Drop-in front-matter block for white papers, decks, and gated downloads"
 ---
@@ -85,7 +85,7 @@ MolTrace was founded to build **one platform** where the layers know about each 
 2. **Human-in-the-loop, never autonomous.** AI accelerates; humans decide.
 3. **Open-science under the hood.** RDKit, nmrglue, mzML, FastAPI — no proprietary file-format lock-in.
 4. **Multi-modal by default.** NMR + LC-MS + HRMS + MS/MS are one evidence stack, not separate apps.
-5. **Reproducible by construction.** Datasets and model runs are versioned by content hash; every analysis carries a content-hashed output contract that a continuous-integration determinism gate proves regenerates byte-for-byte.
+5. **Reproducible by construction.** Datasets and model runs are versioned by content hash; every analysis carries a content-hashed output contract that a continuous-integration determinism gate proves regenerates byte-for-byte. A versioned, append-only model registry and a provenance-emitting inference router record exactly which model produced each prediction.
 
 ### Leadership
 
@@ -122,7 +122,7 @@ MolTrace was founded to build **one platform** where the layers know about each 
 | Authentication | Tenant-aware JWT + role-based access |
 | Hosting | Vercel (frontend) · Render / Railway (backend) · S3-compatible raw vault |
 | Observability | Audit-event ledger · request-trace IDs · per-tenant dashboards |
-| Reproducibility & MLOps | Content-addressed dataset versioning · experiment / run tracking (params, metrics, dataset-version tag, git SHA, model checksum) · fail-loud data-validation gates (optional DVC · MLflow · Great Expectations) |
+| Reproducibility & MLOps | Content-addressed dataset versioning · experiment / run tracking (params, metrics, dataset-version tag, git SHA, model checksum) · fail-loud data-validation gates (optional DVC · MLflow · Great Expectations) · versioned model registry + 5-layer inference router provenance |
 
 ### Open-source contributions
 
