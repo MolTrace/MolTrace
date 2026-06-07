@@ -98,3 +98,10 @@ ai_model_registry*.db
 moltrace_corpus/
 corpus_store/
 *.corpus.jsonl
+
+# Evaluation harness (Prompt 17): the 100-spectrum gold set is large, hand-
+# validated holdout data (DVC / content-addressed, never committed); persisted
+# gold-eval metric vectors are per-run artifacts. The gold-set manifest (record
+# ids + the pinned SHA-256) is small and IS intended to be version-controlled.
+gold_set_data/
+*.gold_eval.json
