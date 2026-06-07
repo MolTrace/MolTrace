@@ -759,6 +759,11 @@ from .models import (
     SpectrumPredictShiftsResult,
     SpectrumMultipletAnalyzeResult,
     SpectrumPreviewReport,
+    SpectrumReasonAnalogue,
+    SpectrumReasonAudit,
+    SpectrumReasonCandidate,
+    SpectrumReasonRequest,
+    SpectrumReasonResult,
     SpectrumRetrieveHit,
     SpectrumRetrieveRequest,
     SpectrumRetrieveResult,
@@ -5925,6 +5930,119 @@ def _load_similarity_index():
     return index
 
 
+_SIMILARITY_METADATA_CACHE: dict = {}
+
+
+def _load_similarity_metadata():
+    """Load the optional analogue-metadata sidecar used to ground the reasoner.
+
+    A JSON object mapping each similarity-index id to its analogue metadata
+    (``{smiles, license, shift_summary, multiplet_summary, source}``), configured
+    via ``MOLTRACE_SIMILARITY_METADATA`` and cached by path+mtime. Returns
+    ``None`` when unset/absent or malformed — the reasoner then treats each index
+    id as a SMILES string (correct for SMILES-keyed indexes built with
+    ``scripts/build_similarity_index.py``).
+    """
+
+    import json
+    import os
+
+    path = os.environ.get("MOLTRACE_SIMILARITY_METADATA")
+    if not path or not os.path.exists(path):
+        return None
+    key = (path, os.path.getmtime(path))
+    cached = _SIMILARITY_METADATA_CACHE.get(key)
+    if cached is not None:
+        return cached
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    _SIMILARITY_METADATA_CACHE[key] = data
+    return data
+
+
+def _make_metadata_resolver(metadata: dict | None):
+    """Build an injectable id->metadata resolver for ``build_reasoning_context``.
+
+    Returns ``None`` when no metadata sidecar is configured (the reasoner then
+    treats each index id as a SMILES string). When configured, ids missing from
+    the sidecar resolve to ``None`` (skipped with a warning) rather than being
+    misread as SMILES, since a non-SMILES database key carries no structure.
+    """
+
+    if not metadata:
+        return None
+
+    def _resolve(identifier: str):
+        entry = metadata.get(identifier)
+        if entry is None:
+            return None
+        if isinstance(entry, str):
+            return {"smiles": entry}
+        if isinstance(entry, dict):
+            return entry
+        return None
+
+    return _resolve
+
+
+def _reasoning_llm_available() -> bool:
+    """True when the default reasoning backend (Anthropic Claude) can be called.
+
+    Requires the optional ``anthropic`` package to be importable **and** an
+    ``ANTHROPIC_API_KEY`` in the environment. When False, ``/spectrum/reason``
+    still performs retrieval but reports ``reasoner_available=false`` with no
+    candidates rather than failing.
+    """
+
+    import importlib.util
+    import os
+
+    if importlib.util.find_spec("anthropic") is None:
+        return False
+    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+
+def _clip01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _to_reason_candidate(candidate: Any) -> SpectrumReasonCandidate:
+    """Map a library ``rag.Candidate`` (duck-typed) onto the wire model."""
+    posterior = candidate.posterior_confidence
+    return SpectrumReasonCandidate(
+        smiles=candidate.smiles,
+        rationale=candidate.rationale,
+        cited_analogue_ids=list(candidate.cited_analogue_ids),
+        cited_valid_ids=list(candidate.cited_valid_ids),
+        self_confidence=_clip01(candidate.self_confidence),
+        retrieval_supported=bool(candidate.retrieval_supported),
+        posterior_confidence=(None if posterior is None else _clip01(posterior)),
+        verdict=candidate.verdict,
+        accepted=bool(candidate.accepted),
+        dropped_reason=candidate.dropped_reason,
+    )
+
+
+def _to_reason_analogue(analogue: Any) -> SpectrumReasonAnalogue:
+    """Map a library ``rag.RetrievedAnalogue`` (duck-typed) onto the wire model."""
+    return SpectrumReasonAnalogue(
+        analogue_id=analogue.analogue_id,
+        smiles=analogue.smiles,
+        similarity=_clip01(analogue.similarity),
+        l2_distance=max(0.0, float(analogue.l2_distance)),
+        rank=int(analogue.rank),
+        license=analogue.license,
+        shift_summary=analogue.shift_summary,
+        multiplet_summary=analogue.multiplet_summary,
+        source=analogue.source,
+    )
+
+
 @router.post(
     "/spectrum/retrieve",
     response_model=SpectrumRetrieveResult,
@@ -6066,6 +6184,305 @@ async def spectrum_retrieve(
         top_k=payload.top_k,
         results=results,
         warnings=warnings,
+    )
+
+
+@router.post(
+    "/spectrum/reason",
+    response_model=SpectrumReasonResult,
+    dependencies=[Depends(require_access_context)],
+)
+async def spectrum_reason(
+    payload: SpectrumReasonRequest,
+    request: Request,  # auto-injected by FastAPI; tests may pass None
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumReasonResult:
+    """Retrieval-augmented structure reasoning over the spectral index (Prompt 14).
+
+    Encodes the query spectrum (``ppm_axis`` + ``intensity``), retrieves the
+    ``top_k`` nearest known spectra from the **server-configured** similarity
+    index (``MOLTRACE_SIMILARITY_INDEX``) as precedent, then asks Anthropic Claude
+    to propose **retrieval-grounded** candidate structures. Each candidate must
+    cite a real retrieved analogue (or structurally match one) — ungrounded
+    proposals are dropped by the hallucination guard — and every survivor is
+    scored by the Prompt 7 verifier, which is the sole authority on pass/fail; the
+    model's self-confidence is advisory and is never used as the verifier prior.
+
+    Graceful degradation: retrieval runs whenever the index is configured, and
+    reasoning runs only when the model backend is available (``anthropic``
+    installed + ``ANTHROPIC_API_KEY`` set). With no index the response is
+    ``index_available=false``; with no reasoner it is ``reasoner_available=false``
+    and returns retrieval only. One ``spectrum.reason`` audit event per call.
+    """
+
+    import time
+
+    import numpy as np
+
+    _t0 = time.perf_counter()
+    warnings: list[str] = []
+
+    def _emit(
+        *,
+        error_kind: str | None,
+        index_available: bool,
+        index_size: int,
+        reasoner_available: bool,
+        retrieved_count: int,
+        accepted_count: int,
+        rejected_count: int,
+        retry_used: bool,
+        retrieved_ids: list[str],
+        model: str,
+    ) -> None:
+        try:
+            if request is not None:
+                _audit_from_context(
+                    request,
+                    context=context,
+                    event_type="spectrum.reason",
+                    message=(
+                        "Spectrum reasoning failed."
+                        if error_kind is not None
+                        else "Spectrum reasoning completed."
+                    ),
+                    metadata={
+                        "nucleus": payload.nucleus,
+                        "n_points": len(payload.ppm_axis),
+                        "top_k": payload.top_k,
+                        "max_candidates": payload.max_candidates,
+                        "index_available": index_available,
+                        "index_size": index_size,
+                        "reasoner_available": reasoner_available,
+                        "model": model or None,
+                        "retrieved_count": retrieved_count,
+                        "retrieved_ids": retrieved_ids[:200],
+                        "accepted_count": accepted_count,
+                        "rejected_count": rejected_count,
+                        "retry_used": retry_used,
+                        "error_kind": error_kind,
+                        "wall_ms": int((time.perf_counter() - _t0) * 1000),
+                    },
+                )
+        except Exception:
+            pass
+
+    # 1. Validate the paired arrays (Pydantic enforces per-array bounds; equal
+    #    length is enforced here, mirroring /spectrum/analyze/gsd).
+    if len(payload.ppm_axis) != len(payload.intensity):
+        _emit(
+            error_kind="ppm_axis_length_mismatch",
+            index_available=False,
+            index_size=0,
+            reasoner_available=False,
+            retrieved_count=0,
+            accepted_count=0,
+            rejected_count=0,
+            retry_used=False,
+            retrieved_ids=[],
+            model="",
+        )
+        raise HTTPException(
+            status_code=400, detail="ppm_axis and intensity must have the same length."
+        )
+
+    reasoner_available = _reasoning_llm_available()
+
+    # 2. Retrieval needs the server-configured index (graceful if unconfigured).
+    index = _load_similarity_index()
+    if index is None:
+        warnings.append(
+            "Retrieval index not configured (set MOLTRACE_SIMILARITY_INDEX); "
+            "cannot reason."
+        )
+        _emit(
+            error_kind=None,
+            index_available=False,
+            index_size=0,
+            reasoner_available=reasoner_available,
+            retrieved_count=0,
+            accepted_count=0,
+            rejected_count=0,
+            retry_used=False,
+            retrieved_ids=[],
+            model="",
+        )
+        return SpectrumReasonResult(
+            query_nucleus=payload.nucleus,
+            index_available=False,
+            reasoner_available=reasoner_available,
+            index_size=0,
+            top_k=payload.top_k,
+            max_candidates=payload.max_candidates,
+            retrieved=[],
+            candidates=[],
+            rejected=[],
+            audit=None,
+            warnings=warnings,
+        )
+
+    # 3. Build the real query spectrum (required by the Prompt 7 verifier) and
+    #    retrieve precedent.
+    from moltrace.spectroscopy.ai.rag import (
+        DEFAULT_MODEL,
+        RAGError,
+        RAGLLMUnavailable,
+        build_reasoning_context,
+        propose_structures,
+    )
+    from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
+
+    spectrum = NMRSpectrum(
+        data=np.asarray(payload.intensity, dtype=np.float64),
+        ppm_axis=np.asarray(payload.ppm_axis, dtype=np.float64),
+        metadata={"source": "spectrum_reason"},
+        nucleus=payload.nucleus,
+        solvent=payload.solvent,
+        field_mhz=payload.field_mhz,
+    )
+
+    resolver = _make_metadata_resolver(_load_similarity_metadata())
+    try:
+        rag_context = build_reasoning_context(
+            spectrum,
+            index=index,
+            resolver=resolver,
+            top_k=payload.top_k,
+            allowed_licenses=payload.allowed_licenses,
+        )
+    except RAGError as exc:
+        _emit(
+            error_kind="retrieval_failed",
+            index_available=True,
+            index_size=len(index),
+            reasoner_available=reasoner_available,
+            retrieved_count=0,
+            accepted_count=0,
+            rejected_count=0,
+            retry_used=False,
+            retrieved_ids=[],
+            model="",
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Could not encode/retrieve for the query spectrum; check the "
+                f"ppm_axis/intensity and nucleus. ({exc})"
+            ),
+        ) from exc
+
+    retrieved = [_to_reason_analogue(a) for a in rag_context.analogues]
+    retrieved_ids = [a.analogue_id for a in rag_context.analogues]
+
+    # 4. Reasoning runs only when the model backend is available; otherwise we
+    #    return retrieval-only (still useful for the UI).
+    if not reasoner_available:
+        warnings.append(
+            "Reasoning model backend unavailable (install 'anthropic' and set "
+            "ANTHROPIC_API_KEY); returning retrieval only."
+        )
+        _emit(
+            error_kind=None,
+            index_available=True,
+            index_size=len(index),
+            reasoner_available=False,
+            retrieved_count=len(retrieved),
+            accepted_count=0,
+            rejected_count=0,
+            retry_used=False,
+            retrieved_ids=retrieved_ids,
+            model="",
+        )
+        return SpectrumReasonResult(
+            query_nucleus=rag_context.query_nucleus,
+            index_available=True,
+            reasoner_available=False,
+            index_size=len(index),
+            top_k=payload.top_k,
+            max_candidates=payload.max_candidates,
+            truncated=rag_context.truncated,
+            retrieved=retrieved,
+            candidates=[],
+            rejected=[],
+            audit=None,
+            warnings=[*warnings, *rag_context.warnings],
+        )
+
+    # 5. Propose retrieval-grounded structures; the verifier arbitrates.
+    try:
+        result = propose_structures(
+            spectrum,
+            rag_context,
+            max_candidates=payload.max_candidates,
+            model=DEFAULT_MODEL,
+        )
+    except RAGLLMUnavailable:
+        warnings.append(
+            "Reasoning model backend unavailable at call time; returning "
+            "retrieval only."
+        )
+        _emit(
+            error_kind=None,
+            index_available=True,
+            index_size=len(index),
+            reasoner_available=False,
+            retrieved_count=len(retrieved),
+            accepted_count=0,
+            rejected_count=0,
+            retry_used=False,
+            retrieved_ids=retrieved_ids,
+            model="",
+        )
+        return SpectrumReasonResult(
+            query_nucleus=rag_context.query_nucleus,
+            index_available=True,
+            reasoner_available=False,
+            index_size=len(index),
+            top_k=payload.top_k,
+            max_candidates=payload.max_candidates,
+            truncated=rag_context.truncated,
+            retrieved=retrieved,
+            candidates=[],
+            rejected=[],
+            audit=None,
+            warnings=[*warnings, *rag_context.warnings],
+        )
+
+    accepted = [_to_reason_candidate(c) for c in result.accepted]
+    rejected = [_to_reason_candidate(c) for c in result.candidates if not c.accepted]
+    audit = SpectrumReasonAudit(
+        model=result.audit.model,
+        retrieved_ids=list(result.audit.retrieved_ids),
+        retry_used=result.audit.retry_used,
+        parsed_candidate_count=result.audit.parsed_candidate_count,
+        dropped_candidate_count=result.audit.dropped_candidate_count,
+        accepted_candidate_count=result.audit.accepted_candidate_count,
+    )
+    _emit(
+        error_kind=None,
+        index_available=True,
+        index_size=len(index),
+        reasoner_available=True,
+        retrieved_count=len(retrieved),
+        accepted_count=len(accepted),
+        rejected_count=len(rejected),
+        retry_used=result.audit.retry_used,
+        retrieved_ids=retrieved_ids,
+        model=result.audit.model,
+    )
+    return SpectrumReasonResult(
+        query_nucleus=rag_context.query_nucleus,
+        index_available=True,
+        reasoner_available=True,
+        index_size=len(index),
+        top_k=payload.top_k,
+        max_candidates=payload.max_candidates,
+        truncated=rag_context.truncated,
+        retrieved=retrieved,
+        candidates=accepted,
+        rejected=rejected,
+        audit=audit,
+        warnings=[*warnings, *result.audit.warnings],
     )
 
 
