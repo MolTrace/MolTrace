@@ -214,6 +214,7 @@ Beneath the per-analysis chain of custody sits a foundation that makes *the plat
 - **Single source of truth for "better."** One evaluation framework (RMSE, peak / classification F1, Top-k accuracy, BedROC, expected calibration error) decides whether a model change is an improvement, so promotion is a measured decision rather than a judgement call (§5.6).
 - **End-to-end determinism gate.** A continuous-integration test runs one real Bruker FID through the full pipeline ten times and requires **byte-identical** structured output each time; identical inputs therefore yield an identical content hash — the machine-checkable substance behind the platform's reproducibility claim.
 - **Versioned model registry + routed inference.** An append-only registry tracks every artifact that can produce a prediction — NMRNet checkpoints, HOSE-code knowledge-base builds, fine-tuned adapters, embedding models — with its semantic version, SHA-256, training-data lineage, and metric snapshot; an inference router composes the fine-tuned, pretrained, and deterministic-fallback layers and stamps every prediction with the exact set of model ids + checksums that produced it (fed verbatim into the §6.6 audit trail). A result is reproducible bit-for-bit from the registry + lineage, and a reviewer sees *which* model produced each number and *why* one layer was chosen over another.
+- **Licence-clean public-datasets corpus + frozen holdout.** The canonical public datasets (NMRShiftDB2, HMDB, BMRB, MassBank, GNPS, QM9-NMR, 2DNMRGym, …) are ingested into a deduplicated, version-pinned, licence-tagged corpus with frozen, seeded train/val/test splits. The **test** split is a sacred, checksummed holdout that is hash-excluded from every training snapshot, and synthetic (DFT-computed QM9) data is labelled and never mixed into the experimental ground truth; licences are enforced (share-alike honoured, non-redistributable sources never copied in). A never-touched holdout on a licence-clean, deduplicated corpus is what makes a model claim an honest baseline rather than a number that leaked from its own training set.
 
 ---
 
@@ -289,7 +290,7 @@ The FDA's January 2025 *Considerations for the Use of Artificial Intelligence to
 | Define the question of interest | Per-tab analyze targets (1H vs. 13C vs. unified confidence) |
 | Define the context of use | `compound_class` selector + audit-trail context |
 | Assess AI model risk | Transparent multiplier tables + DP4/DP5 panel as fallback |
-| Plan and execute credibility activities | Weekly regression suites (Weeks 22–40) + smoke tests |
+| Plan and execute credibility activities | Weekly regression suites (Weeks 22–40) + smoke tests + a frozen, licence-clean public-datasets corpus with a checksummed never-trained holdout |
 | Assess model output | Layer-by-layer agreement matrix in unified confidence |
 | Document credibility evidence | Report composer + provenance manifests + versioned model registry + per-prediction `model_versions` |
 | Maintain credibility through lifecycle | Recipe-hash-linked reruns + versioned report records + append-only model registry with reproducible layer routing |

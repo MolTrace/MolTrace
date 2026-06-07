@@ -88,3 +88,13 @@ great_expectations/uncommitted/
 # *.db / *.sqlite patterns above). Listed explicitly for clarity.
 ai_model_registry*.db
 *.registry.db
+
+# Phase 3 public-datasets pipeline (Prompt 20): the normalized corpus, the
+# content-addressed split store, and the train/val/test JSONL are large data
+# artifacts versioned via DVC / the content-addressed remote -- NEVER committed
+# (licences such as CC-BY-SA and the non-redistributable SDBS / METLIN also
+# forbid blind redistribution). The Prompt 19 `moltrace_data_store/` + `.dvc/`
+# patterns above already cover the default remotes; these add corpus working dirs.
+moltrace_corpus/
+corpus_store/
+*.corpus.jsonl
