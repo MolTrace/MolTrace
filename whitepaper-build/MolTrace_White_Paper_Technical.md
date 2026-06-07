@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Technical White Paper"
 subtitle: "Architecture, Scientific Foundations, and Regulatory Posture for Analytical-Method Validators and Regulatory Reviewers"
-version: "2026-06-06"
+version: "2026-06-07"
 audience: "Analytical-method validators, NMR / MS technical leads, regulatory-affairs reviewers, IT / data-integrity auditors"
 length: "≈7,500 words · Technical variant of the canonical hybrid white paper"
 ---
@@ -254,6 +254,7 @@ The raw → recipe → derived DAG above secures a single analysis; an MLOps fou
 - **Experiment tracking.** Every model / benchmark run logs parameters, metrics, artifacts, a dataset-version tag, the git commit SHA, and the registry model-weight checksum from the §3.10 audit subsystem. A native file-backed run store is always available; MLflow is an optional drop-in backend.
 - **Validation gate.** A native validator rejects malformed inputs (schema, recognised nucleus, field-MHz range, NaN / Inf, per-nucleus ppm range) before ingestion or inference; the identical logical suite is expressible as a Great Expectations suite when that optional backend is installed. Both raise loudly.
 - **Determinism gate.** A CI test drives one real Bruker FID through `read_fid → GSD peak-pick → classification → multiplet detection → integration → contract → ICH stub` ten times and asserts the structured output is **byte-identical** on every iteration (one content hash across all ten). Reproducibility is a continuously-tested invariant, not an aspiration.
+- **Versioned model registry + routed inference.** An append-only registry (`moltrace.spectroscopy.ai`) tracks every artifact that can produce a prediction — NMRNet checkpoints, HOSE-code KB builds, LoRA adapters, embedding models — with its semantic version, SHA-256, training-data lineage (dataset snapshot hash + row count), metric snapshot, and lifecycle status (candidate / shadow / production / retired); entries are immutable and a new version supersedes the old (supersession reconstructed from the append-only log). An inference router composes the fine-tuned (LoRA), pretrained (NMRNet), and deterministic-fallback (HOSE) layers — choosing LoRA per atom only when a production adapter exists for the nucleus and the conformer-ensemble uncertainty is within the adapter's validated confidence band — and emits, per prediction, the exact `{model_id: sha256}` set that produced it, fed verbatim into the §3.10 audit entry's `model_versions`. A result is therefore reproducible bit-for-bit from the registry + lineage, and a reviewer sees which model produced each number and why one layer was chosen over another.
 
 The native core of this foundation carries zero new runtime dependencies; the heavier lineage tooling (MLflow, DVC, Great Expectations) lives behind an optional `infra` extra so the default install stays lean.
 
@@ -613,7 +614,7 @@ The FDA's January 2025 seven-step credibility framework[^fda_ai_2025] maps onto 
 
 **Step 6 — Document credibility evidence.** The Week 34 regulatory report composer packages the full evidence chain: raw-archive SHA-256, processing recipe hash, evidence-layer outputs, citation-linked rationale notes, reviewer signoff event, and the export-package hash manifest.
 
-**Step 7 — Maintain credibility through lifecycle.** Recipe-hash-linked re-processing, versioned report records, and the immutable raw vault ensure that any analysis can be regenerated from the raw bytes at any future point — the foundational requirement for lifecycle credibility. Content-addressed dataset versioning, the versioned output contract, and the CI determinism gate (§4.5) extend this from "regenerable in principle" to "byte-identical on re-run," giving lifecycle credibility a machine-checkable proof.
+**Step 7 — Maintain credibility through lifecycle.** Recipe-hash-linked re-processing, versioned report records, and the immutable raw vault ensure that any analysis can be regenerated from the raw bytes at any future point — the foundational requirement for lifecycle credibility. Content-addressed dataset versioning, the versioned output contract, and the CI determinism gate (§4.5) extend this from "regenerable in principle" to "byte-identical on re-run," giving lifecycle credibility a machine-checkable proof. The §4.5 model registry records every artifact (version, SHA-256, lineage, lifecycle status) and the inference router stamps each prediction with the exact model ids + checksums that produced it, so the precise model lineage behind any historical result — and why one layer was selected over another — is recoverable years later.
 
 ---
 
@@ -623,7 +624,7 @@ The ALCOA+ principles map onto MolTrace architectural primitives:
 
 | ALCOA+ principle | MolTrace mechanism |
 |---|---|
-| **A**ttributable | Every audit event carries `user_id`, `tenant_id`, timestamp, IP, and user-agent |
+| **A**ttributable | Every audit event carries `user_id`, `tenant_id`, timestamp, IP, and user-agent; every AI-assisted result also carries the exact model ids + SHA-256 that produced it (§4.5 registry + router `model_versions`) |
 | **L**egible | Pydantic-typed responses with stable JSON keys; HTML report renders for human review |
 | **C**ontemporaneous | Audit events written synchronously in the same transaction as the analyze record |
 | **O**riginal | Immutable raw FID vault; original archive bytes never overwritten |

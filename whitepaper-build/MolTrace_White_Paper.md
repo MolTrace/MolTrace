@@ -7,7 +7,7 @@
 ---
 
 **A MolTrace Technologies, Inc. White Paper**
-Document version: 2026-Q2 · rev 2026-06-06 · Hybrid (business + technical) · Approx. 5,200 words
+Document version: 2026-Q2 · rev 2026-06-07 · Hybrid (business + technical) · Approx. 5,200 words
 
 > *"Scientific intelligence has to be reproducible to be useful, auditable to be acceptable, and integrated to be adopted."*
 
@@ -213,6 +213,7 @@ Beneath the per-analysis chain of custody sits a foundation that makes *the plat
 - **Fail-loud data validation.** Every ingested spectrum and inference input passes a validation gate (schema, recognised nucleus, physically-plausible field, no NaN/Inf, in-range ppm) before entering the pipeline; the same logical suite runs through Great Expectations when that optional backend is installed.
 - **Single source of truth for "better."** One evaluation framework (RMSE, peak / classification F1, Top-k accuracy, BedROC, expected calibration error) decides whether a model change is an improvement, so promotion is a measured decision rather than a judgement call (§5.6).
 - **End-to-end determinism gate.** A continuous-integration test runs one real Bruker FID through the full pipeline ten times and requires **byte-identical** structured output each time; identical inputs therefore yield an identical content hash — the machine-checkable substance behind the platform's reproducibility claim.
+- **Versioned model registry + routed inference.** An append-only registry tracks every artifact that can produce a prediction — NMRNet checkpoints, HOSE-code knowledge-base builds, fine-tuned adapters, embedding models — with its semantic version, SHA-256, training-data lineage, and metric snapshot; an inference router composes the fine-tuned, pretrained, and deterministic-fallback layers and stamps every prediction with the exact set of model ids + checksums that produced it (fed verbatim into the §6.6 audit trail). A result is reproducible bit-for-bit from the registry + lineage, and a reviewer sees *which* model produced each number and *why* one layer was chosen over another.
 
 ---
 
@@ -290,8 +291,8 @@ The FDA's January 2025 *Considerations for the Use of Artificial Intelligence to
 | Assess AI model risk | Transparent multiplier tables + DP4/DP5 panel as fallback |
 | Plan and execute credibility activities | Weekly regression suites (Weeks 22–40) + smoke tests |
 | Assess model output | Layer-by-layer agreement matrix in unified confidence |
-| Document credibility evidence | Report composer + provenance manifests |
-| Maintain credibility through lifecycle | Recipe-hash-linked reruns + versioned report records |
+| Document credibility evidence | Report composer + provenance manifests + versioned model registry + per-prediction `model_versions` |
+| Maintain credibility through lifecycle | Recipe-hash-linked reruns + versioned report records + append-only model registry with reproducible layer routing |
 
 ### 6.3 EMA Reflection Paper on AI
 

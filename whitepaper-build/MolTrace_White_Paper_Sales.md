@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — AI-Native Scientific Intelligence for Pharmaceutical R&D"
 subtitle: "Sales-Led Variant · The Business Case for Audit-Ready Analytical Chemistry"
-version: "2026-06-06"
+version: "2026-06-07"
 audience: "Pharma R&D directors, regulatory affairs leads, CRO commercial teams, analytical operations heads"
 length: "≈4,000 words · Hybrid white paper · Sales-led variant of the canonical hybrid white paper"
 ---
@@ -119,7 +119,7 @@ MolTrace's regulatory posture is anchored in three external frameworks and reinf
 
 **GAMP 5 (Appendix D11) validation acceleration.** For teams running a risk-based Computerised System Validation, MolTrace generates a versioned, byte-reproducible GAMP 5 Appendix D11 CSV document skeleton (intended use, GxP-risk class, requirements-traceability matrix, IQ/OQ/PQ evidence slots). It accelerates the customer's validation; the overall compliance determination stays with the regulated user.
 
-**Reproducible by construction.** Datasets and model runs are versioned by content hash, every result carries its dataset-version tag and git commit, and a continuous-integration determinism gate proves the full pipeline regenerates byte-identical output — the technical backbone of the > 98 % reproducibility figure in §6.
+**Reproducible by construction.** Datasets and model runs are versioned by content hash, every result carries its dataset-version tag and git commit, and a continuous-integration determinism gate proves the full pipeline regenerates byte-identical output — the technical backbone of the > 98 % reproducibility figure in §6. A versioned, append-only model registry tracks every predictor artifact (checkpoints, fine-tuned adapters, fallbacks) and the inference router records exactly which models produced each prediction, so a result is reproducible from the registry and a reviewer sees which model produced each number and why one was chosen over another.
 
 **Operational compliance posture.** SOC 2 Type II · ICH Compliant · GDPR Ready · GxP Validated.
 

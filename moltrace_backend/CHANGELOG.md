@@ -14,6 +14,56 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.12.0 — Model registry + 5-layer inference router (Prompt 13) (2026-06-07)
+
+**Headline:** Adds `moltrace.spectroscopy.ai` — a versioned, **append-only model
+registry** and an **inference router** that composes the LoRA fine-tuned layer,
+the NMRNet pretrained layer, and the deterministic HOSE fallback, emitting exact
+provenance for every prediction. SpectraCheck no longer depends on a single
+hard-coded predictor: a result is reproducible bit-for-bit from the registry +
+lineage, and a reviewer sees *which* artifact produced each number and *why* one
+layer was chosen. Pure backend library — no API/UI/contract change. Layer 3
+(LoRA, Prompt 15) is not yet built; the router resolves it when a production
+adapter is registered and otherwise falls through to Layer 1 / the fallback.
+
+### Added
+- **`moltrace.spectroscopy.ai.registry`** — `ModelEntry` (role ∈
+  {`nmrnet_checkpoint`, `hose_kb`, `lora_adapter`, `embedding_model`},
+  `semantic_version`, `artifact_sha256`, `TrainingDataLineage` = dataset snapshot
+  hash + row count, `created_utc`, `metric_snapshot`, optional `nucleus` /
+  `parent_base_id` / `confidence_band_ppm`, lifecycle `status`; deterministic
+  `entry_hash()`); `ModelRegistry` with `register` / `get` /
+  `resolve(role, nucleus)` / `set_status` / `promote` / `retire` /
+  `list_lineage`. **Append-only**: immutable entries, duplicate `model_id`
+  rejected (`AppendOnlyViolation`), lifecycle changes appended as
+  `StatusTransition` events; promotion to `production` auto-retires the incumbent
+  for the same (role, nucleus) and supersession links are reconstructed from the
+  log. Pluggable `RegistryStore`: `InMemoryRegistryStore` +
+  `SqlAlchemyRegistryStore` (same store → **PostgreSQL** in prod, SQLite in
+  tests; INSERT-only, self-creating tables).
+- **`moltrace.spectroscopy.ai.router`** — `InferenceRouter.predict_shifts_routed`
+  resolves each atom **Layer 3 LoRA → Layer 1 NMRNet → HOSE fallback** (LoRA only
+  when a production adapter exists for the nucleus AND the conformer-ensemble
+  uncertainty ≤ the adapter's validated confidence band). `RoutedPrediction`
+  carries per-atom prediction + uncertainty + layer + a complete, deterministic
+  `model_versions` (`{model_id: sha256}`) that feeds the Prompt 12
+  `AuditEntry.model_versions` verbatim — one prediction, one immutable provenance
+  record. Device delegated to Prompt 6 `predict_shifts` (CUDA → MPS → CPU,
+  MPS → CPU fallback); runs on a CPU-only host.
+
+### Tests
+- `test_ai_registry.py` (both stores) — round-trip with lineage + metric
+  snapshot, append-only enforcement, immutable entries, per-(role, nucleus)
+  `resolve`, supersession + lineage links, lifecycle state machine, deterministic
+  content addressing.
+- `test_ai_router.py` — each resolution branch (fakes), LoRA confidence-band
+  gating incl. the NaN single-conformer edge, provenance completeness +
+  determinism, unregistered-artifact marking, the `model_versions` → `AuditEntry`
+  verbatim handoff, and a CPU-only integration test through real `predict_shifts`.
+
+No artifacts/weights/DB dumps are committed (existing `*.db` / `*.sqlite` /
+`*.pt` patterns + a clarifying `.gitignore` note).
+
 ## v0.11.0 — Audit trail + GxP controls supporting 21 CFR Part 11 (Prompt 12) (2026-06-06)
 
 **Headline:** Adds `moltrace.spectroscopy.audit` — software controls that SUPPORT
