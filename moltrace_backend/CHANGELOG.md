@@ -14,6 +14,56 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.16.1 — POST /spectrum/reason endpoint (retrieval-augmented reasoning contract) (2026-06-07)
+
+**Headline:** Exposes the v0.16.0 Prompt 14 RAG reasoner as a typed API. `POST
+/spectrum/reason` encodes a query spectrum, retrieves precedent from the
+server-configured similarity index, and asks Anthropic Claude for
+**retrieval-grounded** candidate structures that the Prompt 7 verifier arbitrates
+— with graceful degradation when the index or the model backend is unavailable.
+
+### Added
+- **`POST /spectrum/reason`** (`SpectrumReasonRequest` → `SpectrumReasonResult`):
+  - Request `{ ppm_axis[], intensity[], nucleus="1H", solvent?, field_mhz=500,
+    top_k=50 (1..1000), max_candidates=5 (1..20), allowed_licenses? }` — a *real*
+    spectrum (paired arrays, same shape as `/spectrum/analyze/gsd`) is required
+    because the verifier scores each candidate against it.
+  - Response `{ query_nucleus, index_available, reasoner_available, index_size,
+    top_k, max_candidates, truncated, retrieved:[{analogue_id, smiles, similarity,
+    l2_distance, rank, license, shift_summary?, multiplet_summary?, source?}],
+    candidates:[…], rejected:[…], audit:{model, retrieved_ids, retry_used, counts}?,
+    warnings }`. `candidates` are **verifier-accepted** (`verdict="consistent"`)
+    ranked by posterior confidence (desc); `rejected` carries every guard-dropped /
+    verifier-rejected candidate with its `dropped_reason`, for transparency. Each
+    candidate's `self_confidence` is advisory only — `posterior_confidence` /
+    `verdict` / `accepted` come from the verifier and are authoritative.
+  - **Graceful degradation:** retrieval runs whenever the index is configured
+    (`MOLTRACE_SIMILARITY_INDEX`); when unset → `index_available=false`. Reasoning
+    runs only when the model backend is available (`anthropic` installed +
+    `ANTHROPIC_API_KEY`); when not → `reasoner_available=false` and the response
+    returns retrieval only rather than failing.
+  - **Analogue grounding:** an optional `MOLTRACE_SIMILARITY_METADATA` JSON sidecar
+    (`{index_id: {smiles, license, shift_summary, multiplet_summary, source}}`,
+    cached by path+mtime) resolves opaque index ids to real SMILES + licenses for
+    the reasoner. Unset → ids are treated as SMILES (correct for SMILES-keyed
+    indexes). `allowed_licenses` enables licence-aware retrieval (drops analogues
+    outside the allow-list). One `spectrum.reason` audit event per call records the
+    retrieved ids, model, retry, and accepted/rejected counts.
+
+### Validation
+- `tests/test_spectrum_reason_api.py` — 10 tests: graceful-unconfigured-index,
+  retrieval-only-when-reasoner-unavailable, happy path with an injected reasoner
+  (verifier-accepted vs guard-dropped split; `self_confidence` never overrides the
+  posterior; request bounds forwarded; model = `claude-opus-4-8`), metadata-sidecar
+  grounding (db-key → SMILES + license), license allow-list filtering,
+  length-mismatch 400, too-short 422, top_k/max_candidates bounds 422, auth, and
+  OpenAPI registration. ruff clean (new code).
+
+### Compatibility
+- **New endpoint — the frontend must regenerate `schema.d.ts`** (`npm run
+  generate:openapi`). No existing endpoint changed. See
+  `docs/spectrum_reason_endpoint_fe_handoff.md` for the FE wiring checklist.
+
 ## v0.16.0 — Retrieval-augmented reasoning over the spectral index (Prompt 14) (2026-06-07)
 
 **Headline:** Adds `moltrace.spectroscopy.ai.rag` — Anthropic Claude wrapped in a

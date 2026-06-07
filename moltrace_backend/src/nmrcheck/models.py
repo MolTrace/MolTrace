@@ -14881,6 +14881,117 @@ class SpectrumRetrieveResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class SpectrumReasonRequest(BaseModel):
+    """Request body for ``POST /spectrum/reason`` (Prompt 14 RAG reasoner).
+
+    The query spectrum is sent as paired ``ppm_axis`` + ``intensity`` arrays
+    (same shape as ``/spectrum/analyze/gsd``) — a *real* spectrum is required
+    because the Prompt 7 verifier scores each proposed structure against it. The
+    spectrum is encoded and matched against the server-configured similarity index
+    (``MOLTRACE_SIMILARITY_INDEX``) to retrieve precedent, then Anthropic Claude
+    proposes retrieval-grounded candidate structures that the verifier arbitrates.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ppm_axis: list[float] = Field(min_length=16, max_length=524288)
+    intensity: list[float] = Field(min_length=16, max_length=524288)
+    nucleus: GSDPromptNucleus = "1H"
+    solvent: str = Field(default="", max_length=64)
+    field_mhz: float = Field(default=500.0, gt=0.0, le=2000.0)
+    # Retrieval depth (nearest known spectra used as precedent).
+    top_k: int = Field(default=50, ge=1, le=1000)
+    # Cap on candidate structures the reasoner may return.
+    max_candidates: int = Field(default=5, ge=1, le=20)
+    # Optional license allow-list for licence-aware retrieval; analogues whose
+    # license is not listed are dropped before reasoning. ``None`` keeps all.
+    allowed_licenses: list[str] | None = Field(default=None, max_length=64)
+
+
+class SpectrumReasonAnalogue(BaseModel):
+    """One retrieved precedent spectrum that grounds the reasoner."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    analogue_id: str
+    smiles: str
+    similarity: float = Field(ge=0.0, le=1.0)  # bounded transform of L2 (1.0 = identical)
+    l2_distance: float = Field(ge=0.0)
+    rank: int = Field(ge=0)
+    license: str = "unknown"
+    shift_summary: str | None = None
+    multiplet_summary: str | None = None
+    source: str | None = None
+
+
+class SpectrumReasonCandidate(BaseModel):
+    """One proposed structure after the hallucination guard + Prompt 7 verifier.
+
+    ``self_confidence`` is the model's own advisory estimate; it is **never** used
+    as the verifier prior. ``posterior_confidence`` / ``verdict`` / ``accepted``
+    come from the verifier and are authoritative. ``dropped_reason`` is set when
+    the candidate was rejected before or by verification (e.g.
+    ``"hallucination_guard"`` / ``"invalid_smiles"``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    smiles: str
+    rationale: str
+    cited_analogue_ids: list[str] = Field(default_factory=list)
+    cited_valid_ids: list[str] = Field(default_factory=list)
+    self_confidence: float = Field(ge=0.0, le=1.0)
+    retrieval_supported: bool = False
+    posterior_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    verdict: str | None = None
+    accepted: bool = False
+    dropped_reason: str | None = None
+
+
+class SpectrumReasonAudit(BaseModel):
+    """Compact Prompt 12 audit summary for the reasoning call.
+
+    The full system + user prompt and raw completion(s) are captured server-side
+    in the library ``RAGAudit`` / audit log; this summary surfaces the
+    traceable essentials (model, retrieved ids, retry, counts) to the caller.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    model: str
+    retrieved_ids: list[str] = Field(default_factory=list)
+    retry_used: bool = False
+    parsed_candidate_count: int = Field(default=0, ge=0)
+    dropped_candidate_count: int = Field(default=0, ge=0)
+    accepted_candidate_count: int = Field(default=0, ge=0)
+
+
+class SpectrumReasonResult(BaseModel):
+    """Response from ``POST /spectrum/reason``.
+
+    Retrieval (``retrieved``) runs whenever the index is configured; reasoning
+    (``candidates`` / ``rejected``) runs only when the reasoning model backend is
+    available. ``candidates`` are verifier-accepted structures ranked by posterior
+    confidence (desc); ``rejected`` carries every guard-dropped / verifier-rejected
+    candidate with its reason, for transparency and audit.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    query_nucleus: str
+    index_available: bool
+    reasoner_available: bool
+    index_size: int = Field(default=0, ge=0)
+    top_k: int = Field(default=0, ge=0)
+    max_candidates: int = Field(default=0, ge=0)
+    truncated: bool = False
+    retrieved: list[SpectrumReasonAnalogue] = Field(default_factory=list)
+    candidates: list[SpectrumReasonCandidate] = Field(default_factory=list)
+    rejected: list[SpectrumReasonCandidate] = Field(default_factory=list)
+    audit: SpectrumReasonAudit | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
 class JCouplingMatch(BaseModel):
     """One matched observed<->predicted J coupling (Hz)."""
 
