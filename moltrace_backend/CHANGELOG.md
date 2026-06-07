@@ -14,6 +14,99 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.18.0 — Bayesian HPO, calibration head & contradiction detection (Prompt 22) (2026-06-07)
+
+**Headline:** Deepens `moltrace.spectroscopy.ai.finetune` with three Roadmap
+Phase 4 capabilities, all under the same Prompt 15 hard rules (K-fold CV per GAMP
+5 D11, full lineage, gold/holdout hash-exclusion, Prompt 17-gated promotion):
+**(1) Bayesian hyper-parameter optimization** (Optuna) replaces grid search over
+the LoRA knobs and feeds its best config to `finetune_lora`; **(2) a
+confidence-calibration head** (temperature / Platt) with **ECE enforced as a
+first-class promotion gate** — a model that is "more accurate" but lies about its
+confidence is **not** promotable; **(3) contradiction detection** — a
+deterministic detector plus a trained, calibrated classifier that flag internal
+spectral inconsistencies, complementing (not replacing) the Prompt 7 verifier,
+surfacing to the reviewer and feeding the Prompt 16 active-learning queue. Pure
+backend library — no API/UI/contract change.
+
+### Added
+- **`optimize_hyperparameters(snapshot, base_model_id, *, trainer=…, k_folds=5,
+  n_trials=10, sampler=…, tracker=…, …)`** — **Bayesian HPO over the five LoRA
+  knobs** (rank, alpha, dropout, learning-rate, epochs), budgeted to ~10 trials
+  (a budget, **not** a sweep). The default `HPOSampler` is **Optuna** with a
+  **seeded TPE sampler** (lazy-imported; raises `FineTuneUnavailable` when absent
+  — no silent grid fallback); inject any `HPOSampler` for tests. Each trial runs a
+  full **k-fold CV** and is scored by a mean-CV-MAE + calibration objective
+  (lower = better); **every trial is logged to the Prompt 19 tracker** (params,
+  dataset-version binding, `cv_score`). Returns a frozen, content-addressed
+  **`HPOStudy`** (all `HPOTrial`s, best config, sampler, seed, `HPOSearchSpace`)
+  whose `study_id` excludes wall-clock time, so **the search is reproducible**.
+  Re-asserts the holdout exclusion before any trial when `splits` is given.
+- **`finetune_lora(…, hpo_study=…)` + `LoRAConfig.learning_rate`/`.epochs`** —
+  `LoRAConfig` gains the two remaining HPO knobs; hyper-parameters now resolve as
+  explicit `lora_config` → else `hpo_study.best_config` → else defaults. When an
+  `hpo_study` is supplied the run manifest records `{study_id, sampler, n_trials,
+  objective, best_params, best_value}`, so a trained adapter is traceable back to
+  the search that chose its hyper-parameters.
+- **Confidence-calibration head** — `fit_temperature_scaling` (single-parameter
+  temperature on the logit; bounded NLL minimisation) and `fit_platt_scaling`
+  (two-parameter logistic on the logit) return a frozen **`CalibrationHead`**
+  (`temperature` / `platt` / `identity`); `calibration_report` reports **ECE
+  before vs after** (reusing the Prompt 17 `expected_calibration_error`).
+  **`CalibratedBundle`** wraps a model bundle and rewrites each prediction's
+  confidence through the head so downstream ECE measures the *calibrated* model.
+- **Calibration as a first-class promotion gate** — `register_if_eligible` gains
+  `max_ece` and `calibration_head`. When `max_ece` is set, a candidate whose
+  gold-set ECE exceeds it is **not promotable even if it dominates on accuracy**
+  (`promotable = dominates AND ece ≤ max_ece`); a supplied `calibration_head`
+  calibrates per-record confidences *before* the gold-set ECE is measured. The
+  registry `extra` now records `ece`, `max_ece`, `ece_gate_passed`,
+  `dominated_incumbent`, `calibrated`, `calibration`, and `promotable`. Defaults
+  (`max_ece=None`) leave existing behaviour unchanged.
+- **Deterministic contradiction detector** — `detect_contradictions(*,
+  verification_results=…, cross_modal=…, intra_spectral=…, model=…, queue=…)`
+  flags **(a)** no single structure consistent (from Prompt 7 verdicts), **(b)**
+  cross-modal disagreement (NMR vs MS top candidate / RT not corroborated —
+  Prompt 21), and **(c)** intra-spectral impossibilities (integration vs proton
+  count, multiplicity vs coupling neighbours via the n+1 rule, shift outside its
+  plausible window). Returns a **`ContradictionReport`** (`ContradictionSignal`s,
+  `max_severity`, `is_contradiction`, `to_reviewer_dict()`); contradictions above
+  threshold are enqueued to the Prompt 16 **`ActiveLearningQueue`**
+  (`InMemoryActiveLearningQueue` provided, de-duplicating by record hash). It
+  **complements**, does not replace, the deterministic verifier.
+- **Trained contradiction model** — `train_contradiction_detector(examples, *,
+  k_folds=5, max_ece=0.1, splits=…, …)` fits a **calibrated logistic classifier**
+  over the contradiction features under the **same hard rules**: K-fold CV with
+  per-fold precision/recall/F1/ECE, **gold/holdout hash-exclusion**, out-of-fold
+  temperature calibration whose **calibrated ECE is an acceptance gate**, and a
+  content-addressed **`ContradictionModelRun`** manifest (feature set, per-fold +
+  aggregate metrics, dataset hash, code git sha). The resulting
+  **`ContradictionModel`** plugs into `detect_contradictions` as the learned
+  signal.
+
+### Tests
+- `test_ai_finetune.py` grows from 12 to **29 tests** (still CPU-only; Optuna /
+  torch / peft absent). **HPO (5):** ~10-trial budget logs every trial to the
+  tracker and selects the encoded optimum; the study is **reproducible**
+  (`study_id` stable across timestamps); the best config **feeds `finetune_lora`**
+  (manifest carries `study_id`/`best_params`); the default sampler raises
+  `FineTuneUnavailable` without Optuna; `k_folds`/`n_trials` validation.
+  **Calibration (5):** temperature + Platt both reduce ECE; length/empty guards; a
+  **miscalibrated-but-dominant** candidate is **CANDIDATE-only** under a strict
+  gate; a looser gate promotes to `shadow`; a `calibration_head` rewrites the
+  confidence so the calibrated model clears a strict gate. **Contradiction (7):**
+  each deterministic rule fires (and a consistent verdict clears it); reports
+  surface to the reviewer and feed the active-learning queue; below-threshold is
+  not queued; the trained model runs K-fold CV with calibration + full lineage and
+  a reproducible `run_id`, excludes the holdout, validates inputs, and supplies the
+  learned signal to `detect_contradictions`.
+
+### Compatibility
+- **Pure library addition — no endpoint, no contract change.** The frontend does
+  **not** need to regenerate `schema.d.ts`. All new public names are re-exported
+  from `moltrace.spectroscopy.ai`. Existing `finetune_lora` / `register_if_eligible`
+  call sites are unaffected (new parameters default to off).
+
 ## v0.17.0 — LoRA domain fine-tuning pipeline (Prompt 15) (2026-06-07)
 
 **Headline:** Adds `moltrace.spectroscopy.ai.finetune` — Roadmap Layer 3
