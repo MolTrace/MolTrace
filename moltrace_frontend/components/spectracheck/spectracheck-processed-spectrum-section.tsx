@@ -58,6 +58,7 @@ import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel
 import { GsdIntegrationPanel } from "@/components/spectracheck/gsd-integration-panel"
 import { ShiftPredictionPanel } from "@/components/spectracheck/shift-prediction-panel"
 import { SpectrumRetrievePanel } from "@/components/spectracheck/spectrum-retrieve-panel"
+import { SpectrumReasonPanel } from "@/components/spectracheck/spectrum-reason-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
@@ -1637,6 +1638,19 @@ export function SpectraCheckProcessedSpectrumSection({
       <SpectrumRetrievePanel
         candidatesText={candidatesOptional.trim() || candidatesText}
         testId="processed-spectrum-retrieve-surface"
+      />
+
+      {/* ── Decision-support — retrieval-augmented reasoning (Prompt 14) ─
+          Encodes the displayed ppm + intensity trace, retrieves precedent
+          analogues, and asks the reasoning backend to propose verifier-
+          arbitrated candidate structures. Server-side similarity index +
+          reasoning model gating — both flags surfaced independently. */}
+      <SpectrumReasonPanel
+        trace={xy}
+        nucleus={nucleus}
+        solvent={solvent}
+        fieldMhz={Number(spectrometerMhz.trim() || "500") || 500}
+        testId="processed-spectrum-reason-surface"
       />
       </SpectrumResultsFullscreen>
     </div>
