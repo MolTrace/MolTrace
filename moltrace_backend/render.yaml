@@ -25,7 +25,7 @@ services:
       - key: BASE_URL
         value: https://moltrace-backend.onrender.com
       - key: ALLOWED_ORIGINS
-        value: https://moltrace-frontend1.onrender.com
+        value: https://moltrace.co,https://www.moltrace.co,https://moltrace-frontend1.onrender.com
       - key: API_KEY
         generateValue: true
       - key: REQUIRE_VERIFIED_EMAIL
