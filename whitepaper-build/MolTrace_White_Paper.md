@@ -203,6 +203,17 @@ The Week 34 regulatory-report composer is the gate between analytical evidence a
 
 The composer emits structured JSON (machine-readable), an HTML render (human-readable), and an export package (the original raw archive + the recipe + the derived peak table + the report + the hash manifest), so a reviewer or inspector can verify end-to-end that the report's claims are reachable from the raw bytes.
 
+### 4.8 Reproducibility, Dataset Versioning, and the Evaluation Foundation
+
+Beneath the per-analysis chain of custody sits a foundation that makes *the platform itself* reproducible as it evolves:
+
+- **Versioned output contract.** Every SpectraCheck analysis serialises to a schema-versioned contract whose canonical-JSON **content hash** (`sha256:…`) is the analysis's stable identity — the same fingerprint the Regulatory Hub handoff and the ICH report stub (§6.1) embed for traceability.
+- **Content-addressed dataset versioning.** Training and benchmark datasets are pinned and restored **by content hash** (with an optional DVC + S3 backend), so a result is tied to the exact bytes it was computed from — and no data blob is ever committed to git.
+- **Experiment & run tracking.** Each model or benchmark run records its parameters, metrics, artifacts, dataset-version tag, git commit SHA, and — for AI-assisted layers — the registry model-weight checksum (a native run store always on, MLflow optional), linking every metric back to the §6.6 audit trail.
+- **Fail-loud data validation.** Every ingested spectrum and inference input passes a validation gate (schema, recognised nucleus, physically-plausible field, no NaN/Inf, in-range ppm) before entering the pipeline; the same logical suite runs through Great Expectations when that optional backend is installed.
+- **Single source of truth for "better."** One evaluation framework (RMSE, peak / classification F1, Top-k accuracy, BedROC, expected calibration error) decides whether a model change is an improvement, so promotion is a measured decision rather than a judgement call (§5.6).
+- **End-to-end determinism gate.** A continuous-integration test runs one real Bruker FID through the full pipeline ten times and requires **byte-identical** structured output each time; identical inputs therefore yield an identical content hash — the machine-checkable substance behind the platform's reproducibility claim.
+
 ---
 
 ## 5. Scientific Foundations
@@ -254,6 +265,10 @@ The Reaction Optimization program is built on the well-developed literature for 
 
 The MS evidence stack is calibrated against the standard exact-mass and adduct rules in the AI-MS market analysis,[^ai_ms_market] community fragmentation-tree literature, and the canonical mzML / mzXML open standards for vendor-agnostic raw ingestion. The LC-MS feature detection + EIC/XIC + peak purity work (Weeks 36–38) targets the same reviewer-readable evidence quality the qNMR community demands for quantitative work.[^qnmr_pharma]
 
+### 5.6 Model Evaluation & Calibration
+
+Deciding whether a new model or recipe is genuinely *better* is itself a scientific question, so MolTrace standardises on one metric vocabulary rather than ad-hoc per-experiment comparisons: root-mean-square error for shift prediction, F1 for peak and classification agreement, Top-k accuracy for candidate ranking, **BedROC** for early-recognition retrieval — which weights hits near the top of a ranked list, after Truchon & Bayly[^bedroc] — and **expected calibration error** for whether a model's stated confidence matches its observed accuracy, after Guo et al.[^ece_guo] Each metric is a small, separately-tested pure function, and a single evaluation call produces the comparable metric vector that gates model promotion (§4.8).
+
 ---
 
 ## 6. Regulatory & Compliance Posture
@@ -262,7 +277,7 @@ MolTrace is engineered for environments where any analytical claim must withstan
 
 ### 6.1 ICH Q2(R2) — Validation of Analytical Procedures
 
-The 2023 final ICH Q2(R2) guideline expanded the acceptance criteria for analytical method validation to explicitly address data integrity through the analytical lifecycle.[^ich_q2r2] MolTrace's audit-event ledger (`audit_events` table), immutable raw vault, recipe-hash-linked processing runs, and human-review release gate map directly onto the ALCOA+ principles (Attributable, Legible, Contemporaneous, Original, Accurate, plus Complete, Consistent, Enduring, Available).
+The 2023 final ICH Q2(R2) guideline expanded the acceptance criteria for analytical method validation to explicitly address data integrity through the analytical lifecycle.[^ich_q2r2] MolTrace's audit-event ledger (`audit_events` table), immutable raw vault, recipe-hash-linked processing runs, and human-review release gate map directly onto the ALCOA+ principles (Attributable, Legible, Contemporaneous, Original, Accurate, plus Complete, Consistent, Enduring, Available). As the analytical-evidence handoff to the Regulatory Intelligence Hub, the pipeline emits a deterministic ICH Q2(R2) report stub — sample / spectrum summary, result counts, and validation-characteristic slots (specificity, accuracy, precision, range) — that embeds the analysis content hash (§4.8) so the evidence is traceable to the exact run that produced it; the stub scaffolds, and never substitutes for, full method validation.
 
 ### 6.2 FDA AI Credibility Framework (2025)
 
@@ -293,6 +308,10 @@ Every architectural decision in §4 maps to a GxP-aligned data-integrity primiti
 ### 6.6 Audit Trail & Electronic Signatures — Controls Supporting 21 CFR Part 11
 
 MolTrace provides software controls that **support** 21 CFR Part 11 workflows[^cfr_part11] — a cryptographic audit trail, electronic signatures, and access control — layered over the §6.5 data-integrity primitives. A decorator can wrap any analysis layer so each result is written as an immutable, signed audit record capturing the operator, the UTC timestamp, the SHA-256 of the input and output, every method parameter, the software version, and — for AI-assisted layers — the **exact model-weight checksum** that produced it, so the result is reproducible and traceable. Each record is cryptographically chained to the one before it (a SHA-256 hash chain sealed with an organisation-keyed HMAC), so any tampering, deletion, or reordering is caught by a periodic integrity check. Electronic signatures are designed per 21 CFR Part 11.50 (the signature manifestation carries the signer's name, the date and time, and the meaning — authorship, review, approval, or responsibility) and 11.70 (each signature is bound to its specific record so it cannot be copied or transferred). Records carry a configurable retention floor (default seven years) and export to a deterministic, submission-ready report (PDF/A). **Critically, these controls *help customers meet* 21 CFR Part 11 — MolTrace does not claim the product is itself compliant. Full computerized-system validation, SOPs, and identity management remain the customer's responsibility**, and the data-integrity basis follows the FDA's ALCOA+ guidance.[^fda_data_integrity]
+
+### 6.7 GAMP 5 Appendix D11 — Computerised System Validation
+
+For customers running a GAMP 5 risk-based validation, MolTrace generates a versioned **Appendix D11** Computerised System Validation (CSV) document skeleton[^gamp5]: a document-control block, an intended-use statement, the GAMP software-category and GxP-risk classification, a requirements-traceability matrix, and IQ/OQ/PQ activities with test-evidence slots — keyed to the same evidence (the §4.8 metric vector and end-to-end determinism result) the platform already produces. The template is timestamp-free and byte-reproducible, so it can be version-controlled as a controlled document. As with the §6.6 Part 11 controls, this **accelerates** a customer's validation effort; the full computerised-system validation and the overall compliance determination remain the regulated user's responsibility.
 
 ---
 
@@ -432,6 +451,12 @@ For information on pilot deployments, integration with Bruker / Agilent instrume
 [^fulmer_2010]: Fulmer G. R. et al. *NMR Chemical Shifts of Trace Impurities: Common Laboratory Solvents, Organics, and Gases in Deuterated Solvents Relevant to the Organometallic Chemist.* Organometallics 2010, 29, 2176. doi:10.1021/om100106e
 
 [^reich_resources]: Reich H. J. *OH and NH proton chemical shifts, exchange, and broadening.* University of Wisconsin–Madison. https://organicchemistrydata.org/hansreich/resources/nmr/
+
+[^bedroc]: Truchon J.-F.; Bayly C. I. *Evaluating Virtual Screening Methods: Good and Bad Metrics for the "Early Recognition" Problem.* J. Chem. Inf. Model. 2007, 47, 488. doi:10.1021/ci600426e. The BedROC early-recognition metric behind MolTrace's §5.6 evaluation framework.
+
+[^ece_guo]: Guo C.; Pleiss G.; Sun Y.; Weinberger K. Q. *On Calibration of Modern Neural Networks.* Proc. 34th Int. Conf. on Machine Learning (ICML) 2017, PMLR 70, 1321. The expected-calibration-error (ECE) definition behind MolTrace's §5.6 calibration metric.
+
+[^gamp5]: International Society for Pharmaceutical Engineering (ISPE). *GAMP 5: A Risk-Based Approach to Compliant GxP Computerised Systems*, 2nd ed., 2022 — including Appendix D11 (Computerised System Validation). The structure behind the §6.7 validation-document skeleton MolTrace generates.
 
 [^duus_carbo]: Duus J. Ø. et al. *NMR Spectroscopy of Carbohydrates.* Carbohydr. Res. 2000.
 

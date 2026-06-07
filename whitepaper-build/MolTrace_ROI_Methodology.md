@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — ROI Methodology & Measured-Tenant-Data Template"
 subtitle: "A defensible measurement protocol for converting order-of-magnitude claims into tenant-specific evidence"
-version: "2026-Q2"
+version: "2026-06-06"
 audience: "Procurement, FP&A, analytical operations leadership, pilot champions"
 length: "Methodology + fill-in template"
 ---
@@ -66,6 +66,8 @@ The methodology is deliberately conservative — it counts only the time / cost 
 **Definition.** Fraction of analyses whose final report can be regenerated from the raw archive + recipe + input parameters in < 5 minutes by a second reviewer.
 
 **Components measured.** Re-execution of MolTrace analysis pipeline on the original raw archive with the recorded recipe hash; comparison of regenerated report's structured JSON to the original.
+
+**Platform basis.** MolTrace serialises each analysis to a canonical-JSON output contract with a stable `sha256:…` content hash, and a continuous-integration determinism gate re-runs one real FID through the full pipeline ten times asserting byte-identical output. The RR metric therefore measures *operational* reproducibility (a second reviewer, working from the original archive + recipe) on top of an engine whose deterministic regeneration is a continuously-tested invariant.
 
 **Components excluded.** Non-MolTrace analyses (no fair comparison without an equivalent baseline reproducibility protocol).
 

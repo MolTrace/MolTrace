@@ -245,6 +245,18 @@ Re-processing the same archive with a different recipe creates a **new** `fid_ru
 
 `GET /raw-fid/{archive_id}/export` packages the verified original archive, the recipe JSON, the derived peak CSV, the evidence report, the audit trail, and a hash manifest into a single download. The manifest records SHA-256 for every file in the bundle, so a downstream consumer can re-verify the chain of custody without trusting the platform.
 
+### 4.5 Dataset Versioning, Experiment Tracking, and the Determinism Gate
+
+The raw → recipe → derived DAG above secures a single analysis; an MLOps foundation extends the same content-addressed discipline to the data and models behind every layer.
+
+- **Versioned output contract.** Each SpectraCheck analysis serialises through a schema-versioned contract and a canonical-JSON encoder (sorted keys, fixed float rounding, `-0.0` → `0.0`, NaN / Inf rejected) to a stable `sha256:…` content hash. That hash is the analysis's identity across reruns and the value the Regulatory-Hub handoff and the ICH Q2(R2) stub (§8.10, §10) embed.
+- **Content-addressed dataset versioning.** Datasets are pinned and restored **by content hash**; an optional DVC + S3 remote provides distributed storage with a native local-remote fallback, and no dataset blob is committed to git — only the hash pointer.
+- **Experiment tracking.** Every model / benchmark run logs parameters, metrics, artifacts, a dataset-version tag, the git commit SHA, and the registry model-weight checksum from the §3.10 audit subsystem. A native file-backed run store is always available; MLflow is an optional drop-in backend.
+- **Validation gate.** A native validator rejects malformed inputs (schema, recognised nucleus, field-MHz range, NaN / Inf, per-nucleus ppm range) before ingestion or inference; the identical logical suite is expressible as a Great Expectations suite when that optional backend is installed. Both raise loudly.
+- **Determinism gate.** A CI test drives one real Bruker FID through `read_fid → GSD peak-pick → classification → multiplet detection → integration → contract → ICH stub` ten times and asserts the structured output is **byte-identical** on every iteration (one content hash across all ten). Reproducibility is a continuously-tested invariant, not an aspiration.
+
+The native core of this foundation carries zero new runtime dependencies; the heavier lineage tooling (MLflow, DVC, Great Expectations) lives behind an optional `infra` extra so the default install stays lean.
+
 ---
 
 ## 5. Peak Categorisation — Decision Rules
@@ -527,9 +539,23 @@ The MS evidence stack (Weeks 29–32, 35–39) is grounded in:
 
 **EMA Reflection paper on AI in medicinal product lifecycle**.[^ema_ai_reflection] Reproducibility, version control, human oversight — all satisfied through MolTrace's human-review release gate and immutable raw archive.
 
-**ICH Q2(R2) Validation of Analytical Procedures** (2023).[^ich_q2r2] Expanded data-integrity acceptance criteria for the analytical lifecycle.
+**ICH Q2(R2) Validation of Analytical Procedures** (2023).[^ich_q2r2] Expanded data-integrity acceptance criteria for the analytical lifecycle; the pipeline emits a deterministic, content-hash-keyed ICH Q2(R2) report stub as the Regulatory-Hub handoff artefact (§4.5).
+
+**GAMP 5 (2nd ed., 2022), Appendix D11 — Computerised System Validation**.[^gamp5] MolTrace generates a versioned, byte-reproducible D11 CSV document skeleton (intended use, GAMP software category, GxP-risk class, requirements-traceability matrix, IQ/OQ/PQ evidence slots) to accelerate a customer's validation; the overall compliance determination remains the regulated user's responsibility.
 
 **FDA Control of Nitrosamine Impurities in Human Drugs**.[^fda_nitrosamines] Drives the curated impurity-library in `impurities.py`.
+
+### 8.11 Model Evaluation & Calibration Metrics
+
+A model change is an improvement only if a fixed, pre-registered metric says so, so MolTrace centralises the definition of "better" in one evaluation module. Each metric is an independently-tested pure function over predicted-versus-reference data:
+
+- **RMSE** — root-mean-square error for chemical-shift prediction.
+- **F1** — harmonic mean of precision and recall for peak detection and for peak classification, the standard information-retrieval definition.[^vanrijsbergen]
+- **Top-k accuracy** — whether the correct candidate appears in the top *k* of a ranked list.
+- **BedROC** — Boltzmann-enhanced discrimination of ROC, an early-recognition metric that up-weights true hits near the top of a ranked list with a tunable α, after Truchon & Bayly.[^bedroc]
+- **ECE** — expected calibration error, the binned gap between a model's stated confidence and its empirical accuracy, after Guo et al.[^ece_guo]
+
+A single call returns the comparable metric vector consumed by the experiment-tracking and promotion machinery of §4.5, so promotion decisions are auditable measurements rather than judgement calls.
 
 ---
 
@@ -581,13 +607,13 @@ The FDA's January 2025 seven-step credibility framework[^fda_ai_2025] maps onto 
 
 **Step 3 — Assess AI model risk.** MolTrace's transparent multiplier tables (compound-class priors) and the DP4/DP5 panel run side-by-side with the heuristic candidate score. The risk assessment is performed by the human reviewer at the release-gate stage.
 
-**Step 4 — Plan and execute credibility activities.** Weekly regression suites (Weeks 22–40) pin every layer's behavior against a stable test corpus. Workflow-smoke tests exercise the full register → login → validate → analyze → preview → reference-assisted analysis → job submission → review approve/reject → export pipeline.
+**Step 4 — Plan and execute credibility activities.** Weekly regression suites (Weeks 22–40) pin every layer's behavior against a stable test corpus. Workflow-smoke tests exercise the full register → login → validate → analyze → preview → reference-assisted analysis → job submission → review approve/reject → export pipeline. A single evaluation framework (§8.11) — RMSE, F1, Top-k, BedROC, ECE — defines "better" up front, so a model or recipe change is promoted on measured, pre-registered metrics rather than ad-hoc comparison, with each run's metric vector, dataset-version tag, and git SHA captured by the experiment tracker (§4.5).
 
 **Step 5 — Assess model output.** The unified confidence engine's layer-by-layer agreement matrix, contradictions list, missing-layer list, and ambiguity alerts surface model-output uncertainty to the reviewer.
 
 **Step 6 — Document credibility evidence.** The Week 34 regulatory report composer packages the full evidence chain: raw-archive SHA-256, processing recipe hash, evidence-layer outputs, citation-linked rationale notes, reviewer signoff event, and the export-package hash manifest.
 
-**Step 7 — Maintain credibility through lifecycle.** Recipe-hash-linked re-processing, versioned report records, and the immutable raw vault ensure that any analysis can be regenerated from the raw bytes at any future point — the foundational requirement for lifecycle credibility.
+**Step 7 — Maintain credibility through lifecycle.** Recipe-hash-linked re-processing, versioned report records, and the immutable raw vault ensure that any analysis can be regenerated from the raw bytes at any future point — the foundational requirement for lifecycle credibility. Content-addressed dataset versioning, the versioned output contract, and the CI determinism gate (§4.5) extend this from "regenerable in principle" to "byte-identical on re-run," giving lifecycle credibility a machine-checkable proof.
 
 ---
 
@@ -609,7 +635,7 @@ The ALCOA+ principles map onto MolTrace architectural primitives:
 
 A typical inspector question — *"Show me the raw bytes that produced this number"* — is a single click in the UI and a single SQL query in the database.
 
-The §3.10 audit-trail layer hardens this posture cryptographically. **Original / Accurate / Enduring** are strengthened by the hash-chained, HMAC-signed `AuditEntry` ledger — each row links to the prior row's SHA-256 and is sealed with an organisation-keyed HMAC, so tampering, deletion, or reordering is detectable by `verify_chain`, and every AI-assisted result records the exact model-weight checksum that produced it. **Attributable** gains 21 CFR Part 11.50/.70 electronic signatures whose manifestation carries the signer's name, time, and meaning and is cryptographically bound to its record. A configurable **7-year retention floor** and a deterministic PDF/A export round out the *Enduring / Available* attributes for submission. These are controls that **support** 21 CFR Part 11; the overall compliance determination and computerized-system validation remain the customer's responsibility.
+The §3.10 audit-trail layer hardens this posture cryptographically. **Original / Accurate / Enduring** are strengthened by the hash-chained, HMAC-signed `AuditEntry` ledger — each row links to the prior row's SHA-256 and is sealed with an organisation-keyed HMAC, so tampering, deletion, or reordering is detectable by `verify_chain`, and every AI-assisted result records the exact model-weight checksum that produced it. **Attributable** gains 21 CFR Part 11.50/.70 electronic signatures whose manifestation carries the signer's name, time, and meaning and is cryptographically bound to its record. A configurable **7-year retention floor** and a deterministic PDF/A export round out the *Enduring / Available* attributes for submission. The §4.5 reproducibility foundation reinforces *Original / Accurate / Enduring*: datasets and runs are addressed by content hash, every metric carries its dataset-version tag and git SHA, and the end-to-end determinism gate proves a result regenerates byte-for-byte — while the generated GAMP 5 Appendix D11 and ICH Q2(R2) artefacts (§8.10) package this evidence for a CSV file. These are controls that **support** 21 CFR Part 11; the overall compliance determination and computerized-system validation remain the customer's responsibility.
 
 ---
 
@@ -764,6 +790,14 @@ For analytical-method validators, NMR / MS technical leads, regulatory-affairs r
 [^fda_data_integrity]: U.S. Food and Drug Administration. *Data Integrity and Compliance With Drug CGMP: Questions and Answers — Guidance for Industry* (December 2018) — the ALCOA+ data-integrity attributes. U.S. Government work, public domain.
 
 [^fda_nitrosamines]: U.S. Food and Drug Administration. *Control of Nitrosamine Impurities in Human Drugs.* Guidance for Industry.
+
+[^gamp5]: International Society for Pharmaceutical Engineering (ISPE). *GAMP 5: A Risk-Based Approach to Compliant GxP Computerised Systems*, 2nd ed., 2022 — including Appendix D11 (Computerised System Validation). The structure behind the §4.5 / §8.10 validation-document skeleton MolTrace generates.
+
+[^vanrijsbergen]: van Rijsbergen C. J. *Information Retrieval*, 2nd ed. Butterworths, 1979 — the precision / recall / F-measure definitions behind the §8.11 F1 metric.
+
+[^bedroc]: Truchon J.-F.; Bayly C. I. *Evaluating Virtual Screening Methods: Good and Bad Metrics for the "Early Recognition" Problem.* J. Chem. Inf. Model. 2007, 47, 488. doi:10.1021/ci600426e. The BedROC early-recognition metric behind the §8.11 evaluation framework.
+
+[^ece_guo]: Guo C.; Pleiss G.; Sun Y.; Weinberger K. Q. *On Calibration of Modern Neural Networks.* Proc. 34th Int. Conf. on Machine Learning (ICML) 2017, PMLR 70, 1321. The expected-calibration-error definition behind the §8.11 calibration metric.
 
 ---
 

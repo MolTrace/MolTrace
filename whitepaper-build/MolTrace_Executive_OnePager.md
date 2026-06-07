@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Executive One-Pager"
 subtitle: "AI-Native Scientific Intelligence for Pharmaceutical R&D"
-version: "2026-05-28o"
+version: "2026-06-06"
 audience: "Pharmaceutical, biotech, CRO, and academic R&D leadership"
 length: "Single page (≈500 words)"
 ---
@@ -46,7 +46,7 @@ A multi-tenant SaaS platform with three integrated programs sharing one evidence
 
 ## Compliance Posture
 
-SOC 2 Type II · ICH Compliant · GDPR Ready · GxP Validated · ALCOA+ data-integrity primitives baked into every layer of the architecture.
+SOC 2 Type II · ICH Compliant · GDPR Ready · GxP Validated · GAMP 5 (Appendix D11) & ICH Q2(R2) validation-document generation · content-hash reproducibility gate · ALCOA+ data-integrity primitives baked into every layer of the architecture.
 
 ## What's Next
 
