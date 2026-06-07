@@ -81,3 +81,10 @@ moltrace_data_store/
 # Great Expectations scratch (uncommitted validations / data docs).
 gx/uncommitted/
 great_expectations/uncommitted/
+
+# AI model registry + inference router (Prompt 13). The registry persists only
+# content addresses (SHA-256) + lineage metadata -- never weights/blobs/DB dumps.
+# Production uses PostgreSQL; local/test runs use SQLite (already covered by the
+# *.db / *.sqlite patterns above). Listed explicitly for clarity.
+ai_model_registry*.db
+*.registry.db
