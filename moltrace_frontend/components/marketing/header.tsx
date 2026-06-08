@@ -30,7 +30,9 @@ const navItems = [
   { label: "Platform", href: "/platform#platform" },
   { label: "Solutions", href: "/platform#solutions" },
   { label: "Enterprise", href: "/platform#enterprise" },
-  { label: "Documentation", href: "/platform#docs" },
+  // External technical-reference site — opens in a new tab (see the
+  // isExternal handling in both the desktop nav and the mobile sheet).
+  { label: "Documentation", href: "https://docs.moltrace.co" },
 ]
 
 type DropdownItem = { label: string; sub: string; icon: LucideIcon; href: string }
@@ -101,11 +103,13 @@ export function Header() {
             {navItems.map((item) => {
               const hasDropdown = item.label in dropdowns
               if (!hasDropdown) {
+                const isExternal = /^https?:\/\//i.test(item.href)
                 return (
                   <Link
                     key={item.label}
                     href={item.href}
                     className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : null)}
                   >
                     {item.label}
                   </Link>
@@ -297,12 +301,14 @@ export function Header() {
                       .filter((item) => !(item.label in dropdowns))
                       .map((item) => {
                         const Icon = topLevelIcons[item.label]
+                        const isExternal = /^https?:\/\//i.test(item.href)
                         return (
                           <Link
                             key={item.label}
                             href={item.href}
                             onClick={() => setOpen(false)}
                             className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 transition-all hover:-translate-y-px hover:border-[color:var(--mt-teal)]/30 hover:bg-[color:var(--mt-teal-soft)] active:translate-y-0"
+                            {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : null)}
                           >
                             <span
                               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
