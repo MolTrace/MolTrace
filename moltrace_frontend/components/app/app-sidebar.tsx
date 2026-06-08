@@ -26,6 +26,7 @@ import {
   ScrollText,
   Bug,
   Rocket,
+  Activity,
 } from "lucide-react"
 import {
   Tooltip,
@@ -56,6 +57,7 @@ const adminNavigation: SidebarNavItem[] = [
   { name: "Security", href: "/admin/security", icon: Shield },
   { name: "Audit", href: "/admin/audit", icon: ScrollText },
   { name: "Debug", href: "/admin/debug", icon: Bug },
+  { name: "Ops", href: "/admin/ops", icon: Activity },
   { name: "Deployment", href: "/settings/deployment", icon: Rocket },
 ]
 

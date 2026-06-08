@@ -9691,6 +9691,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/ops/deployment-gate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Ops Deployment Gate
+         * @description Prompt 18 release-control posture: the fail-closed deployment-gate status.
+         *
+         *     Runs the gate's self-check (which verifies it allows an all-pass candidate and
+         *     blocks every single-check failure) and reports the four-check policy, the drift
+         *     monitoring thresholds, and the downstream output-contract version. Read-only,
+         *     admin-gated; computed live with no model artifacts required.
+         */
+        get: operations["admin_ops_deployment_gate_admin_ops_deployment_gate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ops/model-lineage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Ops Model Lineage
+         * @description Prompt 18 model-lineage dashboard: per production model, read from the registry.
+         *
+         *     Returns a well-typed, empty dashboard until a Prompt 13 model registry is wired
+         *     into the API and a fine-tuned model is promoted to production
+         *     (``registry_configured`` reflects that). Read-only, admin-gated.
+         */
+        get: operations["admin_ops_model_lineage_admin_ops_model_lineage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/release-health": {
         parameters: {
             query?: never;
@@ -26021,6 +26070,118 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * OpsDeploymentGateCheck
+         * @description One deployment-gate check, surfaced for the release-control panel.
+         */
+        OpsDeploymentGateCheck: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+        };
+        /**
+         * OpsDeploymentGateStatus
+         * @description The fail-closed deployment-gate posture (Prompt 18).
+         *
+         *     A model or pipeline change reaches production only if all four checks pass.
+         *     ``self_check_passed`` is the live verification that the gate machinery fails
+         *     closed — it allows an all-pass candidate and blocks every single-check
+         *     failure; ``fails_closed`` is invariant True.
+         */
+        OpsDeploymentGateStatus: {
+            /**
+             * Fails Closed
+             * @default true
+             */
+            fails_closed: boolean;
+            /** Self Check Passed */
+            self_check_passed: boolean;
+            /** Self Check Failures */
+            self_check_failures?: string[];
+            /** Checks */
+            checks?: components["schemas"]["OpsDeploymentGateCheck"][];
+            /** Output Contract Schema Version */
+            output_contract_schema_version: string;
+            /** Monitoring Thresholds */
+            monitoring_thresholds?: {
+                [key: string]: number;
+            };
+            /**
+             * Data Mode
+             * @default live
+             * @enum {string}
+             */
+            data_mode: "live" | "demo" | "partially_synced" | "unavailable" | "stale";
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at?: string;
+        };
+        /**
+         * OpsModelLineageResponse
+         * @description Per production model: version, snapshot hash, metric vector, promotion, drift.
+         *
+         *     Reads the Prompt 13 model registry. ``registry_configured`` is False (and
+         *     ``rows`` empty) until a registry is wired into the API and a fine-tuned model
+         *     is promoted to production; the contract shape is stable regardless.
+         */
+        OpsModelLineageResponse: {
+            /** Rows */
+            rows?: components["schemas"]["OpsModelLineageRow"][];
+            /**
+             * Registry Configured
+             * @default false
+             */
+            registry_configured: boolean;
+            /** Note */
+            note?: string | null;
+            /**
+             * Data Mode
+             * @default live
+             * @enum {string}
+             */
+            data_mode: "live" | "demo" | "partially_synced" | "unavailable" | "stale";
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at?: string;
+        };
+        /**
+         * OpsModelLineageRow
+         * @description One production model's lineage for the Prompt 18 lineage dashboard.
+         */
+        OpsModelLineageRow: {
+            /** Model Id */
+            model_id: string;
+            /** Role */
+            role: string;
+            /** Nucleus */
+            nucleus?: string | null;
+            /** Semantic Version */
+            semantic_version: string;
+            /** Artifact Sha256 */
+            artifact_sha256: string;
+            /** Training Snapshot Hash */
+            training_snapshot_hash: string;
+            /** Metric Vector */
+            metric_vector?: {
+                [key: string]: number;
+            };
+            /** Promoted Utc */
+            promoted_utc?: string | null;
+            /** Promotion Reason */
+            promotion_reason?: string | null;
+            /** Supersedes */
+            supersedes?: string | null;
+            /**
+             * Drift Status
+             * @default unknown
+             */
+            drift_status: string;
         };
         /** OrganizationCreate */
         OrganizationCreate: {
@@ -65093,6 +65254,72 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_ops_deployment_gate_admin_ops_deployment_gate_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpsDeploymentGateStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_ops_model_lineage_admin_ops_model_lineage_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpsModelLineageResponse"];
                 };
             };
             /** @description Validation Error */
