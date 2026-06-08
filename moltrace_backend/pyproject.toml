@@ -26,6 +26,7 @@ moltrace-gsd-prompt3-sidecar-report = "nmrcheck.gsd_prompt3_validation:main"
 moltrace-gsd-hmdb-sidecar-report = "nmrcheck.gsd_hmdb_validation:main"
 moltrace-gsd-hmdb-style-sidecar-report = "nmrcheck.gsd_hmdb_style_validation:main"
 moltrace-karplus-jcoupling-report = "nmrcheck.karplus_validation:main"
+moltrace-deployment-gate = "moltrace.spectroscopy.ops.deployment_gate:main"
 
 [project.optional-dependencies]
 fid = [
