@@ -200,6 +200,11 @@ class Snapshot:
     n_excluded_for_holdout: int
     git_sha: str
     created_utc: str
+    # Leak-proof CV grouping (Prompt 22b): ``record_hash -> group key`` so every
+    # spectrum of a molecule/batch is kept in one fold (GroupKFold). ``None`` means
+    # no grouping signal was present, so the split reduces to the per-record split.
+    record_groups: Mapping[str, str] | None = None
+    n_groups: int = 0  # distinct CV groups (== row_count when ungrouped)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -214,6 +219,8 @@ class Snapshot:
             "n_excluded_for_holdout": self.n_excluded_for_holdout,
             "git_sha": self.git_sha,
             "created_utc": self.created_utc,
+            "cv_strategy": "group_kfold" if self.record_groups is not None else "kfold",
+            "n_groups": self.n_groups,
         }
 
 
@@ -246,6 +253,30 @@ def _field_of(rec: Any) -> str:
 def _solvent_of(rec: Any) -> str:
     solvent = _spectrum_of(rec).get("solvent")
     return str(solvent) if solvent else "unknown"
+
+
+def _group_of(rec: Any) -> str | None:
+    """The leak-proof CV grouping key for a record (mirrors ``datasets_pipeline._skeleton``).
+
+    Spectra that share a key must never straddle a cross-validation fold; otherwise
+    K-fold CV leaks information between train and eval and reports optimistic,
+    untrustworthy metrics — the classic batch-leakage failure of naive CV, where
+    multiple scans of one batch/sample land on both sides of the split. We prefer an
+    explicit batch/sample identifier when the record carries one, then fall back to
+    the molecule skeleton (the InChIKey connectivity block, first 14 chars) so every
+    spectrum of a molecule — and every scan of one physical sample/batch — is
+    grouped together. Returns ``None`` when no grouping signal exists, in which case
+    the record becomes its own group and the partition reduces to the per-record split.
+    """
+
+    for attr in ("group_key", "sample_id", "batch_key"):
+        val = getattr(rec, attr, None)
+        if val:
+            return str(val)
+    inchikey = getattr(rec, "inchikey", None) or _spectrum_of(rec).get("inchikey")
+    if inchikey:
+        return str(inchikey)[:14]
+    return None
 
 
 def _counts(items: Iterable[str]) -> dict[str, int]:
@@ -305,6 +336,15 @@ def build_training_snapshot(
     solvent = _counts(_solvent_of(rec) for rec in retained)
     source = _counts(getattr(rec, "source_key", "unknown") for rec in retained)
 
+    # Leak-proof CV grouping: map every retained record to its molecule/batch group
+    # (falling back to the bare record hash when no grouping signal exists). When no
+    # record carries a grouping signal the map is the identity and we leave the
+    # snapshot ungrouped, so the data-identity hash and the per-record fold split are
+    # both unchanged — grouping only ever *tightens* CV, never silently shifts it.
+    group_map = {rec.record_hash: (_group_of(rec) or rec.record_hash) for rec in retained}
+    grouped = any(group != rh for rh, group in group_map.items())
+    n_groups = len(set(group_map.values()))
+
     body = {
         "record_hashes": retained_hashes,
         "row_count": len(retained_hashes),
@@ -315,6 +355,8 @@ def build_training_snapshot(
         "source_distribution": source,
         "gold_checksum": gold_checksum,
     }
+    if grouped:  # only perturb the data-identity hash when grouping actually applies
+        body["record_groups"] = sorted(group_map.items())
     snapshot_hash = content_hash(body)
 
     return Snapshot(
@@ -330,6 +372,8 @@ def build_training_snapshot(
         n_excluded_for_holdout=n_excluded,
         git_sha=git_sha if git_sha is not None else current_git_sha(),
         created_utc=created_utc if created_utc is not None else datetime.now(UTC).isoformat(),
+        record_groups=dict(sorted(group_map.items())) if grouped else None,
+        n_groups=n_groups,
     )
 
 
@@ -505,13 +549,39 @@ def _file_sha256(path: Path) -> str:
 # --------------------------------------------------------------------------- #
 # Fold partition + aggregation
 # --------------------------------------------------------------------------- #
-def _assign_folds(record_hashes: Sequence[str], k: int, seed: int) -> list[list[str]]:
-    """Deterministically partition record hashes into ``k`` folds (seeded hash)."""
+def _assign_folds(
+    record_hashes: Sequence[str],
+    k: int,
+    seed: int,
+    *,
+    groups: Mapping[str, str] | None = None,
+) -> list[list[str]]:
+    """Deterministically partition record hashes into ``k`` folds (seeded hash).
+
+    When ``groups`` maps ``record_hash -> group key`` (e.g. the molecule skeleton),
+    whole *groups* are assigned to a fold so every spectrum of a molecule/batch lands
+    in exactly one fold — leak-proof **GroupKFold** cross-validation that prevents
+    train/eval leakage across batches. With ``groups=None`` each record is its own
+    group, which reproduces the historical per-record split byte-for-byte (the group
+    key is then the record hash itself, so the seeded digest is unchanged).
+    """
+
+    def _key(record_hash: str) -> str:
+        if groups is None:
+            return record_hash
+        return groups.get(record_hash, record_hash)
+
+    # Bucket records by group key so co-grouped spectra never straddle a fold.
+    members: dict[str, list[str]] = {}
+    for record_hash in sorted(record_hashes):
+        members.setdefault(_key(record_hash), []).append(record_hash)
 
     folds: list[list[str]] = [[] for _ in range(k)]
-    for record_hash in sorted(record_hashes):
-        digest = hashlib.sha256(f"{record_hash}|{seed}".encode()).hexdigest()
-        folds[int(digest[:16], 16) % k].append(record_hash)
+    for group_key in sorted(members):
+        digest = hashlib.sha256(f"{group_key}|{seed}".encode()).hexdigest()
+        folds[int(digest[:16], 16) % k].extend(members[group_key])
+    for fold in folds:
+        fold.sort()  # canonical order within each fold, independent of group order
     return folds
 
 
@@ -622,7 +692,13 @@ def finetune_lora(
     trainer = trainer or _ModalLoRATrainer()
     resolved_git_sha = git_sha if git_sha is not None else current_git_sha()
 
-    folds = _assign_folds(snapshot.record_hashes, k_folds, seed)
+    # Leak-proof CV: when the snapshot carries grouping, need >= k whole groups.
+    if snapshot.record_groups is not None and snapshot.n_groups < k_folds:
+        raise FineTuneError(
+            f"leak-proof CV needs >= k_folds ({k_folds}) molecule groups; "
+            f"snapshot has {snapshot.n_groups}"
+        )
+    folds = _assign_folds(snapshot.record_hashes, k_folds, seed, groups=snapshot.record_groups)
     fold_metrics: list[FoldMetrics] = []
     total_gpu_hours = 0.0
     for i in range(k_folds):
@@ -688,6 +764,13 @@ def finetune_lora(
         "nucleus": nucleus,
         "lora_config": cfg.as_dict(),
         "k_folds": k_folds,
+        "cv": {
+            "strategy": "group_kfold" if snapshot.record_groups is not None else "kfold",
+            "group_key": "molecule_skeleton",
+            "n_groups": (
+                snapshot.n_groups if snapshot.record_groups is not None else snapshot.row_count
+            ),
+        },
         "seed": seed,
         "row_count": snapshot.row_count,
         "fold_metrics": [f.as_dict() for f in fold_metrics],
@@ -1184,7 +1267,13 @@ def optimize_hyperparameters(
     trainer = trainer or _ModalLoRATrainer()
     resolved_git_sha = git_sha if git_sha is not None else current_git_sha()
     modules = tuple(target_modules) if target_modules is not None else DEFAULT_LORA_TARGET_MODULES
-    folds = _assign_folds(snapshot.record_hashes, k_folds, seed)
+    # Leak-proof CV: when the snapshot carries grouping, need >= k whole groups.
+    if snapshot.record_groups is not None and snapshot.n_groups < k_folds:
+        raise FineTuneError(
+            f"leak-proof CV needs >= k_folds ({k_folds}) molecule groups; "
+            f"snapshot has {snapshot.n_groups}"
+        )
+    folds = _assign_folds(snapshot.record_hashes, k_folds, seed, groups=snapshot.record_groups)
     sampler_name = getattr(sampler, "name", sampler.__class__.__name__)
     objective_desc = "mean_cv_mae_plus_calibration"
 
@@ -1226,6 +1315,13 @@ def optimize_hyperparameters(
         "seed": seed,
         "n_trials": len(trials),
         "k_folds": k_folds,
+        "cv": {
+            "strategy": "group_kfold" if snapshot.record_groups is not None else "kfold",
+            "group_key": "molecule_skeleton",
+            "n_groups": (
+                snapshot.n_groups if snapshot.record_groups is not None else snapshot.row_count
+            ),
+        },
         "search_space": space.as_dict(),
         "trials": [t.as_dict() for t in trials],
         "best_trial": best.as_dict(),
@@ -1961,7 +2057,17 @@ def train_contradiction_detector(
     x_all = _feature_matrix(by_hash, record_hashes, names)
     y_all = _label_vector(by_hash, record_hashes)
 
-    folds = _assign_folds(record_hashes, k_folds, seed)
+    # Leak-proof CV: group co-molecule/co-batch contradiction examples into one fold.
+    cd_group_map = {ex.record_hash: (_group_of(ex) or ex.record_hash) for ex in retained}
+    cd_grouped = any(group != rh for rh, group in cd_group_map.items())
+    cd_n_groups = len(set(cd_group_map.values()))
+    if cd_grouped and cd_n_groups < k_folds:
+        raise FineTuneError(
+            f"leak-proof CV needs >= k_folds ({k_folds}) molecule groups; got {cd_n_groups}"
+        )
+    folds = _assign_folds(
+        record_hashes, k_folds, seed, groups=cd_group_map if cd_grouped else None
+    )
     fold_metrics: list[ContradictionFoldMetrics] = []
     oof_conf: list[float] = []
     oof_correct: list[bool] = []
@@ -2041,6 +2147,11 @@ def train_contradiction_detector(
         "snapshot_hash": resolved_snapshot_hash,
         "feature_names": list(names),
         "k_folds": k_folds,
+        "cv": {
+            "strategy": "group_kfold" if cd_grouped else "kfold",
+            "group_key": "molecule_skeleton",
+            "n_groups": cd_n_groups,
+        },
         "seed": seed,
         "row_count": len(retained),
         "n_positive": int(y_all.sum()),

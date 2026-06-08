@@ -338,6 +338,198 @@ def test_default_trainer_unavailable_without_torch_peft_modal(tmp_path) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Leak-proof GroupKFold cross-validation (Prompt 22b)
+#
+# Multiple spectra of the same molecule/batch must never straddle a CV fold,
+# otherwise the cross-validated metrics leak train info into eval and read
+# optimistically. Records grow a grouping key (molecule skeleton = InChIKey
+# connectivity block); whole groups are assigned to a fold. Records with no
+# grouping signal (the legacy fixtures) fall back to the per-record split, so
+# nothing about the historical behaviour changes.
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class _GroupedExample:
+    """A NormalizedRecord-compatible duck type that also carries an InChIKey,
+    so leak-proof GroupKFold grouping engages."""
+
+    record_hash: str
+    source_key: str
+    modality: Modality
+    spectrum: dict | None
+    inchikey: str
+
+
+def _grouped_examples(n_mol: int, scans_per_mol: int) -> list[_GroupedExample]:
+    """``n_mol`` molecules, each with ``scans_per_mol`` spectra that share one
+    InChIKey connectivity block (first 14 chars) but have distinct record hashes."""
+
+    out: list[_GroupedExample] = []
+    for m in range(n_mol):
+        block = f"MOL{m:011d}"  # exactly 14 chars -> the grouping key
+        for s in range(scans_per_mol):
+            out.append(
+                _GroupedExample(
+                    record_hash=f"sha256:mol{m:03d}scan{s:03d}",
+                    source_key="nmrshiftdb2",
+                    modality=Modality.NMR_1H,
+                    spectrum={"nucleus": "1H", "field_mhz": 400.0, "ppm": [1.0], "intensity": [1.0]},
+                    inchikey=f"{block}-{m:04d}{s:07d}-N",
+                )
+            )
+    return out
+
+
+def test_grouped_cv_keeps_every_molecule_in_one_fold(tmp_path) -> None:
+    # 10 molecules x 3 scans: under per-record CV a molecule would almost surely
+    # split across folds; grouped CV must keep all of a molecule's scans together.
+    examples = _grouped_examples(n_mol=10, scans_per_mol=3)
+    snap = build_training_snapshot(examples, gold_checksum=_gold().checksum())
+    assert snap.record_groups is not None  # grouping engaged
+    assert snap.n_groups == 10
+    assert snap.row_count == 30
+
+    trainer = _FakeTrainer()
+    finetune_lora(
+        snap,
+        _BASE_ID,
+        k_folds=5,
+        trainer=trainer,
+        adapter_cache_dir_override=tmp_path,
+        nucleus="1H",
+        git_sha="abc1234",
+    )
+    group_of = snap.record_groups
+    # No molecule's scans appear on both the eval and train side of any fold.
+    for _fold, train_hashes, eval_hashes in trainer.fold_calls:
+        eval_groups = {group_of[h] for h in eval_hashes}
+        train_groups = {group_of[h] for h in train_hashes}
+        assert eval_groups.isdisjoint(train_groups)
+    # And the eval folds still partition the corpus exactly (complete + disjoint).
+    eval_sets = [set(call[2]) for call in trainer.fold_calls]
+    union: set[str] = set().union(*eval_sets)
+    assert sum(len(s) for s in eval_sets) == snap.row_count == len(union)
+
+
+def test_snapshot_hash_commits_to_cv_grouping() -> None:
+    # Identical record hashes + identical composition, but different molecule
+    # grouping must yield a different data-identity hash (the hash commits to CV
+    # grouping); the ungrouped path leaves identity untouched.
+    base = dict(
+        source_key="nmrshiftdb2",
+        modality=Modality.NMR_1H,
+        spectrum={"nucleus": "1H", "field_mhz": 400.0, "ppm": [1.0], "intensity": [1.0]},
+    )
+    hashes = [f"sha256:rec{i:03d}" for i in range(4)]
+    blocks_a = ["AAAAAAAAAAAAAA", "AAAAAAAAAAAAAA", "BBBBBBBBBBBBBB", "BBBBBBBBBBBBBB"]
+    blocks_b = ["AAAAAAAAAAAAAA", "BBBBBBBBBBBBBB", "CCCCCCCCCCCCCC", "DDDDDDDDDDDDDD"]
+    a = [
+        _GroupedExample(h, inchikey=f"{bk}-{i}", **base)
+        for i, (h, bk) in enumerate(zip(hashes, blocks_a, strict=True))
+    ]
+    b = [
+        _GroupedExample(h, inchikey=f"{bk}-{i}", **base)
+        for i, (h, bk) in enumerate(zip(hashes, blocks_b, strict=True))
+    ]
+
+    snap_a = build_training_snapshot(a, gold_checksum="sha256:g")
+    snap_b = build_training_snapshot(b, gold_checksum="sha256:g")
+    assert snap_a.record_hashes == snap_b.record_hashes  # same training-set identity by hash
+    assert (snap_a.n_groups, snap_b.n_groups) == (2, 4)
+    assert snap_a.snapshot_hash != snap_b.snapshot_hash  # ...but grouping changes data identity
+
+    # Ungrouped path: no grouping signal -> record_groups None, n_groups == rows.
+    plain = build_training_snapshot(_examples(4), gold_checksum="sha256:g")
+    assert plain.record_groups is None
+    assert plain.n_groups == 4
+
+
+def test_ungrouped_folds_match_legacy_per_record_split() -> None:
+    # The group-aware partitioner must reproduce the historical per-record seeded
+    # split byte-for-byte when no grouping is supplied (groups=None).
+    from moltrace.spectroscopy.ai.finetune import _assign_folds
+
+    hashes = [f"sha256:rec{i:03d}" for i in range(12)]
+    k, seed = 5, 0
+    legacy: list[list[str]] = [[] for _ in range(k)]
+    for h in sorted(hashes):
+        digest = hashlib.sha256(f"{h}|{seed}".encode()).hexdigest()
+        legacy[int(digest[:16], 16) % k].append(h)
+
+    assert _assign_folds(hashes, k, seed) == legacy
+    assert _assign_folds(hashes, k, seed, groups=None) == legacy
+
+
+def test_assign_folds_keeps_whole_groups_together() -> None:
+    # The single partitioner feeds every CV loop, including the contradiction
+    # detector's *out-of-fold* calibration head (it temperature-scales pooled OOF
+    # predictions). So proving no group straddles two folds here proves that head
+    # is calibrated leak-proof too: no molecule contributes to both a fold's
+    # trained model and its own out-of-fold score.
+    from moltrace.spectroscopy.ai.finetune import _assign_folds
+
+    groups = {f"sha256:g{g}r{r}": f"GROUP{g}" for g in range(4) for r in range(3)}
+    folds = _assign_folds(list(groups), k=3, seed=0, groups=groups)
+
+    flat = [h for fold in folds for h in fold]
+    assert sorted(flat) == sorted(groups)  # complete
+    assert len(flat) == len(set(flat)) == 12  # disjoint
+    for g in range(4):  # each group lives in exactly one fold
+        members = {h for h, gk in groups.items() if gk == f"GROUP{g}"}
+        holding = [i for i, fold in enumerate(folds) if members & set(fold)]
+        assert len(holding) == 1, f"GROUP{g} leaked across folds {holding}"
+
+
+def test_grouped_cv_requires_at_least_k_groups(tmp_path) -> None:
+    # 3 molecules but k=5 -> cannot form 5 leak-proof folds.
+    snap = build_training_snapshot(
+        _grouped_examples(n_mol=3, scans_per_mol=4), gold_checksum=_gold().checksum()
+    )
+    assert snap.n_groups == 3 and snap.row_count == 12
+    with pytest.raises(FineTuneError, match="molecule groups"):
+        finetune_lora(
+            snap,
+            _BASE_ID,
+            k_folds=5,
+            trainer=_FakeTrainer(),
+            adapter_cache_dir_override=tmp_path,
+            nucleus="1H",
+        )
+
+
+def test_manifest_records_cv_strategy(tmp_path) -> None:
+    snap_g = build_training_snapshot(
+        _grouped_examples(n_mol=6, scans_per_mol=2), gold_checksum=_gold().checksum()
+    )
+    run_g = finetune_lora(
+        snap_g,
+        _BASE_ID,
+        k_folds=3,
+        trainer=_FakeTrainer(),
+        adapter_cache_dir_override=tmp_path / "g",
+        nucleus="1H",
+        git_sha="abc1234",
+    )
+    assert run_g.manifest["cv"] == {
+        "strategy": "group_kfold",
+        "group_key": "molecule_skeleton",
+        "n_groups": 6,
+    }
+
+    snap_p = build_training_snapshot(_examples(12), gold_checksum=_gold().checksum())
+    run_p = finetune_lora(
+        snap_p,
+        _BASE_ID,
+        k_folds=5,
+        trainer=_FakeTrainer(),
+        adapter_cache_dir_override=tmp_path / "p",
+        nucleus="13C",
+        git_sha="abc1234",
+    )
+    assert run_p.manifest["cv"]["strategy"] == "kfold"
+    assert run_p.manifest["cv"]["n_groups"] == 12  # each record its own group
+
+
+# --------------------------------------------------------------------------- #
 # register_if_eligible: the dominance gate + lifecycle
 # --------------------------------------------------------------------------- #
 def test_no_incumbent_registers_candidate_then_shadow(tmp_path) -> None:
@@ -878,6 +1070,57 @@ def test_train_contradiction_detector_validates_inputs() -> None:
     with pytest.raises(FineTuneError):  # examples expose no features
         train_contradiction_detector(
             [_CEx(f"sha256:e{i}", i % 2 == 0, {}) for i in range(6)], k_folds=5
+        )
+
+
+@dataclass(frozen=True)
+class _GroupedCEx:
+    """A ContradictionExample duck type that also carries an InChIKey (grouped CV)."""
+
+    record_hash: str
+    label: bool
+    features: dict
+    inchikey: str
+
+
+def _grouped_contradiction_examples(n_mol: int, scans_per_mol: int) -> list[_GroupedCEx]:
+    out: list[_GroupedCEx] = []
+    for m in range(n_mol):
+        block = f"CMOL{m:010d}"  # exactly 14 chars
+        label = m % 2 == 0
+        for s in range(scans_per_mol):
+            out.append(
+                _GroupedCEx(
+                    record_hash=f"sha256:cmol{m:02d}scan{s:02d}",
+                    label=label,
+                    features={
+                        "nmr_ms_disagree": 1.0 if label else 0.0,
+                        "integration_rel_error": 0.80 if label else 0.05,
+                    },
+                    inchikey=f"{block}-{m}{s}",
+                )
+            )
+    return out
+
+
+def test_contradiction_detector_uses_grouped_cv() -> None:
+    # 6 molecules x 4 scans -> grouped CV with 6 leak-proof groups.
+    run = train_contradiction_detector(
+        _grouped_contradiction_examples(n_mol=6, scans_per_mol=4), k_folds=3, seed=0
+    )
+    assert run.manifest["cv"] == {
+        "strategy": "group_kfold",
+        "group_key": "molecule_skeleton",
+        "n_groups": 6,
+    }
+    assert run.row_count == 24
+
+
+def test_contradiction_detector_requires_at_least_k_groups() -> None:
+    # 2 molecules but k=3 -> too few groups for leak-proof CV (even with 10 rows).
+    with pytest.raises(FineTuneError, match="molecule groups"):
+        train_contradiction_detector(
+            _grouped_contradiction_examples(n_mol=2, scans_per_mol=5), k_folds=3, seed=0
         )
 
 
