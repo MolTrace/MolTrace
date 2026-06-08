@@ -5368,6 +5368,75 @@ class AIModelMonitoringSummary(BaseModel):
     generated_at: datetime = Field(default_factory=generated_at_utc)
 
 
+# --------------------------------------------------------------------------- #
+# MLOps surface (Prompt 18): release-control posture + model-lineage dashboard.
+# These type the GET /admin/ops/* routes that the Prompt 18 dashboard reads.
+# --------------------------------------------------------------------------- #
+class OpsDeploymentGateCheck(BaseModel):
+    """One deployment-gate check, surfaced for the release-control panel."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    description: str
+
+
+class OpsDeploymentGateStatus(BaseModel):
+    """The fail-closed deployment-gate posture (Prompt 18).
+
+    A model or pipeline change reaches production only if all four checks pass.
+    ``self_check_passed`` is the live verification that the gate machinery fails
+    closed — it allows an all-pass candidate and blocks every single-check
+    failure; ``fails_closed`` is invariant True.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    fails_closed: bool = True
+    self_check_passed: bool
+    self_check_failures: list[str] = Field(default_factory=list)
+    checks: list[OpsDeploymentGateCheck] = Field(default_factory=list)
+    output_contract_schema_version: str
+    monitoring_thresholds: dict[str, float] = Field(default_factory=dict)
+    data_mode: DataMode = "live"
+    generated_at: datetime = Field(default_factory=generated_at_utc)
+
+
+class OpsModelLineageRow(BaseModel):
+    """One production model's lineage for the Prompt 18 lineage dashboard."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: str
+    role: str
+    nucleus: str | None = None
+    semantic_version: str
+    artifact_sha256: str
+    training_snapshot_hash: str
+    metric_vector: dict[str, float] = Field(default_factory=dict)
+    promoted_utc: str | None = None
+    promotion_reason: str | None = None
+    supersedes: str | None = None
+    drift_status: str = "unknown"
+
+
+class OpsModelLineageResponse(BaseModel):
+    """Per production model: version, snapshot hash, metric vector, promotion, drift.
+
+    Reads the Prompt 13 model registry. ``registry_configured`` is False (and
+    ``rows`` empty) until a registry is wired into the API and a fine-tuned model
+    is promoted to production; the contract shape is stable regardless.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rows: list[OpsModelLineageRow] = Field(default_factory=list)
+    registry_configured: bool = False
+    note: str | None = None
+    data_mode: DataMode = "live"
+    generated_at: datetime = Field(default_factory=generated_at_utc)
+
+
 class PredictionAuditEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

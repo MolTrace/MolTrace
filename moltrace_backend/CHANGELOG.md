@@ -14,6 +14,53 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.21.1 — Surface the Prompt 18 ops layer through the admin API (2026-06-08)
+
+**Headline:** Exposes the Prompt 18 MLOps layer to the dashboard FE through two
+**read-only, admin-gated** GET endpoints — the fail-closed deployment-gate posture
+and the model-lineage dashboard — typed end-to-end. The v0.21.0 ops compute
+(`moltrace.spectroscopy.ops`) shipped as a library/CLI; this wires it to HTTP so
+the Prompt 18 dashboard can read it. **This is a contract change → the FE must
+regenerate `schema.d.ts`** (see the FE handoff). Additive and read-only, so
+existing clients are unaffected.
+
+### Added
+- **`GET /admin/ops/deployment-gate`** → **`OpsDeploymentGateStatus`** — the
+  release-control posture, computed live (no model artifacts required): `fails_closed`
+  (invariant True), `self_check_passed` + `self_check_failures` (the gate's live
+  self-verification that it allows an all-pass candidate and **blocks every
+  single-check failure**), `checks` (the four-check policy — dominance / audit_chain
+  / tests_green / data_leakage, each with a description), `output_contract_schema_version`
+  (`"1.0.0"`), and `monitoring_thresholds` (the PSI / override / confidence trend
+  bands + latency SLOs). Reuses `ops.deployment_gate.self_check` + the
+  `ops.monitoring` thresholds.
+- **`GET /admin/ops/model-lineage`** → **`OpsModelLineageResponse`** — the lineage
+  dashboard: `rows` of **`OpsModelLineageRow`** (`model_id`, `role`, `nucleus`,
+  `semantic_version`, `artifact_sha256`, `training_snapshot_hash`, `metric_vector`,
+  `promoted_utc`, `promotion_reason`, `supersedes`, `drift_status`), plus
+  `registry_configured` + `note`. Reads the Prompt 13 model registry from
+  `app.state.model_registry` via `ops.monitoring.lineage_dashboard`; returns a
+  well-typed empty dashboard (`registry_configured: false`) until a registry is
+  wired and a fine-tuned model is promoted to production.
+- **Models** (`models.py`): `OpsDeploymentGateStatus`, `OpsDeploymentGateCheck`,
+  `OpsModelLineageResponse`, `OpsModelLineageRow` (all `extra="forbid"`).
+- **`tests/test_ops_api.py`** — 5 tests: gate status shape, lineage empty +
+  registry-backed, admin gating (401/403 unauth), and the `/openapi.json` contract.
+
+### Notes
+- **Reuse-first.** Pure surfacing over the v0.21.0 `moltrace.spectroscopy.ops`
+  compute — no new monitoring/gate logic.
+- **Contract change.** Two new paths + four new schemas in `/openapi.json`; the FE
+  regenerates `src/lib/api/schema.d.ts` (`pnpm generate:openapi`) before building
+  the dashboard. Both routes are admin-gated and read-only.
+- **Deferred follow-up (separate prompt).** The *live drift* panels (input PSI /
+  confidence / override / latency over real production telemetry) need a training
+  baseline + assembled telemetry that are not yet plumbed into the API; the
+  deployment-gate posture and the lineage contract ship now, and the drift endpoint
+  lands once those data sources are wired.
+
+---
+
 ## v0.21.0 — MLOps: monitoring, drift detection, and the fail-closed deployment gate (Prompt 18) (2026-06-08)
 
 **Headline:** Pharma-grade observability and release control from day one —
