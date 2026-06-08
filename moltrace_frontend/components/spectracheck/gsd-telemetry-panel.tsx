@@ -302,7 +302,15 @@ export function GsdTelemetryPanel({
     )
   }
 
-  if (state.status === "error" || !summary) {
+  // The "unavailable" branch covers three operational cases that all
+  // collapse to the same UX outcome: hook error, missing summary, or a
+  // summary that's structurally incomplete (e.g. a hostile proxy stripped
+  // fields, a test/mock primed the cache with a partial object, or the
+  // backend ever drifts from its own schema). `flip_readiness_policy` is
+  // the only nested object the renderer dereferences without a fallback,
+  // so guarding it here keeps the whole tree from unmounting on partial
+  // data.
+  if (state.status === "error" || !summary || !summary.flip_readiness_policy) {
     return (
       <div
         data-testid={testId ?? "gsd-telemetry-panel-error"}
@@ -684,7 +692,10 @@ export function GsdReadinessVerdictCard({
       </div>
     )
   }
-  if (state.status === "error" || !state.summary) {
+  // Mirror GsdTelemetryPanel's guard — fall back to the "unavailable"
+  // card when the summary is missing or structurally incomplete, since
+  // every verdict branch dereferences `flip_readiness_policy`.
+  if (state.status === "error" || !state.summary || !state.summary.flip_readiness_policy) {
     return (
       <div
         data-testid={`${testId}-error`}
