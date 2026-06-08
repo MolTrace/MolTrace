@@ -502,6 +502,10 @@ from .models import (
     NMRRawFIDPreviewResponse,
     NMRRawFIDProcessResponse,
     OperationalMetric,
+    OpsDeploymentGateCheck,
+    OpsDeploymentGateStatus,
+    OpsModelLineageResponse,
+    OpsModelLineageRow,
     OrganizationCreate,
     OrganizationRecord,
     OutboundSyncJob,
@@ -23632,6 +23636,114 @@ def admin_deployment_diagnostics(request: Request) -> dict[str, object]:
         "queue_name": settings.queue_name,
         "require_verified_email": settings.require_verified_email,
     }
+
+
+@router.get(
+    "/admin/ops/deployment-gate",
+    response_model=OpsDeploymentGateStatus,
+    dependencies=[Depends(require_admin)],
+)
+def admin_ops_deployment_gate(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> OpsDeploymentGateStatus:
+    """Prompt 18 release-control posture: the fail-closed deployment-gate status.
+
+    Runs the gate's self-check (which verifies it allows an all-pass candidate and
+    blocks every single-check failure) and reports the four-check policy, the drift
+    monitoring thresholds, and the downstream output-contract version. Read-only,
+    admin-gated; computed live with no model artifacts required.
+    """
+
+    from moltrace.spectroscopy.infra.contract import SCHEMA_VERSION
+    from moltrace.spectroscopy.ops import monitoring as ops_monitoring
+    from moltrace.spectroscopy.ops.deployment_gate import self_check
+
+    self_check_passed, failures = self_check()
+    checks = [
+        OpsDeploymentGateCheck(
+            name="dominance",
+            description="Prompt 17 dominance gate — no regression on safety-critical metrics",
+        ),
+        OpsDeploymentGateCheck(
+            name="audit_chain",
+            description="Prompt 12 audit chain verifies — provenance intact",
+        ),
+        OpsDeploymentGateCheck(
+            name="tests_green",
+            description="the functional + unit test suite is green",
+        ),
+        OpsDeploymentGateCheck(
+            name="data_leakage",
+            description="data-leakage check — the candidate never trained on the gold set",
+        ),
+    ]
+    return OpsDeploymentGateStatus(
+        self_check_passed=self_check_passed,
+        self_check_failures=list(failures),
+        checks=checks,
+        output_contract_schema_version=SCHEMA_VERSION,
+        monitoring_thresholds={
+            "psi_warn": ops_monitoring.PSI_WARN_THRESHOLD,
+            "psi_breach": ops_monitoring.PSI_BREACH_THRESHOLD,
+            "override_trend_warn": ops_monitoring.DEFAULT_OVERRIDE_TREND_WARN,
+            "override_trend_breach": ops_monitoring.DEFAULT_OVERRIDE_TREND_BREACH,
+            "confidence_trend_warn": ops_monitoring.DEFAULT_CONFIDENCE_TREND_WARN,
+            "confidence_trend_breach": ops_monitoring.DEFAULT_CONFIDENCE_TREND_BREACH,
+            "slo_p50_ms": ops_monitoring.DEFAULT_SLO_P50_MS,
+            "slo_p95_ms": ops_monitoring.DEFAULT_SLO_P95_MS,
+        },
+    )
+
+
+@router.get(
+    "/admin/ops/model-lineage",
+    response_model=OpsModelLineageResponse,
+    dependencies=[Depends(require_admin)],
+)
+def admin_ops_model_lineage(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> OpsModelLineageResponse:
+    """Prompt 18 model-lineage dashboard: per production model, read from the registry.
+
+    Returns a well-typed, empty dashboard until a Prompt 13 model registry is wired
+    into the API and a fine-tuned model is promoted to production
+    (``registry_configured`` reflects that). Read-only, admin-gated.
+    """
+
+    registry = getattr(request.app.state, "model_registry", None)
+    if registry is None:
+        return OpsModelLineageResponse(
+            rows=[],
+            registry_configured=False,
+            note=(
+                "No model registry is configured on this deployment yet; the "
+                "lineage dashboard populates once a fine-tuned model is promoted "
+                "to production via the Prompt 13 registry."
+            ),
+        )
+
+    from moltrace.spectroscopy.ops.monitoring import lineage_dashboard
+
+    dashboard = lineage_dashboard(registry)
+    rows = [
+        OpsModelLineageRow(
+            model_id=row.model_id,
+            role=row.role,
+            nucleus=row.nucleus,
+            semantic_version=row.semantic_version,
+            artifact_sha256=row.artifact_sha256,
+            training_snapshot_hash=row.training_snapshot_hash,
+            metric_vector=dict(row.metric_vector),
+            promoted_utc=row.promoted_utc,
+            promotion_reason=row.promotion_reason,
+            supersedes=row.supersedes,
+            drift_status=row.drift_status,
+        )
+        for row in dashboard.rows
+    ]
+    return OpsModelLineageResponse(rows=rows, registry_configured=True)
 
 
 @router.get("/admin/release-health", dependencies=[Depends(require_admin)])
