@@ -14,6 +14,64 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.19.0 — Closed-loop feedback: capture, RLHF reward model & A/B rollout (Prompt 23) (2026-06-07)
+
+**Headline:** Ships the new `moltrace.spectroscopy.feedback` package — the
+production loop that turns reviewer interaction into a compounding data moat
+**without ever letting a model override the science** (Roadmap Phases 5-6). Three
+modules: **(1) in-app feedback capture** — every AI output (predicted shift,
+proposed structure, peak label, purity call, …) is rated with thumbs up/down + an
+optional free-text correction + a structured reason taxonomy, persisted as an
+immutable, content-addressed event carrying the exact Prompt 13 `model_versions`
+that produced it; corrections fan out to the Prompt 16 labeled-example store, bare
+overrides to the active-learning queue, and usage/override analytics roll up where
+the model is weakest; **(2) an RLHF reward/preference model** — corrections +
+accept/reject signals become Bradley-Terry preference pairs and train a
+deterministic reward model that *advisorily* re-ranks the Prompt 14 reasoner's
+candidates and prioritizes the Prompt 16 annotation queue; **(3) A/B champion vs
+challenger rollout** — shadow/canary traffic routing, dominance-gated promotion
+with reviewer guards, **no auto-deploy** (human sign-off + the Prompt 18 gate), and
+**instant rollback**. Pure backend library — no API/UI/contract change.
+
+### Added
+- **`feedback/capture.py`** — `FeedbackEvent` (frozen, content-addressed, with
+  `model_versions` provenance), the `OutputKind` / `FeedbackVerdict` / `ReasonCode`
+  vocabularies, `LabeledExample` (the Prompt 16 sink), `usage_analytics` /
+  `UsageAnalytics` (override rate by output kind + reason histogram), a pluggable
+  `FeedbackStore` (`InMemoryFeedbackStore` + append-only idempotent
+  `SqlAlchemyFeedbackStore`), and the `FeedbackCollector` single intake that
+  persists each event and fans corrections → labeled examples / bare overrides →
+  the active-learning queue.
+- **`feedback/reward_model.py`** — `build_preference_dataset` (mines corrections +
+  accept/reject pairs from the feedback stream), `train_reward_model` (deterministic
+  full-batch Bradley-Terry / pairwise-logistic fit with L2, mirroring the house
+  `_fit_logistic_regression`), `RewardModel` / `RewardModelRun`, `rank_candidates`
+  (**verifier-supremacy enforced structurally** — verifier-accepted candidates
+  always rank above rejected ones; reward only orders *within* a verdict class),
+  and `prioritize_annotation_queue` (severity × likely-wrong blend).
+- **`feedback/ab_testing.py`** — `ABRouter` (deterministic *sticky* hash routing;
+  `SHADOW` = never served / `CANARY` = controlled served fraction), `ArmStats`
+  (live Prompt 17 metrics + reviewer-acceptance + override rate), `evaluate_promotion`
+  / `PromotionDecision` (Prompt 17 dominance + no safety regression + override &
+  acceptance guards + Prompt 18 gate), and the `ABTest` controller whose
+  `promote(...)` refuses to mutate the registry without a positive decision **and**
+  an explicit human `signed_off_by`, while `rollback(...)` is an instant
+  routing-layer kill that never touches the append-only registry.
+- **`tests/test_feedback.py`** — 29 tests covering all four acceptance criteria,
+  including the capture store round-trip across both backends (in-memory + SQLite),
+  the verifier-never-overridden ranking guarantee, and instant rollback proven to
+  leave the registry untouched.
+
+### Design notes
+- **Advisory, never authoritative.** The reward model sharpens ranking and the
+  annotation queue; the deterministic Prompt 7 verifier remains the sole arbiter of
+  correctness. `rank_candidates` cannot promote a verifier-rejected structure above
+  an accepted one.
+- **Instant rollback respects append-only registry semantics.** Retirement is
+  terminal in the Prompt 13 registry, so rollback is modeled as a routing-layer
+  canary-kill (champion stays `production` throughout the test), distinct from the
+  separate, gated, signed-off `registry.promote(challenger)` action.
+
 ## v0.18.1 — Leak-proof GroupKFold cross-validation (Prompt 22) (2026-06-07)
 
 **Headline:** Hardens every cross-validation loop in
