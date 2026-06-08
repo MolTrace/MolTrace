@@ -14,6 +14,48 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.18.1 — Leak-proof GroupKFold cross-validation (Prompt 22) (2026-06-07)
+
+**Headline:** Hardens every cross-validation loop in
+`moltrace.spectroscopy.ai.finetune` against **cross-batch data leakage**. Naive
+K-fold CV that splits by individual spectrum will straddle a molecule's (or a
+physical sample/batch's) multiple scans across the train and eval sides of a
+fold, leaking train information into evaluation and reporting optimistic,
+untrustworthy metrics. The fold partitioner is now **group-aware**: whole groups
+— keyed on the molecule skeleton (the InChIKey connectivity block, first 14
+chars), or an explicit `group_key`/`sample_id`/`batch_key` when a record carries
+one — are assigned to a single fold (**GroupKFold**). This mirrors the dataset-
+level split convention (`datasets_pipeline._skeleton`) already used for
+train/val/test, closing the gap where in-training CV did not group. Pure backend
+library — no API/UI/contract change; fully backward compatible.
+
+### Changed
+- **`_assign_folds(record_hashes, k, seed, *, groups=None)`** — now groups whole
+  molecules/batches into one fold when a `groups` map is supplied. With
+  `groups=None` it reproduces the historical per-record seeded split
+  **byte-for-byte** (the group key is the record hash itself), so existing runs
+  are unchanged. Threaded into all three CV paths: `finetune_lora`,
+  `optimize_hyperparameters`, and `train_contradiction_detector`.
+- **`build_training_snapshot(...)`** — computes a `record_hash -> group key` map
+  (via the new `_group_of` helper, mirroring `datasets_pipeline._skeleton`). The
+  snapshot's data-identity hash commits to the grouping **only when grouping
+  actually applies** — records with no grouping signal leave the `snapshot_hash`
+  and the fold split untouched, so legacy snapshots keep their identity.
+
+### Added
+- **`Snapshot.record_groups` / `Snapshot.n_groups`** — the frozen snapshot now
+  carries its CV grouping (`record_groups=None` ⇒ ungrouped, `n_groups ==
+  row_count`) so the leak-proof split is reproducible and auditable; surfaced in
+  `Snapshot.as_dict()` as `cv_strategy` + `n_groups`.
+- **Group-count guard** — `finetune_lora` / `optimize_hyperparameters` /
+  `train_contradiction_detector` raise `FineTuneError` when grouping is active
+  and the corpus has fewer than `k_folds` distinct groups (you cannot form *k*
+  leak-proof folds from fewer than *k* groups). Ungrouped corpora are unaffected.
+- **`cv` manifest block** — every run manifest (LoRA run, HPO study, contradiction
+  run) now records `{"strategy": "group_kfold"|"kfold", "group_key":
+  "molecule_skeleton", "n_groups": N}` so the validation methodology is part of
+  the auditable lineage.
+
 ## v0.18.0 — Bayesian HPO, calibration head & contradiction detection (Prompt 22) (2026-06-07)
 
 **Headline:** Deepens `moltrace.spectroscopy.ai.finetune` with three Roadmap
