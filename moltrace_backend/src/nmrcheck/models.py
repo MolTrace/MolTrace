@@ -4929,6 +4929,20 @@ PredictionFeedbackType = Literal[
     "error_case",
     "other",
 ]
+# Structured reason taxonomy for *why* an AI output was wrong, mirroring
+# ``moltrace.spectroscopy.feedback.capture.ReasonCode`` exactly so the in-app
+# "Was this correct?" control, the API contract, and the science-layer feedback
+# engine share one vocabulary. Optional and orthogonal to ``feedback_type``
+# (the thumbs verdict): a reviewer can reject *and* tag the reason.
+PredictionFeedbackReason = Literal[
+    "wrong_shift",
+    "wrong_multiplicity",
+    "wrong_structure",
+    "missed_impurity",
+    "wrong_integration",
+    "calibration_off",
+    "other",
+]
 ActiveLearningReason = Literal[
     "low_confidence",
     "high_uncertainty",
@@ -5154,6 +5168,7 @@ class PredictionFeedbackCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     feedback_type: PredictionFeedbackType
+    reason_code: PredictionFeedbackReason | None = None
     reviewer_name: str | None = Field(default=None, max_length=200)
     reviewer_comment: str | None = Field(default=None, max_length=20_000)
     corrected_output_json: dict[str, Any] | None = None
@@ -5166,6 +5181,7 @@ class PredictionFeedback(BaseModel):
     id: int
     prediction_run_id: int
     feedback_type: PredictionFeedbackType
+    reason_code: PredictionFeedbackReason | None = None
     reviewer_name: str | None = None
     reviewer_comment: str | None = None
     corrected_output_json: dict[str, Any] | None = None
@@ -5179,6 +5195,7 @@ class PredictionFeedbackResponse(BaseModel):
     feedback_id: int
     prediction_run_id: int
     feedback_type: PredictionFeedbackType
+    reason_code: PredictionFeedbackReason | None = None
     active_learning_candidate_id: int | None = None
     model_improvement_item_id: int | None = None
     warnings: list[str] = Field(default_factory=list)
@@ -5191,6 +5208,7 @@ class PredictionReviewRequest(BaseModel):
     reviewer_name: str = Field(min_length=1, max_length=200)
     reviewer_comment: str = Field(min_length=1, max_length=20_000)
     decision: PredictionFeedbackType = "accepted"
+    reason_code: PredictionFeedbackReason | None = None
     corrected_output_json: dict[str, Any] | None = None
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
