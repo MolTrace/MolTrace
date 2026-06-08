@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SystemStatusWorkspace } from "@/components/admin/system-status-workspace"
+import { OpsDashboardWorkspace } from "@/components/admin/ops-dashboard-workspace"
 import { SecurityEventsWorkspace } from "@/components/admin/security-events-workspace"
 import { AuditSearchWorkspace } from "@/components/admin/audit-search-workspace"
 import { DebugBundlesWorkspace } from "@/components/admin/debug-bundles-workspace"
@@ -59,6 +60,7 @@ export function AdminInterfaceWorkspace() {
           <TabsTrigger value="audit">Audit</TabsTrigger>
           <TabsTrigger value="debug">Debug</TabsTrigger>
           <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
+          <TabsTrigger value="ops">Ops</TabsTrigger>
           <TabsTrigger value="deployment">Deployment</TabsTrigger>
         </TabsList>
 
@@ -82,6 +84,9 @@ export function AdminInterfaceWorkspace() {
         </TabsContent>
         <TabsContent value="ingestion">
           <FileIngestionNormalizationWorkspace />
+        </TabsContent>
+        <TabsContent value="ops">
+          <OpsDashboardWorkspace />
         </TabsContent>
         <TabsContent value="deployment">
           <DeploymentSettingsWorkspace />
