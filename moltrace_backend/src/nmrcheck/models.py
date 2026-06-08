@@ -16,14 +16,18 @@ from pydantic import (
     model_validator,
 )
 
+# NMR2D model types are intentionally re-exported from ``nmrcheck.models`` for
+# consumers that import them from here (spectral_similarity, unified_confidence,
+# and the week25 evidence-engine tests). ``NMR2DExperimentType`` is also used
+# directly below; the rest are pure re-export shims (F401 suppressed per name).
 from .nmr2d_models import (
-    NMR2DAnalyzeRequest,
-    NMR2DAnalyzeResult,
-    NMR2DCorrelationEvidence,
+    NMR2DAnalyzeRequest,  # noqa: F401
+    NMR2DAnalyzeResult,  # noqa: F401
+    NMR2DCorrelationEvidence,  # noqa: F401
     NMR2DExperimentType,
-    NMR2DPeak,
-    NMR2DPreviewReport,
-    NMR2DRunRecord,
+    NMR2DPeak,  # noqa: F401
+    NMR2DPreviewReport,  # noqa: F401
+    NMR2DRunRecord,  # noqa: F401
 )
 
 DiagnosticLabel = Literal[
@@ -187,7 +191,10 @@ class AnalysisInputs(BaseModel):
                 {
                     "sample_id": "cmpd-001",
                     "smiles": "CCO",
-                    "nmr_text": "¹H NMR (400 MHz, CDCl3) δ 3.65 (q, J = 7.1 Hz, 2H), 1.26 (t, J = 7.1 Hz, 3H), 2.10 (br s, 1H)",
+                    "nmr_text": (
+                        "¹H NMR (400 MHz, CDCl3) δ 3.65 (q, J = 7.1 Hz, 2H), "
+                        "1.26 (t, J = 7.1 Hz, 3H), 2.10 (br s, 1H)"
+                    ),
                     "solvent": "CDCl3",
                 }
             ]
