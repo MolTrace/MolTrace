@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 
-const UPDATE_CHECK_INTERVAL_MS = 15_000
+const UPDATE_CHECK_INTERVAL_MS = 60_000
 const CURRENT_FRONTEND_BUILD_ID = process.env.NEXT_PUBLIC_MOLTRACE_BUILD_ID || "development"
 
 function postSkipWaiting(worker: ServiceWorker | null | undefined) {
@@ -52,15 +52,32 @@ export function PWAUpdateManager() {
 
     const hadController = Boolean(navigator.serviceWorker.controller)
     let didReloadForUpdate = false
+    let updatePending = false
     let disposed = false
     let intervalId: number | undefined
     let registrationRef: ServiceWorkerRegistration | null = null
 
-    const reloadForFreshBuild = () => {
+    // Hard reload onto the fresh build. Only ever invoked when it is
+    // non-disruptive (the tab is backgrounded) — see applyUpdateWhenSafe.
+    const performReload = () => {
       if (didReloadForUpdate || disposed) return
       didReloadForUpdate = true
       registrationRef?.active?.postMessage({ type: "CLEAR_PWA_CACHES" })
       window.location.reload()
+    }
+
+    // A newer build exists. Never reload out from under an actively-working
+    // user: that interrupts in-flight dashboard fetches and loses their place,
+    // which on a frequently-deployed Vercel app reads as "freezing / stale".
+    // Reload only while the tab is hidden; otherwise mark it pending and apply
+    // on the next visibilitychange to hidden (see handleVisibilityChange).
+    const applyUpdateWhenSafe = () => {
+      if (didReloadForUpdate || disposed) return
+      if (document.visibilityState === "hidden") {
+        performReload()
+      } else {
+        updatePending = true
+      }
     }
 
     const checkFrontendBuild = async () => {
@@ -77,7 +94,7 @@ export function PWAUpdateManager() {
 
         if (latestBuildId && latestBuildId !== CURRENT_FRONTEND_BUILD_ID) {
           postSkipWaiting(registrationRef?.waiting)
-          reloadForFreshBuild()
+          applyUpdateWhenSafe()
         }
       } catch {
         // Version checks are best-effort; network recovery/focus will try again.
@@ -94,18 +111,23 @@ export function PWAUpdateManager() {
 
     const handleControllerChange = () => {
       if (!hadController || disposed) return
-      reloadForFreshBuild()
+      applyUpdateWhenSafe()
     }
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") checkForUpdates()
+      if (document.visibilityState === "visible") {
+        checkForUpdates()
+      } else if (updatePending) {
+        // Tab just went to the background with a pending update — now it's safe.
+        performReload()
+      }
     }
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       const data = event.data as { type?: unknown } | null
       if (!data || typeof data.type !== "string") return
       if (data.type === "MOLTRACE_SW_ACTIVATED" && hadController) {
-        reloadForFreshBuild()
+        applyUpdateWhenSafe()
       }
     }
 
