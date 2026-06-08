@@ -26816,6 +26816,8 @@ export interface components {
              * @enum {string}
              */
             feedback_type: "accepted" | "rejected" | "corrected" | "uncertain" | "useful" | "not_useful" | "error_case" | "other";
+            /** Reason Code */
+            reason_code?: ("wrong_shift" | "wrong_multiplicity" | "wrong_structure" | "missed_impurity" | "wrong_integration" | "calibration_off" | "other") | null;
             /** Reviewer Name */
             reviewer_name?: string | null;
             /** Reviewer Comment */
@@ -26841,6 +26843,8 @@ export interface components {
              * @enum {string}
              */
             feedback_type: "accepted" | "rejected" | "corrected" | "uncertain" | "useful" | "not_useful" | "error_case" | "other";
+            /** Reason Code */
+            reason_code?: ("wrong_shift" | "wrong_multiplicity" | "wrong_structure" | "missed_impurity" | "wrong_integration" | "calibration_off" | "other") | null;
             /** Reviewer Name */
             reviewer_name?: string | null;
             /** Reviewer Comment */
@@ -26865,6 +26869,8 @@ export interface components {
              * @enum {string}
              */
             feedback_type: "accepted" | "rejected" | "corrected" | "uncertain" | "useful" | "not_useful" | "error_case" | "other";
+            /** Reason Code */
+            reason_code?: ("wrong_shift" | "wrong_multiplicity" | "wrong_structure" | "missed_impurity" | "wrong_integration" | "calibration_off" | "other") | null;
             /** Active Learning Candidate Id */
             active_learning_candidate_id?: number | null;
             /** Model Improvement Item Id */
@@ -26998,6 +27004,8 @@ export interface components {
              * @enum {string}
              */
             decision: "accepted" | "rejected" | "corrected" | "uncertain" | "useful" | "not_useful" | "error_case" | "other";
+            /** Reason Code */
+            reason_code?: ("wrong_shift" | "wrong_multiplicity" | "wrong_structure" | "missed_impurity" | "wrong_integration" | "calibration_off" | "other") | null;
             /** Corrected Output Json */
             corrected_output_json?: {
                 [key: string]: unknown;
