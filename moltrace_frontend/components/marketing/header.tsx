@@ -23,7 +23,7 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 
 const navItems = [
@@ -66,6 +66,21 @@ const topLevelIcons: Record<string, LucideIcon> = {
 export function Header() {
   const [open, setOpen] = useState(false)
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
+
+  // The mobile menu is hidden at md+ via CSS only (`md:hidden` on the wrapper),
+  // so the Sheet stays mounted and portals its panel + full-screen `bg-black/50`
+  // backdrop to <body>, OUTSIDE that wrapper. If it's open when the viewport
+  // grows past the md breakpoint, that panel/scrim would linger on top of the
+  // desktop layout. Force it closed whenever we cross into desktop width.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)")
+    const closeIfDesktop = () => {
+      if (mq.matches) setOpen(false)
+    }
+    closeIfDesktop()
+    mq.addEventListener("change", closeIfDesktop)
+    return () => mq.removeEventListener("change", closeIfDesktop)
+  }, [])
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 md:backdrop-blur md:supports-[backdrop-filter]:bg-background/60">
@@ -151,7 +166,7 @@ export function Header() {
               <Link href="/sign-up">Sign Up</Link>
             </Button>
             <Button size="sm" asChild>
-              <Link href="#demo">Request Demo</Link>
+              <Link href="/contact?reason=Request%20a%20demo">Request Demo</Link>
             </Button>
           </div>
 
@@ -355,7 +370,7 @@ export function Header() {
                     }}
                   >
                     <Link
-                      href="#demo"
+                      href="/contact?reason=Request%20a%20demo"
                       data-testid="marketing-mobile-sidebar-demo-cta"
                       className="inline-flex items-center justify-center gap-2"
                     >
