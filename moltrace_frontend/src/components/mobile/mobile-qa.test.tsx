@@ -124,7 +124,9 @@ describe("mobile QA", () => {
   it("renders mobile bottom nav", () => {
     render(<MobileBottomNav />)
     expect(screen.getByLabelText("Mobile bottom navigation")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /Landing/ })).toHaveAttribute("href", "/")
+    // The "Landing" label was renamed to "Home" in MobileBottomNav (see
+    // MobileBottomNav.test.tsx which encodes the rename as a hard invariant).
+    expect(screen.getByRole("link", { name: /Home/ })).toHaveAttribute("href", "/")
     expect(screen.getByText("Dashboard")).toBeInTheDocument()
     expect(screen.getByText("SpectraCheck")).toBeInTheDocument()
   })
