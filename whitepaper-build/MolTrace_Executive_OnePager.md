@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Executive One-Pager"
 subtitle: "AI-Native Scientific Intelligence for Pharmaceutical R&D"
-version: "2026-06-06"
+version: "2026-06-07"
 audience: "Pharmaceutical, biotech, CRO, and academic R&D leadership"
 length: "Single page (≈500 words)"
 ---
@@ -34,6 +34,7 @@ A multi-tenant SaaS platform with three integrated programs sharing one evidence
 - **Immutable raw vault.** Vendor archives are SHA-256 hashed on upload and never overwritten; every processing run is a derived, recipe-hashed artifact.
 - **Multi-modal by default.** NMR + HRMS + MS/MS + LC-MS are one evidence stack; cross-modal contradictions surface as first-class warnings.
 - **Human-in-the-loop, never autonomous.** No regulatory document releases without explicit reviewer signoff — aligned with the FDA AI Credibility Framework (2025) and EMA AI reflection paper.
+- **A compounding data moat — gets smarter the more you use it, never overrides the science.** Every AI output carries a one-click *"Was this correct?"* control; each reviewer judgement becomes an immutable, model-version-stamped record that seeds the next training round. An advisory reward model triages where the model is weakest, and new models roll out champion-vs-challenger with measured-dominance promotion, human sign-off, no auto-deploy, and instant rollback — while the deterministic verifier still arbitrates every call. The loop compounds your proprietary advantage on data a competitor without your install base cannot buy.
 - **Open-science under the hood.** RDKit, nmrglue, mzML, FastAPI, Next.js — no proprietary file-format lock-in.
 
 ## Quantified Outcomes (typical 8-FTE analytical team, 600 analyses/year)
