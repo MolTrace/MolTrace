@@ -20,9 +20,12 @@ export function CTASection() {
                 size="lg"
                 variant="secondary"
                 className="min-w-[180px] gap-2 bg-background text-foreground hover:bg-background/90"
+                asChild
               >
-                Request Demo
-                <ArrowRight className="h-4 w-4" />
+                <Link href="/contact?reason=Request%20a%20demo">
+                  Request Demo
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </Button>
               <Button
                 size="lg"

@@ -23,7 +23,7 @@ export function Hero() {
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Button size="lg" className="min-w-[180px] gap-2" asChild>
-              <Link href="#demo">
+              <Link href="/contact?reason=Request%20a%20demo">
                 Request Demo
                 <ArrowRight className="h-4 w-4" />
               </Link>

@@ -125,7 +125,10 @@ describe("Marketing Header — mobile sidebar refresh", () => {
     // rendered element — search via testid then walk up).
     const demoLink = within(sidebar).getByTestId("marketing-mobile-sidebar-demo-cta")
     expect(demoLink).toBeInTheDocument()
-    expect(demoLink).toHaveAttribute("href", "#demo")
+    // Request Demo routes to the Contact page (demo reason preselected),
+    // matching the established /contact?reason=... convention used by the
+    // product sub-pages' "Request a demo" CTAs.
+    expect(demoLink).toHaveAttribute("href", "/contact?reason=Request%20a%20demo")
     // The gradient is applied to either the anchor itself (asChild Slot merges
     // it) or one of its ancestors up to the Sheet content — assert it exists
     // somewhere in the chain.
