@@ -1,0 +1,134 @@
+# MolTrace CI/CD
+#
+# This is a monorepo: pnpm/Next.js FE under moltrace_frontend/ and uv/Python
+# FE under moltrace_backend/. Both are gated by tests before either is
+# deployed via the Vercel + Render deploy hooks.
+#
+# Required GitHub Secrets (set under Settings → Secrets and variables →
+# Actions):
+#   VERCEL_DEPLOY_HOOK   — Vercel "Deploy Hooks" URL for the frontend project
+#                          (Project Settings → Git → Deploy Hooks)
+#   RENDER_DEPLOY_HOOK   — Render "Deploy Hook" URL for the backend service
+#                          (Service Settings → Deploy Hook)
+#
+# Required platform toggles (one-time, manual):
+#   - Vercel: disable auto-deploy on the connected Git repo so this workflow
+#     is the only thing that triggers production deploys.
+#   - Render: set "Auto-Deploy" to "No" on the moltrace-backend service.
+#
+# Without those toggles the platforms will keep deploying every push
+# regardless of this workflow's verdict; with them, only commits that pass
+# both test jobs reach production.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Cancel an older run on the same ref when a new push lands — avoids racing
+# deploys and double-billing minutes.
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-tests:
+    name: Frontend · vitest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: moltrace_frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm must be installed BEFORE setup-node so the cache key can resolve
+      # the pnpm store. Version is pinned to match moltrace_frontend/package.json
+      # (packageManager: pnpm@11.0.3).
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Matches moltrace_frontend/package.json engines.node (22.14.0).
+          node-version: 22.14.0
+          cache: pnpm
+          cache-dependency-path: moltrace_frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `vitest` (no args) runs once in CI environments per its own CI
+      # detection, but `--run` makes the one-shot mode explicit so the job
+      # never hangs in interactive mode if the env var is missing.
+      - name: Run vitest
+        run: pnpm test -- --run
+
+  backend-tests:
+    name: Backend · pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: moltrace_backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          # uv manages its own Python install — we pick the version that
+          # matches moltrace_backend/render.yaml's PYTHON_VERSION.
+          python-version: "3.13.5"
+          enable-cache: true
+          cache-dependency-glob: moltrace_backend/uv.lock
+
+      # The `fid` extra is required for the FID-processing code paths the
+      # tests exercise; `dev` brings pytest + httpx. The `infra` extra
+      # (mlflow/dvc/great-expectations) is intentionally NOT installed —
+      # per the comment in pyproject.toml, adapter tests `pytest.importorskip`
+      # those so the always-on native path stays gated by CI.
+      - name: Install dependencies
+        run: uv sync --frozen --extra fid --extra dev
+
+      # pytest config (testpaths=tests, addopts=-q -m 'not slow') is set in
+      # pyproject.toml so the default run already skips the slow marker.
+      - name: Run pytest
+        run: uv run pytest
+
+  deploy:
+    name: Deploy · Vercel + Render
+    needs: [frontend-tests, backend-tests]
+    # Only deploy when both gates passed on a direct push to main (not PRs,
+    # not manual reruns of feature branches).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        # `--fail` so a 4xx/5xx fails the job (deploy hooks return 201 on
+        # success). `-sS` keeps output quiet but still surfaces errors. The
+        # URL is interpolated from the env var so it never appears in
+        # workflow logs even when --fail prints a diagnostic.
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::VERCEL_DEPLOY_HOOK secret is not set"; exit 1
+          fi
+          curl -sS --fail -X POST "$HOOK"
+
+      - name: Trigger Render deploy hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK secret is not set"; exit 1
+          fi
+          curl -sS --fail -X POST "$HOOK"
