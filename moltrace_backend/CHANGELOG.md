@@ -14,6 +14,77 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.20.0 — Build the closed active-learning loop (Prompt 16) (2026-06-08)
+
+**Headline:** Ships Roadmap Layer 4 — the flywheel and core moat. Every reviewer
+override becomes labeled training data, and the system *actively* chooses the
+most informative spectra for scarce expert attention. New science-layer module
+`moltrace.spectroscopy.ai.active_learning` assembles substrate earlier prompts
+already built (no forks): the Prompt 23 feedback collector, the Prompt 15
+fine-tune pipeline, the Prompt 23 reward-model prioritizer, and the Prompt 12
+audit trail. Library-only — **no FastAPI route, no schema change, no FE
+regeneration required**; surfacing the queue + loop-yield metrics through the
+controlled API and the Prompt 18 dashboard is a deferred follow-up.
+
+### Added
+- **`moltrace/spectroscopy/ai/active_learning.py`** — the four-stage loop:
+  - **`capture_override(session) -> LabeledExample`** — routes a reviewer override
+    through the Prompt 23 `FeedbackCollector` and returns the labeled example it
+    yields. Full provenance in one record: raw-FID hash, processed spectrum (+ its
+    content hash), the Prompt 13 `model_versions` that produced the original, the
+    AI output, the human correction, reviewer id + timestamp. Append-only and
+    idempotent (byte-identical re-submission is a no-op). `OverrideSession` is the
+    structured input; `get_default_collector` / `set_default_collector` mirror the
+    audit recorder's process-wide-default pattern.
+  - **`disagreement_score(spectrum, *, variants) -> float`** (+ richer
+    `score_disagreement(...) -> DisagreementReport`) — runs N model variants and
+    blends three signals in `[0, 1]`: the **vote split on top-1 structure**, the
+    **variance of predicted shifts** (soft-saturated per ppm), and the **spread of
+    confidences**, renormalised over whichever components ≥ 2 variants supply.
+    `VariantPrediction` / `ModelVariant`; `routed_variant` and `rag_variant` adapt
+    the Prompt 13/15 inference router and the Prompt 14 RAG reasoner into variants
+    (the Roadmap's pretrained / fine-tuned / RAG trio).
+  - **`build_annotation_queue(candidate_pool, budget, ...) -> list[PrioritizedItem]`**
+    — scores each candidate by disagreement (→ `ActiveLearningItem` severity),
+    greedily drops near-identical spectra (fingerprint key or an injected
+    `similarity_fn` with a threshold), then orders survivors via the Prompt 23
+    `prioritize_annotation_queue` (severity, optionally blended with a reward
+    model's "likely wrong") and slices to `budget`.
+  - **`retraining_trigger(...) -> bool`** (+ `evaluate_retraining(...) ->
+    RetrainingDecision`) — fires on a **monthly schedule OR** a **volume** of new
+    labels since the last fine-tune (bootstraps on volume alone when no adapter
+    exists yet). **`kickoff_finetune(...)`** is the concrete Prompt 15 wiring
+    (`build_training_snapshot` → `finetune_lora` → `register_if_eligible`);
+    **`maybe_kickoff_retrain`** invokes it iff the trigger fired.
+  - **`loop_yield_metrics(events, *, retrains, ...) -> LoopYieldMetrics`** — the
+    instrumentation: labeled examples / month, the **override-rate trend** over
+    consecutive windows (negative == reviewers overriding less == the model
+    improving), and **accuracy lift per retrain**. `RetrainEvent` carries the
+    tracked metric; **`emit_loop_yield(...)`** writes the rollup to the Prompt 12
+    audit trail for the Prompt 18 dashboard (no-op when no recorder is wired).
+  - **`ActiveLearningError`** for inconsistent inputs.
+- **`moltrace/spectroscopy/ai/__init__.py`** — re-exports the full public surface
+  (23 names); the `active_learning` import is ordered first so the package import
+  stays acyclic despite `feedback.capture` importing back into `ai.finetune`.
+- **`tests/test_ai_active_learning.py`** — 31 tests across all five acceptance
+  criteria (override-capture provenance + append-only, disagreement over the 3
+  variant adapters, queue rank + de-dup + budget guards, trigger schedule/volume +
+  Prompt 15 chain wiring, loop-yield rates/trend/lift + audit emission).
+
+### Notes
+- **Reuse over fork.** No new persistence, queue, training, or audit primitives —
+  the module is orchestration + scoring over existing substrate, so the moat
+  compounds on one code path rather than a parallel one.
+- **Injectable + CPU-only.** Model variants, the retrain kick-off, and the audit
+  recorder are all injected, so scoring and orchestration run with no torch /
+  rdkit / LLM dependencies; the default adapters lazily wire the real models.
+- **Differentiation.** The override-rate trend is direct, auditable evidence the
+  product is getting better; disagreement sampling makes labeling far more
+  efficient than random. Hard for a late competitor to replicate — it needs the
+  install base *and* the closed loop at once.
+
+---
+
 ## v0.19.1 — Wire the structured feedback reason taxonomy into the AI-inference API (Prompt 23) (2026-06-07)
 
 **Headline:** Surfaces Prompt 23's structured "why was it wrong?" reason taxonomy

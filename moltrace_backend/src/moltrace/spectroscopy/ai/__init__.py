@@ -19,10 +19,40 @@
   guard) and arbitrated by the Prompt 7 verifier — the LLM proposes, the
   verifier decides; full prompt/completion/retrieval is captured for the Prompt
   12 audit trail.
+* :mod:`.active_learning` -- the closed active-learning loop (Prompt 16): capture
+  reviewer overrides as labeled examples, score candidate spectra by the
+  disagreement of the pretrained / fine-tuned / RAG variants, build a ranked +
+  de-duplicated annotation queue under a budget, and fire the schedule-or-volume
+  retraining trigger into the Prompt 15 pipeline -- with loop-yield metrics
+  (labeled/month, override-rate trend, accuracy lift) for the Prompt 18 dashboard.
 """
 
 from __future__ import annotations
 
+from moltrace.spectroscopy.ai.active_learning import (
+    ActiveLearningError,
+    DisagreementReport,
+    LoopYieldMetrics,
+    ModelVariant,
+    OverrideSession,
+    RetrainEvent,
+    RetrainingDecision,
+    VariantPrediction,
+    build_annotation_queue,
+    capture_override,
+    disagreement_score,
+    emit_loop_yield,
+    evaluate_retraining,
+    get_default_collector,
+    kickoff_finetune,
+    loop_yield_metrics,
+    maybe_kickoff_retrain,
+    rag_variant,
+    retraining_trigger,
+    routed_variant,
+    score_disagreement,
+    set_default_collector,
+)
 from moltrace.spectroscopy.ai.finetune import (
     ActiveLearningItem,
     ActiveLearningQueue,
@@ -116,6 +146,7 @@ from moltrace.spectroscopy.ai.router import (
 )
 
 __all__ = [
+    "ActiveLearningError",
     "ActiveLearningItem",
     "ActiveLearningQueue",
     "AppendOnlyViolation",
@@ -131,6 +162,7 @@ __all__ = [
     "ContradictionReport",
     "ContradictionSignal",
     "CrossModalEvidence",
+    "DisagreementReport",
     "FinalAdapter",
     "FineTuneError",
     "FineTuneRun",
@@ -150,6 +182,7 @@ __all__ = [
     "InvalidStatusTransition",
     "Layer",
     "LoRAConfig",
+    "LoopYieldMetrics",
     "MSCandidate",
     "MSMSSpectrum",
     "MSModelsError",
@@ -158,7 +191,9 @@ __all__ = [
     "ModelRegistry",
     "ModelRole",
     "ModelStatus",
+    "ModelVariant",
     "NMRCandidate",
+    "OverrideSession",
     "ProposalResult",
     "RAGAudit",
     "RAGContext",
@@ -168,6 +203,8 @@ __all__ = [
     "RankedCandidate",
     "RegistryError",
     "RegistryStore",
+    "RetrainEvent",
+    "RetrainingDecision",
     "RetrievedAnalogue",
     "RoutedAtomPrediction",
     "RoutedPrediction",
@@ -176,25 +213,40 @@ __all__ = [
     "StatusTransition",
     "TrainingDataLineage",
     "TrainingExample",
+    "VariantPrediction",
     "adapter_cache_dir",
     "arbitrate",
+    "build_annotation_queue",
     "build_model_entry",
     "build_reasoning_context",
     "build_training_snapshot",
     "calibration_report",
+    "capture_override",
     "default_hpo_search_space",
     "detect_contradictions",
+    "disagreement_score",
     "dp4_candidate_posterior",
+    "emit_loop_yield",
+    "evaluate_retraining",
     "finetune_lora",
     "fit_platt_scaling",
     "fit_temperature_scaling",
     "fuse_candidates",
+    "get_default_collector",
+    "kickoff_finetune",
+    "loop_yield_metrics",
+    "maybe_kickoff_retrain",
     "optimize_hyperparameters",
     "predict_msms_candidates",
     "predict_retention_times",
     "propose_structures",
+    "rag_variant",
     "register_if_eligible",
     "register_ms_models",
+    "retraining_trigger",
+    "routed_variant",
     "rt_corroboration",
+    "score_disagreement",
+    "set_default_collector",
     "train_contradiction_detector",
 ]
