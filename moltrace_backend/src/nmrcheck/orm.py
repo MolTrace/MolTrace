@@ -5567,6 +5567,7 @@ class PredictionFeedbackORM(Base):
         ForeignKey("prediction_runs.id", ondelete="CASCADE"), index=True
     )
     feedback_type: Mapped[str] = mapped_column(String(32), index=True)
+    reason_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     reviewer_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     reviewer_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     corrected_output_json: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -612,6 +612,7 @@ def create_feedback(
         feedback = PredictionFeedbackORM(
             prediction_run_id=run.id,
             feedback_type=payload.feedback_type,
+            reason_code=payload.reason_code,
             reviewer_name=payload.reviewer_name,
             reviewer_comment=payload.reviewer_comment,
             corrected_output_json=_json_dump(payload.corrected_output_json)
@@ -634,7 +635,11 @@ def create_feedback(
                 if payload.feedback_type == "corrected"
                 else "model_disagreement",
                 priority="high",
-                metadata={"feedback_id": feedback.id, "feedback_type": payload.feedback_type},
+                metadata={
+                    "feedback_id": feedback.id,
+                    "feedback_type": payload.feedback_type,
+                    "reason_code": payload.reason_code,
+                },
             ).id
             queue_item_id = _create_model_improvement_item(
                 session,
@@ -674,6 +679,7 @@ def create_feedback(
             metadata={
                 "prediction_run_id": run.id,
                 "feedback_type": feedback.feedback_type,
+                "reason_code": feedback.reason_code,
                 "model_improvement_item_id": queue_item_id,
             },
         )
@@ -681,6 +687,7 @@ def create_feedback(
             feedback_id=feedback.id,
             prediction_run_id=run.id,
             feedback_type=feedback.feedback_type,  # type: ignore[arg-type]
+            reason_code=feedback.reason_code,  # type: ignore[arg-type]
             active_learning_candidate_id=active_learning_id,
             model_improvement_item_id=queue_item_id,
             warnings=warnings,
@@ -697,6 +704,7 @@ def review_prediction(
 ) -> PredictionFeedbackResponse:
     feedback = PredictionFeedbackCreate(
         feedback_type=payload.decision,
+        reason_code=payload.reason_code,
         reviewer_name=payload.reviewer_name,
         reviewer_comment=payload.reviewer_comment,
         corrected_output_json=payload.corrected_output_json,
@@ -1623,6 +1631,7 @@ def _feedback_to_record(row: PredictionFeedbackORM) -> PredictionFeedback:
         id=row.id,
         prediction_run_id=row.prediction_run_id,
         feedback_type=row.feedback_type,  # type: ignore[arg-type]
+        reason_code=row.reason_code,  # type: ignore[arg-type]
         reviewer_name=row.reviewer_name,
         reviewer_comment=row.reviewer_comment,
         corrected_output_json=_json_dict(row.corrected_output_json)

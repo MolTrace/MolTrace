@@ -241,11 +241,13 @@ def test_phase59_controlled_ai_inference_workflow(tmp_path):
             headers=headers,
             json={
                 "feedback_type": "rejected",
+                "reason_code": "wrong_structure",
                 "reviewer_name": "Reviewer",
                 "reviewer_comment": "Fixture output should be revised.",
             },
         )
         assert feedback.status_code == 200, feedback.text
+        assert feedback.json()["reason_code"] == "wrong_structure"
         assert feedback.json()["active_learning_candidate_id"]
         assert feedback.json()["model_improvement_item_id"]
 
@@ -340,6 +342,12 @@ def test_phase59_controlled_ai_inference_workflow(tmp_path):
         audit = client.get("/ai/prediction-audit", headers=headers)
         assert audit.status_code == 200, audit.text
         assert audit.json()
+        # The structured reason taxonomy round-trips through the read model.
+        assert any(
+            fb["reason_code"] == "wrong_structure"
+            for entry in audit.json()
+            for fb in entry["feedback"]
+        )
 
 
 def test_phase59_controlled_ai_inference_openapi(tmp_path):
@@ -391,3 +399,77 @@ def test_phase59_controlled_ai_inference_openapi(tmp_path):
         "PredictionAuditEntry",
     ]:
         assert schema in schemas
+
+    # The structured reason taxonomy is part of the typed contract the FE binds
+    # to (request, read model, and response all carry the optional reason_code).
+    for schema_name in [
+        "PredictionFeedbackCreate",
+        "PredictionFeedback",
+        "PredictionFeedbackResponse",
+        "PredictionReviewRequest",
+    ]:
+        assert "reason_code" in schemas[schema_name]["properties"], schema_name
+
+
+def test_phase59_feedback_reason_taxonomy(tmp_path):
+    """The structured reason taxonomy is optional, closed, and persisted."""
+    client, headers = _client(tmp_path)
+    with client:
+        approved = _approved_artifact(client, headers)
+        prediction = client.post(
+            "/ai/predictions",
+            headers=headers,
+            json={
+                "service_key": "reaction_outcome_predictor",
+                "model_artifact_id": approved["artifact_id"],
+                "request_json": {"temperature_c": 80, "confidence_score": 0.88},
+            },
+        )
+        assert prediction.status_code == 201, prediction.text
+        prediction_id = prediction.json()["prediction_run_id"]
+
+        # reason_code is optional: a bare thumbs-down has no structured reason.
+        bare = client.post(
+            f"/ai/predictions/{prediction_id}/feedback",
+            headers=headers,
+            json={"feedback_type": "rejected", "reviewer_name": "Reviewer"},
+        )
+        assert bare.status_code == 200, bare.text
+        assert bare.json()["reason_code"] is None
+
+        # Every taxonomy value is accepted and echoed back verbatim.
+        for reason in [
+            "wrong_shift",
+            "wrong_multiplicity",
+            "wrong_structure",
+            "missed_impurity",
+            "wrong_integration",
+            "calibration_off",
+            "other",
+        ]:
+            ok = client.post(
+                f"/ai/predictions/{prediction_id}/feedback",
+                headers=headers,
+                json={"feedback_type": "corrected", "reason_code": reason},
+            )
+            assert ok.status_code == 200, ok.text
+            assert ok.json()["reason_code"] == reason
+
+        # The taxonomy is closed: an out-of-vocabulary reason is rejected (422).
+        bad = client.post(
+            f"/ai/predictions/{prediction_id}/feedback",
+            headers=headers,
+            json={"feedback_type": "rejected", "reason_code": "made_up_reason"},
+        )
+        assert bad.status_code == 422, bad.text
+
+        # The reason flows into the active-learning fan-out metadata.
+        audit = client.get("/ai/prediction-audit", headers=headers)
+        assert audit.status_code == 200, audit.text
+        reasons = {
+            fb["reason_code"]
+            for entry in audit.json()
+            for fb in entry["feedback"]
+            if fb["reason_code"] is not None
+        }
+        assert {"wrong_structure", "calibration_off", "other"}.issubset(reasons)

@@ -14,6 +14,52 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.19.1 — Wire the structured feedback reason taxonomy into the AI-inference API (Prompt 23) (2026-06-07)
+
+**Headline:** Surfaces Prompt 23's structured "why was it wrong?" reason taxonomy
+through the controlled AI-inference API. The science-layer
+`moltrace.spectroscopy.feedback.capture.ReasonCode` vocabulary shipped in v0.19.0
+but was not yet reachable from the FE-facing feedback route. This release closes
+that gap **reuse-first**: it extends the existing
+`POST /ai/predictions/{id}/feedback` (and the prediction-review request) with an
+**optional** `reason_code`, rather than forking a third feedback system. The
+reviewer's thumbs verdict (`feedback_type`) and the structured reason are
+orthogonal — a reviewer can reject *and* tag exactly why — so override analytics
+roll up where the model is weakest. Optional, nullable, additive → existing
+clients are unaffected; this is a contract change, so a FE schema regeneration is
+required.
+
+### Added
+- **`PredictionFeedbackReason`** (`models.py`) — closed 7-value `Literal` taxonomy
+  mirroring `feedback.capture.ReasonCode` exactly: `wrong_shift`,
+  `wrong_multiplicity`, `wrong_structure`, `missed_impurity`, `wrong_integration`,
+  `calibration_off`, `other`. One vocabulary shared by the in-app control, the API
+  contract, and the science-layer feedback engine.
+- **`reason_code: PredictionFeedbackReason | None`** field added to
+  `PredictionFeedbackCreate`, `PredictionFeedback`, `PredictionFeedbackResponse`,
+  and `PredictionReviewRequest`. Renders in OpenAPI as an optional inline
+  string-enum (`anyOf: [enum, null]`) per model; **not** in any `required` list.
+- **`prediction_feedback.reason_code`** nullable `String(32)` column —
+  `PredictionFeedbackORM` (covers fresh DBs / tests via `create_all`) **plus**
+  alembic migration **`0012_prediction_feedback_reason_code`** (covers existing /
+  prod DBs), idempotent via the house `_column_exists` guard.
+
+### Changed
+- **`ai_inference_store.create_feedback` / `review_prediction`** — persist
+  `reason_code`, echo it on the response, and thread it into the active-learning
+  candidate metadata and the prediction-audit fan-out so override analytics can
+  segment by reason. `review_prediction` forwards the reason into the
+  `PredictionFeedbackCreate` it constructs.
+
+### Notes
+- **Reuse over fork.** This wires the existing route; it does not introduce a new
+  endpoint. Model-version attribution is already satisfied via
+  `prediction_run.model_artifact_id` (feedback is attributable to the producing
+  model without a redundant bridge).
+- **Deferred follow-ups (separate prompts):** exposing the reward-model
+  candidate re-ranking and the A/B champion/challenger admin surfaces through the
+  API are intentionally out of scope here.
+
 ## v0.19.0 — Closed-loop feedback: capture, RLHF reward model & A/B rollout (Prompt 23) (2026-06-07)
 
 **Headline:** Ships the new `moltrace.spectroscopy.feedback` package — the
