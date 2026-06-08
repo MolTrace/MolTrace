@@ -14,6 +14,75 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.21.0 — MLOps: monitoring, drift detection, and the fail-closed deployment gate (Prompt 18) (2026-06-08)
+
+**Headline:** Pharma-grade observability and release control from day one —
+**nothing reaches production without passing evaluation, audit, and validation.**
+New `moltrace.spectroscopy.ops` package: continuous drift monitoring, a
+registry-backed lineage dashboard, and a four-check deployment gate wired into CI
+that **fails closed**. Like the rest of the AI/ops layer it is reuse-first
+orchestration over existing substrate (Prompt 17 dominance gate, Prompt 12 audit
+chain, Prompt 13 registry, Prompt 16 override loop) and is fully injectable, so it
+runs on a CPU-only host. Library + CLI + CI only — **no API/contract change, no FE
+regeneration.** (Precondition verified before building: Prompt 23's RLHF reward
+model + champion/challenger A/B are in place and green.)
+
+### Added
+- **`moltrace/spectroscopy/ops/monitoring.py`** — the MLOps layer:
+  - **`production_monitors(...)`** — runs every configured monitor and returns a
+    `MonitoringReport` (worst-of `ok`/`warn`/`breach`): **input drift** (categorical
+    `population_stability_index` of nucleus / field / solvent + `numeric_psi` of
+    molecular weight vs the training snapshot — a large PSI flags new chemistry the
+    model never saw), **confidence drift** (the trend of Prompt 6 per-prediction
+    uncertainty and Prompt 14 RAG grounding), **override-rate drift** (reuses the
+    Prompt 16 `loop_yield_metrics` override trend — a rising trend means live
+    degradation), and **latency** (p50 / p95 vs SLO). Emits every metric to an
+    injectable observability sink and pages an injectable alerter on each breach.
+  - **`lineage_dashboard(registry, drift_status=...)`** — reads the Prompt 13
+    registry as the source of truth: per production model, its version,
+    training-snapshot hash, gold metric vector (Prompt 17), promotion record +
+    supersession, and current live drift status → `LineageDashboard` / `LineageRow`.
+  - **The fail-closed deployment gate** — `evaluate_deployment_gate(...)` /
+    `run_deployment_gate(...)` allow a deploy **only if all four pass**:
+    `check_dominance` (Prompt 17 — no safety regression), `check_audit_chain`
+    (Prompt 12 — provenance intact via `verify_chain`), the test-suite-green flag,
+    and `check_data_leakage` (the training snapshot is bound to the gold checksum
+    **and** its `record_hashes` are disjoint from the holdout). Every input defaults
+    to the failing state, so an under-specified call is blocked — it fails closed.
+- **`moltrace/spectroscopy/ops/deployment_gate.py`** — the CLI the CI invokes
+  (`moltrace-deployment-gate`, registered in `pyproject.toml`). `--self-check`
+  proves the gate fails closed (it allows an all-pass candidate and **blocks every
+  single-check failure**); a flag mode evaluates a real deploy from pre-computed
+  verdicts.
+- **`moltrace/spectroscopy/ops/__init__.py`** — exports the public surface.
+- **`tests/test_ops_monitoring.py`** — 21 tests across all four acceptance criteria
+  (drift metrics + alert/emit, lineage dashboard reads the registry, the gate fails
+  closed on each of the four checks, the output contract is versioned).
+- **`docs/spectracheck_output_contract.md`** — documents the **versioned,
+  content-addressed SpectraCheck output contract** (schema `1.0.0`, the
+  `schema_version` + `content_hash` + `contract` envelope, the field set, and the
+  semver bump policy) so the downstream **Regulatory Hub** and **ReactionIQ**
+  modules can depend on SpectraCheck without breaking.
+- **`.github/workflows/ci-cd.yml`** — new **`deployment-gate`** job: it `needs`
+  both test suites (so "tests green" is satisfied by construction), runs
+  `moltrace-deployment-gate --self-check`, and the `deploy` job now `needs`
+  `deployment-gate` — so a regression in the release-control logic fails CI before
+  it can ever let a bad model reach production.
+
+### Notes
+- **Reuse over fork.** The monitors and the gate are orchestration + math over
+  existing primitives — no new registry, eval, or audit machinery.
+- **Injectable + CPU-only.** The observability sink, the pager, and every data
+  input are injected, so the drift math and the gate logic are pure-Python and
+  unit-testable with no live infrastructure.
+- **Output contract pre-exists** (`infra/contract`, schema `1.0.0`) — this release
+  *documents* it for downstream consumers; it does not change its shape.
+- **Differentiation.** Drift detection, lineage, and fail-closed release gates
+  built in *now* — not bolted on later — is what lets MolTrace sell into regulated
+  environments years sooner.
+
+---
+
 ## v0.20.0 — Build the closed active-learning loop (Prompt 16) (2026-06-08)
 
 **Headline:** Ships Roadmap Layer 4 — the flywheel and core moat. Every reviewer

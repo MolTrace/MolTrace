@@ -124,9 +124,43 @@ jobs:
       - name: Run pytest
         run: uv run pytest -n auto
 
+  deployment-gate:
+    name: Deployment gate · fail-closed release control
+    # The Prompt 18 release gate. It `needs` both test suites, so the gate's
+    # "test suite is green" check is satisfied by construction — if either suite
+    # fails this job is skipped, which cascades to skip `deploy` below. Nothing
+    # reaches production without passing evaluation, audit, and validation.
+    needs: [frontend-tests, backend-tests]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: moltrace_backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13.5"
+          enable-cache: true
+          cache-dependency-glob: moltrace_backend/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra fid --extra dev
+
+      # `--self-check` exits non-zero unless the gate ALLOWS an all-pass candidate
+      # and BLOCKS every single-check failure (dominance · audit chain · tests
+      # green · gold-set leakage). There are no live model artifacts in CI, so this
+      # is the always-on guarantee that the fail-closed release-control machinery
+      # stays intact — a regression in the gate logic fails CI before it can ever
+      # let a bad model through to production.
+      - name: Verify deployment gate fails closed
+        run: uv run moltrace-deployment-gate --self-check
+
   deploy:
     name: Deploy · Vercel + Render (FE + BE)
-    needs: [frontend-tests, backend-tests]
+    needs: [frontend-tests, backend-tests, deployment-gate]
     # Only deploy when both gates passed on a direct push to main (not PRs,
     # not manual reruns of feature branches).
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
