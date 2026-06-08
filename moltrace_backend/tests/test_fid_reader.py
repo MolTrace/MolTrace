@@ -150,6 +150,45 @@ def _axis_has_reference_ppm(spectrum: NMRSpectrum, expected_ppm: float, toleranc
     )
 
 
+# Cross-platform regression guard tolerances for the real-FID fingerprint test.
+# numpy/scipy use platform-specific BLAS backends and SIMD paths, so a byte-exact
+# hash of the rounded spectrum is not portable across OS/arch (it diverged between
+# macOS/arm64 and the Linux/x86_64 CI runner). Peak positions and heights
+# normalized to the spectrum max, however, agree across platforms to far better
+# than these tolerances while still catching any real regression in the
+# FID-processing pipeline. ppm tol ~8 axis bins; intensity tol 0.5% of full scale.
+_REAL_FID_PEAK_PPM_TOL = 0.05
+_REAL_FID_PEAK_INTENSITY_ATOL = 0.005
+
+
+def _assert_reference_peak_values(
+    spectrum: NMRSpectrum,
+    reference_peaks: list[dict[str, float]],
+    *,
+    window_ppm: float = 0.04,
+) -> None:
+    scale = float(np.max(np.abs(spectrum.data)))
+    assert scale > 0.0, "spectrum is flat — cannot normalize peak heights"
+    for peak in reference_peaks:
+        target = float(peak["ppm"])
+        mask = np.abs(spectrum.ppm_axis - target) <= window_ppm
+        assert np.any(mask), f"ppm window missing for {target}"
+        local_axis = spectrum.ppm_axis[mask]
+        local_data = spectrum.data[mask]
+        idx = int(np.argmax(local_data))
+        position = float(local_axis[idx])
+        norm_intensity = float(local_data[idx]) / scale
+        assert position == pytest.approx(target, abs=_REAL_FID_PEAK_PPM_TOL), (
+            f"peak position {position:.4f} ppm off reference {target:.4f} ppm"
+        )
+        assert norm_intensity == pytest.approx(
+            float(peak["norm_intensity"]), abs=_REAL_FID_PEAK_INTENSITY_ATOL
+        ), (
+            f"peak height {norm_intensity:.5f} off reference "
+            f"{float(peak['norm_intensity']):.5f} at {target:.4f} ppm"
+        )
+
+
 def test_bruker_fid_reader_matches_reference_ppm_count_and_metadata(tmp_path: Path) -> None:
     dataset = _write_bruker_dataset(tmp_path)
 
@@ -230,14 +269,16 @@ def test_real_nmrglue_varian_fixture_reads_metadata_and_fingerprint() -> None:
     assert spectrum.ppm_axis[-1] == pytest.approx(expected["ppm_axis_end"])
     assert spectrum.acquisition_time == datetime.fromisoformat(expected["acquisition_time"])
     assert spectrum.metadata["peak_count"] == expected["peak_count"]
-    # The fingerprint hashes rounded float64 FFT output. numpy/scipy use
-    # platform-specific BLAS backends and SIMD paths, so the absolute hash is
-    # not portable across OS/arch — it was frozen on macOS/arm64 and differs on
-    # the Linux/x86_64 CI runner even at identical library versions. Assert the
-    # properties that actually matter (64-char format + within-run determinism),
-    # matching test_nmrshiftdb2_bruker_20_fids_match_processed_references below.
-    # Scientific correctness is already covered by the metadata/ppm/peak_count
-    # assertions above.
+    # Cross-platform regression guard on the FFT output: assert spectral
+    # features (peak positions + heights normalized to the spectrum max) with
+    # tolerance instead of a byte-exact hash. A hash of the rounded spectrum is
+    # not portable across OS/arch (numpy/scipy BLAS + SIMD differences diverged
+    # it between macOS and the Linux CI runner), but these features agree to far
+    # better than the tolerances while still catching real pipeline regressions.
+    _assert_reference_peak_values(spectrum, expected["reference_peaks"])
+    # The fingerprint's actual contract is "identical input -> identical id", so
+    # validate format + within-run determinism (matching
+    # test_nmrshiftdb2_bruker_20_fids_match_processed_references below).
     assert len(spectrum.fingerprint_hash) == 64
     assert repeated.fingerprint_hash == spectrum.fingerprint_hash
     assert from_archive.fingerprint_hash == spectrum.fingerprint_hash
