@@ -7,6 +7,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 import {
   ApiError,
@@ -122,10 +123,9 @@ export function SignInForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="sign-in-password">Password</Label>
-            <Input
+            <PasswordInput
               id="sign-in-password"
               name="password"
-              type="password"
               autoComplete="current-password"
               required
               disabled={isSubmitting}

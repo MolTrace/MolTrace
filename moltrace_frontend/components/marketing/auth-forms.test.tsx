@@ -169,3 +169,63 @@ describe("landing page auth forms", () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
+
+describe("password show/hide toggle", () => {
+  it("toggles the sign-in password field between masked and visible", () => {
+    render(<SignInForm />)
+
+    const password = screen.getByLabelText("Password")
+    // Masked by default — the toggle advertises the action it will perform.
+    expect(password).toHaveAttribute("type", "password")
+    const toggle = screen.getByRole("button", { name: "Show password" })
+    expect(toggle).toHaveAttribute("type", "button")
+    expect(toggle).toHaveAttribute("aria-pressed", "false")
+
+    // Reveal.
+    fireEvent.click(toggle)
+    expect(password).toHaveAttribute("type", "text")
+    const hideToggle = screen.getByRole("button", { name: "Hide password" })
+    expect(hideToggle).toHaveAttribute("aria-pressed", "true")
+
+    // Hide again — round-trips to the original state.
+    fireEvent.click(hideToggle)
+    expect(password).toHaveAttribute("type", "password")
+    expect(screen.getByRole("button", { name: "Show password" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    )
+  })
+
+  it("does not submit the form when the toggle is clicked", () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<SignInForm />)
+    fireEvent.click(screen.getByRole("button", { name: "Show password" }))
+
+    // type="button" must keep the toggle from submitting the surrounding form.
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it("toggles the two sign-up password fields independently", () => {
+    render(<SignUpForm />)
+
+    const password = screen.getByLabelText("Password")
+    const confirm = screen.getByLabelText("Confirm password")
+    expect(password).toHaveAttribute("type", "password")
+    expect(confirm).toHaveAttribute("type", "password")
+
+    // Two toggles, in DOM order: [0] = password, [1] = confirm.
+    const toggles = screen.getAllByRole("button", { name: "Show password" })
+    expect(toggles).toHaveLength(2)
+
+    // Reveal only the first; the confirm field must stay masked.
+    fireEvent.click(toggles[0])
+    expect(password).toHaveAttribute("type", "text")
+    expect(confirm).toHaveAttribute("type", "password")
+    // Exactly one field is now revealed.
+    expect(screen.getAllByRole("button", { name: "Show password" })).toHaveLength(1)
+    expect(screen.getAllByRole("button", { name: "Hide password" })).toHaveLength(1)
+  })
+})
