@@ -7,6 +7,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 import {
   ApiError,
@@ -131,10 +132,9 @@ export function SignUpForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="sign-up-password">Password</Label>
-            <Input
+            <PasswordInput
               id="sign-up-password"
               name="password"
-              type="password"
               autoComplete="new-password"
               required
               disabled={isSubmitting}
@@ -142,10 +142,9 @@ export function SignUpForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="sign-up-password-confirm">Confirm password</Label>
-            <Input
+            <PasswordInput
               id="sign-up-password-confirm"
               name="password-confirm"
-              type="password"
               autoComplete="new-password"
               required
               disabled={isSubmitting}
