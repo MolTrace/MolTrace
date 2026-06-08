@@ -55,18 +55,18 @@ jobs:
         working-directory: moltrace_frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # pnpm must be installed BEFORE setup-node so the cache key can resolve
       # the pnpm store. Version is pinned to match moltrace_frontend/package.json
       # (packageManager: pnpm@11.0.3).
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 11.0.3
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           # Matches moltrace_frontend/package.json engines.node (22.14.0).
           node-version: 22.14.0
@@ -90,10 +90,10 @@ jobs:
         working-directory: moltrace_backend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v7
         with:
           # uv manages its own Python install — we pick the version that
           # matches moltrace_backend/render.yaml's PYTHON_VERSION.
