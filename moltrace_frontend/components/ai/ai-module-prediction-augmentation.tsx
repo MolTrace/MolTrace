@@ -25,6 +25,12 @@ import {
   type EvidenceRiskLevel,
   type EvidenceStatus,
 } from "@/components/science/evidence-card"
+import {
+  REASON_CODES,
+  REASON_CODE_LABEL,
+  isNegativeFeedbackType,
+  type ReasonCode,
+} from "@/components/ai/feedback-reason-code"
 
 type ModuleKey = "spectracheck" | "reaction_optimization" | "regulatory" | "knowledge_extraction"
 
@@ -150,6 +156,11 @@ export function AiModulePredictionAugmentation({
   const [prediction, setPrediction] = useState<AnyRecord | null>(null)
 
   const [feedbackType, setFeedbackType] = useState("useful")
+  // reason_code is meaningful only on a negative feedback_type — we keep an
+  // empty-string sentinel for "not set" and send null on the wire. The UI
+  // gates visibility on isNegativeFeedbackType(feedbackType) so a positive
+  // verdict never carries a stale reason from a prior selection.
+  const [reasonCode, setReasonCode] = useState<ReasonCode | "">("")
   const [feedbackComment, setFeedbackComment] = useState("")
   const [feedbackBusy, setFeedbackBusy] = useState(false)
   const [feedbackErr, setFeedbackErr] = useState("")
@@ -237,6 +248,11 @@ export function AiModulePredictionAugmentation({
         method: "POST",
         body: {
           feedback_type: feedbackType,
+          // Only attach reason_code on a negative verdict — the BE accepts
+          // it on any feedback_type but pairing it with a positive verdict
+          // would muddy the active-learning + audit analytics.
+          reason_code:
+            isNegativeFeedbackType(feedbackType) && reasonCode ? reasonCode : null,
           reviewer_comment: feedbackComment.trim() || null,
         },
       })
@@ -516,6 +532,43 @@ export function AiModulePredictionAugmentation({
                   </Button>
                 </div>
               </div>
+              {/* reason_code row (v0.19.1) — only when the verdict is negative.
+                  Orthogonal to feedback_type per the BE handoff: the verdict
+                  is independent from the structured "why?" tag. Leaving the
+                  dropdown un-set submits null, which is contract-equivalent
+                  to the prior request body. */}
+              {isNegativeFeedbackType(feedbackType) ? (
+                <div className="mt-2 grid gap-2 md:grid-cols-3">
+                  <div className="md:col-span-1">
+                    <Label
+                      htmlFor="prediction-feedback-reason-code"
+                      className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground"
+                    >
+                      Why? (optional)
+                    </Label>
+                    <Select
+                      value={reasonCode}
+                      onValueChange={(v) => setReasonCode(v as ReasonCode)}
+                    >
+                      <SelectTrigger id="prediction-feedback-reason-code" className="mt-1">
+                        <SelectValue placeholder="Choose a reason…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REASON_CODES.map((code) => (
+                          <SelectItem key={code} value={code}>
+                            {REASON_CODE_LABEL[code]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="mt-6 text-xs text-muted-foreground md:col-span-2">
+                    Pick the closest match; reasons fan into the active-learning
+                    candidate metadata and prediction-audit analytics on the
+                    backend.
+                  </p>
+                </div>
+              ) : null}
               {feedbackErr ? <p className="mt-2 text-sm text-destructive">{feedbackErr}</p> : null}
               {feedbackOk ? <p className="mt-2 text-sm text-emerald-700">{feedbackOk}</p> : null}
               {queueMsg ? <p className="mt-2 text-sm text-muted-foreground">{queueMsg}</p> : null}

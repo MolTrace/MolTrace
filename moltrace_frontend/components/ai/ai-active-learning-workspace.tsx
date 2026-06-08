@@ -20,6 +20,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react"
+import {
+  REASON_CODES,
+  REASON_CODE_LABEL,
+  isNegativeFeedbackType,
+  type ReasonCode,
+} from "@/components/ai/feedback-reason-code"
 
 type Row = Record<string, unknown>
 
@@ -93,6 +99,11 @@ export function AiActiveLearningWorkspace() {
 
   const [predictionId, setPredictionId] = useState("")
   const [feedbackType, setFeedbackType] = useState<string>(FEEDBACK_TYPES[0])
+  // reason_code (v0.19.1) — meaningful only on a negative feedback_type.
+  // Empty-string sentinel = "not set" → wire value null. UI gates visibility
+  // on isNegativeFeedbackType so a positive verdict never carries a stale
+  // reason from a prior selection.
+  const [reasonCode, setReasonCode] = useState<ReasonCode | "">("")
   const [reviewerName, setReviewerName] = useState("")
   const [reviewerComment, setReviewerComment] = useState("")
   const [correctedOutputJson, setCorrectedOutputJson] = useState("")
@@ -162,10 +173,18 @@ export function AiActiveLearningWorkspace() {
 
     setFeedbackBusy(true)
     try {
+      // reason_code (v0.19.1) — only meaningful on a negative verdict.
+      // Both endpoints accept it; sending null when it's not applicable
+      // keeps the request shape backward-compatible with the pre-v0.19.1
+      // contract (the field is optional + nullable in the schema).
+      const wireReasonCode =
+        isNegativeFeedbackType(feedbackType) && reasonCode ? reasonCode : null
+
       await apiFetch(`/ai/predictions/${id}/feedback`, {
         method: "POST",
         body: {
           feedback_type: feedbackType,
+          reason_code: wireReasonCode,
           reviewer_name: reviewerName.trim() || null,
           reviewer_comment: reviewerComment.trim() || null,
           corrected_output_json: correctedOutputParsed,
@@ -177,6 +196,7 @@ export function AiActiveLearningWorkspace() {
         body: {
           reviewer_name: reviewerName.trim() || null,
           reviewer_comment: reviewerComment.trim() || null,
+          reason_code: wireReasonCode,
           review_outcome: feedbackType,
         },
       })
@@ -305,6 +325,34 @@ export function AiActiveLearningWorkspace() {
               <Label htmlFor="reviewer-comment">reviewer comment optional</Label>
               <Input id="reviewer-comment" value={reviewerComment} onChange={(e) => setReviewerComment(e.target.value)} placeholder="reviewer_comment" />
             </div>
+            {/* reason_code (v0.19.1) — surfaces only on a negative verdict
+                (rejected / corrected / error_case / uncertain). Orthogonal
+                to feedback_type per the BE handoff. */}
+            {isNegativeFeedbackType(feedbackType) ? (
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="feedback-reason-code">
+                  reason_code optional
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    · structured "why?" tag for the negative verdict
+                  </span>
+                </Label>
+                <Select
+                  value={reasonCode}
+                  onValueChange={(v) => setReasonCode(v as ReasonCode)}
+                >
+                  <SelectTrigger id="feedback-reason-code">
+                    <SelectValue placeholder="Choose a reason…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REASON_CODES.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {REASON_CODE_LABEL[code]} <span className="ml-2 text-muted-foreground">({code})</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">
