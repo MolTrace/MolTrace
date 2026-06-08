@@ -85,6 +85,13 @@ jobs:
   backend-tests:
     name: Backend · pytest
     runs-on: ubuntu-latest
+    # Fail-fast safety net. The suite parallelizes to a few minutes (see
+    # `-n auto` below), so 30 min is a generous ceiling that still kills a true
+    # hang instead of letting it run toward the 6-hour GitHub default. This job
+    # is intentionally NOT coupled to frontend-tests (no `needs:`) — FE and BE
+    # run independently so an FE-only or BE-only change exercises each suite on
+    # its own without waiting on the other.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: moltrace_backend
@@ -111,8 +118,11 @@ jobs:
 
       # pytest config (testpaths=tests, addopts=-q -m 'not slow') is set in
       # pyproject.toml so the default run already skips the slow marker.
+      # `-n auto` (pytest-xdist, in the `dev` extra) fans the ~1.5k tests across
+      # every runner core — minutes instead of the serial ~hour. Kept CI-only
+      # (not in pyproject addopts) so local runs stay serial for clean debugging.
       - name: Run pytest
-        run: uv run pytest
+        run: uv run pytest -n auto
 
   deploy:
     name: Deploy · Vercel + Render (FE + BE)
