@@ -3274,6 +3274,178 @@ class NitrosamineWatchRequest(BaseModel):
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
 
+# --------------------------------------------------------------------------- #
+# Impurity Assessment (stateless) — POST /regulatory/impurities/assess
+# One input -> one report over all five deterministic engines (Q3A/B, Q3C, Q3D,
+# M7, CPCA) + nitrosamine cumulative risk. Decision-support only.
+# --------------------------------------------------------------------------- #
+ImpurityInSilicoCall = Literal["positive", "negative"]
+ImpurityAssessRoute = Literal["oral", "parenteral", "inhalation", "cutaneous"]
+ImpurityAssessSubstanceType = Literal["drug_substance", "drug_product"]
+
+
+class ImpuritySolventInput(BaseModel):
+    """A residual solvent to assess (ICH Q3C). ``identifier`` = name, CAS, or SMILES."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    identifier: str = Field(min_length=1, max_length=256)
+    measured_ppm: float | None = Field(default=None, ge=0.0)
+
+
+class ImpurityElementInput(BaseModel):
+    """An elemental impurity to assess (ICH Q3D). ``element`` = symbol or name."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    element: str = Field(min_length=1, max_length=64)
+    measured_ppm: float | None = Field(default=None, ge=0.0)
+
+
+class ImpurityStructuralInput(BaseModel):
+    """A structural impurity to assess (ICH M7; CPCA when it is a nitrosamine)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    smiles: str = Field(min_length=1, max_length=4096)
+    name: str | None = Field(default=None, max_length=256)
+    in_silico_expert: ImpurityInSilicoCall | None = None
+    in_silico_statistical: ImpurityInSilicoCall | None = None
+    experimental_ames: ImpurityInSilicoCall | None = None
+    experimental_carcinogen: ImpurityInSilicoCall | None = None
+    # Measured level (ng/day) — used for the nitrosamine cumulative-risk sum.
+    measured_ng_per_day: float | None = Field(default=None, ge=0.0)
+
+
+class ImpurityAssessRequest(BaseModel):
+    """Request body for ``POST /regulatory/impurities/assess``.
+
+    The drug-product context (dose, route, substance type, treatment duration)
+    drives the dose-based limits; each impurity list is routed to the matching
+    deterministic engine. All lists are optional — an empty request still returns
+    the ICH Q3A/B reporting/identification/qualification thresholds for the dose.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    daily_dose_g: float = Field(gt=0.0, le=100.0)
+    route: ImpurityAssessRoute = "oral"
+    substance_type: ImpurityAssessSubstanceType = "drug_substance"
+    duration_months: float = Field(default=120.0, gt=0.0, le=1200.0)
+    residual_solvents: list[ImpuritySolventInput] = Field(default_factory=list, max_length=256)
+    elemental_impurities: list[ImpurityElementInput] = Field(default_factory=list, max_length=64)
+    structural_impurities: list[ImpurityStructuralInput] = Field(
+        default_factory=list, max_length=256
+    )
+
+
+class ImpurityThresholdsOut(BaseModel):
+    """ICH Q3A/B reporting / identification / qualification thresholds for the dose."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    substance_type: str
+    reporting_percent: float
+    identification_percent: float
+    qualification_percent: float
+    regulatory_basis: str
+    table_reference: str
+
+
+class ImpuritySolventOut(BaseModel):
+    """ICH Q3C assessment for one residual solvent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    identifier: str
+    matched: bool
+    solvent_name: str | None = None
+    class_number: int | None = None
+    pde_mg_per_day: float | None = None
+    concentration_limit_ppm: float | None = None
+    measured_ppm: float | None = None
+    permitted_ppm: float | None = None
+    passed: bool | None = None
+    margin_ppm: float | None = None
+    regulatory_basis: str
+
+
+class ImpurityElementOut(BaseModel):
+    """ICH Q3D assessment for one elemental impurity."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    element: str
+    element_class: str | None = None
+    route_data_available: bool = True
+    pde_ug_per_day: float | None = None
+    permitted_concentration_ppm: float | None = None
+    control_threshold_ppm: float | None = None
+    measured_ppm: float | None = None
+    passed: bool | None = None
+    regulatory_basis: str
+
+
+class ImpurityCPCAOut(BaseModel):
+    """FDA CPCA nitrosamine categorization (present only for nitrosamines)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: int
+    ai_limit_ng_per_day: float
+    potency_score: int | None = None
+    coc_flag: bool = True
+    measured_ng_per_day: float | None = None
+    within_ai_limit: bool | None = None
+    regulatory_basis: str
+
+
+class ImpurityStructuralOut(BaseModel):
+    """ICH M7 (+ CPCA when a nitrosamine) assessment for one structural impurity."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    smiles: str
+    name: str | None = None
+    m7_class: int
+    m7_ttc_ug_per_day: float | None = None
+    coc_flag: bool
+    expert_review_required: bool
+    regulatory_action_required: str
+    cpca: ImpurityCPCAOut | None = None
+    regulatory_basis: str
+
+
+class ImpurityCumulativeRiskOut(BaseModel):
+    """Nitrosamine cumulative risk (FDA Rev 2): sum(measured / AI) must be < 1."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_risk_ratio: float
+    passes: bool
+    n_components: int
+
+
+class ImpurityAssessResult(BaseModel):
+    """Response from ``POST /regulatory/impurities/assess`` — the unified report."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    daily_dose_g: float
+    route: str
+    substance_type: str
+    duration_months: float
+    thresholds: ImpurityThresholdsOut
+    residual_solvents: list[ImpuritySolventOut] = Field(default_factory=list)
+    elemental_impurities: list[ImpurityElementOut] = Field(default_factory=list)
+    structural_impurities: list[ImpurityStructuralOut] = Field(default_factory=list)
+    nitrosamine_cumulative_risk: ImpurityCumulativeRiskOut | None = None
+    rule_set_versions: dict[str, str] = Field(default_factory=dict)
+    disclaimer: str
+    human_review_required: bool = True
+    warnings: list[str] = Field(default_factory=list)
+
+
 class AIGovernanceRecordCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
