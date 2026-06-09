@@ -22,15 +22,33 @@ from moltrace.regulatory.impurities.q3c_solvents import (
     classify_solvent,
     q3c_rule_set,
 )
+from moltrace.regulatory.impurities.q3d_elements import (
+    ConcentrationLimit,
+    ElementalRiskAssessment,
+    ElementPDE,
+    ElementRiskItem,
+    calculate_concentration_limit,
+    get_element_pde,
+    q3d_rule_set,
+    risk_assessment_report,
+)
 
 __all__ = [
     "ComplianceResult",
+    "ConcentrationLimit",
+    "ElementPDE",
+    "ElementRiskItem",
+    "ElementalRiskAssessment",
     "ImpurityThresholds",
     "SolventClassification",
     "ThresholdValue",
+    "calculate_concentration_limit",
     "calculate_q3ab_thresholds",
     "check_residual_solvent_limits",
     "classify_solvent",
+    "get_element_pde",
     "q3ab_rule_set",
     "q3c_rule_set",
+    "q3d_rule_set",
+    "risk_assessment_report",
 ]
