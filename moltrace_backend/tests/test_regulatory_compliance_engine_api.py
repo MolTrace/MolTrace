@@ -240,6 +240,65 @@ def test_regulatory_compliance_engine_workflow(tmp_path):
         assert update.json()["assigned_to"] == "QA reviewer"
 
 
+def test_residual_solvent_uses_q3c_engine_when_no_tenant_rule(tmp_path):
+    # A dossier with no configured rule-set: the residual-solvent assessment is now
+    # populated from the deterministic ICH Q3C engine instead of warning source_needed.
+    client, headers = _client(tmp_path)
+    with client:
+        juris = _jurisdiction(client, headers, "Q3C engine US", "US")
+        dossier = _dossier(client, headers, juris["id"])
+        res = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/residual-solvent-assessment",
+            headers=headers,
+            json={"solvents_json": [{"solvent_name": "acetonitrile", "observed_ppm": 5000}]},
+        )
+        assert res.status_code == 201, res.text
+        match = res.json()["residual_solvent_summary_json"]["matched_solvents"][0]
+        assert match["rule_found"] is False
+        assert match["solvent_class"] == "class_2"  # ICH Q3C engine
+        assert match["concentration_limit"] == 410.0
+        assert match["source"] == "ich_q3c_engine"
+        assert match["threshold_triggered"] is True  # 5000 ppm > 410 ppm limit
+
+
+def test_residual_solvent_unknown_still_source_needed(tmp_path):
+    # A solvent outside the encoded Q3C subset keeps the source-needed fallback.
+    client, headers = _client(tmp_path)
+    with client:
+        juris = _jurisdiction(client, headers, "Q3C unknown US", "US")
+        dossier = _dossier(client, headers, juris["id"])
+        res = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/residual-solvent-assessment",
+            headers=headers,
+            json={"solvents_json": [{"solvent_name": "water", "observed_ppm": 100}]},
+        )
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert any("source_needed" in w for w in body["warnings"])
+        assert body["residual_solvent_summary_json"]["matched_solvents"][0].get("solvent_class") is None
+
+
+def test_nitrosamine_watch_uses_cpca_for_smiles(tmp_path):
+    # A clean nitrosamine SMILES now yields the real FDA CPCA category + AI limit,
+    # not just a regex motif flag. nitrosamine_confirmed stays False (decision-support).
+    client, headers = _client(tmp_path)
+    with client:
+        juris = _jurisdiction(client, headers, "CPCA US", "US")
+        dossier = _dossier(client, headers, juris["id"])
+        res = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/nitrosamine-watch",
+            headers=headers,
+            json={"structure_text": "CN(C)N=O"},  # NDMA
+        )
+        assert res.status_code == 201, res.text
+        summary = res.json()["nitrosamine_summary_json"]
+        assert summary["review_required"] is True
+        assert summary["nitrosamine_confirmed"] is False
+        assert summary["cpca"]["cpca_category"] == 1
+        assert summary["cpca"]["ai_limit_ng_per_day"] == 26.5
+        assert summary["cpca"]["coc_flag"] is True
+
+
 def test_regulatory_compliance_engine_endpoints_appear_in_openapi(tmp_path):
     client, _headers = _client(tmp_path)
     with client:

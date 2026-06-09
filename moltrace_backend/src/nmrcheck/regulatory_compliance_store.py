@@ -798,6 +798,37 @@ def _solvent_key(name: str | None) -> str:
     return _SOLVENT_ALIASES.get(raw, raw)
 
 
+def _q3c_default(name: str) -> dict[str, Any] | None:
+    """ICH Q3C default classification for a solvent with no tenant rule (deterministic
+    engine). Returns the Option-1 concentration limit (ppm) + PDE so the assessment is
+    populated from the guideline instead of warning ``source_needed``. Tenant rules,
+    when present, remain the override. ``None`` when the solvent is outside the encoded
+    ICH Q3C subset (caller keeps the source-needed path)."""
+
+    if not name.strip():
+        return None
+    try:
+        from moltrace.regulatory.impurities import classify_solvent
+
+        cls = classify_solvent(name)
+    except Exception:
+        return None
+    if not cls.matched:
+        return None
+    return {
+        "fields": {
+            "solvent_class": f"class_{cls.class_number}",
+            "concentration_limit": cls.concentration_limit_ppm,
+            "permitted_daily_exposure": cls.pde_mg_per_day,
+            "source": "ich_q3c_engine",
+            "regulatory_basis": cls.regulatory_basis,
+            "rule_set_version": cls.rule_set_version,
+        },
+        "limit_ppm": cls.concentration_limit_ppm,
+        "class_1": cls.class_number == 1,
+    }
+
+
 def create_residual_solvent_assessment(
     session_factory: sessionmaker[Session],
     dossier_id: int,
@@ -846,8 +877,23 @@ def create_residual_solvent_assessment(
                 if rule.solvent_class == "class_1":
                     match["review_required"] = True
             else:
-                warnings.append(f"source_needed: no configured residual solvent rule matched {name or 'unknown solvent'}.")
-                match["review_required"] = True
+                engine = _q3c_default(name)
+                if engine is not None:
+                    match.update(engine["fields"])
+                    if (
+                        observed_value is not None
+                        and engine["limit_ppm"] is not None
+                        and observed_value >= engine["limit_ppm"]
+                    ):
+                        match["threshold_triggered"] = True
+                    if engine["class_1"]:
+                        match["review_required"] = True
+                else:
+                    warnings.append(
+                        f"source_needed: no configured rule or ICH Q3C entry matched "
+                        f"{name or 'unknown solvent'}."
+                    )
+                    match["review_required"] = True
             if match.get("threshold_triggered") or match.get("review_required"):
                 action = _create_action_item_row(
                     session,
@@ -899,6 +945,30 @@ def _has_nitroso_signal(text: str | None, signals: list[dict[str, Any]]) -> bool
     return any(pattern.search(haystack) for pattern in _NITROSO_PATTERNS)
 
 
+def _cpca_summary(structure_text: str | None) -> dict[str, Any] | None:
+    """FDA CPCA categorization when ``structure_text`` is a parseable nitrosamine
+    SMILES (deterministic engine) — the real potency category + AI limit, replacing
+    the bare regex motif flag. ``None`` for free text / non-nitrosamine input (caller
+    falls back to the regex signal)."""
+
+    if not structure_text or not structure_text.strip():
+        return None
+    try:
+        from moltrace.regulatory.impurities import classify_cpca
+
+        cpca = classify_cpca(structure_text.strip())
+    except Exception:
+        return None
+    return {
+        "cpca_category": cpca.category,
+        "ai_limit_ng_per_day": cpca.ai_limit_ng_per_day,
+        "potency_score": cpca.potency_score,
+        "coc_flag": cpca.coc_flag,
+        "rule_set_version": cpca.rule_set_version,
+        "regulatory_basis": cpca.regulatory_basis,
+    }
+
+
 def create_nitrosamine_watch(
     session_factory: sessionmaker[Session],
     dossier_id: int,
@@ -911,6 +981,9 @@ def create_nitrosamine_watch(
         _require_batch(session, payload.batch_id)
         _require_compound(session, payload.compound_id)
         possible = _has_nitroso_signal(payload.structure_text, payload.risk_signals_json)
+        cpca = _cpca_summary(payload.structure_text)
+        if cpca is not None:
+            possible = True  # a parseable nitrosamine SMILES is a definitive structural signal
         rule_set_ids = [row.id for row in _active_rule_sets(session, dossier)]
         rules = session.scalars(select(NitrosamineRiskRuleORM).where(NitrosamineRiskRuleORM.rule_set_id.in_(rule_set_ids))).all() if rule_set_ids else []
         matched_rules = [
@@ -951,6 +1024,7 @@ def create_nitrosamine_watch(
             "risk_category": "cpca_review_required" if possible else "unknown",
             "review_required": possible,
             "nitrosamine_confirmed": False,
+            "cpca": cpca,  # real FDA CPCA category + AI when structure_text is a nitrosamine SMILES
             "matched_rules": matched_rules,
             "risk_signals_json": payload.risk_signals_json,
         }
