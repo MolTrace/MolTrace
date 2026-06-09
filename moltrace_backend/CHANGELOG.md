@@ -14,6 +14,75 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.22.3 — Regulatory Hub: ICH Q3D(R2) elemental-impurity engine (Prompt 3) (2026-06-08)
+
+**Headline:** The third deterministic regulatory engine completes the ICH impurity
+trio (Q3A/B → Q3C → **Q3D**). `get_element_pde` returns the ICH **Q3D(R2)** permitted
+daily exposure (PDE) for an elemental impurity by administration route, with its class
+and the 30%-of-PDE control threshold; `calculate_concentration_limit` gives the
+permitted product concentration at a daily dose (Option 1: `PDE / max daily dose`); and
+`risk_assessment_report` generates a class-driven Q3D risk assessment over a product's
+components and manufacturing equipment. The PDE table is factual regulatory data
+implemented from the official ICH Q3D(R2) Appendices and cited. Pure, auditable lookups
++ arithmetic over a content-versioned rule-set — **no model in the numeric path**.
+Decision-support: every value carries its regulatory basis + table reference and must be
+verified against the official ICH source and signed off by a qualified reviewer; the
+risk-assessment output is a starting point for a documented Q3D assessment, not a
+determination. No new dependencies; no API/contract change (library only).
+
+**Route coverage — 3 of 4 routes encoded.** The **oral / parenteral / inhalation** PDEs
+(ICH Q3D(R2) Table A.2.1, all 24 elements) are encoded from the canonical ICH values.
+The **cutaneous / transcutaneous** PDEs (the Q3D(R2) addition) are **not encoded** in
+this rule-set: those routes are recognised + validated, but return
+`route_data_available = False` with `pde = None` — an explicit "not encoded" with a note
+to consult the official Q3D(R2) cutaneous appendix, **never a guessed PDE** (decision
+confirmed with the user). Extend the table once those values are confirmed.
+
+### Added
+- **`moltrace/regulatory/impurities/q3d_elements.py`** —
+  - `get_element_pde(element, route)`: resolves an element by **symbol or name** and
+    returns `ElementPDE` (class + description, route, `pde_ug_per_day`,
+    `control_threshold_ug_per_day` = 30% of PDE, `route_data_available`, basis, table
+    reference, content-hashed `rule_set_version`). An element outside the Q3D 24 fails
+    loud; cutaneous/transcutaneous return the explicit not-encoded result.
+  - `calculate_concentration_limit(element, route, max_daily_dose_g)`: Option-1
+    `permitted concentration (ppm) = PDE (microg/day) / max daily dose (g/day)`, plus the
+    control threshold in ppm. Cutaneous routes → `None` limits.
+  - `risk_assessment_report(components, equipment, route, max_daily_dose_g)`: a
+    `ElementRiskItem` per element with likely-present (Class 1 & 2A always; Class 2B only
+    if intentionally added or equipment-sourced; Class 3 for parenteral/inhalation or if
+    added/sourced), potential sources, permitted concentration, and the recommended
+    action (assess vs. apply an intentional-addition / route-based exclusion). Intentional
+    addition is inferred from element names in the component list; equipment sourcing from
+    a heuristic alloy knowledge base (stainless steel, Hastelloy, Inconel, Monel, …).
+  - `q3d_rule_set()` exposes the encoded Table A.2.1 as the auditable rule-set.
+- **`moltrace/regulatory/impurities/__init__.py`** — exports the four dataclasses + three
+  functions + `q3d_rule_set`.
+- **`tests/test_regulatory_q3d.py`** — 166 tests: the full Table A.2.1 (24 elements × 3
+  routes = 72 PDEs) reproduced exactly from an **independent** ground-truth transcription;
+  the 30%-of-PDE control thresholds; Option-1 permitted-concentration arithmetic;
+  symbol/name lookup; explicit cutaneous "not encoded"; unknown-element fail-loud; the
+  class-driven risk logic (Class 1/2A always, 2B exclusion, 3 route-dependent, intentional
+  addition + alloy-KB equipment sourcing); integration with the Phase 0 zero-tolerance
+  calculation gate; and determinism.
+
+### Notes
+- **Reuse-first / born-compliant.** Route + dose validation flows through the Prompt 19
+  foundation (`assert_valid_dose` / `ValidationReport` → `DataValidationError`); outputs
+  carry the content-hashed `rule_set_version`; the regulated PDEs are pinned by the Phase 0
+  `enforce_zero_calculation_errors` gate (`ALLOWED_ROUTES` already recognised
+  cutaneous/transcutaneous).
+- **IP/licensing.** PDEs, classes, and control thresholds are factual regulatory criteria.
+  No ICH guideline prose is reproduced; the basis + table reference (`ICH Q3D(R2) Table
+  A.2.1`) are cited on every result.
+- **No user-facing "compliant" claim.** Risk-assessment items are decision-support; the
+  equipment/intentional-addition inference is heuristic and must be confirmed against the
+  actual materials of construction and supplier data.
+- **White papers:** no update this release (internal library, no customer-facing surface
+  yet) — deferred until the impurity-assessment capability is exposed.
+
+---
+
 ## v0.22.2 — Regulatory Hub: ICH Q3C(R8) residual-solvent classifier (Prompt 2) (2026-06-08)
 
 **Headline:** The second deterministic regulatory engine — `classify_solvent` assigns a
