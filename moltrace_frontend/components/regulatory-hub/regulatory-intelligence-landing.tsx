@@ -548,6 +548,9 @@ export function RegulatoryIntelligenceLanding() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button asChild size="sm">
+            <Link href="/regulatory/impurities">Impurity assessment</Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/regulatory/notifications">Notifications</Link>
           </Button>
@@ -1051,6 +1054,14 @@ export function RegulatoryIntelligenceLanding() {
           </Button>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
+          <ModuleCard
+            accent="cyan"
+            eyebrow="Regulatory · Impurities"
+            title="Impurity assessment"
+            description="One report across ICH Q3A/B, Q3C, Q3D, M7 and FDA CPCA nitrosamine engines — dose in, thresholds and pass/fail out."
+            href="/regulatory/impurities"
+            ctaLabel="Open impurity assessment"
+          />
           <ModuleCard
             accent="cyan"
             eyebrow="Regulatory · Surveillance"
