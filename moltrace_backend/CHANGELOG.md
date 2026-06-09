@@ -14,6 +14,73 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.22.2 — Regulatory Hub: ICH Q3C(R8) residual-solvent classifier (Prompt 2) (2026-06-08)
+
+**Headline:** The second deterministic regulatory engine — `classify_solvent` assigns a
+residual solvent to ICH **Q3C(R8)** Class 1 (avoid), Class 2 (limit by permitted daily
+exposure), or Class 3 (low toxic potential, PDE ≥ 50 mg/day), and
+`check_residual_solvent_limits` checks measured residual levels against the permitted
+limit for a given daily dose. The solvent → class → PDE table is factual regulatory
+data implemented from the official ICH Q3C(R8) Appendices and cited; no copyrighted
+guideline text is reproduced. Pure, auditable lookups + arithmetic over a
+content-versioned rule-set — **no model in the numeric path**. Decision-support: every
+classification carries its regulatory basis + table reference and must be verified
+against the official ICH source and signed off by a qualified reviewer before any
+filing or release use. No new dependencies; no API/contract change (library only).
+
+**Note on the encoded table.** This release encodes a **curated subset** of ICH
+Q3C(R8) Appendices 1-3 — **all 5 Class 1 solvents, 18 common Class 2 solvents, and 21
+representative Class 3 solvents (44 total)** — transcribed from the canonical ICH
+values (e.g. Class 2 PDEs: methanol 30 mg/day, acetonitrile 4.1, dichloromethane 6.0,
+chloroform 0.6; Class 1 limits: benzene 2 ppm, carbon tetrachloride 4 ppm). A solvent
+not in the encoded subset returns `matched = False` — an explicit "unknown" with a note
+to classify against the official Appendix, **never a guessed limit**. Extend the table
+from the official ICH Q3C(R8) source as needed; verify every value before filing use.
+
+### Added
+- **`moltrace/regulatory/impurities/q3c_solvents.py`** —
+  - `classify_solvent(solvent_identifier, route='oral'|'parenteral'|'inhalation')`:
+    resolves a solvent by **name, CAS number, or SMILES** (SMILES via RDKit
+    canonicalisation) and returns a `SolventClassification` carrying `class_number` +
+    `class_description`, the systemic `pde_mg_per_day` (Class 2/3), the Option-1
+    `concentration_limit_ppm`, `cas_number`, recommended `analytical_methods`,
+    `regulatory_basis`, `table_reference`, `matched`, and the content-hashed
+    `rule_set_version`. Unknown solvent → `matched=False` (explicit, never guessed).
+  - `check_residual_solvent_limits(product_spec, daily_dose_g, route='oral')`: for each
+    measured solvent (ppm) returns a `ComplianceResult` with the dose-scaled permitted
+    limit (**Option 2**: `PDE × 1000 / daily_dose_g`; **Option 1** fixed concentration
+    limit for Class 1), `passed`, and the signed `margin_ppm`. Unknown solvent →
+    `passed=None` (cannot be judged). Non-positive dose fails loud.
+  - `q3c_rule_set()` exposes the encoded Q3C table as the auditable rule-set; route is
+    validated + recorded but does not change the (systemic) PDE.
+- **`moltrace/regulatory/impurities/__init__.py`** — exports `classify_solvent`,
+  `check_residual_solvent_limits`, `SolventClassification`, `ComplianceResult`,
+  `q3c_rule_set`.
+- **`tests/test_regulatory_q3c.py`** — 134 tests: the full 44-solvent ICH Q3C(R8) table
+  reproduced exactly (class + PDE + Option-1 ppm) from an **independent** ground-truth
+  transcription; the 4 named concentration limits (ethanol 5000, methanol 3000,
+  acetonitrile 410, dichloromethane 600 ppm at the oral PDE); name/CAS/alias/SMILES
+  lookup; Class 1 avoid + Class 3 invariants; dose-scaled Option-2 compliance pass/fail
+  + margin; Class 1 fixed-limit (dose-independent) check; explicit unknown handling;
+  route validation; integration with the Phase 0 zero-tolerance calculation gate; and
+  determinism (including the SMILES path).
+
+### Notes
+- **Reuse-first / born-compliant.** Route validation flows through the Prompt 19
+  foundation (`ValidationReport`/`ValidationFailure` → `DataValidationError`); outputs
+  carry the content-hashed `rule_set_version` (`rule_set_version`/`content_hash`); the
+  regulated numbers are pinned by the Phase 0 `enforce_zero_calculation_errors` gate.
+- **IP/licensing.** Class assignments, PDEs, and concentration limits are factual
+  regulatory criteria. No ICH guideline prose is reproduced; the basis + table
+  reference (`ICH Q3C(R8) Appendices 1-3`) are cited on every result.
+- **No user-facing "compliant" claim.** Results are decision-support; every result
+  notes that a qualified reviewer must verify against the official ICH Q3C(R8) source
+  and sign off before any filing or release decision.
+- **White papers:** no update this release (internal library, no customer-facing
+  surface yet) — deferred until the impurity-assessment capability is exposed.
+
+---
+
 ## v0.22.1 — Regulatory Hub: ICH Q3A/B impurity threshold calculator (Prompt 1) (2026-06-08)
 
 **Headline:** The first deterministic regulatory calculator — `calculate_q3ab_thresholds`
