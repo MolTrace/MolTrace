@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Technical White Paper"
 subtitle: "Architecture, Scientific Foundations, and Regulatory Posture for Analytical-Method Validators and Regulatory Reviewers"
-version: "2026-06-08"
+version: "2026-06-09"
 audience: "Analytical-method validators, NMR / MS technical leads, regulatory-affairs reviewers, IT / data-integrity auditors"
 length: "≈7,500 words · Technical variant of the canonical hybrid white paper"
 ---
@@ -562,6 +562,8 @@ The MS evidence stack (Weeks 29–32, 35–39) is grounded in:
 **GAMP 5 (2nd ed., 2022), Appendix D11 — Computerised System Validation**.[^gamp5] MolTrace generates a versioned, byte-reproducible D11 CSV document skeleton (intended use, GAMP software category, GxP-risk class, requirements-traceability matrix, IQ/OQ/PQ evidence slots) to accelerate a customer's validation; the overall compliance determination remains the regulated user's responsibility.
 
 **FDA Control of Nitrosamine Impurities in Human Drugs**.[^fda_nitrosamines] Drives the curated impurity-library in `impurities.py`.
+
+**ICH Q3A/B, Q3C(R8), Q3D(R2), M7(R2) + FDA CPCA — unified Impurity Assessment.** Five deterministic engines are exposed through one authenticated endpoint (`POST /regulatory/impurities/assess`) and one Regulatory-Hub panel: Q3A/B reporting/identification/qualification thresholds for the dose, Q3C residual-solvent class limits scaled to the daily dose (Option 2), Q3D elemental-impurity PDEs by administration route, M7 mutagenic-impurity classification from (Q)SAR/experimental inputs, and the FDA CPCA carcinogenic-potency category for nitrosamines with a cumulative risk-ratio gate (must be < 1). Each engine returns its `regulatory_basis` and a SHA-256 of the rule set that produced it (`rule_set_versions`), so a number is traceable to the exact encoded guideline revision; the route degrades gracefully (unknown elements / unparseable SMILES become non-blocking warnings rather than failures) and every response is `human_review_required` by construction.
 
 ### 8.11 Model Evaluation & Calibration Metrics
 

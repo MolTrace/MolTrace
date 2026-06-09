@@ -7,7 +7,7 @@
 ---
 
 **A MolTrace Technologies, Inc. White Paper**
-Document version: 2026-Q2 · rev 2026-06-08 · Hybrid (business + technical) · Approx. 5,400 words
+Document version: 2026-Q2 · rev 2026-06-09 · Hybrid (business + technical) · Approx. 5,400 words
 
 > *"Scientific intelligence has to be reproducible to be useful, auditable to be acceptable, and integrated to be adopted."*
 
@@ -314,6 +314,8 @@ The EMA reflection paper on AI in the medicinal-product lifecycle similarly emph
 ### 6.4 Nitrosamine Impurities & Trace Contaminants
 
 The FDA's guidance on the *Control of Nitrosamine Impurities in Human Drugs*[^fda_nitrosamines] is operationally relevant to MolTrace's impurity-candidate panel (`build_impurity_candidates` in `peak_categorization.py`). Curated solvent/impurity reference shifts drive cross-checks at analyze time so candidate trace impurities are surfaced inline with structural assignments rather than as a separate downstream report.
+
+The Regulatory Intelligence Hub now exposes these controls as a single **Impurity Assessment** surface: one form (daily dose, route, substance type, treatment duration, plus any observed residual solvents, elemental impurities, and structural impurities) returns one tabbed report computed by five deterministic engines — ICH Q3A/B reporting/identification/qualification thresholds, ICH Q3C(R8) residual-solvent class limits (dose-scaled), ICH Q3D(R2) elemental-impurity PDEs, ICH M7(R2) mutagenic-impurity (Q)SAR classification, and the FDA Carcinogenic Potency Categorization Approach (CPCA) for nitrosamines, with a cumulative nitrosamine risk-ratio gate. Each engine's output carries its own regulatory-basis citation and a content hash of the rule set that produced it (`rule_set_versions`), the assessment never blocks on a malformed input (unknown elements or unparseable structures are returned as non-blocking notices), and — like every regulatory output — the result is decision-support that is gated behind an explicit qualified-reviewer sign-off before export.
 
 ### 6.5 GxP-Aligned Data Integrity
 
