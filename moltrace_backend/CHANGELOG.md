@@ -14,6 +14,82 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.22.4 — Regulatory Hub: ICH M7(R2) mutagenic-impurity classifier (Prompt 4) (2026-06-08)
+
+**Headline:** `classify_m7` assesses a potential impurity under ICH **M7(R2)** using
+the five-class scheme of Mueller et al. (2006): a DNA-reactive structural-alert
+screen plus the dual-(Q)SAR rule, with experimental data overriding in-silico
+predictions, Cohort of Concern (CoC) handling, and the staged (less-than-lifetime)
+threshold of toxicological concern (TTC). It returns the class (1–5), the TTC or a
+compound-specific-AI flag, the in-silico concordance, the CoC flag, an
+expert-review flag, and a narrative for **CTD Section 3.2.S.3.2**. No new
+dependencies; no API/contract change (library only).
+
+**Deterministic logic vs. (Q)SAR model — the M7 split.** The M7 **decision logic**
+(class assignment, the dual-(Q)SAR rule, CoC handling, the staged-TTC math) is pure,
+auditable, content-versioned — **no model in this path**. The only model-like
+component is the **structural-alert screen**: a curated expert rule-based SMARTS set
+(the M7-required "expert rule-based (Q)SAR" surrogate, in the spirit of
+Ashby–Tennant / Benigni–Bossa) — a rule engine, **not an LLM**. For a formal M7
+assessment, supply the results of two complementary (Q)SAR systems via
+`in_silico_result_expert` / `in_silico_result_statistical`; the internal screen is
+the per-system default only when a result is not supplied (recorded transparently in
+the reasoning).
+
+**Decision tree.** experimental carcinogenicity positive → **Class 1** (compound-
+specific AI); CoC structure not cleared by a negative Ames → **Class 2** (compound-
+specific AI; TTC not applicable); negative carcinogenicity → **Class 5**; positive
+Ames → **Class 2**; negative Ames → **Class 5**; else dual-(Q)SAR — both negative →
+**Class 5**, either positive → **Class 3** (TTC), discordant → **Class 3** +
+expert-review. Staged TTC by `duration_months`: ≤1 mo → 120, >1–12 mo → 20, >1–10 yr
+→ 10, >10 yr → 1.5 µg/day (default 120 months = the >1–10 yr band, 10 µg/day).
+
+### Added
+- **`moltrace/regulatory/impurities/m7_classifier.py`** —
+  - `classify_m7(smiles, duration_months=120, in_silico_result_expert=None,
+    in_silico_result_statistical=None, experimental_ames=None,
+    experimental_carcinogen=None) -> M7Classification` (`m7_class`, `ttc_ug_per_day`,
+    `regulatory_action_required`, `structural_alerts`, `in_silico_concordance`,
+    `expert_review_required`, `coc_flag`, `coc_categories`, `data_basis`, `reasoning`,
+    content-hashed `rule_set_version`).
+  - A 17-pattern DNA-reactive structural-alert SMARTS screen and a CoC structural
+    screen (**N-nitroso, alkyl-azoxy** — robust). RDKit recognises structure only;
+    parse failures fail loud.
+  - `m7_rule_set()` exposes the class definitions, staged-TTC table, and alert names
+    as the auditable rule-set.
+- **`moltrace/regulatory/impurities/__init__.py`** — exports `classify_m7`,
+  `M7Classification`, `m7_rule_set`.
+- **`tests/test_regulatory_m7.py`** — 47 tests: every decision-tree branch; CoC
+  (NDMA / azoxymethane → compound-specific AI, not cleared by a negative Ames, cleared
+  only by negative carcinogenicity); the staged-TTC bands; the structural-alert screen;
+  the **two spec consistency invariants** swept over a 324-case input matrix (a
+  (Q)SAR-driven Class 5 is negative from both in-silico systems; a Class 1 has positive
+  experimental carcinogenicity); a coumarin is not a false CoC; fail-loud SMILES / enum
+  / duration validation; and determinism.
+
+### Notes
+- **Reuse-first / born-compliant.** SMILES validates through the Prompt 19 foundation
+  (`assert_valid_compound_record` → `DataValidationError`); outputs carry the
+  content-hashed `rule_set_version`; the structural screen reuses the RDKit + `BlockLogs`
+  pattern from the Q3C classifier.
+- **Coverage caveats (flagged in-module).** (1) **Class 4** (alert shared with the drug
+  substance / a tested-negative related compound) needs drug-substance context not taken
+  by this function and is **not auto-assigned**. (2) CoC structural auto-detection covers
+  N-nitroso + alkyl-azoxy; **aflatoxin-like** compounds are a named CoC member not
+  reliably detectable from a simple SMARTS and must be flagged by identity. (3) The alert
+  set is a **curated subset**; verify classifications against the official ICH M7(R2)
+  guideline + its Q&A worked examples and qualified expert review before any filing use.
+- **IP/licensing.** The class scheme, TTC values, and alert concepts are factual
+  regulatory criteria; no ICH guideline prose is reproduced. Basis cited on every result.
+- **No user-facing "compliant" claim.** The class + TTC + narrative are decision-support
+  for CTD 3.2.S.3.2, to be reviewed and signed off by a qualified toxicologist.
+- **Sets up Prompt 5 (CPCA).** M7's CoC + mutagenicity framework is the base the
+  FDA/EMA nitrosamine CPCA classifier builds on.
+- **White papers:** no update this release (internal library, no customer-facing surface
+  yet) — deferred until the impurity-assessment capability is exposed.
+
+---
+
 ## v0.22.3 — Regulatory Hub: ICH Q3D(R2) elemental-impurity engine (Prompt 3) (2026-06-08)
 
 **Headline:** The third deterministic regulatory engine completes the ICH impurity

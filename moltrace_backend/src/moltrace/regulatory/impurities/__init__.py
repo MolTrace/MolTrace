@@ -9,6 +9,11 @@ reviewer verifies and signs off, never a regulatory determination.
 
 from __future__ import annotations
 
+from moltrace.regulatory.impurities.m7_classifier import (
+    M7Classification,
+    classify_m7,
+    m7_rule_set,
+)
 from moltrace.regulatory.impurities.q3ab_calculator import (
     ImpurityThresholds,
     ThresholdValue,
@@ -40,13 +45,16 @@ __all__ = [
     "ElementRiskItem",
     "ElementalRiskAssessment",
     "ImpurityThresholds",
+    "M7Classification",
     "SolventClassification",
     "ThresholdValue",
     "calculate_concentration_limit",
     "calculate_q3ab_thresholds",
     "check_residual_solvent_limits",
+    "classify_m7",
     "classify_solvent",
     "get_element_pde",
+    "m7_rule_set",
     "q3ab_rule_set",
     "q3c_rule_set",
     "q3d_rule_set",
