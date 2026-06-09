@@ -4014,6 +4014,10 @@ class RegulatoryDossierORM(Base):
         nullable=True,
     )
     intended_use: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Product context for dose-driven impurity limits (ICH Q3A/B thresholds,
+    # dose-scaled Q3C/Q3D limits). One dose per dossier; all its assessments use it.
+    max_daily_dose_g: Mapped[float | None] = mapped_column(Float, nullable=True)
+    substance_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="draft")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(

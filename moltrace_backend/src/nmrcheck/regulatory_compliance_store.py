@@ -649,6 +649,49 @@ def _best_impurity_trigger(
     return best_trigger, best_rule
 
 
+def _q3ab_trigger(
+    daily_dose_g: float, observed_level_percent: float, substance_type: str = "drug_substance"
+) -> str:
+    """ICH Q3A/B threshold band the observed impurity level falls in (deterministic
+    engine) when no tenant rule matches."""
+
+    try:
+        from moltrace.regulatory.impurities import calculate_q3ab_thresholds
+
+        thr = calculate_q3ab_thresholds(daily_dose_g, substance_type)
+    except Exception:
+        return "none"
+    if observed_level_percent >= thr.qualification_threshold.effective_percent:
+        return "qualification"
+    if observed_level_percent >= thr.identification_threshold.effective_percent:
+        return "identification"
+    if observed_level_percent >= thr.reporting_threshold.effective_percent:
+        return "reporting"
+    return "none"
+
+
+def _m7_summary(structural_assignment: str | None) -> dict[str, Any] | None:
+    """ICH M7 mutagenicity classification when ``structural_assignment`` is a parseable
+    SMILES (deterministic engine). ``None`` for free-text assignments."""
+
+    if not structural_assignment or not structural_assignment.strip():
+        return None
+    try:
+        from moltrace.regulatory.impurities import classify_m7
+
+        m7 = classify_m7(structural_assignment.strip())
+    except Exception:
+        return None
+    return {
+        "m7_class": m7.m7_class,
+        "ttc_ug_per_day": m7.ttc_ug_per_day,
+        "coc_flag": m7.coc_flag,
+        "expert_review_required": m7.expert_review_required,
+        "regulatory_basis": m7.regulatory_basis,
+        "rule_set_version": m7.rule_set_version,
+    }
+
+
 def create_impurity_risk_register(
     session_factory: sessionmaker[Session],
     dossier_id: int,
@@ -666,8 +709,19 @@ def create_impurity_risk_register(
             observed_level_percent=payload.observed_level_percent,
             observed_amount=payload.observed_amount,
         )
+        # Dose for the Q3A/B band: per-call override wins, else the dossier's product dose.
+        dose = (
+            payload.daily_dose_g if payload.daily_dose_g is not None else dossier.max_daily_dose_g
+        )
         if payload.threshold_triggered is not None:
             trigger = payload.threshold_triggered
+        elif rule is None and dose is not None and payload.observed_level_percent is not None:
+            # No tenant rule but a dose is available -> compute the ICH Q3A/B band from the
+            # deterministic engine (overrides the default no-rule review_required signal).
+            trigger = _q3ab_trigger(
+                dose, payload.observed_level_percent, dossier.substance_type or "drug_substance"
+            )
+        m7 = _m7_summary(payload.structural_assignment)
         warnings = list(payload.warnings_json)
         notes = list(payload.notes_json) or [_COMPLIANCE_NOTE]
         action: RegulatoryActionItemORM | None = None
@@ -698,6 +752,9 @@ def create_impurity_risk_register(
                 citation_ids=citation_ids,
                 metadata={"threshold_triggered": trigger, "rule_id": rule.id if rule is not None else None},
             )
+        _impurity_metadata = dict(payload.metadata_json)
+        if m7 is not None:
+            _impurity_metadata["m7"] = m7
         row = ImpurityRiskRegisterORM(
             dossier_id=dossier_id,
             impurity_name=payload.impurity_name,
@@ -713,7 +770,7 @@ def create_impurity_risk_register(
             status=status,
             warnings_json=_json_dump(warnings),
             notes_json=_json_dump(notes),
-            metadata_json=_json_dump(_metadata_with_warnings(payload.metadata_json, warnings)),
+            metadata_json=_json_dump(_metadata_with_warnings(_impurity_metadata, warnings)),
         )
         session.add(row)
         session.flush()
@@ -798,12 +855,12 @@ def _solvent_key(name: str | None) -> str:
     return _SOLVENT_ALIASES.get(raw, raw)
 
 
-def _q3c_default(name: str) -> dict[str, Any] | None:
+def _q3c_default(name: str, daily_dose_g: float | None = None) -> dict[str, Any] | None:
     """ICH Q3C default classification for a solvent with no tenant rule (deterministic
-    engine). Returns the Option-1 concentration limit (ppm) + PDE so the assessment is
-    populated from the guideline instead of warning ``source_needed``. Tenant rules,
-    when present, remain the override. ``None`` when the solvent is outside the encoded
-    ICH Q3C subset (caller keeps the source-needed path)."""
+    engine). When the dossier carries a daily dose, the dose-scaled Option-2 limit is
+    used (``PDE * 1000 / dose``); otherwise the Option-1 concentration limit (10 g/day
+    reference). Tenant rules, when present, remain the override. ``None`` when the
+    solvent is outside the encoded ICH Q3C subset (caller keeps the source-needed path)."""
 
     if not name.strip():
         return None
@@ -815,16 +872,22 @@ def _q3c_default(name: str) -> dict[str, Any] | None:
         return None
     if not cls.matched:
         return None
+    limit_ppm = cls.concentration_limit_ppm
+    limit_basis = "ICH Q3C Option 1 (10 g/day reference)"
+    if daily_dose_g is not None and cls.pde_mg_per_day is not None:
+        limit_ppm = cls.pde_mg_per_day * 1000.0 / daily_dose_g  # Option 2, dose-scaled
+        limit_basis = "ICH Q3C Option 2 (dose-scaled to the dossier daily dose)"
     return {
         "fields": {
             "solvent_class": f"class_{cls.class_number}",
-            "concentration_limit": cls.concentration_limit_ppm,
+            "concentration_limit": limit_ppm,
             "permitted_daily_exposure": cls.pde_mg_per_day,
             "source": "ich_q3c_engine",
             "regulatory_basis": cls.regulatory_basis,
             "rule_set_version": cls.rule_set_version,
+            "limit_basis": limit_basis,
         },
-        "limit_ppm": cls.concentration_limit_ppm,
+        "limit_ppm": limit_ppm,
         "class_1": cls.class_number == 1,
     }
 
@@ -877,7 +940,7 @@ def create_residual_solvent_assessment(
                 if rule.solvent_class == "class_1":
                     match["review_required"] = True
             else:
-                engine = _q3c_default(name)
+                engine = _q3c_default(name, dossier.max_daily_dose_g)
                 if engine is not None:
                     match.update(engine["fields"])
                     if (

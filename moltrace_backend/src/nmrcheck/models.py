@@ -2499,6 +2499,9 @@ class RegulatoryDossierCreate(BaseModel):
     compound_name: str | None = Field(default=None, max_length=240)
     jurisdiction_id: int | None = None
     intended_use: str | None = Field(default=None, max_length=500)
+    # Product context for dose-driven impurity limits (Q3A/B, dose-scaled Q3C/Q3D).
+    max_daily_dose_g: float | None = Field(default=None, gt=0, le=100)
+    substance_type: Literal["drug_substance", "drug_product"] | None = None
     status: RegulatoryDossierStatus = "draft"
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
@@ -2523,6 +2526,8 @@ class RegulatoryDossierUpdate(BaseModel):
     compound_name: str | None = Field(default=None, max_length=240)
     jurisdiction_id: int | None = None
     intended_use: str | None = Field(default=None, max_length=500)
+    max_daily_dose_g: float | None = Field(default=None, gt=0, le=100)
+    substance_type: Literal["drug_substance", "drug_product"] | None = None
     status: RegulatoryDossierStatus | None = None
     metadata_json: dict[str, Any] | None = None
 
@@ -2548,6 +2553,8 @@ class RegulatoryDossier(BaseModel):
     compound_name: str | None = None
     jurisdiction_id: int | None = None
     intended_use: str | None = None
+    max_daily_dose_g: float | None = None
+    substance_type: Literal["drug_substance", "drug_product"] | None = None
     status: RegulatoryDossierStatus
     created_at: datetime
     updated_at: datetime
@@ -3220,6 +3227,9 @@ class ImpurityRiskRegisterCreate(BaseModel):
     source: ImpurityEvidenceSource = "user_entered"
     observed_level_percent: float | None = Field(default=None, ge=0)
     observed_amount: float | None = Field(default=None, ge=0)
+    # Optional: drives the deterministic ICH Q3A/B threshold band when no tenant rule
+    # matches (Q3A/B thresholds are dose-driven; substance type assumed drug_substance).
+    daily_dose_g: float | None = Field(default=None, gt=0, le=100)
     threshold_triggered: ImpurityThresholdTriggered | None = None
     structural_assignment: str | None = Field(default=None, max_length=20_000)
     compound_id: int | None = Field(default=None, ge=1)
