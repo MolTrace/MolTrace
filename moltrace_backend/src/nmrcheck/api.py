@@ -385,8 +385,16 @@ from .models import (
     HRMSCandidateMatchResult,
     HRMSFormulaSearchRequest,
     HRMSFormulaSearchResult,
+    ImpurityAssessRequest,
+    ImpurityAssessResult,
+    ImpurityCPCAOut,
+    ImpurityCumulativeRiskOut,
+    ImpurityElementOut,
     ImpurityRiskRegister,
     ImpurityRiskRegisterCreate,
+    ImpuritySolventOut,
+    ImpurityStructuralOut,
+    ImpurityThresholdsOut,
     InferenceExplanation,
     InferenceExplanationCreate,
     ImplementationTask,
@@ -6187,6 +6195,244 @@ async def spectrum_retrieve(
         index_size=len(index),
         top_k=payload.top_k,
         results=results,
+        warnings=warnings,
+    )
+
+
+_IMPURITY_ASSESS_DISCLAIMER = (
+    "Decision-support only, NOT a regulatory determination. Every threshold, PDE, class, "
+    "TTC, and AI limit is a deterministic computation from the cited ICH/FDA guideline and "
+    "must be verified against the official source and signed off by a qualified toxicologist "
+    "/ regulatory-affairs professional before any filing or release decision."
+)
+
+
+@router.post(
+    "/regulatory/impurities/assess",
+    response_model=ImpurityAssessResult,
+    dependencies=[Depends(require_access_context)],
+)
+async def regulatory_impurities_assess(
+    payload: ImpurityAssessRequest,
+    request: Request,  # auto-injected by FastAPI; tests may pass None
+    context: AccessContext = Depends(require_access_context),
+) -> ImpurityAssessResult:
+    """Unified ICH/FDA impurity assessment over all five deterministic engines.
+
+    One drug-product context (dose, route, substance type, treatment duration) plus
+    optional impurity lists -> one report: ICH **Q3A/B** reporting/identification/
+    qualification thresholds (always, dose-driven), **Q3C** residual-solvent limits,
+    **Q3D** elemental-impurity PDEs, **M7** mutagenicity class + TTC, and the FDA
+    **CPCA** nitrosamine category + AI limit (for nitrosamine structures), plus the
+    nitrosamine cumulative-risk sum. Every number is a deterministic computation with
+    its regulatory basis; the result is **decision-support requiring qualified
+    sign-off**, never a regulatory determination. Per-impurity failures degrade to a
+    ``warnings`` entry rather than failing the whole request. One
+    ``regulatory.impurity.assess`` audit event is emitted per call.
+    """
+
+    from moltrace.regulatory.impurities import (
+        calculate_concentration_limit,
+        calculate_cumulative_risk,
+        calculate_q3ab_thresholds,
+        check_residual_solvent_limits,
+        classify_cpca,
+        classify_m7,
+        classify_solvent,
+        get_element_pde,
+    )
+    from moltrace.regulatory.infra.validation import DataValidationError
+
+    warnings: list[str] = []
+    rule_set_versions: dict[str, str] = {}
+
+    # 1. ICH Q3A/B thresholds (always; dose-driven).
+    try:
+        thr = calculate_q3ab_thresholds(
+            payload.daily_dose_g, payload.substance_type, payload.route
+        )
+    except DataValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    rule_set_versions["q3ab"] = thr.rule_set_version
+    thresholds = ImpurityThresholdsOut(
+        substance_type=payload.substance_type,
+        reporting_percent=thr.reporting_threshold.effective_percent,
+        identification_percent=thr.identification_threshold.effective_percent,
+        qualification_percent=thr.qualification_threshold.effective_percent,
+        regulatory_basis=thr.regulatory_basis,
+        table_reference=thr.table_reference,
+    )
+
+    # 2. ICH Q3C residual solvents (oral / parenteral / inhalation only).
+    solvent_outs: list[ImpuritySolventOut] = []
+    if payload.residual_solvents:
+        if payload.route not in ("oral", "parenteral", "inhalation"):
+            warnings.append(
+                f"ICH Q3C residual-solvent limits are not defined for the {payload.route} "
+                "route; residual solvents were not assessed."
+            )
+        else:
+            for item in payload.residual_solvents:
+                try:
+                    cls = classify_solvent(item.identifier, payload.route)
+                except DataValidationError as exc:
+                    warnings.append(f"residual solvent {item.identifier!r}: {exc}")
+                    continue
+                rule_set_versions["q3c"] = cls.rule_set_version
+                permitted_ppm = passed = margin_ppm = None
+                if item.measured_ppm is not None and cls.matched:
+                    comp = check_residual_solvent_limits(
+                        {item.identifier: item.measured_ppm},
+                        payload.daily_dose_g,
+                        payload.route,
+                    )[0]
+                    permitted_ppm, passed, margin_ppm = (
+                        comp.permitted_ppm,
+                        comp.passed,
+                        comp.margin_ppm,
+                    )
+                solvent_outs.append(
+                    ImpuritySolventOut(
+                        identifier=item.identifier,
+                        matched=cls.matched,
+                        solvent_name=cls.solvent_name if cls.matched else None,
+                        class_number=cls.class_number,
+                        pde_mg_per_day=cls.pde_mg_per_day,
+                        concentration_limit_ppm=cls.concentration_limit_ppm,
+                        measured_ppm=item.measured_ppm,
+                        permitted_ppm=permitted_ppm,
+                        passed=passed,
+                        margin_ppm=margin_ppm,
+                        regulatory_basis=cls.regulatory_basis,
+                    )
+                )
+
+    # 3. ICH Q3D elemental impurities.
+    element_outs: list[ImpurityElementOut] = []
+    for item in payload.elemental_impurities:
+        try:
+            pde = get_element_pde(item.element, payload.route)
+            limit = calculate_concentration_limit(
+                item.element, payload.route, payload.daily_dose_g
+            )
+        except DataValidationError as exc:
+            warnings.append(f"elemental impurity {item.element!r}: {exc}")
+            continue
+        rule_set_versions["q3d"] = pde.rule_set_version
+        passed = None
+        if item.measured_ppm is not None and limit.permitted_concentration_ppm is not None:
+            passed = item.measured_ppm <= limit.permitted_concentration_ppm
+        element_outs.append(
+            ImpurityElementOut(
+                element=pde.element,
+                element_class=pde.element_class,
+                route_data_available=pde.route_data_available,
+                pde_ug_per_day=pde.pde_ug_per_day,
+                permitted_concentration_ppm=limit.permitted_concentration_ppm,
+                control_threshold_ppm=limit.control_threshold_ppm,
+                measured_ppm=item.measured_ppm,
+                passed=passed,
+                regulatory_basis=pde.regulatory_basis,
+            )
+        )
+
+    # 4. ICH M7 (+ FDA CPCA for nitrosamines) structural impurities.
+    structural_outs: list[ImpurityStructuralOut] = []
+    nitrosamine_components: list[tuple[str, float]] = []
+    for item in payload.structural_impurities:
+        try:
+            m7 = classify_m7(
+                item.smiles,
+                duration_months=payload.duration_months,
+                in_silico_result_expert=item.in_silico_expert,
+                in_silico_result_statistical=item.in_silico_statistical,
+                experimental_ames=item.experimental_ames,
+                experimental_carcinogen=item.experimental_carcinogen,
+            )
+        except DataValidationError as exc:
+            warnings.append(f"structural impurity {item.name or item.smiles!r}: {exc}")
+            continue
+        rule_set_versions["m7"] = m7.rule_set_version
+
+        cpca_out = None
+        try:
+            cpca = classify_cpca(item.smiles)
+        except DataValidationError:
+            cpca = None  # not a nitrosamine
+        if cpca is not None:
+            rule_set_versions["cpca"] = cpca.rule_set_version
+            within = None
+            if item.measured_ng_per_day is not None:
+                within = item.measured_ng_per_day <= cpca.ai_limit_ng_per_day
+                nitrosamine_components.append((item.smiles, item.measured_ng_per_day))
+            cpca_out = ImpurityCPCAOut(
+                category=cpca.category,
+                ai_limit_ng_per_day=cpca.ai_limit_ng_per_day,
+                potency_score=cpca.potency_score,
+                coc_flag=cpca.coc_flag,
+                measured_ng_per_day=item.measured_ng_per_day,
+                within_ai_limit=within,
+                regulatory_basis=cpca.regulatory_basis,
+            )
+
+        structural_outs.append(
+            ImpurityStructuralOut(
+                smiles=item.smiles,
+                name=item.name,
+                m7_class=m7.m7_class,
+                m7_ttc_ug_per_day=m7.ttc_ug_per_day,
+                coc_flag=m7.coc_flag,
+                expert_review_required=m7.expert_review_required,
+                regulatory_action_required=m7.regulatory_action_required,
+                cpca=cpca_out,
+                regulatory_basis=m7.regulatory_basis,
+            )
+        )
+
+    # 5. Nitrosamine cumulative risk (FDA Rev 2): sum(measured / AI) < 1.
+    cumulative = None
+    if nitrosamine_components:
+        cr = calculate_cumulative_risk(nitrosamine_components)
+        cumulative = ImpurityCumulativeRiskOut(
+            total_risk_ratio=cr.total_risk_ratio,
+            passes=cr.passes,
+            n_components=len(cr.components),
+        )
+
+    try:
+        if request is not None:
+            _audit_from_context(
+                request,
+                context=context,
+                event_type="regulatory.impurity.assess",
+                message="Impurity assessment completed.",
+                metadata={
+                    "daily_dose_g": payload.daily_dose_g,
+                    "route": payload.route,
+                    "substance_type": payload.substance_type,
+                    "n_residual_solvents": len(payload.residual_solvents),
+                    "n_elemental_impurities": len(payload.elemental_impurities),
+                    "n_structural_impurities": len(payload.structural_impurities),
+                    "n_nitrosamines": len(nitrosamine_components),
+                    "n_warnings": len(warnings),
+                },
+            )
+    except Exception:
+        pass
+
+    return ImpurityAssessResult(
+        daily_dose_g=payload.daily_dose_g,
+        route=payload.route,
+        substance_type=payload.substance_type,
+        duration_months=payload.duration_months,
+        thresholds=thresholds,
+        residual_solvents=solvent_outs,
+        elemental_impurities=element_outs,
+        structural_impurities=structural_outs,
+        nitrosamine_cumulative_risk=cumulative,
+        rule_set_versions=rule_set_versions,
+        disclaimer=_IMPURITY_ASSESS_DISCLAIMER,
+        human_review_required=True,
         warnings=warnings,
     )
 

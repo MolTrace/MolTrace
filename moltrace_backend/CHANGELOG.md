@@ -14,6 +14,60 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.23.1 — Regulatory Hub: unified Impurity Assessment endpoint (2026-06-09)
+
+**Headline:** `POST /regulatory/impurities/assess` exposes the five impurity engines as
+**one cohesive capability** — one drug-product context (dose, route, substance type,
+treatment duration) + optional impurity lists → **one unified report**. This is the
+first customer-facing surface for the Regulatory Hub's Tier A, deliberately shaped as a
+**single endpoint / single panel** (not five separate screens) to avoid UI clutter. FE
+handoff included.
+
+**Coverage in one call:** ICH **Q3A/B** reporting/identification/qualification thresholds
+(always, dose-driven), **Q3C** residual-solvent limits + pass/fail, **Q3D** elemental PDEs
++ permitted concentration, **M7** mutagenicity class + TTC, FDA **CPCA** nitrosamine
+category + AI limit (for nitrosamine structures), and the nitrosamine **cumulative-risk**
+sum (`sum(measured/AI) < 1`). Every number is a deterministic computation carrying its
+regulatory basis + the per-engine content-hashed `rule_set_version`.
+
+### Added
+- **`POST /regulatory/impurities/assess`** (`src/nmrcheck/api.py`) — flat router under the
+  existing `/regulatory/...` namespace; `require_access_context` auth; one
+  `regulatory.impurity.assess` audit event per call. **Per-impurity failures degrade to a
+  `warnings` entry, never a 500** (unknown solvent → `matched=false`; unknown element /
+  invalid SMILES / cutaneous-route-for-Q3C → warning). Engines lazy-imported in-handler.
+- **Pydantic models** (`src/nmrcheck/models.py`): `ImpurityAssessRequest` (+ `…SolventInput`
+  / `…ElementInput` / `…StructuralInput`) and `ImpurityAssessResult` (+ `ImpurityThresholdsOut`,
+  `ImpuritySolventOut`, `ImpurityElementOut`, `ImpurityStructuralOut`, `ImpurityCPCAOut`,
+  `ImpurityCumulativeRiskOut`). Typed contract (not `*_json` blobs) so the FE gets a precise
+  `schema.d.ts`. `human_review_required: bool = True` + `disclaimer` on every response.
+- **`tests/test_regulatory_impurities_assess_api.py`** — 10 wire-level tests: all five
+  engines in one call; thresholds-only empty request; unknown solvent (explicit `matched`
+  false); unknown element / invalid SMILES → warning; cutaneous-route Q3C skip;
+  cumulative-risk pass + fail; auth (401); non-positive dose (422); and OpenAPI registration
+  of the path + `ImpurityAssessRequest`/`Result`/`ImpurityCPCAOut` schemas.
+- **`docs/fe_handoff_impurity_assessment.md`** — numbered FE handoff + the simplified
+  single-panel UI redesign spec (one input → one report, no new nav, disclaimer surfaced).
+
+### Notes
+- **Contracts-first.** The OpenAPI contract is live; the FE regenerates
+  `moltrace_frontend/src/lib/api/schema.d.ts` via `pnpm generate:openapi` (the FE handoff has
+  the checklist). No frontend files are touched in this backend change.
+- **Integration strategy (Phase 1 of 2).** This stateless endpoint is the new cohesive
+  surface. **Phase 2** (next backend unit) retrofits the existing hollow dossier endpoints
+  (`…/impurity-risk-register` → Q3A/B+M7, `…/residual-solvent-assessment` → Q3C,
+  `…/nitrosamine-watch` → CPCA, replacing their regex/rule-row/manual-input logic with the
+  engines) and adds a Q3D dossier sub-resource, demoting tenant rule-rows to an optional
+  override layer.
+- **Decision-support.** The unified disclaimer + `human_review_required=True` are on every
+  response: deterministic computation requiring qualified toxicologist / RA sign-off, never a
+  regulatory determination.
+- **White papers — still deferred** until the FE panel ships (the capability becomes
+  customer-*visible* with the UI, at which point the six white papers get the nitrosamine-AI +
+  unified-impurity-assessment write-up).
+
+---
+
 ## v0.23.0 — Regulatory Hub: Nitrosamine CPCA classifier (Prompt 5, flagship) (2026-06-09)
 
 **Headline:** `classify_cpca` implements the **canonical FDA Carcinogenic Potency
