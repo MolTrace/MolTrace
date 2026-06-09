@@ -14,6 +14,57 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.22.1 — Regulatory Hub: ICH Q3A/B impurity threshold calculator (Prompt 1) (2026-06-08)
+
+**Headline:** The first deterministic regulatory calculator — `calculate_q3ab_thresholds`
+computes ICH **Q3A(R2)** (drug substances) and **Q3B(R2)** (drug products) reporting,
+identification, and qualification thresholds from the maximum daily dose. The
+threshold values are factual regulatory criteria implemented from the official ICH
+Attachment-1 tables and cited; no copyrighted guideline text is reproduced. Pure,
+auditable arithmetic over a content-versioned rule-set — **no model in the numeric
+path**. Decision-support: every value carries its regulatory basis + table reference
+and must be verified against the official ICH source and signed off by a qualified
+reviewer before any filing use. No new dependencies; no API/contract change.
+
+**Note on the encoded tables.** The build prompt's inline summary simplified the
+Q3B identification/qualification tables (and added a 20 mg cap to Q3A `>2g`
+qualification that is not in ICH Q3A). Per the prompt's own "reproduce ICH Table 1
+exactly" validation — and confirmed with the user — this release encodes the
+**canonical ICH Q3A(R2)/Q3B(R2)** tables: the multi-band Q3B with µg-TDI caps
+(`<1mg → 1.0% or 5µg`, `1–10mg → 0.5% or 20µg`, `>10mg–2g → 0.2% or 2mg`, `>2g →
+0.10%` for identification; the analogous qualification bands), and Q3A `>2g`
+qualification at `0.05%`.
+
+### Added
+- **`moltrace/regulatory/impurities/q3ab_calculator.py`** — `calculate_q3ab_thresholds(
+  daily_dose_g, substance_type='drug_substance'|'drug_product', route='oral')`:
+  - resolves each ICH "**% or absolute, whichever is lower**" rule to a single
+    **effective %** for the given dose (converting an mg/day or µg/day total-daily-
+    intake cap to a percentage of the dose), flagging which limit binds;
+  - returns `ImpurityThresholds` of three `ThresholdValue`s (reporting /
+    identification / qualification), each carrying `effective_percent`,
+    `percent_rule`, `absolute_cap` + `absolute_unit`, `absolute_is_binding`,
+    `dose_band`, `basis`, and `table_reference`, plus the top-level
+    `regulatory_basis`, `guidance_effective_year`, and the content-hashed
+    `rule_set_version`;
+  - `q3ab_rule_set()` exposes the encoded tables as the auditable rule-set; route
+    is validated + recorded but does not change the (route-independent) thresholds.
+  - Input is validated through the Phase 0 `assert_valid_dose` (fail-loud).
+- **`moltrace/regulatory/impurities/__init__.py`** — package exports.
+- **`tests/test_regulatory_q3ab.py`** — 25 tests: every ICH Q3A(R2)/Q3B(R2) Table-1
+  value reproduced exactly across all bands + boundaries, the "whichever-lower"
+  resolution, 5 representative product/substance dose cases, integration with the
+  Phase 0 zero-tolerance calculation-error gate, determinism, and fail-loud input.
+
+### Notes
+- **Reuse-first / born-compliant.** Inputs validate through the Prompt 19
+  foundation, outputs are content-versioned (`rule_set_version`) and pass the
+  zero-error hard gate — the calculator is auditable from line one.
+- **Deterministic.** Identical inputs produce a byte-identical result
+  (`content_hash`).
+
+---
+
 ## v0.22.0 — Regulatory Hub: Phase 0 foundation (Prompt 19) (2026-06-08)
 
 **Headline:** Opens the **Regulatory Hub** — MolTrace's second module (Roadmap
