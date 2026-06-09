@@ -1838,6 +1838,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/regulatory/impurities/assess": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regulatory Impurities Assess
+         * @description Unified ICH/FDA impurity assessment over all five deterministic engines.
+         *
+         *     One drug-product context (dose, route, substance type, treatment duration) plus
+         *     optional impurity lists -> one report: ICH **Q3A/B** reporting/identification/
+         *     qualification thresholds (always, dose-driven), **Q3C** residual-solvent limits,
+         *     **Q3D** elemental-impurity PDEs, **M7** mutagenicity class + TTC, and the FDA
+         *     **CPCA** nitrosamine category + AI limit (for nitrosamine structures), plus the
+         *     nitrosamine cumulative-risk sum. Every number is a deterministic computation with
+         *     its regulatory basis; the result is **decision-support requiring qualified
+         *     sign-off**, never a regulatory determination. Per-impurity failures degrade to a
+         *     ``warnings`` entry rather than failing the whole request. One
+         *     ``regulatory.impurity.assess`` audit event is emitted per call.
+         */
+        post: operations["regulatory_impurities_assess_regulatory_impurities_assess_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spectrum/reason": {
         parameters: {
             query?: never;
@@ -19919,6 +19950,149 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /**
+         * ImpurityAssessRequest
+         * @description Request body for ``POST /regulatory/impurities/assess``.
+         *
+         *     The drug-product context (dose, route, substance type, treatment duration)
+         *     drives the dose-based limits; each impurity list is routed to the matching
+         *     deterministic engine. All lists are optional — an empty request still returns
+         *     the ICH Q3A/B reporting/identification/qualification thresholds for the dose.
+         */
+        ImpurityAssessRequest: {
+            /** Daily Dose G */
+            daily_dose_g: number;
+            /**
+             * Route
+             * @default oral
+             * @enum {string}
+             */
+            route: "oral" | "parenteral" | "inhalation" | "cutaneous";
+            /**
+             * Substance Type
+             * @default drug_substance
+             * @enum {string}
+             */
+            substance_type: "drug_substance" | "drug_product";
+            /**
+             * Duration Months
+             * @default 120
+             */
+            duration_months: number;
+            /** Residual Solvents */
+            residual_solvents?: components["schemas"]["ImpuritySolventInput"][];
+            /** Elemental Impurities */
+            elemental_impurities?: components["schemas"]["ImpurityElementInput"][];
+            /** Structural Impurities */
+            structural_impurities?: components["schemas"]["ImpurityStructuralInput"][];
+        };
+        /**
+         * ImpurityAssessResult
+         * @description Response from ``POST /regulatory/impurities/assess`` — the unified report.
+         */
+        ImpurityAssessResult: {
+            /** Daily Dose G */
+            daily_dose_g: number;
+            /** Route */
+            route: string;
+            /** Substance Type */
+            substance_type: string;
+            /** Duration Months */
+            duration_months: number;
+            thresholds: components["schemas"]["ImpurityThresholdsOut"];
+            /** Residual Solvents */
+            residual_solvents?: components["schemas"]["ImpuritySolventOut"][];
+            /** Elemental Impurities */
+            elemental_impurities?: components["schemas"]["ImpurityElementOut"][];
+            /** Structural Impurities */
+            structural_impurities?: components["schemas"]["ImpurityStructuralOut"][];
+            nitrosamine_cumulative_risk?: components["schemas"]["ImpurityCumulativeRiskOut"] | null;
+            /** Rule Set Versions */
+            rule_set_versions?: {
+                [key: string]: string;
+            };
+            /** Disclaimer */
+            disclaimer: string;
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /**
+         * ImpurityCPCAOut
+         * @description FDA CPCA nitrosamine categorization (present only for nitrosamines).
+         */
+        ImpurityCPCAOut: {
+            /** Category */
+            category: number;
+            /** Ai Limit Ng Per Day */
+            ai_limit_ng_per_day: number;
+            /** Potency Score */
+            potency_score?: number | null;
+            /**
+             * Coc Flag
+             * @default true
+             */
+            coc_flag: boolean;
+            /** Measured Ng Per Day */
+            measured_ng_per_day?: number | null;
+            /** Within Ai Limit */
+            within_ai_limit?: boolean | null;
+            /** Regulatory Basis */
+            regulatory_basis: string;
+        };
+        /**
+         * ImpurityCumulativeRiskOut
+         * @description Nitrosamine cumulative risk (FDA Rev 2): sum(measured / AI) must be < 1.
+         */
+        ImpurityCumulativeRiskOut: {
+            /** Total Risk Ratio */
+            total_risk_ratio: number;
+            /** Passes */
+            passes: boolean;
+            /** N Components */
+            n_components: number;
+        };
+        /**
+         * ImpurityElementInput
+         * @description An elemental impurity to assess (ICH Q3D). ``element`` = symbol or name.
+         */
+        ImpurityElementInput: {
+            /** Element */
+            element: string;
+            /** Measured Ppm */
+            measured_ppm?: number | null;
+        };
+        /**
+         * ImpurityElementOut
+         * @description ICH Q3D assessment for one elemental impurity.
+         */
+        ImpurityElementOut: {
+            /** Element */
+            element: string;
+            /** Element Class */
+            element_class?: string | null;
+            /**
+             * Route Data Available
+             * @default true
+             */
+            route_data_available: boolean;
+            /** Pde Ug Per Day */
+            pde_ug_per_day?: number | null;
+            /** Permitted Concentration Ppm */
+            permitted_concentration_ppm?: number | null;
+            /** Control Threshold Ppm */
+            control_threshold_ppm?: number | null;
+            /** Measured Ppm */
+            measured_ppm?: number | null;
+            /** Passed */
+            passed?: boolean | null;
+            /** Regulatory Basis */
+            regulatory_basis: string;
+        };
         /** ImpurityRiskRegister */
         ImpurityRiskRegister: {
             /** Id */
@@ -20021,6 +20195,87 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * ImpuritySolventInput
+         * @description A residual solvent to assess (ICH Q3C). ``identifier`` = name, CAS, or SMILES.
+         */
+        ImpuritySolventInput: {
+            /** Identifier */
+            identifier: string;
+            /** Measured Ppm */
+            measured_ppm?: number | null;
+        };
+        /**
+         * ImpuritySolventOut
+         * @description ICH Q3C assessment for one residual solvent.
+         */
+        ImpuritySolventOut: {
+            /** Identifier */
+            identifier: string;
+            /** Matched */
+            matched: boolean;
+            /** Solvent Name */
+            solvent_name?: string | null;
+            /** Class Number */
+            class_number?: number | null;
+            /** Pde Mg Per Day */
+            pde_mg_per_day?: number | null;
+            /** Concentration Limit Ppm */
+            concentration_limit_ppm?: number | null;
+            /** Measured Ppm */
+            measured_ppm?: number | null;
+            /** Permitted Ppm */
+            permitted_ppm?: number | null;
+            /** Passed */
+            passed?: boolean | null;
+            /** Margin Ppm */
+            margin_ppm?: number | null;
+            /** Regulatory Basis */
+            regulatory_basis: string;
+        };
+        /**
+         * ImpurityStructuralInput
+         * @description A structural impurity to assess (ICH M7; CPCA when it is a nitrosamine).
+         */
+        ImpurityStructuralInput: {
+            /** Smiles */
+            smiles: string;
+            /** Name */
+            name?: string | null;
+            /** In Silico Expert */
+            in_silico_expert?: ("positive" | "negative") | null;
+            /** In Silico Statistical */
+            in_silico_statistical?: ("positive" | "negative") | null;
+            /** Experimental Ames */
+            experimental_ames?: ("positive" | "negative") | null;
+            /** Experimental Carcinogen */
+            experimental_carcinogen?: ("positive" | "negative") | null;
+            /** Measured Ng Per Day */
+            measured_ng_per_day?: number | null;
+        };
+        /**
+         * ImpurityStructuralOut
+         * @description ICH M7 (+ CPCA when a nitrosamine) assessment for one structural impurity.
+         */
+        ImpurityStructuralOut: {
+            /** Smiles */
+            smiles: string;
+            /** Name */
+            name?: string | null;
+            /** M7 Class */
+            m7_class: number;
+            /** M7 Ttc Ug Per Day */
+            m7_ttc_ug_per_day?: number | null;
+            /** Coc Flag */
+            coc_flag: boolean;
+            /** Expert Review Required */
+            expert_review_required: boolean;
+            /** Regulatory Action Required */
+            regulatory_action_required: string;
+            cpca?: components["schemas"]["ImpurityCPCAOut"] | null;
+            /** Regulatory Basis */
+            regulatory_basis: string;
+        };
         /** ImpurityThresholdRule */
         ImpurityThresholdRule: {
             /** Id */
@@ -20083,6 +20338,24 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ImpurityThresholdsOut
+         * @description ICH Q3A/B reporting / identification / qualification thresholds for the dose.
+         */
+        ImpurityThresholdsOut: {
+            /** Substance Type */
+            substance_type: string;
+            /** Reporting Percent */
+            reporting_percent: number;
+            /** Identification Percent */
+            identification_percent: number;
+            /** Qualification Percent */
+            qualification_percent: number;
+            /** Regulatory Basis */
+            regulatory_basis: string;
+            /** Table Reference */
+            table_reference: string;
         };
         /** InferenceExplanation */
         InferenceExplanation: {
@@ -42962,6 +43235,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpectrumRetrieveResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regulatory_impurities_assess_regulatory_impurities_assess_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImpurityAssessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImpurityAssessResult"];
                 };
             };
             /** @description Validation Error */
