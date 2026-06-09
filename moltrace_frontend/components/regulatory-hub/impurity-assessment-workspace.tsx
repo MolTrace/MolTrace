@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react"
 import {
   AlertTriangle,
+  ArrowLeft,
   CheckCircle2,
   ChevronDown,
   Download,
@@ -14,6 +15,7 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react"
+import Link from "next/link"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { AlertCard } from "@/components/dashboard/alert-card"
@@ -292,6 +294,18 @@ export function ImpurityAssessmentWorkspace() {
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-8 pb-12">
+      {/* Back to the Regulatory Hub landing. Links to the standalone /regulatory
+          route (not the /spectracheck tab, whose local tab state defaults back
+          to SpectraCheck), matching the other Regulatory sub-pages. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/regulatory">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Regulatory Hub
+          </Link>
+        </Button>
+      </div>
+
       {/* Header */}
       <header className="space-y-1">
         <p
