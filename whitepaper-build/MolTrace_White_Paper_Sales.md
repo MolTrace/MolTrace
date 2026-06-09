@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — AI-Native Scientific Intelligence for Pharmaceutical R&D"
 subtitle: "Sales-Led Variant · The Business Case for Audit-Ready Analytical Chemistry"
-version: "2026-06-08"
+version: "2026-06-09"
 audience: "Pharma R&D directors, regulatory affairs leads, CRO commercial teams, analytical operations heads"
 length: "≈4,000 words · Hybrid white paper · Sales-led variant of the canonical hybrid white paper"
 ---
@@ -90,7 +90,7 @@ Every layer's output is a typed contract with stable JSON keys so downstream int
 
 ### 4.2 Regulatory Intelligence Hub
 
-Dossier scaffolding, FDA / EMA / ICH-aligned audit packs, human-in-the-loop release gating, and AI-supported regulatory-question / answer routing. Integrated with the SpectraCheck evidence trail so any claim in a dossier hyperlinks back to its source evidence layer.
+Dossier scaffolding, FDA / EMA / ICH-aligned audit packs, human-in-the-loop release gating, and AI-supported regulatory-question / answer routing. Integrated with the SpectraCheck evidence trail so any claim in a dossier hyperlinks back to its source evidence layer. A one-screen **Impurity Assessment** turns a dose and a list of observed impurities into a single report across five deterministic engines — ICH Q3A/B thresholds, Q3C residual solvents, Q3D elemental impurities, M7 mutagenic impurities, and the FDA CPCA nitrosamine classification with cumulative risk — each line traceable to its regulatory basis and gated behind qualified-reviewer sign-off.
 
 ### 4.3 Reaction Optimization
 
