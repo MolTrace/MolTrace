@@ -14,6 +14,74 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.22.0 — Regulatory Hub: Phase 0 foundation (Prompt 19) (2026-06-08)
+
+**Headline:** Opens the **Regulatory Hub** — MolTrace's second module (Roadmap
+Phase 7), which turns SpectraCheck's confirmed structures / impurity peaks /
+purity into regulatory submission-**support** drafts (for qualified
+regulatory-affairs + toxicology review and sign-off, never finished filings).
+This first commit lays the Phase 0 measurement + reproducibility foundation —
+objective, versioned, reproducible acceptance evidence from day one, which is what
+makes a regulated tool auditable rather than "trust us." Built **reuse-first** over
+the spectroscopy Phase 0 foundation (`moltrace.spectroscopy.infra`); the
+deterministic, native paths need no extra dependencies, and the optional `infra`
+extra upgrades versioning/tracking/validation to DVC+S3 / MLflow / Great
+Expectations. **No API/contract change, no FE regeneration.**
+
+Overriding principle established here — **deterministic-first**: regulated math and
+classification are computed by an auditable, version-pinned rule engine tied to a
+named guidance revision; LLMs are reserved for narrative/retrieval/triage and never
+produce a regulated number.
+
+### Added
+- **`moltrace/regulatory/`** — new module package (sibling to
+  `moltrace/spectroscopy/`), and **`moltrace/regulatory/infra/`** — the Phase 0
+  foundation:
+  - **`eval.py`** — the regulatory metric layer (the single source of truth for
+    "better"), with the two **zero-tolerance hard gates**: `calculation_error_rate`
+    must be 0 (`enforce_zero_calculation_errors`) and `formula_coverage` must be
+    100% (`enforce_full_coverage`); plus classification accuracy vs expert
+    (`classification_accuracy`, CPCA/M7), `citation_correctness`,
+    `hallucination_rate`, `narrative_acceptance_rate` + `levenshtein` edit
+    distance, and `needs_review_precision`. `RegulatoryMetricVector` (content-
+    hashable) + `enforce_hard_gates`. Reuses the tested `PRF`/`f1_score`/
+    `classification_f1` confusion primitives.
+  - **`versioning.py`** — content-addressed `rule_set_version` / `corpus_snapshot_version`
+    / `gold_set_version` + a `RegulatoryArtifact` with source-guidance + effective-
+    date provenance; re-exports the `dataset_hash` / `current_git_sha` / DVC+S3 +
+    local remotes. No blobs in git.
+  - **`tracking.py`** — `log_regulatory_run(...)` logs the metric vector + rule-set
+    + model + corpus versions + git SHA per run (MLflow when the `infra` extra is
+    present, native file store otherwise), run-id linkable to the Prompt 13 registry.
+  - **`validation.py`** — fail-loud schema gates for every structured input
+    (`validate_compound_record`, `validate_dose`, `validate_impurity_list` — the
+    SpectraCheck handoff, `validate_corpus_document`) + `assert_valid_*`; reuses the
+    `ValidationReport`/`DataValidationError` model and the optional GE adapter.
+  - **`compliance.py`** — `build_regulatory_validation_document(...)`, the versioned
+    GAMP 5 Appendix D11 / CSV validation-document skeleton pinned to a rule-set
+    version, that the Prompt 21 validation suite fills with formal evidence. Reuses
+    the spectroscopy D11 template.
+- **`tests/test_regulatory_infra.py`** + **`tests/test_regulatory_e2e.py`** — 21
+  tests: the hard gates, every metric, versioning determinism, per-run tracking,
+  fail-loud validation, the GAMP 5 skeleton, and a **cross-module e2e** (a
+  SpectraCheck-style impurity input → deterministic ICH Q3A/Q3C/M7 evaluation → CTD
+  Module 3 stub) whose **deterministic numeric path is byte-identical across 10
+  runs** — in CI via `tests/`. (The ICH calculators are deterministic stubs here;
+  Prompts 1–4/8 replace them.)
+
+### Notes
+- **Reuse-first.** Orchestration + the regulatory-specific metrics/schemas over the
+  spectroscopy Phase 0 substrate — one tested content-hash kernel, one failure
+  model, one tracker, one D11 template.
+- **Deterministic numeric path** is content-hashed via the shared determinism
+  kernel (`infra.contract.content_hash`) and proven byte-identical ×10.
+- **No new dependencies.** Native paths only; `moltrace_runs/`, `mlruns/`, and the
+  DVC cache are already gitignored.
+- **Decision-support framing** baked into the module + the GAMP 5 template (controls
+  that *support* 21 CFR Part 11 / GAMP 5 / draft Annex 22; customer-led validation).
+
+---
+
 ## v0.21.1 — Surface the Prompt 18 ops layer through the admin API (2026-06-08)
 
 **Headline:** Exposes the Prompt 18 MLOps layer to the dashboard FE through two
