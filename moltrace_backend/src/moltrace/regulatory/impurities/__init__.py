@@ -15,10 +15,22 @@ from moltrace.regulatory.impurities.q3ab_calculator import (
     calculate_q3ab_thresholds,
     q3ab_rule_set,
 )
+from moltrace.regulatory.impurities.q3c_solvents import (
+    ComplianceResult,
+    SolventClassification,
+    check_residual_solvent_limits,
+    classify_solvent,
+    q3c_rule_set,
+)
 
 __all__ = [
+    "ComplianceResult",
     "ImpurityThresholds",
+    "SolventClassification",
     "ThresholdValue",
     "calculate_q3ab_thresholds",
+    "check_residual_solvent_limits",
+    "classify_solvent",
     "q3ab_rule_set",
+    "q3c_rule_set",
 ]
