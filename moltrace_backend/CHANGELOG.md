@@ -14,6 +14,52 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.23.2 — Regulatory Hub: legacy dossier endpoints now compute via the engines (Phase 2a) (2026-06-09)
+
+**Headline:** The existing dossier assessment endpoints stop being hollow — they now
+**compute via the deterministic engines** instead of regex flags / tenant rule-row
+lookups. Same routes, same dossier workflow, same UI tabs; real ICH/FDA math behind
+them. Backward‑compatible (no contract change): the tenant `*RuleORM` rows remain the
+**override** when present, and every existing assertion still holds.
+
+**Retrofitted (Phase 2a — the two zero-contract-change overrides):**
+- **`POST /regulatory/dossiers/{id}/residual-solvent-assessment`** — when no tenant
+  `ResidualSolventRuleORM` matches a solvent, it is now classified by the **ICH Q3C
+  engine** (`classify_solvent`): the match carries `solvent_class`, the Option‑1
+  `concentration_limit` (ppm), `permitted_daily_exposure`, `source: "ich_q3c_engine"`,
+  and the content‑hashed `rule_set_version`; `threshold_triggered` is set when the
+  observed ppm meets/exceeds the Q3C limit, and Class 1 still flags `review_required`.
+  A solvent outside the encoded Q3C subset keeps the prior `source_needed` fallback.
+- **`POST /regulatory/dossiers/{id}/nitrosamine-watch`** — when `structure_text` is a
+  parseable **nitrosamine SMILES**, the summary now carries a real **FDA CPCA** block
+  (`cpca.cpca_category`, `ai_limit_ng_per_day`, `potency_score`, `coc_flag`,
+  `rule_set_version`) instead of just a regex motif flag, and a structural nitrosamine
+  the regex would miss now correctly sets `review_required`. `nitrosamine_confirmed`
+  stays `false` (decision‑support); free text falls back to the regex signal.
+
+### Added / Changed
+- **`src/nmrcheck/regulatory_compliance_store.py`** — `_q3c_default()` and
+  `_cpca_summary()` engine helpers (lazy‑import the engines; fail soft to the legacy
+  path), wired into `create_residual_solvent_assessment` and `create_nitrosamine_watch`.
+- **`tests/test_regulatory_compliance_engine_api.py`** — 3 new tests (engine‑backed
+  no‑rule solvent; unknown‑solvent source‑needed fallback preserved; CPCA category for a
+  nitrosamine SMILES). The 2 existing workflow/OpenAPI tests are unchanged and still pass.
+
+### Notes
+- **Backward‑compatible / tenant override preserved.** Tenant rule rows still win when
+  configured; the engines only fill what the tenant previously had to type or left as
+  `source_needed`. No request/response contract changed, so no FE regeneration is needed
+  for this release.
+- **Phase 2b (deferred — needs a small contract decision).** Retrofitting
+  `…/impurity-risk-register` to compute via **Q3A/B + M7** requires a `daily_dose_g`
+  input the model does not yet carry (Q3A/B thresholds are dose‑driven), and a **Q3D**
+  dossier sub‑resource is net‑new surface. Both are a deliberate follow‑up (a contract
+  change → FE ripple) rather than silent additions here.
+- **Decision‑support unchanged.** All assessments remain drafts requiring qualified human
+  review; `nitrosamine_confirmed` stays `false`.
+
+---
+
 ## v0.23.1 — Regulatory Hub: unified Impurity Assessment endpoint (2026-06-09)
 
 **Headline:** `POST /regulatory/impurities/assess` exposes the five impurity engines as
