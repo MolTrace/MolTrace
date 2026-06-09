@@ -14,6 +14,60 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.23.3 — Regulatory Hub: product dose on the dossier; impurity-register via Q3A/B + M7 (Phase 2b) (2026-06-09)
+
+**Headline:** The third hollow dossier endpoint is retrofitted, **integrated properly with
+the dossier domain model**. A dossier is one drug product with one max daily dose, so the
+dose now lives **on the dossier** (`max_daily_dose_g` + `substance_type`) and *every*
+impurity assessment under it sources that one dose — `impurity-risk-register` computes the
+ICH **Q3A/B** threshold band from it, `residual-solvent-assessment` switches to dose-scaled
+**Q3C Option 2**, and M7 is attached for structural SMILES. Backward-compatible (both
+columns nullable → prior dose-unaware behaviour when unset).
+
+**Schema + contract delta.** New nullable columns `regulatory_dossiers.max_daily_dose_g`
+(Float) + `substance_type` (String) via **Alembic migration `0013_dossier_max_daily_dose`**
+(idempotent, auto-runs on deploy). `RegulatoryDossierCreate` / `Update` / `RegulatoryDossier`
+gain the two typed fields. `ImpurityRiskRegisterCreate.daily_dose_g` remains as an **optional
+per-call override**; when omitted the dossier dose is used.
+
+### Behaviour
+- **`POST /regulatory/dossiers/{id}/impurity-risk-register`** — when no tenant rule matches
+  and a dose is available (override → dossier), the `threshold_triggered` band (reporting /
+  identification / qualification) is computed from `calculate_q3ab_thresholds` using the
+  dossier's `substance_type`, instead of defaulting to `review_required`. A SMILES
+  `structural_assignment` adds an `m7` block (`m7_class`, `ttc_ug_per_day`, `coc_flag`,
+  `expert_review_required`, `regulatory_basis`, `rule_set_version`) to `metadata_json`.
+- **`POST /regulatory/dossiers/{id}/residual-solvent-assessment`** — the Q3C engine default
+  (v0.23.2) now uses the dossier dose for the **dose-scaled Option-2** limit
+  (`PDE × 1000 / dose`) when present, else Option 1; the match records `limit_basis`.
+
+### Added / Changed
+- **`src/nmrcheck/orm.py`** + **`alembic/versions/0013_dossier_max_daily_dose.py`** — the two
+  nullable dossier columns + migration.
+- **`src/nmrcheck/models.py`** — `max_daily_dose_g` + `substance_type` on the three dossier
+  models; `ImpurityRiskRegisterCreate.daily_dose_g` (optional override).
+- **`src/nmrcheck/regulatory_intelligence.py`** — dossier create / patch / record-mapper
+  carry the two fields.
+- **`src/nmrcheck/regulatory_compliance_store.py`** — `_q3ab_trigger()` (substance-type-aware)
+  + `_m7_summary()` helpers; impurity-register sources the dose from the dossier;
+  `_q3c_default()` is dose-aware (Option 2).
+- **`tests/test_regulatory_compliance_engine_api.py`** — 2 new tests (per-call dose; and the
+  end-to-end **dossier-level dose** driving both impurity-register Q3A/B and residual-solvent
+  Option-2). All prior tests unchanged + green.
+- **`docs/fe_handoff_impurity_assessment.md`** — Phase 2b contract-delta addendum (dossier
+  dose fields).
+
+### Notes
+- **The legacy override is now complete** for the three regex/lookup endpoints:
+  residual-solvent → Q3C (v0.23.2), nitrosamine-watch → CPCA (v0.23.2), impurity-register
+  → Q3A/B + M7 (this release), all sourcing the dossier dose. Tenant `*RuleORM` rows remain
+  the override layer.
+- **Still pending:** the **Q3D** dossier sub-resource (net-new endpoint + model) — the
+  only remaining piece of the "override the legacy brains" consolidation.
+- **Decision-support unchanged;** every record remains a draft requiring qualified review.
+
+---
+
 ## v0.23.2 — Regulatory Hub: legacy dossier endpoints now compute via the engines (Phase 2a) (2026-06-09)
 
 **Headline:** The existing dossier assessment endpoints stop being hollow — they now

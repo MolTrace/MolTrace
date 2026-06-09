@@ -189,3 +189,29 @@ pnpm dev                       # exercise the panel against a local backend (:30
 
 Backend contract is locked + tested (`tests/test_regulatory_impurities_assess_api.py`,
 10 tests green) and the path + schemas are in `/openapi.json`.
+
+---
+
+## Addendum — Phase 2b contract delta (v0.23.3): product dose on the dossier
+
+The **dossier** is now where the product's daily dose lives, so all of its impurity
+assessments are dose-consistent. **Additive + backward-compatible** (nullable) — regenerate
+`schema.d.ts` and surface the two new dossier fields.
+
+- **`RegulatoryDossier` / `RegulatoryDossierCreate` / `RegulatoryDossierUpdate`** gain:
+  - **`max_daily_dose_g`** *(optional, `0 < x ≤ 100`, g/day)* — the product max daily dose.
+  - **`substance_type`** *(optional, `"drug_substance" | "drug_product"`)*.
+  Add both to the dossier create/edit form (a "Product dosing" group). They drive every
+  impurity assessment under the dossier.
+- **`POST …/{id}/impurity-risk-register`** — when no tenant rule matches, the
+  `threshold_triggered` band (reporting / identification / qualification) is computed from
+  the **ICH Q3A/B** engine using the dossier's dose + substance type (no per-call input
+  needed). `ImpurityRiskRegisterCreate.daily_dose_g` stays as an optional **override**.
+- **`POST …/{id}/residual-solvent-assessment`** — when the dossier has a dose, the Q3C
+  engine default uses the **dose-scaled Option-2** limit; the match's `limit_basis` says
+  which option was used.
+- **`metadata_json.m7`** *(on the impurity-register response record)* — a SMILES
+  `structural_assignment` adds `{ m7_class, ttc_ug_per_day, coc_flag, expert_review_required,
+  regulatory_basis, rule_set_version }`. Surface it as an "ICH M7 class" badge if useful.
+
+Omitting the dossier dose reproduces the prior dose-unaware behaviour exactly.

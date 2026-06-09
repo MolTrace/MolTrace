@@ -299,6 +299,75 @@ def test_nitrosamine_watch_uses_cpca_for_smiles(tmp_path):
         assert summary["cpca"]["coc_flag"] is True
 
 
+def test_impurity_register_uses_q3ab_engine_and_m7_when_no_rule(tmp_path):
+    # A dossier with no rule-set: the impurity register now derives the threshold band
+    # from the ICH Q3A/B engine (dose-driven) and attaches the ICH M7 class for a SMILES.
+    client, headers = _client(tmp_path)
+    with client:
+        juris = _jurisdiction(client, headers, "Q3AB engine US", "US")
+        dossier = _dossier(client, headers, juris["id"])
+        res = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/impurity-risk-register",
+            headers=headers,
+            json={
+                "impurity_name": "NDMA-like feature",
+                "impurity_type": "process_impurity",
+                "observed_level_percent": 0.12,
+                "daily_dose_g": 1.0,  # 1 g/day drug substance -> qualification at 0.10%
+                "structural_assignment": "CN(C)N=O",  # NDMA SMILES -> M7
+            },
+        )
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["threshold_triggered"] == "qualification"  # ICH Q3A/B engine
+        m7 = body["metadata_json"]["m7"]
+        assert m7["m7_class"] == 2  # ICH M7: Cohort-of-Concern nitrosamine
+        assert m7["coc_flag"] is True
+
+
+def test_dossier_level_dose_drives_impurity_assessments(tmp_path):
+    # The product dose lives ON the dossier; all its impurity assessments source it,
+    # with no per-call dose needed (proper integration with the dossier domain model).
+    client, headers = _client(tmp_path)
+    with client:
+        juris = _jurisdiction(client, headers, "Dossier dose US", "US")
+        dossier = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "Dosed product",
+                "jurisdiction_id": juris["id"],
+                "max_daily_dose_g": 1.0,
+                "substance_type": "drug_substance",
+            },
+        ).json()
+        assert dossier["max_daily_dose_g"] == 1.0
+        assert dossier["substance_type"] == "drug_substance"
+
+        # impurity-register with NO per-call daily_dose_g -> Q3A/B band from the dossier dose.
+        imp = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/impurity-risk-register",
+            headers=headers,
+            json={
+                "impurity_name": "X",
+                "observed_level_percent": 0.12,
+                "structural_assignment": "CN(C)N=O",
+            },
+        ).json()
+        assert imp["threshold_triggered"] == "qualification"  # 0.12% >= 0.10% qual @ 1 g/day
+        assert imp["metadata_json"]["m7"]["m7_class"] == 2
+
+        # residual-solvent uses the dossier dose -> dose-scaled ICH Q3C Option 2 limit.
+        sol = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/residual-solvent-assessment",
+            headers=headers,
+            json={"solvents_json": [{"solvent_name": "acetonitrile", "observed_ppm": 100}]},
+        ).json()
+        match = sol["residual_solvent_summary_json"]["matched_solvents"][0]
+        assert match["concentration_limit"] == 4100.0  # 4.1 mg/day * 1000 / 1 g (Option 2)
+        assert "Option 2" in match["limit_basis"]
+
+
 def test_regulatory_compliance_engine_endpoints_appear_in_openapi(tmp_path):
     client, _headers = _client(tmp_path)
     with client:

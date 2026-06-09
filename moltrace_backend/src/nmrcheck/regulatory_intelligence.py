@@ -282,6 +282,8 @@ def create_dossier(
             compound_name=payload.compound_name,
             jurisdiction_id=payload.jurisdiction_id,
             intended_use=payload.intended_use,
+            max_daily_dose_g=payload.max_daily_dose_g,
+            substance_type=payload.substance_type,
             status=payload.status,
             metadata_json=_json_dump(payload.metadata_json),
         )
@@ -344,6 +346,8 @@ def patch_dossier(
             "compound_name",
             "jurisdiction_id",
             "intended_use",
+            "max_daily_dose_g",
+            "substance_type",
             "status",
         ):
             if field in update:
@@ -1242,6 +1246,8 @@ def _dossier_to_record(row: RegulatoryDossierORM) -> RegulatoryDossier:
         compound_name=row.compound_name,
         jurisdiction_id=row.jurisdiction_id,
         intended_use=row.intended_use,
+        max_daily_dose_g=row.max_daily_dose_g,
+        substance_type=row.substance_type,  # type: ignore[arg-type]
         status=row.status,  # type: ignore[arg-type]
         created_at=row.created_at,
         updated_at=row.updated_at,
