@@ -14,6 +14,87 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.23.0 — Regulatory Hub: Nitrosamine CPCA classifier (Prompt 5, flagship) (2026-06-09)
+
+**Headline:** `classify_cpca` implements the **canonical FDA Carcinogenic Potency
+Categorization Approach (CPCA)** — a deterministic structure-activity flowchart that
+scores an N-nitrosamine's carcinogenic potency and assigns it to one of five potency
+categories, each with a recommended acceptable intake (AI) limit. `calculate_cumulative_risk`
+applies the FDA Rev-2 cumulative rule (`sum(measured / AI) < 1`). This is the payoff of
+the `impurities/` module: it derives the compound-specific AI that ICH M7 defers to for
+Cohort-of-Concern nitrosamines. No new dependencies; no API/contract change (library only).
+
+**DISCLAIMER (in every result + intended for any UI).** CPCA output is **decision-support,
+not a regulatory determination**. Potency categorization and AI-limit results must be
+reviewed and signed off by a qualified toxicologist / regulatory-affairs professional
+before any filing or release use.
+
+**Canonical FDA CPCA — not the prompt's inline scheme (decision confirmed with the user).**
+The build prompt specified a simplified `count-deactivating-features -> 18/45/100/400/1500`
+ladder with `NDMA->Cat1, NDPA->Cat2, NDBA->Cat3` targets. That scheme is **non-canonical**:
+the real FDA CPCA is a **potency-score flowchart** (`score = alpha-H score + activating +
+deactivating feature points`) with the AI ladder **26.5 / 100 / 400 / 1500 / 1500 ng/day**
+(EMA Category 1 = 18), and there is **no 45 ng/day tier**. The scoring tables here are
+transcribed verbatim from the FDA's own open-source reference tool
+(`github.com/FDA/featurize-nitrosamines`) and the Aug-2023 NDSRI guidance. Per the prompt's
+own "reproduce FDA's published table" instruction — and confirmed with the user — this
+release encodes the **canonical FDA CPCA**.
+
+**Corrected validation categories.** Worked from the real rubric, the published validation
+nitrosamines are **all Category 1**: NDMA (3,3)->score 1, NDEA (2,2)->1, NDPA (2,2)->1,
+NDBA (2,2)->1, NMBzA (2,3 + benzylic -1)->0. (The prompt's NDPA->2 / NDBA->3 / NMBzA->3
+were artifacts of the non-canonical scheme; NDMA/NDEA->1 were correct. The slide-9 "NDMA
+96 ng/day" text calibrates the *Category-2 limit value*, not NDMA's own category.)
+
+### Added
+- **`moltrace/regulatory/impurities/cpca_classifier.py`** —
+  - `classify_cpca(smiles, authority='FDA'|'EMA') -> CPCAResult` (`category` 1-5,
+    `ai_limit_ng_per_day`, `potency_score`, `alpha_h_distribution` + `alpha_h_score`,
+    `activating_features` / `deactivating_features` + `feature_evidence`, `is_ndsri`,
+    `coc_flag`, `disclaimer`, content-hashed `rule_set_version`). `authority` selects the
+    Category-1 limit (FDA 26.5 / EMA 18); Categories 2-5 are common.
+  - `calculate_cumulative_risk(nitrosamines, authority='FDA') -> CumulativeRiskResult`
+    (`total_risk_ratio = sum(measured/AI)`, `passes = ratio < 1`, per-component breakdown).
+  - The exact FDA alpha-hydrogen score table, the 16 feature point-values, the flowchart,
+    and the AI ladder. RDKit recognises structure only (alpha-carbons, rings, substituents).
+  - `cpca_rule_set()` exposes the encoded rubric as the auditable rule-set.
+- **`moltrace/regulatory/impurities/__init__.py`** — exports `classify_cpca`,
+  `calculate_cumulative_risk`, `CPCAResult`, `CumulativeRiskResult`, `cpca_rule_set`.
+- **`tests/test_regulatory_cpca.py`** — 32 tests: the 5 validation nitrosamines (all
+  Category 1, FDA 26.5 / EMA 18); the full alpha-H score table; forced Category 5 (tertiary
+  alpha-carbon, (1,1) alpha-H); ring features (pyrrolidine->Cat4, morpholine->Cat2,
+  piperidine->Cat3, thiomorpholine->Cat4); carboxylic-acid (no double-count); genuine
+  beta-hydroxyl; benzylic / beta-methyl activating features; the score->category mapping;
+  cumulative-risk pass/fail/at-limit; the disclaimer; coc_flag; fail-loud non-nitrosamine /
+  invalid SMILES / unknown authority; and determinism.
+
+### Notes
+- **Fidelity.** The alpha-H scoring, flowchart, AI ladder, ring features, carboxylic-acid,
+  tertiary-alpha-carbon, and benzylic features are **exact** (reproduce the FDA reference
+  values). The **chain-length, EWG, beta-hydroxyl, and beta-methyl detectors are faithful
+  but approximate** rdkit reimplementations of the FDA tool's cheminformatics; they are
+  tuned to avoid false-positive *deactivating* calls (the unsafe, limit-raising direction)
+  and should be **verified against the FDA `featurize-nitrosamines` tool** for complex
+  structures. Expert-override cases (e.g. the FDA biotin worked example, which manually
+  substitutes a conservative alpha-H value) are not auto-replicated.
+- **Reuse-first / born-compliant.** SMILES validates through the Prompt 19 foundation
+  (`assert_valid_compound_record`); outputs carry the content-hashed `rule_set_version`;
+  the RDKit + `BlockLogs` pattern is shared with the Q3C/M7 classifiers.
+- **IP/licensing.** CPCA category definitions, AI limits, and feature point-values are
+  factual regulatory criteria; the scoring tables are reproduced from the FDA's public-domain
+  guidance + open-source tool and cited. No copyrighted prose is reproduced.
+- **Sources.** FDA *Recommended Acceptable Intake Limits for NDSRIs* (Aug 2023,
+  `fda.gov/media/170794/download`); FDA `featurize-nitrosamines`
+  (`github.com/FDA/featurize-nitrosamines`); FDA Nitrosamine Guidance Rev 2 (Sept 2024).
+- **White papers — trigger assessed, deferred.** CPCA is the first *major customer-relevant*
+  capability in the Regulatory Hub, but it is not yet customer-*exposed* (no API endpoint /
+  UI). Per the white-paper maintenance matrix, the six white papers are updated when a
+  capability becomes customer-facing; that update is deferred to the CPCA endpoint + FE
+  handoff (the natural next step), at which point the nitrosamine-AI capability + measured
+  behaviour should be written up.
+
+---
+
 ## v0.22.4 — Regulatory Hub: ICH M7(R2) mutagenic-impurity classifier (Prompt 4) (2026-06-08)
 
 **Headline:** `classify_m7` assesses a potential impurity under ICH **M7(R2)** using

@@ -9,6 +9,13 @@ reviewer verifies and signs off, never a regulatory determination.
 
 from __future__ import annotations
 
+from moltrace.regulatory.impurities.cpca_classifier import (
+    CPCAResult,
+    CumulativeRiskResult,
+    calculate_cumulative_risk,
+    classify_cpca,
+    cpca_rule_set,
+)
 from moltrace.regulatory.impurities.m7_classifier import (
     M7Classification,
     classify_m7,
@@ -39,8 +46,10 @@ from moltrace.regulatory.impurities.q3d_elements import (
 )
 
 __all__ = [
+    "CPCAResult",
     "ComplianceResult",
     "ConcentrationLimit",
+    "CumulativeRiskResult",
     "ElementPDE",
     "ElementRiskItem",
     "ElementalRiskAssessment",
@@ -49,10 +58,13 @@ __all__ = [
     "SolventClassification",
     "ThresholdValue",
     "calculate_concentration_limit",
+    "calculate_cumulative_risk",
     "calculate_q3ab_thresholds",
     "check_residual_solvent_limits",
+    "classify_cpca",
     "classify_m7",
     "classify_solvent",
+    "cpca_rule_set",
     "get_element_pde",
     "m7_rule_set",
     "q3ab_rule_set",
