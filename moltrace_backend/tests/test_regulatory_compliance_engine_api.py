@@ -368,6 +368,42 @@ def test_dossier_level_dose_drives_impurity_assessments(tmp_path):
         assert "Option 2" in match["limit_basis"]
 
 
+def test_dossier_elemental_impurity_assessment_uses_q3d_route(tmp_path):
+    # ICH Q3D PDEs are route-dependent; the new assessment sources route + dose from
+    # the dossier (the engine is the sole source — Q3D has no legacy tenant rule type).
+    client, headers = _client(tmp_path)
+    with client:
+        juris = _jurisdiction(client, headers, "Q3D US", "US")
+        dossier = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "Parenteral product",
+                "jurisdiction_id": juris["id"],
+                "max_daily_dose_g": 1.0,
+                "route": "parenteral",
+            },
+        ).json()
+        res = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/elemental-impurity-assessment",
+            headers=headers,
+            json={"elements_json": [{"element": "Pb", "observed_ppm": 10}, {"element": "Fe"}]},
+        )
+        assert res.status_code == 201, res.text
+        summary = res.json()["elemental_summary_json"]
+        assert summary["route"] == "parenteral"
+        pb = next(m for m in summary["assessed_elements"] if m["input_element"] == "Pb")
+        assert pb["element_class"] == "1"
+        assert pb["pde_ug_per_day"] == 5.0  # Pb parenteral PDE (route-dependent)
+        assert pb["permitted_concentration_ppm"] == 5.0  # 5 microg/day / 1 g
+        assert pb["threshold_triggered"] is True  # 10 ppm > 5 ppm
+        assert any("Fe" in w for w in res.json()["warnings"])  # not an ICH Q3D element
+        listed = client.get(
+            f"/regulatory/dossiers/{dossier['id']}/elemental-impurity-assessment", headers=headers
+        ).json()
+        assert len(listed) == 1
+
+
 def test_regulatory_compliance_engine_endpoints_appear_in_openapi(tmp_path):
     client, _headers = _client(tmp_path)
     with client:
@@ -379,6 +415,7 @@ def test_regulatory_compliance_engine_endpoints_appear_in_openapi(tmp_path):
         "/regulatory/rule-sets/{rule_set_id}",
         "/regulatory/dossiers/{dossier_id}/batch-assessment",
         "/regulatory/dossiers/{dossier_id}/impurity-risk-register",
+        "/regulatory/dossiers/{dossier_id}/elemental-impurity-assessment",
         "/regulatory/dossiers/{dossier_id}/residual-solvent-assessment",
         "/regulatory/dossiers/{dossier_id}/nitrosamine-watch",
         "/regulatory/dossiers/{dossier_id}/qnmr-compliance",

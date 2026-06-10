@@ -14,6 +14,54 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.23.4 — Regulatory Hub: Q3D elemental-impurity dossier endpoint + product route (Phase 2c) (2026-06-09)
+
+**Headline:** The final "override the legacy brains" piece — a **net-new** dossier
+sub-resource `POST /regulatory/dossiers/{id}/elemental-impurity-assessment` (+ GET list)
+that computes ICH **Q3D** elemental-impurity PDEs + permitted concentrations via the
+deterministic engine. ICH Q3D PDEs are **route-dependent**, so the dossier now also
+carries the product **route** (alongside `max_daily_dose_g` / `substance_type` from
+0013) and the Q3D + dose-scaled assessments source it. With this, **all four impurity
+engines are wired into the dossier** (Q3A/B, Q3C, M7, CPCA, Q3D), each sourcing the
+dossier's product context.
+
+**Schema + contract delta (additive).** **Alembic migration `0014_dossier_route_elemental_summary`**
+adds `regulatory_dossiers.route` (nullable) + `batch_regulatory_assessments.elemental_summary_json`
+(server-default `{}`). The three dossier models gain `route`
+(`oral|parenteral|inhalation|cutaneous`); `BatchRegulatoryAssessment` gains
+`elemental_summary_json`; new `ElementalImpurityAssessmentRequest`.
+
+### Added
+- **`POST/GET /regulatory/dossiers/{id}/elemental-impurity-assessment`** (`api.py`) —
+  same flat-router / auth / `_compliance_actor` / `_raise_compliance_http_error` pattern
+  as the other dossier assessments. Per-element: `get_element_pde(element, dossier.route)`
+  + `calculate_concentration_limit(element, route, dossier.dose)`; `threshold_triggered`
+  when `observed_ppm >= permitted`; Class 1 → `review_required`; an action item per
+  exceedance. Unknown element / cutaneous-not-encoded / missing dose → a `warnings` entry
+  (never a 500). One `regulatory_compliance.elemental_impurity_assessment.create` audit event.
+- **`src/nmrcheck/orm.py`** + **`alembic/versions/0014_…`** — the route + elemental-summary
+  columns.
+- **`src/nmrcheck/models.py`** — `route` on the dossier models; `elemental_summary_json` on
+  `BatchRegulatoryAssessment`; `ElementalImpurityAssessmentRequest`.
+- **`src/nmrcheck/regulatory_intelligence.py`** — dossier create/patch/record carry `route`.
+- **`src/nmrcheck/regulatory_compliance_store.py`** — `create_elemental_impurity_assessment`
+  + `list_elemental_impurity_assessments`; `_assessment_to_record` maps the new slot.
+- **`tests/test_regulatory_compliance_engine_api.py`** — 1 new test (parenteral dossier:
+  Pb route-dependent PDE 5 microg/day → 5 ppm permitted → triggered + Class 1; unknown
+  element warning; GET list) + the new path in the OpenAPI assertion.
+- **`docs/fe_handoff_impurity_assessment.md`** — addendum updated (dossier `route` +
+  the Q3D dossier endpoint).
+
+### Notes
+- **The legacy override is complete.** All five engines compute behind the dossier's
+  three assessment endpoints (Q3A/B+M7, Q3C, CPCA) plus the new Q3D endpoint, every one
+  sourcing the dossier product context (dose, substance type, route).
+- ICH Q3C PDEs are systemic (route-independent), so the residual-solvent retrofit is
+  unaffected by the route addition; route matters only for the route-dependent Q3D PDEs.
+- **Decision-support unchanged;** every assessment is a draft requiring qualified review.
+
+---
+
 ## v0.23.3 — Regulatory Hub: product dose on the dossier; impurity-register via Q3A/B + M7 (Phase 2b) (2026-06-09)
 
 **Headline:** The third hollow dossier endpoint is retrofitted, **integrated properly with
