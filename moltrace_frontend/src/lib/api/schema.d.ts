@@ -7410,6 +7410,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/regulatory/dossiers/{dossier_id}/elemental-impurity-assessment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Regulatory Elemental Impurity Assessments Route */
+        get: operations["list_regulatory_elemental_impurity_assessments_route_regulatory_dossiers__dossier_id__elemental_impurity_assessment_get"];
+        put?: never;
+        /** Create Regulatory Elemental Impurity Assessment Route */
+        post: operations["create_regulatory_elemental_impurity_assessment_route_regulatory_dossiers__dossier_id__elemental_impurity_assessment_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/regulatory/dossiers/{dossier_id}/nitrosamine-watch": {
         parameters: {
             query?: never;
@@ -7422,6 +7440,29 @@ export interface paths {
         put?: never;
         /** Create Regulatory Nitrosamine Watch Route */
         post: operations["create_regulatory_nitrosamine_watch_route_regulatory_dossiers__dossier_id__nitrosamine_watch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regulatory/dossiers/{dossier_id}/nitrosamine-cumulative-risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Regulatory Nitrosamine Cumulative Risk Route
+         * @description Dossier-level nitrosamine cumulative risk (FDA Rev 2): ``sum(measured / AI limit) < 1``
+         *     across the dossier's nitrosamine watches that carry both a CPCA AI limit and a measured
+         *     ng/day. Watches missing either input are reported under ``excluded`` so coverage is
+         *     explicit. Decision-support requiring qualified sign-off; never a regulatory determination.
+         */
+        get: operations["get_regulatory_nitrosamine_cumulative_risk_route_regulatory_dossiers__dossier_id__nitrosamine_cumulative_risk_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11898,6 +11939,10 @@ export interface components {
             overall_status: "not_assessed" | "ready_for_review" | "action_required" | "blocked" | "reviewed";
             /** Impurity Summary Json */
             impurity_summary_json?: {
+                [key: string]: unknown;
+            };
+            /** Elemental Summary Json */
+            elemental_summary_json?: {
                 [key: string]: unknown;
             };
             /** Residual Solvent Summary Json */
@@ -17536,6 +17581,76 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /**
+         * DossierNitrosamineCumulativeRisk
+         * @description Dossier-level nitrosamine cumulative risk (FDA Rev 2) — response for
+         *     ``GET /regulatory/dossiers/{id}/nitrosamine-cumulative-risk``.
+         *
+         *     Sums ``measured / AI limit`` across every nitrosamine watch on the dossier that
+         *     carries both a CPCA AI limit (its structure parsed as a nitrosamine) and a measured
+         *     ng/day; the total ``total_risk_ratio`` **must be < 1**. Watches missing either input
+         *     are reported under ``excluded`` so the coverage of the verdict is explicit. The < 1
+         *     decision rule is the CPCA engine's; the result is decision-support requiring
+         *     qualified sign-off, never a regulatory determination.
+         */
+        DossierNitrosamineCumulativeRisk: {
+            /** Dossier Id */
+            dossier_id: number;
+            /** Total Risk Ratio */
+            total_risk_ratio: number;
+            /** Passes */
+            passes: boolean;
+            /** N Components */
+            n_components: number;
+            /** Components */
+            components?: components["schemas"]["DossierNitrosamineRiskComponent"][];
+            /** Excluded */
+            excluded?: components["schemas"]["DossierNitrosamineExcludedAssessment"][];
+            /**
+             * N Excluded
+             * @default 0
+             */
+            n_excluded: number;
+            /** Regulatory Basis */
+            regulatory_basis: string;
+            /** Disclaimer */
+            disclaimer: string;
+            /** Notes */
+            notes?: string[];
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
+        /**
+         * DossierNitrosamineExcludedAssessment
+         * @description A nitrosamine watch left out of the cumulative-risk sum, with the reason.
+         */
+        DossierNitrosamineExcludedAssessment: {
+            /** Assessment Id */
+            assessment_id: number;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * DossierNitrosamineRiskComponent
+         * @description One nitrosamine watch contributing to the dossier cumulative-risk sum.
+         */
+        DossierNitrosamineRiskComponent: {
+            /** Assessment Id */
+            assessment_id: number;
+            /** Structure Text */
+            structure_text?: string | null;
+            /** Category */
+            category: number;
+            /** Ai Limit Ng Per Day */
+            ai_limit_ng_per_day: number;
+            /** Measured Ng Per Day */
+            measured_ng_per_day: number;
+            /** Risk Ratio */
+            risk_ratio: number;
+        };
         /** DriftAlert */
         DriftAlert: {
             /** Id */
@@ -17657,6 +17772,27 @@ export interface components {
             reason: string;
             /** Authentication Method */
             authentication_method?: string | null;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ElementalImpurityAssessmentRequest
+         * @description Request for ``POST /regulatory/dossiers/{id}/elemental-impurity-assessment`` (ICH Q3D).
+         *
+         *     ``elements_json`` is a list of ``{"element": <symbol|name>, "observed_ppm": <float>}``.
+         *     The PDE + permitted concentration use the dossier's ``route`` + ``max_daily_dose_g``.
+         */
+        ElementalImpurityAssessmentRequest: {
+            /** Batch Id */
+            batch_id?: number | null;
+            /** Compound Id */
+            compound_id?: number | null;
+            /** Elements Json */
+            elements_json?: {
+                [key: string]: unknown;
+            }[];
             /** Metadata Json */
             metadata_json?: {
                 [key: string]: unknown;
@@ -20176,6 +20312,8 @@ export interface components {
             observed_level_percent?: number | null;
             /** Observed Amount */
             observed_amount?: number | null;
+            /** Daily Dose G */
+            daily_dose_g?: number | null;
             /** Threshold Triggered */
             threshold_triggered?: ("none" | "reporting" | "identification" | "qualification" | "review_required") | null;
             /** Structural Assignment */
@@ -26320,6 +26458,8 @@ export interface components {
             compound_id?: number | null;
             /** Structure Text */
             structure_text?: string | null;
+            /** Measured Ng Per Day */
+            measured_ng_per_day?: number | null;
             /** Risk Signals Json */
             risk_signals_json?: {
                 [key: string]: unknown;
@@ -31103,6 +31243,12 @@ export interface components {
             jurisdiction_id?: number | null;
             /** Intended Use */
             intended_use?: string | null;
+            /** Max Daily Dose G */
+            max_daily_dose_g?: number | null;
+            /** Substance Type */
+            substance_type?: ("drug_substance" | "drug_product") | null;
+            /** Route */
+            route?: ("oral" | "parenteral" | "inhalation" | "cutaneous") | null;
             /**
              * Status
              * @enum {string}
@@ -31176,6 +31322,12 @@ export interface components {
             jurisdiction_id?: number | null;
             /** Intended Use */
             intended_use?: string | null;
+            /** Max Daily Dose G */
+            max_daily_dose_g?: number | null;
+            /** Substance Type */
+            substance_type?: ("drug_substance" | "drug_product") | null;
+            /** Route */
+            route?: ("oral" | "parenteral" | "inhalation" | "cutaneous") | null;
             /**
              * Status
              * @default draft
@@ -31207,6 +31359,12 @@ export interface components {
             jurisdiction_id?: number | null;
             /** Intended Use */
             intended_use?: string | null;
+            /** Max Daily Dose G */
+            max_daily_dose_g?: number | null;
+            /** Substance Type */
+            substance_type?: ("drug_substance" | "drug_product") | null;
+            /** Route */
+            route?: ("oral" | "parenteral" | "inhalation" | "cutaneous") | null;
             /** Status */
             status?: ("draft" | "in_review" | "ready" | "blocked" | "approved" | "archived") | null;
             /** Metadata Json */
@@ -59199,6 +59357,80 @@ export interface operations {
             };
         };
     };
+    list_regulatory_elemental_impurity_assessments_route_regulatory_dossiers__dossier_id__elemental_impurity_assessment_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dossier_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchRegulatoryAssessment"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_regulatory_elemental_impurity_assessment_route_regulatory_dossiers__dossier_id__elemental_impurity_assessment_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dossier_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ElementalImpurityAssessmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchRegulatoryAssessment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_regulatory_nitrosamine_watch_route_regulatory_dossiers__dossier_id__nitrosamine_watch_get: {
         parameters: {
             query?: {
@@ -59260,6 +59492,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchRegulatoryAssessment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_regulatory_nitrosamine_cumulative_risk_route_regulatory_dossiers__dossier_id__nitrosamine_cumulative_risk_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dossier_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DossierNitrosamineCumulativeRisk"];
                 };
             };
             /** @description Validation Error */
