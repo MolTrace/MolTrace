@@ -14,6 +14,41 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.23.6 — Regulatory Hub: dossier project link is user-scoped (security) (2026-06-10)
+
+**Headline:** `create_dossier` / `patch_dossier` now validate a referenced `project_id`
+against the **acting user**. A bearer-token caller may only link a workspace project they
+own (`ProjectORM.user_id == actor.user_id`); a system api key (internal / admin ops) keeps
+the global lookup. Previously `_validate_dossier_links` did a global primary-key existence
+check only, so an authenticated user could link a dossier to **another tenant's** project.
+The happy path (linking your own project, or none) is unchanged.
+
+### Changed
+- **`src/nmrcheck/regulatory_intelligence.py`** — `_validate_dossier_links` now takes the
+  `actor` and scopes the project lookup: absent **or** owned-by-another-user both raise the
+  same `KeyError("Project not found.")` → non-leaking 404 (cross-tenant existence is never
+  disclosed). Ownership is enforced only when `project_id` is (re)assigned in the request —
+  not re-checked for an inherited link on an unrelated patch. `create_dossier` /
+  `patch_dossier` thread the actor through.
+
+### Added
+- **`tests/test_regulatory_dossier_project_scoping_api.py`** — 9 tests with real bearer
+  users: cross-user link → 404; own link → 201; system key → 201 (global); missing → 404;
+  patch assigning another user's project → 404; an unrelated patch does not re-check the
+  inherited link; an owner can patch-assign their own project; the takeover shape (patch
+  mutating an existing owned link to an unowned target → 404, stored link preserved); and an
+  owner re-pointing between two of their own projects → 200.
+
+### Notes
+- **Scope:** only the `project_id` link is hardened (the flagged item; `ProjectORM` —
+  table `projects` — has a clean non-nullable `user_id` owner, distinct from the SpectraCheck
+  `/projects` entity which is `owner_id`-keyed). The sibling `spectracheck_session_id` /
+  `reaction_project_id` links remain global existence checks — their ownership models differ
+  (`reaction_projects.owner_id` is nullable) and were not in scope; flagged for a separate
+  pass if desired.
+- No migration; no behaviour change to the authenticated happy path or to system-key /
+  admin flows.
+
 ## v0.23.5 — Regulatory Hub: dossier-level nitrosamine cumulative-risk rollup (net-new) (2026-06-09)
 
 **Headline:** A **net-new** dossier sub-resource `GET /regulatory/dossiers/{id}/nitrosamine-cumulative-risk`
