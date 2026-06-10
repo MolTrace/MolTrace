@@ -294,12 +294,12 @@ export function ImpurityAssessmentWorkspace() {
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-8 pb-12">
-      {/* Back to the Regulatory Hub landing. Links to the standalone /regulatory
-          route (not the /spectracheck tab, whose local tab state defaults back
-          to SpectraCheck), matching the other Regulatory sub-pages. */}
+      {/* Back to the Regulatory Hub tab in the Programs workspace — the
+          ?program param restores the tab so the hub stays highlighted between
+          SpectraCheck and ReactionIQ, matching where the user came from. */}
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/regulatory">
+          <Link href="/spectracheck?program=regulatory_hub">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Regulatory Hub
           </Link>

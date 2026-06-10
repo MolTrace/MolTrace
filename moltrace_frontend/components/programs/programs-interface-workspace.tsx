@@ -1,6 +1,7 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AiModulePredictionAugmentation } from "@/components/ai/ai-module-prediction-augmentation"
 import { ReactionProgramInterfaceWorkspace } from "@/components/reaction-optimization/reaction-program-interface-workspace"
@@ -16,6 +17,9 @@ const PROGRAM_ANALYTICS_MODULES: Record<string, CoreAnalyticsModule> = {
   reaction_optimization: "reactioniq",
 }
 
+const PROGRAM_TABS = ["spectracheck", "regulatory_hub", "reaction_optimization"]
+const DEFAULT_PROGRAM = "spectracheck"
+
 export function ProgramsInterfaceWorkspace({
   desktopMode = false,
   sessionId = null,
@@ -24,7 +28,50 @@ export function ProgramsInterfaceWorkspace({
   sessionId?: string | null
 }) {
   const isMobile = useIsMobile()
-  const [activeProgram, setActiveProgram] = useState("spectracheck")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // The active program is mirrored in the URL (?program=…) so deep links and a
+  // browser-back return to /spectracheck restore the chosen module instead of
+  // snapping to the SpectraCheck default. Local state keeps the tab switch
+  // instant; the URL is updated alongside it.
+  const [activeProgram, setActiveProgramState] = useState(() => {
+    const p = searchParams.get("program")
+    return p && PROGRAM_TABS.includes(p) ? p : DEFAULT_PROGRAM
+  })
+
+  const setActiveProgram = useCallback(
+    (next: string) => {
+      setActiveProgramState(next)
+      const params = new URLSearchParams(searchParams.toString())
+      if (next === DEFAULT_PROGRAM) {
+        params.delete("program")
+      } else {
+        params.set("program", next)
+      }
+      const query = params.toString()
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    },
+    [router, pathname, searchParams],
+  )
+
+  // Keep the tab in sync when ?program changes while this component stays
+  // mounted (same-route navigation — e.g. the SpectraCheck "Regulatory Impact"
+  // bridge card links to /spectracheck?program=regulatory_hub from within the
+  // SpectraCheck tab). A bare URL only resets to the default after a param has
+  // been seen, so local tab clicks (which strip the default's param) and test
+  // environments without a live router never fight the local state.
+  const sawProgramParamRef = useRef(false)
+  useEffect(() => {
+    const p = searchParams.get("program")
+    if (p && PROGRAM_TABS.includes(p)) {
+      sawProgramParamRef.current = true
+      setActiveProgramState((current) => (current === p ? current : p))
+    } else if (sawProgramParamRef.current) {
+      setActiveProgramState((current) => (current === DEFAULT_PROGRAM ? current : DEFAULT_PROGRAM))
+    }
+  }, [searchParams])
 
   useEffect(() => {
     trackCoreModuleOpened(PROGRAM_ANALYTICS_MODULES[activeProgram] ?? activeProgram, {
