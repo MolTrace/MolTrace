@@ -271,7 +271,7 @@ def create_dossier(
     actor: RegulatoryActor,
 ) -> RegulatoryDossier:
     with session_scope(session_factory) as session:
-        _validate_dossier_links(session, payload)
+        _validate_dossier_links(session, payload, actor=actor)
         row = RegulatoryDossierORM(
             project_id=payload.project_id,
             sample_id=payload.sample_id,
@@ -336,7 +336,7 @@ def patch_dossier(
             return None
         update = payload.model_dump(exclude_unset=True)
         candidate = payload.model_copy(update={})
-        _validate_dossier_links(session, candidate, existing=row)
+        _validate_dossier_links(session, candidate, existing=row, actor=actor)
         for field in (
             "project_id",
             "sample_id",
@@ -1059,6 +1059,7 @@ def _validate_dossier_links(
     session: Session,
     payload: RegulatoryDossierCreate | RegulatoryDossierUpdate,
     *,
+    actor: RegulatoryActor,
     existing: RegulatoryDossierORM | None = None,
 ) -> None:
     values = payload.model_dump(exclude_unset=True)
@@ -1072,8 +1073,21 @@ def _validate_dossier_links(
         existing.reaction_project_id if existing is not None else None,
     )
     jurisdiction_id = values.get("jurisdiction_id", existing.jurisdiction_id if existing is not None else None)
-    if project_id is not None and session.get(ProjectORM, project_id) is None:
-        raise KeyError("Project not found.")
+    if project_id is not None:
+        project = session.get(ProjectORM, project_id)
+        if project is None:
+            raise KeyError("Project not found.")
+        # Projects are user-owned. When the caller assigns/changes the project link in this
+        # request, it must be a project they own — a system api key (internal/admin ops) may
+        # reference any project. The same "not found" message is raised whether the project is
+        # absent or owned by another user, so cross-tenant existence is never leaked. Ownership
+        # is only re-checked when project_id is set this request, not for an inherited link.
+        if (
+            "project_id" in values
+            and not actor.system_api_key
+            and project.user_id != actor.user_id
+        ):
+            raise KeyError("Project not found.")
     if spectracheck_session_id is not None and session.get(SpectraCheckSessionORM, spectracheck_session_id) is None:
         raise KeyError("SpectraCheck session not found.")
     if reaction_project_id is not None and session.get(ReactionProjectORM, reaction_project_id) is None:
