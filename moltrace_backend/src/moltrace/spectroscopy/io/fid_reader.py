@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+import shutil
 import tarfile
 import tempfile
 import warnings
@@ -207,18 +208,76 @@ def _safe_extract_tar(archive: tarfile.TarFile, root: Path) -> None:
     archive.extractall(root)
 
 
+# Vendor marker files nmrglue opens by exact (lowercase) name. Some exports —
+# notably Varian/Agilent "nmroned" datasets — store them uppercase (FID /
+# PROCPAR). That reads fine on a case-INsensitive filesystem (macOS dev) but is
+# invisible on a case-SENsitive one (Linux CI and the Render production host),
+# so both dataset detection and the nmrglue read have to be case-insensitive.
+_VENDOR_MARKER_FILES = frozenset(
+    {
+        "fid",
+        "ser",
+        "acqus",
+        "acqu",
+        "acqu2",
+        "acqu2s",
+        "acqu3",
+        "acqu3s",
+        "procpar",
+        "procs",
+        "proc",
+        "proc2",
+        "proc2s",
+        "proc3",
+        "proc3s",
+    }
+)
+
+
+def _has_marker(directory: Path, marker: str) -> bool:
+    """Case-insensitive check that *directory* contains a file named *marker*."""
+    try:
+        return any(c.is_file() and c.name.lower() == marker for c in directory.iterdir())
+    except OSError:
+        return False
+
+
+def _ensure_lowercase_marker_aliases(dataset_root: Path) -> None:
+    """Give nmrglue the lowercase marker filenames it opens by exact name.
+
+    On a case-sensitive filesystem an uppercase ``FID``/``PROCPAR`` export is
+    otherwise unreadable. For any vendor marker present only in non-lowercase
+    form, create a lowercase alias (symlink, falling back to a copy). No-op on a
+    case-insensitive filesystem, where the lowercase name already resolves to the
+    same file, so the macOS-dev path is unchanged.
+    """
+    try:
+        entries = [c for c in dataset_root.iterdir() if c.is_file()]
+    except OSError:
+        return
+    for f in entries:
+        lower = f.name.lower()
+        if f.name == lower or lower not in _VENDOR_MARKER_FILES:
+            continue
+        alias = dataset_root / lower
+        if alias.exists():  # case-insensitive FS already resolves it
+            continue
+        try:
+            alias.symlink_to(f.name)
+        except OSError:
+            try:
+                shutil.copyfile(f, alias)
+            except OSError:
+                pass
+
+
 def _detect_dataset(root: Path) -> tuple[str, Path]:
     root = root.resolve()
-    bruker = [
-        fid.parent
-        for fid in root.rglob("fid")
-        if fid.is_file() and (fid.parent / "acqus").is_file()
-    ]
-    varian = [
-        fid.parent
-        for fid in root.rglob("fid")
-        if fid.is_file() and (fid.parent / "procpar").is_file()
-    ]
+    # Case-insensitive `fid`/`FID` match + case-insensitive sibling check, so an
+    # uppercase Varian/Agilent dataset is found on a case-sensitive host.
+    fid_files = [p for p in root.rglob("[Ff][Ii][Dd]") if p.is_file()]
+    bruker = [fid.parent for fid in fid_files if _has_marker(fid.parent, "acqus")]
+    varian = [fid.parent for fid in fid_files if _has_marker(fid.parent, "procpar")]
     if bruker:
         bruker.sort(key=lambda p: (len(p.relative_to(root).parts), str(p).lower()))
         return "bruker", bruker[0]
@@ -246,6 +305,7 @@ def _require_nmrglue() -> Any:
 
 
 def _read_bruker(ng: Any, dataset_root: Path) -> tuple[dict[str, Any], dict[str, Any], np.ndarray]:
+    _ensure_lowercase_marker_aliases(dataset_root)
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -274,6 +334,7 @@ def _should_remove_bruker_digital_filter(dictionary: dict[str, Any]) -> bool:
 
 
 def _read_varian(ng: Any, dataset_root: Path) -> tuple[dict[str, Any], dict[str, Any], np.ndarray]:
+    _ensure_lowercase_marker_aliases(dataset_root)
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
