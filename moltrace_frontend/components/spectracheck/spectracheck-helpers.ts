@@ -16,7 +16,19 @@ export function authErrorMessage(): string {
 
 export function formatApiError(err: unknown, fallback: string): string {
   if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return authErrorMessage()
-  if (err instanceof ApiError && err.status === 404) return "Backend endpoint not available yet."
+  if (err instanceof ApiError && err.status === 404) {
+    // FastAPI returns {"detail":"Not Found"} for an unmatched route — the only
+    // 404 that means "endpoint not available". Surface any other 404 detail
+    // (e.g. "Project not found.") instead of mislabeling a resource error.
+    const detail =
+      err.data && typeof err.data === "object" && typeof (err.data as { detail?: unknown }).detail === "string"
+        ? (err.data as { detail: string }).detail.trim()
+        : ""
+    if (detail && detail.toLowerCase() !== "not found") {
+      return sanitizePublicApiErrorMessage(detail, 404)
+    }
+    return "Backend endpoint not available yet."
+  }
   if (err instanceof Error) {
     return sanitizePublicApiErrorMessage(err.message, err instanceof ApiError ? err.status : undefined)
   }
