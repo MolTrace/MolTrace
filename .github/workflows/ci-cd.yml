@@ -83,14 +83,21 @@ jobs:
         run: pnpm test -- --run
 
   backend-tests:
-    name: Backend · pytest
+    name: Backend · pytest (shard ${{ matrix.group }}/4)
     runs-on: ubuntu-latest
-    # Fail-fast safety net. The suite parallelizes to a few minutes (see
-    # `-n auto` below), so 30 min is a generous ceiling that still kills a true
-    # hang instead of letting it run toward the 6-hour GitHub default. This job
-    # is intentionally NOT coupled to frontend-tests (no `needs:`) — FE and BE
-    # run independently so an FE-only or BE-only change exercises each suite on
-    # its own without waiting on the other.
+    # Sharded across 4 parallel runners with pytest-split. GitHub's standard
+    # ubuntu-latest is only 2 vCPU, so `-n auto` alone gave a modest speedup and
+    # the whole non-slow suite had crept up to ~30 min — right at the ceiling, so
+    # it intermittently got KILLED near 90 % (a timed-out job reports as
+    # "cancelled", which then skips the gate + deploy). Each shard now runs ~1/4
+    # of the collected tests (still `-n auto` within the shard) → ~8 min, and the
+    # 30-min backstop only ever fires on a true hang. `fail-fast: false` so one
+    # shard's real failure reports on its own instead of cancelling its siblings.
+    # NOT coupled to frontend-tests (no `needs:`) — FE and BE run independently.
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
     timeout-minutes: 30
     defaults:
       run:
@@ -116,13 +123,49 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --extra fid --extra dev
 
-      # pytest config (testpaths=tests, addopts=-q -m 'not slow') is set in
-      # pyproject.toml so the default run already skips the slow marker.
-      # `-n auto` (pytest-xdist, in the `dev` extra) fans the ~1.5k tests across
-      # every runner core — minutes instead of the serial ~hour. Kept CI-only
-      # (not in pyproject addopts) so local runs stay serial for clean debugging.
-      - name: Run pytest
-        run: uv run pytest -n auto
+      # pytest config (testpaths=tests, addopts=-q -m 'not slow') in
+      # pyproject.toml already skips the slow marker; pytest-split then divides
+      # the collected (non-slow) tests into 4 groups by count and this leg runs
+      # only group ${{ matrix.group }}. `-n auto` still fans that group across the
+      # runner's cores. pytest-split is pulled in just-in-time via `uv run --with`
+      # so the backend's pyproject stays untouched (split-sessions: no BE edits).
+      # CI-only: local runs stay serial (`uv run pytest`) for clean debugging.
+      - name: Run pytest (shard ${{ matrix.group }}/4)
+        run: uv run --with pytest-split pytest -n auto --splits 4 --group ${{ matrix.group }}
+
+  backend-slow-tests:
+    name: Backend · slow regression suite
+    # The heavy FID/GSD validation guards (>30s, marked `slow` and therefore
+    # excluded from the per-commit fast lane above). Run on pushes to main only
+    # so the regression coverage isn't lost while PRs stay fast. This is an
+    # independent signal — a failure turns the run red but does NOT block the
+    # deploy hooks. To make it a hard deploy gate, add `backend-slow-tests` to
+    # the `deploy` job's `needs:` below.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Generous ceiling: the slow set is a handful of heavy fixtures (the dense
+    # ¹³C FID recovery alone is ~40s of compute), so 30 min kills a true hang
+    # without clipping a legitimately long validation run.
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: moltrace_backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13.5"
+          enable-cache: true
+          cache-dependency-glob: moltrace_backend/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra fid --extra dev
+
+      - name: Run slow tests
+        run: uv run pytest -n auto -m slow
 
   deployment-gate:
     name: Deployment gate · fail-closed release control
