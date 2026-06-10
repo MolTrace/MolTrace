@@ -30,6 +30,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import {
+  NitrosamineCumulativeRiskCard,
+  type NitrosamineCumulativeRisk,
+} from "@/components/regulatory-hub/nitrosamine-cumulative-risk-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
@@ -629,12 +633,14 @@ export function RegulatoryDossierWorkspace() {
   const [rsAssessErr, setRsAssessErr] = useState("")
 
   const [nitrosamineAssessments, setNitrosamineAssessments] = useState<Record<string, unknown>[]>([])
+  const [nitrosamineCumulativeRisk, setNitrosamineCumulativeRisk] = useState<NitrosamineCumulativeRisk | null>(null)
   const [naCompoundId, setNaCompoundId] = useState<string>("none")
   const [naImpurityId, setNaImpurityId] = useState<string>("none")
   const [naStructureText, setNaStructureText] = useState("")
   const [naEvidenceLinkId, setNaEvidenceLinkId] = useState<string>("none")
   const [naRuleSetId, setNaRuleSetId] = useState<string>("none")
   const [naBatchId, setNaBatchId] = useState("")
+  const [naMeasuredNgPerDay, setNaMeasuredNgPerDay] = useState("")
   const [naBusy, setNaBusy] = useState(false)
   const [naErr, setNaErr] = useState("")
 
@@ -788,6 +794,16 @@ export function RegulatoryDossierWorkspace() {
         setNitrosamineAssessments(asArray(nawRaw).filter(isRecord) as Record<string, unknown>[])
       } catch {
         setNitrosamineAssessments([])
+      }
+
+      try {
+        const ncrRaw = await apiFetch<NitrosamineCumulativeRisk>(
+          `/regulatory/dossiers/${dossierId}/nitrosamine-cumulative-risk`,
+          { method: "GET" }
+        )
+        setNitrosamineCumulativeRisk(ncrRaw ?? null)
+      } catch {
+        setNitrosamineCumulativeRisk(null)
       }
 
       try {
@@ -953,6 +969,20 @@ export function RegulatoryDossierWorkspace() {
       setNitrosamineAssessments(asArray(raw).filter(isRecord) as Record<string, unknown>[])
     } catch {
       /* list refresh is best-effort */
+    }
+  }, [dossierId])
+
+  const refreshNitrosamineCumulativeRisk = useCallback(async () => {
+    if (!Number.isFinite(dossierId)) return
+    try {
+      const raw = await apiFetch<NitrosamineCumulativeRisk>(
+        `/regulatory/dossiers/${dossierId}/nitrosamine-cumulative-risk`,
+        { method: "GET" }
+      )
+      setNitrosamineCumulativeRisk(raw ?? null)
+    } catch {
+      /* rollup refresh is best-effort; null renders an "unavailable" note */
+      setNitrosamineCumulativeRisk(null)
     }
   }, [dossierId])
 
@@ -1422,6 +1452,11 @@ export function RegulatoryDossierWorkspace() {
         const b = Number.parseInt(bid, 10)
         if (Number.isFinite(b) && b >= 1) body.batch_id = b
       }
+      const mngpd = naMeasuredNgPerDay.trim()
+      if (mngpd) {
+        const m = Number.parseFloat(mngpd)
+        if (Number.isFinite(m) && m >= 0) body.measured_ng_per_day = m
+      }
       await apiFetch(`/regulatory/dossiers/${dossierId}/nitrosamine-watch`, {
         method: "POST",
         body,
@@ -1431,7 +1466,11 @@ export function RegulatoryDossierWorkspace() {
         action_item_count: risk_signals_json.length,
         risk_category: naRuleSetId !== "none" && naRuleSetId.trim() ? "rule_set_selected" : "no_rule_set",
       })
-      await Promise.all([refreshNitrosamineAssessments(), refreshRuleSets()])
+      await Promise.all([
+        refreshNitrosamineAssessments(),
+        refreshNitrosamineCumulativeRisk(),
+        refreshRuleSets(),
+      ])
     } catch (e) {
       setNaErr(formatApiError(e, "Run nitrosamine watch failed."))
     } finally {
@@ -3537,6 +3576,21 @@ export function RegulatoryDossierWorkspace() {
                         onChange={(e) => setNaBatchId(e.target.value)}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reg-na-measured">measured_ng_per_day</Label>
+                      <Input
+                        id="reg-na-measured"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="Optional — ng/day, feeds cumulative risk"
+                        value={naMeasuredNgPerDay}
+                        onChange={(e) => setNaMeasuredNgPerDay(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        A watch counts toward the cumulative-risk rollup only with both a parseable nitrosamine{" "}
+                        <span className="font-mono">structure_text</span> and this measured value.
+                      </p>
+                    </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="reg-na-structure">structure_text</Label>
                       <Textarea
@@ -3634,6 +3688,11 @@ export function RegulatoryDossierWorkspace() {
                 </div>
 
                 <Separator />
+
+                {/* Dossier-level FDA-Rev-2 cumulative-risk rollup — sits between
+                    the watch-create form and the per-watch assessment results,
+                    beside the watch list. Best-effort fetch; null → muted note. */}
+                <NitrosamineCumulativeRiskCard data={nitrosamineCumulativeRisk} />
 
                 {latestNitrosamineAssessment ? (
                   (() => {
