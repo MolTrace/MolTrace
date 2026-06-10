@@ -146,7 +146,7 @@ async function main() {
   })
   record("Settings menuitem links to /dashboard/settings", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
-  // Help & Support → external (https://docs.moltrace.ai)
+  // Help & Support → external (https://docs.moltrace.co)
   r = await safe(async () => {
     const item = page.getByRole("menuitem", { name: /Help & Support/i }).first()
     const href = await item.getAttribute("href")
