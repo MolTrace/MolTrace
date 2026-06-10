@@ -17,6 +17,7 @@ from .models import (
     BatchRegulatoryAssessment,
     BatchRegulatoryAssessmentCreate,
     ImpurityRiskRegister,
+    ElementalImpurityAssessmentRequest,
     ImpurityRiskRegisterCreate,
     ImpurityThresholdRule,
     JurisdictionalRequirementMap,
@@ -836,6 +837,7 @@ def _assessment_to_record(row: BatchRegulatoryAssessmentORM) -> BatchRegulatoryA
         compound_id=row.compound_id,
         overall_status=row.overall_status,  # type: ignore[arg-type]
         impurity_summary_json=_json_dict(row.impurity_summary_json),
+        elemental_summary_json=_json_dict(row.elemental_summary_json),
         residual_solvent_summary_json=_json_dict(row.residual_solvent_summary_json),
         nitrosamine_summary_json=_json_dict(row.nitrosamine_summary_json),
         qnmr_summary_json=_json_dict(row.qnmr_summary_json),
@@ -997,6 +999,139 @@ def create_residual_solvent_assessment(
             metadata={"dossier_id": dossier_id, "action_item_ids": action_ids},
         )
         return _assessment_to_record(row)
+
+
+def create_elemental_impurity_assessment(
+    session_factory: sessionmaker[Session],
+    dossier_id: int,
+    payload: ElementalImpurityAssessmentRequest,
+    *,
+    actor: RegulatoryComplianceActor,
+) -> BatchRegulatoryAssessment:
+    """ICH Q3D elemental-impurity assessment (deterministic engine). The PDE and
+    permitted concentration use the dossier's ``route`` + ``max_daily_dose_g``. ICH Q3D
+    has no legacy tenant rule type, so the engine is the sole source. Decision-support;
+    every result requires qualified human review."""
+
+    from moltrace.regulatory.impurities import calculate_concentration_limit, get_element_pde
+    from moltrace.regulatory.infra.validation import DataValidationError
+
+    with session_scope(session_factory) as session:
+        dossier = _require_dossier(session, dossier_id)
+        _require_batch(session, payload.batch_id)
+        _require_compound(session, payload.compound_id)
+        route = dossier.route or "oral"
+        dose = dossier.max_daily_dose_g
+        matches: list[dict[str, Any]] = []
+        action_ids: list[int] = []
+        warnings: list[str] = []
+        for element in payload.elements_json:
+            name = str(element.get("element") or element.get("name") or "")
+            observed = element.get("observed_ppm") or element.get("measured_ppm")
+            try:
+                observed_value = float(observed) if observed is not None else None
+            except (TypeError, ValueError):
+                observed_value = None
+            match: dict[str, Any] = {
+                "input_element": name,
+                "observed_concentration": observed_value,
+                "route": route,
+                "threshold_triggered": False,
+            }
+            try:
+                pde = get_element_pde(name, route)
+            except DataValidationError:
+                warnings.append(
+                    f"source_needed: {name or 'unknown element'} is not an ICH Q3D-listed element."
+                )
+                match["review_required"] = True
+                matches.append(match)
+                continue
+            match.update(
+                {
+                    "element": pde.element,
+                    "element_class": pde.element_class,
+                    "pde_ug_per_day": pde.pde_ug_per_day,
+                    "route_data_available": pde.route_data_available,
+                    "source": "ich_q3d_engine",
+                    "regulatory_basis": pde.regulatory_basis,
+                    "rule_set_version": pde.rule_set_version,
+                }
+            )
+            permitted_ppm = None
+            if dose is not None and pde.route_data_available:
+                try:
+                    limit = calculate_concentration_limit(name, route, dose)
+                except DataValidationError:
+                    limit = None
+                if limit is not None:
+                    permitted_ppm = limit.permitted_concentration_ppm
+                    match["permitted_concentration_ppm"] = permitted_ppm
+                    match["control_threshold_ppm"] = limit.control_threshold_ppm
+            elif dose is None:
+                warnings.append(
+                    f"dossier max_daily_dose_g required for the permitted concentration of "
+                    f"{pde.element}."
+                )
+            if observed_value is not None and permitted_ppm is not None:
+                match["threshold_triggered"] = observed_value >= permitted_ppm
+            if pde.element_class == "1":
+                match["review_required"] = True
+            if match.get("threshold_triggered") or match.get("review_required"):
+                action = _create_action_item_row(
+                    session,
+                    actor=actor,
+                    dossier_id=dossier_id,
+                    batch_id=payload.batch_id,
+                    compound_id=payload.compound_id,
+                    action_type="elemental_impurity_review",
+                    title="Elemental impurity review required",
+                    description=(
+                        "Elemental impurity evidence produced a review required draft "
+                        "compliance assessment."
+                    ),
+                    severity="high" if match.get("threshold_triggered") else "warning",
+                    citation_ids=[],
+                    metadata=match,
+                )
+                action_ids.append(action.id)
+            matches.append(match)
+        status = "action_required" if action_ids else "ready_for_review"
+        row = BatchRegulatoryAssessmentORM(
+            dossier_id=dossier_id,
+            batch_id=payload.batch_id,
+            compound_id=payload.compound_id,
+            overall_status=status,
+            elemental_summary_json=_json_dump(
+                {"assessed_elements": matches, "route": route, "action_required": bool(action_ids)}
+            ),
+            action_item_ids_json=_json_dump(action_ids),
+            warnings_json=_json_dump(warnings),
+            notes_json=_json_dump([_COMPLIANCE_NOTE]),
+            metadata_json=_json_dump(payload.metadata_json),
+        )
+        session.add(row)
+        session.flush()
+        _audit(
+            session,
+            actor=actor,
+            event_type="regulatory_compliance.elemental_impurity_assessment.create",
+            message="Elemental impurity draft compliance assessment created.",
+            entity_type="batch_regulatory_assessment",
+            entity_id=row.id,
+            metadata={"dossier_id": dossier_id, "action_item_ids": action_ids},
+        )
+        return _assessment_to_record(row)
+
+
+def list_elemental_impurity_assessments(
+    session_factory: sessionmaker[Session], dossier_id: int
+) -> list[BatchRegulatoryAssessment]:
+    return [
+        item
+        for item in list_batch_assessments(session_factory, dossier_id)
+        if item.elemental_summary_json
+    ]
 
 
 def _has_nitroso_signal(text: str | None, signals: list[dict[str, Any]]) -> bool:

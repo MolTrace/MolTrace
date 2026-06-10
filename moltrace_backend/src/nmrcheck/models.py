@@ -2502,6 +2502,7 @@ class RegulatoryDossierCreate(BaseModel):
     # Product context for dose-driven impurity limits (Q3A/B, dose-scaled Q3C/Q3D).
     max_daily_dose_g: float | None = Field(default=None, gt=0, le=100)
     substance_type: Literal["drug_substance", "drug_product"] | None = None
+    route: Literal["oral", "parenteral", "inhalation", "cutaneous"] | None = None
     status: RegulatoryDossierStatus = "draft"
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
@@ -2528,6 +2529,7 @@ class RegulatoryDossierUpdate(BaseModel):
     intended_use: str | None = Field(default=None, max_length=500)
     max_daily_dose_g: float | None = Field(default=None, gt=0, le=100)
     substance_type: Literal["drug_substance", "drug_product"] | None = None
+    route: Literal["oral", "parenteral", "inhalation", "cutaneous"] | None = None
     status: RegulatoryDossierStatus | None = None
     metadata_json: dict[str, Any] | None = None
 
@@ -2555,6 +2557,7 @@ class RegulatoryDossier(BaseModel):
     intended_use: str | None = None
     max_daily_dose_g: float | None = None
     substance_type: Literal["drug_substance", "drug_product"] | None = None
+    route: Literal["oral", "parenteral", "inhalation", "cutaneous"] | None = None
     status: RegulatoryDossierStatus
     created_at: datetime
     updated_at: datetime
@@ -3205,6 +3208,7 @@ class BatchRegulatoryAssessment(BaseModel):
     compound_id: int | None = None
     overall_status: BatchRegulatoryAssessmentStatus
     impurity_summary_json: dict[str, Any] = Field(default_factory=dict)
+    elemental_summary_json: dict[str, Any] = Field(default_factory=dict)
     residual_solvent_summary_json: dict[str, Any] = Field(default_factory=dict)
     nitrosamine_summary_json: dict[str, Any] = Field(default_factory=dict)
     qnmr_summary_json: dict[str, Any] = Field(default_factory=dict)
@@ -3271,6 +3275,21 @@ class ResidualSolventAssessmentRequest(BaseModel):
     batch_id: int | None = Field(default=None, ge=1)
     compound_id: int | None = Field(default=None, ge=1)
     solvents_json: list[dict[str, Any]] = Field(default_factory=list)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ElementalImpurityAssessmentRequest(BaseModel):
+    """Request for ``POST /regulatory/dossiers/{id}/elemental-impurity-assessment`` (ICH Q3D).
+
+    ``elements_json`` is a list of ``{"element": <symbol|name>, "observed_ppm": <float>}``.
+    The PDE + permitted concentration use the dossier's ``route`` + ``max_daily_dose_g``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    batch_id: int | None = Field(default=None, ge=1)
+    compound_id: int | None = Field(default=None, ge=1)
+    elements_json: list[dict[str, Any]] = Field(default_factory=list)
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
 

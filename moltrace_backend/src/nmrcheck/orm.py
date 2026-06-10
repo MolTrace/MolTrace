@@ -4018,6 +4018,7 @@ class RegulatoryDossierORM(Base):
     # dose-scaled Q3C/Q3D limits). One dose per dossier; all its assessments use it.
     max_daily_dose_g: Mapped[float | None] = mapped_column(Float, nullable=True)
     substance_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    route: Mapped[str | None] = mapped_column(String(32), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="draft")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -4415,6 +4416,7 @@ class BatchRegulatoryAssessmentORM(Base):
     )
     overall_status: Mapped[str] = mapped_column(String(32), default="not_assessed")
     impurity_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    elemental_summary_json: Mapped[str] = mapped_column(Text, default="{}")
     residual_solvent_summary_json: Mapped[str] = mapped_column(Text, default="{}")
     nitrosamine_summary_json: Mapped[str] = mapped_column(Text, default="{}")
     qnmr_summary_json: Mapped[str] = mapped_column(Text, default="{}")

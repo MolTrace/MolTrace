@@ -215,3 +215,17 @@ assessments are dose-consistent. **Additive + backward-compatible** (nullable) �
   regulatory_basis, rule_set_version }`. Surface it as an "ICH M7 class" badge if useful.
 
 Omitting the dossier dose reproduces the prior dose-unaware behaviour exactly.
+
+### Phase 2c (v0.23.4): dossier `route` + Q3D elemental endpoint
+
+- **Dossier `route`** *(new, optional, `"oral" | "parenteral" | "inhalation" | "cutaneous"`)* —
+  add it to the same "Product dosing" group as `max_daily_dose_g` / `substance_type`. ICH
+  Q3D PDEs are route-dependent, so the Q3D assessment uses it.
+- **`POST /regulatory/dossiers/{id}/elemental-impurity-assessment`** *(new; GET to list)* —
+  body `{ batch_id?, compound_id?, elements_json: [{ element, observed_ppm? }], metadata_json? }`.
+  Returns a `BatchRegulatoryAssessment` whose **`elemental_summary_json`** *(new slot, also on the
+  envelope)* has `{ route, action_required, assessed_elements: [{ element, element_class,
+  pde_ug_per_day, permitted_concentration_ppm, control_threshold_ppm, threshold_triggered,
+  review_required? }] }`. Surface it as an "Elemental impurities (Q3D)" tab on the dossier,
+  matching the residual-solvent / nitrosamine tabs. Unknown / cutaneous / no-dose cases land in
+  the top-level `warnings`.

@@ -332,6 +332,7 @@ from .models import (
     DriftAlert,
     ElectronicSignatureRecord,
     ElectronicSignatureRecordCreate,
+    ElementalImpurityAssessmentRequest,
     EmailActionRequest,
     EmailOutboxRecord,
     EnvironmentCheckResponse,
@@ -19609,6 +19610,49 @@ def list_regulatory_residual_solvent_assessments_route(
 ) -> list[BatchRegulatoryAssessment]:
     try:
         return compliance_store.list_residual_solvent_assessments(
+            _state(request).session_factory, dossier_id
+        )
+    except Exception as exc:
+        _raise_compliance_http_error(exc)
+        raise
+
+
+@router.post(
+    "/regulatory/dossiers/{dossier_id}/elemental-impurity-assessment",
+    response_model=BatchRegulatoryAssessment,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_regulatory_elemental_impurity_assessment_route(
+    dossier_id: int,
+    payload: ElementalImpurityAssessmentRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> BatchRegulatoryAssessment:
+    try:
+        return compliance_store.create_elemental_impurity_assessment(
+            _state(request).session_factory,
+            dossier_id,
+            payload,
+            actor=_compliance_actor(context),
+        )
+    except Exception as exc:
+        _raise_compliance_http_error(exc)
+        raise
+
+
+@router.get(
+    "/regulatory/dossiers/{dossier_id}/elemental-impurity-assessment",
+    response_model=list[BatchRegulatoryAssessment],
+    dependencies=[Depends(require_access_context)],
+)
+def list_regulatory_elemental_impurity_assessments_route(
+    dossier_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[BatchRegulatoryAssessment]:
+    try:
+        return compliance_store.list_elemental_impurity_assessments(
             _state(request).session_factory, dossier_id
         )
     except Exception as exc:
