@@ -14,6 +14,52 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.23.5 — Regulatory Hub: dossier-level nitrosamine cumulative-risk rollup (net-new) (2026-06-09)
+
+**Headline:** A **net-new** dossier sub-resource `GET /regulatory/dossiers/{id}/nitrosamine-cumulative-risk`
+that rolls every nitrosamine watch on a dossier up into one FDA-Rev-2 cumulative-risk
+verdict — `sum(measured / AI limit)` across the dossier's assessments, which **must be < 1**.
+Cumulative risk previously existed only *within a single* `POST /regulatory/impurities/assess`
+call; it now aggregates across the *stored* per-dossier nitrosamine assessments. The `< 1`
+decision rule stays in the CPCA engine — the legacy "brains" are not re-implemented.
+
+**Schema + contract delta (additive; no migration).** `NitrosamineWatchRequest` gains an
+optional `measured_ng_per_day` (≥ 0), persisted into the watch's `nitrosamine_summary_json`
+(JSON column — no DDL) alongside the structure it was measured against, so a watch can feed the
+rollup. New response models `DossierNitrosamineCumulativeRisk`, `DossierNitrosamineRiskComponent`,
+`DossierNitrosamineExcludedAssessment`.
+
+### Added
+- **`GET /regulatory/dossiers/{id}/nitrosamine-cumulative-risk`** (`api.py`) — same flat-router /
+  auth / `_raise_compliance_http_error` pattern as the other dossier sub-resources. Read-only
+  compute over `list_nitrosamine_watch`: gathers watches carrying **both** a CPCA AI limit and a
+  measured ng/day, sums `measured / AI` via the engine, and reports the rest under `excluded` with
+  a reason (no silent drop). Empty / none-qualifying → ratio `0.0`, `passes` true, with an
+  explanatory note. One read; no audit write, no persistence.
+- **`src/moltrace/regulatory/impurities/cpca_classifier.py`** — new public
+  `aggregate_cumulative_risk(components)` owning the `< 1` verdict from pre-known
+  `(ai_limit, measured)` components; `calculate_cumulative_risk` now delegates to it (single
+  source of truth for the rule). Exported from the impurities package.
+- **`src/nmrcheck/models.py`** — `measured_ng_per_day` on `NitrosamineWatchRequest`; the three
+  new `DossierNitrosamine*` response models.
+- **`src/nmrcheck/regulatory_compliance_store.py`** — `dossier_nitrosamine_cumulative_risk`;
+  `create_nitrosamine_watch` persists the measured value + structure into the summary.
+- **`tests/test_regulatory_nitrosamine_cumulative_risk_api.py`** — 11 tests (pass `< 1`, fail
+  `≥ 1`, exclusion for missing measured value / non-parseable structure, empty-dossier default,
+  404, OpenAPI presence, and engine-level `aggregate_cumulative_risk` unit behaviour).
+- **`docs/fe_handoff_nitrosamine_cumulative_risk.md`** — FE handoff (regenerate schema, contract
+  delta by name, request/response shapes, suggested panel placement).
+
+### Notes
+- **Additive + backwards-compatible.** Existing watches (no `measured_ng_per_day`) are simply
+  reported under `excluded`; no migration, no behaviour change to any existing route.
+- **Decision-support unchanged;** the rollup is a draft requiring qualified toxicology /
+  regulatory sign-off, never a regulatory determination. `human_review_required` is always true.
+- **White papers deferred to the FE task** that adds the cumulative-risk *panel* (a new UI surface
+  = maintenance-matrix Trigger 2). This backend endpoint changes no documented decision rule or
+  regulatory framework — cumulative risk + FDA Rev 2 are already in the papers — so no paper
+  trigger fires yet; the user-visible surface (and its PDF rebuild) lands with the FE panel.
+
 ## v0.23.4 — Regulatory Hub: Q3D elemental-impurity dossier endpoint + product route (Phase 2c) (2026-06-09)
 
 **Headline:** The final "override the legacy brains" piece — a **net-new** dossier
