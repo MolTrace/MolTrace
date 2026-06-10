@@ -94,7 +94,7 @@ export function RegulatoryNotificationsWorkspace() {
     <div className="mx-auto max-w-[1200px] space-y-6 p-4 md:p-6">
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/regulatory">
+          <Link href="/spectracheck?program=regulatory_hub">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Regulatory Intelligence
           </Link>

@@ -136,7 +136,7 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
         </span>
       }
       description="Bridge handoff to Regulatory Hub for review-required action items. Decision support only — not legal advice."
-      href="/regulatory"
+      href="/spectracheck?program=regulatory_hub"
       ctaLabel="Open Regulatory Hub"
     >
         <div className="grid gap-3 md:grid-cols-2">
