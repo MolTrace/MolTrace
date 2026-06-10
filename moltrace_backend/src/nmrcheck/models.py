@@ -3299,8 +3299,61 @@ class NitrosamineWatchRequest(BaseModel):
     batch_id: int | None = Field(default=None, ge=1)
     compound_id: int | None = Field(default=None, ge=1)
     structure_text: str | None = Field(default=None, max_length=200_000)
+    # Measured level (ng/day). When the structure parses as a nitrosamine (so a CPCA AI
+    # limit is derived), this lets the watch feed the dossier-level cumulative-risk
+    # rollup (GET .../nitrosamine-cumulative-risk): ratio = measured / AI limit.
+    measured_ng_per_day: float | None = Field(default=None, ge=0.0)
     risk_signals_json: list[dict[str, Any]] = Field(default_factory=list)
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class DossierNitrosamineRiskComponent(BaseModel):
+    """One nitrosamine watch contributing to the dossier cumulative-risk sum."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    assessment_id: int
+    structure_text: str | None = None
+    category: int
+    ai_limit_ng_per_day: float
+    measured_ng_per_day: float
+    risk_ratio: float
+
+
+class DossierNitrosamineExcludedAssessment(BaseModel):
+    """A nitrosamine watch left out of the cumulative-risk sum, with the reason."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    assessment_id: int
+    reason: str
+
+
+class DossierNitrosamineCumulativeRisk(BaseModel):
+    """Dossier-level nitrosamine cumulative risk (FDA Rev 2) — response for
+    ``GET /regulatory/dossiers/{id}/nitrosamine-cumulative-risk``.
+
+    Sums ``measured / AI limit`` across every nitrosamine watch on the dossier that
+    carries both a CPCA AI limit (its structure parsed as a nitrosamine) and a measured
+    ng/day; the total ``total_risk_ratio`` **must be < 1**. Watches missing either input
+    are reported under ``excluded`` so the coverage of the verdict is explicit. The < 1
+    decision rule is the CPCA engine's; the result is decision-support requiring
+    qualified sign-off, never a regulatory determination.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    dossier_id: int
+    total_risk_ratio: float
+    passes: bool
+    n_components: int
+    components: list[DossierNitrosamineRiskComponent] = Field(default_factory=list)
+    excluded: list[DossierNitrosamineExcludedAssessment] = Field(default_factory=list)
+    n_excluded: int = 0
+    regulatory_basis: str
+    disclaimer: str
+    notes: list[str] = Field(default_factory=list)
+    human_review_required: bool = True
 
 
 # --------------------------------------------------------------------------- #

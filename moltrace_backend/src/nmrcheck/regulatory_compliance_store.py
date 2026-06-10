@@ -16,8 +16,11 @@ from .models import (
     AnalyticalMethodValidationProfileCreate,
     BatchRegulatoryAssessment,
     BatchRegulatoryAssessmentCreate,
-    ImpurityRiskRegister,
+    DossierNitrosamineCumulativeRisk,
+    DossierNitrosamineExcludedAssessment,
+    DossierNitrosamineRiskComponent,
     ElementalImpurityAssessmentRequest,
+    ImpurityRiskRegister,
     ImpurityRiskRegisterCreate,
     ImpurityThresholdRule,
     JurisdictionalRequirementMap,
@@ -1223,6 +1226,11 @@ def create_nitrosamine_watch(
             "review_required": possible,
             "nitrosamine_confirmed": False,
             "cpca": cpca,  # real FDA CPCA category + AI when structure_text is a nitrosamine SMILES
+            # Measured ng/day + the SMILES it was measured against feed the dossier-level
+            # cumulative-risk rollup; only kept when the structure parsed as a nitrosamine
+            # (cpca present) so the AI-limit ratio is meaningful.
+            "measured_ng_per_day": payload.measured_ng_per_day,
+            "structure_text": payload.structure_text.strip() if (cpca is not None and payload.structure_text) else None,
             "matched_rules": matched_rules,
             "risk_signals_json": payload.risk_signals_json,
         }
@@ -1774,3 +1782,85 @@ def list_nitrosamine_watch(session_factory: sessionmaker[Session], dossier_id: i
         for item in list_batch_assessments(session_factory, dossier_id)
         if item.nitrosamine_summary_json
     ]
+
+
+def dossier_nitrosamine_cumulative_risk(
+    session_factory: sessionmaker[Session], dossier_id: int
+) -> DossierNitrosamineCumulativeRisk:
+    """Roll the dossier's nitrosamine watches up into one FDA Rev-2 cumulative-risk verdict.
+
+    Every nitrosamine watch carrying both a CPCA AI limit (its structure parsed as a
+    nitrosamine) and a measured ng/day contributes ``measured / AI limit`` to the sum,
+    which must be **< 1**. Watches missing either input are listed under ``excluded`` so
+    the verdict's coverage is explicit (a watch with no measured amount cannot have a risk
+    ratio). The ``< 1`` decision rule itself is the CPCA engine's
+    (:func:`aggregate_cumulative_risk`) — never re-implemented here.
+    """
+
+    from moltrace.regulatory.impurities import aggregate_cumulative_risk
+
+    watches = list_nitrosamine_watch(session_factory, dossier_id)  # also validates the dossier
+    raw_components: list[dict[str, Any]] = []
+    excluded: list[DossierNitrosamineExcludedAssessment] = []
+    for watch in watches:
+        summary = watch.nitrosamine_summary_json or {}
+        cpca = summary.get("cpca")
+        measured = summary.get("measured_ng_per_day")
+        if not cpca or cpca.get("ai_limit_ng_per_day") is None:
+            excluded.append(
+                DossierNitrosamineExcludedAssessment(
+                    assessment_id=watch.id,
+                    reason="structure is not a parseable nitrosamine; no CPCA AI limit to score against.",
+                )
+            )
+            continue
+        if measured is None:
+            excluded.append(
+                DossierNitrosamineExcludedAssessment(
+                    assessment_id=watch.id,
+                    reason="no measured ng/day recorded on this nitrosamine watch.",
+                )
+            )
+            continue
+        raw_components.append(
+            {
+                "assessment_id": watch.id,
+                "structure_text": summary.get("structure_text"),
+                "category": cpca.get("cpca_category"),
+                "ai_limit_ng_per_day": cpca.get("ai_limit_ng_per_day"),
+                "measured_ng_per_day": measured,
+            }
+        )
+
+    result = aggregate_cumulative_risk(raw_components)
+    components = [
+        DossierNitrosamineRiskComponent(
+            assessment_id=comp["assessment_id"],
+            structure_text=comp.get("structure_text"),
+            category=comp["category"],
+            ai_limit_ng_per_day=comp["ai_limit_ng_per_day"],
+            measured_ng_per_day=comp["measured_ng_per_day"],
+            risk_ratio=comp["risk_ratio"],
+        )
+        for comp in result.components
+    ]
+    notes = list(result.notes)
+    if not components:
+        notes.insert(
+            0,
+            "No nitrosamine watch on this dossier carries both a CPCA AI limit and a "
+            "measured ng/day; cumulative risk is 0 by default.",
+        )
+    return DossierNitrosamineCumulativeRisk(
+        dossier_id=dossier_id,
+        total_risk_ratio=result.total_risk_ratio,
+        passes=result.passes,
+        n_components=len(components),
+        components=components,
+        excluded=excluded,
+        n_excluded=len(excluded),
+        regulatory_basis=result.regulatory_basis,
+        disclaimer=result.disclaimer,
+        notes=notes,
+        human_review_required=True,
+    )

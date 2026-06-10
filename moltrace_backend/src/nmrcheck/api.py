@@ -329,6 +329,7 @@ from .models import (
     DeviationRecord,
     DeviationRecordCreate,
     DeviationRecordUpdate,
+    DossierNitrosamineCumulativeRisk,
     DriftAlert,
     ElectronicSignatureRecord,
     ElectronicSignatureRecordCreate,
@@ -19696,6 +19697,30 @@ def list_regulatory_nitrosamine_watch_route(
 ) -> list[BatchRegulatoryAssessment]:
     try:
         return compliance_store.list_nitrosamine_watch(_state(request).session_factory, dossier_id)
+    except Exception as exc:
+        _raise_compliance_http_error(exc)
+        raise
+
+
+@router.get(
+    "/regulatory/dossiers/{dossier_id}/nitrosamine-cumulative-risk",
+    response_model=DossierNitrosamineCumulativeRisk,
+    dependencies=[Depends(require_access_context)],
+)
+def get_regulatory_nitrosamine_cumulative_risk_route(
+    dossier_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> DossierNitrosamineCumulativeRisk:
+    """Dossier-level nitrosamine cumulative risk (FDA Rev 2): ``sum(measured / AI limit) < 1``
+    across the dossier's nitrosamine watches that carry both a CPCA AI limit and a measured
+    ng/day. Watches missing either input are reported under ``excluded`` so coverage is
+    explicit. Decision-support requiring qualified sign-off; never a regulatory determination.
+    """
+    try:
+        return compliance_store.dossier_nitrosamine_cumulative_risk(
+            _state(request).session_factory, dossier_id
+        )
     except Exception as exc:
         _raise_compliance_http_error(exc)
         raise

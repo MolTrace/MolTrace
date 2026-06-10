@@ -12,6 +12,7 @@ from __future__ import annotations
 from moltrace.regulatory.impurities.cpca_classifier import (
     CPCAResult,
     CumulativeRiskResult,
+    aggregate_cumulative_risk,
     calculate_cumulative_risk,
     classify_cpca,
     cpca_rule_set,
@@ -57,6 +58,7 @@ __all__ = [
     "M7Classification",
     "SolventClassification",
     "ThresholdValue",
+    "aggregate_cumulative_risk",
     "calculate_concentration_limit",
     "calculate_cumulative_risk",
     "calculate_q3ab_thresholds",

@@ -474,37 +474,40 @@ def classify_cpca(smiles: str, authority: str = "FDA") -> CPCAResult:
     )
 
 
-def calculate_cumulative_risk(
-    nitrosamines: list[tuple[str, float]], authority: str = "FDA"
-) -> CumulativeRiskResult:
-    """Cumulative risk for multiple nitrosamines (FDA Rev 2).
+def aggregate_cumulative_risk(components: list[dict[str, Any]]) -> CumulativeRiskResult:
+    """Cumulative-risk verdict from components whose AI limits are already known.
 
-    For each ``(SMILES, measured_ng_per_day)``, the ratio ``measured / AI_limit`` is
-    summed; the total **must be < 1**. Each component is classified via
-    :func:`classify_cpca` to obtain its AI limit.
+    Each component must carry ``ai_limit_ng_per_day`` (> 0) and ``measured_ng_per_day``
+    (>= 0); the per-component ``risk_ratio`` is computed as measured / AI limit and the
+    total summed (must be **< 1**, FDA Rev 2). Any other keys on a component (``smiles``,
+    ``category``, ``assessment_id`` …) are passed through untouched. Use this when the AI
+    limits come from prior CPCA classifications — e.g. a dossier-level rollup over stored
+    nitrosamine assessments — so the ``< 1`` decision rule lives in exactly one place.
+    :func:`calculate_cumulative_risk` is the SMILES-driven front door onto this same rule.
     """
 
-    components: list[dict[str, Any]] = []
+    enriched: list[dict[str, Any]] = []
     total = 0.0
-    for smiles, measured in nitrosamines:
-        measured_ng = float(measured)
-        if measured_ng < 0:
-            _fail("measured", f"measured ng/day must be >= 0, got {measured_ng}")
-        result = classify_cpca(smiles, authority=authority)
-        ratio = measured_ng / result.ai_limit_ng_per_day
+    for comp in components:
+        ai_limit = float(comp["ai_limit_ng_per_day"])
+        measured = float(comp["measured_ng_per_day"])
+        if ai_limit <= 0:
+            _fail("ai_limit_ng_per_day", f"AI limit must be > 0, got {ai_limit}")
+        if measured < 0:
+            _fail("measured_ng_per_day", f"measured ng/day must be >= 0, got {measured}")
+        ratio = measured / ai_limit
         total += ratio
-        components.append(
+        enriched.append(
             {
-                "smiles": smiles,
-                "category": result.category,
-                "ai_limit_ng_per_day": result.ai_limit_ng_per_day,
-                "measured_ng_per_day": measured_ng,
+                **comp,
+                "ai_limit_ng_per_day": ai_limit,
+                "measured_ng_per_day": measured,
                 "risk_ratio": ratio,
             }
         )
 
     return CumulativeRiskResult(
-        components=tuple(components),
+        components=tuple(enriched),
         total_risk_ratio=total,
         passes=total < 1.0,
         regulatory_basis=GUIDELINE,
@@ -515,6 +518,31 @@ def calculate_cumulative_risk(
             DISCLAIMER,
         ),
     )
+
+
+def calculate_cumulative_risk(
+    nitrosamines: list[tuple[str, float]], authority: str = "FDA"
+) -> CumulativeRiskResult:
+    """Cumulative risk for multiple nitrosamines (FDA Rev 2).
+
+    For each ``(SMILES, measured_ng_per_day)``, the ratio ``measured / AI_limit`` is
+    summed; the total **must be < 1**. Each component is classified via
+    :func:`classify_cpca` to obtain its AI limit, then handed to
+    :func:`aggregate_cumulative_risk`, which owns the ``< 1`` decision rule.
+    """
+
+    components: list[dict[str, Any]] = []
+    for smiles, measured in nitrosamines:
+        result = classify_cpca(smiles, authority=authority)
+        components.append(
+            {
+                "smiles": smiles,
+                "category": result.category,
+                "ai_limit_ng_per_day": result.ai_limit_ng_per_day,
+                "measured_ng_per_day": float(measured),
+            }
+        )
+    return aggregate_cumulative_risk(components)
 
 
 def cpca_rule_set() -> dict[str, Any]:
