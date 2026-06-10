@@ -408,7 +408,7 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link
-                  href="https://docs.moltrace.ai"
+                  href="https://docs.moltrace.co"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex w-full cursor-pointer items-center"
