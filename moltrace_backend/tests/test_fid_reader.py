@@ -225,6 +225,45 @@ def test_varian_fid_reader_matches_reference_ppm_count_and_metadata(tmp_path: Pa
     _assert_reference_peaks_match(spectrum, REFERENCE_1H_PEAKS)
 
 
+def test_detect_dataset_finds_uppercase_varian_markers(tmp_path: Path) -> None:
+    """`_detect_dataset` must find a Varian dataset whose marker files are
+    uppercase (``FID`` / ``PROCPAR``). Vendor exports vary in case; the CI and
+    Render production hosts use a case-sensitive filesystem, so a case-sensitive
+    lookup would miss them (passes on a case-insensitive macOS dev box only)."""
+    from moltrace.spectroscopy.io.fid_reader import _detect_dataset
+
+    dataset = tmp_path / "dataset"
+    dataset.mkdir()
+    (dataset / "FID").write_bytes(b"\x00" * 16)
+    (dataset / "PROCPAR").write_text("seqfil 1 1\n")
+
+    vendor, root = _detect_dataset(tmp_path)
+    assert vendor == "varian"
+    assert root == dataset.resolve()
+
+
+def test_varian_reader_handles_uppercase_marker_filenames(tmp_path: Path) -> None:
+    """Regression (v0.23.x): Varian/Agilent "nmroned" exports store ``FID`` /
+    ``PROCPAR`` uppercase. nmrglue opens them by exact lowercase name, so on a
+    case-sensitive filesystem (Linux CI + the Render production host) the read
+    failed — dropping the HMDB harness parseable rate from 95 % to 82 %. read_fid
+    now detects case-insensitively and aliases the markers to lowercase, so the
+    same dataset reads on both filesystems."""
+    dataset = _write_varian_dataset(tmp_path)
+    # nmrglue writes lowercase fid/procpar; uppercase them to mirror the export.
+    for lower, upper in (("fid", "FID"), ("procpar", "PROCPAR")):
+        src = dataset / lower
+        if src.exists():
+            src.rename(dataset / upper)
+
+    spectrum = read_fid(dataset)
+
+    assert isinstance(spectrum, NMRSpectrum)
+    assert spectrum.metadata["vendor"] == "Varian/Agilent"
+    assert spectrum.data.size > 0
+    _assert_reference_peaks_match(spectrum, REFERENCE_1H_PEAKS)
+
+
 def test_bruker_13c_reader_uses_carbon_apodization_and_ppm_scale(tmp_path: Path) -> None:
     dataset = _write_bruker_dataset(
         tmp_path,
