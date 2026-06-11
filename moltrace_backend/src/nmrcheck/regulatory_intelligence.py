@@ -273,6 +273,7 @@ def create_dossier(
     with session_scope(session_factory) as session:
         _validate_dossier_links(session, payload, actor=actor)
         row = RegulatoryDossierORM(
+            created_by_user_id=actor.user_id,  # owner; NULL for a system api key
             project_id=payload.project_id,
             sample_id=payload.sample_id,
             spectracheck_session_id=payload.spectracheck_session_id,
@@ -305,11 +306,21 @@ def create_dossier(
 def list_dossiers(
     session_factory: sessionmaker[Session],
     *,
+    owner_scope_id: int | None = None,
     limit: int = 200,
 ) -> list[RegulatoryDossier]:
+    """List dossiers, scoped to ``owner_scope_id`` when set.
+
+    ``owner_scope_id is None`` (a system api key or admin) lists every dossier; a
+    user-scoped caller sees only the dossiers they own. NULL-owner rows (system-created
+    or un-backfilled legacy) are therefore invisible to a user-scoped caller.
+    """
     with session_scope(session_factory) as session:
+        stmt = select(RegulatoryDossierORM)
+        if owner_scope_id is not None:
+            stmt = stmt.where(RegulatoryDossierORM.created_by_user_id == owner_scope_id)
         rows = session.scalars(
-            select(RegulatoryDossierORM).order_by(RegulatoryDossierORM.id.desc()).limit(limit)
+            stmt.order_by(RegulatoryDossierORM.id.desc()).limit(limit)
         ).all()
         return [_dossier_to_record(row) for row in rows]
 
@@ -321,6 +332,28 @@ def get_dossier(
     with session_scope(session_factory) as session:
         row = session.get(RegulatoryDossierORM, dossier_id)
         return _dossier_to_record(row) if row is not None else None
+
+
+def can_read_dossier(
+    session_factory: sessionmaker[Session],
+    dossier_id: int,
+    *,
+    owner_scope_id: int | None,
+) -> bool:
+    """Whether a caller scoped to ``owner_scope_id`` may read this dossier.
+
+    ``owner_scope_id is None`` (a system api key or admin) may read any dossier; a
+    user-scoped caller may read only a dossier they own (``created_by_user_id ==
+    owner_scope_id``). A missing dossier and an unowned one are indistinguishable (both
+    ``False``) so cross-tenant existence is never leaked. This is the single source of
+    truth for dossier read access — the route dependency and the by-child-id reads both
+    call it.
+    """
+    with session_scope(session_factory) as session:
+        row = session.get(RegulatoryDossierORM, dossier_id)
+        if row is None:
+            return False
+        return owner_scope_id is None or row.created_by_user_id == owner_scope_id
 
 
 def patch_dossier(

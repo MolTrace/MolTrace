@@ -573,10 +573,19 @@ def list_action_items(
     *,
     dossier_id: int | None = None,
     status: str | None = None,
+    owner_scope_id: int | None = None,
     limit: int = 200,
 ) -> list[RegulatoryActionItem]:
     with session_scope(session_factory) as session:
         stmt = select(RegulatoryActionItemORM).order_by(RegulatoryActionItemORM.id.desc()).limit(limit)
+        if owner_scope_id is not None:
+            # Restrict to action items whose dossier the caller owns (a system api key /
+            # admin passes owner_scope_id=None and sees all). The inner join also drops
+            # action items with no dossier from a user-scoped view.
+            stmt = stmt.join(
+                RegulatoryDossierORM,
+                RegulatoryActionItemORM.dossier_id == RegulatoryDossierORM.id,
+            ).where(RegulatoryDossierORM.created_by_user_id == owner_scope_id)
         if dossier_id is not None:
             stmt = stmt.where(RegulatoryActionItemORM.dossier_id == dossier_id)
         if status is not None:

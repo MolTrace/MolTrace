@@ -3990,9 +3990,17 @@ class RegulatoryDossierORM(Base):
         Index("ix_regulatory_dossiers_jurisdiction_created", "jurisdiction_id", "created_at"),
         Index("ix_regulatory_dossiers_spectracheck", "spectracheck_session_id"),
         Index("ix_regulatory_dossiers_reaction_project", "reaction_project_id"),
+        Index("ix_regulatory_dossiers_created_by_user", "created_by_user_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # Owner = the user who created the dossier; reads are scoped to it (a system api key
+    # sees all). NULL for system-key-created or legacy rows (legacy backfilled from the
+    # regulatory.dossier.create audit event in migration 0015).
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     project_id: Mapped[int | None] = mapped_column(
         ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,

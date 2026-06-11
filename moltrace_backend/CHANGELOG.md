@@ -14,6 +14,70 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.0 — Regulatory Hub: dossier reads are user-scoped (security; migration 0015) (2026-06-10)
+
+**Headline:** Regulatory dossier **reads** are now scoped to the creating user. A dossier
+carries a new `created_by_user_id` owner (set from the acting user at create; NULL for a
+system api key); a bearer caller may read only dossiers they own — and their sub-resources
+and by-child records — while a **system api key or an admin sees all**. Previously any
+authenticated user could read any tenant's dossier and its linked ids. A missing dossier and
+one owned by another user both return the same non-leaking 404. This completes the dossier
+access-control story begun by the v0.23.6 write-side project-link scoping.
+
+**Schema + migration.** New nullable `regulatory_dossiers.created_by_user_id` (FK `users.id`,
+ondelete SET NULL, indexed). **Migration `0015_dossier_created_by_user_id`** (down_revision
+0014) adds the column + index and **backfills legacy rows from the audit trail** — each
+dossier's creator is recovered from its `regulatory.dossier.create` audit event
+(`audit_events.actor_user_id`). Rows with no attributable creator (system-created or
+pre-audit) stay NULL = system-visible-only. **No request/response model changed**, so no
+`schema.d.ts` regen is needed — the change is behavioral (404s for non-owners).
+
+### Changed
+- **`src/nmrcheck/orm.py`** — `created_by_user_id` column + `ix_regulatory_dossiers_created_by_user`.
+- **`src/nmrcheck/regulatory_intelligence.py`** — `create_dossier` sets the owner;
+  `list_dossiers` gains `owner_scope_id` (filters by owner when set); new `can_read_dossier`
+  is the single source of truth for the read-access rule (system/admin scope `None` = all).
+- **`src/nmrcheck/api.py`** — new `require_readable_dossier` route dependency added to all 19
+  `GET /regulatory/dossiers/{dossier_id}/…` reads (incl. the mobile summary) so the ownership
+  gate is enforced at the boundary; the top-level list passes the scope; the four by-child-id
+  GETs (submission-package, CTD bundle, query, readiness-report) resolve their parent dossier
+  via `_readable_via_parent_dossier`. Scope comes from `_user_scope_for_context` (system key +
+  admin → unrestricted).
+- **`alembic/versions/0015_…`** — additive idempotent column + index + audit backfill.
+- **Sibling query-param reads** that filter by `?dossier_id` and would otherwise be an
+  alternate path around the gate (surfaced by an adversarial review): `GET
+  /regulatory/action-items`, `GET /regulatory/notifications`, and `GET
+  /bridges/spectroscopy-to-regulatory`. Their store list fns (`list_action_items`,
+  `list_notifications`, `list_spectroscopy_to_regulatory_bridges`) gain `owner_scope_id` and
+  inner-join the dossier on `created_by_user_id` — this scopes **both** the `?dossier_id=X`
+  case and the unfiltered enumeration (a user-scoped caller sees only rows tied to dossiers
+  they own; dossier-less rows are hidden; system/admin see all). Routes pass the scope.
+
+### Added
+- **`tests/test_regulatory_dossier_read_scoping_api.py`** — 10 tests: owner reads / non-owner
+  404 / system 200 (top-level + sub-resources + mobile summary); list filtered to owner;
+  system-created (NULL-owner) dossier invisible to bearers; admin sees all; non-leaking 404
+  (unowned == missing); by-child readiness-report scoped via parent; audit backfill recovers
+  the legacy owner and leaves system-created rows NULL; action-items list owner-scoped (real
+  data) + notifications/bridges query-param reads reject cross-user.
+- Updated `tests/test_regulatory_dossier_project_scoping_api.py` — the one v0.23.6 test whose
+  verification GET-as-non-owner now (correctly) 404s reads via the system key instead.
+
+### Notes
+- **The boundary is the user, not a tenant** — MolTrace has no per-request tenant context or
+  user→tenant mapping; all data scoping is per-user (matching the SpectraCheck `owner_scope_id`
+  house pattern and the v0.23.6 write guard).
+- **Scope is READS.** The write/sync paths that resolve a dossier id without an ownership
+  check — `PATCH /regulatory/dossiers/{id}`, the POST sub-resource creates, `…/link-compound`,
+  the mobile review-decision sync — are the same vulnerability class on the write side and are
+  deferred to a follow-up write-hardening pass.
+- **Deferred cross-module by-id reads:** `GET /bridges/spectroscopy-to-regulatory/{id}` and
+  `GET /bridges/regulatory-to-reaction/{id}` carry an optional `dossier_id` but are cross-module
+  artifacts whose ownership also spans session / reaction-project / compound links; scoping them
+  needs its own ownership model and is left to the cross-module pass (the dossier-filtered
+  *list* of spectroscopy bridges is scoped here).
+- **Decision-support unchanged;** every dossier remains a draft requiring qualified review.
+
 ## v0.23.6 — Regulatory Hub: dossier project link is user-scoped (security) (2026-06-10)
 
 **Headline:** `create_dossier` / `patch_dossier` now validate a referenced `project_id`

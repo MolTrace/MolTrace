@@ -156,7 +156,9 @@ def test_patch_cannot_mutate_existing_link_to_unowned_project(tmp_path):
         )
         assert res.status_code == 404, res.text
         assert "Project not found." in res.json()["detail"]
-        got = client.get(f"/regulatory/dossiers/{dossier_id}", headers=bob)
+        # Verify the link is untouched via the SYSTEM key — the system-created dossier has
+        # no owner, so bob (a non-owner bearer) can no longer read it under read-scoping.
+        got = client.get(f"/regulatory/dossiers/{dossier_id}", headers=SYSTEM)
         assert got.status_code == 200, got.text
         assert got.json()["project_id"] == alice_p1  # link unchanged
 
