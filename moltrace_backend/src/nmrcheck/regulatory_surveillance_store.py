@@ -716,10 +716,18 @@ def list_notifications(
     *,
     status: str | None = None,
     dossier_id: int | None = None,
+    owner_scope_id: int | None = None,
     limit: int = 200,
 ) -> list[RegulatoryImpactNotification]:
     with session_scope(session_factory) as session:
         stmt = select(RegulatoryImpactNotificationORM).order_by(RegulatoryImpactNotificationORM.id.desc()).limit(limit)
+        if owner_scope_id is not None:
+            # Restrict to notifications whose dossier the caller owns (system/admin pass
+            # None and see all); the inner join also drops dossier-less notifications.
+            stmt = stmt.join(
+                RegulatoryDossierORM,
+                RegulatoryImpactNotificationORM.dossier_id == RegulatoryDossierORM.id,
+            ).where(RegulatoryDossierORM.created_by_user_id == owner_scope_id)
         if status is not None:
             stmt = stmt.where(RegulatoryImpactNotificationORM.status == status)
         if dossier_id is not None:

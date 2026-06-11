@@ -2465,6 +2465,47 @@ def _user_scope_for_context(context: AccessContext) -> int | None:
     return context.user_id
 
 
+def require_readable_dossier(
+    dossier_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> None:
+    """Authorize read access to a dossier addressed by path ``dossier_id``.
+
+    Attached as a route dependency on every ``/regulatory/dossiers/{dossier_id}/…`` read so
+    the ownership gate lives in one place. A system api key / admin (scope ``None``) reads
+    any dossier; a user-scoped caller may read only dossiers they own. A missing dossier and
+    one owned by another user both raise the same 404 (non-leaking). The route's own store
+    call still runs afterward.
+    """
+    if not regulatory_store.can_read_dossier(
+        _state(request).session_factory,
+        dossier_id,
+        owner_scope_id=_user_scope_for_context(context),
+    ):
+        raise HTTPException(status_code=404, detail="Regulatory dossier not found.")
+
+
+def _readable_via_parent_dossier(
+    request: Request, context: AccessContext, dossier_id: int | None
+) -> bool:
+    """Whether the caller may read a child record belonging to dossier ``dossier_id``.
+
+    For by-child-id reads (submission package, CTD bundle, query, readiness report) that
+    don't carry the dossier in the path. A system api key / admin reads anything; a
+    user-scoped caller may read the child only if it belongs to a dossier they own — a
+    child with no dossier (orphaned) is hidden from user-scoped callers.
+    """
+    scope = _user_scope_for_context(context)
+    if scope is None:
+        return True
+    if dossier_id is None:
+        return False
+    return regulatory_store.can_read_dossier(
+        _state(request).session_factory, dossier_id, owner_scope_id=scope
+    )
+
+
 def _health_response(request: Request | None = None) -> dict[str, object]:
     checks: dict[str, str] = {"app": "ok"}
     if request is not None:
@@ -11875,7 +11916,7 @@ def create_regulatory_submission_package_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/submission-package",
     response_model=list[RegulatorySubmissionPackage],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_submission_packages_for_dossier_route(
     dossier_id: int,
@@ -11901,7 +11942,7 @@ def get_regulatory_submission_package_route(
     context: AccessContext = Depends(require_access_context),
 ) -> RegulatorySubmissionPackage:
     record = interop_store.get_submission_package(_state(request).session_factory, package_id)
-    if record is None:
+    if record is None or not _readable_via_parent_dossier(request, context, record.dossier_id):
         raise HTTPException(status_code=404, detail="Regulatory submission package not found.")
     return record
 
@@ -16024,7 +16065,7 @@ def reject_regulatory_rule_update_proposal_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/change-impact",
     response_model=RegulatoryDossierChangeImpact,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def get_regulatory_dossier_change_impact_route(
     dossier_id: int,
@@ -16056,6 +16097,7 @@ def list_regulatory_notifications_route(
         _state(request).session_factory,
         status=status_filter,
         dossier_id=dossier_id,
+        owner_scope_id=_user_scope_for_context(context),
         limit=limit,
     )
 
@@ -18228,7 +18270,7 @@ def get_mobile_spectracheck_session_summary_route(
 @router.get(
     "/mobile/regulatory/dossiers/{dossier_id}/summary",
     response_model=MobileResourceSummary,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def get_mobile_regulatory_dossier_summary_route(
     dossier_id: int,
@@ -18648,6 +18690,7 @@ def list_spectroscopy_to_regulatory_bridges_route(
     return product_store.list_spectroscopy_to_regulatory_bridges(
         _state(request).session_factory,
         dossier_id=dossier_id,
+        owner_scope_id=_user_scope_for_context(context),
         limit=limit,
     )
 
@@ -18921,7 +18964,7 @@ def create_ctd_module3_bundle_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/ctd-module3-bundle",
     response_model=list[CTDModule3ReportBundle],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_ctd_module3_bundles_route(
     dossier_id: int,
@@ -18949,7 +18992,7 @@ def get_ctd_module3_bundle_route(
     context: AccessContext = Depends(require_access_context),
 ) -> CTDModule3ReportBundle:
     record = product_store.get_ctd_module3_bundle(_state(request).session_factory, bundle_id)
-    if record is None:
+    if record is None or not _readable_via_parent_dossier(request, context, record.dossier_id):
         raise HTTPException(status_code=404, detail="CTD Module 3 bundle not found.")
     return record
 
@@ -19115,13 +19158,17 @@ def list_regulatory_dossiers_route(
     limit: int = Query(default=200, ge=1, le=500),
     context: AccessContext = Depends(require_access_context),
 ) -> list[RegulatoryDossier]:
-    return regulatory_store.list_dossiers(_state(request).session_factory, limit=limit)
+    return regulatory_store.list_dossiers(
+        _state(request).session_factory,
+        owner_scope_id=_user_scope_for_context(context),
+        limit=limit,
+    )
 
 
 @router.get(
     "/regulatory/dossiers/{dossier_id}",
     response_model=RegulatoryDossier,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def get_regulatory_dossier_route(
     dossier_id: int,
@@ -19187,7 +19234,7 @@ def create_regulatory_requirement_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/requirements",
     response_model=list[RegulatoryRequirement],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_requirements_route(
     dossier_id: int,
@@ -19254,7 +19301,7 @@ def create_regulatory_evidence_link_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/evidence-links",
     response_model=list[RegulatoryEvidenceLink],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_evidence_links_route(
     dossier_id: int,
@@ -19303,7 +19350,7 @@ def get_regulatory_query_route(
     context: AccessContext = Depends(require_access_context),
 ) -> RegulatoryQuery:
     record = regulatory_store.get_query(_state(request).session_factory, query_id)
-    if record is None:
+    if record is None or not _readable_via_parent_dossier(request, context, record.dossier_id):
         raise HTTPException(status_code=404, detail="Regulatory query not found.")
     return record
 
@@ -19335,7 +19382,7 @@ def create_regulatory_risk_assessment_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/risk-assessment",
     response_model=RegulatoryRiskAssessment,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def get_regulatory_risk_assessment_route(
     dossier_id: int,
@@ -19381,7 +19428,7 @@ def create_regulatory_review_decision_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/review",
     response_model=list[RegulatoryReviewDecision],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_review_decisions_route(
     dossier_id: int,
@@ -19430,7 +19477,7 @@ def get_regulatory_readiness_report_route(
     context: AccessContext = Depends(require_access_context),
 ) -> RegulatoryReadinessReport:
     record = regulatory_store.get_readiness_report(_state(request).session_factory, report_id)
-    if record is None:
+    if record is None or not _readable_via_parent_dossier(request, context, record.dossier_id):
         raise HTTPException(status_code=404, detail="Regulatory readiness report not found.")
     return record
 
@@ -19518,7 +19565,7 @@ def create_regulatory_batch_assessment_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/batch-assessment",
     response_model=list[BatchRegulatoryAssessment],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_batch_assessments_route(
     dossier_id: int,
@@ -19559,7 +19606,7 @@ def create_regulatory_impurity_risk_register_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/impurity-risk-register",
     response_model=list[ImpurityRiskRegister],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_impurity_risk_register_route(
     dossier_id: int,
@@ -19602,7 +19649,7 @@ def create_regulatory_residual_solvent_assessment_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/residual-solvent-assessment",
     response_model=list[BatchRegulatoryAssessment],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_residual_solvent_assessments_route(
     dossier_id: int,
@@ -19645,7 +19692,7 @@ def create_regulatory_elemental_impurity_assessment_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/elemental-impurity-assessment",
     response_model=list[BatchRegulatoryAssessment],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_elemental_impurity_assessments_route(
     dossier_id: int,
@@ -19688,7 +19735,7 @@ def create_regulatory_nitrosamine_watch_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/nitrosamine-watch",
     response_model=list[BatchRegulatoryAssessment],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_nitrosamine_watch_route(
     dossier_id: int,
@@ -19705,7 +19752,7 @@ def list_regulatory_nitrosamine_watch_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/nitrosamine-cumulative-risk",
     response_model=DossierNitrosamineCumulativeRisk,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def get_regulatory_nitrosamine_cumulative_risk_route(
     dossier_id: int,
@@ -19753,7 +19800,7 @@ def create_regulatory_qnmr_compliance_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/qnmr-compliance",
     response_model=list[QNMRComplianceProfile],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_qnmr_compliance_route(
     dossier_id: int,
@@ -19796,7 +19843,7 @@ def create_regulatory_method_validation_profile_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/method-validation-profile",
     response_model=list[AnalyticalMethodValidationProfile],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_method_validation_profile_route(
     dossier_id: int,
@@ -19839,7 +19886,7 @@ def create_regulatory_ai_governance_record_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/ai-governance-record",
     response_model=list[AIGovernanceRecord],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_ai_governance_record_route(
     dossier_id: int,
@@ -19882,7 +19929,7 @@ def create_regulatory_jurisdictional_map_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/jurisdictional-map",
     response_model=list[JurisdictionalRequirementMap],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
 )
 def list_regulatory_jurisdictional_map_route(
     dossier_id: int,
@@ -19936,6 +19983,7 @@ def list_regulatory_action_items_route(
         _state(request).session_factory,
         dossier_id=dossier_id,
         status=status_filter,
+        owner_scope_id=_user_scope_for_context(context),
         limit=limit,
     )
 

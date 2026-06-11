@@ -366,12 +366,20 @@ def list_spectroscopy_to_regulatory_bridges(
     session_factory: sessionmaker[Session],
     *,
     dossier_id: int | None = None,
+    owner_scope_id: int | None = None,
     limit: int = 500,
 ) -> list[SpectroscopyToRegulatoryBridge]:
     with session_scope(session_factory) as session:
         stmt = select(SpectroscopyToRegulatoryBridgeORM).order_by(
             SpectroscopyToRegulatoryBridgeORM.id.desc()
         )
+        if owner_scope_id is not None:
+            # Restrict to bridges whose dossier the caller owns (system/admin pass None and
+            # see all); the inner join also drops dossier-less bridges from a user view.
+            stmt = stmt.join(
+                RegulatoryDossierORM,
+                SpectroscopyToRegulatoryBridgeORM.dossier_id == RegulatoryDossierORM.id,
+            ).where(RegulatoryDossierORM.created_by_user_id == owner_scope_id)
         if dossier_id is not None:
             stmt = stmt.where(SpectroscopyToRegulatoryBridgeORM.dossier_id == dossier_id)
         return [_s2r_to_record(row) for row in session.scalars(stmt.limit(limit)).all()]
