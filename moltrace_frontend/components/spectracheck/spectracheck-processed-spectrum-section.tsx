@@ -1584,6 +1584,39 @@ export function SpectraCheckProcessedSpectrumSection({
         </div>
       )}
 
+      {/* ── GSD pipeline overview — discoverability for prompts 3/4/5 ──────
+          The experimental GSD path is a multi-stage pipeline, but its result
+          panels (Step 3b–3e) stay hidden until a run completes, so the stages
+          are otherwise invisible. When GSD is selected but not yet run, name
+          the stages so the pipeline is discoverable. GSD-mode only — the
+          default legacy path and the legacy-by-default behaviour are untouched. */}
+      {analysisBackend === "gsd_prompt3" && gsdResult == null ? (
+        <div className="rounded-2xl border border-dashed border-amber-300/60 bg-amber-50/40 p-5 dark:border-amber-900/50 dark:bg-amber-950/10">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+            GSD pipeline · prompts 3 → 4 → 5
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Run GSD analysis above to populate the experimental peak-detection pipeline. Each stage
+            renders as its own panel here once the run completes.
+          </p>
+          <ol className="mt-3 grid gap-2 sm:grid-cols-3">
+            {[
+              { n: "Prompt 3", title: "Peak detection", sub: "GSD detect + auto-classification" },
+              { n: "Prompt 4", title: "Multiplet & J-coupling", sub: "first-order + complex; candidate J-agreement" },
+              { n: "Prompt 5", title: "Region integration", sub: "relative proton-ratio readout" },
+            ].map((s) => (
+              <li key={s.n} className="rounded-lg border bg-card p-3">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  {s.n}
+                </span>
+                <p className="mt-0.5 text-sm font-semibold text-foreground">{s.title}</p>
+                <p className="text-xs text-muted-foreground">{s.sub}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+
       {/* ── Step 3b — GSD-Prompt-3 output (experimental) ──────────────────
           Only renders when the user has run the experimental backend.
           Lives alongside the legacy Step 3 results without replacing them. */}
