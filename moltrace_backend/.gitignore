@@ -28,6 +28,7 @@ nmrcheck.sqlite3
 
 # Scientific/raw artifacts and generated archives
 raw_data_vault/
+storage/
 artifacts/
 uploads/
 exports/
