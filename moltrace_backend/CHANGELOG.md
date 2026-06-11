@@ -14,6 +14,35 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.5 — Regulatory Hub: readiness reports rehydrate (dossier-scoped list read) (2026-06-11)
+
+**Headline:** The readiness report — the dossier pipeline's capstone (prompt 5) output — only had a
+`POST` create + `GET`-by-id, so the dossier workspace could not reload a persisted report. Revisiting a
+dossier showed *"No readiness report loaded in this session"* even after one had been generated and
+stored. Adds the dossier-scoped list read so the UI can rehydrate the latest report on load.
+
+### Added
+- **`src/nmrcheck/api.py`** — `GET /regulatory/dossiers/{dossier_id}/readiness-report` →
+  `list[RegulatoryReadinessReport]`, newest-first (id desc). Gated by `require_dossier_access`, so it
+  carries the same per-user owner scope as the rest of the dossier reads (owner + system/admin read;
+  a non-owner gets the non-leaking 404), mirroring `list_regulatory_review_decisions_route`.
+- **`src/nmrcheck/regulatory_intelligence.py`** — `list_readiness_reports(session_factory, dossier_id)`
+  (validates the dossier via `_dossier_or_raise`, returns records ordered by id desc).
+- **`tests/test_regulatory_intelligence_api.py`** — the list returns the just-created report first
+  (rehydration), and the OpenAPI contract test now asserts the `get` on the readiness-report path.
+- **`tests/test_regulatory_dossier_read_scoping_api.py`** — `readiness-report` added to the
+  owner/non-owner/system sub-resource loop (owner 200, non-owner 404, system 200).
+
+### Notes
+- Contract regenerated: `moltrace_frontend/src/lib/api/schema.d.ts` now types the new GET (operation
+  `list_regulatory_readiness_reports_route_...`); 37+/1− diff, no other drift. FE wiring (fetch on
+  dossier load, render `[0]` as the current report) is a separate frontend task.
+- Surfaced by an FE↔BE integration audit of regulatory prompts 1–5 against the dossier tabs, where
+  readiness (prompt 5) was the weakest-integrated surface. Remaining audit findings are separate
+  follow-ups: the readiness tab reads `metadata_json` hash/download fields that `create_readiness_report`
+  never populates; `GET/POST /regulatory/dossiers/{id}/elemental-impurity-assessment` has no FE consumer;
+  and the Developer-JSON panel omits ~10 loaded payloads.
+
 ## v0.24.4 — Regulatory Hub: surveillance is a privileged (admin/system) process (security) (2026-06-11)
 
 **Headline:** Closes the last item from the v0.24.3 convergence review. `POST /regulatory/surveillance/runs`

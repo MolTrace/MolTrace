@@ -19474,6 +19474,25 @@ def create_regulatory_readiness_report_route(
 
 
 @router.get(
+    "/regulatory/dossiers/{dossier_id}/readiness-report",
+    response_model=list[RegulatoryReadinessReport],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
+)
+def list_regulatory_readiness_reports_route(
+    dossier_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[RegulatoryReadinessReport]:
+    try:
+        return regulatory_store.list_readiness_reports(
+            _state(request).session_factory, dossier_id
+        )
+    except Exception as exc:
+        _raise_regulatory_http_error(exc)
+        raise
+
+
+@router.get(
     "/regulatory/readiness-reports/{report_id}",
     response_model=RegulatoryReadinessReport,
     dependencies=[Depends(require_access_context)],

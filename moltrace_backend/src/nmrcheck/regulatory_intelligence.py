@@ -858,6 +858,20 @@ def get_readiness_report(
         return _readiness_report_to_record(row) if row is not None else None
 
 
+def list_readiness_reports(
+    session_factory: sessionmaker[Session],
+    dossier_id: int,
+) -> list[RegulatoryReadinessReport]:
+    with session_scope(session_factory) as session:
+        _dossier_or_raise(session, dossier_id)
+        rows = session.scalars(
+            select(RegulatoryReadinessReportORM)
+            .where(RegulatoryReadinessReportORM.dossier_id == dossier_id)
+            .order_by(RegulatoryReadinessReportORM.id.desc())
+        ).all()
+        return [_readiness_report_to_record(row) for row in rows]
+
+
 def _extract_source_text(filename: str, content_type: str | None, content: bytes) -> tuple[str, list[str]]:
     lower = filename.lower()
     warnings: list[str] = []
