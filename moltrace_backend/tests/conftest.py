@@ -95,14 +95,25 @@ def openapi_schema(routed_app: FastAPI) -> dict:
 @pytest.fixture()
 def app(routed_app: FastAPI, tmp_path: Path) -> Iterator[FastAPI]:
     """``routed_app`` with a fresh, seeded SQLite database for this test."""
-    session_factory = create_session_factory(f"sqlite:///{tmp_path}/test.sqlite3")
+    database_url = f"sqlite:///{tmp_path}/test.sqlite3"
+    session_factory = create_session_factory(database_url)
     seed_database(session_factory)
-    previous = routed_app.state.session_factory
+    prev_factory = routed_app.state.session_factory
+    prev_settings = routed_app.state.settings
     routed_app.state.session_factory = session_factory
+    # Point settings at the per-test DB too, so request-time helpers that derive
+    # filesystem paths from settings.database_url isolate per test. In particular
+    # _orchestration_storage_root() resolves the /files/upload storage dir as
+    # "<db parent>/storage"; with the shared app's ":memory:" URL that collapsed
+    # to one fixed ./storage for EVERY test, so two tests uploading a same-named
+    # file (IDs reset to 1 -> "1_<name>") collided on the writer's exclusive
+    # open("xb"). Under tmp_path the storage dir is unique per test and cleaned up.
+    routed_app.state.settings = _test_settings(database_url)
     try:
         yield routed_app
     finally:
-        routed_app.state.session_factory = previous
+        routed_app.state.session_factory = prev_factory
+        routed_app.state.settings = prev_settings
 
 
 @pytest.fixture()
