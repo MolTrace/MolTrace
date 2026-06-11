@@ -15650,7 +15650,7 @@ def search_regulatory_sources_route(
     "/regulatory/surveillance/sources",
     response_model=RegulatorySourceWatcher,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_admin)],  # surveillance config is a privileged platform process
 )
 def create_regulatory_source_watcher_route(
     payload: RegulatorySourceWatcherCreate,
@@ -15707,7 +15707,7 @@ def get_regulatory_source_watcher_route(
 @router.patch(
     "/regulatory/surveillance/sources/{watcher_id}",
     response_model=RegulatorySourceWatcher,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_admin)],  # surveillance config is a privileged platform process
 )
 def update_regulatory_source_watcher_route(
     watcher_id: int,
@@ -15734,7 +15734,9 @@ def update_regulatory_source_watcher_route(
     "/regulatory/surveillance/runs",
     response_model=RegulatorySurveillanceRun,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    # Privileged: a run fans out review action-items/notifications onto matched dossiers across
+    # tenants, so it is restricted to admins + the system api key (the platform job runs as system).
+    dependencies=[Depends(require_admin)],
 )
 def create_regulatory_surveillance_run_route(
     payload: RegulatorySurveillanceRunCreate,

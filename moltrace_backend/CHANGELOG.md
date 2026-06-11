@@ -14,6 +14,28 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.4 — Regulatory Hub: surveillance is a privileged (admin/system) process (security) (2026-06-11)
+
+**Headline:** Closes the last item from the v0.24.3 convergence review. `POST /regulatory/surveillance/runs`
+was callable by any authenticated user, and a run fans out review **action-items / notifications** onto
+every dossier its server-side jurisdiction / citation match selects — across tenants. Per the product
+decision, surveillance is a **privileged platform process**, so its *write* routes are now admin +
+system-key only (the platform's surveillance job runs under the system key).
+
+### Changed
+- **`src/nmrcheck/api.py`** — `require_admin` (admins + the system api key pass; a non-admin bearer gets
+  403) now gates the three mutating surveillance routes: `POST /regulatory/surveillance/runs`,
+  `POST /regulatory/surveillance/sources`, and `PATCH /regulatory/surveillance/sources/{watcher_id}`. The
+  GET reads (list/get sources + runs) stay open as monitoring views.
+
+### Added
+- **`tests/test_regulatory_dossier_read_scoping_api.py`** — a non-admin bearer gets 403 from the run +
+  source-watcher creates (so no cross-dossier children are written); the system key + an admin pass the gate.
+
+### Notes
+- Completes the dossier access-control epic (v0.23.6 + v0.24.0–.4). Remaining (separate, pre-existing,
+  different module): `POST /regulatory/action-items` create + the generic cross-module resource-link model.
+
 ## v0.24.3 — Regulatory Hub: scope the cross-module bridge CREATE paths (security) (2026-06-11)
 
 **Headline:** A convergence review confirmed the dossier read / dossier-path-write / by-child-id-write

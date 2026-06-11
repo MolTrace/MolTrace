@@ -447,3 +447,30 @@ def test_regulatory_to_reaction_bridge_create_requires_dossier_ownership(tmp_pat
         assert client.post(
             "/bridges/regulatory-to-reaction", headers=SYSTEM, json={"dossier_id": did}
         ).status_code == 400
+
+
+# --------------------------------------------------------------------------- #
+# Surveillance is a privileged platform process: runs (which fan out review children
+# across dossiers) and source-watcher config are admin / system-only.
+# --------------------------------------------------------------------------- #
+def test_surveillance_writes_are_privileged(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        admin = _sign_up(client, ADMIN_EMAIL)
+        # A non-admin bearer is blocked at the gate (403) before any cross-dossier fan-out runs.
+        assert client.post("/regulatory/surveillance/runs", headers=alice, json={}).status_code == 403
+        assert (
+            client.post("/regulatory/surveillance/sources", headers=alice, json={"title": "w"}).status_code
+            == 403
+        )
+        # The system key (the platform job) and admins pass the gate; the watcher create succeeds.
+        assert client.post("/regulatory/surveillance/runs", headers=SYSTEM, json={}).status_code != 403
+        assert (
+            client.post("/regulatory/surveillance/sources", headers=SYSTEM, json={"title": "w"}).status_code
+            == 201
+        )
+        assert (
+            client.post("/regulatory/surveillance/sources", headers=admin, json={"title": "w"}).status_code
+            == 201
+        )
