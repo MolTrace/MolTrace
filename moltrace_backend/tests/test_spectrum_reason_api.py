@@ -33,23 +33,6 @@ from moltrace.spectroscopy.ai.rag import (
 )
 from moltrace.spectroscopy.similarity import SpectrumIndex, encode_spectrum
 from nmrcheck import api as api_module
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _app(tmp_path):
-    return create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'reason.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-
-
-def _client(tmp_path) -> TestClient:
-    return TestClient(_app(tmp_path))
 
 
 def _post(client: TestClient, body: dict, key: str | None = "test-key"):
@@ -104,9 +87,8 @@ def _reason_body(**overrides) -> dict:
 # --------------------------------------------------------------------------- #
 # Graceful degradation
 # --------------------------------------------------------------------------- #
-def test_reason_not_configured_index_is_graceful(tmp_path, monkeypatch):
+def test_reason_not_configured_index_is_graceful(client, monkeypatch):
     monkeypatch.delenv("MOLTRACE_SIMILARITY_INDEX", raising=False)
-    client = _client(tmp_path)
     with client:
         res = _post(client, _reason_body())
     assert res.status_code == 200, res.text
@@ -120,12 +102,11 @@ def test_reason_not_configured_index_is_graceful(tmp_path, monkeypatch):
     assert any("not configured" in w.lower() for w in body["warnings"])
 
 
-def test_reason_retrieval_only_when_reasoner_unavailable(tmp_path, monkeypatch):
+def test_reason_retrieval_only_when_reasoner_unavailable(client, tmp_path, monkeypatch):
     path = _build_index(tmp_path, _default_refs())
     monkeypatch.setenv("MOLTRACE_SIMILARITY_INDEX", path)
     monkeypatch.delenv("MOLTRACE_SIMILARITY_METADATA", raising=False)
     monkeypatch.setattr(api_module, "_reasoning_llm_available", lambda: False)
-    client = _client(tmp_path)
     with client:
         res = _post(client, _reason_body())
     assert res.status_code == 200, res.text
@@ -146,7 +127,7 @@ def test_reason_retrieval_only_when_reasoner_unavailable(tmp_path, monkeypatch):
     assert any("model backend unavailable" in w.lower() for w in body["warnings"])
 
 
-def test_reason_happy_path_injected_reasoner(tmp_path, monkeypatch):
+def test_reason_happy_path_injected_reasoner(client, tmp_path, monkeypatch):
     path = _build_index(tmp_path, _default_refs())
     monkeypatch.setenv("MOLTRACE_SIMILARITY_INDEX", path)
     monkeypatch.setattr(api_module, "_reasoning_llm_available", lambda: True)
@@ -194,7 +175,6 @@ def test_reason_happy_path_injected_reasoner(tmp_path, monkeypatch):
 
     monkeypatch.setattr(rag_module, "propose_structures", _fake_propose)
 
-    client = _client(tmp_path)
     with client:
         res = _post(client, _reason_body(max_candidates=4))
     assert res.status_code == 200, res.text
@@ -235,7 +215,7 @@ def test_reason_happy_path_injected_reasoner(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- #
 # Metadata sidecar (analogue grounding) + license-aware retrieval
 # --------------------------------------------------------------------------- #
-def test_reason_metadata_sidecar_grounds_analogue(tmp_path, monkeypatch):
+def test_reason_metadata_sidecar_grounds_analogue(client, tmp_path, monkeypatch):
     # An index keyed by an opaque database id; the sidecar resolves it to SMILES.
     path = _build_index(tmp_path, {"db:001": ([7.26], [128.4])})
     meta_path = tmp_path / "meta.json"
@@ -248,7 +228,6 @@ def test_reason_metadata_sidecar_grounds_analogue(tmp_path, monkeypatch):
     monkeypatch.setenv("MOLTRACE_SIMILARITY_INDEX", path)
     monkeypatch.setenv("MOLTRACE_SIMILARITY_METADATA", str(meta_path))
     monkeypatch.setattr(api_module, "_reasoning_llm_available", lambda: False)
-    client = _client(tmp_path)
     with client:
         res = _post(client, _reason_body(top_k=1))
     assert res.status_code == 200, res.text
@@ -261,7 +240,7 @@ def test_reason_metadata_sidecar_grounds_analogue(tmp_path, monkeypatch):
     assert hit["source"] == "nmrshiftdb2"
 
 
-def test_reason_license_allow_list_filters(tmp_path, monkeypatch):
+def test_reason_license_allow_list_filters(client, tmp_path, monkeypatch):
     path = _build_index(tmp_path, {"db:001": ([7.26], [128.4])})
     meta_path = tmp_path / "meta.json"
     meta_path.write_text(
@@ -271,7 +250,6 @@ def test_reason_license_allow_list_filters(tmp_path, monkeypatch):
     monkeypatch.setenv("MOLTRACE_SIMILARITY_INDEX", path)
     monkeypatch.setenv("MOLTRACE_SIMILARITY_METADATA", str(meta_path))
     monkeypatch.setattr(api_module, "_reasoning_llm_available", lambda: False)
-    client = _client(tmp_path)
     with client:
         res = _post(client, _reason_body(top_k=1, allowed_licenses=["MIT"]))
     assert res.status_code == 200, res.text
@@ -284,25 +262,22 @@ def test_reason_license_allow_list_filters(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- #
 # Validation + auth + registration
 # --------------------------------------------------------------------------- #
-def test_reason_length_mismatch_is_400(tmp_path, monkeypatch):
+def test_reason_length_mismatch_is_400(client, monkeypatch):
     monkeypatch.delenv("MOLTRACE_SIMILARITY_INDEX", raising=False)
-    client = _client(tmp_path)
     body = {"ppm_axis": [0.0] * 16, "intensity": [0.0] * 17}
     with client:
         res = _post(client, body)
     assert res.status_code == 400, res.text
 
 
-def test_reason_array_too_short_is_422(tmp_path):
-    client = _client(tmp_path)
+def test_reason_array_too_short_is_422(client):
     body = {"ppm_axis": [0.0] * 8, "intensity": [0.0] * 8}
     with client:
         res = _post(client, body)
     assert res.status_code == 422
 
 
-def test_reason_bounds_are_validated(tmp_path):
-    client = _client(tmp_path)
+def test_reason_bounds_are_validated(client):
     with client:
         assert _post(client, _reason_body(top_k=0)).status_code == 422
         assert _post(client, _reason_body(top_k=5000)).status_code == 422
@@ -310,14 +285,13 @@ def test_reason_bounds_are_validated(tmp_path):
         assert _post(client, _reason_body(max_candidates=999)).status_code == 422
 
 
-def test_reason_requires_auth(tmp_path):
-    client = _client(tmp_path)
+def test_reason_requires_auth(client):
     with client:
         res = _post(client, _reason_body(), key=None)
     assert res.status_code in (401, 403)
 
 
-def test_reason_registered_in_openapi(tmp_path):
-    paths = _app(tmp_path).openapi()["paths"]
+def test_reason_registered_in_openapi(openapi_schema):
+    paths = openapi_schema["paths"]
     assert "/spectrum/reason" in paths
     assert "post" in paths["/spectrum/reason"]

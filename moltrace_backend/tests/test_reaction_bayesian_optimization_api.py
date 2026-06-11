@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'reaction_bo.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app)
-
 
 def _sign_up(client: TestClient, email: str = "phase50@example.com") -> dict[str, str]:
     res = client.post(
@@ -149,8 +135,7 @@ def _seed_five_completed(client: TestClient, headers: dict[str, str], project_id
         )
 
 
-def test_phase50_profiles_can_be_created(tmp_path):
-    client = _client(tmp_path)
+def test_phase50_profiles_can_be_created(client):
     with client:
         headers = _sign_up(client)
         project = _project(client, headers)
@@ -193,8 +178,7 @@ def test_phase50_profiles_can_be_created(tmp_path):
         assert safety.json()["max_temperature_c"] == 90
 
 
-def test_bo_run_with_insufficient_data_returns_exploratory_recommendations(tmp_path):
-    client = _client(tmp_path)
+def test_bo_run_with_insufficient_data_returns_exploratory_recommendations(client):
     with client:
         headers = _sign_up(client, "low-data@example.com")
         project = _project(client, headers)
@@ -228,8 +212,7 @@ def test_bo_run_with_insufficient_data_returns_exploratory_recommendations(tmp_p
         assert "Fewer than 5 completed experiments" in " ".join(body["warnings"])
 
 
-def test_bo_run_with_completed_experiments_returns_ranked_recommendations(tmp_path):
-    client = _client(tmp_path)
+def test_bo_run_with_completed_experiments_returns_ranked_recommendations(client):
     with client:
         headers = _sign_up(client, "ranked@example.com")
         project = _project(client, headers)
@@ -263,8 +246,7 @@ def test_bo_run_with_completed_experiments_returns_ranked_recommendations(tmp_pa
         assert fetched.json()["recommendations"][0]["bo_run_id"] == body["bo_run_id"]
 
 
-def test_safety_blocked_conditions_are_not_recommended_as_allowed(tmp_path):
-    client = _client(tmp_path)
+def test_safety_blocked_conditions_are_not_recommended_as_allowed(client):
     with client:
         headers = _sign_up(client, "safety@example.com")
         project = _project(client, headers)
@@ -289,8 +271,7 @@ def test_safety_blocked_conditions_are_not_recommended_as_allowed(tmp_path):
                 assert item["safety_status"] != "allowed"
 
 
-def test_cost_aware_mode_penalizes_expensive_conditions(tmp_path):
-    client = _client(tmp_path)
+def test_cost_aware_mode_penalizes_expensive_conditions(client):
     with client:
         headers = _sign_up(client, "cost@example.com")
         project = _project(client, headers)
@@ -331,8 +312,7 @@ def test_cost_aware_mode_penalizes_expensive_conditions(tmp_path):
         assert recommendations[0]["acquisition_score"] > recommendations[-1]["acquisition_score"]
 
 
-def test_recommendation_approval_requires_reviewer_rationale(tmp_path):
-    client = _client(tmp_path)
+def test_recommendation_approval_requires_reviewer_rationale(client):
     with client:
         headers = _sign_up(client, "approval@example.com")
         project = _project(client, headers)
@@ -372,8 +352,7 @@ def test_recommendation_approval_requires_reviewer_rationale(tmp_path):
         assert batch.json()["recommendations_json"]
 
 
-def test_phase50_openapi_includes_all_endpoints(tmp_path):
-    client = _client(tmp_path)
+def test_phase50_openapi_includes_all_endpoints(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

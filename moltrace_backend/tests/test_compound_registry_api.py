@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'compound_registry.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _spectracheck_session(client: TestClient, headers: dict[str, str]) -> dict:
     project_res = client.post(
@@ -111,8 +97,8 @@ def _stored_report(client: TestClient, headers: dict[str, str]) -> dict:
     return report_res.json()
 
 
-def test_compound_registry_workflow_links_search_and_graph(tmp_path):
-    client, headers = _client(tmp_path)
+def test_compound_registry_workflow_links_search_and_graph(client, api_headers):
+    headers = api_headers
     with client:
         compound_res = client.post(
             "/compound-registry/compounds",
@@ -279,8 +265,7 @@ def test_compound_registry_workflow_links_search_and_graph(tmp_path):
         assert any(edge["relation_type"] == "product_of" for edge in graph["edges"])
 
 
-def test_compound_registry_endpoints_appear_in_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_compound_registry_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

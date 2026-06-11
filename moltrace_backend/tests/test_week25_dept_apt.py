@@ -4,13 +4,10 @@ import json
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
 from nmrcheck.dept import DeptAptParseError, analyze_dept_apt_preview, parse_dept_apt_table
 from nmrcheck.models import DeptAptAnalyzeResult, DeptAptPeak, DeptAptPreviewReport
 from nmrcheck.nmr2d import analyze_nmr2d, analyze_nmr2d_preview, parse_nmr2d_upload
-from nmrcheck.settings import Settings
 
 DEPT_FIXTURES = Path(__file__).parent / "fixtures" / "dept"
 NMR2D_FIXTURES = Path(__file__).parent / "fixtures" / "nmr2d"
@@ -29,19 +26,6 @@ def _dept(name: str) -> bytes:
 
 def _nmr2d(name: str) -> bytes:
     return (NMR2D_FIXTURES / name).read_bytes()
-
-
-def _client(tmp_path, *, enable_2d: bool = True) -> tuple[TestClient, dict[str, str]]:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'week25_dept_apt.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-            enable_2d_nmr=enable_2d,
-            enable_2d_contour_preview=True,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
 
 
 def test_dept_apt_models_accept_required_fields_and_labels() -> None:
@@ -271,12 +255,11 @@ def test_hmqc_is_treated_like_hsqc_for_dept_apt_support() -> None:
     assert any("DEPT/APT cross-check for HSQC/HMQC" in note for note in result.notes)
 
 
-def test_dept_preview_endpoint_works(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_dept_preview_endpoint_works(client, api_headers) -> None:
     with client:
         response = client.post(
             "/carbon13/dept/preview",
-            headers=headers,
+            headers=api_headers,
             data={"experiment_type": "DEPT135"},
             files={"file": ("ethanol_dept135.csv", _dept("ethanol_dept135.csv"), "text/csv")},
         )
@@ -286,12 +269,11 @@ def test_dept_preview_endpoint_works(tmp_path) -> None:
     assert response.json()["metadata"]["typed_peak_count"] == 2
 
 
-def test_dept_analyze_endpoint_works_with_carbon13_text(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_dept_analyze_endpoint_works_with_carbon13_text(client, api_headers) -> None:
     with client:
         response = client.post(
             "/carbon13/dept/analyze",
-            headers=headers,
+            headers=api_headers,
             data={"experiment_type": "DEPT135", "carbon13_text": ETHANOL_CARBON, "solvent": "CDCl3"},
             files={"file": ("ethanol_dept135.csv", _dept("ethanol_dept135.csv"), "text/csv")},
         )
@@ -301,12 +283,11 @@ def test_dept_analyze_endpoint_works_with_carbon13_text(tmp_path) -> None:
     assert response.json()["dept_apt_consistency_score"] == 1.0
 
 
-def test_nmr2d_analyze_endpoint_accepts_dept_apt_file(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_nmr2d_analyze_endpoint_accepts_dept_apt_file(client, api_headers) -> None:
     with client:
         response = client.post(
             "/nmr2d/analyze",
-            headers=headers,
+            headers=api_headers,
             data={
                 "smiles": "CCO",
                 "sample_id": "ethanol-hsqc-api-dept",
@@ -328,12 +309,11 @@ def test_nmr2d_analyze_endpoint_accepts_dept_apt_file(tmp_path) -> None:
     assert payload["metadata"]["dept_apt_evidence"]["experiment_detected"] == "DEPT135"
 
 
-def test_invalid_dept_file_in_nmr2d_analyze_returns_400(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_invalid_dept_file_in_nmr2d_analyze_returns_400(client, api_headers) -> None:
     with client:
         response = client.post(
             "/nmr2d/analyze",
-            headers=headers,
+            headers=api_headers,
             data={
                 "smiles": "CCO",
                 "proton_nmr_text": ETHANOL_PROTON,
@@ -350,12 +330,11 @@ def test_invalid_dept_file_in_nmr2d_analyze_returns_400(tmp_path) -> None:
     assert "No valid DEPT/APT peaks" in response.json()["detail"]
 
 
-def test_malformed_2d_file_still_returns_400(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_malformed_2d_file_still_returns_400(client, api_headers) -> None:
     with client:
         response = client.post(
             "/nmr2d/analyze",
-            headers=headers,
+            headers=api_headers,
             data={"smiles": "CCO", "save_run": "false"},
             files={"file": ("bad_2d.csv", b"foo,bar\nnope,nope\n", "text/csv")},
         )
@@ -364,12 +343,11 @@ def test_malformed_2d_file_still_returns_400(tmp_path) -> None:
     assert "No valid 2D NMR cross-peaks" in response.json()["detail"]
 
 
-def test_nmr2d_analyze_without_dept_file_still_works(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_nmr2d_analyze_without_dept_file_still_works(client, api_headers) -> None:
     with client:
         response = client.post(
             "/nmr2d/analyze",
-            headers=headers,
+            headers=api_headers,
             data={
                 "smiles": "CCO",
                 "sample_id": "ethanol-hsqc-no-dept",
@@ -386,17 +364,16 @@ def test_nmr2d_analyze_without_dept_file_still_works(tmp_path) -> None:
     assert response.json()["metadata"]["dept_apt_evidence"] is None
 
 
-def test_report_includes_dept_apt_section_fields_when_2d_uses_dept(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_report_includes_dept_apt_section_fields_when_2d_uses_dept(client, api_headers) -> None:
     with client:
         analysis_payload = json.loads((STATE_FIXTURES / "ethanol_inputs.json").read_text())
-        analysis = client.post("/analyze", headers=headers, json=analysis_payload)
+        analysis = client.post("/analyze", headers=api_headers, json=analysis_payload)
         assert analysis.status_code == 200, analysis.text
-        history = client.get("/history?limit=1", headers=headers)
+        history = client.get("/history?limit=1", headers=api_headers)
         analysis_id = int(history.json()[0]["id"])
         saved = client.post(
             "/nmr2d/analyze",
-            headers=headers,
+            headers=api_headers,
             data={
                 "smiles": "CCO",
                 "sample_id": "ethanol-report-dept",
@@ -412,8 +389,8 @@ def test_report_includes_dept_apt_section_fields_when_2d_uses_dept(tmp_path) -> 
             },
         )
         assert saved.status_code == 200, saved.text
-        report = client.get(f"/reports/{analysis_id}.json", headers=headers)
-        html = client.get(f"/reports/{analysis_id}.html", headers=headers)
+        report = client.get(f"/reports/{analysis_id}.json", headers=api_headers)
+        html = client.get(f"/reports/{analysis_id}.html", headers=api_headers)
 
     assert report.status_code == 200, report.text
     section = report.json()["nmr2d_evidence"][0]

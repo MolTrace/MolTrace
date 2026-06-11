@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'reaction_execution.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app)
-
 
 def _sign_up(client: TestClient, email: str = "phase52@example.com") -> dict[str, str]:
     res = client.post(
@@ -134,8 +120,7 @@ def _approved_recommendation(client: TestClient, headers: dict[str, str], projec
     return approved.json()
 
 
-def test_create_execution_batch_and_add_item(tmp_path):
-    client = _client(tmp_path)
+def test_create_execution_batch_and_add_item(client):
     with client:
         headers = _sign_up(client, "phase52-batch@example.com")
         project = _project(client, headers)
@@ -154,8 +139,7 @@ def test_create_execution_batch_and_add_item(tmp_path):
         assert listed.json()[0]["id"] == item["id"]
 
 
-def test_convert_approved_recommendation_to_planned_experiment(tmp_path):
-    client = _client(tmp_path)
+def test_convert_approved_recommendation_to_planned_experiment(client):
     with client:
         headers = _sign_up(client, "phase52-convert@example.com")
         project = _project(client, headers)
@@ -180,8 +164,7 @@ def test_convert_approved_recommendation_to_planned_experiment(tmp_path):
         assert body["event"]["event_type"] == "planned"
 
 
-def test_mark_execution_item_running_completed_and_failed(tmp_path):
-    client = _client(tmp_path)
+def test_mark_execution_item_running_completed_and_failed(client):
     with client:
         headers = _sign_up(client, "phase52-status@example.com")
         project = _project(client, headers)
@@ -216,8 +199,7 @@ def test_mark_execution_item_running_completed_and_failed(tmp_path):
         assert failed.json()["failure_reason"] == "Vial broke before workup."
 
 
-def test_add_analytical_result_extract_and_confirm_outcome(tmp_path):
-    client = _client(tmp_path)
+def test_add_analytical_result_extract_and_confirm_outcome(client):
     with client:
         headers = _sign_up(client, "phase52-outcome@example.com")
         project = _project(client, headers)
@@ -294,8 +276,7 @@ def test_add_analytical_result_extract_and_confirm_outcome(tmp_path):
         assert body["outcome"]["conversion_percent"] == 81.2
 
 
-def test_optimization_cycle_can_be_created_listed_and_decision_requires_rationale(tmp_path):
-    client = _client(tmp_path)
+def test_optimization_cycle_can_be_created_listed_and_decision_requires_rationale(client):
     with client:
         headers = _sign_up(client, "phase52-cycle@example.com")
         project = _project(client, headers)
@@ -339,8 +320,7 @@ def test_optimization_cycle_can_be_created_listed_and_decision_requires_rational
         assert decision.json()["decision"] == "continue_optimization"
 
 
-def test_phase52_openapi_includes_execution_and_feedback_endpoints(tmp_path):
-    client = _client(tmp_path)
+def test_phase52_openapi_includes_execution_and_feedback_endpoints(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

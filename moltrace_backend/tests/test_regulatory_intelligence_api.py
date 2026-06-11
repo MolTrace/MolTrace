@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'regulatory_intelligence.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app)
-
 
 def _sign_up(client: TestClient, email: str = "regulatory@example.com") -> dict[str, str]:
     res = client.post(
@@ -109,8 +95,7 @@ def _requirement(
     return res.json()
 
 
-def test_regulatory_jurisdiction_source_search_and_dossier_workflow(tmp_path):
-    client = _client(tmp_path)
+def test_regulatory_jurisdiction_source_search_and_dossier_workflow(client):
     with client:
         headers = _sign_up(client, "reg-intel-workflow@example.com")
 
@@ -192,8 +177,7 @@ def test_regulatory_jurisdiction_source_search_and_dossier_workflow(tmp_path):
         assert fetched_query.json()["answer"]["citation_ids_json"] == answer["citation_ids_json"]
 
 
-def test_regulatory_risk_review_and_readiness_report(tmp_path):
-    client = _client(tmp_path)
+def test_regulatory_risk_review_and_readiness_report(client):
     with client:
         headers = _sign_up(client, "reg-intel-risk@example.com")
         jurisdiction = _jurisdiction(client, headers)
@@ -292,8 +276,7 @@ def test_regulatory_risk_review_and_readiness_report(tmp_path):
         assert fetched_report.json()["id"] == readiness["id"]
 
 
-def test_phase53_openapi_includes_regulatory_intelligence_endpoints(tmp_path):
-    client = _client(tmp_path)
+def test_phase53_openapi_includes_regulatory_intelligence_endpoints(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

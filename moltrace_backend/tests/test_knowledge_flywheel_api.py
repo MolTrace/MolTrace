@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'knowledge_flywheel.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _source(client: TestClient, headers: dict[str, str]) -> dict:
     res = client.post(
@@ -53,8 +39,8 @@ def _upload_text(client: TestClient, headers: dict[str, str], source_id: int, te
     return body
 
 
-def test_knowledge_flywheel_extraction_review_dataset_workflow(tmp_path):
-    client, headers = _client(tmp_path)
+def test_knowledge_flywheel_extraction_review_dataset_workflow(client, api_headers):
+    headers = api_headers
     with client:
         source = _source(client, headers)
         text = (
@@ -254,8 +240,7 @@ def test_knowledge_flywheel_extraction_review_dataset_workflow(tmp_path):
         assert search.json()["reaction_records"]
 
 
-def test_knowledge_flywheel_endpoints_appear_in_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_knowledge_flywheel_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

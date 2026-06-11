@@ -2,21 +2,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
 PRODUCT_ORDER = ["SpectraCheck", "Regulatory Hub", "Reaction Optimization"]
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase65_golden_pilot.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
 
 
 def _tenant(client: TestClient, headers: dict[str, str]) -> dict:
@@ -86,8 +72,8 @@ def _scenario(client: TestClient, headers: dict[str, str], dataset_id: int, *, m
     return body
 
 
-def test_golden_dataset_scenario_contract_run_validation_and_bundle(tmp_path):
-    client, headers = _client(tmp_path)
+def test_golden_dataset_scenario_contract_run_validation_and_bundle(client, api_headers):
+    headers = api_headers
     with client:
         tenant = _tenant(client, headers)
         dataset = _dataset(client, headers)
@@ -169,8 +155,8 @@ def test_golden_dataset_scenario_contract_run_validation_and_bundle(tmp_path):
         assert bundle_body["package_json"]["secrets_included"] is False
 
 
-def test_missing_endpoint_acceptance_readiness_signoff_and_dashboard(tmp_path):
-    client, headers = _client(tmp_path)
+def test_missing_endpoint_acceptance_readiness_signoff_and_dashboard(client, api_headers):
+    headers = api_headers
     with client:
         tenant = _tenant(client, headers)
         dataset = _dataset(client, headers)
@@ -264,8 +250,8 @@ def test_missing_endpoint_acceptance_readiness_signoff_and_dashboard(tmp_path):
         assert dashboard.json()["latest_readiness"]["readiness_status"] == "ready_for_pilot"
 
 
-def test_customer_pilot_data_cannot_mix_with_demo_data(tmp_path):
-    client, headers = _client(tmp_path)
+def test_customer_pilot_data_cannot_mix_with_demo_data(client, api_headers):
+    headers = api_headers
     with client:
         demo = _dataset(client, headers)
         customer = client.post(
@@ -299,8 +285,8 @@ def test_customer_pilot_data_cannot_mix_with_demo_data(tmp_path):
         assert "Customer pilot data must not be mixed" in mixed.json()["detail"]
 
 
-def test_phase65_openapi_includes_pilot_endpoints(tmp_path):
-    client, headers = _client(tmp_path)
+def test_phase65_openapi_includes_pilot_endpoints(client, api_headers):
+    headers = api_headers
     with client:
         response = client.get("/openapi.json", headers=headers)
         assert response.status_code == 200, response.text

@@ -1,11 +1,6 @@
 import json
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
 REQUIRED_FRONTEND_CONTRACT_OPERATIONS = {
     "/system/health": {"get"},
     "/system/status": {"get"},
@@ -115,22 +110,9 @@ PROTECTED_FRONTEND_ENTRYPOINTS = [
 ]
 
 
-def _client(tmp_path) -> tuple[TestClient, dict[str, str]]:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'frontend_may10_11_contract.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
-def test_may10_11_frontend_endpoint_families_are_openapi_backed(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_may10_11_frontend_endpoint_families_are_openapi_backed(client, api_headers) -> None:
     with client:
-        response = client.get("/openapi.json", headers=headers)
+        response = client.get("/openapi.json", headers=api_headers)
 
     assert response.status_code == 200, response.text
     paths = response.json()["paths"]
@@ -165,8 +147,7 @@ def test_regenerated_frontend_backend_contract_report_has_no_missing_operations(
     assert report["unresolvedCount"] <= 18
 
 
-def test_frontend_entrypoints_require_auth_with_safe_public_errors(tmp_path) -> None:
-    client, _headers = _client(tmp_path)
+def test_frontend_entrypoints_require_auth_with_safe_public_errors(client) -> None:
     with client:
         responses = [client.get(path) for path in PROTECTED_FRONTEND_ENTRYPOINTS]
 
@@ -187,11 +168,12 @@ def test_frontend_entrypoints_require_auth_with_safe_public_errors(tmp_path) -> 
         assert marker not in combined
 
 
-def test_workflow_templates_and_mobile_command_center_match_frontend_contract(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_workflow_templates_and_mobile_command_center_match_frontend_contract(
+    client, api_headers
+) -> None:
     with client:
-        templates_res = client.get("/workflow-templates", headers=headers)
-        command_res = client.get("/mobile/command-center", headers=headers)
+        templates_res = client.get("/workflow-templates", headers=api_headers)
+        command_res = client.get("/mobile/command-center", headers=api_headers)
 
     assert templates_res.status_code == 200, templates_res.text
     templates = templates_res.json()

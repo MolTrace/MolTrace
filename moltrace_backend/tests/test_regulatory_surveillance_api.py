@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'regulatory_surveillance.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _jurisdiction(client: TestClient, headers: dict[str, str]) -> dict:
     res = client.post(
@@ -71,8 +57,8 @@ def _rule_set(client: TestClient, headers: dict[str, str], jurisdiction_id: int,
     return res.json()
 
 
-def test_regulatory_source_surveillance_change_impact_workflow(tmp_path):
-    client, headers = _client(tmp_path)
+def test_regulatory_source_surveillance_change_impact_workflow(client, api_headers):
+    headers = api_headers
     with client:
         jurisdiction = _jurisdiction(client, headers)
 
@@ -254,8 +240,7 @@ def test_regulatory_source_surveillance_change_impact_workflow(tmp_path):
         assert dismissed.json()["status"] == "dismissed"
 
 
-def test_regulatory_surveillance_endpoints_appear_in_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_regulatory_surveillance_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

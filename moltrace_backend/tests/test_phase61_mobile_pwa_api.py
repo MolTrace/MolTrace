@@ -2,9 +2,6 @@ import hashlib
 
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
 DEFAULT_PROGRAM_ORDER = ["spectracheck", "regulatory_hub", "reaction_optimization"]
 REQUIRED_MOBILE_PATHS = [
     "/mobile/config",
@@ -26,17 +23,6 @@ REQUIRED_MOBILE_PATHS = [
     "/mobile/jobs/summary",
     "/mobile/offline-safe-summary",
 ]
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase61_mobile_pwa.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
 
 
 def _analysis_payload() -> dict:
@@ -81,8 +67,8 @@ def _draft(
     return response.json()
 
 
-def test_mobile_config_returns_integrated_program_order(tmp_path):
-    client, headers = _client(tmp_path)
+def test_mobile_config_returns_integrated_program_order(client, api_headers):
+    headers = api_headers
     with client:
         response = client.get("/mobile/config", headers=headers)
         assert response.status_code == 200, response.text
@@ -92,8 +78,8 @@ def test_mobile_config_returns_integrated_program_order(tmp_path):
         assert body["draft_sync_required"] is True
 
 
-def test_pwa_api_responses_disable_http_cache_and_expose_backend_version(tmp_path):
-    client, headers = _client(tmp_path)
+def test_pwa_api_responses_disable_http_cache_and_expose_backend_version(client, api_headers):
+    headers = api_headers
     with client:
         response = client.get("/mobile/config", headers=headers)
         assert response.status_code == 200, response.text
@@ -103,8 +89,8 @@ def test_pwa_api_responses_disable_http_cache_and_expose_backend_version(tmp_pat
         assert response.headers["x-moltrace-backend-version"] == "0.21.0"
 
 
-def test_mobile_dashboard_returns_compact_summaries(tmp_path):
-    client, headers = _client(tmp_path)
+def test_mobile_dashboard_returns_compact_summaries(client, api_headers):
+    headers = api_headers
     with client:
         response = client.get("/mobile/dashboard", headers=headers)
         assert response.status_code == 200, response.text
@@ -124,8 +110,8 @@ def test_mobile_dashboard_returns_compact_summaries(tmp_path):
         assert "latest_report_json" not in serialized
 
 
-def test_mobile_action_draft_rejects_raw_spectrum_like_payload(tmp_path):
-    client, headers = _client(tmp_path)
+def test_mobile_action_draft_rejects_raw_spectrum_like_payload(client, api_headers):
+    headers = api_headers
     with client:
         response = client.post(
             "/mobile/action-drafts",
@@ -144,8 +130,8 @@ def test_mobile_action_draft_rejects_raw_spectrum_like_payload(tmp_path):
         assert "forbidden_mobile_payload_field" in response.text
 
 
-def test_mobile_action_draft_rejects_token_password_like_payload(tmp_path):
-    client, headers = _client(tmp_path)
+def test_mobile_action_draft_rejects_token_password_like_payload(client, api_headers):
+    headers = api_headers
     with client:
         response = client.post(
             "/mobile/action-drafts",
@@ -164,8 +150,8 @@ def test_mobile_action_draft_rejects_token_password_like_payload(tmp_path):
         assert "forbidden_mobile_payload_field" in response.text
 
 
-def test_mobile_sync_applies_valid_review_draft_and_audits(tmp_path):
-    client, headers = _client(tmp_path)
+def test_mobile_sync_applies_valid_review_draft_and_audits(client, api_headers):
+    headers = api_headers
     with client:
         analysis_id = _analysis_id(client, headers)
         draft = _draft(
@@ -202,8 +188,8 @@ def test_mobile_sync_applies_valid_review_draft_and_audits(tmp_path):
         assert any(event["event_type"] == "mobile.review_decision.sync" for event in audit.json())
 
 
-def test_mobile_sync_rejects_invalid_draft_with_warning(tmp_path):
-    client, headers = _client(tmp_path)
+def test_mobile_sync_rejects_invalid_draft_with_warning(client, api_headers):
+    headers = api_headers
     with client:
         draft = _draft(
             client,
@@ -227,8 +213,8 @@ def test_mobile_sync_rejects_invalid_draft_with_warning(tmp_path):
         assert drafts.json()[0]["validation_warnings_json"]
 
 
-def test_mobile_push_subscription_stores_endpoint_hash_without_raw_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_mobile_push_subscription_stores_endpoint_hash_without_raw_endpoint(client, api_headers):
+    headers = api_headers
     endpoint = "https://push.example.test/subscriptions/raw-endpoint-123"
     with client:
         response = client.post(
@@ -250,8 +236,8 @@ def test_mobile_push_subscription_stores_endpoint_hash_without_raw_endpoint(tmp_
         assert "public-key-material" not in str(body)
 
 
-def test_mobile_notifications_can_be_listed_read_and_dismissed(tmp_path):
-    client, headers = _client(tmp_path)
+def test_mobile_notifications_can_be_listed_read_and_dismissed(client, api_headers):
+    headers = api_headers
     with client:
         analysis_id = _analysis_id(client, headers)
         created = client.post(
@@ -290,8 +276,8 @@ def test_mobile_notifications_can_be_listed_read_and_dismissed(tmp_path):
         assert dismissed.json()["status"] == "dismissed"
 
 
-def test_mobile_report_preview_avoids_raw_appendices(tmp_path):
-    client, headers = _client(tmp_path)
+def test_mobile_report_preview_avoids_raw_appendices(client, api_headers):
+    headers = api_headers
     with client:
         analysis_id = _analysis_id(client, headers)
         report = client.post(f"/reports/from-analysis/{analysis_id}", headers=headers)
@@ -308,8 +294,7 @@ def test_mobile_report_preview_avoids_raw_appendices(tmp_path):
         assert "parsed_peaks" not in preview_text
 
 
-def test_openapi_includes_mobile_endpoints(tmp_path):
-    client, headers = _client(tmp_path)
+def test_openapi_includes_mobile_endpoints(client):
     with client:
         response = client.get("/openapi.json")
         assert response.status_code == 200, response.text

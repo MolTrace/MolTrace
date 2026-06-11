@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'reaction.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app)
-
 
 def _sign_up(client: TestClient, email: str) -> dict[str, str]:
     res = client.post(
@@ -106,8 +92,7 @@ def _add_experiment(
     return res.json()
 
 
-def test_reaction_optimization_mvp_workflow(tmp_path):
-    client = _client(tmp_path)
+def test_reaction_optimization_mvp_workflow(client):
     with client:
         headers = _sign_up(client, "chemist@example.com")
 
@@ -318,8 +303,7 @@ def test_reaction_optimization_mvp_workflow(tmp_path):
         assert evidence["metadata"]["evidence_count"] == 1
 
 
-def test_reaction_endpoints_appear_in_openapi(tmp_path):
-    client = _client(tmp_path)
+def test_reaction_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

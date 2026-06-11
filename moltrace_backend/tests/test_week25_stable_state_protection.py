@@ -2,16 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from nmrcheck.analysis import analyze_inputs
-from nmrcheck.api import create_app
 from nmrcheck.carbon13 import analyze_carbon13_text
 from nmrcheck.fid import fid_settings_from_preset
 from nmrcheck.models import AnalysisInputs
 from nmrcheck.nmr2d_analyzer import analyze_nmr2d
 from nmrcheck.nmr2d_parser import parse_processed_2d_nmr
-from nmrcheck.settings import Settings
 from nmrcheck.spectrum import parse_processed_spectrum
 
 FIXTURES = Path(__file__).parent / "fixtures" / "week25"
@@ -100,16 +96,8 @@ def test_2d_analysis_does_not_alter_stable_1d_fid_or_viewer_outputs() -> None:
     assert _stable_snapshot() == before
 
 
-def test_stable_route_snapshots_with_2d_feature_enabled(tmp_path) -> None:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'week25_protection.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-            enable_2d_nmr=True,
-        )
-    )
-    with TestClient(app) as client:
+def test_stable_route_snapshots_with_2d_feature_enabled(client) -> None:
+    with client:
         health = client.get("/health")
         presets = client.get("/fid/presets")
         status = client.get("/nmr2d/status")

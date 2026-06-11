@@ -19,9 +19,7 @@ Covers four surfaces:
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
 from nmrcheck.jcoupling_prediction import predict_proton_couplings_from_smiles
 from nmrcheck.models import (
     CandidateInput,
@@ -33,7 +31,6 @@ from nmrcheck.multiplet_jcoupling_bridge import (
     collect_observed_couplings,
     score_multiplets_against_candidates,
 )
-from nmrcheck.settings import Settings
 from nmrcheck.unified_confidence import (
     DEFAULT_LAYER_WEIGHTS,
     build_unified_candidate_confidence,
@@ -215,14 +212,7 @@ def test_bridge_compacts_mutual_couplings_from_multiplets() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_jcoupling_endpoint_contract_and_audit(tmp_path) -> None:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase37_jc.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
+def test_jcoupling_endpoint_contract_and_audit(client, api_headers) -> None:
     payload = {
         "sample_id": "phase37-endpoint",
         "candidates": [
@@ -231,8 +221,8 @@ def test_jcoupling_endpoint_contract_and_audit(tmp_path) -> None:
         ],
         "observed_j_couplings_hz": QUININE_OBSERVED,
     }
-    headers = {"x-api-key": "test-key"}
-    with TestClient(app) as client:
+    headers = api_headers
+    with client:
         res = client.post("/candidates/compare/jcoupling", headers=headers, json=payload)
         assert res.status_code == 200, res.text
         data = res.json()
@@ -261,7 +251,7 @@ def test_jcoupling_endpoint_contract_and_audit(tmp_path) -> None:
         assert meta["human_review_required"] is True
 
     # empty candidate list is rejected by request validation (422)
-    with TestClient(app) as client:
+    with client:
         bad = client.post(
             "/candidates/compare/jcoupling", headers=headers, json={"candidates": []}
         )

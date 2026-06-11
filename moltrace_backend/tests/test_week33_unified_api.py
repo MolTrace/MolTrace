@@ -1,22 +1,5 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'unified.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
-def test_unified_confidence_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_confidence_endpoint(client, api_headers):
+    headers = api_headers
     payload = {
         "candidates": [
             {"name": "methanol", "smiles": "CO"},
@@ -41,8 +24,8 @@ def test_unified_confidence_endpoint(tmp_path):
     assert data["best_candidate"]["confidence_score"] > 0.6
 
 
-def test_unified_confidence_evidence_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_confidence_evidence_endpoint(client, api_headers):
+    headers = api_headers
     data = {
         "candidates_text": "methanol | CO | alternate\nethanol | CCO | proposed",
         "observed_proton_text": "1H NMR delta 3.65 (q, J = 7.1 Hz, 2H), 1.26 (t, J = 7.1 Hz, 3H)",
@@ -61,8 +44,8 @@ def test_unified_confidence_evidence_endpoint(tmp_path):
     assert res.json()["best_candidate"]["name"] == "ethanol"
 
 
-def test_unified_confidence_invalid_2d_text_returns_400(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_confidence_invalid_2d_text_returns_400(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/confidence/candidates/unified/evidence",

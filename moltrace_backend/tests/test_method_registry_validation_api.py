@@ -1,23 +1,5 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'method_registry.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app)
-
-
-def test_method_registry_validation_dashboard_workflow(tmp_path):
-    client = _client(tmp_path)
-    headers = {"x-api-key": "test-key"}
+def test_method_registry_validation_dashboard_workflow(client, api_headers):
+    headers = api_headers
     with client:
         builtins_res = client.get("/method-registry", headers=headers)
         assert builtins_res.status_code == 200, builtins_res.text
@@ -211,8 +193,7 @@ def test_method_registry_validation_dashboard_workflow(tmp_path):
         assert audit_res.json()
 
 
-def test_method_registry_endpoints_appear_in_openapi(tmp_path):
-    client = _client(tmp_path)
+def test_method_registry_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

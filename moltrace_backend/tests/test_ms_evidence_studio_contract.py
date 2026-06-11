@@ -1,11 +1,6 @@
 from collections.abc import Callable
 from typing import Any
 
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
 REQUIRED_MS_EVIDENCE_STUDIO_ENDPOINTS = [
     "/ms/hrms/candidates/match/evidence",
     "/ms/hrms/formulas/search",
@@ -55,21 +50,9 @@ CANDIDATES_TEXT = "methanol | CO | alternate\nethanol | CCO | proposed"
 MSMS_PEAKS = "m/z,intensity\n47.04914,10\n29.03858,100\n31.01839,25\n"
 
 
-def _client(tmp_path) -> tuple[TestClient, dict[str, str]]:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'ms_evidence_studio.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
-def test_ms_evidence_studio_required_paths_appear_in_openapi(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_ms_evidence_studio_required_paths_appear_in_openapi(client, api_headers) -> None:
     with client:
-        response = client.get("/openapi.json", headers=headers)
+        response = client.get("/openapi.json", headers=api_headers)
 
     assert response.status_code == 200
     paths = response.json()["paths"]
@@ -78,8 +61,10 @@ def test_ms_evidence_studio_required_paths_appear_in_openapi(tmp_path) -> None:
         assert "post" in paths[path]
 
 
-def test_lcms_dereplication_upload_accepts_frontend_file_only_and_stays_cautious(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_lcms_dereplication_upload_accepts_frontend_file_only_and_stays_cautious(
+    client, api_headers
+) -> None:
+    headers = api_headers
     library = "name,smiles,role\nethanol,CCO,library\nmethanol,CO,library\n"
     with client:
         response = client.post(
@@ -99,8 +84,8 @@ def test_lcms_dereplication_upload_accepts_frontend_file_only_and_stays_cautious
     assert len(body["file_sha256"]) == 64
 
 
-def test_lcms_dereplication_evidence_wraps_consensus_bridge(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_lcms_dereplication_evidence_wraps_consensus_bridge(client, api_headers) -> None:
+    headers = api_headers
     with client:
         response = client.post(
             "/ms/lcms/dereplication/evidence",
@@ -121,8 +106,8 @@ def test_lcms_dereplication_evidence_wraps_consensus_bridge(tmp_path) -> None:
     assert "do not confirm identity" in " ".join(body["notes"])
 
 
-def test_ms_evidence_studio_frontend_facing_endpoints_smoke(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_ms_evidence_studio_frontend_facing_endpoints_smoke(client, api_headers) -> None:
+    headers = api_headers
     cases: list[tuple[str, Callable[[], Any], tuple[str, ...]]] = [
         (
             "/ms/hrms/candidates/match/evidence",

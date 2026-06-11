@@ -1,22 +1,5 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def client_with_key(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'msms.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
-def test_msms_annotation_endpoint(tmp_path):
-    client, headers = client_with_key(tmp_path)
+def test_msms_annotation_endpoint(client, api_headers):
+    headers = api_headers
     payload = {
         "precursor_mz": 47.04914,
         "adduct": "[M+H]+",
@@ -34,8 +17,8 @@ def test_msms_annotation_endpoint(tmp_path):
     assert data["best_candidate"]["fragment_match_count"] >= 1
 
 
-def test_msms_annotation_evidence_endpoint_without_candidates(tmp_path):
-    client, headers = client_with_key(tmp_path)
+def test_msms_annotation_evidence_endpoint_without_candidates(client, api_headers):
+    headers = api_headers
     data = {
         "precursor_mz": "181.07066",
         "adduct": "[M+H]+",
@@ -49,8 +32,8 @@ def test_msms_annotation_evidence_endpoint_without_candidates(tmp_path):
     assert any(hit["loss_name"] == "H2O" for hit in body["neutral_loss_hits"])
 
 
-def test_msms_unsupported_adduct_returns_400(tmp_path):
-    client, headers = client_with_key(tmp_path)
+def test_msms_unsupported_adduct_returns_400(client, api_headers):
+    headers = api_headers
     payload = {
         "precursor_mz": 100.0,
         "adduct": "[M+Foo]+",

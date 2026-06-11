@@ -1,14 +1,3 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(Settings(database_url=f"sqlite:///{tmp_path / 'lcms_grouping.sqlite3'}", require_verified_email=False, api_key="test-key"))
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
 def _source_text():
     return "scan_id,ms_level,rt_min,mz,intensity,precursor_mz\ns1,1,0.0,47.04914,5,\ns2,1,0.1,47.04914,100,\ns3,1,0.2,47.04914,7,\n"
 
@@ -17,8 +6,8 @@ def _blank_text():
     return "scan_id,ms_level,rt_min,mz,intensity,precursor_mz\nb1,1,0.0,47.04914,2,\nb2,1,0.1,47.04914,5,\nb3,1,0.2,47.04914,2,\n"
 
 
-def test_lcms_feature_grouping_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_lcms_feature_grouping_endpoint(client, api_headers):
+    headers = api_headers
     payload = {
         "runs": [{"run_id": "sample", "role": "sample", "source_text": _source_text()}],
         "target_mz_text": "47.04914",
@@ -33,8 +22,8 @@ def test_lcms_feature_grouping_endpoint(tmp_path):
     assert data["feature_table_text"].startswith("group_id")
 
 
-def test_lcms_feature_grouping_evidence_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_lcms_feature_grouping_evidence_endpoint(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/ms/lcms/features/group/evidence",
@@ -53,8 +42,8 @@ def test_lcms_feature_grouping_evidence_endpoint(tmp_path):
     assert data["groups"][0]["blank_area"] > 0
 
 
-def test_lcms_feature_grouping_upload_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_lcms_feature_grouping_upload_endpoint(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/ms/lcms/features/group/upload",
@@ -71,8 +60,8 @@ def test_lcms_feature_grouping_upload_endpoint(tmp_path):
     assert len(data["alignment_summaries"][0]["file_sha256"]) == 64
 
 
-def test_lcms_feature_grouping_bad_input_returns_400(tmp_path):
-    client, headers = _client(tmp_path)
+def test_lcms_feature_grouping_bad_input_returns_400(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/ms/lcms/features/group",

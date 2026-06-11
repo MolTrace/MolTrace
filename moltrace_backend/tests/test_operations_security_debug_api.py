@@ -1,20 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'operations.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return TestClient(app)
-
 
 def _sign_up(client: TestClient, email: str) -> dict[str, str]:
     res = client.post(
@@ -29,10 +14,9 @@ def _sign_up(client: TestClient, email: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
 
-def test_operations_security_and_debug_workflow(tmp_path, monkeypatch):
+def test_operations_security_and_debug_workflow(client, api_headers, monkeypatch):
     monkeypatch.setenv("API_KEY", "super-secret-test-value")
-    client = _client(tmp_path)
-    admin_headers = {"x-api-key": "test-key"}
+    admin_headers = api_headers
 
     with client:
         viewer_headers = _sign_up(client, "viewer@example.com")
@@ -128,8 +112,7 @@ def test_operations_security_and_debug_workflow(tmp_path, monkeypatch):
         assert viewer_admin.status_code == 403, viewer_admin.text
 
 
-def test_operations_endpoints_appear_in_openapi(tmp_path):
-    client = _client(tmp_path)
+def test_operations_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

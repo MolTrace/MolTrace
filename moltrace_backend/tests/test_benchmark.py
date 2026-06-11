@@ -2,14 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
 from nmrcheck.benchmark import LAYER_WEIGHTS, evaluate_case, evaluate_suite
 from nmrcheck.models import BenchmarkCase
-from nmrcheck.settings import Settings
-
-HEADERS = {"x-api-key": "test-key"}
 
 # Ethanol — minimal but realistic test case. The observed NMR text matches
 # the canonical proton spectrum the rest of the suite uses.
@@ -28,19 +22,6 @@ ETHANOL_CASE = BenchmarkCase(
     operator="alice",
     instrument="Bruker 400",
 )
-
-
-def _client(tmp_path):
-    return TestClient(
-        create_app(
-            Settings(
-                database_url=f"sqlite:///{tmp_path / 'bench.sqlite3'}",
-                require_verified_email=False,
-                api_key="test-key",
-                raw_data_vault_dir=str(tmp_path / "raw_data_vault"),
-            )
-        )
-    )
 
 
 class TestEvaluateCase:
@@ -148,11 +129,11 @@ class TestEvaluateSuite:
 
 
 class TestBenchmarkEndpoint:
-    def test_endpoint_returns_full_scorecard(self, tmp_path) -> None:
-        with _client(tmp_path) as client:
+    def test_endpoint_returns_full_scorecard(self, client, api_headers) -> None:
+        with client:
             response = client.post(
                 "/benchmark/spectracheck/run",
-                headers=HEADERS,
+                headers=api_headers,
                 json={
                     "cases": [ETHANOL_CASE.model_dump()],
                     "robustness_drop_peaks": 1,
@@ -169,16 +150,16 @@ class TestBenchmarkEndpoint:
         layer_names = {layer["name"] for layer in case_result["layers"]}
         assert layer_names == set(LAYER_WEIGHTS)
 
-    def test_endpoint_rejects_empty_case_list(self, tmp_path) -> None:
-        with _client(tmp_path) as client:
+    def test_endpoint_rejects_empty_case_list(self, client, api_headers) -> None:
+        with client:
             response = client.post(
                 "/benchmark/spectracheck/run",
-                headers=HEADERS,
+                headers=api_headers,
                 json={"cases": [], "robustness_drop_peaks": 1},
             )
         assert response.status_code == 422
 
-    def test_endpoint_accepts_multiple_cases(self, tmp_path) -> None:
+    def test_endpoint_accepts_multiple_cases(self, client, api_headers) -> None:
         cases = [
             ETHANOL_CASE.model_dump(),
             {
@@ -191,10 +172,10 @@ class TestBenchmarkEndpoint:
                 "instrument": None,
             },
         ]
-        with _client(tmp_path) as client:
+        with client:
             response = client.post(
                 "/benchmark/spectracheck/run",
-                headers=HEADERS,
+                headers=api_headers,
                 json={"cases": cases, "robustness_drop_peaks": 0},
             )
         assert response.status_code == 200, response.text

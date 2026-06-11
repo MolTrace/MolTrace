@@ -4,30 +4,15 @@ import json
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
 from nmrcheck.candidate import compare_candidates, parse_candidate_text
 from nmrcheck.models import CandidateComparisonRequest, CandidateInput
-from nmrcheck.settings import Settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
 STATE_FIXTURES = FIXTURES / "current_state"
 
 ETHANOL_1H = "1H NMR (400 MHz, CDCl3) delta 3.65 (q, J = 7.1 Hz, 2H), 1.26 (t, J = 7.1 Hz, 3H), 2.10 (br s, 1H)"
 ETHANOL_13C = "13C NMR (101 MHz, CDCl3) delta 58.3, 18.2."
-
-
-def _client(tmp_path) -> tuple[TestClient, dict[str, str]]:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'week26_candidates.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-            enable_2d_nmr=True,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
 
 
 def _load_state_json(name: str) -> dict[str, object]:
@@ -120,12 +105,11 @@ def test_structure_only_candidate_comparison_is_capped_as_weak_support() -> None
     assert any("No 1H or 13C text" in warning for warning in result.warnings)
 
 
-def test_candidate_compare_endpoint_works_with_json(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_candidate_compare_endpoint_works_with_json(client, api_headers) -> None:
     with client:
         response = client.post(
             "/candidates/compare",
-            headers=headers,
+            headers=api_headers,
             json={
                 "sample_id": "EtOH-JSON",
                 "solvent": "CDCl3",
@@ -144,14 +128,13 @@ def test_candidate_compare_endpoint_works_with_json(tmp_path) -> None:
     assert data["ranked_candidates"][0]["score_breakdown"]["proton_score"] is not None
 
 
-def test_candidate_compare_evidence_endpoint_works_with_multipart_layers(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_candidate_compare_evidence_endpoint_works_with_multipart_layers(client, api_headers) -> None:
     dept_bytes = (FIXTURES / "dept" / "ethanol_dept135.csv").read_bytes()
     hsqc_bytes = (FIXTURES / "nmr2d" / "ethanol_hsqc.csv").read_bytes()
     with client:
         response = client.post(
             "/candidates/compare/evidence",
-            headers=headers,
+            headers=api_headers,
             data={
                 "sample_id": "EtOH-MULTI",
                 "solvent": "CDCl3",
@@ -177,12 +160,11 @@ def test_candidate_compare_evidence_endpoint_works_with_multipart_layers(tmp_pat
     assert data["ranked_candidates"][0]["score_breakdown"]["nmr2d_score"] is not None
 
 
-def test_candidate_compare_evidence_rejects_invalid_dept_file(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_candidate_compare_evidence_rejects_invalid_dept_file(client, api_headers) -> None:
     with client:
         response = client.post(
             "/candidates/compare/evidence",
-            headers=headers,
+            headers=api_headers,
             data={"candidates_text": "Ethanol | CCO | proposed"},
             files={"dept_apt_file": ("invalid_dept.csv", b"not_a_shift\nnope\n", "text/csv")},
         )
@@ -191,22 +173,21 @@ def test_candidate_compare_evidence_rejects_invalid_dept_file(tmp_path) -> None:
     assert "No valid DEPT/APT peaks" in response.json()["detail"]
 
 
-def test_candidate_comparison_does_not_change_stable_endpoint_outputs(tmp_path) -> None:
-    client, headers = _client(tmp_path)
+def test_candidate_comparison_does_not_change_stable_endpoint_outputs(client, api_headers) -> None:
     spectrum_content = (STATE_FIXTURES / "processed_spectrum_trace.csv").read_bytes()
     proton_payload = _load_state_json("ethanol_inputs.json")
     carbon_payload = _load_state_json("ethanol_carbon13_inputs.json")
     with client:
         spectrum_before = client.post(
             "/spectrum/preview",
-            headers=headers,
+            headers=api_headers,
             files={"file": ("processed_spectrum_trace.csv", spectrum_content, "text/csv")},
         )
-        proton_before = client.post("/proton/evidence", headers=headers, json=proton_payload)
-        carbon_before = client.post("/carbon13/analyze", headers=headers, json=carbon_payload)
+        proton_before = client.post("/proton/evidence", headers=api_headers, json=proton_payload)
+        carbon_before = client.post("/carbon13/analyze", headers=api_headers, json=carbon_payload)
         candidate_response = client.post(
             "/candidates/compare",
-            headers=headers,
+            headers=api_headers,
             json={
                 "sample_id": "stable-guard",
                 "solvent": "CDCl3",
@@ -220,11 +201,11 @@ def test_candidate_comparison_does_not_change_stable_endpoint_outputs(tmp_path) 
         )
         spectrum_after = client.post(
             "/spectrum/preview",
-            headers=headers,
+            headers=api_headers,
             files={"file": ("processed_spectrum_trace.csv", spectrum_content, "text/csv")},
         )
-        proton_after = client.post("/proton/evidence", headers=headers, json=proton_payload)
-        carbon_after = client.post("/carbon13/analyze", headers=headers, json=carbon_payload)
+        proton_after = client.post("/proton/evidence", headers=api_headers, json=proton_payload)
+        carbon_after = client.post("/carbon13/analyze", headers=api_headers, json=carbon_payload)
 
     assert candidate_response.status_code == 200, candidate_response.text
     assert spectrum_before.status_code == 200

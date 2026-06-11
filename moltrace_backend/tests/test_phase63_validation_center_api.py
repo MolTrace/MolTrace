@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase63_validation_center.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _project(client: TestClient, headers: dict[str, str]) -> dict:
     response = client.post(
@@ -108,8 +94,8 @@ def _protocol_and_case(
     return protocol.json(), test_case.json()
 
 
-def test_validation_workflow_traceability_and_failed_execution_deviation(tmp_path):
-    client, headers = _client(tmp_path)
+def test_validation_workflow_traceability_and_failed_execution_deviation(client, api_headers):
+    headers = api_headers
     with client:
         project = _project(client, headers)
         requirement = _urs(client, headers, project["id"])
@@ -166,8 +152,8 @@ def test_validation_workflow_traceability_and_failed_execution_deviation(tmp_pat
         assert protocol["id"] > 0
 
 
-def test_esignature_controlled_record_and_new_version_rules(tmp_path):
-    client, headers = _client(tmp_path)
+def test_esignature_controlled_record_and_new_version_rules(client, api_headers):
+    headers = api_headers
     with client:
         missing_reason = client.post(
             "/esignatures/records",
@@ -238,8 +224,8 @@ def test_esignature_controlled_record_and_new_version_rules(tmp_path):
         assert new_version.json()["metadata_json"]["previous_record_id"] == record_body["id"]
 
 
-def test_data_integrity_inspection_package_release_and_capa(tmp_path):
-    client, headers = _client(tmp_path)
+def test_data_integrity_inspection_package_release_and_capa(client, api_headers):
+    headers = api_headers
     with client:
         project = _project(client, headers)
         record = client.post(
@@ -357,8 +343,8 @@ def test_data_integrity_inspection_package_release_and_capa(tmp_path):
         assert capa.json()["source_deviation_id"] == deviation.json()["id"]
 
 
-def test_phase63_openapi_includes_validation_endpoints(tmp_path):
-    client, headers = _client(tmp_path)
+def test_phase63_openapi_includes_validation_endpoints(client, api_headers):
+    headers = api_headers
     with client:
         openapi = client.get("/openapi.json", headers=headers)
         assert openapi.status_code == 200, openapi.text

@@ -12,21 +12,6 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path) -> TestClient:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'predict.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return TestClient(app)
-
 
 def _post(client: TestClient, body: dict) -> object:
     return client.post(
@@ -36,8 +21,7 @@ def _post(client: TestClient, body: dict) -> object:
     )
 
 
-def test_predict_shifts_happy_path_reports_method_and_shifts(tmp_path) -> None:
-    client = _client(tmp_path)
+def test_predict_shifts_happy_path_reports_method_and_shifts(client) -> None:
     with client:
         res = _post(client, {"smiles": "c1ccccc1", "n_conformers": 4})  # benzene
     assert res.status_code == 200, res.text
@@ -59,8 +43,7 @@ def test_predict_shifts_happy_path_reports_method_and_shifts(tmp_path) -> None:
     assert sample["uncertainty_ppm"] is None or sample["uncertainty_ppm"] >= 0.0
 
 
-def test_default_nuclei_predicts_both(tmp_path) -> None:
-    client = _client(tmp_path)
+def test_default_nuclei_predicts_both(client) -> None:
     with client:
         res = _post(client, {"smiles": "CCO"})  # ethanol has H and C
     assert res.status_code == 200, res.text
@@ -68,8 +51,7 @@ def test_default_nuclei_predicts_both(tmp_path) -> None:
     assert nuclei == {"1H", "13C"}
 
 
-def test_only_requested_nucleus_returned(tmp_path) -> None:
-    client = _client(tmp_path)
+def test_only_requested_nucleus_returned(client) -> None:
     with client:
         res = _post(client, {"smiles": "CCO", "nuclei": ["13C"]})
     assert res.status_code == 200, res.text
@@ -77,29 +59,25 @@ def test_only_requested_nucleus_returned(tmp_path) -> None:
     assert shifts and all(s["nucleus"] == "13C" and s["element"] == "C" for s in shifts)
 
 
-def test_invalid_smiles_returns_400(tmp_path) -> None:
-    client = _client(tmp_path)
+def test_invalid_smiles_returns_400(client) -> None:
     with client:
         res = _post(client, {"smiles": "not a molecule )("})
     assert res.status_code == 400, res.text
 
 
-def test_unknown_nucleus_is_rejected_by_schema(tmp_path) -> None:
-    client = _client(tmp_path)
+def test_unknown_nucleus_is_rejected_by_schema(client) -> None:
     with client:
         res = _post(client, {"smiles": "CCO", "nuclei": ["19F"]})
     assert res.status_code == 422  # not in the GSDPromptNucleus enum
 
 
-def test_requires_auth(tmp_path) -> None:
-    client = _client(tmp_path)
+def test_requires_auth(client) -> None:
     with client:
         res = client.post("/spectrum/predict/shifts", json={"smiles": "CCO"})
     assert res.status_code in (401, 403)
 
 
-def test_openapi_registers_path_and_models(tmp_path) -> None:
-    client = _client(tmp_path)
+def test_openapi_registers_path_and_models(client) -> None:
     with client:
         spec = client.get("/openapi.json").json()
     assert "/spectrum/predict/shifts" in spec["paths"]

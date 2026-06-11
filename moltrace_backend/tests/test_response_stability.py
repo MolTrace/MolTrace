@@ -1,24 +1,8 @@
-from fastapi.testclient import TestClient
-
 from nmrcheck import analytics_store
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
 
 
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'response-stability.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
-def test_unavailable_service_response_is_stable_json(tmp_path, monkeypatch):
-    client, headers = _client(tmp_path)
+def test_unavailable_service_response_is_stable_json(client, api_headers, monkeypatch):
+    headers = api_headers
     secret_url = "postgresql://moltrace:secret-password@db.example/moltrace"
 
     def failing_summary(*args, **kwargs):
@@ -45,9 +29,7 @@ def test_unavailable_service_response_is_stable_json(tmp_path, monkeypatch):
     assert "Traceback" not in res.text
 
 
-def test_system_health_includes_non_breaking_data_mode_metadata(tmp_path):
-    client, _headers = _client(tmp_path)
-
+def test_system_health_includes_non_breaking_data_mode_metadata(client):
     with client:
         res = client.get("/system/health")
 
