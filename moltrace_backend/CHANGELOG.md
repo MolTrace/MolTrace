@@ -14,6 +14,33 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.6 — Regulatory Hub: readiness reports carry a content hash (provenance) (2026-06-11)
+
+**Headline:** `create_readiness_report` passed `metadata_json` straight through, so the dossier
+workspace's readiness "report hash" field (it reads `metadata_json.report_hash` / `sha256` / `hash`)
+was permanently empty. Each readiness report is now stamped with a deterministic sha256 over its
+substantive content, giving the snapshot a stable provenance fingerprint.
+
+### Changed
+- **`src/nmrcheck/regulatory_intelligence.py`** — `create_readiness_report` computes
+  `report_hash = sha256(canonical content)` over `{dossier_id, status, summary, requirements, evidence,
+  gaps, risks, citation_ids, review_status}` (canonical via `_json_dump(sort_keys=True)`) and merges it
+  into `metadata_json` (caller metadata preserved; the system hash wins on key collision). Content-only —
+  excludes warnings/notes/caller metadata so it is stable for identical content.
+
+### Added
+- **`tests/test_regulatory_intelligence_api.py`** — asserts `metadata_json.report_hash` is a 64-char hex
+  sha256 on a created readiness report.
+
+### Notes
+- Second item from the prompts-1–5 ↔ dossier integration audit (after v0.24.5). The readiness tab's
+  *download* links stay intentionally empty — a readiness report has no downloadable artifact (unlike a
+  submission package), so no `*_url` is fabricated; hiding that section for readiness is a small FE polish.
+- The audit's third finding — `GET/POST /regulatory/dossiers/{id}/elemental-impurity-assessment` having no
+  FE consumer — is **not** a backend defect: it is a fully built and tested ICH Q3D feature
+  (`test_regulatory_q3d.py`, `test_regulatory_compliance_engine_api.py`) the dossier workspace simply has
+  not wired into a sub-tab yet. Kept as-is; FE wiring is the follow-up, not retirement.
+
 ## v0.24.5 — Regulatory Hub: readiness reports rehydrate (dossier-scoped list read) (2026-06-11)
 
 **Headline:** The readiness report — the dossier pipeline's capstone (prompt 5) output — only had a

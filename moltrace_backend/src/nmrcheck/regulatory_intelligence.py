@@ -804,36 +804,55 @@ def create_readiness_report(
         status = "blocked" if risk_payload.get("overall_risk") in {"critical", "high"} and gaps else "requires_review"
         if not gaps and requirements:
             status = "ready_for_review"
+        summary = {
+            "dossier_title": dossier.title,
+            "jurisdiction_id": dossier.jurisdiction_id,
+            "requirement_count": len(requirements),
+            "evidence_link_count": len(evidence_links),
+            "gap_count": len(gaps),
+            "review_count": len(reviews),
+            "source_supported": bool(citation_ids),
+        }
+        requirement_summaries = [_requirement_summary(req) for req in requirements]
+        evidence_summaries = [_evidence_summary(ev) for ev in evidence_links]
+        review_status = {
+            "latest_decision": reviews[0].decision if reviews else None,
+            "latest_reviewer": reviews[0].reviewer_name if reviews else None,
+            "dossier_status": dossier.status,
+        }
+        # Deterministic content fingerprint so a persisted report has a stable
+        # provenance hash the UI can show (metadata_json.report_hash). Canonical
+        # via _json_dump(sort_keys=True); covers substantive content only, not
+        # warnings/notes or caller-supplied metadata.
+        report_hash = hashlib.sha256(
+            _json_dump(
+                {
+                    "dossier_id": dossier_id,
+                    "status": status,
+                    "summary": summary,
+                    "requirements": requirement_summaries,
+                    "evidence": evidence_summaries,
+                    "gaps": gaps,
+                    "risks": risk_payload,
+                    "citation_ids": citation_ids,
+                    "review_status": review_status,
+                }
+            ).encode("utf-8")
+        ).hexdigest()
         row = RegulatoryReadinessReportORM(
             dossier_id=dossier_id,
             status=status,
-            summary_json=_json_dump(
-                {
-                    "dossier_title": dossier.title,
-                    "jurisdiction_id": dossier.jurisdiction_id,
-                    "requirement_count": len(requirements),
-                    "evidence_link_count": len(evidence_links),
-                    "gap_count": len(gaps),
-                    "review_count": len(reviews),
-                    "source_supported": bool(citation_ids),
-                }
-            ),
-            requirements_json=_json_dump([_requirement_summary(row) for row in requirements]),
-            evidence_json=_json_dump([_evidence_summary(row) for row in evidence_links]),
+            summary_json=_json_dump(summary),
+            requirements_json=_json_dump(requirement_summaries),
+            evidence_json=_json_dump(evidence_summaries),
             gaps_json=_json_dump(gaps),
             risks_json=_json_dump(risk_payload),
             citation_ids_json=_json_dump(citation_ids),
-            review_status_json=_json_dump(
-                {
-                    "latest_decision": reviews[0].decision if reviews else None,
-                    "latest_reviewer": reviews[0].reviewer_name if reviews else None,
-                    "dossier_status": dossier.status,
-                }
-            ),
+            review_status_json=_json_dump(review_status),
             warnings_json=_json_dump(warnings),
             notes_json=_json_dump([_SAFE_NOTE, "Readiness report is a draft interpretation and requires review."]),
             human_review_required=True,
-            metadata_json=_json_dump(payload.metadata_json),
+            metadata_json=_json_dump({**payload.metadata_json, "report_hash": report_hash}),
         )
         session.add(row)
         session.flush()
