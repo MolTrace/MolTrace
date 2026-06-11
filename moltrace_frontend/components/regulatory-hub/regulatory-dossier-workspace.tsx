@@ -780,6 +780,21 @@ export function RegulatoryDossierWorkspace() {
       }
 
       try {
+        // Rehydrate a persisted readiness report on load (v0.24.5). load()
+        // resets readinessReport to null above; the in-session generate is a
+        // POST, so without this GET a saved report never reappears on reload.
+        // The dossier-scoped list read returns newest-first — take [0].
+        const rrRaw = await apiFetch<unknown>(
+          `/regulatory/dossiers/${dossierId}/readiness-report`,
+          { method: "GET" }
+        )
+        const reports = asArray(rrRaw).filter(isRecord) as Record<string, unknown>[]
+        setReadinessReport(reports[0] ?? null)
+      } catch {
+        setReadinessReport(null)
+      }
+
+      try {
         const rulesRaw = await apiFetch<unknown>("/regulatory/rule-sets?status=active", { method: "GET" })
         setRuleSets(asArray(rulesRaw).filter(isRecord) as Record<string, unknown>[])
       } catch {
