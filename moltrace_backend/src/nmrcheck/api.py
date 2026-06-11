@@ -18672,6 +18672,7 @@ def create_spectroscopy_to_regulatory_bridge_route(
             _state(request).session_factory,
             payload,
             actor=_product_actor(context),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_product_http_error(exc)
@@ -18757,6 +18758,7 @@ def create_regulatory_to_reaction_bridge_route(
             _state(request).session_factory,
             payload,
             actor=_product_actor(context),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_product_http_error(exc)

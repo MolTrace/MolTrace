@@ -279,12 +279,13 @@ def create_spectroscopy_to_regulatory_bridge(
     payload: SpectroscopyToRegulatoryBridgeCreate,
     *,
     actor: ProductOrchestrationActor,
+    owner_scope_id: int | None = None,
 ) -> SpectroscopyToRegulatoryBridge:
     with session_scope(session_factory) as session:
         session_row = _optional(session, SpectraCheckSessionORM, payload.spectracheck_session_id)
         evidence_row = _optional(session, SpectraCheckEvidenceRecordORM, payload.evidence_item_id)
         report_row = _optional(session, SpectraCheckReportRecordORM, payload.report_id)
-        dossier = _resolve_dossier(session, payload.dossier_id, session_row)
+        dossier = _resolve_dossier(session, payload.dossier_id, session_row, owner_scope_id)
         warnings: list[str] = []
         notes = [_PRODUCT_RULE_NOTE, _REVIEW_NOTE]
         if dossier is None:
@@ -429,10 +430,11 @@ def create_regulatory_to_reaction_bridge(
     payload: RegulatoryToReactionBridgeCreate,
     *,
     actor: ProductOrchestrationActor,
+    owner_scope_id: int | None = None,
 ) -> RegulatoryToReactionBridge:
     with session_scope(session_factory) as session:
-        action_rows = _regulatory_action_rows(session, payload)
-        dossier = _resolve_r2r_dossier(session, payload, action_rows)
+        action_rows = _regulatory_action_rows(session, payload, owner_scope_id)
+        dossier = _resolve_r2r_dossier(session, payload, action_rows, owner_scope_id)
         reaction_project_id = payload.reaction_project_id or (
             dossier.reaction_project_id if dossier is not None else None
         )
@@ -1035,21 +1037,42 @@ def _required(session: Session, model: type[Any], entity_id: int | None, label: 
     return row
 
 
+def _dossier_owned_by(session: Session, dossier_id: int | None, owner_scope_id: int | None) -> bool:
+    """In-session dossier-ownership check (mirrors regulatory_intelligence.dossier_owned_by):
+    system/admin scope (``None``) sees all; else the dossier must be owned by the scope user;
+    a missing / ``None`` dossier is hidden from a user-scoped caller."""
+    if owner_scope_id is None:
+        return True
+    if dossier_id is None:
+        return False
+    row = session.get(RegulatoryDossierORM, dossier_id)
+    return row is not None and row.created_by_user_id == owner_scope_id
+
+
 def _resolve_dossier(
     session: Session,
     dossier_id: int | None,
     session_row: SpectraCheckSessionORM | None,
+    owner_scope_id: int | None = None,
 ) -> RegulatoryDossierORM | None:
     if dossier_id is not None:
-        return _required(session, RegulatoryDossierORM, dossier_id, "Regulatory dossier")
+        dossier = _required(session, RegulatoryDossierORM, dossier_id, "Regulatory dossier")
+        if not _dossier_owned_by(session, dossier.id, owner_scope_id):
+            raise ProductOrchestrationNotFoundError("Regulatory dossier not found.")
+        return dossier
     if session_row is None:
         return None
-    return session.scalar(
+    dossier = session.scalar(
         select(RegulatoryDossierORM)
         .where(RegulatoryDossierORM.spectracheck_session_id == session_row.id)
         .order_by(RegulatoryDossierORM.id.desc())
         .limit(1)
     )
+    # A session-derived dossier the caller does not own is treated as absent — the bridge then
+    # inspects evidence but creates no action items on someone else's dossier.
+    if dossier is not None and not _dossier_owned_by(session, dossier.id, owner_scope_id):
+        return None
+    return dossier
 
 
 def _spectroscopy_sources(
@@ -1471,18 +1494,24 @@ def _create_reg_action_item(
 def _regulatory_action_rows(
     session: Session,
     payload: RegulatoryToReactionBridgeCreate,
+    owner_scope_id: int | None = None,
 ) -> list[RegulatoryActionItemORM]:
     if payload.regulatory_action_item_id is not None:
-        return [
-            _required(
-                session,
-                RegulatoryActionItemORM,
-                payload.regulatory_action_item_id,
-                "Regulatory action item",
-            )
-        ]
+        action = _required(
+            session,
+            RegulatoryActionItemORM,
+            payload.regulatory_action_item_id,
+            "Regulatory action item",
+        )
+        # The action item's content is reflected into the reaction-side constraint, so a
+        # user-scoped caller may reference it only if they own its parent dossier.
+        if not _dossier_owned_by(session, action.dossier_id, owner_scope_id):
+            raise ProductOrchestrationNotFoundError("Regulatory action item not found.")
+        return [action]
     if payload.dossier_id is None:
         return []
+    if not _dossier_owned_by(session, payload.dossier_id, owner_scope_id):
+        raise ProductOrchestrationNotFoundError("Regulatory dossier not found.")
     return list(
         session.scalars(
             select(RegulatoryActionItemORM)
@@ -1497,9 +1526,13 @@ def _resolve_r2r_dossier(
     session: Session,
     payload: RegulatoryToReactionBridgeCreate,
     action_rows: list[RegulatoryActionItemORM],
+    owner_scope_id: int | None = None,
 ) -> RegulatoryDossierORM | None:
     if payload.dossier_id is not None:
-        return _required(session, RegulatoryDossierORM, payload.dossier_id, "Regulatory dossier")
+        dossier = _required(session, RegulatoryDossierORM, payload.dossier_id, "Regulatory dossier")
+        if not _dossier_owned_by(session, dossier.id, owner_scope_id):
+            raise ProductOrchestrationNotFoundError("Regulatory dossier not found.")
+        return dossier
     for action in action_rows:
         if action.dossier_id is not None:
             return session.get(RegulatoryDossierORM, action.dossier_id)

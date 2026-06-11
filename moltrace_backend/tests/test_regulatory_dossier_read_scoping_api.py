@@ -406,3 +406,44 @@ def test_mobile_action_item_access_rule(tmp_path):
         assert _mobile_can_access_action_item(owned_item, s, MobileActor(system_api_key=True)) is True
         assert _mobile_can_access_action_item(orphan_item, s, MobileActor(user_id=alice.id)) is False
         assert _mobile_can_access_action_item(orphan_item, s, MobileActor(system_api_key=True)) is True
+
+
+# --------------------------------------------------------------------------- #
+# Cross-module bridge CREATE: must not write/read dossier children on a body-supplied
+# dossier the caller does not own.
+# --------------------------------------------------------------------------- #
+def test_spectroscopy_bridge_create_requires_dossier_ownership(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        bob = _sign_up(client, "bob@example.com")
+        did = _create_dossier(client, alice)
+
+        def make(headers):
+            return client.post(
+                "/bridges/spectroscopy-to-regulatory", headers=headers, json={"dossier_id": did}
+            )
+
+        assert make(bob).status_code == 404      # non-owner cannot inject action items
+        assert make(alice).status_code == 201    # owner
+        assert make(SYSTEM).status_code == 201   # system unrestricted
+
+
+def test_regulatory_to_reaction_bridge_create_requires_dossier_ownership(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        bob = _sign_up(client, "bob@example.com")
+        did = _create_dossier(client, alice)
+        # A non-owner is stopped at the ownership gate (404) before any further work; the owner
+        # and the system key pass the gate and only then fail on the missing reaction project
+        # (400) — which isolates the 404 as the ownership check, not incidental validation.
+        assert client.post(
+            "/bridges/regulatory-to-reaction", headers=bob, json={"dossier_id": did}
+        ).status_code == 404
+        assert client.post(
+            "/bridges/regulatory-to-reaction", headers=alice, json={"dossier_id": did}
+        ).status_code == 400
+        assert client.post(
+            "/bridges/regulatory-to-reaction", headers=SYSTEM, json={"dossier_id": did}
+        ).status_code == 400

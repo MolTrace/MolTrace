@@ -14,6 +14,39 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.3 — Regulatory Hub: scope the cross-module bridge CREATE paths (security) (2026-06-11)
+
+**Headline:** A convergence review confirmed the dossier read / dossier-path-write / by-child-id-write
+surface is fully owner-scoped (v0.24.0–.2), and surfaced two remaining **child-producing** entry
+points: the cross-module bridge *creates* resolve a body-supplied `dossier_id` (or session / action-item
+id) existence-only, then write or reflect dossier-owned **action items**. A user-scoped caller could
+thus inject review action items into — or read action-item content out of — another tenant's dossier.
+Both create paths are now owner-gated.
+
+### Changed
+- **`src/nmrcheck/product_orchestration_store.py`** — new local `_dossier_owned_by` (mirrors
+  `regulatory_intelligence.dossier_owned_by`). `create_spectroscopy_to_regulatory_bridge` and
+  `create_regulatory_to_reaction_bridge` gained `owner_scope_id`; `_resolve_dossier` (incl. its
+  spectracheck-session fallback), `_regulatory_action_rows`, and `_resolve_r2r_dossier` now reject a
+  body dossier / action item whose parent dossier the user does not own (non-leaking
+  `ProductOrchestrationNotFoundError` → 404; the session-fallback simply yields no dossier so no
+  children are written). System api key / admin remain unrestricted.
+- **`src/nmrcheck/api.py`** — both bridge-create routes pass
+  `owner_scope_id=_user_scope_for_context(context)`.
+
+### Added
+- **`tests/test_regulatory_dossier_read_scoping_api.py`** — +2: non-owner spectroscopy-to-regulatory
+  bridge create → 404 (owner / system → 201); non-owner regulatory-to-reaction bridge create → 404
+  while owner / system pass the gate (then 400 on the missing reaction project — isolating the 404 as
+  the ownership check).
+
+### Notes
+- **Deferred (tracked):** `POST /regulatory/surveillance/runs` fan-out also creates action-item /
+  notification children on matched dossiers without an owner gate. Per the convergence decision it is a
+  **privileged / system process** → the fix is to gate the route with `require_admin` (or restrict the
+  child-writes to the system key), tracked as its own task. The generic cross-module resource-link model
+  and `POST /regulatory/action-items` create remain a separate pre-existing pass.
+
 ## v0.24.2 — Regulatory Hub: scope by-child-id dossier writes (security) (2026-06-11)
 
 **Headline:** Closes the last cross-tenant write gaps an adversarial review surfaced after v0.24.1:
