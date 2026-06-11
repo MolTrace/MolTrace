@@ -1084,6 +1084,19 @@ def _mobile_can_access_dossier(dossier: RegulatoryDossierORM, actor: MobileActor
     return actor.user_id is not None and dossier.created_by_user_id == actor.user_id
 
 
+def _mobile_can_access_action_item(
+    target: RegulatoryActionItemORM, session: Session, actor: MobileActor
+) -> bool:
+    """A mobile sync may mutate a regulatory action item only if the actor owns its parent
+    dossier (a system api key acts across users; a dossier-less item is system-only)."""
+    if actor.system_api_key:
+        return True
+    if target.dossier_id is None:
+        return False
+    dossier = session.get(RegulatoryDossierORM, target.dossier_id)
+    return dossier is not None and _mobile_can_access_dossier(dossier, actor)
+
+
 def _apply_review_decision(
     session: Session,
     row: MobileActionDraftORM,
@@ -1228,7 +1241,7 @@ def _apply_regulatory_action_update(
         if status not in _REGULATORY_ACTION_STATUSES:
             raise MobileSyncValidationError(["invalid_status: regulatory action status is not allowed"])
         target = session.get(RegulatoryActionItemORM, _target_int(row))
-        if target is None:
+        if target is None or not _mobile_can_access_action_item(target, session, actor):
             raise MobileSyncValidationError(["target_not_found: regulatory_action_item"])
         previous = target.status
         target.status = status

@@ -12,8 +12,19 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from nmrcheck.api import create_app
-from nmrcheck.mobile_store import MobileActor, _mobile_can_access_dossier
-from nmrcheck.orm import AuditEventORM, Base, RegulatoryDossierORM, UserORM
+from nmrcheck.mobile_store import (
+    MobileActor,
+    _mobile_can_access_action_item,
+    _mobile_can_access_dossier,
+)
+from nmrcheck.orm import (
+    AuditEventORM,
+    Base,
+    RegulatoryActionItemORM,
+    RegulatoryDossierORM,
+    UserORM,
+)
+from nmrcheck.regulatory_intelligence import dossier_owned_by
 from nmrcheck.settings import Settings
 
 SYSTEM = {"x-api-key": "test-key"}
@@ -310,3 +321,88 @@ def test_mobile_dossier_access_rule():
     # A NULL-owner (system-created) dossier is reachable only by the system key.
     assert _mobile_can_access_dossier(system_made, MobileActor(user_id=7)) is False
     assert _mobile_can_access_dossier(system_made, MobileActor(system_api_key=True)) is True
+
+
+# --------------------------------------------------------------------------- #
+# By-child-id writes: mutating a dossier child requires owning the parent dossier
+# (require_dossier_access can't apply — the path is keyed by the child id).
+# --------------------------------------------------------------------------- #
+def test_requirement_patch_requires_ownership(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        bob = _sign_up(client, "bob@example.com")
+        did = _create_dossier(client, alice)
+        req = client.post(
+            f"/regulatory/dossiers/{did}/requirements",
+            headers=alice,
+            json={"title": "Identity", "requirement_text": "Document the identity."},
+        )
+        assert req.status_code == 201, req.text
+        rid = req.json()["id"]
+        assert client.patch(f"/regulatory/requirements/{rid}", headers=bob, json={"title": "x"}).status_code == 404
+        assert client.patch(f"/regulatory/requirements/{rid}", headers=alice, json={"title": "owned"}).status_code == 200
+        assert client.patch(f"/regulatory/requirements/{rid}", headers=SYSTEM, json={"title": "sys"}).status_code == 200
+
+
+def test_action_item_patch_requires_ownership(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        bob = _sign_up(client, "bob@example.com")
+        did = _create_dossier(client, alice)
+        # A nitrosamine watch raises a review action item on alice's dossier.
+        assert client.post(
+            f"/regulatory/dossiers/{did}/nitrosamine-watch",
+            headers=alice,
+            json={"structure_text": "CN(C)N=O"},
+        ).status_code == 201
+        items = client.get("/regulatory/action-items", headers=alice, params={"dossier_id": did}).json()
+        assert items
+        ai = items[0]["id"]
+        assert client.patch(f"/regulatory/action-items/{ai}", headers=bob, json={"title": "x"}).status_code == 404
+        assert client.patch(f"/regulatory/action-items/{ai}", headers=alice, json={"title": "owned"}).status_code == 200
+
+
+def test_dossier_owned_by_rule(tmp_path):
+    # The canonical in-session rule the by-child write gates funnel through (each store mirrors it).
+    engine = create_engine(f"sqlite:///{tmp_path / 'owned.sqlite3'}")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(engine)
+    with Session() as s:
+        owner = UserORM(email="owner@example.com", password_hash="x")
+        s.add(owner)
+        s.flush()
+        owned = RegulatoryDossierORM(title="owned", created_by_user_id=owner.id)
+        unowned = RegulatoryDossierORM(title="system", created_by_user_id=None)
+        s.add_all([owned, unowned])
+        s.commit()
+        assert dossier_owned_by(s, owned.id, None) is True             # system / admin
+        assert dossier_owned_by(s, owned.id, owner.id) is True          # owner
+        assert dossier_owned_by(s, owned.id, owner.id + 999) is False   # another user
+        assert dossier_owned_by(s, unowned.id, owner.id) is False       # NULL owner, user-scoped
+        assert dossier_owned_by(s, unowned.id, None) is True            # NULL owner, system
+        assert dossier_owned_by(s, 999_999, owner.id) is False          # missing dossier
+        assert dossier_owned_by(s, None, owner.id) is False             # no dossier anchor
+
+
+def test_mobile_action_item_access_rule(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'mobile_ai.sqlite3'}")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(engine)
+    with Session() as s:
+        alice = UserORM(email="alice@example.com", password_hash="x")
+        s.add(alice)
+        s.flush()
+        dossier = RegulatoryDossierORM(title="d", created_by_user_id=alice.id)
+        s.add(dossier)
+        s.flush()
+        owned_item = RegulatoryActionItemORM(dossier_id=dossier.id, title="t", description="d")
+        orphan_item = RegulatoryActionItemORM(dossier_id=None, title="o", description="d")
+        s.add_all([owned_item, orphan_item])
+        s.commit()
+        assert _mobile_can_access_action_item(owned_item, s, MobileActor(user_id=alice.id)) is True
+        assert _mobile_can_access_action_item(owned_item, s, MobileActor(user_id=alice.id + 999)) is False
+        assert _mobile_can_access_action_item(owned_item, s, MobileActor(system_api_key=True)) is True
+        assert _mobile_can_access_action_item(orphan_item, s, MobileActor(user_id=alice.id)) is False
+        assert _mobile_can_access_action_item(orphan_item, s, MobileActor(system_api_key=True)) is True
