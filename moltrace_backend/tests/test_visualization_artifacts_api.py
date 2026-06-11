@@ -1,22 +1,7 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
 
 
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'visualization.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
-def test_spectrum_artifact_normalizes_to_spectrum_1d(tmp_path):
-    client, headers = _client(tmp_path)
+def test_spectrum_artifact_normalizes_to_spectrum_1d(client, api_headers):
+    headers = api_headers
     with client:
         upload = client.post(
             "/files/upload",
@@ -56,8 +41,8 @@ def test_spectrum_artifact_normalizes_to_spectrum_1d(tmp_path):
         assert len(body["data"]["x"]) == len(body["data"]["y"]) == 4
 
 
-def test_msms_artifact_normalizes_to_msms_mirror(tmp_path):
-    client, headers = _client(tmp_path)
+def test_msms_artifact_normalizes_to_msms_mirror(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/visualization/normalize",
@@ -93,8 +78,8 @@ def test_msms_artifact_normalizes_to_msms_mirror(tmp_path):
         assert body["provenance"]["request_id"] == "pytest-msms"
 
 
-def test_lcms_feature_artifact_normalizes_to_chromatogram_or_table(tmp_path):
-    client, headers = _client(tmp_path)
+def test_lcms_feature_artifact_normalizes_to_chromatogram_or_table(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/visualization/normalize",
@@ -136,8 +121,8 @@ def test_lcms_feature_artifact_normalizes_to_chromatogram_or_table(tmp_path):
             assert "feature_id" in body["data"]["columns"]
 
 
-def test_fragmentation_artifact_normalizes_to_fragmentation_tree(tmp_path):
-    client, headers = _client(tmp_path)
+def test_fragmentation_artifact_normalizes_to_fragmentation_tree(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/visualization/normalize",
@@ -171,8 +156,8 @@ def test_fragmentation_artifact_normalizes_to_fragmentation_tree(tmp_path):
         assert body["data"]["contradictions"] == ["review_required"]
 
 
-def test_unknown_artifact_returns_json_viewer_with_warning(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unknown_artifact_returns_json_viewer_with_warning(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/visualization/normalize",
@@ -190,8 +175,7 @@ def test_unknown_artifact_returns_json_viewer_with_warning(tmp_path):
         assert any("could not be normalized" in warning for warning in body["warnings"])
 
 
-def test_visualization_endpoints_appear_in_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_visualization_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

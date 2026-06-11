@@ -1,21 +1,6 @@
 import hashlib
 import json
 
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase62_interoperability.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
 
 
 def _connector(client: TestClient, headers: dict[str, str]) -> dict:
@@ -70,8 +55,8 @@ def _dossier(client: TestClient, headers: dict[str, str]) -> dict:
     return response.json()
 
 
-def test_connector_health_credentials_and_watch_folder_are_safe(tmp_path):
-    client, headers = _client(tmp_path)
+def test_connector_health_credentials_and_watch_folder_are_safe(client, api_headers, tmp_path):
+    headers = api_headers
     with client:
         connector = _connector(client, headers)
 
@@ -124,8 +109,8 @@ def test_connector_health_credentials_and_watch_folder_are_safe(tmp_path):
         assert watch_folder.json()["connector_id"] == connector["id"]
 
 
-def test_ingestion_run_hashes_files_and_skips_duplicate_hash(tmp_path):
-    client, headers = _client(tmp_path)
+def test_ingestion_run_hashes_files_and_skips_duplicate_hash(client, api_headers):
+    headers = api_headers
     with client:
         connector = _connector(client, headers)
         content = "ppm,intensity\n1.0,10\n2.0,20\n"
@@ -162,8 +147,8 @@ def test_ingestion_run_hashes_files_and_skips_duplicate_hash(tmp_path):
         assert duplicate_body["warnings_json"]
 
 
-def test_file_normalization_supports_csv_tsv_and_unsupported_warning(tmp_path):
-    client, headers = _client(tmp_path)
+def test_file_normalization_supports_csv_tsv_and_unsupported_warning(client, api_headers):
+    headers = api_headers
     with client:
         csv_file = _upload_file(
             client,
@@ -207,8 +192,8 @@ def test_file_normalization_supports_csv_tsv_and_unsupported_warning(tmp_path):
         assert unsupported_body["warnings_json"]
 
 
-def test_external_links_mapping_ctd_package_and_openapi(tmp_path):
-    client, headers = _client(tmp_path)
+def test_external_links_mapping_ctd_package_and_openapi(client, api_headers):
+    headers = api_headers
     with client:
         connector = _connector(client, headers)
         external = client.post(

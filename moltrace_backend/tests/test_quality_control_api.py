@@ -1,20 +1,5 @@
 import json
 
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'quality_control.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
 
 
 def _create_session(client: TestClient, headers: dict):
@@ -68,8 +53,8 @@ def _upload_file(
     return res.json()
 
 
-def test_quality_control_assesses_artifacts_files_evidence_session_and_override(tmp_path):
-    client, headers = _client(tmp_path)
+def test_quality_control_assesses_artifacts_files_evidence_session_and_override(client, api_headers):
+    headers = api_headers
     with client:
         _project, _sample, session = _create_session(client, headers)
 
@@ -208,8 +193,7 @@ def test_quality_control_assesses_artifacts_files_evidence_session_and_override(
         assert session_qc["metrics_json"]["requires_review"] >= 1
 
 
-def test_quality_control_endpoints_appear_in_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_quality_control_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text
