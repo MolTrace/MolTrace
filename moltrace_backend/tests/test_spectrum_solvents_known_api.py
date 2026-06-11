@@ -100,19 +100,12 @@ def test_solvents_known_d2o_has_no_13c_residual() -> None:
     asyncio.run(run())
 
 
-def test_openapi_schema_includes_solvents_endpoint() -> None:
-    tmpdir = mkdtemp(prefix="nmrcheck-solvents-openapi-")
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmpdir}/solvents_openapi.sqlite3",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    schema = app.openapi()
-    assert "/spectrum/solvents/known" in schema["paths"], (
+def test_openapi_schema_includes_solvents_endpoint(openapi_schema: dict) -> None:
+    # Uses the worker-shared OpenAPI schema (conftest) instead of building a
+    # fresh app + regenerating the schema per test.
+    assert "/spectrum/solvents/known" in openapi_schema["paths"], (
         "/spectrum/solvents/known must appear in the OpenAPI schema so "
         "`npm run generate:openapi` picks it up for the FE dropdown."
     )
-    operation = schema["paths"]["/spectrum/solvents/known"]["get"]
+    operation = openapi_schema["paths"]["/spectrum/solvents/known"]["get"]
     assert operation["operationId"] == "spectrum_solvents_known_spectrum_solvents_known_get"
