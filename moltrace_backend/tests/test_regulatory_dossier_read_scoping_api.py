@@ -71,7 +71,7 @@ def test_owner_reads_own_dossier_non_owner_404_system_200(tmp_path):
         assert client.get(f"/regulatory/dossiers/{did}", headers=bob).status_code == 404
         assert client.get(f"/regulatory/dossiers/{did}", headers=SYSTEM).status_code == 200
         # Sub-resources are gated by the same dependency (empty owned dossier still 200s).
-        for sub in ("impurity-risk-register", "nitrosamine-cumulative-risk", "batch-assessment"):
+        for sub in ("impurity-risk-register", "nitrosamine-cumulative-risk", "batch-assessment", "readiness-report"):
             assert client.get(f"/regulatory/dossiers/{did}/{sub}", headers=alice).status_code == 200, sub
             assert client.get(f"/regulatory/dossiers/{did}/{sub}", headers=bob).status_code == 404, sub
             assert client.get(f"/regulatory/dossiers/{did}/{sub}", headers=SYSTEM).status_code == 200, sub

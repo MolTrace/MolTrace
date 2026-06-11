@@ -7294,7 +7294,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List Regulatory Readiness Reports Route */
+        get: operations["list_regulatory_readiness_reports_route_regulatory_dossiers__dossier_id__readiness_report_get"];
         put?: never;
         /** Create Regulatory Readiness Report Route */
         post: operations["create_regulatory_readiness_report_route_regulatory_dossiers__dossier_id__readiness_report_post"];
@@ -58941,6 +58942,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RegulatoryReviewDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_regulatory_readiness_reports_route_regulatory_dossiers__dossier_id__readiness_report_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dossier_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegulatoryReadinessReport"][];
                 };
             };
             /** @description Validation Error */

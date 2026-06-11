@@ -275,6 +275,17 @@ def test_regulatory_risk_review_and_readiness_report(client):
         assert fetched_report.status_code == 200, fetched_report.text
         assert fetched_report.json()["id"] == readiness["id"]
 
+        # Rehydration: the dossier-scoped list returns persisted reports newest-first,
+        # so the UI can reload a readiness report without an in-session POST.
+        listed = client.get(
+            f"/regulatory/dossiers/{dossier['id']}/readiness-report",
+            headers=headers,
+        )
+        assert listed.status_code == 200, listed.text
+        listed_reports = listed.json()
+        assert isinstance(listed_reports, list)
+        assert listed_reports[0]["id"] == readiness["id"]
+
 
 def test_phase53_openapi_includes_regulatory_intelligence_endpoints(client):
     with client:
@@ -303,3 +314,4 @@ def test_phase53_openapi_includes_regulatory_intelligence_endpoints(client):
         assert path in paths
     assert "post" in paths["/regulatory/sources/upload"]
     assert "patch" in paths["/regulatory/dossiers/{dossier_id}"]
+    assert "get" in paths["/regulatory/dossiers/{dossier_id}/readiness-report"]
