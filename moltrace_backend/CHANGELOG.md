@@ -14,6 +14,41 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.2 — Regulatory Hub: scope by-child-id dossier writes (security) (2026-06-11)
+
+**Headline:** Closes the last cross-tenant write gaps an adversarial review surfaced after v0.24.1:
+dossier *children* mutated by their OWN id (not under `/regulatory/dossiers/{dossier_id}/…`), so the
+path-based `require_dossier_access` gate structurally could not apply. A user-scoped caller may now
+mutate a **requirement**, **action item**, or **notification** only if they own the parent dossier
+(system api key / admin unrestricted); the mobile review-decision sync's `regulatory_action_item`
+branch is gated the same way. Missing and unowned both return the same non-leaking 404 /
+`target_not_found`.
+
+### Changed
+- **`src/nmrcheck/regulatory_intelligence.py`** — new in-session `dossier_owned_by(session,
+  dossier_id, owner_scope_id)` is the canonical access rule (system/admin `None` → all; else the
+  parent dossier must be owned; missing / `None` → False); `can_read_dossier` now delegates to it;
+  `patch_requirement` gained `owner_scope_id` and gates on the requirement's parent dossier.
+- **`src/nmrcheck/regulatory_compliance_store.py`** — `update_action_item` gained `owner_scope_id`
+  and gates on the action item's parent dossier (mirrors the v0.24.0 read-side list join).
+- **`src/nmrcheck/regulatory_surveillance_store.py`** — `update_notification` gained `owner_scope_id`
+  and gates on the notification's parent dossier (its `list_notifications` read was already scoped).
+- **`src/nmrcheck/mobile_store.py`** — the mobile `regulatory_action_item` review-update branch checks
+  `_mobile_can_access_action_item` (resolve parent dossier → `_mobile_can_access_dossier`); an unowned
+  target → non-leaking `target_not_found`.
+- **`src/nmrcheck/api.py`** — the three by-child-id write routes (PATCH `requirements/{id}`,
+  `action-items/{id}`, `notifications/{id}`) pass `owner_scope_id=_user_scope_for_context(context)`.
+
+### Added
+- **`tests/test_regulatory_dossier_read_scoping_api.py`** — +4: non-owner PATCH of a requirement /
+  action item → 404 (owner / system succeed); the canonical `dossier_owned_by` rule; the mobile
+  `_mobile_can_access_action_item` rule (owner / non-owner / system / orphan).
+
+### Notes
+- Found by the post-v0.24.1 adversarial review (write-side lens). The `/regulatory/action-items` and
+  cross-module action-item **create** paths, plus the generic cross-module resource-link model, remain
+  a separate (different-module, pre-existing) hardening pass — not introduced or worsened here.
+
 ## v0.24.1 — Regulatory Hub: dossier writes + cross-module bridge reads scoped (security) (2026-06-11)
 
 **Headline:** Completes the dossier access-control story (after v0.24.0 read-scoping) by closing

@@ -334,26 +334,36 @@ def get_dossier(
         return _dossier_to_record(row) if row is not None else None
 
 
+def dossier_owned_by(
+    session: Session, dossier_id: int | None, owner_scope_id: int | None
+) -> bool:
+    """In-session check: may a caller scoped to ``owner_scope_id`` access dossier ``dossier_id``?
+
+    ``owner_scope_id is None`` (a system api key or admin) may access any dossier; a
+    user-scoped caller may access only a dossier they own (``created_by_user_id ==
+    owner_scope_id``). A missing dossier, an unowned one, and ``dossier_id is None`` are all
+    indistinguishable (``False``) so cross-tenant existence is never leaked. This is the single
+    source of truth for dossier access — :func:`can_read_dossier` (the route dependency) and the
+    by-child-id read/write gates all funnel through it. Use this variant when you already hold a
+    session (e.g. gating a write to a dossier child).
+    """
+    if owner_scope_id is None:
+        return True
+    if dossier_id is None:
+        return False
+    row = session.get(RegulatoryDossierORM, dossier_id)
+    return row is not None and row.created_by_user_id == owner_scope_id
+
+
 def can_read_dossier(
     session_factory: sessionmaker[Session],
     dossier_id: int,
     *,
     owner_scope_id: int | None,
 ) -> bool:
-    """Whether a caller scoped to ``owner_scope_id`` may read this dossier.
-
-    ``owner_scope_id is None`` (a system api key or admin) may read any dossier; a
-    user-scoped caller may read only a dossier they own (``created_by_user_id ==
-    owner_scope_id``). A missing dossier and an unowned one are indistinguishable (both
-    ``False``) so cross-tenant existence is never leaked. This is the single source of
-    truth for dossier read access — the route dependency and the by-child-id reads both
-    call it.
-    """
+    """Whether a caller scoped to ``owner_scope_id`` may access this dossier (its own id)."""
     with session_scope(session_factory) as session:
-        row = session.get(RegulatoryDossierORM, dossier_id)
-        if row is None:
-            return False
-        return owner_scope_id is None or row.created_by_user_id == owner_scope_id
+        return dossier_owned_by(session, dossier_id, owner_scope_id)
 
 
 def patch_dossier(
@@ -458,10 +468,13 @@ def patch_requirement(
     payload: RegulatoryRequirementUpdate,
     *,
     actor: RegulatoryActor,
+    owner_scope_id: int | None = None,
 ) -> RegulatoryRequirement | None:
     with session_scope(session_factory) as session:
         row = session.get(RegulatoryRequirementORM, requirement_id)
-        if row is None:
+        # A requirement is a dossier child; a user-scoped caller may patch it only if they own
+        # the parent dossier. Missing and unowned both return None -> non-leaking 404.
+        if row is None or not dossier_owned_by(session, row.dossier_id, owner_scope_id):
             return None
         update = payload.model_dump(exclude_unset=True)
         if "citation_ids_json" in update:

@@ -735,16 +735,31 @@ def list_notifications(
         return [_notification_to_record(row) for row in session.scalars(stmt).all()]
 
 
+def _dossier_owned_by(session: Session, dossier_id: int | None, owner_scope_id: int | None) -> bool:
+    """In-session dossier-ownership check (mirrors regulatory_intelligence.dossier_owned_by):
+    system/admin scope (``None``) sees all; else the parent dossier must be owned by the scope
+    user; a missing / ``None`` dossier is hidden from a user-scoped caller."""
+    if owner_scope_id is None:
+        return True
+    if dossier_id is None:
+        return False
+    row = session.get(RegulatoryDossierORM, dossier_id)
+    return row is not None and row.created_by_user_id == owner_scope_id
+
+
 def update_notification(
     session_factory: sessionmaker[Session],
     notification_id: int,
     payload: RegulatoryImpactNotificationUpdate,
     *,
     actor: RegulatorySurveillanceActor,
+    owner_scope_id: int | None = None,
 ) -> RegulatoryImpactNotification | None:
     with session_scope(session_factory) as session:
         row = session.get(RegulatoryImpactNotificationORM, notification_id)
-        if row is None:
+        # A notification is dossier-linked; a user-scoped caller may mutate it only if they own
+        # the parent dossier. Missing/unowned both return None -> non-leaking 404.
+        if row is None or not _dossier_owned_by(session, row.dossier_id, owner_scope_id):
             return None
         update = payload.model_dump(exclude_unset=True)
         if "status" in update and update["status"] is not None:

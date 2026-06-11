@@ -16120,6 +16120,7 @@ def update_regulatory_notification_route(
             notification_id,
             payload,
             actor=_surveillance_actor(context),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_surveillance_http_error(exc)
@@ -19266,6 +19267,7 @@ def patch_regulatory_requirement_route(
             requirement_id,
             payload,
             actor=_regulatory_actor(context),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_regulatory_http_error(exc)
@@ -20006,6 +20008,7 @@ def update_regulatory_action_item_route(
             action_item_id,
             payload,
             actor=_compliance_actor(context),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_compliance_http_error(exc)

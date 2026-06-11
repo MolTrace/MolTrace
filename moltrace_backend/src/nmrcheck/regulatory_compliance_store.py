@@ -593,16 +593,31 @@ def list_action_items(
         return [_action_to_record(row) for row in session.scalars(stmt).all()]
 
 
+def _dossier_owned_by(session: Session, dossier_id: int | None, owner_scope_id: int | None) -> bool:
+    """In-session dossier-ownership check (mirrors regulatory_intelligence.dossier_owned_by):
+    system/admin scope (``None``) sees all; else the parent dossier must be owned by the scope
+    user; a missing / ``None`` dossier is hidden from a user-scoped caller."""
+    if owner_scope_id is None:
+        return True
+    if dossier_id is None:
+        return False
+    row = session.get(RegulatoryDossierORM, dossier_id)
+    return row is not None and row.created_by_user_id == owner_scope_id
+
+
 def update_action_item(
     session_factory: sessionmaker[Session],
     action_item_id: int,
     payload: RegulatoryActionItemUpdate,
     *,
     actor: RegulatoryComplianceActor,
+    owner_scope_id: int | None = None,
 ) -> RegulatoryActionItem | None:
     with session_scope(session_factory) as session:
         row = session.get(RegulatoryActionItemORM, action_item_id)
-        if row is None:
+        # An action item is a dossier child; a user-scoped caller may patch it only if they own
+        # the parent dossier. Missing/unowned both return None -> non-leaking 404.
+        if row is None or not _dossier_owned_by(session, row.dossier_id, owner_scope_id):
             return None
         fields = payload.model_fields_set
         for field_name in ("action_type", "title", "description", "severity", "status", "due_date", "assigned_to"):
