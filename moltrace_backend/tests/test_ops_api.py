@@ -5,29 +5,9 @@ dashboard (empty until a registry is wired, populated when it is), admin gating,
 and the OpenAPI contract the FE dashboard is generated from.
 """
 
-from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-_ADMIN = {"x-api-key": "test-key"}
-
-
-def _client(tmp_path) -> TestClient:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'ops.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return TestClient(app)
-
-
-def test_deployment_gate_status(tmp_path):
-    client = _client(tmp_path)
-    res = client.get("/admin/ops/deployment-gate", headers=_ADMIN)
+def test_deployment_gate_status(client, api_headers):
+    res = client.get("/admin/ops/deployment-gate", headers=api_headers)
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["fails_closed"] is True
@@ -44,9 +24,8 @@ def test_deployment_gate_status(tmp_path):
     assert body["monitoring_thresholds"]["slo_p95_ms"] == 2000.0
 
 
-def test_model_lineage_empty_until_registry_wired(tmp_path):
-    client = _client(tmp_path)
-    res = client.get("/admin/ops/model-lineage", headers=_ADMIN)
+def test_model_lineage_empty_until_registry_wired(client, api_headers):
+    res = client.get("/admin/ops/model-lineage", headers=api_headers)
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["registry_configured"] is False
@@ -54,14 +33,13 @@ def test_model_lineage_empty_until_registry_wired(tmp_path):
     assert body["note"]  # explains how it populates
 
 
-def test_model_lineage_reads_registry_when_wired(tmp_path):
+def test_model_lineage_reads_registry_when_wired(client, api_headers):
     from moltrace.spectroscopy.ai.registry import (
         ModelRegistry,
         ModelRole,
         TrainingDataLineage,
     )
 
-    client = _client(tmp_path)
     registry = ModelRegistry()
     entry = registry.register_artifact(
         role=ModelRole.LORA_ADAPTER,
@@ -74,31 +52,34 @@ def test_model_lineage_reads_registry_when_wired(tmp_path):
         metric_snapshot={"top1_accuracy": 0.91},
     )
     registry.promote(entry.model_id, reason="dominance gate passed")
+    previous = getattr(client.app.state, "model_registry", None)
     client.app.state.model_registry = registry
+    try:
+        res = client.get("/admin/ops/model-lineage", headers=api_headers)
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["registry_configured"] is True
+        assert len(body["rows"]) == 1
+        row = body["rows"][0]
+        assert row["model_id"] == entry.model_id
+        assert row["training_snapshot_hash"] == "sha256:snap-1"
+        assert row["metric_vector"]["top1_accuracy"] == 0.91
+        assert row["promotion_reason"] == "dominance gate passed"
+        assert row["drift_status"] == "unknown"
+    finally:
+        # The app is shared per xdist worker; restore so this wiring doesn't
+        # leak into other tests that expect an unconfigured registry.
+        client.app.state.model_registry = previous
 
-    res = client.get("/admin/ops/model-lineage", headers=_ADMIN)
-    assert res.status_code == 200, res.text
-    body = res.json()
-    assert body["registry_configured"] is True
-    assert len(body["rows"]) == 1
-    row = body["rows"][0]
-    assert row["model_id"] == entry.model_id
-    assert row["training_snapshot_hash"] == "sha256:snap-1"
-    assert row["metric_vector"]["top1_accuracy"] == 0.91
-    assert row["promotion_reason"] == "dominance gate passed"
-    assert row["drift_status"] == "unknown"
 
-
-def test_ops_endpoints_require_admin(tmp_path):
-    client = _client(tmp_path)
+def test_ops_endpoints_require_admin(client):
     for path in ("/admin/ops/deployment-gate", "/admin/ops/model-lineage"):
         res = client.get(path)  # no credentials
         assert res.status_code in (401, 403), f"{path} -> {res.status_code}: {res.text}"
 
 
-def test_ops_endpoints_in_openapi(tmp_path):
-    client = _client(tmp_path)
-    spec = client.get("/openapi.json").json()
+def test_ops_endpoints_in_openapi(openapi_schema):
+    spec = openapi_schema
     assert "/admin/ops/deployment-gate" in spec["paths"]
     assert "/admin/ops/model-lineage" in spec["paths"]
     schemas = spec["components"]["schemas"]

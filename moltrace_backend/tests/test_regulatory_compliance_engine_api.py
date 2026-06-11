@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'regulatory_compliance.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _jurisdiction(client: TestClient, headers: dict[str, str], name: str, country_code: str) -> dict:
     res = client.post(
@@ -103,8 +89,8 @@ def _rule_set(
     return res.json()
 
 
-def test_regulatory_compliance_engine_workflow(tmp_path):
-    client, headers = _client(tmp_path)
+def test_regulatory_compliance_engine_workflow(client, api_headers):
+    headers = api_headers
     with client:
         us = _jurisdiction(client, headers, "Phase 55 US", "US")
         eu = _jurisdiction(client, headers, "Phase 55 EU", "EU")
@@ -240,10 +226,10 @@ def test_regulatory_compliance_engine_workflow(tmp_path):
         assert update.json()["assigned_to"] == "QA reviewer"
 
 
-def test_residual_solvent_uses_q3c_engine_when_no_tenant_rule(tmp_path):
+def test_residual_solvent_uses_q3c_engine_when_no_tenant_rule(client, api_headers):
     # A dossier with no configured rule-set: the residual-solvent assessment is now
     # populated from the deterministic ICH Q3C engine instead of warning source_needed.
-    client, headers = _client(tmp_path)
+    headers = api_headers
     with client:
         juris = _jurisdiction(client, headers, "Q3C engine US", "US")
         dossier = _dossier(client, headers, juris["id"])
@@ -261,9 +247,9 @@ def test_residual_solvent_uses_q3c_engine_when_no_tenant_rule(tmp_path):
         assert match["threshold_triggered"] is True  # 5000 ppm > 410 ppm limit
 
 
-def test_residual_solvent_unknown_still_source_needed(tmp_path):
+def test_residual_solvent_unknown_still_source_needed(client, api_headers):
     # A solvent outside the encoded Q3C subset keeps the source-needed fallback.
-    client, headers = _client(tmp_path)
+    headers = api_headers
     with client:
         juris = _jurisdiction(client, headers, "Q3C unknown US", "US")
         dossier = _dossier(client, headers, juris["id"])
@@ -278,10 +264,10 @@ def test_residual_solvent_unknown_still_source_needed(tmp_path):
         assert body["residual_solvent_summary_json"]["matched_solvents"][0].get("solvent_class") is None
 
 
-def test_nitrosamine_watch_uses_cpca_for_smiles(tmp_path):
+def test_nitrosamine_watch_uses_cpca_for_smiles(client, api_headers):
     # A clean nitrosamine SMILES now yields the real FDA CPCA category + AI limit,
     # not just a regex motif flag. nitrosamine_confirmed stays False (decision-support).
-    client, headers = _client(tmp_path)
+    headers = api_headers
     with client:
         juris = _jurisdiction(client, headers, "CPCA US", "US")
         dossier = _dossier(client, headers, juris["id"])
@@ -299,10 +285,10 @@ def test_nitrosamine_watch_uses_cpca_for_smiles(tmp_path):
         assert summary["cpca"]["coc_flag"] is True
 
 
-def test_impurity_register_uses_q3ab_engine_and_m7_when_no_rule(tmp_path):
+def test_impurity_register_uses_q3ab_engine_and_m7_when_no_rule(client, api_headers):
     # A dossier with no rule-set: the impurity register now derives the threshold band
     # from the ICH Q3A/B engine (dose-driven) and attaches the ICH M7 class for a SMILES.
-    client, headers = _client(tmp_path)
+    headers = api_headers
     with client:
         juris = _jurisdiction(client, headers, "Q3AB engine US", "US")
         dossier = _dossier(client, headers, juris["id"])
@@ -325,10 +311,10 @@ def test_impurity_register_uses_q3ab_engine_and_m7_when_no_rule(tmp_path):
         assert m7["coc_flag"] is True
 
 
-def test_dossier_level_dose_drives_impurity_assessments(tmp_path):
+def test_dossier_level_dose_drives_impurity_assessments(client, api_headers):
     # The product dose lives ON the dossier; all its impurity assessments source it,
     # with no per-call dose needed (proper integration with the dossier domain model).
-    client, headers = _client(tmp_path)
+    headers = api_headers
     with client:
         juris = _jurisdiction(client, headers, "Dossier dose US", "US")
         dossier = client.post(
@@ -368,10 +354,10 @@ def test_dossier_level_dose_drives_impurity_assessments(tmp_path):
         assert "Option 2" in match["limit_basis"]
 
 
-def test_dossier_elemental_impurity_assessment_uses_q3d_route(tmp_path):
+def test_dossier_elemental_impurity_assessment_uses_q3d_route(client, api_headers):
     # ICH Q3D PDEs are route-dependent; the new assessment sources route + dose from
     # the dossier (the engine is the sole source — Q3D has no legacy tenant rule type).
-    client, headers = _client(tmp_path)
+    headers = api_headers
     with client:
         juris = _jurisdiction(client, headers, "Q3D US", "US")
         dossier = client.post(
@@ -404,8 +390,7 @@ def test_dossier_elemental_impurity_assessment_uses_q3d_route(tmp_path):
         assert len(listed) == 1
 
 
-def test_regulatory_compliance_engine_endpoints_appear_in_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_regulatory_compliance_engine_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

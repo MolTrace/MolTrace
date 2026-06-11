@@ -14,23 +14,10 @@ from moltrace.regulatory.impurities import (
     calculate_cumulative_risk,
 )
 from moltrace.regulatory.infra.validation import DataValidationError
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
 
 # NDMA: FDA CPCA Category 1 -> AI limit 26.5 ng/day.
 NDMA = "CN(C)N=O"
 NDMA_AI = 26.5
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'nitrosamine_cumulative.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
 
 
 def _dossier(client: TestClient, headers: dict[str, str]) -> dict:
@@ -78,8 +65,8 @@ def _rollup(client, headers, dossier_id):
 # --------------------------------------------------------------------------- #
 # API: the rollup verdict
 # --------------------------------------------------------------------------- #
-def test_cumulative_risk_passes_below_one(tmp_path):
-    client, headers = _client(tmp_path)
+def test_cumulative_risk_passes_below_one(client, api_headers):
+    headers = api_headers
     with client:
         dossier = _dossier(client, headers)
         _watch(client, headers, dossier["id"], structure_text=NDMA, measured=10.0)
@@ -103,8 +90,8 @@ def test_cumulative_risk_passes_below_one(tmp_path):
         assert comp["assessment_id"] > 0
 
 
-def test_cumulative_risk_fails_at_or_above_one(tmp_path):
-    client, headers = _client(tmp_path)
+def test_cumulative_risk_fails_at_or_above_one(client, api_headers):
+    headers = api_headers
     with client:
         dossier = _dossier(client, headers)
         # Two NDMA at 20 ng/day each -> 40 / 26.5 > 1.
@@ -116,8 +103,8 @@ def test_cumulative_risk_fails_at_or_above_one(tmp_path):
         assert body["n_components"] == 2
 
 
-def test_watch_without_measured_is_excluded(tmp_path):
-    client, headers = _client(tmp_path)
+def test_watch_without_measured_is_excluded(client, api_headers):
+    headers = api_headers
     with client:
         dossier = _dossier(client, headers)
         _watch(client, headers, dossier["id"], structure_text=NDMA, measured=12.0)
@@ -130,8 +117,8 @@ def test_watch_without_measured_is_excluded(tmp_path):
         assert body["passes"] is True
 
 
-def test_non_nitrosamine_watch_is_excluded(tmp_path):
-    client, headers = _client(tmp_path)
+def test_non_nitrosamine_watch_is_excluded(client, api_headers):
+    headers = api_headers
     with client:
         dossier = _dossier(client, headers)
         # Free-text flag (no parseable structure) -> no CPCA AI limit, even with a measured value.
@@ -150,8 +137,8 @@ def test_non_nitrosamine_watch_is_excluded(tmp_path):
         assert body["passes"] is True
 
 
-def test_empty_dossier_is_zero_and_passes(tmp_path):
-    client, headers = _client(tmp_path)
+def test_empty_dossier_is_zero_and_passes(client, api_headers):
+    headers = api_headers
     with client:
         dossier = _dossier(client, headers)
         body = _rollup(client, headers, dossier["id"]).json()
@@ -162,15 +149,14 @@ def test_empty_dossier_is_zero_and_passes(tmp_path):
         assert any("cumulative risk is 0 by default" in note for note in body["notes"])
 
 
-def test_rollup_missing_dossier_is_404(tmp_path):
-    client, headers = _client(tmp_path)
+def test_rollup_missing_dossier_is_404(client, api_headers):
+    headers = api_headers
     with client:
         res = _rollup(client, headers, 999_999)
         assert res.status_code == 404, res.text
 
 
-def test_rollup_route_in_openapi(tmp_path):
-    client, headers = _client(tmp_path)
+def test_rollup_route_in_openapi(client):
     with client:
         spec = client.get("/openapi.json").json()
         assert (

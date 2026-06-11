@@ -1,16 +1,5 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(Settings(database_url=f"sqlite:///{tmp_path / 'lcms.sqlite3'}", require_verified_email=False, api_key="test-key"))
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
-def test_lcms_import_bridge_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_lcms_import_bridge_endpoint(client, api_headers):
+    headers = api_headers
     payload = {
         "filename": "ethanol.csv",
         "source_text": "scan_id,ms_level,rt_min,mz,intensity,precursor_mz\nms1,1,0.1,47.04914,100,\nms2,2,0.2,29.03858,100,47.04914\n",
@@ -25,8 +14,8 @@ def test_lcms_import_bridge_endpoint(tmp_path):
     assert data["selected_msms_precursor_mz"] == 47.04914
 
 
-def test_lcms_import_bridge_evidence_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_lcms_import_bridge_evidence_endpoint(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/ms/lcms/import/bridge/evidence",
@@ -43,8 +32,8 @@ def test_lcms_import_bridge_evidence_endpoint(tmp_path):
     assert data["extracted_ms1_peak_count"] == 2
 
 
-def test_lcms_import_bridge_upload_endpoint_preserves_hash(tmp_path):
-    client, headers = _client(tmp_path)
+def test_lcms_import_bridge_upload_endpoint_preserves_hash(client, api_headers):
+    headers = api_headers
     source = b"scan_id,ms_level,rt_min,mz,intensity,precursor_mz\nms1,1,0.1,47.04914,100,\n"
     with client:
         res = client.post(
@@ -60,8 +49,8 @@ def test_lcms_import_bridge_upload_endpoint_preserves_hash(tmp_path):
     assert len(data["file_sha256"]) == 64
 
 
-def test_lcms_import_bridge_malformed_input_returns_400(tmp_path):
-    client, headers = _client(tmp_path)
+def test_lcms_import_bridge_malformed_input_returns_400(client, api_headers):
+    headers = api_headers
     with client:
         res = client.post(
             "/ms/lcms/import/bridge",

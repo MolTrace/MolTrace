@@ -18,14 +18,10 @@ Two layers:
 
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
-
 from nmrcheck.api import (
     _FLIP_READINESS_POLICY,
     _compute_flip_readiness_verdict,
-    create_app,
 )
-from nmrcheck.settings import Settings
 
 # ---------------------------------------------------------------------------
 # Unit tests against the pure helper.
@@ -162,27 +158,15 @@ def test_verdict_clear_at_solvent_rate_floor_boundary() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _client(tmp_path) -> tuple[object, TestClient]:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'gsd-flip-readiness.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return app, TestClient(app)
-
-
 def test_endpoint_returns_insufficient_data_verdict_on_empty_window(
-    tmp_path,
+    client,
+    api_headers,
 ) -> None:
     """An empty window must yield ``insufficient_data`` (0 < 500)."""
-    _, client = _client(tmp_path)
     with client:
         res = client.get(
             "/spectrum/analyze/gsd/telemetry-summary",
-            headers={"x-api-key": "test-key"},
+            headers=api_headers,
             params={"window_days": 30},
         )
         assert res.status_code == 200, res.text

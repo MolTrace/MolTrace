@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'workflow_automation.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _create_session(client: TestClient, headers: dict):
     project_res = client.post(
@@ -47,8 +33,8 @@ def _create_session(client: TestClient, headers: dict):
     return project, sample, session_res.json()
 
 
-def test_builtin_templates_are_listed_and_fetchable(tmp_path):
-    client, headers = _client(tmp_path)
+def test_builtin_templates_are_listed_and_fetchable(client, api_headers):
+    headers = api_headers
     with client:
         res = client.get("/workflow-templates", headers=headers)
         assert res.status_code == 200, res.text
@@ -71,8 +57,8 @@ def test_builtin_templates_are_listed_and_fetchable(tmp_path):
         assert detail.json()["slug"] == "quick_nmr_text_candidate_check"
 
 
-def test_workflow_run_create_missing_input_blocks_quick_workflow(tmp_path):
-    client, headers = _client(tmp_path)
+def test_workflow_run_create_missing_input_blocks_quick_workflow(client, api_headers):
+    headers = api_headers
     with client:
         _project, _sample, session = _create_session(client, headers)
         create_res = client.post(
@@ -98,8 +84,8 @@ def test_workflow_run_create_missing_input_blocks_quick_workflow(tmp_path):
         assert "candidates_text" in started["warnings"][0]
 
 
-def test_quick_nmr_workflow_start_records_events_steps_artifacts_and_session_listing(tmp_path):
-    client, headers = _client(tmp_path)
+def test_quick_nmr_workflow_start_records_events_steps_artifacts_and_session_listing(client, api_headers):
+    headers = api_headers
     with client:
         _project, _sample, session = _create_session(client, headers)
         create_res = client.post(
@@ -153,8 +139,8 @@ def test_quick_nmr_workflow_start_records_events_steps_artifacts_and_session_lis
         assert any(run["id"] == workflow["id"] for run in session_runs.json())
 
 
-def test_workflow_run_can_be_canceled_before_start(tmp_path):
-    client, headers = _client(tmp_path)
+def test_workflow_run_can_be_canceled_before_start(client, api_headers):
+    headers = api_headers
     with client:
         _project, _sample, session = _create_session(client, headers)
         create_res = client.post(
@@ -179,8 +165,8 @@ def test_workflow_run_can_be_canceled_before_start(tmp_path):
         assert all(step["status"] == "skipped" for step in canceled["steps"])
 
 
-def test_workflow_template_create_patch_and_openapi(tmp_path):
-    client, headers = _client(tmp_path)
+def test_workflow_template_create_patch_and_openapi(client, api_headers):
+    headers = api_headers
     with client:
         create_res = client.post(
             "/workflow-templates",

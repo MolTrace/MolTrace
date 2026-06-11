@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase58_ml_factory.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _dataset_version(client: TestClient, headers: dict[str, str]) -> dict:
     response = client.post(
@@ -43,8 +29,8 @@ def _dataset_version(client: TestClient, headers: dict[str, str]) -> dict:
     return response.json()
 
 
-def test_phase58_ml_model_factory_workflow(tmp_path):
-    client, headers = _client(tmp_path)
+def test_phase58_ml_model_factory_workflow(client, api_headers):
+    headers = api_headers
     with client:
         tasks = client.get("/ml/tasks", headers=headers)
         assert tasks.status_code == 200, tasks.text
@@ -281,8 +267,7 @@ def test_phase58_ml_model_factory_workflow(tmp_path):
         assert audit.json()
 
 
-def test_phase58_ml_model_factory_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_phase58_ml_model_factory_openapi(client):
     with client:
         response = client.get("/openapi.json")
     assert response.status_code == 200, response.text

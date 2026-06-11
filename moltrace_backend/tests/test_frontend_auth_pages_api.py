@@ -15,8 +15,8 @@ def _client(tmp_path, *, require_verified_email: bool = False) -> TestClient:
     return TestClient(app)
 
 
-def test_frontend_sign_up_and_sign_in_issue_sessions(tmp_path) -> None:
-    with _client(tmp_path) as client:
+def test_frontend_sign_up_and_sign_in_issue_sessions(client) -> None:
+    with client:
         sign_up = client.post(
             "/auth/sign-up",
             json={
@@ -52,8 +52,8 @@ def test_frontend_sign_up_and_sign_in_issue_sessions(tmp_path) -> None:
         assert sign_in.json()["detail"] == "Signed in."
 
 
-def test_frontend_sign_up_rejects_password_confirmation_mismatch(tmp_path) -> None:
-    with _client(tmp_path) as client:
+def test_frontend_sign_up_rejects_password_confirmation_mismatch(client) -> None:
+    with client:
         response = client.post(
             "/auth/sign-up",
             json={
@@ -91,8 +91,8 @@ def test_frontend_sign_up_respects_email_verification_requirement(tmp_path) -> N
         assert sign_in.status_code == 401
 
 
-def test_frontend_auth_routes_appear_in_openapi(tmp_path) -> None:
-    with _client(tmp_path) as client:
+def test_frontend_auth_routes_appear_in_openapi(client) -> None:
+    with client:
         response = client.get("/openapi.json")
 
     assert response.status_code == 200

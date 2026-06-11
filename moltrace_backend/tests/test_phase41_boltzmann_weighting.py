@@ -23,9 +23,7 @@ from __future__ import annotations
 import math
 
 import pytest
-from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
 from nmrcheck.jcoupling_prediction import (
     BOLTZMANN_RT_KCAL_MOL,
     KARPLUS_CATEGORY_GENERIC,
@@ -38,7 +36,6 @@ from nmrcheck.models import (
     UnifiedCandidateConfidenceRequest,
 )
 from nmrcheck.multiplet_jcoupling_bridge import score_multiplets_against_candidates
-from nmrcheck.settings import Settings
 from nmrcheck.unified_confidence import _bridge_multiplet_jcoupling_request
 
 # beta-D-galactopyranose: the Phase 40 worst case (generic/uniform 8.49 Hz vs
@@ -217,14 +214,7 @@ def test_unified_threads_weighting_into_bridge_request() -> None:
     assert bridged.karplus_max_conformers == 9
 
 
-def test_jcoupling_endpoint_accepts_weighting(tmp_path) -> None:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase41_boltz.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
+def test_jcoupling_endpoint_accepts_weighting(client, api_headers) -> None:
     payload = {
         "sample_id": "phase41-endpoint",
         "candidates": [{"name": "galactose", "smiles": BETA_D_GALACTOSE}],
@@ -233,8 +223,8 @@ def test_jcoupling_endpoint_accepts_weighting(tmp_path) -> None:
         "karplus_conformer_weighting": "boltzmann",
         "karplus_max_conformers": 8,
     }
-    headers = {"x-api-key": "test-key"}
-    with TestClient(app) as client:
+    headers = api_headers
+    with client:
         res = client.post("/candidates/compare/jcoupling", headers=headers, json=payload)
         assert res.status_code == 200, res.text
         assert res.json()["metadata"]["karplus_conformer_weighting"] == "boltzmann"

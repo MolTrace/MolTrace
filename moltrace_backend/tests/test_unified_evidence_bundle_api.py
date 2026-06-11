@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'unified_bundle.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _bundle_item(
     layer: str,
@@ -60,20 +46,18 @@ def _post_bundle(client: TestClient, headers: dict, evidence_items: list[dict]):
     )
 
 
-def test_unified_evidence_bundle_empty_list_returns_clear_400(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_evidence_bundle_empty_list_returns_clear_400(client, api_headers):
     with client:
         res = client.post(
             "/confidence/candidates/unified/evidence-bundle",
-            headers=headers,
+            headers=api_headers,
             json={"sample_id": "empty", "evidence_items": []},
         )
     assert res.status_code == 400
     assert "at least one evidence item" in res.text
 
 
-def test_unified_evidence_bundle_with_predicted_nmr_evidence_works(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_evidence_bundle_with_predicted_nmr_evidence_works(client, api_headers):
     item = _bundle_item(
         "predicted_nmr",
         {
@@ -100,7 +84,7 @@ def test_unified_evidence_bundle_with_predicted_nmr_evidence_works(tmp_path):
         },
     )
     with client:
-        res = _post_bundle(client, headers, [item])
+        res = _post_bundle(client, api_headers, [item])
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["sample_id"] == "sample-bundle-1"
@@ -112,8 +96,7 @@ def test_unified_evidence_bundle_with_predicted_nmr_evidence_works(tmp_path):
     assert "response" not in data["metadata"]["evidence_references"][0]
 
 
-def test_unified_evidence_bundle_ignores_unselected_items(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_evidence_bundle_ignores_unselected_items(client, api_headers):
     unselected = _bundle_item(
         "predicted_nmr",
         {
@@ -142,7 +125,7 @@ def test_unified_evidence_bundle_ignores_unselected_items(tmp_path):
         },
     )
     with client:
-        res = _post_bundle(client, headers, [unselected, selected])
+        res = _post_bundle(client, api_headers, [unselected, selected])
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["best_candidate"]["name"] == "ethanol"
@@ -151,8 +134,7 @@ def test_unified_evidence_bundle_ignores_unselected_items(tmp_path):
     assert "Candidate-specific predicted NMR" not in data["evidence_layers_used"]
 
 
-def test_unified_evidence_bundle_with_hrms_evidence_works(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_evidence_bundle_with_hrms_evidence_works(client, api_headers):
     item = _bundle_item(
         "hrms_exact_mass",
         {
@@ -177,7 +159,7 @@ def test_unified_evidence_bundle_with_hrms_evidence_works(tmp_path):
         },
     )
     with client:
-        res = _post_bundle(client, headers, [item])
+        res = _post_bundle(client, api_headers, [item])
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["best_candidate"]["name"] == "ethanol"
@@ -185,8 +167,7 @@ def test_unified_evidence_bundle_with_hrms_evidence_works(tmp_path):
     assert "HRMS exact mass" in data["evidence_layers_used"]
 
 
-def test_unified_evidence_bundle_with_msms_evidence_works(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_evidence_bundle_with_msms_evidence_works(client, api_headers):
     item = _bundle_item(
         "msms_annotation",
         {
@@ -203,15 +184,14 @@ def test_unified_evidence_bundle_with_msms_evidence_works(tmp_path):
         },
     )
     with client:
-        res = _post_bundle(client, headers, [item])
+        res = _post_bundle(client, api_headers, [item])
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["best_candidate"]["name"] == "ethanol"
     assert "Processed MS/MS annotation" in data["evidence_layers_used"]
 
 
-def test_unified_evidence_bundle_contradictions_increment_count(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_evidence_bundle_contradictions_increment_count(client, api_headers):
     item = _bundle_item(
         "hrms_exact_mass",
         {
@@ -230,7 +210,7 @@ def test_unified_evidence_bundle_contradictions_increment_count(tmp_path):
         label="conflicting_evidence",
     )
     with client:
-        res = _post_bundle(client, headers, [item])
+        res = _post_bundle(client, api_headers, [item])
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["contradiction_count"] >= 1
@@ -238,8 +218,7 @@ def test_unified_evidence_bundle_contradictions_increment_count(tmp_path):
     assert "HRMS conflicts with the selected candidate." in data["global_contradictions"]
 
 
-def test_unified_evidence_bundle_preserves_warnings(tmp_path):
-    client, headers = _client(tmp_path)
+def test_unified_evidence_bundle_preserves_warnings(client, api_headers):
     item = _bundle_item(
         "msms_annotation",
         {
@@ -257,7 +236,7 @@ def test_unified_evidence_bundle_preserves_warnings(tmp_path):
         warnings=["Evidence Queue item had source warnings."],
     )
     with client:
-        res = _post_bundle(client, headers, [item])
+        res = _post_bundle(client, api_headers, [item])
     assert res.status_code == 200, res.text
     data = res.json()
     assert "Evidence Queue item had source warnings." in data["warnings"]
@@ -265,8 +244,7 @@ def test_unified_evidence_bundle_preserves_warnings(tmp_path):
     assert "Candidate fragment assignment is tentative." in data["best_candidate"]["warnings"]
 
 
-def test_unified_evidence_bundle_endpoint_appears_in_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_unified_evidence_bundle_endpoint_appears_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200

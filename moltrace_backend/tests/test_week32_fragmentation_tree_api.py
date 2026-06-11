@@ -1,16 +1,5 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(Settings(database_url=f"sqlite:///{tmp_path / 'frag.sqlite3'}", require_verified_email=False, api_key="test-key"))
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
-def test_fragmentation_tree_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_fragmentation_tree_endpoint(client, api_headers):
+    headers = api_headers
     payload = {
         "precursor_mz": 47.04914,
         "adduct": "[M+H]+",
@@ -25,8 +14,8 @@ def test_fragmentation_tree_endpoint(tmp_path):
     assert data["best_candidate"]["diagnostic_loss_count"] >= 1
 
 
-def test_fragmentation_tree_evidence_endpoint(tmp_path):
-    client, headers = _client(tmp_path)
+def test_fragmentation_tree_evidence_endpoint(client, api_headers):
+    headers = api_headers
     data = {
         "precursor_mz": "47.04914",
         "adduct": "[M+H]+",
@@ -39,8 +28,8 @@ def test_fragmentation_tree_evidence_endpoint(tmp_path):
     assert res.json()["best_candidate"]["name"] == "ethanol"
 
 
-def test_fragmentation_tree_invalid_peak_table_returns_400(tmp_path):
-    client, headers = _client(tmp_path)
+def test_fragmentation_tree_invalid_peak_table_returns_400(client, api_headers):
+    headers = api_headers
     payload = {
         "precursor_mz": 47.04914,
         "adduct": "[M+H]+",

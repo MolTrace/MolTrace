@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase59_ai_inference.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _dataset_version(client: TestClient, headers: dict[str, str], suffix: str) -> dict:
     response = client.post(
@@ -132,8 +118,8 @@ def _approved_artifact(client: TestClient, headers: dict[str, str]) -> dict:
     }
 
 
-def test_phase59_controlled_ai_inference_workflow(tmp_path):
-    client, headers = _client(tmp_path)
+def test_phase59_controlled_ai_inference_workflow(client, api_headers):
+    headers = api_headers
     with client:
         services = client.get("/ai/services", headers=headers)
         assert services.status_code == 200, services.text
@@ -350,8 +336,7 @@ def test_phase59_controlled_ai_inference_workflow(tmp_path):
         )
 
 
-def test_phase59_controlled_ai_inference_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_phase59_controlled_ai_inference_openapi(client):
     with client:
         response = client.get("/openapi.json")
     assert response.status_code == 200, response.text
@@ -411,9 +396,9 @@ def test_phase59_controlled_ai_inference_openapi(tmp_path):
         assert "reason_code" in schemas[schema_name]["properties"], schema_name
 
 
-def test_phase59_feedback_reason_taxonomy(tmp_path):
+def test_phase59_feedback_reason_taxonomy(client, api_headers):
     """The structured reason taxonomy is optional, closed, and persisted."""
-    client, headers = _client(tmp_path)
+    headers = api_headers
     with client:
         approved = _approved_artifact(client, headers)
         prediction = client.post(

@@ -26,9 +26,7 @@ Coverage:
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
 from nmrcheck.jcoupling_prediction import (
     KARPLUS_DEFAULT_MAX_CONFORMERS,
     karplus_3j,
@@ -40,7 +38,6 @@ from nmrcheck.models import (
     UnifiedCandidateConfidenceRequest,
 )
 from nmrcheck.multiplet_jcoupling_bridge import score_multiplets_against_candidates
-from nmrcheck.settings import Settings
 from nmrcheck.unified_confidence import (
     DEFAULT_LAYER_WEIGHTS,
     _bridge_multiplet_jcoupling_request,
@@ -232,14 +229,7 @@ def test_unified_karplus_defaults_do_not_perturb_denominator() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_jcoupling_endpoint_accepts_use_karplus(tmp_path) -> None:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase38_karplus.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
+def test_jcoupling_endpoint_accepts_use_karplus(client, api_headers) -> None:
     payload = {
         "sample_id": "phase38-endpoint",
         "candidates": [{"name": "glucose", "smiles": BETA_D_GLUCOSE}],
@@ -247,8 +237,8 @@ def test_jcoupling_endpoint_accepts_use_karplus(tmp_path) -> None:
         "use_karplus": True,
         "karplus_max_conformers": 8,
     }
-    headers = {"x-api-key": "test-key"}
-    with TestClient(app) as client:
+    headers = api_headers
+    with client:
         res = client.post("/candidates/compare/jcoupling", headers=headers, json=payload)
         assert res.status_code == 200, res.text
         data = res.json()

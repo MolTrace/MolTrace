@@ -4,22 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nmrcheck import tenant_saas_store as tenant_store
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
 
 PRODUCT_ORDER = ["SpectraCheck", "Regulatory Hub", "Reaction Optimization"]
 PRODUCT_PROGRAMS = ["spectracheck", "regulatory_hub", "reaction_optimization"]
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase64_tenant_saas.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
 
 
 def _tenant(client: TestClient, headers: dict[str, str]) -> dict:
@@ -39,8 +26,8 @@ def _tenant(client: TestClient, headers: dict[str, str]) -> dict:
     return response.json()
 
 
-def test_create_tenant_environment_entitlement_and_module_order(tmp_path):
-    client, headers = _client(tmp_path)
+def test_create_tenant_environment_entitlement_and_module_order(client, api_headers):
+    headers = api_headers
     with client:
         tenant = _tenant(client, headers)
 
@@ -95,8 +82,8 @@ def test_create_tenant_environment_entitlement_and_module_order(tmp_path):
         assert body["modules"][2]["readiness_status"] == "disabled_by_entitlement"
 
 
-def test_pilot_onboarding_seeds_tasks_in_program_order(tmp_path):
-    client, headers = _client(tmp_path)
+def test_pilot_onboarding_seeds_tasks_in_program_order(client, api_headers):
+    headers = api_headers
     with client:
         tenant = _tenant(client, headers)
         pilot = client.post(
@@ -140,8 +127,8 @@ def test_pilot_onboarding_seeds_tasks_in_program_order(tmp_path):
         ]
 
 
-def test_profiles_usage_roi_procurement_and_audit_are_safe(tmp_path):
-    client, headers = _client(tmp_path)
+def test_profiles_usage_roi_procurement_and_audit_are_safe(client, api_headers):
+    headers = api_headers
     with client:
         tenant = _tenant(client, headers)
 
@@ -261,8 +248,8 @@ def test_cross_tenant_scope_helper_blocks_mismatch():
     tenant_store.ensure_tenant_scope(1, 2, is_internal_super_admin=True)
 
 
-def test_phase64_openapi_includes_tenant_endpoints(tmp_path):
-    client, headers = _client(tmp_path)
+def test_phase64_openapi_includes_tenant_endpoints(client, api_headers):
+    headers = api_headers
     with client:
         response = client.get("/openapi.json", headers=headers)
         assert response.status_code == 200, response.text

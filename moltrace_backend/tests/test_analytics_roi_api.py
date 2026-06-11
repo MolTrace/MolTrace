@@ -1,20 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'analytics.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return TestClient(app)
-
 
 def _sign_up(client: TestClient, email: str) -> dict[str, str]:
     res = client.post(
@@ -29,9 +14,8 @@ def _sign_up(client: TestClient, email: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
 
-def test_analytics_roi_feedback_and_renewal_workflow(tmp_path):
-    client = _client(tmp_path)
-    admin_headers = {"x-api-key": "test-key"}
+def test_analytics_roi_feedback_and_renewal_workflow(client, api_headers):
+    admin_headers = api_headers
 
     with client:
         viewer_headers = _sign_up(client, "viewer@example.com")
@@ -208,9 +192,8 @@ def test_analytics_roi_feedback_and_renewal_workflow(tmp_path):
         assert viewer_admin.status_code == 403, viewer_admin.text
 
 
-def test_core_module_events_are_sanitized_filterable_and_admin_only(tmp_path):
-    client = _client(tmp_path)
-    admin_headers = {"x-api-key": "test-key"}
+def test_core_module_events_are_sanitized_filterable_and_admin_only(client, api_headers):
+    admin_headers = api_headers
 
     with client:
         viewer_headers = _sign_up(client, "viewer@example.com")
@@ -316,8 +299,7 @@ def test_core_module_events_are_sanitized_filterable_and_admin_only(tmp_path):
         assert len(by_status.json()) == 3
 
 
-def test_analytics_endpoints_appear_in_openapi(tmp_path):
-    client = _client(tmp_path)
+def test_analytics_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

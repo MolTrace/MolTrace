@@ -1,7 +1,6 @@
 from tempfile import mkdtemp
 
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from starlette.requests import Request
 
@@ -275,27 +274,13 @@ def test_analyze_endpoint_rejects_mismatched_smiles_and_nmr_text() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _validate_client():
-    tmpdir = mkdtemp(prefix="nmrcheck-validate-")
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmpdir}/validate.sqlite3",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    init_db(app.state.session_factory)
-    return TestClient(app)
-
-
 _HEADERS = {"x-api-key": "test-key"}
 
 
-def test_validate_endpoint_both_inputs_match_marks_analysis_ready() -> None:
+def test_validate_endpoint_both_inputs_match_marks_analysis_ready(client) -> None:
     """Both SMILES and 1H NMR text supplied and they agree → analysis_ready=true,
     no errors, structure_nmr_match=true. This is the green-path the frontend
     renders as 'Validation passed — analysis ready'."""
-    client = _validate_client()
     response = client.post(
         "/analyze/validate",
         headers=_HEADERS,
@@ -315,12 +300,11 @@ def test_validate_endpoint_both_inputs_match_marks_analysis_ready() -> None:
     assert body["errors"] == []
 
 
-def test_validate_endpoint_smiles_only_returns_partial_no_errors() -> None:
+def test_validate_endpoint_smiles_only_returns_partial_no_errors(client) -> None:
     """SMILES alone is a valid input mode — backend returns
     structure_valid=true, nmr_text_valid=false, errors empty, with a warning
     about adding 1H NMR text. The frontend renders this as the 'Partial
     inputs — you can still proceed' state."""
-    client = _validate_client()
     response = client.post(
         "/analyze/validate",
         headers=_HEADERS,
@@ -335,9 +319,8 @@ def test_validate_endpoint_smiles_only_returns_partial_no_errors() -> None:
     assert any("1H NMR text" in warning for warning in body["warnings"])
 
 
-def test_validate_endpoint_nmr_text_only_returns_partial_no_errors() -> None:
+def test_validate_endpoint_nmr_text_only_returns_partial_no_errors(client) -> None:
     """Symmetric case: 1H NMR text alone is also a valid input mode."""
-    client = _validate_client()
     response = client.post(
         "/analyze/validate",
         headers=_HEADERS,
@@ -352,11 +335,10 @@ def test_validate_endpoint_nmr_text_only_returns_partial_no_errors() -> None:
     assert any("SMILES" in warning for warning in body["warnings"])
 
 
-def test_validate_endpoint_neither_input_returns_warnings_no_errors() -> None:
+def test_validate_endpoint_neither_input_returns_warnings_no_errors(client) -> None:
     """Empty payload — neither SMILES nor 1H NMR text. The endpoint still
     returns 200 with both warnings, no errors. The frontend renders this as
     'No inputs supplied — nothing to validate'."""
-    client = _validate_client()
     response = client.post(
         "/analyze/validate",
         headers=_HEADERS,
@@ -374,11 +356,10 @@ def test_validate_endpoint_neither_input_returns_warnings_no_errors() -> None:
     assert "1H NMR text" in joined
 
 
-def test_validate_endpoint_mismatch_emits_explicit_error() -> None:
+def test_validate_endpoint_mismatch_emits_explicit_error(client) -> None:
     """SMILES + non-matching NMR text → structure_nmr_match=false, errors
     populated with the specific mismatch (the frontend renders this as
     'Validation failed' with the backend error list)."""
-    client = _validate_client()
     response = client.post(
         "/analyze/validate",
         headers=_HEADERS,
@@ -402,11 +383,10 @@ def test_validate_endpoint_mismatch_emits_explicit_error() -> None:
     ), body["errors"]
 
 
-def test_validate_endpoint_carbon13_text_matches_structure() -> None:
+def test_validate_endpoint_carbon13_text_matches_structure(client) -> None:
     """SMILES + a 13C text whose signal count agrees with the carbon count →
     carbon13_text_valid and structure_carbon13_match both true, no errors.
     The validate card renders the 13C layer chips in their 'ok' state."""
-    client = _validate_client()
     response = client.post(
         "/analyze/validate",
         headers=_HEADERS,
@@ -427,10 +407,9 @@ def test_validate_endpoint_carbon13_text_matches_structure() -> None:
     assert body["errors"] == []
 
 
-def test_validate_endpoint_carbon13_overcount_emits_error() -> None:
+def test_validate_endpoint_carbon13_overcount_emits_error(client) -> None:
     """More 13C signals than carbon atoms → structure_carbon13_match false
     with an explicit mismatch error (the card renders 'Validation failed')."""
-    client = _validate_client()
     response = client.post(
         "/analyze/validate",
         headers=_HEADERS,
@@ -449,11 +428,10 @@ def test_validate_endpoint_carbon13_overcount_emits_error() -> None:
     assert any("¹³C NMR mismatch" in err for err in body["errors"]), body["errors"]
 
 
-def test_validate_endpoint_carbon13_text_only_returns_partial_no_errors() -> None:
+def test_validate_endpoint_carbon13_text_only_returns_partial_no_errors(client) -> None:
     """13C text alone is a valid input mode — the endpoint returns
     carbon13_text_valid true with no errors, and 13C absence of a SMILES /
     1H text keeps analysis_ready false (the card renders 'Partial inputs')."""
-    client = _validate_client()
     response = client.post(
         "/analyze/validate",
         headers=_HEADERS,
@@ -473,10 +451,9 @@ def test_validate_endpoint_carbon13_text_only_returns_partial_no_errors() -> Non
     assert body["errors"] == []
 
 
-def test_validate_endpoint_response_shape_matches_frontend_contract() -> None:
+def test_validate_endpoint_response_shape_matches_frontend_contract(client) -> None:
     """The frontend declares ValidationReport with a specific set of fields —
     this test asserts every one is present so the wire contract is locked."""
-    client = _validate_client()
     response = client.post(
         "/analyze/validate",
         headers=_HEADERS,

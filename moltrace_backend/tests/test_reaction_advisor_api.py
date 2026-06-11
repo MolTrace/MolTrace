@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'reaction_advisor.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app)
-
 
 def _sign_up(client: TestClient, email: str = "advisor@example.com") -> dict[str, str]:
     res = client.post(
@@ -136,8 +122,7 @@ def _manual_recommendation(
     return res.json()
 
 
-def test_advisor_run_uses_rule_based_mode_without_llm_provider(tmp_path):
-    client = _client(tmp_path)
+def test_advisor_run_uses_rule_based_mode_without_llm_provider(client):
     with client:
         headers = _sign_up(client, "advisor-run@example.com")
         project = _project(client, headers)
@@ -165,8 +150,7 @@ def test_advisor_run_uses_rule_based_mode_without_llm_provider(tmp_path):
         assert "External LLM guidance is not configured. Rule-based mechanistic advisor was used." in body["notes"]
 
 
-def test_safety_blocked_recommendation_is_not_accepted(tmp_path):
-    client = _client(tmp_path)
+def test_safety_blocked_recommendation_is_not_accepted(client):
     with client:
         headers = _sign_up(client, "advisor-safety@example.com")
         project = _project(client, headers)
@@ -190,8 +174,7 @@ def test_safety_blocked_recommendation_is_not_accepted(tmp_path):
         assert body["recommendation"] != "accept_for_review"
 
 
-def test_high_cost_recommendation_produces_cost_warning(tmp_path):
-    client = _client(tmp_path)
+def test_high_cost_recommendation_produces_cost_warning(client):
     with client:
         headers = _sign_up(client, "advisor-cost@example.com")
         project = _project(client, headers)
@@ -220,8 +203,7 @@ def test_high_cost_recommendation_produces_cost_warning(tmp_path):
         assert any(flag["type"] == "high_cost" for flag in body["risk_flags"])
 
 
-def test_low_data_project_labels_insufficient_information(tmp_path):
-    client = _client(tmp_path)
+def test_low_data_project_labels_insufficient_information(client):
     with client:
         headers = _sign_up(client, "advisor-low-data@example.com")
         project = _project(client, headers)
@@ -239,8 +221,7 @@ def test_low_data_project_labels_insufficient_information(tmp_path):
         assert "Insufficient information" in " ".join(body["warnings"])
 
 
-def test_mechanistic_hypothesis_can_be_created_and_updated(tmp_path):
-    client = _client(tmp_path)
+def test_mechanistic_hypothesis_can_be_created_and_updated(client):
     with client:
         headers = _sign_up(client, "advisor-hypothesis@example.com")
         project = _project(client, headers)
@@ -264,8 +245,7 @@ def test_mechanistic_hypothesis_can_be_created_and_updated(tmp_path):
         assert updated.json()["confidence_label"] == "medium"
 
 
-def test_literature_prior_can_be_created_and_listed(tmp_path):
-    client = _client(tmp_path)
+def test_literature_prior_can_be_created_and_listed(client):
     with client:
         headers = _sign_up(client, "advisor-literature@example.com")
         project = _project(client, headers)
@@ -288,8 +268,7 @@ def test_literature_prior_can_be_created_and_listed(tmp_path):
         assert listed.json()[0]["title"] == "Internal amidation note"
 
 
-def test_bo_vs_advisor_comparison_and_review_endpoint(tmp_path):
-    client = _client(tmp_path)
+def test_bo_vs_advisor_comparison_and_review_endpoint(client):
     with client:
         headers = _sign_up(client, "advisor-compare@example.com")
         project = _project(client, headers)
@@ -334,8 +313,7 @@ def test_bo_vs_advisor_comparison_and_review_endpoint(tmp_path):
         assert review.json()["metadata"]["review"]["decision"] == "reviewed"
 
 
-def test_phase51_openapi_includes_advisor_endpoints(tmp_path):
-    client = _client(tmp_path)
+def test_phase51_openapi_includes_advisor_endpoints(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

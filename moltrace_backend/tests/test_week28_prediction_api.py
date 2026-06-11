@@ -1,29 +1,12 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
 ETHANOL_1H = "1H NMR delta 3.65 (q, 2H), 1.26 (t, 3H), 2.10 (br s, 1H)"
 ETHANOL_13C = "13C NMR delta 58.3, 18.2."
 
 
-def client_with_key(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'pred.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
-def test_prediction_nmr_preview_endpoint(tmp_path):
-    client, headers = client_with_key(tmp_path)
+def test_prediction_nmr_preview_endpoint(client, api_headers):
     with client:
         res = client.post(
             "/prediction/nmr/preview",
-            headers=headers,
+            headers=api_headers,
             json={"name": "ethanol", "smiles": "CCO"},
         )
     assert res.status_code == 200
@@ -33,12 +16,11 @@ def test_prediction_nmr_preview_endpoint(tmp_path):
     assert data["carbon13_peaks"]
 
 
-def test_prediction_nmr_match_endpoint_ranks_candidates(tmp_path):
-    client, headers = client_with_key(tmp_path)
+def test_prediction_nmr_match_endpoint_ranks_candidates(client, api_headers):
     with client:
         res = client.post(
             "/prediction/nmr/match",
-            headers=headers,
+            headers=api_headers,
             json={
                 "solvent": "CDCl3",
                 "observed_proton_text": ETHANOL_1H,
@@ -56,8 +38,7 @@ def test_prediction_nmr_match_endpoint_ranks_candidates(tmp_path):
     assert data["evidence_layers_used"] == ["1H predicted-match", "13C predicted-match"]
 
 
-def test_prediction_nmr_match_evidence_accepts_hsqc_file(tmp_path):
-    client, headers = client_with_key(tmp_path)
+def test_prediction_nmr_match_evidence_accepts_hsqc_file(client, api_headers):
     files = {
         "observed_nmr2d_file": (
             "ethanol_hsqc.csv",
@@ -72,7 +53,7 @@ def test_prediction_nmr_match_evidence_accepts_hsqc_file(tmp_path):
         "nmr2d_experiment_type": "HSQC",
     }
     with client:
-        res = client.post("/prediction/nmr/match/evidence", headers=headers, data=data, files=files)
+        res = client.post("/prediction/nmr/match/evidence", headers=api_headers, data=data, files=files)
     assert res.status_code == 200
     body = res.json()
     assert body["best_candidate"]["name"] == "ethanol"
@@ -93,12 +74,11 @@ def test_prediction_nmr_match_evidence_accepts_hsqc_file(tmp_path):
     assert len(provenance["candidates_text"]["sha256"]) == 64
 
 
-def test_prediction_nmr_match_evidence_rejects_malformed_2d_file(tmp_path):
-    client, headers = client_with_key(tmp_path)
+def test_prediction_nmr_match_evidence_rejects_malformed_2d_file(client, api_headers):
     files = {"observed_nmr2d_file": ("bad.csv", b"not,a,valid,table\n1,2,3,4\n", "text/csv")}
     data = {"candidates_text": "ethanol | CCO | proposed", "nmr2d_experiment_type": "HSQC"}
     with client:
-        res = client.post("/prediction/nmr/match/evidence", headers=headers, data=data, files=files)
+        res = client.post("/prediction/nmr/match/evidence", headers=api_headers, data=data, files=files)
     assert res.status_code == 400
     detail = res.json()["detail"]
     assert detail["error"]["code"] == "invalid_observed_nmr2d_file"
@@ -106,8 +86,7 @@ def test_prediction_nmr_match_evidence_rejects_malformed_2d_file(tmp_path):
     assert detail["limitations"]
 
 
-def test_prediction_nmr_match_evidence_accepts_frontend_formdata_payload(tmp_path):
-    client, headers = client_with_key(tmp_path)
+def test_prediction_nmr_match_evidence_accepts_frontend_formdata_payload(client, api_headers):
     data = {
         "candidates_text": (
             "Ethanol | CCO | proposed\n"
@@ -120,7 +99,7 @@ def test_prediction_nmr_match_evidence_accepts_frontend_formdata_payload(tmp_pat
         "sample_id": "frontend-test-001",
     }
     with client:
-        res = client.post("/prediction/nmr/match/evidence", headers=headers, data=data)
+        res = client.post("/prediction/nmr/match/evidence", headers=api_headers, data=data)
     assert res.status_code == 200
     body = res.json()
     assert body["sample_id"] == "frontend-test-001"
@@ -145,12 +124,11 @@ def test_prediction_nmr_match_evidence_accepts_frontend_formdata_payload(tmp_pat
     assert body["notes"]
 
 
-def test_prediction_nmr_match_evidence_rejects_empty_candidate_form_with_structured_error(tmp_path):
-    client, headers = client_with_key(tmp_path)
+def test_prediction_nmr_match_evidence_rejects_empty_candidate_form_with_structured_error(client, api_headers):
     with client:
         res = client.post(
             "/prediction/nmr/match/evidence",
-            headers=headers,
+            headers=api_headers,
             data={"candidates_text": "   ", "observed_proton_text": ETHANOL_1H},
         )
     assert res.status_code == 400
@@ -159,8 +137,7 @@ def test_prediction_nmr_match_evidence_rejects_empty_candidate_form_with_structu
     assert "requires human review" in detail["notes"][0]
 
 
-def test_prediction_nmr_match_evidence_openapi_includes_moltrace_contract_fields(tmp_path):
-    client, _headers = client_with_key(tmp_path)
+def test_prediction_nmr_match_evidence_openapi_includes_moltrace_contract_fields(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200

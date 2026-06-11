@@ -17,23 +17,6 @@ from __future__ import annotations
 
 import math
 
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path) -> tuple[object, TestClient]:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'gsd-telemetry.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return app, TestClient(app)
-
 
 def _synthetic_cdcl3_spectrum() -> tuple[list[float], list[float]]:
     """A minimal 1H spectrum with a CDCl3 residual at ~7.26 ppm.
@@ -59,10 +42,9 @@ def _synthetic_cdcl3_spectrum() -> tuple[list[float], list[float]]:
     return ppm, intensity
 
 
-def test_spectrum_analyze_gsd_emits_telemetry_audit_event(tmp_path) -> None:
+def test_spectrum_analyze_gsd_emits_telemetry_audit_event(client, api_headers) -> None:
     """Happy-path GSD invocation writes one ``spectrum.analyze_gsd`` event."""
-    _, client = _client(tmp_path)
-    headers = {"x-api-key": "test-key"}
+    headers = api_headers
 
     ppm, intensity = _synthetic_cdcl3_spectrum()
     with client:
@@ -132,10 +114,9 @@ def test_spectrum_analyze_gsd_emits_telemetry_audit_event(tmp_path) -> None:
         assert "error_kind" not in meta
 
 
-def test_spectrum_analyze_gsd_emits_telemetry_on_validation_error(tmp_path) -> None:
+def test_spectrum_analyze_gsd_emits_telemetry_on_validation_error(client, api_headers) -> None:
     """Validation failure (mismatched array lengths) still writes one event."""
-    _, client = _client(tmp_path)
-    headers = {"x-api-key": "test-key"}
+    headers = api_headers
 
     with client:
         res = client.post(
@@ -181,15 +162,14 @@ def test_spectrum_analyze_gsd_emits_telemetry_on_validation_error(tmp_path) -> N
         assert isinstance(meta["wall_ms"], int) and meta["wall_ms"] >= 0
 
 
-def test_spectrum_analyze_gsd_telemetry_does_not_break_handler(tmp_path) -> None:
+def test_spectrum_analyze_gsd_telemetry_does_not_break_handler(client, api_headers) -> None:
     """Even if telemetry would somehow fail, the analysis response is intact.
 
     Smoke check that the response payload is well-formed after the
     telemetry call returns — i.e. the telemetry emission is non-blocking
     and does not mutate the response.
     """
-    _, client = _client(tmp_path)
-    headers = {"x-api-key": "test-key"}
+    headers = api_headers
 
     ppm, intensity = _synthetic_cdcl3_spectrum()
     with client:

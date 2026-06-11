@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'spectracheck_persistence.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
 
 def _create_project_sample_session(client: TestClient, headers: dict):
     project_res = client.post(
@@ -67,8 +53,8 @@ def _create_project_sample_session(client: TestClient, headers: dict):
     return project, sample, session
 
 
-def test_spectracheck_project_sample_session_persistence_flow(tmp_path):
-    client, headers = _client(tmp_path)
+def test_spectracheck_project_sample_session_persistence_flow(client, api_headers):
+    headers = api_headers
     with client:
         project, sample, session = _create_project_sample_session(client, headers)
 
@@ -203,12 +189,8 @@ def test_spectracheck_project_sample_session_persistence_flow(tmp_path):
         assert reports_res.json()[0]["id"] == report["id"]
 
 
-def test_spectracheck_persistence_endpoints_appear_in_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
-    with client:
-        res = client.get("/openapi.json")
-    assert res.status_code == 200
-    paths = res.json()["paths"]
+def test_spectracheck_persistence_endpoints_appear_in_openapi(openapi_schema):
+    paths = openapi_schema["paths"]
     required_paths = [
         "/projects",
         "/projects/{project_id}",

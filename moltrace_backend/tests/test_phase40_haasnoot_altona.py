@@ -29,9 +29,7 @@ Coverage:
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
 from nmrcheck.jcoupling_prediction import (
     KARPLUS_CATEGORY_GENERIC,
     KARPLUS_CATEGORY_HAASNOOT_ALTONA,
@@ -45,7 +43,6 @@ from nmrcheck.models import (
     UnifiedCandidateConfidenceRequest,
 )
 from nmrcheck.multiplet_jcoupling_bridge import score_multiplets_against_candidates
-from nmrcheck.settings import Settings
 from nmrcheck.unified_confidence import _bridge_multiplet_jcoupling_request
 
 # trans-decalin: rigid trans-fused bicyclic (no ring flip) -> a covalently
@@ -241,14 +238,7 @@ def test_unified_threads_method_into_bridge_request() -> None:
     assert bridged.karplus_max_conformers == 9
 
 
-def test_jcoupling_endpoint_accepts_method(tmp_path) -> None:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase40_hla.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
+def test_jcoupling_endpoint_accepts_method(client, api_headers) -> None:
     payload = {
         "sample_id": "phase40-endpoint",
         "candidates": [{"name": "glucose", "smiles": BETA_D_GLUCOSE}],
@@ -257,8 +247,8 @@ def test_jcoupling_endpoint_accepts_method(tmp_path) -> None:
         "karplus_method": "haasnoot_altona",
         "karplus_max_conformers": 8,
     }
-    headers = {"x-api-key": "test-key"}
-    with TestClient(app) as client:
+    headers = api_headers
+    with client:
         res = client.post("/candidates/compare/jcoupling", headers=headers, json=payload)
         assert res.status_code == 200, res.text
         assert res.json()["metadata"]["karplus_method"] == "haasnoot_altona"

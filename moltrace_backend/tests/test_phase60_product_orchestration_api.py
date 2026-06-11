@@ -1,20 +1,6 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
 DEFAULT_PROGRAM_ORDER = ["spectracheck", "regulatory_hub", "reaction_optimization"]
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'phase60_product_orchestration.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
 
 
 def _dossier(client: TestClient, headers: dict[str, str]) -> dict:
@@ -127,8 +113,8 @@ def _active_impurity_rule_set(client: TestClient, headers: dict[str, str]) -> di
     return response.json()
 
 
-def test_phase60_product_program_order_and_module_priority(tmp_path):
-    client, headers = _client(tmp_path)
+def test_phase60_product_program_order_and_module_priority(client, api_headers):
+    headers = api_headers
     with client:
         programs = client.get("/product/programs", headers=headers)
         assert programs.status_code == 200, programs.text
@@ -142,8 +128,8 @@ def test_phase60_product_program_order_and_module_priority(tmp_path):
         assert by_context["project"] == DEFAULT_PROGRAM_ORDER
 
 
-def test_phase60_cross_module_orchestration_workflow(tmp_path):
-    client, headers = _client(tmp_path)
+def test_phase60_cross_module_orchestration_workflow(client, api_headers):
+    headers = api_headers
     with client:
         dossier = _dossier(client, headers)
         reaction_project = _reaction_project(client, headers)
@@ -267,8 +253,7 @@ def test_phase60_cross_module_orchestration_workflow(tmp_path):
         assert center_body["reaction_summary_json"]["display_order"] == 3
 
 
-def test_phase60_product_orchestration_openapi(tmp_path):
-    client, _headers = _client(tmp_path)
+def test_phase60_product_orchestration_openapi(client):
     with client:
         response = client.get("/openapi.json")
     assert response.status_code == 200, response.text

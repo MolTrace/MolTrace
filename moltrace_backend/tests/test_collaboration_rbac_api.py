@@ -1,19 +1,5 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'collaboration.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app)
-
 
 def _sign_up(client: TestClient, email: str) -> dict[str, str]:
     res = client.post(
@@ -89,8 +75,7 @@ def _create_project_session_report(client: TestClient, headers: dict[str, str]):
     return project, sample, session, evidence, report
 
 
-def test_collaboration_rbac_human_review_workflow_and_audit(tmp_path):
-    client = _client(tmp_path)
+def test_collaboration_rbac_human_review_workflow_and_audit(client, api_headers):
     with client:
         owner_headers = _sign_up(client, "owner@example.com")
         viewer_headers = _sign_up(client, "viewer@example.com")
@@ -245,7 +230,7 @@ def test_collaboration_rbac_human_review_workflow_and_audit(tmp_path):
 
         audit_res = client.get(
             "/audit",
-            headers={"x-api-key": "test-key"},
+            headers=api_headers,
             params={"limit": 100, "entity_type": "approval_record"},
         )
         assert audit_res.status_code == 200, audit_res.text
@@ -255,8 +240,7 @@ def test_collaboration_rbac_human_review_workflow_and_audit(tmp_path):
         )
 
 
-def test_collaboration_endpoints_appear_in_openapi(tmp_path):
-    client = _client(tmp_path)
+def test_collaboration_endpoints_appear_in_openapi(client):
     with client:
         res = client.get("/openapi.json")
     assert res.status_code == 200, res.text

@@ -1,20 +1,3 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'structure_report.sqlite3'}",
-            require_verified_email=False,
-            api_key="test-key",
-        )
-    )
-    return TestClient(app), {"x-api-key": "test-key"}
-
-
 def _unified_payload():
     best = {
         "rank": 1,
@@ -69,8 +52,8 @@ def _unified_payload():
     }
 
 
-def test_structure_report_compose_endpoint_accepts_unified_result(tmp_path):
-    client, headers = _client(tmp_path)
+def test_structure_report_compose_endpoint_accepts_unified_result(client, api_headers):
+    headers = api_headers
     payload = {
         "report_title": "Regulatory-ready Structure Elucidation Report",
         "require_human_approval": True,
@@ -87,8 +70,8 @@ def test_structure_report_compose_endpoint_accepts_unified_result(tmp_path):
     assert data["provenance"]["html_report_sha256"]
 
 
-def test_structure_report_evidence_endpoint_runs_unified_request(tmp_path):
-    client, headers = _client(tmp_path)
+def test_structure_report_evidence_endpoint_runs_unified_request(client, api_headers):
+    headers = api_headers
     data = {
         "candidates_text": "methanol | CO | alternate\nethanol | CCO | proposed",
         "hrms_observed_mz": "47.04914",
@@ -106,8 +89,8 @@ def test_structure_report_evidence_endpoint_runs_unified_request(tmp_path):
     assert body["provenance"]["source_files"] == ["ethanol_hrms.csv"]
 
 
-def test_structure_report_html_endpoint_escapes_payload(tmp_path):
-    client, headers = _client(tmp_path)
+def test_structure_report_html_endpoint_escapes_payload(client, api_headers):
+    headers = api_headers
     payload = {
         "report_title": "<script>alert('x')</script>",
         "project_name": "<b>Project</b>",

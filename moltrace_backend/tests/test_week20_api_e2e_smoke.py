@@ -1,13 +1,5 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def test_register_login_validate_analyze_workspace_report_smoke(tmp_path) -> None:
-    db_url = f"sqlite:///{tmp_path / 'nmrcheck_test.sqlite3'}"
-    app = create_app(Settings(database_url=db_url, require_verified_email=False, api_key="test-key"))
-    with TestClient(app) as client:
+def test_register_login_validate_analyze_workspace_report_smoke(client, api_headers) -> None:
+    with client:
         email = "week20@example.com"
         password = "StrongPassword123!"
         reg = client.post("/auth/register", json={"email": email, "password": password})

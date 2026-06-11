@@ -1,12 +1,5 @@
-from fastapi.testclient import TestClient
-
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def test_lcms_feature_family_consensus_endpoint(tmp_path):
-    app = create_app(Settings(database_url=f"sqlite:///{tmp_path / 'lcms_consensus.sqlite3'}", require_verified_email=False, api_key="test-key"))
-    with TestClient(app) as client:
+def test_lcms_feature_family_consensus_endpoint(client):
+    with client:
         client.post("/auth/register", json={"email": "consensus@example.com", "password": "StrongPassword123!"})
         login = client.post("/auth/login", json={"email": "consensus@example.com", "password": "StrongPassword123!"})
         assert login.status_code == 200

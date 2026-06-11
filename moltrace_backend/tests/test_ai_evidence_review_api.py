@@ -1,20 +1,6 @@
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
 from nmrcheck.orm import AIEvidenceItemORM
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path):
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'ai-evidence-review.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return app, TestClient(app)
 
 
 def _sign_up(client: TestClient, email: str) -> dict[str, str]:
@@ -50,10 +36,7 @@ def _insert_evidence(app, *, status: str = "pending_review") -> int:
         return int(row.id)
 
 
-def test_ai_evidence_queue_review_creates_audit_event(tmp_path):
-    app, client = _client(tmp_path)
-    api_headers = {"x-api-key": "test-key"}
-
+def test_ai_evidence_queue_review_creates_audit_event(app, client, api_headers):
     with client:
         reviewer_headers = _sign_up(client, "reviewer@example.com")
         evidence_id = _insert_evidence(app)
@@ -107,9 +90,7 @@ def test_ai_evidence_queue_review_creates_audit_event(tmp_path):
         assert audit_events[0]["metadata"]["chain_of_thought_exposed"] is False
 
 
-def test_ai_evidence_queue_reject_and_comment_validation(tmp_path):
-    app, client = _client(tmp_path)
-
+def test_ai_evidence_queue_reject_and_comment_validation(app, client):
     with client:
         reviewer_headers = _sign_up(client, "rejector@example.com")
         evidence_id = _insert_evidence(app)

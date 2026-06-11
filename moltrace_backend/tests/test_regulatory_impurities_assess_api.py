@@ -12,29 +12,12 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from nmrcheck.api import create_app
-from nmrcheck.settings import Settings
-
-
-def _client(tmp_path) -> TestClient:
-    app = create_app(
-        Settings(
-            database_url=f"sqlite:///{tmp_path / 'impurities.sqlite3'}",
-            api_key="test-key",
-            require_verified_email=False,
-            admin_emails=("admin@example.com",),
-        )
-    )
-    return TestClient(app)
-
-
 def _post(client: TestClient, body: dict, key: str | None = "test-key"):
     headers = {"x-api-key": key} if key else {}
     return client.post("/regulatory/impurities/assess", headers=headers, json=body)
 
 
-def test_full_assessment_exercises_all_five_engines(tmp_path):
-    client = _client(tmp_path)
+def test_full_assessment_exercises_all_five_engines(client):
     body = {
         "daily_dose_g": 1.0,
         "route": "oral",
@@ -95,8 +78,7 @@ def test_full_assessment_exercises_all_five_engines(tmp_path):
     assert "decision-support" in j["disclaimer"].lower()
 
 
-def test_empty_request_returns_thresholds_only(tmp_path):
-    client = _client(tmp_path)
+def test_empty_request_returns_thresholds_only(client):
     with client:
         res = _post(client, {"daily_dose_g": 0.5})
     assert res.status_code == 200, res.text
@@ -108,8 +90,7 @@ def test_empty_request_returns_thresholds_only(tmp_path):
     assert j["nitrosamine_cumulative_risk"] is None
 
 
-def test_unknown_solvent_is_explicit_not_an_error(tmp_path):
-    client = _client(tmp_path)
+def test_unknown_solvent_is_explicit_not_an_error(client):
     with client:
         res = _post(
             client, {"daily_dose_g": 1.0, "residual_solvents": [{"identifier": "unobtainium"}]}
@@ -120,8 +101,7 @@ def test_unknown_solvent_is_explicit_not_an_error(tmp_path):
     assert sol["class_number"] is None
 
 
-def test_unknown_element_degrades_to_warning(tmp_path):
-    client = _client(tmp_path)
+def test_unknown_element_degrades_to_warning(client):
     with client:
         res = _post(client, {"daily_dose_g": 1.0, "elemental_impurities": [{"element": "Fe"}]})
     assert res.status_code == 200, res.text
@@ -130,8 +110,7 @@ def test_unknown_element_degrades_to_warning(tmp_path):
     assert any("Fe" in w for w in j["warnings"])
 
 
-def test_invalid_smiles_degrades_to_warning(tmp_path):
-    client = _client(tmp_path)
+def test_invalid_smiles_degrades_to_warning(client):
     with client:
         res = _post(
             client,
@@ -143,8 +122,7 @@ def test_invalid_smiles_degrades_to_warning(tmp_path):
     assert len(j["warnings"]) == 1
 
 
-def test_cutaneous_route_skips_q3c_with_warning(tmp_path):
-    client = _client(tmp_path)
+def test_cutaneous_route_skips_q3c_with_warning(client):
     with client:
         res = _post(
             client,
@@ -160,8 +138,7 @@ def test_cutaneous_route_skips_q3c_with_warning(tmp_path):
     assert any("q3c" in w.lower() and "cutaneous" in w.lower() for w in j["warnings"])
 
 
-def test_cumulative_risk_passes_when_below_one(tmp_path):
-    client = _client(tmp_path)
+def test_cumulative_risk_passes_when_below_one(client):
     with client:
         res = _post(
             client,
@@ -179,22 +156,19 @@ def test_cumulative_risk_passes_when_below_one(tmp_path):
     assert cr["passes"] is True  # 10/26.5 + 10/26.5 < 1
 
 
-def test_requires_auth(tmp_path):
-    client = _client(tmp_path)
+def test_requires_auth(client):
     with client:
         res = _post(client, {"daily_dose_g": 1.0}, key=None)
     assert res.status_code == 401
 
 
-def test_nonpositive_dose_is_422(tmp_path):
-    client = _client(tmp_path)
+def test_nonpositive_dose_is_422(client):
     with client:
         res = _post(client, {"daily_dose_g": 0.0})
     assert res.status_code == 422  # Field(gt=0.0)
 
 
-def test_openapi_registers_the_contract(tmp_path):
-    client = _client(tmp_path)
+def test_openapi_registers_the_contract(client):
     with client:
         spec = client.get("/openapi.json").json()
     assert "/regulatory/impurities/assess" in spec["paths"]
