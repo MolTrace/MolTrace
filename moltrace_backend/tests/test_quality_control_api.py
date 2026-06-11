@@ -1,5 +1,6 @@
 import json
 
+from fastapi.testclient import TestClient
 
 
 def _create_session(client: TestClient, headers: dict):

@@ -1,6 +1,7 @@
 import hashlib
 import json
 
+from fastapi.testclient import TestClient
 
 
 def _connector(client: TestClient, headers: dict[str, str]) -> dict:
