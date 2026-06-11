@@ -86,6 +86,7 @@ async def _process(fixture_zip: Path) -> int:
     return result.peak_count
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "fixture_name",
     [
@@ -108,6 +109,7 @@ def test_raw_fid_process_no_longer_zero_peaks(fixture_name: str) -> None:
     )
 
 
+@pytest.mark.slow
 def test_raw_fid_process_recovers_dense_13c_60000006() -> None:
     """The previously-slow fixture (was 241s zero-peak, then 5.5 min) now ~40s.
 

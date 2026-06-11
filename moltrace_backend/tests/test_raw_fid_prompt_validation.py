@@ -30,6 +30,7 @@ from nmrcheck.settings import Settings
 pytest.importorskip("nmrglue")
 
 
+@pytest.mark.slow
 def test_raw_fid_prompt_fixture_report_is_reporting_only(tmp_path: Path) -> None:
     fixture_root = Path(__file__).parent / "fixtures" / "nmrshiftdb2"
 
@@ -261,6 +262,7 @@ def test_raw_fid_prompt_fixture_report_is_reporting_only(tmp_path: Path) -> None
     assert row["fixture_id"] in readiness_markdown
 
 
+@pytest.mark.slow
 def test_raw_fid_prompt_fixture_report_can_include_varian_fixture() -> None:
     fixture_root = Path(__file__).parent / "fixtures" / "nmrshiftdb2"
     varian_root = Path(__file__).parent / "fixtures" / "nmrglue" / "varian"

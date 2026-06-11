@@ -116,6 +116,7 @@ def test_prompt3_gsd_harness_smoke_and_baseline_floor() -> None:
     )
 
 
+@pytest.mark.slow
 def test_prompt3_gsd_meets_promotion_gate() -> None:
     """Strict promotion gate.
 
