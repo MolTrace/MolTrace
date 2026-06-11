@@ -2114,6 +2114,19 @@ export function RegulatoryDossierWorkspace() {
       regulatory_query_result: queryResult,
       submission_package_by_dossier: submissionPackageByDossier,
       submission_package_by_id: submissionPackageById,
+      // Previously omitted — these are all loaded into state by this workspace
+      // but were absent from the Developer JSON, so the panel showed only a
+      // partial view. Surface every loaded sub-resource for parity.
+      impurity_register: impurityRegisterRows,
+      residual_solvent_assessments: residualAssessments,
+      nitrosamine_assessments: nitrosamineAssessments,
+      nitrosamine_cumulative_risk: nitrosamineCumulativeRisk,
+      rule_sets: ruleSets,
+      qnmr_profiles: qnmrProfiles,
+      method_validation_profiles: methodProfiles,
+      ai_governance_records: aiGovernanceRecords,
+      jurisdictional_maps: jurisdictionalMaps,
+      change_impact: changeImpact,
     }),
     [
       dossier,
@@ -2125,6 +2138,16 @@ export function RegulatoryDossierWorkspace() {
       queryResult,
       submissionPackageByDossier,
       submissionPackageById,
+      impurityRegisterRows,
+      residualAssessments,
+      nitrosamineAssessments,
+      nitrosamineCumulativeRisk,
+      ruleSets,
+      qnmrProfiles,
+      methodProfiles,
+      aiGovernanceRecords,
+      jurisdictionalMaps,
+      changeImpact,
     ]
   )
 
@@ -6006,6 +6029,27 @@ export function RegulatoryDossierWorkspace() {
                       {dictListField(readinessReport, "gaps_json").length ? (
                         <ul className="space-y-2 font-mono text-[11px] text-muted-foreground">
                           {dictListField(readinessReport, "gaps_json").map((row, i) => (
+                            <li key={i} className="break-all rounded-md border bg-muted/30 p-2">
+                              {JSON.stringify(row)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">—</p>
+                      )}
+                    </div>
+
+                    {/* evidence_json from the readiness report — the satisfied
+                        requirement→evidence links the report rolled up. Previously
+                        loaded but only counted for analytics (evidence_link_count);
+                        now rendered so reviewers see what evidence backs the report. */}
+                    <div>
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                        evidence links · {dictListField(readinessReport, "evidence_json").length}
+                      </p>
+                      {dictListField(readinessReport, "evidence_json").length ? (
+                        <ul className="space-y-2 font-mono text-[11px] text-muted-foreground">
+                          {dictListField(readinessReport, "evidence_json").map((row, i) => (
                             <li key={i} className="break-all rounded-md border bg-muted/30 p-2">
                               {JSON.stringify(row)}
                             </li>
