@@ -267,6 +267,11 @@ def test_regulatory_risk_review_and_readiness_report(client):
         assert readiness["gaps_json"]
         assert readiness["risks_json"]["overall_risk"] == "critical"
         assert readiness["human_review_required"] is True
+        # Provenance: a persisted readiness report carries a stable sha256 content
+        # hash in metadata_json.report_hash (what the dossier UI surfaces).
+        report_hash = readiness["metadata_json"]["report_hash"]
+        assert isinstance(report_hash, str) and len(report_hash) == 64
+        assert all(c in "0123456789abcdef" for c in report_hash)
 
         fetched_report = client.get(
             f"/regulatory/readiness-reports/{readiness['id']}",
