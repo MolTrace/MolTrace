@@ -95,7 +95,9 @@ def test_patch_cannot_assign_another_users_project(tmp_path):
         alice = _sign_up(client, "alice@example.com")
         bob = _sign_up(client, "bob@example.com")
         alice_project = _project(client, alice, "Alice project")
-        dossier_id = _create_dossier(client, SYSTEM).json()["id"]  # created with no project link
+        # Bob owns the dossier (so he passes the dossier-access gate), then tries to link
+        # Alice's project — the project-link write scoping rejects it.
+        dossier_id = _create_dossier(client, bob).json()["id"]
         res = client.patch(
             f"/regulatory/dossiers/{dossier_id}",
             headers=bob,
@@ -113,7 +115,14 @@ def test_patch_unrelated_field_does_not_recheck_inherited_project(tmp_path):
         alice = _sign_up(client, "alice@example.com")
         bob = _sign_up(client, "bob@example.com")
         alice_project = _project(client, alice, "Alice project")
-        dossier_id = _create_dossier(client, SYSTEM, project_id=alice_project).json()["id"]
+        # Bob owns the dossier; the SYSTEM key links it to Alice's project (system bypasses
+        # project ownership). Bob then patches an unrelated field — the inherited link is
+        # not re-validated, so it succeeds.
+        dossier_id = _create_dossier(client, bob).json()["id"]
+        linked = client.patch(
+            f"/regulatory/dossiers/{dossier_id}", headers=SYSTEM, json={"project_id": alice_project}
+        )
+        assert linked.status_code == 200, linked.text
         res = client.patch(
             f"/regulatory/dossiers/{dossier_id}",
             headers=bob,
@@ -140,27 +149,26 @@ def test_owner_can_patch_assign_own_project(tmp_path):
 
 
 def test_patch_cannot_mutate_existing_link_to_unowned_project(tmp_path):
-    # The takeover shape: a dossier already linked to one of Alice's projects must not be
-    # re-pointed by Bob to ANOTHER project he does not own, and the stored link is preserved.
+    # The takeover shape: Bob owns a dossier linked to his own project and must not be able to
+    # re-point it to Alice's project; the stored link is preserved.
     client = TestClient(_app(tmp_path))
     with client:
         alice = _sign_up(client, "alice@example.com")
         bob = _sign_up(client, "bob@example.com")
-        alice_p1 = _project(client, alice, "Alice project one")
-        alice_p2 = _project(client, alice, "Alice project two")
-        dossier_id = _create_dossier(client, SYSTEM, project_id=alice_p1).json()["id"]
+        bob_project = _project(client, bob, "Bob project")
+        alice_project = _project(client, alice, "Alice project")
+        dossier_id = _create_dossier(client, bob, project_id=bob_project).json()["id"]
         res = client.patch(
             f"/regulatory/dossiers/{dossier_id}",
             headers=bob,
-            json={"project_id": alice_p2},
+            json={"project_id": alice_project},
         )
         assert res.status_code == 404, res.text
         assert "Project not found." in res.json()["detail"]
-        # Verify the link is untouched via the SYSTEM key — the system-created dossier has
-        # no owner, so bob (a non-owner bearer) can no longer read it under read-scoping.
-        got = client.get(f"/regulatory/dossiers/{dossier_id}", headers=SYSTEM)
+        # Bob owns the dossier, so he can read it back; the link is unchanged.
+        got = client.get(f"/regulatory/dossiers/{dossier_id}", headers=bob)
         assert got.status_code == 200, got.text
-        assert got.json()["project_id"] == alice_p1  # link unchanged
+        assert got.json()["project_id"] == bob_project  # link unchanged
 
 
 def test_owner_can_repoint_between_own_projects(tmp_path):

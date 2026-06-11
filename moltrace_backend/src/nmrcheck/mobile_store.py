@@ -1074,6 +1074,16 @@ def _apply_synced_draft(
     )
 
 
+def _mobile_can_access_dossier(dossier: RegulatoryDossierORM, actor: MobileActor) -> bool:
+    """A mobile sync may mutate a dossier only if the actor owns it (a system api key acts
+    across users). A NULL-owner dossier is reachable only by the system key — consistent with
+    the v0.24.0 read-scoping rule, where unowned and not-yours are indistinguishable.
+    """
+    if actor.system_api_key:
+        return True
+    return actor.user_id is not None and dossier.created_by_user_id == actor.user_id
+
+
 def _apply_review_decision(
     session: Session,
     row: MobileActionDraftORM,
@@ -1169,7 +1179,7 @@ def _apply_review_decision(
     if target_type in {"regulatory_dossier", "dossier"}:
         target_id = _target_int(row)
         dossier = session.get(RegulatoryDossierORM, target_id)
-        if dossier is None:
+        if dossier is None or not _mobile_can_access_dossier(dossier, actor):
             raise MobileSyncValidationError(["target_not_found: regulatory_dossier"])
         decision = _normalized_decision(payload)
         if decision not in {"approve", "approved", "needs_changes", "reject", "rejected", "defer", "deferred"}:

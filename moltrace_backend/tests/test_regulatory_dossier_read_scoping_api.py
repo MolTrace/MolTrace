@@ -12,6 +12,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from nmrcheck.api import create_app
+from nmrcheck.mobile_store import MobileActor, _mobile_can_access_dossier
 from nmrcheck.orm import AuditEventORM, Base, RegulatoryDossierORM, UserORM
 from nmrcheck.settings import Settings
 
@@ -259,3 +260,53 @@ def test_query_param_dossier_reads_reject_cross_user(tmp_path):
             assert bob_res.status_code == 200, bob_res.text
             assert bob_res.json() == []
             assert client.get(ep, headers=SYSTEM, params={"dossier_id": did}).status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# Write access: the same owner gate now guards POST/PATCH under a dossier.
+# --------------------------------------------------------------------------- #
+def test_write_to_dossier_requires_ownership(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        bob = _sign_up(client, "bob@example.com")
+        did = _create_dossier(client, alice)
+
+        def watch(headers):
+            return client.post(
+                f"/regulatory/dossiers/{did}/nitrosamine-watch",
+                headers=headers,
+                json={"structure_text": "CN(C)N=O"},
+            )
+
+        # A non-owner POST is blocked at the access gate; owner + system succeed.
+        assert watch(bob).status_code == 404
+        assert watch(alice).status_code == 201
+        assert watch(SYSTEM).status_code == 201
+        # PATCH is gated identically.
+        assert client.patch(f"/regulatory/dossiers/{did}", headers=bob, json={"title": "x"}).status_code == 404
+        assert client.patch(f"/regulatory/dossiers/{did}", headers=alice, json={"title": "x"}).status_code == 200
+
+
+def test_bridge_by_id_reads_404_for_unknown_id(tmp_path):
+    # Wiring smoke for the cross-module bridge by-id gate (the ownership logic is the same
+    # _readable_via_parent_dossier helper proven by the readiness-report by-child test).
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        for ep in ("/bridges/spectroscopy-to-regulatory/999999", "/bridges/regulatory-to-reaction/999999"):
+            assert client.get(ep, headers=alice).status_code == 404
+
+
+# --------------------------------------------------------------------------- #
+# Mobile review-decision sync: a draft may mutate a dossier only if the actor owns it.
+# --------------------------------------------------------------------------- #
+def test_mobile_dossier_access_rule():
+    owned = RegulatoryDossierORM(title="owned", created_by_user_id=7)
+    system_made = RegulatoryDossierORM(title="system", created_by_user_id=None)
+    assert _mobile_can_access_dossier(owned, MobileActor(user_id=7)) is True
+    assert _mobile_can_access_dossier(owned, MobileActor(user_id=8)) is False
+    assert _mobile_can_access_dossier(owned, MobileActor(system_api_key=True)) is True
+    # A NULL-owner (system-created) dossier is reachable only by the system key.
+    assert _mobile_can_access_dossier(system_made, MobileActor(user_id=7)) is False
+    assert _mobile_can_access_dossier(system_made, MobileActor(system_api_key=True)) is True

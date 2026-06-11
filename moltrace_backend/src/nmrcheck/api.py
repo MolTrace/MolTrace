@@ -2465,18 +2465,19 @@ def _user_scope_for_context(context: AccessContext) -> int | None:
     return context.user_id
 
 
-def require_readable_dossier(
+def require_dossier_access(
     dossier_id: int,
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> None:
-    """Authorize read access to a dossier addressed by path ``dossier_id``.
+    """Authorize read *or write* access to a dossier addressed by path ``dossier_id``.
 
-    Attached as a route dependency on every ``/regulatory/dossiers/{dossier_id}/…`` read so
-    the ownership gate lives in one place. A system api key / admin (scope ``None``) reads
-    any dossier; a user-scoped caller may read only dossiers they own. A missing dossier and
-    one owned by another user both raise the same 404 (non-leaking). The route's own store
-    call still runs afterward.
+    Attached as a route dependency on every ``/regulatory/dossiers/{dossier_id}/…`` route
+    (GET reads and POST/PATCH writes) so the ownership gate lives in one place. A system api
+    key / admin (scope ``None``) may access any dossier; a user-scoped caller may access only
+    dossiers they own. A missing dossier and one owned by another user both raise the same 404
+    (non-leaking). The route's own store call still runs afterward. Access (own-or-admin) is
+    the same for reads and writes in this model, so one gate serves both.
     """
     if not regulatory_store.can_read_dossier(
         _state(request).session_factory,
@@ -11884,7 +11885,7 @@ def update_webhook_subscription_route(
     "/regulatory/dossiers/{dossier_id}/submission-package",
     response_model=RegulatorySubmissionPackage,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_submission_package_route(
     dossier_id: int,
@@ -11916,7 +11917,7 @@ def create_regulatory_submission_package_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/submission-package",
     response_model=list[RegulatorySubmissionPackage],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_submission_packages_for_dossier_route(
     dossier_id: int,
@@ -16065,7 +16066,7 @@ def reject_regulatory_rule_update_proposal_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/change-impact",
     response_model=RegulatoryDossierChangeImpact,
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def get_regulatory_dossier_change_impact_route(
     dossier_id: int,
@@ -18270,7 +18271,7 @@ def get_mobile_spectracheck_session_summary_route(
 @router.get(
     "/mobile/regulatory/dossiers/{dossier_id}/summary",
     response_model=MobileResourceSummary,
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def get_mobile_regulatory_dossier_summary_route(
     dossier_id: int,
@@ -18708,7 +18709,7 @@ def get_spectroscopy_to_regulatory_bridge_route(
     record = product_store.get_spectroscopy_to_regulatory_bridge(
         _state(request).session_factory, bridge_id
     )
-    if record is None:
+    if record is None or not _readable_via_parent_dossier(request, context, record.dossier_id):
         raise HTTPException(status_code=404, detail="Spectroscopy-to-regulatory bridge not found.")
     return record
 
@@ -18792,7 +18793,7 @@ def get_regulatory_to_reaction_bridge_route(
     record = product_store.get_regulatory_to_reaction_bridge(
         _state(request).session_factory, bridge_id
     )
-    if record is None:
+    if record is None or not _readable_via_parent_dossier(request, context, record.dossier_id):
         raise HTTPException(status_code=404, detail="Regulatory-to-reaction bridge not found.")
     return record
 
@@ -18941,7 +18942,7 @@ def list_reaction_compliance_objectives_route(
     "/regulatory/dossiers/{dossier_id}/ctd-module3-bundle",
     response_model=CTDModule3ReportBundle,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_ctd_module3_bundle_route(
     dossier_id: int,
@@ -18964,7 +18965,7 @@ def create_ctd_module3_bundle_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/ctd-module3-bundle",
     response_model=list[CTDModule3ReportBundle],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_ctd_module3_bundles_route(
     dossier_id: int,
@@ -19168,7 +19169,7 @@ def list_regulatory_dossiers_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}",
     response_model=RegulatoryDossier,
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def get_regulatory_dossier_route(
     dossier_id: int,
@@ -19184,7 +19185,7 @@ def get_regulatory_dossier_route(
 @router.patch(
     "/regulatory/dossiers/{dossier_id}",
     response_model=RegulatoryDossier,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def patch_regulatory_dossier_route(
     dossier_id: int,
@@ -19211,7 +19212,7 @@ def patch_regulatory_dossier_route(
     "/regulatory/dossiers/{dossier_id}/requirements",
     response_model=RegulatoryRequirement,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_requirement_route(
     dossier_id: int,
@@ -19234,7 +19235,7 @@ def create_regulatory_requirement_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/requirements",
     response_model=list[RegulatoryRequirement],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_requirements_route(
     dossier_id: int,
@@ -19278,7 +19279,7 @@ def patch_regulatory_requirement_route(
     "/regulatory/dossiers/{dossier_id}/evidence-links",
     response_model=RegulatoryEvidenceLink,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_evidence_link_route(
     dossier_id: int,
@@ -19301,7 +19302,7 @@ def create_regulatory_evidence_link_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/evidence-links",
     response_model=list[RegulatoryEvidenceLink],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_evidence_links_route(
     dossier_id: int,
@@ -19319,7 +19320,7 @@ def list_regulatory_evidence_links_route(
     "/regulatory/dossiers/{dossier_id}/query",
     response_model=RegulatoryQuery,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def answer_regulatory_dossier_query_route(
     dossier_id: int,
@@ -19359,7 +19360,7 @@ def get_regulatory_query_route(
     "/regulatory/dossiers/{dossier_id}/risk-assessment",
     response_model=RegulatoryRiskAssessment,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_risk_assessment_route(
     dossier_id: int,
@@ -19382,7 +19383,7 @@ def create_regulatory_risk_assessment_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/risk-assessment",
     response_model=RegulatoryRiskAssessment,
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def get_regulatory_risk_assessment_route(
     dossier_id: int,
@@ -19405,7 +19406,7 @@ def get_regulatory_risk_assessment_route(
     "/regulatory/dossiers/{dossier_id}/review",
     response_model=RegulatoryReviewDecision,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_review_decision_route(
     dossier_id: int,
@@ -19428,7 +19429,7 @@ def create_regulatory_review_decision_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/review",
     response_model=list[RegulatoryReviewDecision],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_review_decisions_route(
     dossier_id: int,
@@ -19446,7 +19447,7 @@ def list_regulatory_review_decisions_route(
     "/regulatory/dossiers/{dossier_id}/readiness-report",
     response_model=RegulatoryReadinessReport,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_readiness_report_route(
     dossier_id: int,
@@ -19542,7 +19543,7 @@ def get_regulatory_rule_set_route(
     "/regulatory/dossiers/{dossier_id}/batch-assessment",
     response_model=BatchRegulatoryAssessment,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_batch_assessment_route(
     dossier_id: int,
@@ -19565,7 +19566,7 @@ def create_regulatory_batch_assessment_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/batch-assessment",
     response_model=list[BatchRegulatoryAssessment],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_batch_assessments_route(
     dossier_id: int,
@@ -19583,7 +19584,7 @@ def list_regulatory_batch_assessments_route(
     "/regulatory/dossiers/{dossier_id}/impurity-risk-register",
     response_model=ImpurityRiskRegister,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_impurity_risk_register_route(
     dossier_id: int,
@@ -19606,7 +19607,7 @@ def create_regulatory_impurity_risk_register_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/impurity-risk-register",
     response_model=list[ImpurityRiskRegister],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_impurity_risk_register_route(
     dossier_id: int,
@@ -19626,7 +19627,7 @@ def list_regulatory_impurity_risk_register_route(
     "/regulatory/dossiers/{dossier_id}/residual-solvent-assessment",
     response_model=BatchRegulatoryAssessment,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_residual_solvent_assessment_route(
     dossier_id: int,
@@ -19649,7 +19650,7 @@ def create_regulatory_residual_solvent_assessment_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/residual-solvent-assessment",
     response_model=list[BatchRegulatoryAssessment],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_residual_solvent_assessments_route(
     dossier_id: int,
@@ -19669,7 +19670,7 @@ def list_regulatory_residual_solvent_assessments_route(
     "/regulatory/dossiers/{dossier_id}/elemental-impurity-assessment",
     response_model=BatchRegulatoryAssessment,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_elemental_impurity_assessment_route(
     dossier_id: int,
@@ -19692,7 +19693,7 @@ def create_regulatory_elemental_impurity_assessment_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/elemental-impurity-assessment",
     response_model=list[BatchRegulatoryAssessment],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_elemental_impurity_assessments_route(
     dossier_id: int,
@@ -19712,7 +19713,7 @@ def list_regulatory_elemental_impurity_assessments_route(
     "/regulatory/dossiers/{dossier_id}/nitrosamine-watch",
     response_model=BatchRegulatoryAssessment,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_nitrosamine_watch_route(
     dossier_id: int,
@@ -19735,7 +19736,7 @@ def create_regulatory_nitrosamine_watch_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/nitrosamine-watch",
     response_model=list[BatchRegulatoryAssessment],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_nitrosamine_watch_route(
     dossier_id: int,
@@ -19752,7 +19753,7 @@ def list_regulatory_nitrosamine_watch_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/nitrosamine-cumulative-risk",
     response_model=DossierNitrosamineCumulativeRisk,
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def get_regulatory_nitrosamine_cumulative_risk_route(
     dossier_id: int,
@@ -19777,7 +19778,7 @@ def get_regulatory_nitrosamine_cumulative_risk_route(
     "/regulatory/dossiers/{dossier_id}/qnmr-compliance",
     response_model=QNMRComplianceProfile,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_qnmr_compliance_route(
     dossier_id: int,
@@ -19800,7 +19801,7 @@ def create_regulatory_qnmr_compliance_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/qnmr-compliance",
     response_model=list[QNMRComplianceProfile],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_qnmr_compliance_route(
     dossier_id: int,
@@ -19820,7 +19821,7 @@ def list_regulatory_qnmr_compliance_route(
     "/regulatory/dossiers/{dossier_id}/method-validation-profile",
     response_model=AnalyticalMethodValidationProfile,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_method_validation_profile_route(
     dossier_id: int,
@@ -19843,7 +19844,7 @@ def create_regulatory_method_validation_profile_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/method-validation-profile",
     response_model=list[AnalyticalMethodValidationProfile],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_method_validation_profile_route(
     dossier_id: int,
@@ -19863,7 +19864,7 @@ def list_regulatory_method_validation_profile_route(
     "/regulatory/dossiers/{dossier_id}/ai-governance-record",
     response_model=AIGovernanceRecord,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_ai_governance_record_route(
     dossier_id: int,
@@ -19886,7 +19887,7 @@ def create_regulatory_ai_governance_record_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/ai-governance-record",
     response_model=list[AIGovernanceRecord],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_ai_governance_record_route(
     dossier_id: int,
@@ -19906,7 +19907,7 @@ def list_regulatory_ai_governance_record_route(
     "/regulatory/dossiers/{dossier_id}/jurisdictional-map",
     response_model=JurisdictionalRequirementMap,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def create_regulatory_jurisdictional_map_route(
     dossier_id: int,
@@ -19929,7 +19930,7 @@ def create_regulatory_jurisdictional_map_route(
 @router.get(
     "/regulatory/dossiers/{dossier_id}/jurisdictional-map",
     response_model=list[JurisdictionalRequirementMap],
-    dependencies=[Depends(require_access_context), Depends(require_readable_dossier)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def list_regulatory_jurisdictional_map_route(
     dossier_id: int,
@@ -20598,7 +20599,7 @@ def link_reaction_experiment_compound_route(
     "/regulatory/dossiers/{dossier_id}/link-compound",
     response_model=CompoundRegistryLinkResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
 )
 def link_regulatory_dossier_compound_route(
     dossier_id: int,

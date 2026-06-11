@@ -14,6 +14,42 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.1 — Regulatory Hub: dossier writes + cross-module bridge reads scoped (security) (2026-06-11)
+
+**Headline:** Completes the dossier access-control story (after v0.24.0 read-scoping) by closing
+the write side. The dossier gate is generalized to `require_dossier_access` (own-or-system/admin,
+same rule for reads and writes) and now also guards every POST/PATCH under
+`/regulatory/dossiers/{dossier_id}/…`: the PATCH, the 16 sub-resource creates, and link-compound —
+so a non-owner bearer can no longer mutate another user's dossier or its children. The mobile
+review-decision sync that flips `dossier.status` is gated the same way, and the two cross-module
+bridge by-id reads inherit the parent-dossier check. Same non-leaking 404. No migration (reuses the
+`created_by_user_id` column from v0.24.0).
+
+### Changed
+- **`src/nmrcheck/api.py`** — `require_readable_dossier` renamed to `require_dossier_access` (one
+  gate for reads + writes; access is own-or-admin for both) and added to all 19 POST/PATCH
+  `/regulatory/dossiers/{dossier_id}/…` routes. The two bridge by-id GETs
+  (`/bridges/spectroscopy-to-regulatory/{id}`, `/bridges/regulatory-to-reaction/{id}`) gate via
+  `_readable_via_parent_dossier(record.dossier_id)` — readable when the linked dossier is owned (or
+  system/admin); a dossier-less bridge is system-only.
+- **`src/nmrcheck/mobile_store.py`** — the `/mobile/sync` review-decision path that mutates
+  `dossier.status` now checks `_mobile_can_access_dossier` (own-or-system); an unowned / NULL-owner
+  target is rejected as `target_not_found` (non-leaking).
+
+### Added
+- **`tests/test_regulatory_dossier_read_scoping_api.py`** — +3: non-owner POST/PATCH under a dossier
+  → 404 (owner / system succeed); bridge by-id wiring smoke; `_mobile_can_access_dossier` unit rule.
+- Restructured 3 tests in `tests/test_regulatory_dossier_project_scoping_api.py` so the patcher owns
+  the dossier (passing the new access gate) — the project-link **write** scoping is still asserted.
+
+### Notes
+- **The boundary is the user** (no tenant context), consistent with v0.24.0 / v0.23.6.
+- Mobile sync has no admin carve-out (`MobileActor` lacks `is_admin`) — an admin syncing is scoped to
+  their own dossiers; safer to block than allow cross-user mobile mutation. System key is unrestricted.
+- The dossier-less cross-module bridge case uses the conservative **system-only** default; a richer
+  model (derive ownership from the session / reaction-project / compound owner) is left for the
+  cross-module pass.
+
 ## v0.24.0 — Regulatory Hub: dossier reads are user-scoped (security; migration 0015) (2026-06-10)
 
 **Headline:** Regulatory dossier **reads** are now scoped to the creating user. A dossier
