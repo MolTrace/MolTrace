@@ -35,6 +35,10 @@ import {
   NitrosamineCumulativeRiskCard,
   type NitrosamineCumulativeRisk,
 } from "@/components/regulatory-hub/nitrosamine-cumulative-risk-card"
+import {
+  DossierAIDecisionsPanel,
+  type AIDecision,
+} from "@/components/regulatory-hub/dossier-ai-decisions-panel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
@@ -718,6 +722,7 @@ export function RegulatoryDossierWorkspace() {
   const [mvAssessErr, setMvAssessErr] = useState("")
 
   const [aiGovernanceRecords, setAiGovernanceRecords] = useState<Record<string, unknown>[]>([])
+  const [aiDecisions, setAiDecisions] = useState<AIDecision[]>([])
   const [agName, setAgName] = useState("")
   const [agModelVersionId, setAgModelVersionId] = useState("")
   const [agMethodId, setAgMethodId] = useState("")
@@ -895,6 +900,18 @@ export function RegulatoryDossierWorkspace() {
         setAiGovernanceRecords(asArray(agRaw).filter(isRecord) as Record<string, unknown>[])
       } catch {
         setAiGovernanceRecords([])
+      }
+
+      try {
+        // EU GMP Draft Annex 22 AI-decision chain (newest-first). Empty until
+        // the governed AI path writes records; render the empty state.
+        const aidRaw = await apiFetch<AIDecision[]>(
+          `/regulatory/dossiers/${dossierId}/ai-decisions`,
+          { method: "GET" }
+        )
+        setAiDecisions(Array.isArray(aidRaw) ? aidRaw : [])
+      } catch {
+        setAiDecisions([])
       }
 
       try {
@@ -1081,6 +1098,19 @@ export function RegulatoryDossierWorkspace() {
         { method: "GET" }
       )
       setAiGovernanceRecords(asArray(raw).filter(isRecord) as Record<string, unknown>[])
+    } catch {
+      /* list refresh is best-effort */
+    }
+  }, [dossierId])
+
+  const refreshAiDecisions = useCallback(async () => {
+    if (!Number.isFinite(dossierId)) return
+    try {
+      const raw = await apiFetch<AIDecision[]>(
+        `/regulatory/dossiers/${dossierId}/ai-decisions`,
+        { method: "GET" }
+      )
+      setAiDecisions(Array.isArray(raw) ? raw : [])
     } catch {
       /* list refresh is best-effort */
     }
@@ -2189,6 +2219,7 @@ export function RegulatoryDossierWorkspace() {
       qnmr_profiles: qnmrProfiles,
       method_validation_profiles: methodProfiles,
       ai_governance_records: aiGovernanceRecords,
+      ai_decisions: aiDecisions,
       jurisdictional_maps: jurisdictionalMaps,
       change_impact: changeImpact,
     }),
@@ -2210,6 +2241,7 @@ export function RegulatoryDossierWorkspace() {
       qnmrProfiles,
       methodProfiles,
       aiGovernanceRecords,
+      aiDecisions,
       jurisdictionalMaps,
       changeImpact,
     ]
@@ -4830,6 +4862,17 @@ export function RegulatoryDossierWorkspace() {
                 </div>
               </div>
             </ModuleCard>
+
+            {/* EU GMP Draft Annex 22 AI-decision records — beneath the existing
+                AI-governance content. Draft framing: renders the API disclaimer,
+                never claims compliance. */}
+            {Number.isFinite(dossierId) ? (
+              <DossierAIDecisionsPanel
+                decisions={aiDecisions}
+                dossierId={dossierId}
+                onReviewed={refreshAiDecisions}
+              />
+            ) : null}
           </TabsContent>
 
           <TabsContent value="jurisdictional-map" className="min-w-0 max-w-full space-y-6">
