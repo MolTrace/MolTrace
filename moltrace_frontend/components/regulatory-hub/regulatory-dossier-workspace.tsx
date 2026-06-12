@@ -2955,6 +2955,65 @@ export function RegulatoryDossierWorkspace() {
                   </Table>
                 </div>
             </ModuleCard>
+
+            {/* Active rule sets — the actual tenant rule sets the section
+                header promises ("Active rule sets … evaluated against this
+                dossier"). Previously only the requirement-category counts
+                rendered, so the header oversold the content; this table renders
+                the loaded `ruleSets` (GET /regulatory/rule-sets?status=active). */}
+            <ModuleCard
+              accent="cyan"
+              eyebrow="Dossier · Compliance Rules"
+              title="Active rule sets"
+              description={
+                <>
+                  Tenant rule sets currently <span className="font-mono">active</span> (GET
+                  /regulatory/rule-sets?status=active). Manage them in the rule-updates workspace.
+                </>
+              }
+            >
+              {ruleSets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active rule sets loaded for this tenant.</p>
+              ) : (
+                <div className="table-scroll">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>name</TableHead>
+                        <TableHead>version</TableHead>
+                        <TableHead>source</TableHead>
+                        <TableHead>jurisdiction</TableHead>
+                        <TableHead>status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ruleSets.map((r, i) => {
+                        const jid = readRecordNumber(r, "jurisdiction_id")
+                        const status = readRecordString(r, "status") ?? "—"
+                        return (
+                          <TableRow key={readRecordNumber(r, "id") ?? i}>
+                            <TableCell className="font-medium">{readRecordString(r, "name") ?? "—"}</TableCell>
+                            <TableCell className="font-mono text-xs">{readRecordString(r, "version") ?? "—"}</TableCell>
+                            <TableCell className="font-mono text-xs uppercase">{readRecordString(r, "source_type") ?? "—"}</TableCell>
+                            <TableCell className="font-mono text-xs">{jid != null ? jid : "—"}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={`font-normal ${
+                                  status === "active" ? "border-success/50 text-success" : "text-muted-foreground"
+                                }`}
+                              >
+                                {status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </ModuleCard>
           </TabsContent>
 
           <TabsContent value="impurity-register" className="min-w-0 max-w-full space-y-6">
