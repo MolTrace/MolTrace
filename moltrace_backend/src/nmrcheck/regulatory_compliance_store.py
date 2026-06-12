@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -73,6 +75,8 @@ from .orm import (
     ResidualSolventRuleORM,
     utcnow,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RegulatoryComplianceError(ValueError):
@@ -1293,6 +1297,17 @@ def create_nitrosamine_watch(
             entity_id=row.id,
             metadata={"dossier_id": dossier_id, "review_required": possible},
         )
+        # Annex 22 governance: a CPCA potency categorization is an AI decision — record it
+        # (best-effort) so it surfaces on the dossier's ai-decisions chain for human review.
+        if cpca is not None:
+            _safe_record_cpca_decision(
+                session,
+                dossier_id,
+                actor=actor,
+                cpca=cpca,
+                structure_text=payload.structure_text,
+                source_assessment_id=row.id,
+            )
         return _assessment_to_record(row)
 
 
@@ -1961,6 +1976,70 @@ def _persist_ai_decision(
     return row
 
 
+def _record_ai_decision(
+    session: Session,
+    dossier_id: int,
+    *,
+    actor: RegulatoryComplianceActor,
+    decision_type: str,
+    model_name: str,
+    model_version: str,
+    output: Mapping[str, Any],
+    confidence: float,
+    feature_attribution: Mapping[str, Any],
+    regulatory_basis: str,
+    risk_level: str,
+    input_smiles: str | None = None,
+    input_data_hash: str | None = None,
+    timestamp_utc: datetime | None = None,
+) -> RegulatoryAIDecisionORM:
+    """Persist one chained AI-decision record within an existing session.
+
+    Shared by the public ``create_ai_decision`` endpoint and the request-path hooks (e.g.
+    ``create_nitrosamine_watch``) so a decision made while computing an assessment is recorded
+    in the same transaction. The chain hash is computed by the library record; ``user_id``
+    comes from the authenticated actor.
+    """
+
+    if input_data_hash is None:
+        input_data_hash = content_hash(
+            {"decision_type": decision_type, "input_smiles": input_smiles, "output": dict(output)}
+        )
+    record = AIDecisionRecord.create(
+        timestamp_utc=_coerce_utc(timestamp_utc) or datetime.now(UTC),
+        user_id=_ai_decision_actor_id(actor),
+        decision_type=decision_type,
+        model_name=model_name,
+        model_version=model_version,
+        input_smiles=input_smiles,
+        input_data_hash=input_data_hash,
+        output=output,
+        confidence=confidence,
+        feature_attribution=feature_attribution,
+        regulatory_basis=regulatory_basis,
+        risk_level=risk_level,
+        hitl_required=risk_level == "high",
+        previous_entry_hash=_ai_decision_head(session, dossier_id),
+    )
+    row = _persist_ai_decision(session, dossier_id, record, reviews_entry_hash=None)
+    _audit(
+        session,
+        actor=actor,
+        event_type="regulatory_compliance.ai_decision.create",
+        message="Annex 22 AI decision recorded.",
+        entity_type="regulatory_ai_decision",
+        entity_id=row.id,
+        metadata={
+            "dossier_id": dossier_id,
+            "decision_type": decision_type,
+            "risk_level": risk_level,
+            "hitl_required": record.hitl_required,
+            "entry_hash": record.entry_hash,
+        },
+    )
+    return row
+
+
 def create_ai_decision(
     session_factory: sessionmaker[Session],
     dossier_id: int,
@@ -1968,54 +2047,69 @@ def create_ai_decision(
     *,
     actor: RegulatoryComplianceActor,
 ) -> RegulatoryAIDecision:
-    """Record one Annex 22 (draft) AI decision, chained to the dossier's prior records.
-
-    The chain hash is computed by the library record; ``user_id`` comes from the
-    authenticated actor (never the payload).
-    """
+    """Record one Annex 22 (draft) AI decision, chained to the dossier's prior records."""
 
     with session_scope(session_factory) as session:
         _require_dossier(session, dossier_id)
-        input_data_hash = payload.input_data_hash or content_hash(
-            {
-                "decision_type": payload.decision_type,
-                "input_smiles": payload.input_smiles,
-                "output": payload.output_json,
-            }
-        )
-        record = AIDecisionRecord.create(
-            timestamp_utc=_coerce_utc(payload.timestamp_utc) or datetime.now(UTC),
-            user_id=_ai_decision_actor_id(actor),
+        row = _record_ai_decision(
+            session,
+            dossier_id,
+            actor=actor,
             decision_type=payload.decision_type,
             model_name=payload.model_name,
             model_version=payload.model_version,
-            input_smiles=payload.input_smiles,
-            input_data_hash=input_data_hash,
             output=payload.output_json,
             confidence=payload.confidence,
             feature_attribution=payload.feature_attribution_json,
             regulatory_basis=payload.regulatory_basis,
             risk_level=payload.risk_level,
-            hitl_required=payload.risk_level == "high",
-            previous_entry_hash=_ai_decision_head(session, dossier_id),
-        )
-        row = _persist_ai_decision(session, dossier_id, record, reviews_entry_hash=None)
-        _audit(
-            session,
-            actor=actor,
-            event_type="regulatory_compliance.ai_decision.create",
-            message="Annex 22 AI decision recorded.",
-            entity_type="regulatory_ai_decision",
-            entity_id=row.id,
-            metadata={
-                "dossier_id": dossier_id,
-                "decision_type": payload.decision_type,
-                "risk_level": payload.risk_level,
-                "hitl_required": record.hitl_required,
-                "entry_hash": record.entry_hash,
-            },
+            input_smiles=payload.input_smiles,
+            input_data_hash=payload.input_data_hash,
+            timestamp_utc=payload.timestamp_utc,
         )
         return _ai_decision_to_record(row)
+
+
+def _safe_record_cpca_decision(
+    session: Session,
+    dossier_id: int,
+    *,
+    actor: RegulatoryComplianceActor,
+    cpca: Mapping[str, Any],
+    structure_text: str | None,
+    source_assessment_id: int,
+) -> None:
+    """Best-effort: record a CPCA potency categorization as a (high-risk) Annex 22 AI decision.
+
+    Governance recording must never break the underlying nitrosamine assessment, so any failure
+    is logged and swallowed. CPCA is deterministic (confidence 1.0) but a potency categorization
+    requires toxicologist sign-off, so it is recorded as high-risk -> human review required.
+    """
+
+    try:
+        _record_ai_decision(
+            session,
+            dossier_id,
+            actor=actor,
+            decision_type="cpca_classification",
+            model_name="deterministic:fda_cpca_nitrosamine",
+            model_version=str(cpca.get("rule_set_version") or "unversioned"),
+            output=dict(cpca),
+            confidence=1.0,
+            feature_attribution={
+                "engine": "deterministic",
+                "potency_score": cpca.get("potency_score"),
+                "coc_flag": cpca.get("coc_flag"),
+                "source_assessment_id": source_assessment_id,
+            },
+            regulatory_basis=str(cpca.get("regulatory_basis") or "FDA Nitrosamine Guidance Rev 2"),
+            risk_level="high",
+            input_smiles=structure_text.strip() if structure_text else None,
+        )
+    except Exception:  # pragma: no cover - governance side-channel is best-effort
+        logger.warning(
+            "failed to record CPCA AI-decision for dossier %s", dossier_id, exc_info=True
+        )
 
 
 def list_ai_decisions(
