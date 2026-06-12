@@ -109,7 +109,6 @@ describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
     render(<ProgramsInterfaceWorkspace />)
 
     const rawFile = new File(["pretend-fid"], "program-raw.zip", { type: "application/zip" })
-    await user.click(screen.getByRole("button", { name: /Evidence Inputs/i }))
     await user.click(screen.getByRole("tab", { name: /Raw FID upload/i }))
     fireEvent.drop(screen.getByRole("button", { name: /Drop raw FID archive/i }), {
       dataTransfer: { files: [rawFile], types: ["Files"] },
@@ -132,7 +131,6 @@ describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
     expect(screen.getByText("ReactionIQ workspace placeholder")).toBeInTheDocument()
 
     await user.click(screen.getByRole("tab", { name: /^SpectraCheck$/i }))
-    await user.click(screen.getByRole("button", { name: /Evidence Inputs/i }))
     await user.click(screen.getByRole("tab", { name: /Raw FID upload/i }))
     await waitFor(() => {
       expect(screen.getAllByText("program-raw.zip").length).toBeGreaterThan(0)
