@@ -2,7 +2,6 @@
 
 import {
   FormEvent,
-  type ReactNode,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -18,7 +17,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,
@@ -137,37 +136,62 @@ import {
 } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-function SpectraCheckTabWithTooltip({
-  value,
-  className,
-  tooltip,
-  children,
-}: {
-  value: string
-  className?: string
-  tooltip: string
-  children: ReactNode
-}) {
-  return (
-    <TabsTrigger value={value} className={className} data-testid={`spectracheck-tab-${value}`}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex w-full items-center justify-center gap-1 text-center">{children}</span>
-        </TooltipTrigger>
-        <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-          {tooltip}
-        </TooltipContent>
-      </Tooltip>
-    </TabsTrigger>
-  )
-}
+// ── Two-tier SpectraCheck section navigation ─────────────────────────────
+// The engine has 13 sections. They group into the structure-elucidation
+// pipeline (orient → input evidence → analyse → output); each multi-section
+// group exposes a persistent secondary tablist so siblings stay visible. The
+// per-section blurb (formerly a hover Tooltip on every tab — which obstructed
+// moving between tabs) is relocated to a single caption line below the nav.
+type SpectraNavSection = { value: string; label: string; desc: string }
+type SpectraNavGroup = { id: string; label: string; sections: SpectraNavSection[] }
 
-const tabTriggerClass = cn(
-  "shrink-0 whitespace-normal text-left text-xs sm:text-sm sm:text-center sm:whitespace-nowrap",
-  "font-mono",
-  "data-[state=active]:[background-color:var(--mt-teal)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm",
-  "data-[state=inactive]:text-muted-foreground",
-)
+const SPECTRACHECK_NAV: SpectraNavGroup[] = [
+  {
+    id: "start",
+    label: "Overview",
+    sections: [
+      { value: "tab-overview", label: "Overview", desc: "Summary of available evidence, backend connection status, and next recommended actions." },
+      { value: "tab-workflow", label: "Workflow", desc: "Workflow templates run a predefined sequence of analysis, QC, evidence, unified confidence, and report steps so the session can be reproduced." },
+    ],
+  },
+  {
+    id: "inputs",
+    label: "Evidence Inputs",
+    sections: [
+      { value: "tab-nmr-text", label: "NMR text + candidates", desc: "Enter candidate structures and literature-style 1H/13C NMR text for quick structure-evidence comparison." },
+      { value: "tab-processed", label: "Processed 1H / 13C upload", desc: "Upload processed spectrum files such as CSV, TSV, TXT, or JCAMP-DX for preview, peak picking, and evidence matching." },
+      { value: "tab-raw-fid", label: "Raw FID upload", desc: "Upload raw Bruker or Agilent/Varian FID archives for non-destructive processing. Raw data should remain immutable." },
+      { value: "tab-dept-2d", label: "DEPT/APT + 2D NMR", desc: "Use DEPT/APT carbon typing and COSY, HSQC/HMQC, or HMBC correlations as supporting connectivity evidence." },
+      { value: "tab-ms-evidence", label: "MS Evidence", desc: "HRMS, formula search, adduct inference, MS/MS, fragmentation, and optional LC-MS feature workflows using shared session inputs." },
+    ],
+  },
+  {
+    id: "analysis",
+    label: "Analysis",
+    sections: [
+      { value: "tab-predicted", label: "Predicted NMR matching", desc: "Compare observed NMR evidence against candidate-specific predicted 1H, 13C, and HSQC-style signals." },
+      { value: "tab-evidence-queue", label: "Evidence Queue", desc: "Queue session evidence items for triage, review, and unified-evidence preparation." },
+      { value: "tab-unified", label: "Unified evidence", desc: "Combine available NMR/MS evidence layers into a transparent candidate confidence summary." },
+    ],
+  },
+  {
+    id: "output",
+    label: "Output",
+    sections: [
+      { value: "tab-report", label: "Report", desc: "Prepare a reviewer-ready structure elucidation report with evidence, warnings, provenance, and human approval state." },
+      { value: "tab-benchmark", label: "Benchmark", desc: "Run the 5-layer SpectraCheck benchmark — peak-level accuracy, structural ranking, explainability, robustness, regulatory evidence." },
+    ],
+  },
+  {
+    id: "developer",
+    label: "Developer",
+    sections: [
+      { value: "tab-dev-json", label: "Developer JSON", desc: "Raw backend responses for debugging, validation, and frontend/backend schema inspection." },
+    ],
+  },
+]
+
+const SPECTRACHECK_SECTIONS = SPECTRACHECK_NAV.flatMap((g) => g.sections)
 
 const defaultCandidates = `Methanol | CO | starting material
 Ethanol | CCO | proposed
@@ -266,6 +290,11 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   const urlSessionHandledRef = useRef<string | null>(null)
 
   const [activeTab, setActiveTab] = useState(defaultTab)
+  // Two-tier nav: which primary group owns the active section, and the active
+  // section's metadata (for the relocated description caption).
+  const activeSpectraGroup =
+    SPECTRACHECK_NAV.find((g) => g.sections.some((s) => s.value === activeTab)) ?? SPECTRACHECK_NAV[0]
+  const activeSpectraSection = SPECTRACHECK_SECTIONS.find((s) => s.value === activeTab)
   const [sessionRecord, setSessionRecord] = useState<unknown>(null)
   const tabStateCtx = useOptionalSpectraCheckTabState()
 
@@ -1140,100 +1169,96 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
       >
       <div className="min-h-0 min-w-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0">
-        <div className="min-w-0 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
-          <TabsList className="inline-flex h-auto min-h-9 w-max min-w-0 max-w-full flex-nowrap justify-start gap-1 sm:flex-wrap">
-            <SpectraCheckTabWithTooltip
-              value="tab-overview"
-              className={tabTriggerClass}
-              tooltip="Summary of available evidence, backend connection status, and next recommended actions."
-            >
-              Overview
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-workflow"
-              className={tabTriggerClass}
-              tooltip="Workflow templates run a predefined sequence of analysis, QC, evidence, unified confidence, and report steps so the session can be reproduced."
-            >
-              Workflow
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-nmr-text"
-              className={tabTriggerClass}
-              tooltip="Enter candidate structures and literature-style 1H/13C NMR text for quick structure-evidence comparison."
-            >
-              NMR text + candidates
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-processed"
-              className={tabTriggerClass}
-              tooltip="Upload processed spectrum files such as CSV, TSV, TXT, or JCAMP-DX for preview, peak picking, and evidence matching."
-            >
-              Processed 1H / 13C upload
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-raw-fid"
-              className={tabTriggerClass}
-              tooltip="Upload raw Bruker or Agilent/Varian FID archives for non-destructive processing. Raw data should remain immutable."
-            >
-              Raw FID upload
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-dept-2d"
-              className={tabTriggerClass}
-              tooltip="Use DEPT/APT carbon typing and COSY, HSQC/HMQC, or HMBC correlations as supporting connectivity evidence."
-            >
-              DEPT/APT + 2D NMR
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-predicted"
-              className={tabTriggerClass}
-              tooltip="Compare observed NMR evidence against candidate-specific predicted 1H, 13C, and HSQC-style signals."
-            >
-              Predicted NMR matching
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-ms-evidence"
-              className={tabTriggerClass}
-              tooltip="HRMS, formula search, adduct inference, MS/MS, fragmentation, and optional LC-MS feature workflows using shared session inputs."
-            >
-              MS Evidence
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-evidence-queue"
-              className={tabTriggerClass}
-              tooltip="Queue session evidence items for triage, review, and unified-evidence preparation."
-            >
-              Evidence Queue
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-unified"
-              className={tabTriggerClass}
-              tooltip="Combine available NMR/MS evidence layers into a transparent candidate confidence summary."
-            >
-              Unified evidence
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-report"
-              className={tabTriggerClass}
-              tooltip="Prepare a reviewer-ready structure elucidation report with evidence, warnings, provenance, and human approval state."
-            >
-              Report
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-benchmark"
-              className={tabTriggerClass}
-              tooltip="Run the 5-layer SpectraCheck benchmark — peak-level accuracy, structural ranking, explainability, robustness, regulatory evidence."
-            >
-              Benchmark
-            </SpectraCheckTabWithTooltip>
-            <SpectraCheckTabWithTooltip
-              value="tab-dev-json"
-              className={tabTriggerClass}
-              tooltip="Raw backend responses for debugging, validation, and frontend/backend schema inspection."
-            >
-              Developer JSON
-            </SpectraCheckTabWithTooltip>
-          </TabsList>
+        {/* Two-tier section nav — primary pipeline groups (always visible) +
+            a persistent secondary tablist for the active group, so every
+            sibling is discoverable. The per-section blurb is relocated to one
+            caption line below (the old per-tab hover tooltip obstructed moving
+            between tabs). Drives the same activeTab the 13 panels read. */}
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1.5" aria-label="SpectraCheck sections">
+            {SPECTRACHECK_NAV.map((g) => {
+              const active = g.sections.some((s) => s.value === activeTab)
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => {
+                    if (!active) setActiveTab(g.sections[0].value)
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs font-semibold transition-colors",
+                    active
+                      ? "[background-color:var(--mt-teal)] text-[#04080F] shadow-sm"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {g.label}
+                  {g.sections.length > 1 ? (
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "rounded-full px-1.5 text-[10px] tabular-nums",
+                        active ? "bg-black/15 text-[#04080F]" : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {g.sections.length}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
+
+          {activeSpectraGroup.sections.length > 1 ? (
+            <div className="min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+              <div
+                role="tablist"
+                aria-label={`${activeSpectraGroup.label} sections`}
+                className="inline-flex w-max items-center gap-1 rounded-lg border bg-muted/30 p-1"
+                onKeyDown={(e) => {
+                  const ss = activeSpectraGroup.sections
+                  const idx = ss.findIndex((s) => s.value === activeTab)
+                  let next = -1
+                  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % ss.length
+                  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + ss.length) % ss.length
+                  else if (e.key === "Home") next = 0
+                  else if (e.key === "End") next = ss.length - 1
+                  else return
+                  e.preventDefault()
+                  setActiveTab(ss[next].value)
+                  e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+                }}
+              >
+                {activeSpectraGroup.sections.map((s) => {
+                  const on = activeTab === s.value
+                  return (
+                    <button
+                      key={s.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={on}
+                      tabIndex={on ? 0 : -1}
+                      data-testid={`spectracheck-tab-${s.value}`}
+                      onClick={() => setActiveTab(s.value)}
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1 font-mono text-xs transition-colors",
+                        on
+                          ? "bg-card font-semibold text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {s.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {activeSpectraSection ? (
+            <p className="text-xs text-muted-foreground">{activeSpectraSection.desc}</p>
+          ) : null}
         </div>
 
         <TabsContent value="tab-overview" className="mt-4 space-y-12">
