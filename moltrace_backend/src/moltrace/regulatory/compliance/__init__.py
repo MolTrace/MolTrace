@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from moltrace.regulatory.compliance.annex22_wrapper import (
     DRAFT_DISCLAIMER,
+    GENESIS_HASH,
     AIDecisionRecord,
     Annex22Error,
     Annex22Log,
@@ -25,6 +26,7 @@ from moltrace.regulatory.compliance.annex22_wrapper import (
 
 __all__ = [
     "DRAFT_DISCLAIMER",
+    "GENESIS_HASH",
     "AIDecisionRecord",
     "Annex22Error",
     "Annex22Log",

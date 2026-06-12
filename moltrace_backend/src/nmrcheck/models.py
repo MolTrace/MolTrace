@@ -3568,6 +3568,79 @@ class AIGovernanceRecord(BaseModel):
     human_review_required: bool = True
 
 
+class RegulatoryAIDecisionCreate(BaseModel):
+    """Inputs to record one EU GMP Draft Annex 22 AI decision; the store computes the chain.
+
+    ``confidence`` is constrained to [0, 1] so an uncalibrated/NaN value is rejected at the
+    contract boundary (the draft requires a calibrated confidence). ``user_id`` is taken from
+    the authenticated caller, never the payload.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision_type: str = Field(min_length=1, max_length=128)
+    model_name: str = Field(min_length=1, max_length=240)
+    model_version: str = Field(min_length=1, max_length=512)
+    regulatory_basis: str = Field(min_length=1, max_length=512)
+    risk_level: Literal["low", "medium", "high"] = "medium"
+    confidence: float = Field(ge=0.0, le=1.0)
+    output_json: dict[str, Any] = Field(default_factory=dict)
+    feature_attribution_json: dict[str, Any] = Field(default_factory=dict)
+    input_smiles: str | None = Field(default=None, max_length=4000)
+    input_data_hash: str | None = Field(default=None, max_length=96)
+    timestamp_utc: datetime | None = None
+
+
+class RegulatoryAIDecision(BaseModel):
+    """A persisted, hash-chained Annex 22 (draft) AI-decision record (decision or HITL review)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    dossier_id: int
+    entry_hash: str
+    previous_entry_hash: str
+    timestamp_utc: datetime
+    user_id: str
+    decision_type: str
+    model_name: str
+    model_version: str
+    input_smiles: str | None = None
+    input_data_hash: str
+    output_json: dict[str, Any] = Field(default_factory=dict)
+    confidence: float
+    feature_attribution_json: dict[str, Any] = Field(default_factory=dict)
+    regulatory_basis: str
+    risk_level: str
+    hitl_required: bool
+    hitl_reviewer_id: str | None = None
+    hitl_review_timestamp: datetime | None = None
+    hitl_approved: bool | None = None
+    reviews_entry_hash: str | None = None
+    created_at: datetime
+    compliance_checklist: dict[str, bool] = Field(default_factory=dict)
+    disclaimer: str = ""
+
+
+class RegulatoryAIDecisionReview(BaseModel):
+    """A human-in-the-loop review verdict for a high-risk AI decision."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    approved: bool
+    reason: str | None = Field(default=None, max_length=2000)
+
+
+class RegulatoryAIDecisionChainStatus(BaseModel):
+    """Tamper-evidence verdict for a dossier's AI-decision hash chain."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    count: int
+    breaks: list[str] = Field(default_factory=list)
+
+
 class JurisdictionalRequirementMapCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

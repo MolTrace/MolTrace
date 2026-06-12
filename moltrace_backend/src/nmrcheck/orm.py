@@ -4503,6 +4503,50 @@ class AIGovernanceRecordORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class RegulatoryAIDecisionORM(Base):
+    """One hash-chained EU GMP Draft Annex 22 AI-decision record for a dossier.
+
+    Append-only: rows are immutable and chained per dossier via
+    ``previous_entry_hash`` -> ``entry_hash``. A HITL review is itself a row (its
+    ``reviews_entry_hash`` points at the reviewed decision). Backs
+    ``moltrace.regulatory.compliance.AIDecisionRecord``.
+    """
+
+    __tablename__ = "regulatory_ai_decisions"
+    __table_args__ = (
+        Index("ix_regulatory_ai_decisions_dossier", "dossier_id", "id"),
+        Index("ix_regulatory_ai_decisions_entry_hash", "entry_hash"),
+        Index("ix_regulatory_ai_decisions_reviews", "reviews_entry_hash"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dossier_id: Mapped[int] = mapped_column(
+        ForeignKey("regulatory_dossiers.id", ondelete="CASCADE")
+    )
+    entry_hash: Mapped[str] = mapped_column(String(96))
+    previous_entry_hash: Mapped[str] = mapped_column(String(96))
+    timestamp_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    user_id: Mapped[str] = mapped_column(String(128))
+    decision_type: Mapped[str] = mapped_column(String(128))
+    model_name: Mapped[str] = mapped_column(String(240))
+    model_version: Mapped[str] = mapped_column(String(512))
+    input_smiles: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input_data_hash: Mapped[str] = mapped_column(String(96))
+    output_json: Mapped[str] = mapped_column(Text, default="{}")
+    confidence: Mapped[float] = mapped_column(Float)
+    feature_attribution_json: Mapped[str] = mapped_column(Text, default="{}")
+    regulatory_basis: Mapped[str] = mapped_column(String(512))
+    risk_level: Mapped[str] = mapped_column(String(16))
+    hitl_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    hitl_reviewer_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    hitl_review_timestamp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    hitl_approved: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    reviews_entry_hash: Mapped[str | None] = mapped_column(String(96), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class JurisdictionalRequirementMapORM(Base):
     __tablename__ = "jurisdictional_requirement_maps"
     __table_args__ = (

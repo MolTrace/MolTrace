@@ -3,10 +3,19 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, sessionmaker
+
+from moltrace.regulatory.compliance import (
+    DRAFT_DISCLAIMER,
+    GENESIS_HASH,
+    AIDecisionRecord,
+    annex22_compliance_checklist,
+)
+from moltrace.spectroscopy.infra.contract import content_hash
 
 from .database import session_scope
 from .models import (
@@ -32,6 +41,9 @@ from .models import (
     RegulatoryActionItem,
     RegulatoryActionItemCreate,
     RegulatoryActionItemUpdate,
+    RegulatoryAIDecision,
+    RegulatoryAIDecisionCreate,
+    RegulatoryAIDecisionReview,
     RegulatoryRuleSet,
     RegulatoryRuleSetCreate,
     ResidualSolventAssessmentRequest,
@@ -51,6 +63,7 @@ from .orm import (
     NitrosamineRiskRuleORM,
     QNMRComplianceProfileORM,
     RegulatoryActionItemORM,
+    RegulatoryAIDecisionORM,
     RegulatoryCitationORM,
     RegulatoryDossierORM,
     RegulatoryJurisdictionORM,
@@ -1887,4 +1900,284 @@ def dossier_nitrosamine_cumulative_risk(
         disclaimer=result.disclaimer,
         notes=notes,
         human_review_required=True,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# EU GMP Draft Annex 22 AI-decision records (Prompt 12 wiring)
+# --------------------------------------------------------------------------- #
+def _ai_decision_actor_id(actor: RegulatoryComplianceActor) -> str:
+    if actor.user_id is not None:
+        return str(actor.user_id)
+    return "system" if actor.system_api_key else "anonymous"
+
+
+def _coerce_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    return dt.astimezone(UTC) if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
+def _ai_decision_head(session: Session, dossier_id: int) -> str:
+    last = session.scalars(
+        select(RegulatoryAIDecisionORM)
+        .where(RegulatoryAIDecisionORM.dossier_id == dossier_id)
+        .order_by(RegulatoryAIDecisionORM.id.desc())
+    ).first()
+    return last.entry_hash if last is not None else GENESIS_HASH
+
+
+def _persist_ai_decision(
+    session: Session,
+    dossier_id: int,
+    record: AIDecisionRecord,
+    *,
+    reviews_entry_hash: str | None,
+) -> RegulatoryAIDecisionORM:
+    row = RegulatoryAIDecisionORM(
+        dossier_id=dossier_id,
+        entry_hash=record.entry_hash,
+        previous_entry_hash=record.previous_entry_hash,
+        timestamp_utc=record.timestamp_utc,
+        user_id=record.user_id,
+        decision_type=record.decision_type,
+        model_name=record.model_name,
+        model_version=record.model_version,
+        input_smiles=record.input_smiles,
+        input_data_hash=record.input_data_hash,
+        output_json=_json_dump(record.output),
+        confidence=record.confidence,
+        feature_attribution_json=_json_dump(record.feature_attribution),
+        regulatory_basis=record.regulatory_basis,
+        risk_level=record.risk_level,
+        hitl_required=record.hitl_required,
+        hitl_reviewer_id=record.hitl_reviewer_id,
+        hitl_review_timestamp=record.hitl_review_timestamp,
+        hitl_approved=record.hitl_approved,
+        reviews_entry_hash=reviews_entry_hash,
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
+def create_ai_decision(
+    session_factory: sessionmaker[Session],
+    dossier_id: int,
+    payload: RegulatoryAIDecisionCreate,
+    *,
+    actor: RegulatoryComplianceActor,
+) -> RegulatoryAIDecision:
+    """Record one Annex 22 (draft) AI decision, chained to the dossier's prior records.
+
+    The chain hash is computed by the library record; ``user_id`` comes from the
+    authenticated actor (never the payload).
+    """
+
+    with session_scope(session_factory) as session:
+        _require_dossier(session, dossier_id)
+        input_data_hash = payload.input_data_hash or content_hash(
+            {
+                "decision_type": payload.decision_type,
+                "input_smiles": payload.input_smiles,
+                "output": payload.output_json,
+            }
+        )
+        record = AIDecisionRecord.create(
+            timestamp_utc=_coerce_utc(payload.timestamp_utc) or datetime.now(UTC),
+            user_id=_ai_decision_actor_id(actor),
+            decision_type=payload.decision_type,
+            model_name=payload.model_name,
+            model_version=payload.model_version,
+            input_smiles=payload.input_smiles,
+            input_data_hash=input_data_hash,
+            output=payload.output_json,
+            confidence=payload.confidence,
+            feature_attribution=payload.feature_attribution_json,
+            regulatory_basis=payload.regulatory_basis,
+            risk_level=payload.risk_level,
+            hitl_required=payload.risk_level == "high",
+            previous_entry_hash=_ai_decision_head(session, dossier_id),
+        )
+        row = _persist_ai_decision(session, dossier_id, record, reviews_entry_hash=None)
+        _audit(
+            session,
+            actor=actor,
+            event_type="regulatory_compliance.ai_decision.create",
+            message="Annex 22 AI decision recorded.",
+            entity_type="regulatory_ai_decision",
+            entity_id=row.id,
+            metadata={
+                "dossier_id": dossier_id,
+                "decision_type": payload.decision_type,
+                "risk_level": payload.risk_level,
+                "hitl_required": record.hitl_required,
+                "entry_hash": record.entry_hash,
+            },
+        )
+        return _ai_decision_to_record(row)
+
+
+def list_ai_decisions(
+    session_factory: sessionmaker[Session], dossier_id: int
+) -> list[RegulatoryAIDecision]:
+    with session_scope(session_factory) as session:
+        _require_dossier(session, dossier_id)
+        rows = session.scalars(
+            select(RegulatoryAIDecisionORM)
+            .where(RegulatoryAIDecisionORM.dossier_id == dossier_id)
+            .order_by(RegulatoryAIDecisionORM.id.desc())
+        ).all()
+        return [_ai_decision_to_record(row) for row in rows]
+
+
+def submit_ai_decision_review(
+    session_factory: sessionmaker[Session],
+    dossier_id: int,
+    entry_hash: str,
+    payload: RegulatoryAIDecisionReview,
+    *,
+    actor: RegulatoryComplianceActor,
+) -> RegulatoryAIDecision:
+    """Append a HITL review for a high-risk decision (the chain is never mutated)."""
+
+    with session_scope(session_factory) as session:
+        _require_dossier(session, dossier_id)
+        decision = session.scalars(
+            select(RegulatoryAIDecisionORM)
+            .where(RegulatoryAIDecisionORM.dossier_id == dossier_id)
+            .where(RegulatoryAIDecisionORM.entry_hash == entry_hash)
+        ).first()
+        if decision is None:
+            raise RegulatoryComplianceNotFoundError(
+                f"AI decision {entry_hash} not found for dossier {dossier_id}."
+            )
+        if not decision.hitl_required:
+            raise RegulatoryComplianceError(
+                f"AI decision {entry_hash} is {decision.risk_level}-risk; no review required."
+            )
+        already = session.scalars(
+            select(RegulatoryAIDecisionORM)
+            .where(RegulatoryAIDecisionORM.dossier_id == dossier_id)
+            .where(RegulatoryAIDecisionORM.reviews_entry_hash == entry_hash)
+        ).first()
+        if already is not None:
+            raise RegulatoryComplianceError(f"AI decision {entry_hash} has already been reviewed.")
+
+        ts = datetime.now(UTC)
+        review = AIDecisionRecord.create(
+            timestamp_utc=ts,
+            user_id=_ai_decision_actor_id(actor),
+            decision_type=f"{decision.decision_type}.hitl_review",
+            model_name=decision.model_name,
+            model_version=decision.model_version,
+            input_smiles=decision.input_smiles,
+            input_data_hash=decision.input_data_hash,
+            output=_json_dict(decision.output_json),
+            confidence=decision.confidence,
+            feature_attribution={"hitl_review_of": entry_hash, "reason": payload.reason},
+            regulatory_basis=decision.regulatory_basis,
+            risk_level=decision.risk_level,
+            hitl_required=True,
+            previous_entry_hash=_ai_decision_head(session, dossier_id),
+            hitl_reviewer_id=_ai_decision_actor_id(actor),
+            hitl_review_timestamp=ts,
+            hitl_approved=payload.approved,
+        )
+        row = _persist_ai_decision(session, dossier_id, review, reviews_entry_hash=entry_hash)
+        _audit(
+            session,
+            actor=actor,
+            event_type="regulatory_compliance.ai_decision.review",
+            message="Annex 22 AI decision reviewed.",
+            entity_type="regulatory_ai_decision",
+            entity_id=row.id,
+            metadata={
+                "dossier_id": dossier_id,
+                "reviews_entry_hash": entry_hash,
+                "approved": payload.approved,
+            },
+        )
+        return _ai_decision_to_record(row)
+
+
+def verify_ai_decision_chain(
+    session_factory: sessionmaker[Session], dossier_id: int
+) -> dict[str, Any]:
+    """Recompute the dossier's AI-decision hash chain; report integrity + any breaks."""
+
+    with session_scope(session_factory) as session:
+        _require_dossier(session, dossier_id)
+        rows = session.scalars(
+            select(RegulatoryAIDecisionORM)
+            .where(RegulatoryAIDecisionORM.dossier_id == dossier_id)
+            .order_by(RegulatoryAIDecisionORM.id.asc())
+        ).all()
+        breaks: list[str] = []
+        prev = GENESIS_HASH
+        for i, row in enumerate(rows):
+            record = _ai_decision_orm_to_record(row)
+            if row.previous_entry_hash != prev:
+                breaks.append(
+                    f"record[{i}] {row.entry_hash}: previous_entry_hash "
+                    f"{row.previous_entry_hash} != expected {prev}"
+                )
+            if record.recompute_hash() != row.entry_hash:
+                breaks.append(f"record[{i}] {row.entry_hash}: content hash mismatch (tampered)")
+            prev = row.entry_hash
+        return {"ok": not breaks, "count": len(rows), "breaks": breaks}
+
+
+def _ai_decision_orm_to_record(row: RegulatoryAIDecisionORM) -> AIDecisionRecord:
+    """Reconstruct the library record from a row (raw stored values, for hash recompute)."""
+
+    return AIDecisionRecord(
+        timestamp_utc=row.timestamp_utc,
+        user_id=row.user_id,
+        decision_type=row.decision_type,
+        model_name=row.model_name,
+        model_version=row.model_version,
+        input_smiles=row.input_smiles,
+        input_data_hash=row.input_data_hash,
+        output=_json_dict(row.output_json),
+        confidence=row.confidence,
+        feature_attribution=_json_dict(row.feature_attribution_json),
+        regulatory_basis=row.regulatory_basis,
+        risk_level=row.risk_level,
+        hitl_required=row.hitl_required,
+        previous_entry_hash=row.previous_entry_hash,
+        entry_hash=row.entry_hash,
+        hitl_reviewer_id=row.hitl_reviewer_id,
+        hitl_review_timestamp=row.hitl_review_timestamp,
+        hitl_approved=row.hitl_approved,
+    )
+
+
+def _ai_decision_to_record(row: RegulatoryAIDecisionORM) -> RegulatoryAIDecision:
+    record = _ai_decision_orm_to_record(row)
+    return RegulatoryAIDecision(
+        id=row.id,
+        dossier_id=row.dossier_id,
+        entry_hash=row.entry_hash,
+        previous_entry_hash=row.previous_entry_hash,
+        timestamp_utc=_coerce_utc(row.timestamp_utc) or row.timestamp_utc,
+        user_id=row.user_id,
+        decision_type=row.decision_type,
+        model_name=row.model_name,
+        model_version=row.model_version,
+        input_smiles=row.input_smiles,
+        input_data_hash=row.input_data_hash,
+        output_json=_json_dict(row.output_json),
+        confidence=row.confidence,
+        feature_attribution_json=_json_dict(row.feature_attribution_json),
+        regulatory_basis=row.regulatory_basis,
+        risk_level=row.risk_level,
+        hitl_required=row.hitl_required,
+        hitl_reviewer_id=row.hitl_reviewer_id,
+        hitl_review_timestamp=_coerce_utc(row.hitl_review_timestamp),
+        hitl_approved=row.hitl_approved,
+        reviews_entry_hash=row.reviews_entry_hash,
+        created_at=_coerce_utc(row.created_at) or row.created_at,
+        compliance_checklist=annex22_compliance_checklist(record),
+        disclaimer=DRAFT_DISCLAIMER,
     )
