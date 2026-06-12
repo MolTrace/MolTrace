@@ -22,6 +22,7 @@ import {
 } from "@/src/lib/analytics/analytics-client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
+import { cn } from "@/lib/utils"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { MlModelProvenanceSummary } from "@/components/ml/ml-model-provenance-summary"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -56,7 +57,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle, ArrowLeft, ChevronDown, Loader2 } from "lucide-react"
 import { RegulatoryDossierLinkedCompoundCard } from "@/components/regulatory-hub/regulatory-dossier-linked-compound-card"
@@ -217,8 +218,54 @@ const JURISDICTION_PRESET_LABELS = [
   "ICH",
 ] as const
 
-const dossierTabClass =
-  "font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+// ── Two-tier dossier section navigation ──────────────────────────────────
+// The dossier has 18 sections. They are organised into discoverable primary
+// groups; any group with more than one section exposes a persistent secondary
+// nav so every sibling is always visible. This replaces the prior pattern of
+// two hidden Select dropdowns (+ "Back to …" buttons) where sub-sections were
+// invisible until a dropdown was opened and couldn't be seen once you drilled in.
+type DossierNavGroup = { id: string; label: string; sections: string[] }
+
+const DOSSIER_NAV: DossierNavGroup[] = [
+  { id: "overview", label: "Overview", sections: ["overview"] },
+  { id: "requirements", label: "Requirements & Evidence", sections: ["requirements", "evidence", "compliance-rules"] },
+  { id: "impurity-safety", label: "Impurity & Safety", sections: ["impurity-register", "residual-solvents", "nitrosamine-watch"] },
+  { id: "quality", label: "Quality & Governance", sections: ["qnmr-method-validation", "ai-governance"] },
+  { id: "jurisdiction", label: "Jurisdiction", sections: ["jurisdictional-map", "change-impact"] },
+  { id: "review", label: "Review & Readiness", sections: ["action-items", "qa", "risk", "review", "readiness"] },
+  { id: "submission", label: "Submission", sections: ["submission-package"] },
+  { id: "developer", label: "Developer JSON", sections: ["json"] },
+]
+
+const DOSSIER_SECTION_LABEL: Record<string, string> = {
+  overview: "Overview",
+  requirements: "Requirements",
+  evidence: "Evidence Links",
+  "compliance-rules": "Compliance Rules",
+  "impurity-register": "Impurity Register",
+  "residual-solvents": "Residual Solvent",
+  "nitrosamine-watch": "Nitrosamine Watch",
+  "qnmr-method-validation": "qNMR / Method Validation",
+  "ai-governance": "AI Governance",
+  "jurisdictional-map": "Jurisdictional Map",
+  "change-impact": "Change Impact",
+  "action-items": "Action Items",
+  qa: "Cited Q&A",
+  risk: "Risk Assessment",
+  review: "Review",
+  readiness: "Readiness",
+  "submission-package": "Submission Package",
+  json: "Developer JSON",
+}
+
+/** overall_risk → badge palette (high/critical red · medium amber · low green). */
+function riskBadgeClass(level: string): string {
+  const l = level.toLowerCase()
+  if (l === "high" || l === "critical") return "border-destructive/50 text-destructive"
+  if (l === "medium" || l === "moderate") return "border-warning/50 text-warning"
+  if (l === "low") return "border-success/50 text-success"
+  return "text-muted-foreground"
+}
 
 function requirementStatusColor(status: string | null | undefined): string | undefined {
   switch ((status ?? "").toLowerCase()) {
@@ -2166,6 +2213,12 @@ export function RegulatoryDossierWorkspace() {
     ]
   )
 
+  // Active primary group for the two-tier nav + the values surfaced as nav
+  // badges so reviewers see dossier state without drilling into a section.
+  const activeNavGroup = DOSSIER_NAV.find((g) => g.sections.includes(activeTab)) ?? DOSSIER_NAV[0]
+  const dossierRiskLevel = readRecordString(riskAssessment ?? {}, "overall_risk") ?? ""
+  const dossierReadinessStatus = readRecordString(readinessReport ?? {}, "status") ?? ""
+
   const dossierJurisdictionLine = useMemo(() => {
     if (!dossier) return "—"
     const jid = readRecordNumber(dossier, "jurisdiction_id")
@@ -2250,15 +2303,97 @@ export function RegulatoryDossierWorkspace() {
         </div>
       ) : dossier ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
-          <TabsList className="inline-flex h-auto min-h-9 w-full max-w-full flex-wrap justify-start gap-1 p-1">
-            <TabsTrigger value="overview" className={dossierTabClass}>Overview</TabsTrigger>
-            <TabsTrigger value="requirements" className={dossierTabClass}>Requirements</TabsTrigger>
-            <TabsTrigger value="jurisdictional-map" className={dossierTabClass}>Jurisdictional Map</TabsTrigger>
-            <TabsTrigger value="change-impact" className={dossierTabClass}>Change Impact</TabsTrigger>
-            <TabsTrigger value="action-items" className={dossierTabClass}>Action Items</TabsTrigger>
-            <TabsTrigger value="submission-package" className={dossierTabClass}>Submission Package Builder</TabsTrigger>
-            <TabsTrigger value="json" className={dossierTabClass}>Developer JSON</TabsTrigger>
-          </TabsList>
+          {/* Two-tier section nav — primary groups (always visible) + a
+              persistent secondary row for the active multi-section group, so
+              every sibling is discoverable. Risk / readiness state surface as
+              badges. Drives the same `activeTab` the 18 TabsContent panels read. */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-1.5" aria-label="Dossier sections">
+              {DOSSIER_NAV.map((g) => {
+                const active = g.sections.includes(activeTab)
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => {
+                      if (!active) setActiveTab(g.sections[0])
+                    }}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs font-semibold transition-colors",
+                      active
+                        ? "bg-[color:var(--mt-cyan)] text-[#04080F] shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {g.label}
+                    {g.sections.length > 1 ? (
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 text-[10px] tabular-nums",
+                          active ? "bg-black/15 text-[#04080F]" : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {g.sections.length}
+                      </span>
+                    ) : null}
+                    {g.id === "review" && dossierRiskLevel ? (
+                      <span
+                        className={cn(
+                          "rounded-full border px-1.5 text-[9px] font-bold uppercase",
+                          riskBadgeClass(dossierRiskLevel),
+                        )}
+                      >
+                        {dossierRiskLevel}
+                      </span>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+
+            {activeNavGroup.sections.length > 1 ? (
+              <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-muted/30 p-1">
+                <span className="px-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  {activeNavGroup.label}
+                </span>
+                {activeNavGroup.sections.map((s) => {
+                  const on = activeTab === s
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-current={on ? "page" : undefined}
+                      onClick={() => setActiveTab(s)}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors",
+                        on
+                          ? "bg-card font-semibold text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {DOSSIER_SECTION_LABEL[s] ?? s}
+                      {s === "risk" && dossierRiskLevel ? (
+                        <span
+                          className={cn(
+                            "rounded-full border px-1 text-[9px] font-bold uppercase",
+                            riskBadgeClass(dossierRiskLevel),
+                          )}
+                        >
+                          {dossierRiskLevel}
+                        </span>
+                      ) : null}
+                      {s === "readiness" && dossierReadinessStatus ? (
+                        <span className="rounded-full border px-1 text-[9px] font-bold uppercase text-muted-foreground">
+                          {dossierReadinessStatus.replace(/_/g, " ")}
+                        </span>
+                      ) : null}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
+          </div>
 
           <TabsContent value="overview" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
@@ -2508,31 +2643,6 @@ export function RegulatoryDossierWorkspace() {
                 Per-section coverage status and shortcuts to evidence, compliance rules, impurity register, solvents, nitrosamine watch, qNMR validation, and AI governance.
               </p>
             </div>
-            <ModuleCard
-              accent="cyan"
-              eyebrow="Dossier · Sections"
-              title="Requirements Sections"
-              description="Requirements parent section for evidence, compliance, impurity, solvent, nitrosamine, qNMR, and AI governance."
-            >
-              <div className="max-w-md space-y-2">
-                <Label>Requirements dropdown</Label>
-                <Select value="requirements" onValueChange={setActiveTab}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select requirements section" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="requirements">Requirements</SelectItem>
-                    <SelectItem value="evidence">Evidence Links</SelectItem>
-                    <SelectItem value="compliance-rules">Compliance Rules</SelectItem>
-                    <SelectItem value="impurity-register">Impurity Risk Register</SelectItem>
-                    <SelectItem value="residual-solvents">Residual Solvent Watch</SelectItem>
-                    <SelectItem value="nitrosamine-watch">Nitrosamine Watch</SelectItem>
-                    <SelectItem value="qnmr-method-validation">qNMR / Method Validation</SelectItem>
-                    <SelectItem value="ai-governance">AI Governance</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </ModuleCard>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Requirements"
@@ -5359,28 +5469,6 @@ export function RegulatoryDossierWorkspace() {
                 Cited Q&amp;A, risk hot-spots, review checkpoints, and submission-readiness — each routes to the global Action Queue when escalated.
               </p>
             </div>
-            <ModuleCard
-              accent="cyan"
-              eyebrow="Dossier · Action Sections"
-              title="Action Items Sections"
-              description="Action Items parent section for cited Q&A, risk, review, and readiness."
-            >
-              <div className="max-w-md space-y-2">
-                <Label>Action Items dropdown</Label>
-                <Select value="action-items" onValueChange={setActiveTab}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select action item section" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="action-items">Action Items</SelectItem>
-                    <SelectItem value="qa">Cited Q&amp;A</SelectItem>
-                    <SelectItem value="risk">Risk Assessment</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="readiness">Readiness Report</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </ModuleCard>
             {Number.isFinite(dossierId) ? (
               <RegulatoryActionQueueCard dossierId={dossierId} />
             ) : (
