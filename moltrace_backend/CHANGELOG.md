@@ -14,6 +14,32 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.8 — Regulatory Hub: nitrosamine watch auto-records its CPCA AI decision (2026-06-12)
+
+**Headline:** Closes the loop from v0.24.7 — a nitrosamine watch that runs an FDA CPCA potency
+categorization now **automatically** records that categorization as an Annex 22 (draft) AI
+decision on the dossier's hash-chained `ai-decisions` log, so governance flows from the request
+path, not only from explicit POSTs. CPCA is deterministic (confidence 1.0) but a potency
+categorization needs toxicologist sign-off, so it is recorded as **high-risk -> human review
+required**.
+
+### Changed
+- **`src/nmrcheck/regulatory_compliance_store.py`** — `create_nitrosamine_watch` records a
+  `cpca_classification` AI decision (best-effort, in the same transaction; a governance-recording
+  failure is logged and never breaks the underlying assessment). Refactored a session-level
+  `_record_ai_decision` out of `create_ai_decision` so the request-path hook and the public
+  endpoint share one chained-write path.
+
+### Added
+- **`tests/test_regulatory_ai_decisions_api.py`** — a nitrosamine watch over a parseable
+  nitrosamine SMILES creates exactly one high-risk `cpca_classification` decision (confidence 1.0,
+  HITL required, chain verifies). Existing nitrosamine/compliance tests stay green (the hook is
+  additive, no return-type change).
+
+### Notes
+- First request-path producer of AI-decision records; other deterministic classifications (M7,
+  Q3D, …) can be hooked the same way via `_record_ai_decision` when desired.
+
 ## v0.24.7 — Regulatory Hub: surface Annex 22 (draft) AI decisions on the dossier (2026-06-12)
 
 **Headline:** Wires the Prompt 12 EU GMP **Draft** Annex 22 governance records

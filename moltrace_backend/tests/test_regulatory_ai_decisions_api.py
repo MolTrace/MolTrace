@@ -209,3 +209,35 @@ def test_ai_decisions_in_openapi(client):
     assert "get" in paths[base] and "post" in paths[base]
     assert f"{base}/{{entry_hash}}/review" in paths
     assert f"{base}/verify" in paths
+
+
+def test_nitrosamine_watch_auto_records_cpca_decision(client):
+    # Creating a nitrosamine-watch with a parseable nitrosamine SMILES runs a CPCA
+    # categorization, which is auto-recorded (best-effort) as a high-risk HITL AI decision.
+    with client:
+        headers = _sign_up(client)
+        did = _dossier(client, headers)
+        watch = client.post(
+            f"/regulatory/dossiers/{did}/nitrosamine-watch",
+            headers=headers,
+            json={"structure_text": "CN(C)N=O", "measured_ng_per_day": 10.0},
+        )
+        assert watch.status_code == 201, watch.text
+
+        decisions = client.get(
+            f"/regulatory/dossiers/{did}/ai-decisions", headers=headers
+        ).json()
+        cpca = [d for d in decisions if d["decision_type"] == "cpca_classification"]
+        assert len(cpca) == 1
+        decision = cpca[0]
+        assert decision["confidence"] == 1.0  # deterministic categorization
+        assert decision["risk_level"] == "high"
+        assert decision["hitl_required"] is True  # CPCA needs toxicologist sign-off
+        assert decision["input_smiles"] == "CN(C)N=O"
+        assert decision["output_json"].get("cpca_category")
+        assert decision["compliance_checklist"]["hitl_opportunity_for_high_risk"] is True
+
+        verify = client.get(
+            f"/regulatory/dossiers/{did}/ai-decisions/verify", headers=headers
+        ).json()
+        assert verify["ok"] is True
