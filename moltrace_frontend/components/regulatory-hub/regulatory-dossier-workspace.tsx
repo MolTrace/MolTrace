@@ -2366,7 +2366,8 @@ export function RegulatoryDossierWorkspace() {
                     {gi > 0 ? <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" /> : null}
                     <span
                       aria-hidden
-                      className="shrink-0 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70"
+                      className="shrink-0 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em]"
+                      style={{ color: "var(--mt-cyan)" }}
                     >
                       {g.label}
                     </span>
