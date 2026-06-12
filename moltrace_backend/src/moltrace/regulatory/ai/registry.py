@@ -182,7 +182,10 @@ class RegistryEntry:
 
 @dataclass(frozen=True)
 class StatusTransition:
-    """One append-only lifecycle event for an ``entry_id`` (``from_status is None`` = registration)."""
+    """One append-only lifecycle event for an ``entry_id``.
+
+    ``from_status is None`` marks the initial registration event.
+    """
 
     entry_id: str
     from_status: ArtifactStatus | None

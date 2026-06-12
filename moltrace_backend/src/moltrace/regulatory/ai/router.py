@@ -77,7 +77,10 @@ GENERATIVE_KINDS: frozenset[TaskKind] = frozenset(
 
 @dataclass(frozen=True)
 class RegulatoryTask:
-    """A unit of work to route. ``operation`` selects the engine/template; ``payload`` are its inputs."""
+    """A unit of work to route.
+
+    ``operation`` selects the engine/template; ``payload`` carries its inputs.
+    """
 
     kind: TaskKind
     operation: str
