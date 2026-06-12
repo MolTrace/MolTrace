@@ -14,6 +14,43 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.7 — Regulatory Hub: surface Annex 22 (draft) AI decisions on the dossier (2026-06-12)
+
+**Headline:** Wires the Prompt 12 EU GMP **Draft** Annex 22 governance records
+(`moltrace.regulatory.compliance.AIDecisionRecord`) into the live dossier API, so an
+AI-assisted regulatory decision — its model + version, calibrated confidence, feature
+attribution, regulatory basis, and risk level — is persisted as a tamper-evident, per-dossier
+hash chain with a human-in-the-loop gate for high-risk decisions. The Annex is in draft and not
+in force; these are decision-support governance records, never an "Annex 22 compliant" claim.
+
+### Added
+- **`src/nmrcheck/orm.py`** — `regulatory_ai_decisions` table (append-only; chained per dossier
+  via `previous_entry_hash` -> `entry_hash`; a HITL review is its own row linked by
+  `reviews_entry_hash`). Migration **`0016_regulatory_ai_decisions`** (additive + idempotent).
+- **`src/nmrcheck/models.py`** — `RegulatoryAIDecisionCreate` (confidence constrained to [0,1]
+  so an uncalibrated/NaN value is rejected at the boundary), `RegulatoryAIDecision` (carries the
+  per-decision `compliance_checklist` + draft `disclaimer`), `RegulatoryAIDecisionReview`,
+  `RegulatoryAIDecisionChainStatus`.
+- **`src/nmrcheck/regulatory_compliance_store.py`** — `create_ai_decision` /
+  `list_ai_decisions` / `submit_ai_decision_review` / `verify_ai_decision_chain`. The chain hash
+  is computed by the library record (no duplication); `user_id` comes from the authenticated
+  actor, never the payload; verification recomputes each row's content hash + links.
+- **`src/nmrcheck/api.py`** — `GET/POST /regulatory/dossiers/{id}/ai-decisions`,
+  `POST /regulatory/dossiers/{id}/ai-decisions/{entry_hash}/review`, and
+  `GET /regulatory/dossiers/{id}/ai-decisions/verify`. All gated by `require_dossier_access`
+  (owner + system/admin; non-owner gets the non-leaking 404).
+- **`tests/test_regulatory_ai_decisions_api.py`** — create + chained list, the HITL
+  approve/double-review/non-high-risk flow, chain verification incl. DB-level tamper detection,
+  confidence 422, per-user owner scoping, and the OpenAPI contract.
+
+### Notes
+- Contract regenerated: `moltrace_frontend/src/lib/api/schema.d.ts` types the four operations
+  (additive, +332 lines, no drift). FE wiring (render the chain + HITL badge in the existing AI
+  Governance sub-tab) is a separate frontend task.
+- Completes the "later wiring step" called out after Prompt 12: the records now have an
+  owner-scoped, tamper-evident API surface. The governance decorator is still applied per
+  call-site separately (it changes a function's return type).
+
 ## v0.24.6 — Regulatory Hub: readiness reports carry a content hash (provenance) (2026-06-11)
 
 **Headline:** `create_readiness_report` passed `metadata_json` straight through, so the dossier

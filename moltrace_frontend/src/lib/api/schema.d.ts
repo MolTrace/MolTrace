@@ -7524,6 +7524,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/regulatory/dossiers/{dossier_id}/ai-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Regulatory Ai Decisions Route */
+        get: operations["list_regulatory_ai_decisions_route_regulatory_dossiers__dossier_id__ai_decisions_get"];
+        put?: never;
+        /** Create Regulatory Ai Decision Route */
+        post: operations["create_regulatory_ai_decision_route_regulatory_dossiers__dossier_id__ai_decisions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regulatory/dossiers/{dossier_id}/ai-decisions/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Verify Regulatory Ai Decision Chain Route */
+        get: operations["verify_regulatory_ai_decision_chain_route_regulatory_dossiers__dossier_id__ai_decisions_verify_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regulatory/dossiers/{dossier_id}/ai-decisions/{entry_hash}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Regulatory Ai Decision Route */
+        post: operations["review_regulatory_ai_decision_route_regulatory_dossiers__dossier_id__ai_decisions__entry_hash__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/regulatory/dossiers/{dossier_id}/jurisdictional-map": {
         parameters: {
             query?: never;
@@ -30820,6 +30872,137 @@ export interface components {
             peaks_used_indices?: number[];
             /** Excluded Peaks Indices */
             excluded_peaks_indices?: number[];
+        };
+        /**
+         * RegulatoryAIDecision
+         * @description A persisted, hash-chained Annex 22 (draft) AI-decision record (decision or HITL review).
+         */
+        RegulatoryAIDecision: {
+            /** Id */
+            id: number;
+            /** Dossier Id */
+            dossier_id: number;
+            /** Entry Hash */
+            entry_hash: string;
+            /** Previous Entry Hash */
+            previous_entry_hash: string;
+            /**
+             * Timestamp Utc
+             * Format: date-time
+             */
+            timestamp_utc: string;
+            /** User Id */
+            user_id: string;
+            /** Decision Type */
+            decision_type: string;
+            /** Model Name */
+            model_name: string;
+            /** Model Version */
+            model_version: string;
+            /** Input Smiles */
+            input_smiles?: string | null;
+            /** Input Data Hash */
+            input_data_hash: string;
+            /** Output Json */
+            output_json?: {
+                [key: string]: unknown;
+            };
+            /** Confidence */
+            confidence: number;
+            /** Feature Attribution Json */
+            feature_attribution_json?: {
+                [key: string]: unknown;
+            };
+            /** Regulatory Basis */
+            regulatory_basis: string;
+            /** Risk Level */
+            risk_level: string;
+            /** Hitl Required */
+            hitl_required: boolean;
+            /** Hitl Reviewer Id */
+            hitl_reviewer_id?: string | null;
+            /** Hitl Review Timestamp */
+            hitl_review_timestamp?: string | null;
+            /** Hitl Approved */
+            hitl_approved?: boolean | null;
+            /** Reviews Entry Hash */
+            reviews_entry_hash?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Compliance Checklist */
+            compliance_checklist?: {
+                [key: string]: boolean;
+            };
+            /**
+             * Disclaimer
+             * @default
+             */
+            disclaimer: string;
+        };
+        /**
+         * RegulatoryAIDecisionChainStatus
+         * @description Tamper-evidence verdict for a dossier's AI-decision hash chain.
+         */
+        RegulatoryAIDecisionChainStatus: {
+            /** Ok */
+            ok: boolean;
+            /** Count */
+            count: number;
+            /** Breaks */
+            breaks?: string[];
+        };
+        /**
+         * RegulatoryAIDecisionCreate
+         * @description Inputs to record one EU GMP Draft Annex 22 AI decision; the store computes the chain.
+         *
+         *     ``confidence`` is constrained to [0, 1] so an uncalibrated/NaN value is rejected at the
+         *     contract boundary (the draft requires a calibrated confidence). ``user_id`` is taken from
+         *     the authenticated caller, never the payload.
+         */
+        RegulatoryAIDecisionCreate: {
+            /** Decision Type */
+            decision_type: string;
+            /** Model Name */
+            model_name: string;
+            /** Model Version */
+            model_version: string;
+            /** Regulatory Basis */
+            regulatory_basis: string;
+            /**
+             * Risk Level
+             * @default medium
+             * @enum {string}
+             */
+            risk_level: "low" | "medium" | "high";
+            /** Confidence */
+            confidence: number;
+            /** Output Json */
+            output_json?: {
+                [key: string]: unknown;
+            };
+            /** Feature Attribution Json */
+            feature_attribution_json?: {
+                [key: string]: unknown;
+            };
+            /** Input Smiles */
+            input_smiles?: string | null;
+            /** Input Data Hash */
+            input_data_hash?: string | null;
+            /** Timestamp Utc */
+            timestamp_utc?: string | null;
+        };
+        /**
+         * RegulatoryAIDecisionReview
+         * @description A human-in-the-loop review verdict for a high-risk AI decision.
+         */
+        RegulatoryAIDecisionReview: {
+            /** Approved */
+            approved: boolean;
+            /** Reason */
+            reason?: string | null;
         };
         /** RegulatoryActionItem */
         RegulatoryActionItem: {
@@ -59785,6 +59968,155 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AIGovernanceRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_regulatory_ai_decisions_route_regulatory_dossiers__dossier_id__ai_decisions_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dossier_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegulatoryAIDecision"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_regulatory_ai_decision_route_regulatory_dossiers__dossier_id__ai_decisions_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dossier_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegulatoryAIDecisionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegulatoryAIDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_regulatory_ai_decision_chain_route_regulatory_dossiers__dossier_id__ai_decisions_verify_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dossier_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegulatoryAIDecisionChainStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_regulatory_ai_decision_route_regulatory_dossiers__dossier_id__ai_decisions__entry_hash__review_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dossier_id: number;
+                entry_hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegulatoryAIDecisionReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegulatoryAIDecision"];
                 };
             };
             /** @description Validation Error */

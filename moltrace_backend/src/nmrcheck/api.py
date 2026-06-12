@@ -11,14 +11,14 @@ import math
 import re
 import uuid
 import zipfile
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from html import escape as html_escape
 from pathlib import Path
-from typing import Any, Literal, Mapping
+from typing import Any, Literal
 
 from fastapi import (
     APIRouter,
@@ -30,11 +30,13 @@ from fastapi import (
     Form,
     Header,
     HTTPException,
-    Path as ApiPath,
     Query,
     Request,
     UploadFile,
     status,
+)
+from fastapi import (
+    Path as ApiPath,
 )
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,17 +49,17 @@ from sqlalchemy.orm import Session, sessionmaker
 from . import ai_evidence_store as ai_evidence_store
 from . import ai_inference_store as ai_store
 from . import analytics_store as analytics_store
-from .compound_classes import normalize_compound_class
 from . import collaboration_store as collab_store
 from . import compound_registry_store as compound_store
+
 # build_proton_inventory exported by peak_categorization — imported alongside
 # the other category builders below.
 from . import golden_pilot_store as golden_pilot_store
 from . import interoperability_store as interop_store
 from . import knowledge_flywheel_store as knowledge_store
 from . import method_registry_store as method_store
-from . import mobile_store as mobile_store
 from . import ml_model_factory_store as ml_store
+from . import mobile_store as mobile_store
 from . import operations_store as ops_store
 from . import orchestration_store as orch_store
 from . import product_orchestration_store as product_store
@@ -78,18 +80,6 @@ from .analysis import analyze_inputs, validate_inputs
 from .baseline import normalize_baseline_mode
 from .benchmark import evaluate_suite
 from .candidate import compare_candidates, parse_candidate_text
-from .literature_data import references_for_keys
-from .peak_categorization import (
-    build_dp4_candidate_ranking,
-    build_impurity_candidates,
-    build_labile_hydrogen_summary,
-    build_peak_category_summary,
-    build_predicted_vs_observed,
-    build_proton_inventory,
-    enrich_peaks,
-    is_aminoglycoside_like_structure,
-    reconcile_proton_peaks_with_reference_text,
-)
 from .candidate_predicted import (
     PREDICTED_NMR_MATCH_LIMITATIONS,
     match_candidates_with_predicted_nmr,
@@ -106,6 +96,7 @@ from .carbon13 import (
     refine_carbon13_peaks_with_text_guidance,
 )
 from .chemistry import structure_summary_from_smiles
+from .compound_classes import normalize_compound_class
 from .database import (
     audit_event,
     authenticate_user,
@@ -114,6 +105,7 @@ from .database import (
     build_project_dashboard,
     compare_sample_analyses,
     consume_user_action_token,
+    count_gsd_graduated_users,
     create_job,
     create_project,
     create_project_sample,
@@ -162,7 +154,6 @@ from .database import (
     save_fid_run,
     save_raw_archive_preview,
     set_job_backend_id,
-    count_gsd_graduated_users,
     set_user_admin_status,
     set_user_gsd_graduation,
     set_user_password,
@@ -197,12 +188,14 @@ from .lcms_consensus import LCMSFeatureFamilyConsensusError, score_lcms_feature_
 from .lcms_features import LCMSFeatureDetectionError, detect_lcms_features
 from .lcms_grouping import LCMSFeatureGroupingError, group_lcms_features
 from .lcms_import import LCMSImportError, import_lcms_bridge
+from .literature_data import references_for_keys
 from .models import (
     AccessTokenResponse,
     ActiveLearningCandidate,
     ActiveLearningCandidateCreate,
     ActiveLearningCandidateUpdate,
     AdminSystemSummary,
+    AdminUserGSDGraduationRequest,
     AdminUserRecord,
     AIEvidenceItem,
     AIEvidenceModule,
@@ -244,9 +237,6 @@ from .models import (
     BenchmarkDatasetCreate,
     BenchmarkRunRequest,
     BenchmarkRunResponse,
-    CAPARecord,
-    CAPARecordCreate,
-    CAPARecordUpdate,
     CalibrationAssessment,
     CalibrationAssessmentCreate,
     CanaryDeploymentCreate,
@@ -258,9 +248,14 @@ from .models import (
     CandidatePredictedNMRMatchEvidenceRequest,
     CandidatePredictedNMRMatchRequest,
     CandidatePredictedNMRMatchResult,
+    CAPARecord,
+    CAPARecordCreate,
+    CAPARecordUpdate,
     Carbon13AnalysisReport,
     Carbon13Inputs,
     Carbon13UploadPreview,
+    ComplianceDrivenOptimizationObjective,
+    ComplianceDrivenOptimizationObjectiveCreate,
     CompoundAlias,
     CompoundAliasCreate,
     CompoundBatch,
@@ -279,8 +274,6 @@ from .models import (
     CompoundRelationshipCreate,
     CompoundStructureRecord,
     CompoundStructureRecordCreate,
-    ComplianceDrivenOptimizationObjective,
-    ComplianceDrivenOptimizationObjectiveCreate,
     ConnectorCredentialReference,
     ConnectorCredentialReferenceCreate,
     ConnectorHealthCheck,
@@ -302,22 +295,24 @@ from .models import (
     CrossModuleWorkflowTemplateCreate,
     CTDModule3ReportBundle,
     CTDModule3ReportBundleCreate,
-    CustomerOnboardingProject,
-    CustomerOnboardingProjectCreate,
-    CustomerOnboardingProjectUpdate,
     CustomerAcceptanceProtocol,
     CustomerAcceptanceProtocolCreate,
     CustomerAcceptanceProtocolUpdate,
     CustomerAcceptanceTest,
     CustomerAcceptanceTestExecute,
+    CustomerOnboardingProject,
+    CustomerOnboardingProjectCreate,
+    CustomerOnboardingProjectUpdate,
     CustomerSuccessHealthScore,
+    DataIntegrityAssessment,
+    DataIntegrityAssessmentCreate,
     DatasetVersion,
     DatasetVersionCreate,
     DatasetVersionUpdate,
-    DataIntegrityAssessment,
-    DataIntegrityAssessmentCreate,
     DebugBundle,
     DebugBundleCreate,
+    DemoTenantSeed,
+    DemoTenantSeedCreate,
     DependencyCheck,
     DeploymentCandidate,
     DeploymentCandidateApprovalRequest,
@@ -343,13 +338,15 @@ from .models import (
     EvidenceCommentRecord,
     EvidenceCommentUpdate,
     EvidenceInputProvenance,
-    ExtractedAnalyticalRecord,
-    ExtractedReactionRecord,
-    ExtractedRegulatoryRecord,
+    ExpectedOutputContract,
+    ExpectedOutputContractCreate,
     ExternalObjectLink,
     ExternalObjectLinkCreate,
     ExternalSystemRecord,
     ExternalSystemRecordCreate,
+    ExtractedAnalyticalRecord,
+    ExtractedReactionRecord,
+    ExtractedRegulatoryRecord,
     FeatureFlag,
     FeatureFlagCreate,
     FeatureFlagUpdate,
@@ -365,16 +362,14 @@ from .models import (
     FIDRunReport,
     FIDRunReviewCreate,
     FIDRunReviewDecisionRecord,
-    FileRecord,
     FileNormalizationRequest,
     FileNormalizationRun,
+    FileRecord,
+    FlipReadinessPolicy,
+    FlipReadinessVerdict,
+    FullStoredAnalysisRecord,
     FunctionalSpecification,
     FunctionalSpecificationCreate,
-    DemoTenantSeed,
-    DemoTenantSeedCreate,
-    ExpectedOutputContract,
-    ExpectedOutputContractCreate,
-    FullStoredAnalysisRecord,
     GoldenDataset,
     GoldenDatasetCreate,
     GoldenDatasetUpdate,
@@ -387,6 +382,9 @@ from .models import (
     HRMSCandidateMatchResult,
     HRMSFormulaSearchRequest,
     HRMSFormulaSearchResult,
+    ImplementationTask,
+    ImplementationTaskCreate,
+    ImplementationTaskUpdate,
     ImpurityAssessRequest,
     ImpurityAssessResult,
     ImpurityCPCAOut,
@@ -399,18 +397,15 @@ from .models import (
     ImpurityThresholdsOut,
     InferenceExplanation,
     InferenceExplanationCreate,
-    ImplementationTask,
-    ImplementationTaskCreate,
-    ImplementationTaskUpdate,
     IngestionRun,
     IngestionRunCreate,
+    InspectionReadinessPackage,
+    InspectionReadinessPackageCreate,
     InstrumentWatchFolder,
     InstrumentWatchFolderCreate,
     InstrumentWatchFolderScanRequest,
     InstrumentWatchFolderUpdate,
     IntegrationImportResponse,
-    InspectionReadinessPackage,
-    InspectionReadinessPackageCreate,
     JobEventRecord,
     JobRecord,
     JurisdictionalRequirementMap,
@@ -448,6 +443,19 @@ from .models import (
     MessageResponse,
     MethodComparisonRun,
     MethodComparisonRunCreate,
+    MethodRegistryEntry,
+    MethodRegistryEntryCreate,
+    MethodRegistryEntryUpdate,
+    MetricsSummary,
+    MLEvaluationRun,
+    MLEvaluationRunCreate,
+    MLEvaluationRunResponse,
+    MLModelHealthSummary,
+    MLTaskDefinition,
+    MLTaskDefinitionCreate,
+    MLTrainingRun,
+    MLTrainingRunCreate,
+    MLTrainingRunResponse,
     MobileActionDraft,
     MobileActionDraftCreate,
     MobileActionDraftPatch,
@@ -470,19 +478,6 @@ from .models import (
     MobileSyncRequest,
     MobileSyncResponse,
     MobileViewPreferencePatch,
-    MethodRegistryEntry,
-    MethodRegistryEntryCreate,
-    MethodRegistryEntryUpdate,
-    MetricsSummary,
-    MLEvaluationRun,
-    MLEvaluationRunCreate,
-    MLEvaluationRunResponse,
-    MLModelHealthSummary,
-    MLTaskDefinition,
-    MLTaskDefinitionCreate,
-    MLTrainingRun,
-    MLTrainingRunCreate,
-    MLTrainingRunResponse,
     ModelArtifact,
     ModelCard,
     ModelCardCreate,
@@ -498,14 +493,17 @@ from .models import (
     ModelVersion,
     ModelVersionCreate,
     ModelVersionUpdate,
+    ModulePriorityMap,
+    ModulePriorityMapPatch,
     MS1AdductInferenceRequest,
     MS1AdductInferenceResult,
     MSMSAnnotationRequest,
     MSMSAnnotationResult,
     MSMSFragmentationTreeRequest,
     MSMSFragmentationTreeResult,
-    ModulePriorityMap,
-    ModulePriorityMapPatch,
+    MultipletDescriptor,
+    MultipletJCouplingBridgeRequest,
+    MultipletJCouplingBridgeResult,
     NitrosamineWatchRequest,
     NMRProcessedAnalyzeResponse,
     NMRProcessedPreviewResponse,
@@ -546,10 +544,10 @@ from .models import (
     PredictionRun,
     PredictionServiceConfig,
     PredictionServiceConfigCreate,
-    ProductProgramOrderPatch,
-    ProductProgramRegistry,
     ProcurementEvidencePackage,
     ProcurementEvidencePackageCreate,
+    ProductProgramOrderPatch,
+    ProductProgramRegistry,
     ProjectCreate,
     ProjectDashboardRecord,
     ProjectPermissionCreate,
@@ -570,11 +568,10 @@ from .models import (
     QueueWorkerStatus,
     RawArchiveExportManifest,
     RawArchiveRecord,
-    RecordRetentionPolicy,
-    RecordRetentionPolicyCreate,
     ReactionAdvisorReviewRequest,
     ReactionAnalyticalResult,
     ReactionAnalyticalResultCreate,
+    ReactionApprovedExperimentsExportRequest,
     ReactionBayesianOptimizationRun,
     ReactionBayesianOptimizationRunRequest,
     ReactionConditionCritique,
@@ -594,7 +591,6 @@ from .models import (
     ReactionExecutionItemCreate,
     ReactionExecutionItemUpdate,
     ReactionExecutionStatusUpdate,
-    ReactionApprovedExperimentsExportRequest,
     ReactionExperiment,
     ReactionExperimentCreate,
     ReactionExperimentEvidence,
@@ -638,10 +634,15 @@ from .models import (
     ReactionVariable,
     ReactionVariableCreate,
     ReactionVariableUpdate,
+    RecordRetentionPolicy,
+    RecordRetentionPolicyCreate,
     RegulatoryActionItem,
     RegulatoryActionItemCreate,
     RegulatoryActionItemUpdate,
-    RegulatoryAnswer,
+    RegulatoryAIDecision,
+    RegulatoryAIDecisionChainStatus,
+    RegulatoryAIDecisionCreate,
+    RegulatoryAIDecisionReview,
     RegulatoryChangeEvent,
     RegulatoryChangeReviewRequest,
     RegulatoryCitation,
@@ -688,10 +689,10 @@ from .models import (
     RegulatorySourceWatcher,
     RegulatorySourceWatcherCreate,
     RegulatorySourceWatcherUpdate,
-    RegulatorySurveillanceRun,
-    RegulatorySurveillanceRunCreate,
     RegulatorySubmissionPackage,
     RegulatorySubmissionPackageCreate,
+    RegulatorySurveillanceRun,
+    RegulatorySurveillanceRunCreate,
     RegulatoryToReactionBridge,
     RegulatoryToReactionBridgeCreate,
     RenewalValueReport,
@@ -713,13 +714,13 @@ from .models import (
     SampleDetailRecord,
     SampleReportsRecord,
     SampleTimelineRecord,
+    ScenarioValidationResult,
     ScientificKnowledgeGraph,
     ScientificKnowledgeGraphEdge,
     ScientificKnowledgeGraphEdgeCreate,
     ScoringProfile,
     ScoringProfileCreate,
     ScoringProfileUpdate,
-    ScenarioValidationResult,
     SecureShareLinkCreate,
     SecureShareLinkRecord,
     SecurityEvent,
@@ -732,13 +733,11 @@ from .models import (
     SessionReviewerUpdate,
     ShadowEvaluationRun,
     ShadowEvaluationRunCreate,
-    SpectroscopyToRegulatoryBridge,
-    SpectroscopyToRegulatoryBridgeCreate,
-    SpectraCheckImportFileRequest,
     SpectraCheckAuditEventRecord,
     SpectraCheckEvidenceCreate,
     SpectraCheckEvidenceRecord,
     SpectraCheckEvidenceUpdate,
+    SpectraCheckImportFileRequest,
     SpectraCheckProjectCreate,
     SpectraCheckProjectRecord,
     SpectraCheckProjectUpdate,
@@ -756,22 +755,18 @@ from .models import (
     SpectraCheckUnifiedEvidenceSave,
     SpectralSimilarityRequest,
     SpectralSimilarityResult,
+    SpectroscopyToRegulatoryBridge,
+    SpectroscopyToRegulatoryBridgeCreate,
     SpectrumAnalyzeResult,
-    AdminUserGSDGraduationRequest,
-    FlipReadinessPolicy,
-    FlipReadinessVerdict,
-    MultipletDescriptor,
-    MultipletJCouplingBridgeRequest,
-    MultipletJCouplingBridgeResult,
     SpectrumGSDAnalyzeRequest,
     SpectrumGSDAnalyzeResult,
     SpectrumGSDTelemetrySummary,
     SpectrumIntegrationAnalyzeRequest,
     SpectrumIntegrationAnalyzeResult,
     SpectrumMultipletAnalyzeRequest,
+    SpectrumMultipletAnalyzeResult,
     SpectrumPredictShiftsRequest,
     SpectrumPredictShiftsResult,
-    SpectrumMultipletAnalyzeResult,
     SpectrumPreviewReport,
     SpectrumReasonAnalogue,
     SpectrumReasonAudit,
@@ -785,15 +780,15 @@ from .models import (
     SpectrumSolventInfo,
     StoredAnalysisRecord,
     StoredReportRecord,
-    StructureSummary,
     StructureElucidationReportRequest,
     StructureElucidationReportResult,
+    StructureSummary,
     SubscriptionPlan,
     SubscriptionPlanCreate,
+    SystemHealthResponse,
     SystemReleaseApproveRequest,
     SystemReleaseRecord,
     SystemReleaseRecordCreate,
-    SystemHealthResponse,
     SystemStatusResponse,
     TeamMemberCreate,
     TeamMemberRecord,
@@ -836,19 +831,19 @@ from .models import (
     UnifiedEvidenceBundleRequest,
     UsageEvent,
     UsageEventCreate,
-    UserRequirementSpecification,
-    UserRequirementSpecificationCreate,
     UserCreate,
     UserFeedbackEvent,
     UserFeedbackEventCreate,
     UserLogin,
     UserPublic,
+    UserRequirementSpecification,
+    UserRequirementSpecificationCreate,
     UserSignIn,
     UserSignUp,
-    ValidationReport,
     ValidationProject,
     ValidationProjectCreate,
     ValidationProjectUpdate,
+    ValidationReport,
     ValidationRiskAssessment,
     ValidationRiskAssessmentCreate,
     ValidationRun,
@@ -881,8 +876,23 @@ from .multiplet_jcoupling_bridge import (
 )
 from .nmr2d import NMR2DParseError, analyze_nmr2d_preview, parse_nmr2d_upload
 from .nmr_prediction import predict_nmr_from_smiles_fast
+from .peak_categorization import (
+    build_dp4_candidate_ranking,
+    build_impurity_candidates,
+    build_labile_hydrogen_summary,
+    build_peak_category_summary,
+    build_predicted_vs_observed,
+    build_proton_inventory,
+    enrich_peaks,
+    is_aminoglycoside_like_structure,
+    reconcile_proton_peaks_with_reference_text,
+)
 from .proton import analyze_proton_evidence
 from .queueing import enqueue_job_processing
+from .raw_fid_prompt_validation import (
+    attach_report_provenance,
+    build_fixture_validation_report,
+)
 from .raw_vault import (
     RAW_ARCHIVE_HASH_MISMATCH_MESSAGE,
     RawVaultError,
@@ -890,10 +900,6 @@ from .raw_vault import (
     load_raw_archive_bytes,
     verify_raw_archive_integrity,
     verify_stored_raw_upload,
-)
-from .raw_fid_prompt_validation import (
-    attach_report_provenance,
-    build_fixture_validation_report,
 )
 from .regulatory_report import StructureElucidationReportError, compose_structure_elucidation_report
 from .settings import Settings, get_settings, validate_startup_settings
@@ -1931,7 +1937,7 @@ def _emit_gsd_telemetry(
     *,
     request: Request | None,
     context: AccessContext | None,
-    payload: "SpectrumGSDAnalyzeRequest",
+    payload: SpectrumGSDAnalyzeRequest,
     classified: list[Any] | None,
     environments: list[Any] | None,
     wall_ms: int,
@@ -6810,8 +6816,8 @@ async def spectrum_solvents_known(
     def _residual_centre(windows: list[Any], kinds: set[str]) -> float | None:
         for window in windows:
             if getattr(window, "kind", None) in kinds:
-                low = float(getattr(window, "low"))
-                high = float(getattr(window, "high"))
+                low = float(window.low)
+                high = float(window.high)
                 return round((low + high) / 2.0, 4)
         return None
 
@@ -7137,6 +7143,8 @@ def _cluster_legacy_peaks_into_environments(
 
     from moltrace.spectroscopy.peaks.gsd import (
         Peak as _GSDPeak,
+    )
+    from moltrace.spectroscopy.peaks.gsd import (
         cluster_into_environments as _cluster,
     )
 
@@ -7229,13 +7237,15 @@ def _compute_legacy_peak_qc_metrics(
     if not peaks or not x or not y or len(x) != len(y) or len(x) < 16:
         return peaks
 
+    import numpy as _np
+
     from moltrace.spectroscopy.io.fid_reader import NMRSpectrum as _NMRSpectrum
     from moltrace.spectroscopy.peaks.gsd import (
         _fit_single_with_model as _gsd_fit_single,
+    )
+    from moltrace.spectroscopy.peaks.gsd import (
         _robust_noise as _gsd_noise,
     )
-
-    import numpy as _np
 
     x_arr = _np.asarray(x, dtype=_np.float64)
     y_arr = _np.asarray(y, dtype=_np.float64)
@@ -19922,6 +19932,92 @@ def list_regulatory_ai_governance_record_route(
     try:
         return compliance_store.list_ai_governance_records(
             _state(request).session_factory, dossier_id
+        )
+    except Exception as exc:
+        _raise_compliance_http_error(exc)
+        raise
+
+
+@router.get(
+    "/regulatory/dossiers/{dossier_id}/ai-decisions",
+    response_model=list[RegulatoryAIDecision],
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
+)
+def list_regulatory_ai_decisions_route(
+    dossier_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[RegulatoryAIDecision]:
+    try:
+        return compliance_store.list_ai_decisions(_state(request).session_factory, dossier_id)
+    except Exception as exc:
+        _raise_compliance_http_error(exc)
+        raise
+
+
+@router.post(
+    "/regulatory/dossiers/{dossier_id}/ai-decisions",
+    response_model=RegulatoryAIDecision,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
+)
+def create_regulatory_ai_decision_route(
+    dossier_id: int,
+    payload: RegulatoryAIDecisionCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> RegulatoryAIDecision:
+    try:
+        return compliance_store.create_ai_decision(
+            _state(request).session_factory,
+            dossier_id,
+            payload,
+            actor=_compliance_actor(context),
+        )
+    except Exception as exc:
+        _raise_compliance_http_error(exc)
+        raise
+
+
+@router.get(
+    "/regulatory/dossiers/{dossier_id}/ai-decisions/verify",
+    response_model=RegulatoryAIDecisionChainStatus,
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
+)
+def verify_regulatory_ai_decision_chain_route(
+    dossier_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> RegulatoryAIDecisionChainStatus:
+    try:
+        return compliance_store.verify_ai_decision_chain(
+            _state(request).session_factory, dossier_id
+        )
+    except Exception as exc:
+        _raise_compliance_http_error(exc)
+        raise
+
+
+@router.post(
+    "/regulatory/dossiers/{dossier_id}/ai-decisions/{entry_hash}/review",
+    response_model=RegulatoryAIDecision,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_dossier_access)],
+)
+def review_regulatory_ai_decision_route(
+    dossier_id: int,
+    entry_hash: str,
+    payload: RegulatoryAIDecisionReview,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> RegulatoryAIDecision:
+    try:
+        return compliance_store.submit_ai_decision_review(
+            _state(request).session_factory,
+            dossier_id,
+            entry_hash,
+            payload,
+            actor=_compliance_actor(context),
         )
     except Exception as exc:
         _raise_compliance_http_error(exc)

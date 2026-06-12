@@ -44,6 +44,7 @@ from moltrace.regulatory.infra.versioning import content_hash
 
 __all__ = [
     "DRAFT_DISCLAIMER",
+    "GENESIS_HASH",
     "AIDecisionRecord",
     "Annex22Error",
     "Annex22Log",
