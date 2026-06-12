@@ -828,6 +828,16 @@ def create_impurity_risk_register(
             entity_id=row.id,
             metadata={"dossier_id": dossier_id, "threshold_triggered": trigger},
         )
+        # Annex 22 governance: an ICH M7 mutagenicity classification is an AI decision.
+        if m7 is not None:
+            _safe_record_m7_decision(
+                session,
+                dossier_id,
+                actor=actor,
+                m7=m7,
+                structural_assignment=payload.structural_assignment,
+                source_register_id=row.id,
+            )
         return _impurity_to_record(row)
 
 
@@ -1165,6 +1175,20 @@ def create_elemental_impurity_assessment(
             entity_id=row.id,
             metadata={"dossier_id": dossier_id, "action_item_ids": action_ids},
         )
+        # Annex 22 governance: an ICH Q3D elemental assessment is an AI decision.
+        if matches:
+            q3d_rule_set_version = next(
+                (m.get("rule_set_version") for m in matches if m.get("rule_set_version")), None
+            )
+            _safe_record_q3d_decision(
+                session,
+                dossier_id,
+                actor=actor,
+                summary={"assessed_elements": matches, "route": route},
+                rule_set_version=q3d_rule_set_version,
+                threshold_triggered=bool(action_ids),
+                source_assessment_id=row.id,
+            )
         return _assessment_to_record(row)
 
 
@@ -2070,6 +2094,31 @@ def create_ai_decision(
         return _ai_decision_to_record(row)
 
 
+def _safe_record_ai_decision(
+    session: Session,
+    dossier_id: int,
+    *,
+    actor: RegulatoryComplianceActor,
+    **decision: Any,
+) -> None:
+    """Best-effort wrapper around :func:`_record_ai_decision` for request-path hooks.
+
+    Governance recording must never break the underlying assessment, so any failure is logged
+    and swallowed. The decisions are deterministic rule-engine classifications (confidence 1.0);
+    the caller picks the risk level (``high`` -> human-review-required).
+    """
+
+    try:
+        _record_ai_decision(session, dossier_id, actor=actor, **decision)
+    except Exception:  # pragma: no cover - governance side-channel is best-effort
+        logger.warning(
+            "failed to record %s AI-decision for dossier %s",
+            decision.get("decision_type", "?"),
+            dossier_id,
+            exc_info=True,
+        )
+
+
 def _safe_record_cpca_decision(
     session: Session,
     dossier_id: int,
@@ -2079,37 +2128,95 @@ def _safe_record_cpca_decision(
     structure_text: str | None,
     source_assessment_id: int,
 ) -> None:
-    """Best-effort: record a CPCA potency categorization as a (high-risk) Annex 22 AI decision.
+    """Record a CPCA potency categorization as a high-risk AI decision (toxicologist sign-off)."""
 
-    Governance recording must never break the underlying nitrosamine assessment, so any failure
-    is logged and swallowed. CPCA is deterministic (confidence 1.0) but a potency categorization
-    requires toxicologist sign-off, so it is recorded as high-risk -> human review required.
-    """
+    _safe_record_ai_decision(
+        session,
+        dossier_id,
+        actor=actor,
+        decision_type="cpca_classification",
+        model_name="deterministic:fda_cpca_nitrosamine",
+        model_version=str(cpca.get("rule_set_version") or "unversioned"),
+        output=dict(cpca),
+        confidence=1.0,
+        feature_attribution={
+            "engine": "deterministic",
+            "potency_score": cpca.get("potency_score"),
+            "coc_flag": cpca.get("coc_flag"),
+            "source_assessment_id": source_assessment_id,
+        },
+        regulatory_basis=str(cpca.get("regulatory_basis") or "FDA Nitrosamine Guidance Rev 2"),
+        risk_level="high",
+        input_smiles=structure_text.strip() if structure_text else None,
+    )
 
-    try:
-        _record_ai_decision(
-            session,
-            dossier_id,
-            actor=actor,
-            decision_type="cpca_classification",
-            model_name="deterministic:fda_cpca_nitrosamine",
-            model_version=str(cpca.get("rule_set_version") or "unversioned"),
-            output=dict(cpca),
-            confidence=1.0,
-            feature_attribution={
-                "engine": "deterministic",
-                "potency_score": cpca.get("potency_score"),
-                "coc_flag": cpca.get("coc_flag"),
-                "source_assessment_id": source_assessment_id,
-            },
-            regulatory_basis=str(cpca.get("regulatory_basis") or "FDA Nitrosamine Guidance Rev 2"),
-            risk_level="high",
-            input_smiles=structure_text.strip() if structure_text else None,
-        )
-    except Exception:  # pragma: no cover - governance side-channel is best-effort
-        logger.warning(
-            "failed to record CPCA AI-decision for dossier %s", dossier_id, exc_info=True
-        )
+
+def _safe_record_m7_decision(
+    session: Session,
+    dossier_id: int,
+    *,
+    actor: RegulatoryComplianceActor,
+    m7: Mapping[str, Any],
+    structural_assignment: str | None,
+    source_register_id: int,
+) -> None:
+    """Record an ICH M7 mutagenicity classification; mutagenic classes (1-3) are high-risk."""
+
+    m7_class = m7.get("m7_class")
+    mutagenic = isinstance(m7_class, int) and m7_class in {1, 2, 3}
+    _safe_record_ai_decision(
+        session,
+        dossier_id,
+        actor=actor,
+        decision_type="m7_classification",
+        model_name="deterministic:ich_m7",
+        model_version=str(m7.get("rule_set_version") or "unversioned"),
+        output=dict(m7),
+        confidence=1.0,
+        feature_attribution={
+            "engine": "deterministic",
+            "m7_class": m7_class,
+            "coc_flag": m7.get("coc_flag"),
+            "source_register_id": source_register_id,
+        },
+        regulatory_basis=str(m7.get("regulatory_basis") or "ICH M7(R2)"),
+        risk_level="high" if mutagenic else "low",
+        input_smiles=structural_assignment.strip() if structural_assignment else None,
+    )
+
+
+def _safe_record_q3d_decision(
+    session: Session,
+    dossier_id: int,
+    *,
+    actor: RegulatoryComplianceActor,
+    summary: Mapping[str, Any],
+    rule_set_version: str | None,
+    threshold_triggered: bool,
+    source_assessment_id: int,
+) -> None:
+    """Record an ICH Q3D elemental-impurity assessment; a triggered limit is high-risk."""
+
+    elements = summary.get("assessed_elements", [])
+    _safe_record_ai_decision(
+        session,
+        dossier_id,
+        actor=actor,
+        decision_type="q3d_elemental_assessment",
+        model_name="deterministic:ich_q3d",
+        model_version=str(rule_set_version or "unversioned"),
+        output=dict(summary),
+        confidence=1.0,
+        feature_attribution={
+            "engine": "deterministic",
+            "element_count": len(elements) if isinstance(elements, list) else 0,
+            "threshold_triggered": threshold_triggered,
+            "source_assessment_id": source_assessment_id,
+        },
+        regulatory_basis="ICH Q3D(R2)",
+        risk_level="high" if threshold_triggered else "low",
+        input_smiles=None,
+    )
 
 
 def list_ai_decisions(

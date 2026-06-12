@@ -14,6 +14,32 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.24.9 — Regulatory Hub: M7 + Q3D classifications auto-record AI decisions (2026-06-12)
+
+**Headline:** Extends v0.24.8 from CPCA to the other two deterministic regulatory classifications:
+an impurity register that runs an **ICH M7** mutagenicity classification, and an **ICH Q3D**
+elemental-impurity assessment, now each auto-record an Annex 22 (draft) AI decision on the
+dossier's hash-chained log — risk-tiered, so the human-review queue reflects real criticality.
+
+### Changed
+- **`src/nmrcheck/regulatory_compliance_store.py`** — `create_impurity_risk_register` records an
+  `m7_classification` decision (mutagenic classes 1–3 → **high-risk/HITL**, otherwise low);
+  `create_elemental_impurity_assessment` records a `q3d_elemental_assessment` decision (a triggered
+  Class-1 / limit element → **high-risk**, otherwise low). Both are best-effort, additive, and in
+  the same transaction — a governance-recording failure is logged and never breaks the assessment.
+  A shared `_safe_record_ai_decision` wrapper now backs the CPCA / M7 / Q3D hooks.
+
+### Added
+- **`tests/test_regulatory_ai_decisions_api.py`** — an impurity register over NDMA records one
+  high-risk `m7_classification` (class 2); a Pb/Fe elemental assessment records one high-risk
+  `q3d_elemental_assessment` carrying the Q3D `rule_set_version`. Existing impurity/elemental/M7/Q3D
+  tests stay green.
+
+### Notes
+- All three flagship deterministic classifications (CPCA, M7, Q3D) now produce governance records
+  from the request path. The decorator-based `with_annex22_governance` remains for callers that
+  want the in-memory `GovernedResult` gate rather than dossier persistence.
+
 ## v0.24.8 — Regulatory Hub: nitrosamine watch auto-records its CPCA AI decision (2026-06-12)
 
 **Headline:** Closes the loop from v0.24.7 — a nitrosamine watch that runs an FDA CPCA potency

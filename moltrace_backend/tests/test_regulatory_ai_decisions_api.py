@@ -241,3 +241,50 @@ def test_nitrosamine_watch_auto_records_cpca_decision(client):
             f"/regulatory/dossiers/{did}/ai-decisions/verify", headers=headers
         ).json()
         assert verify["ok"] is True
+
+
+def test_impurity_register_auto_records_m7_decision(client):
+    # An impurity register over a parseable SMILES runs an ICH M7 classification, recorded as
+    # an AI decision (mutagenic classes 1-3 -> high-risk / HITL).
+    with client:
+        headers = _sign_up(client)
+        did = _dossier(client, headers)
+        reg = client.post(
+            f"/regulatory/dossiers/{did}/impurity-risk-register",
+            headers=headers,
+            json={
+                "impurity_name": "NDMA-like feature",
+                "impurity_type": "process_impurity",
+                "observed_level_percent": 0.12,
+                "daily_dose_g": 1.0,
+                "structural_assignment": "CN(C)N=O",  # NDMA SMILES -> M7 class 2 (CoC)
+            },
+        )
+        assert reg.status_code == 201, reg.text
+        decisions = client.get(f"/regulatory/dossiers/{did}/ai-decisions", headers=headers).json()
+        m7 = [d for d in decisions if d["decision_type"] == "m7_classification"]
+        assert len(m7) == 1
+        assert m7[0]["output_json"]["m7_class"] == 2
+        assert m7[0]["risk_level"] == "high"  # mutagenic class -> human review required
+        assert m7[0]["confidence"] == 1.0
+
+
+def test_elemental_assessment_auto_records_q3d_decision(client):
+    # An ICH Q3D elemental assessment is recorded as a (quantitative) AI decision; a Class-1
+    # element (Pb) triggers review -> high-risk.
+    with client:
+        headers = _sign_up(client)
+        did = _dossier(client, headers)
+        res = client.post(
+            f"/regulatory/dossiers/{did}/elemental-impurity-assessment",
+            headers=headers,
+            json={"elements_json": [{"element": "Pb", "observed_ppm": 10}, {"element": "Fe"}]},
+        )
+        assert res.status_code == 201, res.text
+        decisions = client.get(f"/regulatory/dossiers/{did}/ai-decisions", headers=headers).json()
+        q3d = [d for d in decisions if d["decision_type"] == "q3d_elemental_assessment"]
+        assert len(q3d) == 1
+        assert "assessed_elements" in q3d[0]["output_json"]
+        assert q3d[0]["confidence"] == 1.0
+        assert q3d[0]["model_version"].startswith("sha256:")  # Q3D rule_set_version
+        assert q3d[0]["risk_level"] == "high"  # Pb (Class 1) -> review required
