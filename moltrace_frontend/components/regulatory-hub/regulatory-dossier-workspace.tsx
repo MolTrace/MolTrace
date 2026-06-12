@@ -2354,43 +2354,69 @@ export function RegulatoryDossierWorkspace() {
 
             {activeNavGroup.sections.length > 1 ? (
               <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-muted/30 p-1">
-                <span className="px-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                <span
+                  aria-hidden
+                  className="px-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                >
                   {activeNavGroup.label}
                 </span>
-                {activeNavGroup.sections.map((s) => {
-                  const on = activeTab === s
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      aria-current={on ? "page" : undefined}
-                      onClick={() => setActiveTab(s)}
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors",
-                        on
-                          ? "bg-card font-semibold text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {DOSSIER_SECTION_LABEL[s] ?? s}
-                      {s === "risk" && dossierRiskLevel ? (
-                        <span
-                          className={cn(
-                            "rounded-full border px-1 text-[9px] font-bold uppercase",
-                            riskBadgeClass(dossierRiskLevel),
-                          )}
-                        >
-                          {dossierRiskLevel}
-                        </span>
-                      ) : null}
-                      {s === "readiness" && dossierReadinessStatus ? (
-                        <span className="rounded-full border px-1 text-[9px] font-bold uppercase text-muted-foreground">
-                          {dossierReadinessStatus.replace(/_/g, " ")}
-                        </span>
-                      ) : null}
-                    </button>
-                  )
-                })}
+                {/* Proper tab-widget keyboard nav: roving tabindex + Arrow/Home/
+                    End move focus and selection across the group's sections. */}
+                <div
+                  role="tablist"
+                  aria-label={`${activeNavGroup.label} sections`}
+                  className="flex flex-wrap items-center gap-1"
+                  onKeyDown={(e) => {
+                    const sections = activeNavGroup.sections
+                    const idx = sections.indexOf(activeTab)
+                    let next = -1
+                    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % sections.length
+                    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + sections.length) % sections.length
+                    else if (e.key === "Home") next = 0
+                    else if (e.key === "End") next = sections.length - 1
+                    else return
+                    e.preventDefault()
+                    setActiveTab(sections[next])
+                    e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+                  }}
+                >
+                  {activeNavGroup.sections.map((s) => {
+                    const on = activeTab === s
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        role="tab"
+                        aria-selected={on}
+                        tabIndex={on ? 0 : -1}
+                        onClick={() => setActiveTab(s)}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors",
+                          on
+                            ? "bg-card font-semibold text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {DOSSIER_SECTION_LABEL[s] ?? s}
+                        {s === "risk" && dossierRiskLevel ? (
+                          <span
+                            className={cn(
+                              "rounded-full border px-1 text-[9px] font-bold uppercase",
+                              riskBadgeClass(dossierRiskLevel),
+                            )}
+                          >
+                            {dossierRiskLevel}
+                          </span>
+                        ) : null}
+                        {s === "readiness" && dossierReadinessStatus ? (
+                          <span className="rounded-full border px-1 text-[9px] font-bold uppercase text-muted-foreground">
+                            {dossierReadinessStatus.replace(/_/g, " ")}
+                          </span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             ) : null}
           </div>
@@ -2847,11 +2873,6 @@ export function RegulatoryDossierWorkspace() {
                 SpectraCheck evidence items, dossier artifacts, and external citations attached to this dossier.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
-                Back to Requirements
-              </Button>
-            </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Evidence Links"
@@ -3028,11 +3049,6 @@ export function RegulatoryDossierWorkspace() {
                 Tenant rule sets evaluated against this dossier — open the rule-updates workspace to propose changes.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
-                Back to Requirements
-              </Button>
-            </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Compliance Rules"
@@ -3138,11 +3154,6 @@ export function RegulatoryDossierWorkspace() {
               <p className="text-sm text-muted-foreground">
                 ICH Q3A/Q3B-aligned register with thresholds, identification status, and qualified justifications.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
-                Back to Requirements
-              </Button>
             </div>
             <ModuleCard
               accent="cyan"
@@ -3413,11 +3424,6 @@ export function RegulatoryDossierWorkspace() {
               <p className="text-sm text-muted-foreground">
                 Class 1 / 2 / 3 solvent levels and PDE compliance against the active rule set.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
-                Back to Requirements
-              </Button>
             </div>
             <ModuleCard
               accent="cyan"
@@ -3703,11 +3709,6 @@ export function RegulatoryDossierWorkspace() {
               <p className="text-sm text-muted-foreground">
                 FDA / EMA nitrosamine risk-narrative coverage with cited evidence and reviewer signoff state.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
-                Back to Requirements
-              </Button>
             </div>
             <ModuleCard
               accent="cyan"
@@ -4089,11 +4090,6 @@ export function RegulatoryDossierWorkspace() {
               <p className="text-sm text-muted-foreground">
                 Method validation parameters, qualified-reference traceability, and reviewer signoff for quantitative NMR.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
-                Back to Requirements
-              </Button>
             </div>
             <ModuleCard
               accent="cyan"
@@ -4556,11 +4552,6 @@ export function RegulatoryDossierWorkspace() {
               <p className="text-sm text-muted-foreground">
                 Model versions, prompts, validation evidence, and human-review checkpoints for AI-assisted dossier content.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("requirements")}>
-                Back to Requirements
-              </Button>
             </div>
             <ModuleCard
               accent="cyan"
@@ -5499,11 +5490,6 @@ export function RegulatoryDossierWorkspace() {
                 Question / answer pairs that must cite source evidence. Required before promoting to in-review.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
-                Back to Action Items
-              </Button>
-            </div>
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Mandatory</AlertTitle>
@@ -5777,11 +5763,6 @@ export function RegulatoryDossierWorkspace() {
                 Per-requirement risk hints and overall dossier risk level — feeds the High-risk dossier KPI on the landing page.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
-                Back to Action Items
-              </Button>
-            </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Risk Assessment"
@@ -5917,11 +5898,6 @@ export function RegulatoryDossierWorkspace() {
               <p className="text-sm text-muted-foreground">
                 Record an internal review decision (approve / reject / escalate) with reviewer attribution. Not legal advice or external regulatory approval.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
-                Back to Action Items
-              </Button>
             </div>
             <ModuleCard
               accent="cyan"
@@ -6083,11 +6059,6 @@ export function RegulatoryDossierWorkspace() {
               <p className="text-sm text-muted-foreground">
                 Pre-submission checklist with per-section coverage and reviewer signoff state — share with the regulatory affairs team.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("action-items")}>
-                Back to Action Items
-              </Button>
             </div>
             <ModuleCard
               accent="cyan"
