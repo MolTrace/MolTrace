@@ -2364,13 +2364,19 @@ export function RegulatoryDossierWorkspace() {
                 {DOSSIER_NAV.map((g, gi) => (
                   <div key={g.id} className="inline-flex items-center gap-1">
                     {gi > 0 ? <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" /> : null}
-                    <span
-                      aria-hidden
-                      className="shrink-0 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em]"
-                      style={{ color: "var(--mt-cyan)" }}
-                    >
-                      {g.label}
-                    </span>
+                    {/* Single-tab groups skip the label: it would duplicate (or add
+                        nothing over) the tab itself — e.g. "OVERVIEW" next to the
+                        "Overview" tab — which is exactly the header/tab confusion
+                        this nav is trying to avoid. The divider still chunks them. */}
+                    {g.sections.length > 1 ? (
+                      <span
+                        aria-hidden
+                        className="shrink-0 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em]"
+                        style={{ color: "var(--mt-cyan)" }}
+                      >
+                        {g.label}
+                      </span>
+                    ) : null}
                     {g.sections.map((s) => {
                       const on = activeTab === s
                       return (
