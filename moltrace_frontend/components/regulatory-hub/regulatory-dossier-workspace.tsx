@@ -237,6 +237,8 @@ const DOSSIER_NAV: DossierNavGroup[] = [
   { id: "developer", label: "Developer JSON", sections: ["json"] },
 ]
 
+const DOSSIER_SECTIONS = DOSSIER_NAV.flatMap((g) => g.sections)
+
 const DOSSIER_SECTION_LABEL: Record<string, string> = {
   overview: "Overview",
   requirements: "Requirements",
@@ -2213,9 +2215,8 @@ export function RegulatoryDossierWorkspace() {
     ]
   )
 
-  // Active primary group for the two-tier nav + the values surfaced as nav
-  // badges so reviewers see dossier state without drilling into a section.
-  const activeNavGroup = DOSSIER_NAV.find((g) => g.sections.includes(activeTab)) ?? DOSSIER_NAV[0]
+  // Dossier state surfaced as nav badges so reviewers see risk / readiness
+  // without opening a section.
   const dossierRiskLevel = readRecordString(riskAssessment ?? {}, "overall_risk") ?? ""
   const dossierReadinessStatus = readRecordString(readinessReport ?? {}, "status") ?? ""
 
@@ -2303,122 +2304,80 @@ export function RegulatoryDossierWorkspace() {
         </div>
       ) : dossier ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
-          {/* Two-tier section nav — primary groups (always visible) + a
-              persistent secondary row for the active multi-section group, so
-              every sibling is discoverable. Risk / readiness state surface as
-              badges. Drives the same `activeTab` the 18 TabsContent panels read. */}
+          {/* Section nav — one grouped tablist (matches SpectraCheck): every
+              section is visible and one click away, organised into labelled
+              groups with dividers. Arrow / Home / End roam across all sections;
+              risk / readiness state surface as badges on their tabs. Drives the
+              same activeTab the 18 TabsContent panels read. */}
           <div className="space-y-2">
-            <div className="flex flex-wrap gap-1.5" aria-label="Dossier sections">
-              {DOSSIER_NAV.map((g) => {
-                const active = g.sections.includes(activeTab)
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    aria-current={active ? "page" : undefined}
-                    onClick={() => {
-                      if (!active) setActiveTab(g.sections[0])
-                    }}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs font-semibold transition-colors",
-                      active
-                        ? "bg-[color:var(--mt-cyan)] text-[#04080F] shadow-sm"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    )}
-                  >
-                    {g.label}
-                    {g.sections.length > 1 ? (
-                      <span
-                        className={cn(
-                          "rounded-full px-1.5 text-[10px] tabular-nums",
-                          active ? "bg-black/15 text-[#04080F]" : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {g.sections.length}
-                      </span>
-                    ) : null}
-                    {g.id === "review" && dossierRiskLevel ? (
-                      <span
-                        className={cn(
-                          "rounded-full border px-1.5 text-[9px] font-bold uppercase",
-                          riskBadgeClass(dossierRiskLevel),
-                        )}
-                      >
-                        {dossierRiskLevel}
-                      </span>
-                    ) : null}
-                  </button>
-                )
-              })}
-            </div>
-
-            {activeNavGroup.sections.length > 1 ? (
-              <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-muted/30 p-1">
-                <span
-                  aria-hidden
-                  className="px-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-                >
-                  {activeNavGroup.label}
-                </span>
-                {/* Proper tab-widget keyboard nav: roving tabindex + Arrow/Home/
-                    End move focus and selection across the group's sections. */}
-                <div
-                  role="tablist"
-                  aria-label={`${activeNavGroup.label} sections`}
-                  className="flex flex-wrap items-center gap-1"
-                  onKeyDown={(e) => {
-                    const sections = activeNavGroup.sections
-                    const idx = sections.indexOf(activeTab)
-                    let next = -1
-                    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % sections.length
-                    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + sections.length) % sections.length
-                    else if (e.key === "Home") next = 0
-                    else if (e.key === "End") next = sections.length - 1
-                    else return
-                    e.preventDefault()
-                    setActiveTab(sections[next])
-                    e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
-                  }}
-                >
-                  {activeNavGroup.sections.map((s) => {
-                    const on = activeTab === s
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        role="tab"
-                        aria-selected={on}
-                        tabIndex={on ? 0 : -1}
-                        onClick={() => setActiveTab(s)}
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors",
-                          on
-                            ? "bg-card font-semibold text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        {DOSSIER_SECTION_LABEL[s] ?? s}
-                        {s === "risk" && dossierRiskLevel ? (
-                          <span
-                            className={cn(
-                              "rounded-full border px-1 text-[9px] font-bold uppercase",
-                              riskBadgeClass(dossierRiskLevel),
-                            )}
-                          >
-                            {dossierRiskLevel}
-                          </span>
-                        ) : null}
-                        {s === "readiness" && dossierReadinessStatus ? (
-                          <span className="rounded-full border px-1 text-[9px] font-bold uppercase text-muted-foreground">
-                            {dossierReadinessStatus.replace(/_/g, " ")}
-                          </span>
-                        ) : null}
-                      </button>
-                    )
-                  })}
-                </div>
+            <div className="min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+              <div
+                role="tablist"
+                aria-label="Dossier sections"
+                className="inline-flex w-max items-center gap-1 rounded-lg border bg-muted/20 p-1"
+                onKeyDown={(e) => {
+                  const all = DOSSIER_SECTIONS
+                  const idx = all.indexOf(activeTab)
+                  let next = -1
+                  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % all.length
+                  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + all.length) % all.length
+                  else if (e.key === "Home") next = 0
+                  else if (e.key === "End") next = all.length - 1
+                  else return
+                  e.preventDefault()
+                  setActiveTab(all[next])
+                  e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+                }}
+              >
+                {DOSSIER_NAV.map((g, gi) => (
+                  <div key={g.id} className="inline-flex items-center gap-1">
+                    {gi > 0 ? <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" /> : null}
+                    <span
+                      aria-hidden
+                      className="shrink-0 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70"
+                    >
+                      {g.label}
+                    </span>
+                    {g.sections.map((s) => {
+                      const on = activeTab === s
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          role="tab"
+                          aria-selected={on}
+                          tabIndex={on ? 0 : -1}
+                          onClick={() => setActiveTab(s)}
+                          className={cn(
+                            "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1 text-xs transition-colors",
+                            on
+                              ? "bg-[color:var(--mt-cyan)] font-semibold text-[#04080F] shadow-sm"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          )}
+                        >
+                          {DOSSIER_SECTION_LABEL[s] ?? s}
+                          {s === "risk" && dossierRiskLevel ? (
+                            <span
+                              className={cn(
+                                "rounded-full border px-1 text-[9px] font-bold uppercase",
+                                riskBadgeClass(dossierRiskLevel),
+                              )}
+                            >
+                              {dossierRiskLevel}
+                            </span>
+                          ) : null}
+                          {s === "readiness" && dossierReadinessStatus ? (
+                            <span className="rounded-full border px-1 text-[9px] font-bold uppercase text-muted-foreground">
+                              {dossierReadinessStatus.replace(/_/g, " ")}
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
               </div>
-            ) : null}
+            </div>
           </div>
 
           <TabsContent value="overview" className="min-w-0 max-w-full space-y-6">
