@@ -290,10 +290,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   const urlSessionHandledRef = useRef<string | null>(null)
 
   const [activeTab, setActiveTab] = useState(defaultTab)
-  // Two-tier nav: which primary group owns the active section, and the active
-  // section's metadata (for the relocated description caption).
-  const activeSpectraGroup =
-    SPECTRACHECK_NAV.find((g) => g.sections.some((s) => s.value === activeTab)) ?? SPECTRACHECK_NAV[0]
+  // Active section's metadata, for the relocated description caption.
   const activeSpectraSection = SPECTRACHECK_SECTIONS.find((s) => s.value === activeTab)
   const [sessionRecord, setSessionRecord] = useState<unknown>(null)
   const tabStateCtx = useOptionalSpectraCheckTabState()
@@ -1169,92 +1166,67 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
       >
       <div className="min-h-0 min-w-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0">
-        {/* Two-tier section nav — primary pipeline groups (always visible) +
-            a persistent secondary tablist for the active group, so every
-            sibling is discoverable. The per-section blurb is relocated to one
-            caption line below (the old per-tab hover tooltip obstructed moving
-            between tabs). Drives the same activeTab the 13 panels read. */}
+        {/* Section nav — one grouped tablist: every section is visible and
+            one click away (this is the engine — power users move fast), but
+            organised into the structure-elucidation pipeline by labelled
+            groups. Arrow / Home / End roam across all sections. The per-section
+            blurb is the caption below (the old per-tab hover tooltip obstructed
+            moving between tabs). Drives the same activeTab the 13 panels read. */}
         <div className="space-y-2">
-          <div className="flex flex-wrap gap-1.5" aria-label="SpectraCheck sections">
-            {SPECTRACHECK_NAV.map((g) => {
-              const active = g.sections.some((s) => s.value === activeTab)
-              return (
-                <button
-                  key={g.id}
-                  type="button"
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => {
-                    if (!active) setActiveTab(g.sections[0].value)
-                  }}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-mono text-xs font-semibold transition-colors",
-                    active
-                      ? "[background-color:var(--mt-teal)] text-[#04080F] shadow-sm"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  {g.label}
-                  {g.sections.length > 1 ? (
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "rounded-full px-1.5 text-[10px] tabular-nums",
-                        active ? "bg-black/15 text-[#04080F]" : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {g.sections.length}
-                    </span>
-                  ) : null}
-                </button>
-              )
-            })}
-          </div>
-
-          {activeSpectraGroup.sections.length > 1 ? (
-            <div className="min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
-              <div
-                role="tablist"
-                aria-label={`${activeSpectraGroup.label} sections`}
-                className="inline-flex w-max items-center gap-1 rounded-lg border bg-muted/30 p-1"
-                onKeyDown={(e) => {
-                  const ss = activeSpectraGroup.sections
-                  const idx = ss.findIndex((s) => s.value === activeTab)
-                  let next = -1
-                  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % ss.length
-                  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + ss.length) % ss.length
-                  else if (e.key === "Home") next = 0
-                  else if (e.key === "End") next = ss.length - 1
-                  else return
-                  e.preventDefault()
-                  setActiveTab(ss[next].value)
-                  e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
-                }}
-              >
-                {activeSpectraGroup.sections.map((s) => {
-                  const on = activeTab === s.value
-                  return (
-                    <button
-                      key={s.value}
-                      type="button"
-                      role="tab"
-                      aria-selected={on}
-                      tabIndex={on ? 0 : -1}
-                      data-testid={`spectracheck-tab-${s.value}`}
-                      onClick={() => setActiveTab(s.value)}
-                      className={cn(
-                        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1 font-mono text-xs transition-colors",
-                        on
-                          ? "bg-card font-semibold text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {s.label}
-                    </button>
-                  )
-                })}
-              </div>
+          <div className="min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+            <div
+              role="tablist"
+              aria-label="SpectraCheck sections"
+              className="inline-flex w-max items-center gap-1 rounded-lg border bg-muted/20 p-1"
+              onKeyDown={(e) => {
+                const all = SPECTRACHECK_SECTIONS
+                const idx = all.findIndex((s) => s.value === activeTab)
+                let next = -1
+                if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % all.length
+                else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + all.length) % all.length
+                else if (e.key === "Home") next = 0
+                else if (e.key === "End") next = all.length - 1
+                else return
+                e.preventDefault()
+                setActiveTab(all[next].value)
+                e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+              }}
+            >
+              {SPECTRACHECK_NAV.map((g, gi) => (
+                <div key={g.id} className="inline-flex items-center gap-1">
+                  {gi > 0 ? <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" /> : null}
+                  <span
+                    aria-hidden
+                    className="shrink-0 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70"
+                  >
+                    {g.label}
+                  </span>
+                  {g.sections.map((s) => {
+                    const on = activeTab === s.value
+                    return (
+                      <button
+                        key={s.value}
+                        type="button"
+                        role="tab"
+                        aria-selected={on}
+                        tabIndex={on ? 0 : -1}
+                        data-testid={`spectracheck-tab-${s.value}`}
+                        onClick={() => setActiveTab(s.value)}
+                        className={cn(
+                          "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1 font-mono text-xs transition-colors",
+                          on
+                            ? "[background-color:var(--mt-teal)] font-bold text-[#04080F] shadow-sm"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        {s.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
-          ) : null}
+          </div>
 
           {activeSpectraSection ? (
             <p className="text-xs text-muted-foreground">{activeSpectraSection.desc}</p>
