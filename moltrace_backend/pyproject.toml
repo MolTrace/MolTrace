@@ -33,6 +33,14 @@ fid = [
     "nmrglue>=0.11",
     "numpy>=1.26",
 ]
+# Word (.docx) rendering for the ICH Q1A(R2) stability protocol generator (Prompt 11). OPTIONAL: the
+# generator's native path returns a structured StabilityProtocol and renders Markdown with zero extra
+# dependencies; installing this group upgrades StabilityProtocol.to_docx() to emit a .docx. The
+# default CI `test` job does not install it, so the always-on path is what gets gated; the docx test
+# `pytest.importorskip("docx")`s instead.
+docx = [
+    "python-docx>=1.1.2",
+]
 dev = [
     "pytest>=8.0",
     # Parallel test execution (`pytest -n auto`) — used by the CI backend job to
