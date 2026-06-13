@@ -733,6 +733,11 @@ from .models import (
     SessionReviewerUpdate,
     ShadowEvaluationRun,
     ShadowEvaluationRunCreate,
+    SPCAlertOut,
+    SPCAnalyzeRequest,
+    SPCAnalyzeResult,
+    SPCCapabilityOut,
+    SPCSignalOut,
     SpectraCheckAuditEventRecord,
     SpectraCheckEvidenceCreate,
     SpectraCheckEvidenceRecord,
@@ -6484,6 +6489,153 @@ async def regulatory_impurities_assess(
         disclaimer=_IMPURITY_ASSESS_DISCLAIMER,
         human_review_required=True,
         warnings=warnings,
+    )
+
+
+_SPC_ANALYZE_DISCLAIMER = (
+    "Decision-support only, NOT a batch disposition. The capability indices and SPC/CUSUM/EWMA "
+    "signals are deterministic computations from version-pinned SQC references (Montgomery; "
+    "Western Electric 1956; Nelson 1984); a qualified person reviews every signal and owns the "
+    "disposition."
+)
+
+
+def _spc_signal_out(signal: object) -> SPCSignalOut:
+    return SPCSignalOut(
+        rule_number=signal.rule_number,
+        rule_name=signal.rule_name,
+        method=signal.method,
+        description=signal.description,
+        indices=list(signal.indices),
+        side=signal.side,
+    )
+
+
+def _spc_finite(value: float | None) -> float | None:
+    """Map a non-finite capability index (zero-variation inf/nan) to null for valid JSON."""
+
+    if value is None or not math.isfinite(value):
+        return None
+    return value
+
+
+@router.post(
+    "/regulatory/spc/analyze",
+    response_model=SPCAnalyzeResult,
+    dependencies=[Depends(require_access_context)],
+)
+async def regulatory_spc_analyze(
+    payload: SPCAnalyzeRequest,
+    request: Request,  # auto-injected by FastAPI; tests may pass None
+    context: AccessContext = Depends(require_access_context),
+) -> SPCAnalyzeResult:
+    """Process-capability + SPC trending over a measurement series (ICH Q10 / SQC).
+
+    Takes a time-ordered series for one (product, parameter) plus its specification limits and
+    returns the process-capability indices (Cp/Cpk/Pp/Ppk/Cpm), the eight Shewhart SPC signals
+    (Western Electric / Nelson / Montgomery), the CUSUM and EWMA detectors, and pre-OOS trending
+    alerts with the early-warning lead (``first_signal_index`` before ``first_oos_index``).
+    Stateless and deterministic — decision-support requiring qualified sign-off; the engine never
+    dispositions a batch. Emits one ``regulatory.spc.analyze`` audit event per call.
+    """
+
+    from moltrace.regulatory.quality import (
+        MeasurementPoint,
+        MeasurementSeries,
+        analyze_series,
+    )
+
+    series = MeasurementSeries(
+        product=payload.product,
+        parameter=payload.parameter,
+        points=tuple(
+            MeasurementPoint(
+                value=m.value, timepoint=m.timepoint, batch_id=m.batch_id, label=m.label
+            )
+            for m in payload.measurements
+        ),
+        usl=payload.usl,
+        lsl=payload.lsl,
+        target=payload.target,
+        unit=payload.unit,
+    )
+    try:
+        report = analyze_series(
+            series,
+            rule_set=payload.rule_set,
+            warn_within_sigma=payload.warn_within_sigma,
+            subgroup_size=payload.subgroup_size,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        if request is not None:
+            _audit_from_context(
+                request,
+                context=context,
+                event_type="regulatory.spc.analyze",
+                message="SPC capability/trending analysis completed.",
+                metadata={
+                    "product": payload.product,
+                    "parameter": payload.parameter,
+                    "n": report.n,
+                    "rule_set": payload.rule_set,
+                    "n_oos": len(report.oos_indices),
+                    "n_signals": (
+                        len(report.spc_signals)
+                        + len(report.cusum_signals)
+                        + len(report.ewma_signals)
+                    ),
+                },
+            )
+    except Exception:
+        pass
+
+    cap = report.capability
+    return SPCAnalyzeResult(
+        product=report.product,
+        parameter=report.parameter,
+        n=report.n,
+        rule_set=report.rule_set,
+        capability=SPCCapabilityOut(
+            n=cap.n,
+            mean=cap.mean,
+            sigma_within=cap.sigma_within,
+            sigma_overall=cap.sigma_overall,
+            usl=cap.usl,
+            lsl=cap.lsl,
+            target=cap.target,
+            cp=_spc_finite(cap.cp),
+            cpk=_spc_finite(cap.cpk),
+            cpu=_spc_finite(cap.cpu),
+            cpl=_spc_finite(cap.cpl),
+            pp=_spc_finite(cap.pp),
+            ppk=_spc_finite(cap.ppk),
+            cpm=_spc_finite(cap.cpm),
+            rating=cap.rating.value,
+            interpretation=cap.interpretation,
+            is_capable=cap.is_capable,
+            warnings=list(cap.warnings),
+        ),
+        spc_signals=[_spc_signal_out(s) for s in report.spc_signals],
+        cusum_signals=[_spc_signal_out(s) for s in report.cusum_signals],
+        ewma_signals=[_spc_signal_out(s) for s in report.ewma_signals],
+        alerts=[
+            SPCAlertOut(
+                severity=a.severity.value,
+                category=a.category,
+                message=a.message,
+                indices=list(a.indices),
+            )
+            for a in report.alerts
+        ],
+        oos_indices=list(report.oos_indices),
+        first_signal_index=report.first_signal_index,
+        first_oos_index=report.first_oos_index,
+        lead_points=report.lead_points,
+        disclaimer=_SPC_ANALYZE_DISCLAIMER,
+        human_review_required=True,
     )
 
 

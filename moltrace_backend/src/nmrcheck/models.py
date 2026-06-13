@@ -3528,6 +3528,121 @@ class ImpurityAssessResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+# --------------------------------------------------------------------------- #
+# Process capability & SPC trending (POST /regulatory/spc/analyze)
+# --------------------------------------------------------------------------- #
+SPCRuleSet = Literal["western_electric", "western_electric_classic", "nelson", "montgomery"]
+
+
+class SPCMeasurementInput(BaseModel):
+    """One time-ordered measurement in an SPC series."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    timepoint: str = Field(default="", max_length=64)
+    batch_id: str = Field(default="", max_length=120)
+    label: str = Field(default="", max_length=120)
+
+
+class SPCAnalyzeRequest(BaseModel):
+    """Request body for ``POST /regulatory/spc/analyze``.
+
+    A time-ordered measurement series for one (product, parameter) plus its specification limits.
+    At least one of ``usl``/``lsl`` is required (a 400 is returned otherwise). ``rule_set`` selects
+    the Shewhart rule set; CUSUM and EWMA are always computed alongside.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    product: str = Field(default="", max_length=240)
+    parameter: str = Field(default="", max_length=240)
+    measurements: list[SPCMeasurementInput] = Field(min_length=2, max_length=10000)
+    usl: float | None = None
+    lsl: float | None = None
+    target: float | None = None
+    unit: str = Field(default="", max_length=32)
+    rule_set: SPCRuleSet = "western_electric"
+    warn_within_sigma: float = Field(default=1.0, ge=0.0, le=10.0)
+    subgroup_size: int | None = Field(default=None, ge=2, le=10)
+
+
+class SPCCapabilityOut(BaseModel):
+    """Process-capability / -performance indices. Non-finite values (zero process variation) are
+    reported as null; ``rating`` and ``warnings`` carry the meaning."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    n: int
+    mean: float
+    sigma_within: float
+    sigma_overall: float
+    usl: float | None = None
+    lsl: float | None = None
+    target: float | None = None
+    cp: float | None = None
+    cpk: float | None = None
+    cpu: float | None = None
+    cpl: float | None = None
+    pp: float | None = None
+    ppk: float | None = None
+    cpm: float | None = None
+    rating: str
+    interpretation: str
+    is_capable: bool
+    warnings: list[str] = Field(default_factory=list)
+
+
+class SPCSignalOut(BaseModel):
+    """A fired Shewhart rule, CUSUM, or EWMA signal with the offending point indices."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule_number: int | None = None
+    rule_name: str
+    method: str
+    description: str
+    indices: list[int] = Field(default_factory=list)
+    side: str
+
+
+class SPCAlertOut(BaseModel):
+    """A trending alert raised over the series."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    severity: str
+    category: str
+    message: str
+    indices: list[int] = Field(default_factory=list)
+
+
+class SPCAnalyzeResult(BaseModel):
+    """Response from ``POST /regulatory/spc/analyze`` — capability + SPC/CUSUM/EWMA + trending.
+
+    ``first_signal_index`` < ``first_oos_index`` (``lead_points`` > 0) is the early-warning lead: a
+    drift/shift signal fired before any point went out-of-specification.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    product: str
+    parameter: str
+    n: int
+    rule_set: str
+    capability: SPCCapabilityOut
+    spc_signals: list[SPCSignalOut] = Field(default_factory=list)
+    cusum_signals: list[SPCSignalOut] = Field(default_factory=list)
+    ewma_signals: list[SPCSignalOut] = Field(default_factory=list)
+    alerts: list[SPCAlertOut] = Field(default_factory=list)
+    oos_indices: list[int] = Field(default_factory=list)
+    first_signal_index: int | None = None
+    first_oos_index: int | None = None
+    lead_points: int | None = None
+    disclaimer: str
+    human_review_required: bool = True
+
+
 class AIGovernanceRecordCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
