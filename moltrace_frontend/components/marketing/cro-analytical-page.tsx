@@ -41,7 +41,7 @@ import { Header } from "@/components/marketing/header"
  *
  * Distinct visual identity vs the other solution/module pages:
  *   - Orange hero badge (Pharma=indigo, Academic=rose,
- *     Spectroscopy=emerald, Regulatory=cyan, ReactionIQ=violet,
+ *     Spectroscopy=emerald, Regulatory=cyan, Repho=violet,
  *     Integrations=amber).
  *   - Hero visual is a live BATCH-THROUGHPUT queue card with per-client
  *     isolation tags — not a lifecycle rail, layer stack, audit ledger,

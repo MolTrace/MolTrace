@@ -26,7 +26,7 @@ import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
 
 /**
- * Reaction Optimization (ReactionIQ) module page — full marketing-shell
+ * Reaction Optimization (Repho) module page — full marketing-shell
  * route at /reaction-optimization.
  *
  * Differentiation from /spectroscopy and /regulatory-hub:
@@ -38,9 +38,9 @@ import { Header } from "@/components/marketing/header"
  *     → Propose → Run → Measure → Update → Decide.
  *   - "Frameworks coverage" pattern becomes a "Methods we ship" matrix
  *     (Bayesian / Multi-objective / Active learning / Closed-loop).
- *   - Comparison table is "Trial-and-error vs ReactionIQ".
+ *   - Comparison table is "Trial-and-error vs Repho".
  *   - Closing loop completes the three-pillar narrative: Spectroscopy
- *     evidence + Regulatory constraints → ReactionIQ next experiment.
+ *     evidence + Regulatory constraints → Repho next experiment.
  *
  * Backend grounding: nmrcheck/reaction_bo.py (run_bayesian_optimization,
  * expected_improvement, acquisition_score), reaction_advisor.py,
@@ -343,10 +343,10 @@ const CROSS_MODULE_LOOP: LoopStep[] = [
   },
   {
     step: "Regentry routes",
-    body: "Constraint flips from 'informational' to 'hard limit' for subsequent rounds. ReactionIQ receives the new constraint vector via the typed cross-module API.",
+    body: "Constraint flips from 'informational' to 'hard limit' for subsequent rounds. Repho receives the new constraint vector via the typed cross-module API.",
   },
   {
-    step: "ReactionIQ reacts",
+    step: "Repho reacts",
     body: "Surrogate masks the violating region. Round 5 acquisition function only proposes conditions predicted to keep acetic acid below 2%. Result: 81% yield, 0.7% impurity.",
   },
   {
@@ -420,7 +420,7 @@ export function ReactionOptimizationPage() {
                     className="border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300"
                   >
                     <FlaskConical className="mr-1 h-3 w-3" aria-hidden />
-                    Module · ReactionIQ
+                    Module · Repho
                   </Badge>
                   <Badge variant="outline" className="text-muted-foreground">
                     Bayesian · Multi-objective · Closed-loop
@@ -431,7 +431,7 @@ export function ReactionOptimizationPage() {
                   <span style={{ color: "var(--mt-teal)" }}>the surrogate</span> — not by intuition.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
-                  ReactionIQ runs the closed-loop optimisation engine inside MolTrace. Bayesian
+                  Repho runs the closed-loop optimisation engine inside MolTrace. Bayesian
                   acquisition over a live Gaussian-process surrogate proposes the conditions most
                   worth trying next — under hard constraints from your spectroscopy evidence and
                   regulatory framework.
@@ -439,7 +439,7 @@ export function ReactionOptimizationPage() {
                 <div className="mt-10 flex flex-wrap items-center gap-4">
                   <Button asChild size="lg" className="gap-2">
                     <Link href="/reactions">
-                      Open ReactionIQ
+                      Open Repho
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                   </Button>
@@ -556,7 +556,7 @@ export function ReactionOptimizationPage() {
                   withstand inspection — and don't survive the analyst who wrote them.
                 </p>
                 <p className="font-medium text-foreground">
-                  ReactionIQ runs the acquisition function in your stead. It remembers every prior
+                  Repho runs the acquisition function in your stead. It remembers every prior
                   campaign, respects every active regulatory constraint, and proposes the
                   experiment most likely to advance the Pareto frontier — with an auditable trail
                   of why.
@@ -868,7 +868,7 @@ export function ReactionOptimizationPage() {
           </div>
         </section>
 
-        {/* ── Trial-and-error vs ReactionIQ ───────────────────────────────── */}
+        {/* ── Trial-and-error vs Repho ───────────────────────────────── */}
         <section className="border-b bg-muted/20">
           <div className="mx-auto max-w-7xl px-5 py-16 sm:px-6 lg:px-8 lg:py-24">
             <div className="max-w-3xl">
@@ -882,7 +882,7 @@ export function ReactionOptimizationPage() {
                 What changes when the surrogate picks the next experiment.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Trial-and-error campaigns aren't bad — they're under-instrumented. ReactionIQ keeps
+                Trial-and-error campaigns aren't bad — they're under-instrumented. Repho keeps
                 the chemist as the decision-maker but moves the experiment-selection step from
                 gut to acquisition function.
               </p>
@@ -893,7 +893,7 @@ export function ReactionOptimizationPage() {
                   <tr>
                     <th className="px-5 py-3">Dimension</th>
                     <th className="px-5 py-3">Trial-and-error</th>
-                    <th className="px-5 py-3">ReactionIQ</th>
+                    <th className="px-5 py-3">Repho</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -915,7 +915,7 @@ export function ReactionOptimizationPage() {
                       <td className="px-5 py-3.5 align-top text-xs leading-relaxed text-foreground">
                         <span className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
                           <CheckCircle2 className="h-2.5 w-2.5" aria-hidden />
-                          with ReactionIQ
+                          with Repho
                         </span>
                         <p>{row.reactioniq}</p>
                       </td>
@@ -942,7 +942,7 @@ export function ReactionOptimizationPage() {
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 Picking up the cross-module worked example from Spectroscopy + Regentry —
-                here's the role ReactionIQ plays when the impurity threshold is crossed mid-campaign.
+                here's the role Repho plays when the impurity threshold is crossed mid-campaign.
               </p>
             </div>
             <ol className="mt-12 grid gap-4 lg:grid-cols-4">
@@ -1082,13 +1082,13 @@ export function ReactionOptimizationPage() {
               </h2>
               <p className="mt-4 text-base text-muted-foreground sm:text-lg">
                 Pick a reaction where you've already run 30+ conditions and can't tell what to try
-                next. We'll show you the Pareto frontier ReactionIQ would propose — with your
+                next. We'll show you the Pareto frontier Repho would propose — with your
                 regulatory constraints already enforced.
               </p>
               <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
                 <Button asChild size="lg" className="gap-2">
                   <Link href="/reactions">
-                    Open ReactionIQ
+                    Open Repho
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>

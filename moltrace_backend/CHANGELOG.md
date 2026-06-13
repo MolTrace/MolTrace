@@ -1138,7 +1138,7 @@ model + champion/challenger A/B are in place and green.)
 - **`docs/spectracheck_output_contract.md`** — documents the **versioned,
   content-addressed SpectraCheck output contract** (schema `1.0.0`, the
   `schema_version` + `content_hash` + `contract` envelope, the field set, and the
-  semver bump policy) so the downstream **Regentry** and **ReactionIQ**
+  semver bump policy) so the downstream **Regentry** and **Repho**
   modules can depend on SpectraCheck without breaking.
 - **`.github/workflows/ci-cd.yml`** — new **`deployment-gate`** job: it `needs`
   both test suites (so "tests green" is satisfied by construction), runs

@@ -4,7 +4,7 @@ import { ReactionOptimizationPage } from "@/components/marketing/reaction-optimi
 export const metadata: Metadata = {
   title: "Reaction Optimization · MolTrace",
   description:
-    "ReactionIQ runs the Bayesian acquisition over a live Gaussian-process surrogate — proposing the next experiment under hard constraints from your spectroscopy evidence and regulatory framework.",
+    "Repho runs the Bayesian acquisition over a live Gaussian-process surrogate — proposing the next experiment under hard constraints from your spectroscopy evidence and regulatory framework.",
   alternates: { canonical: "/reaction-optimization" },
   openGraph: {
     title: "Reaction Optimization · MolTrace",

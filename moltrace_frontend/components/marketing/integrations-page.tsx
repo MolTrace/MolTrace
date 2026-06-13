@@ -907,7 +907,7 @@ export function IntegrationsPage() {
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 Integrations is what connects the dots. Spectroscopy, Regentry, and
-                ReactionIQ deliver value individually — together, through connectors, they're a
+                Repho deliver value individually — together, through connectors, they're a
                 closed evidence loop that survives inspection and outlasts personnel.
               </p>
             </div>
@@ -996,7 +996,7 @@ export function IntegrationsPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">ReactionIQ →</p>
+                    <p className="text-sm font-semibold">Repho →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Pushes campaign recommendations into ELN experiments via outbound sync.
                     </p>

@@ -840,7 +840,7 @@ export function SpectroscopyPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">ReactionIQ →</p>
+                    <p className="text-sm font-semibold">Repho →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Feeds the impurity limit back into the reaction recipe as a Bayesian prior on
                       the next experiment.

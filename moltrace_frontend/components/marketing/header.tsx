@@ -39,14 +39,14 @@ type DropdownItem = { label: string; sub: string; icon: LucideIcon; href: string
 
 // All four Platform module pages are in-app marketing routes. Each
 // lives at a top-level slug matching its dropdown label (slight rename
-// for /reaction-optimization vs ReactionIQ, /regulatory-hub vs Regulatory
+// for /reaction-optimization vs Repho, /regulatory-hub vs Regulatory
 // Intelligence Hub). External docs links are reserved for deeper
 // technical-reference content under docs.moltrace.co.
 const dropdowns: Record<string, DropdownItem[]> = {
   Platform: [
     { label: "SpectraCheck",                sub: "NMR · MS · Structure elucidation",  icon: Waves,        href: "/spectroscopy" },
     { label: "Regentry", sub: "ICH · FDA · EMA compliance",        icon: ShieldCheck,  href: "/regulatory-hub" },
-    { label: "ReactionIQ",                  sub: "Bayesian · Multi-objective",        icon: FlaskConical, href: "/reaction-optimization" },
+    { label: "Repho",                  sub: "Bayesian · Multi-objective",        icon: FlaskConical, href: "/reaction-optimization" },
     { label: "Integrations",                sub: "Bruker · Agilent · LIMS",           icon: Workflow,     href: "/integrations" },
   ],
   Solutions: [

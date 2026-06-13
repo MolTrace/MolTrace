@@ -296,7 +296,7 @@ export function ImpurityAssessmentWorkspace() {
     <div className="mx-auto max-w-[1200px] space-y-8 pb-12">
       {/* Back to the Regentry tab in the Programs workspace — the
           ?program param restores the tab so the hub stays highlighted between
-          SpectraCheck and ReactionIQ, matching where the user came from. */}
+          SpectraCheck and Repho, matching where the user came from. */}
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/spectracheck?program=regulatory_hub">

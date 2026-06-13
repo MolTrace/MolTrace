@@ -120,7 +120,7 @@ const PILLARS: Pillar[] = [
   },
   {
     icon: Beaker,
-    name: "ReactionIQ",
+    name: "Repho",
     blurb:
       "Turns regulatory action items into reaction-optimization constraints. Bayesian + ML-guided next-experiment recommendations under impurity limits.",
     href: "https://docs.moltrace.co/guides/modules/optimization/",
@@ -550,7 +550,7 @@ export function AboutPage() {
 {`  Raw FID  ─►  Processed spectrum  ─►  Peaks + categories  ─►  Multi-modal evidence
                                                                             │
                                                                             ▼
-        ┌─►  Next experiment (ReactionIQ)  ◄─  Regulatory action items  ◄─┘
+        ┌─►  Next experiment (Repho)  ◄─  Regulatory action items  ◄─┘
         │                                            (Regentry)
         │
         └─  with impurity / solvent / nitrosamine constraints fed back as priors`}

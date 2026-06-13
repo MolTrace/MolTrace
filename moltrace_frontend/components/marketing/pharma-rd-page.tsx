@@ -36,7 +36,7 @@ import { Header } from "@/components/marketing/header"
  *
  * Solution pages differ from the Platform module pages by AXIS:
  *   - Platform pages answer "what does this module do?" (Spectroscopy,
- *     Regentry, ReactionIQ, Integrations).
+ *     Regentry, Repho, Integrations).
  *   - Solution pages answer "what does MolTrace do for ME?" — they are
  *     audience-first, organised around a persona's jobs-to-be-done and
  *     the lifecycle they live in.
@@ -47,14 +47,14 @@ import { Header } from "@/components/marketing/header"
  *
  * Distinct visual identity vs the other pages:
  *   - Indigo hero badge (Spectroscopy=emerald, Regulatory=cyan,
- *     ReactionIQ=violet, Integrations=amber).
+ *     Repho=violet, Integrations=amber).
  *   - Hero visual is a live PROGRAM-LIFECYCLE card (phases with status),
  *     not a layer stack or audit ledger.
  *   - Lifecycle-phase capability grid is unique to the solution pages.
  *
  * All content grounded in real MolTrace capabilities: the 40-layer
  * evidence stack, SpectraCheck cross-modal confirmation, the ICH-aware
- * Regentry, ReactionIQ Bayesian optimization, recipe-hash
+ * Regentry, Repho Bayesian optimization, recipe-hash
  * provenance, and the published validation numbers (94.4% solvent
  * auto-detect, 8.5× dense-¹³C speedup, ALCOA+ ledger).
  */
@@ -82,7 +82,7 @@ const LIFECYCLE: Phase[] = [
     name: "Lead optimization",
     icon: Beaker,
     fits: [
-      "ReactionIQ proposes the next experiment by Bayesian optimization",
+      "Repho proposes the next experiment by Bayesian optimization",
       "Track analog series with traceable structure evidence per compound",
       "Surface process impurities while the route is still cheap to change",
     ],
@@ -185,7 +185,7 @@ const WORKFLOWS: UseCase[] = [
     icon: FlaskConical,
     name: "Reaction & route optimization",
     blurb:
-      "ReactionIQ runs multi-objective Bayesian optimization over yield, selectivity, and impurity limits — and accepts those limits as priors so the next route is cleaner by design.",
+      "Repho runs multi-objective Bayesian optimization over yield, selectivity, and impurity limits — and accepts those limits as priors so the next route is cleaner by design.",
     inputs: "Reaction recipe · objectives · constraints",
     outputs: "Next experiment · Pareto front · rationale",
   },
@@ -294,7 +294,7 @@ const WORKED_EXAMPLE: LoopStep[] = [
     body: "ICH Q3C: acetic acid is Class 3, no action below 5000 ppm. The finding lands in dossier section 3.2.S.3.2 as informational — no human review queued.",
   },
   {
-    step: "ReactionIQ constrains",
+    step: "Repho constrains",
     body: "The impurity limit propagates as a Bayesian prior on the next route. Workup and solvent are adjusted automatically so the following batch is cleaner by design.",
   },
   {
@@ -564,7 +564,7 @@ export function PharmaRdPage() {
      ▼            ▼             ▼              ▼                    ▼
   confirm     optimize      definitive     impurity +          dossier +
   hits        the route     elucidation    method val.         ALCOA+ ledger
-  (NMR+MS)    (ReactionIQ)  (DP4 + trail)  (Q3x · Q2(R2))      (signoff gate)`}
+  (NMR+MS)    (Repho)  (DP4 + trail)  (Q3x · Q2(R2))      (signoff gate)`}
               </pre>
             </div>
 
@@ -873,7 +873,7 @@ export function PharmaRdPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">ReactionIQ →</p>
+                    <p className="text-sm font-semibold">Repho →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Feeds the impurity limit into the next route as a Bayesian prior.
                     </p>
