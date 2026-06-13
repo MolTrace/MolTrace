@@ -46,7 +46,7 @@ const dropdowns: Record<string, DropdownItem[]> = {
   Platform: [
     { label: "SpectraCheck",                sub: "NMR · MS · Structure elucidation",  icon: Waves,        href: "/spectroscopy" },
     { label: "ComplianceCore", sub: "ICH · FDA · EMA compliance",        icon: ShieldCheck,  href: "/regulatory-hub" },
-    { label: "Reaction Optimization",       sub: "Bayesian · Multi-objective",        icon: FlaskConical, href: "/reaction-optimization" },
+    { label: "ReactionIQ",                  sub: "Bayesian · Multi-objective",        icon: FlaskConical, href: "/reaction-optimization" },
     { label: "Integrations",                sub: "Bruker · Agilent · LIMS",           icon: Workflow,     href: "/integrations" },
   ],
   Solutions: [

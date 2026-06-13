@@ -51,7 +51,7 @@ describe("Marketing Footer", () => {
     // Sample one item per section
     for (const link of [
       "SpectraCheck",
-      "Reaction Optimization",
+      "ReactionIQ",
       "About",
       "Documentation",
       "Privacy",
@@ -75,8 +75,8 @@ describe("Marketing Footer", () => {
       ["SpectraCheck", "/spectroscopy"],
       // ComplianceCore is in-app at /regulatory-hub.
       ["ComplianceCore", "/regulatory-hub"],
-      // Reaction Optimization is in-app at /reaction-optimization.
-      ["Reaction Optimization", "/reaction-optimization"],
+      // ReactionIQ is in-app at /reaction-optimization.
+      ["ReactionIQ", "/reaction-optimization"],
       // Integrations is in-app at /integrations.
       ["Integrations", "/integrations"],
       // ── Company ─────────────────────────────────────────────────────
