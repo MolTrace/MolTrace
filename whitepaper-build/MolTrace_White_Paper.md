@@ -7,7 +7,7 @@
 ---
 
 **A MolTrace Technologies, Inc. White Paper**
-Document version: 2026-Q2 · rev 2026-06-09 · Hybrid (business + technical) · Approx. 5,400 words
+Document version: 2026-Q2 · rev 2026-06-13 · Hybrid (business + technical) · Approx. 5,400 words
 
 > *"Scientific intelligence has to be reproducible to be useful, auditable to be acceptable, and integrated to be adopted."*
 
@@ -316,6 +316,8 @@ The EMA reflection paper on AI in the medicinal-product lifecycle similarly emph
 The FDA's guidance on the *Control of Nitrosamine Impurities in Human Drugs*[^fda_nitrosamines] is operationally relevant to MolTrace's impurity-candidate panel (`build_impurity_candidates` in `peak_categorization.py`). Curated solvent/impurity reference shifts drive cross-checks at analyze time so candidate trace impurities are surfaced inline with structural assignments rather than as a separate downstream report.
 
 The ComplianceCore now exposes these controls as a single **Impurity Assessment** surface: one form (daily dose, route, substance type, treatment duration, plus any observed residual solvents, elemental impurities, and structural impurities) returns one tabbed report computed by five deterministic engines — ICH Q3A/B reporting/identification/qualification thresholds, ICH Q3C(R8) residual-solvent class limits (dose-scaled), ICH Q3D(R2) elemental-impurity PDEs, ICH M7(R2) mutagenic-impurity (Q)SAR classification, and the FDA Carcinogenic Potency Categorization Approach (CPCA) for nitrosamines, with a cumulative nitrosamine risk-ratio gate. Each engine's output carries its own regulatory-basis citation and a content hash of the rule set that produced it (`rule_set_versions`), the assessment never blocks on a malformed input (unknown elements or unparseable structures are returned as non-blocking notices), and — like every regulatory output — the result is decision-support that is gated behind an explicit qualified-reviewer sign-off before export.
+
+**Process capability & continued process verification.** A companion **Process Capability & Trending** panel in the same ComplianceCore dossier turns a time-ordered measurement series for one parameter — assay, a named impurity, water content — into a control chart plus a capability read-out through a single stateless `POST /regulatory/spc/analyze`. It computes the short- and long-term capability indices (Cp, Cpk, Cpu, Cpl, Pp, Ppk, Cpm) against caller-supplied specification limits, runs the selected Shewhart rule set (Western Electric, Nelson, or Montgomery) alongside CUSUM and EWMA, and surfaces the early-warning lead explicitly: when a drift or shift signal fires *before* the first out-of-specification point, the lead time (in samples) is reported so a trend can be acted on ahead of the breach. This maps to Stage 3 (Continued Process Verification) of the FDA process-validation lifecycle and to ICH Q6A acceptance-criterion setting; a degenerate input (zero within-batch variation) returns null indices with an explicit caveat rather than a misleading number. As with every regulatory output, the result carries a verbatim disclaimer and a human-review requirement — decision-support, never a batch disposition.
 
 ### 6.5 GxP-Aligned Data Integrity
 

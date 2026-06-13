@@ -1,7 +1,7 @@
 ---
 title: "MolTrace — Technical White Paper"
 subtitle: "Architecture, Scientific Foundations, and Regulatory Posture for Analytical-Method Validators and Regulatory Reviewers"
-version: "2026-06-09"
+version: "2026-06-13"
 audience: "Analytical-method validators, NMR / MS technical leads, regulatory-affairs reviewers, IT / data-integrity auditors"
 length: "≈7,500 words · Technical variant of the canonical hybrid white paper"
 ---
@@ -564,6 +564,8 @@ The MS evidence stack (Weeks 29–32, 35–39) is grounded in:
 **FDA Control of Nitrosamine Impurities in Human Drugs**.[^fda_nitrosamines] Drives the curated impurity-library in `impurities.py`.
 
 **ICH Q3A/B, Q3C(R8), Q3D(R2), M7(R2) + FDA CPCA — unified Impurity Assessment.** Five deterministic engines are exposed through one authenticated endpoint (`POST /regulatory/impurities/assess`) and one Regulatory-Hub panel: Q3A/B reporting/identification/qualification thresholds for the dose, Q3C residual-solvent class limits scaled to the daily dose (Option 2), Q3D elemental-impurity PDEs by administration route, M7 mutagenic-impurity classification from (Q)SAR/experimental inputs, and the FDA CPCA carcinogenic-potency category for nitrosamines with a cumulative risk-ratio gate (must be < 1). Each engine returns its `regulatory_basis` and a SHA-256 of the rule set that produced it (`rule_set_versions`), so a number is traceable to the exact encoded guideline revision; the route degrades gracefully (unknown elements / unparseable SMILES become non-blocking warnings rather than failures) and every response is `human_review_required` by construction.
+
+**Process capability & SPC trending — Continued Process Verification.** A sixth ComplianceCore engine analyses a time-ordered measurement series for one *(product, parameter)* through one authenticated endpoint (`POST /regulatory/spc/analyze`) and one Regulatory-Hub panel. It returns the process-capability/-performance indices (Cp, Cpk, Cpu, Cpl, Pp, Ppk, plus Cpm against a target) computed from within- and overall-sigma against caller-supplied USL/LSL, the selected Shewhart rule set (Western Electric / Western Electric classic / Nelson / Montgomery) evaluated alongside CUSUM and EWMA, and the out-of-specification and signal index sets for chart annotation. The contract foregrounds the early-warning lead — `first_signal_index`, `first_oos_index`, and `lead_points` — so a drift or shift flagged before any spec breach is reported as quantified lead time; non-finite indices arising from zero within-batch variation are returned as `null` with explicit `warnings` rather than a fabricated number. The engine maps to Stage 3 (Continued Process Verification) of the FDA process-validation lifecycle and to ICH Q6A acceptance-criterion setting; the series is caller-supplied (no persisted measurement table yet), every response is `human_review_required`, and the result carries a verbatim decision-support disclaimer — it is never a batch disposition.
 
 ### 8.11 Model Evaluation & Calibration Metrics
 
