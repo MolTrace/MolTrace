@@ -1,0 +1,1323 @@
+{
+  "cpca": {
+    "invariants": [
+      {
+        "assertion_hint": "For any valid nitrosamine SMILES, assert 1 <= classify_cpca(smiles).category <= 5; test across all branches (forced Category 5, flowchart paths, all ring sizes, both authorities).",
+        "description": "The computed category must always be an integer in the set {1, 2, 3, 4, 5}, corresponding to potency tiers from highest (1) to lowest (5) carcinogenic potency.",
+        "name": "Category is always in valid range [1,5]"
+      },
+      {
+        "assertion_hint": "For all valid categories, verify _AI_LIMITS[1] < _AI_LIMITS[2] < _AI_LIMITS[3] < _AI_LIMITS[4], and _AI_LIMITS[4] == _AI_LIMITS[5]. For any SMILES, assert result.ai_limit_ng_per_day == _AI_LIMITS[result.category] or _AI_LIMIT_CAT1_EMA when authority=='EMA' and category==1.",
+        "description": "As category increases (lower potency), the AI limit should increase or stay equal: _AI_LIMITS[cat] >= _AI_LIMITS[cat+1] is false; actually AI limits go 26.5 (cat 1) \u2192 100 (cat 2) \u2192 400 (cat 3) \u2192 1500 (cat 4&5). Inverse: cat 1 < cat 2 < cat 3 = cat 4 in terms of allowed dose.",
+        "name": "AI limit is strictly monotonic inverse to category"
+      },
+      {
+        "assertion_hint": "For any list of nitrosamines where sum(measured_ng_per_day / ai_limit) == 1.0, verify calculate_cumulative_risk() returns passes=False. Repeat with sum slightly below 1.0 (e.g. 0.9999) and verify passes=True.",
+        "description": "The FDA Rev 2 cumulative-risk rule requires total_risk_ratio < 1.0, not <= 1.0. A component exactly at its AI limit (measured == ai_limit_ng_per_day, ratio == 1.0) alone fails; multiple components summing to exactly 1.0 also fail.",
+        "name": "Cumulative risk threshold is strict inequality (< 1.0, not <= 1.0)"
+      }
+    ],
+    "public_functions": [
+      "classify_cpca",
+      "calculate_cumulative_risk",
+      "cpca_rule_set"
+    ],
+    "worked_examples": [
+      {
+        "expected": {
+          "ai_limit_ng_per_day": 26.5,
+          "alpha_h_distribution": "3,3",
+          "alpha_h_score": 1,
+          "category": 1,
+          "coc_flag": true,
+          "potency_score": 1
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "CPCA alpha-hydrogen score table (_ALPHA_H_SCORE['3,3']=1) and AI limits (_AI_LIMITS[1]=26.5)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "CN(C)N=O"
+        },
+        "name": "NDMA Category 1 (FDA)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "ai_limit_ng_per_day": 18,
+          "category": 1
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "EMA-specific Category 1 AI limit (_AI_LIMIT_CAT1_EMA=18.0)",
+        "inputs": {
+          "authority": "EMA",
+          "smiles": "CN(C)N=O"
+        },
+        "name": "NDMA Category 1 (EMA)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "ai_limit_ng_per_day": 26.5,
+          "alpha_h_distribution": "2,2",
+          "alpha_h_score": 1,
+          "category": 1,
+          "potency_score": 1
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "CPCA alpha-hydrogen score table (_ALPHA_H_SCORE['2,2']=1)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "CCN(CC)N=O"
+        },
+        "name": "NDEA Category 1",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "ai_limit_ng_per_day": 100,
+          "category": 2,
+          "potency_score": 2
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "Flowchart: alpha_h_score (1) + morpholine ring feature (1) = score 2 \u2192 Category 2; AI limits (_AI_LIMITS[2]=100.0)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "O=NN1CCOCC1"
+        },
+        "name": "N-nitrosomorpholine Category 2",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "ai_limit_ng_per_day": 400,
+          "category": 3,
+          "potency_score": 3
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "Flowchart: alpha_h_score (1) + 6-ring feature (2) = score 3 \u2192 Category 3; AI limits (_AI_LIMITS[3]=400.0)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "O=NN1CCCCC1"
+        },
+        "name": "N-nitrosopiperidine Category 3",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "ai_limit_ng_per_day": 1500,
+          "category": 4,
+          "potency_score": 4
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "Flowchart: alpha_h_score (1) + pyrrolidine ring feature (3) = score 4 \u2192 Category 4; AI limits (_AI_LIMITS[4]=1500.0)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "O=NN1CCCC1"
+        },
+        "name": "N-nitrosopyrrolidine Category 4",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "ai_limit_ng_per_day": 1500,
+          "category": 5
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "Forced Category 5 rule: tertiary alpha-carbon detected (no potency_score computed); AI limits (_AI_LIMITS[5]=1500.0)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "O=NN(C(C)(C)C)C(C)(C)C"
+        },
+        "name": "Di-tert-butyl nitrosamine Forced Category 5 (tertiary alpha)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "ai_limit_ng_per_day": 1500,
+          "alpha_h_distribution": "1,1",
+          "alpha_h_score": 4,
+          "category": 5
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "Forced Category 5 rule: alpha_h_score (1,1) = 4 (sentinel value forces Category 5); AI limits (_AI_LIMITS[5]=1500.0)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "CC(C)N(N=O)C(C)C"
+        },
+        "name": "Diisopropyl nitrosamine Forced Category 5 (low alpha-H)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "category": 4,
+          "potency_score": 4
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "Flowchart: alpha_h_score (2,3)=1 + carboxylic_acid feature (3) = score 4 \u2192 Category 4; feature scores (_FEATURE_SCORES['carboxylic_acid']=3)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "O=NN(C)CC(=O)O"
+        },
+        "name": "N-nitroso-sarcosine Category 4 (carboxylic acid)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "category": 2
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "Flowchart: alpha_h_score (2,3)=1 + beta-hydroxyl one side (1) = score 2 \u2192 Category 2; feature scores (_FEATURE_SCORES['beta_hydroxyl_one_side']=1)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "O=NN(C)CCO"
+        },
+        "name": "N-nitroso-2-aminoethanol Category 2 (beta-hydroxyl)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "category": 1
+        },
+        "function": "classify_cpca",
+        "guideline_trace": "Feature scores: benzylic activating feature (_FEATURE_SCORES['aryl_on_alpha_benzylic']=-1)",
+        "inputs": {
+          "authority": "FDA",
+          "smiles": "O=NN(C)Cc1ccccc1"
+        },
+        "name": "NMBzA benzylic activating",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "passes": true,
+          "total_risk_ratio": 0.7547169811320755
+        },
+        "function": "calculate_cumulative_risk",
+        "guideline_trace": "Cumulative risk rule: sum(measured / AI_limit) < 1.0 (FDA Rev 2); (10/26.5 + 10/26.5) \u2248 0.755 < 1.0 \u2192 passes",
+        "inputs": {
+          "authority": "FDA",
+          "nitrosamines": [
+            [
+              "CN(C)N=O",
+              10
+            ],
+            [
+              "CCN(CC)N=O",
+              10
+            ]
+          ]
+        },
+        "name": "Cumulative risk pass (two Category 1 nitrosamines)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "passes": false,
+          "total_risk_ratio": 1.509433962264151
+        },
+        "function": "calculate_cumulative_risk",
+        "guideline_trace": "Cumulative risk rule: sum(measured / AI_limit) < 1.0 (FDA Rev 2); (20/26.5 + 20/26.5) \u2248 1.509 > 1.0 \u2192 fails",
+        "inputs": {
+          "authority": "FDA",
+          "nitrosamines": [
+            [
+              "CN(C)N=O",
+              20
+            ],
+            [
+              "CCN(CC)N=O",
+              20
+            ]
+          ]
+        },
+        "name": "Cumulative risk fail (two Category 1 nitrosamines at high dose)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "passes": false,
+          "total_risk_ratio": 1
+        },
+        "function": "calculate_cumulative_risk",
+        "guideline_trace": "Cumulative risk rule: ratio must be < 1.0 (strict inequality); 26.5/26.5 = 1.0 is NOT < 1.0 \u2192 fails",
+        "inputs": {
+          "authority": "FDA",
+          "nitrosamines": [
+            [
+              "CN(C)N=O",
+              26.5
+            ]
+          ]
+        },
+        "name": "Cumulative risk at limit (exactly 1.0 fails)",
+        "source": "validated_unit_test"
+      }
+    ]
+  },
+  "m7": {
+    "invariants": [
+      {
+        "assertion_hint": "For any valid call to classify_m7(): if result.m7_class == 5 and result.data_basis == 'qsar', then assert result.in_silico_concordance == 'concordant_negative'.",
+        "description": "Every Class 5 assignment driven by QSAR decision (data_basis == 'qsar') must have both in-silico systems negative (in_silico_concordance == 'concordant_negative'). This enforces the dual-QSAR rule: positive from either system -> Class 3.",
+        "name": "Class 5 (QSAR-driven) requires concordant negative"
+      },
+      {
+        "assertion_hint": "For any valid call to classify_m7(): if result.m7_class == 1, then assert input experimental_carcinogen == 'positive'.",
+        "description": "Every Class 1 assignment must be backed by positive experimental carcinogenicity data. This enforces ICH M7(R2) section 6 definition: Class 1 = known mutagenic carcinogen (mutagenicity + carcinogenicity data positive).",
+        "name": "Class 1 requires experimental carcinogenicity data"
+      },
+      {
+        "assertion_hint": "For any valid call to classify_m7(): if result.coc_flag == True and result.m7_class != 5, then assert result.ttc_ug_per_day is None.",
+        "description": "Any Cohort of Concern compound (coc_flag == True) that is not Class 5 must have ttc_ug_per_day == None. This enforces ICH M7(R2) section 7.5: Cohort of Concern compounds require compound-specific acceptable intakes; the TTC does not apply to high-potency mutagenic carcinogens (N-nitroso, alkyl-azoxy, aflatoxin-like).",
+        "name": "Cohort of Concern never permits TTC-based acceptable intake"
+      },
+      {
+        "assertion_hint": "For duration_months \u2208 [0.5, 1, 1.5, 6, 12, 24, 120, 121, 240], call classify_m7(alerting_structure, duration_months=d, experimental_*=None) and verify ttc_ug_per_day matches the correct band threshold and is monotonically decreasing (or stable at boundary).",
+        "description": "The TTC value is strictly monotone decreasing with increasing exposure duration: \u22641mo(120) > >1-12mo(20) > >1-10yr(10) > >10yr(1.5). This reflects decreasing safe exposure levels over longer durations for a single mutagenic impurity (10^-5 risk).",
+        "name": "Staged TTC is monotonically non-increasing in dose band"
+      }
+    ],
+    "public_functions": [
+      "classify_m7",
+      "m7_rule_set"
+    ],
+    "worked_examples": [
+      {
+        "expected": {
+          "data_basis": "qsar",
+          "in_silico_concordance": "concordant_negative",
+          "m7_class": 5
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 6: Class 5 = no structural alert, or alerting structure with data demonstrating lack of mutagenicity; dual QSAR rule (both negative)",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": null,
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": "negative",
+          "in_silico_result_statistical": "negative",
+          "smiles": "CCO"
+        },
+        "name": "Class 5 (Concordant negative QSAR, no structural alert)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "data_basis": "qsar",
+          "duration_band": ">1-10 years (10 microg/day)",
+          "expert_review_required": true,
+          "in_silico_concordance": "discordant",
+          "m7_class": 3,
+          "ttc_ug_per_day": 10
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 6: Class 3 = alerting structure, unrelated to drug substance, with no mutagenicity data; discordant QSAR treated as positive (Class 3)",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": null,
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": "positive",
+          "in_silico_result_statistical": "negative",
+          "smiles": "Nc1ccccc1"
+        },
+        "name": "Class 3 (Discordant QSAR with alerting structure)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "data_basis": "qsar",
+          "m7_class": 3,
+          "ttc_ug_per_day": 10
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 6: Class 3 default when structural alert detected and no experimental override; staged TTC for >1-10 years (default duration=120mo)",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": null,
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": null,
+          "in_silico_result_statistical": null,
+          "smiles": "O=[N+]([O-])c1ccccc1"
+        },
+        "name": "Class 3 (Alerting structure, no in-silico data provided)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "data_basis": "experimental_ames",
+          "m7_class": 2,
+          "ttc_ug_per_day": 10
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 6: Class 2 = known mutagen with unknown carcinogenic potential (bacterial mutagenicity positive, no rodent carcinogenicity data); staged TTC applies",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": "positive",
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": null,
+          "in_silico_result_statistical": null,
+          "smiles": "Nc1ccccc1"
+        },
+        "name": "Class 2 (Experimental Ames positive)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "data_basis": "experimental_carcinogenicity",
+          "m7_class": 1
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 6: Class 1 = known mutagenic carcinogen (mutagenicity + carcinogenicity data positive); requires compound-specific acceptable intake (not TTC)",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": null,
+          "experimental_carcinogen": "positive",
+          "in_silico_result_expert": null,
+          "in_silico_result_statistical": null,
+          "smiles": "CCOS(=O)(=O)C"
+        },
+        "name": "Class 1 (Experimental carcinogenicity positive)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "data_basis": "experimental_carcinogenicity",
+          "m7_class": 5
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 6: Class 5 achieved when negative carcinogenicity study overrides structural alert and positive QSAR; experimental data is determinative",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": null,
+          "experimental_carcinogen": "negative",
+          "in_silico_result_expert": "positive",
+          "in_silico_result_statistical": "positive",
+          "smiles": "Nc1ccccc1"
+        },
+        "name": "Class 5 (Experimental carcinogenicity negative overrides alert)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "data_basis": "experimental_ames",
+          "m7_class": 5
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 6: Class 5 from negative bacterial assay (experimental Ames); experimental data overrides structural alert",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": "negative",
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": null,
+          "in_silico_result_statistical": null,
+          "smiles": "Nc1ccccc1"
+        },
+        "name": "Class 5 (Experimental Ames negative overrides alert)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "coc_flag": true,
+          "data_basis": "cohort_of_concern_structure",
+          "expert_review_required": true,
+          "m7_class": 2
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 7.5 (Cohort of Concern): N-nitroso compounds are high-potency mutagenic carcinogens; TTC not applicable, compound-specific AI required",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": null,
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": null,
+          "in_silico_result_statistical": null,
+          "smiles": "CN(C)N=O"
+        },
+        "name": "Class 2 (Cohort of Concern: N-nitroso, no carcinogenicity data)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "coc_flag": true,
+          "data_basis": "experimental_carcinogenicity",
+          "m7_class": 1
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 6 & 7.5: Class 1 (mutagenic carcinogen) overrides CoC distinction when carcinogenicity data are positive",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": null,
+          "experimental_carcinogen": "positive",
+          "in_silico_result_expert": null,
+          "in_silico_result_statistical": null,
+          "smiles": "CN(C)N=O"
+        },
+        "name": "Class 1 (Cohort of Concern: N-nitroso with carcinogenicity positive)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "coc_flag": true,
+          "data_basis": "cohort_of_concern_structure",
+          "m7_class": 2
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 7.5: Cohort of Concern compounds are not cleared by negative bacterial assay; only negative carcinogenicity study clears them to Class 5",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": "negative",
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": null,
+          "in_silico_result_statistical": null,
+          "smiles": "CN(C)N=O"
+        },
+        "name": "Class 2 (Cohort of Concern not cleared by negative Ames)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "coc_flag": true,
+          "data_basis": "experimental_carcinogenicity",
+          "m7_class": 5
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 7.5: Negative carcinogenicity study definitively clears a Cohort of Concern compound to Class 5",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": "negative",
+          "experimental_carcinogen": "negative",
+          "in_silico_result_expert": null,
+          "in_silico_result_statistical": null,
+          "smiles": "CN(C)N=O"
+        },
+        "name": "Class 5 (Cohort of Concern cleared by negative carcinogenicity)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "m7_class": 3,
+          "ttc_ug_per_day": 120
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) staged TTC: \u22641 month exposure \u2192 120 microg/day",
+        "inputs": {
+          "duration_months": 0.5,
+          "experimental_ames": null,
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": "positive",
+          "in_silico_result_statistical": "positive",
+          "smiles": "Nc1ccccc1"
+        },
+        "name": "Staged TTC band: \u22641 month",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "duration_band": ">1-12 months (20 microg/day)",
+          "m7_class": 3,
+          "ttc_ug_per_day": 20
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) staged TTC: >1 month to 12 months exposure \u2192 20 microg/day",
+        "inputs": {
+          "duration_months": 6,
+          "experimental_ames": null,
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": "positive",
+          "in_silico_result_statistical": "positive",
+          "smiles": "Nc1ccccc1"
+        },
+        "name": "Staged TTC band: >1 month to 12 months",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "duration_band": ">1-10 years (10 microg/day)",
+          "m7_class": 3,
+          "ttc_ug_per_day": 10
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) staged TTC: >1 to 10 years exposure \u2192 10 microg/day",
+        "inputs": {
+          "duration_months": 60,
+          "experimental_ames": null,
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": "positive",
+          "in_silico_result_statistical": "positive",
+          "smiles": "Nc1ccccc1"
+        },
+        "name": "Staged TTC band: >1 to 10 years",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "duration_band": ">10 years to lifetime (1.5 microg/day)",
+          "m7_class": 3,
+          "ttc_ug_per_day": 1.5
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) staged TTC: >10 years to lifetime exposure \u2192 1.5 microg/day (lifetime TTC)",
+        "inputs": {
+          "duration_months": 240,
+          "experimental_ames": null,
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": "positive",
+          "in_silico_result_statistical": "positive",
+          "smiles": "Nc1ccccc1"
+        },
+        "name": "Staged TTC band: >10 years to lifetime",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "data_basis": "qsar",
+          "expert_review_required": false,
+          "in_silico_concordance": "concordant_positive",
+          "m7_class": 3,
+          "ttc_ug_per_day": 10
+        },
+        "function": "classify_m7",
+        "guideline_trace": "ICH M7(R2) section 6: Class 3 when both QSAR systems are concordant positive and no experimental data override; concordant results do not force expert review",
+        "inputs": {
+          "duration_months": 120,
+          "experimental_ames": null,
+          "experimental_carcinogen": null,
+          "in_silico_result_expert": "positive",
+          "in_silico_result_statistical": "positive",
+          "smiles": "Nc1ccccc1"
+        },
+        "name": "Class 3 (Positive QSAR, either system)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "effective_year": "2023",
+          "guideline": "ICH M7(R2)",
+          "lifetime_ttc_ug_per_day": 1.5
+        },
+        "function": "m7_rule_set",
+        "guideline_trace": "ICH M7(R2) encoded rule-set (auditable, version-controlled); table reference: staged TTC (less-than-lifetime acceptable intakes)",
+        "inputs": {},
+        "name": "m7_rule_set() returns encoded parameters",
+        "source": "encoded_rule_set_table"
+      }
+    ]
+  },
+  "q3ab": {
+    "invariants": [
+      {
+        "assertion_hint": "For any result from calculate_q3ab_thresholds, assert that for all three thresholds (reporting, identification, qualification): effective_percent <= percent_rule + 1e-9 (floating-point tolerance)",
+        "description": "The effective_percent (after resolving absolute caps) must never exceed the percent_rule from the guideline band, since effective_percent = min(percent_rule, cap_as_percent)",
+        "name": "effective_percent_never_exceeds_percent_rule"
+      },
+      {
+        "assertion_hint": "For each threshold: (absolute_is_binding and absolute_cap is not None) implies cap_as_percent < percent_rule; (not absolute_is_binding) implies (absolute_cap is None or cap_as_percent >= percent_rule)",
+        "description": "When absolute_is_binding is True, the absolute cap must exist (not None) and the calculated cap_as_percent must be strictly lower than percent_rule; when False, either no cap exists or cap_as_percent >= percent_rule",
+        "name": "absolute_is_binding_consistency"
+      },
+      {
+        "assertion_hint": "For Q3A: if daily_dose_g <= 2.0, dose_band contains '\u2264 2 g'; if > 2.0, contains '> 2 g'. For Q3B ID: if dose_mg < 1, band = '<1mg'; if [1,10], = '1-10mg'; if (10,2000], = '>10mg-2g'; if > 2000, = '>2g'. Qual bands: [0,10), [10,100], (100,2000], >2000",
+        "description": "The dose_band label must match the actual daily_dose_g: for Q3A, \u22642g vs >2g; for Q3B, ID and qual bands must match the documented ranges (e.g., <1mg, 1-10mg, >10mg-2g, >2g)",
+        "name": "dose_band_assignment_matches_dose_range"
+      }
+    ],
+    "public_functions": [
+      "calculate_q3ab_thresholds",
+      "q3ab_rule_set"
+    ],
+    "worked_examples": [
+      {
+        "expected": {
+          "identification_threshold.absolute_is_binding": false,
+          "identification_threshold.effective_percent": 0.1,
+          "qualification_threshold.absolute_is_binding": false,
+          "qualification_threshold.effective_percent": 0.15,
+          "reporting_threshold.absolute_is_binding": false,
+          "reporting_threshold.effective_percent": 0.05
+        },
+        "function": "calculate_q3ab_thresholds",
+        "guideline_trace": "ICH Q3A(R2) Attachment 1, band \u22642g/day",
+        "inputs": {
+          "daily_dose_g": 0.5,
+          "substance_type": "drug_substance"
+        },
+        "name": "Q3A substance \u22642g band, 0.5g dose (rules bind)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "identification_threshold.absolute_cap": 1,
+          "identification_threshold.absolute_is_binding": true,
+          "identification_threshold.absolute_unit": "mg_per_day",
+          "identification_threshold.effective_percent": 0.05,
+          "qualification_threshold.absolute_is_binding": true,
+          "qualification_threshold.effective_percent": 0.05,
+          "reporting_threshold.effective_percent": 0.05
+        },
+        "function": "calculate_q3ab_thresholds",
+        "guideline_trace": "ICH Q3A(R2) Attachment 1, band \u22642g/day, 1.0 mg/day cap = 0.05%",
+        "inputs": {
+          "daily_dose_g": 2,
+          "substance_type": "drug_substance"
+        },
+        "name": "Q3A substance 2.0g boundary (qual capped by 1.0 mg/day absolute)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "identification_threshold.effective_percent": 0.05,
+          "qualification_threshold.effective_percent": 0.05,
+          "reporting_threshold.effective_percent": 0.03
+        },
+        "function": "calculate_q3ab_thresholds",
+        "guideline_trace": "ICH Q3A(R2) Attachment 1, band >2g/day",
+        "inputs": {
+          "daily_dose_g": 3,
+          "substance_type": "drug_substance"
+        },
+        "name": "Q3A substance >2g band, 3.0g dose",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "identification_threshold.absolute_cap": 5,
+          "identification_threshold.absolute_unit": "ug_per_day",
+          "identification_threshold.effective_percent": 1,
+          "qualification_threshold.absolute_cap": 50,
+          "qualification_threshold.absolute_unit": "ug_per_day",
+          "qualification_threshold.effective_percent": 1,
+          "reporting_threshold.effective_percent": 0.1
+        },
+        "function": "calculate_q3ab_thresholds",
+        "guideline_trace": "ICH Q3B(R2) Attachment 1, ID band <1mg, qual band <10mg",
+        "inputs": {
+          "daily_dose_g": 0.0005,
+          "substance_type": "drug_product"
+        },
+        "name": "Q3B product 0.5mg dose (<1mg ID band, <10mg qual band)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "identification_threshold.absolute_cap": 20,
+          "identification_threshold.absolute_is_binding": true,
+          "identification_threshold.absolute_unit": "ug_per_day",
+          "identification_threshold.effective_percent": 0.2,
+          "qualification_threshold.absolute_cap": 200,
+          "qualification_threshold.absolute_unit": "ug_per_day",
+          "qualification_threshold.effective_percent": 0.5,
+          "reporting_threshold.effective_percent": 0.1
+        },
+        "function": "calculate_q3ab_thresholds",
+        "guideline_trace": "ICH Q3B(R2) Attachment 1, ID band 1-10mg, qual band 10-100mg",
+        "inputs": {
+          "daily_dose_g": 0.01,
+          "substance_type": "drug_product"
+        },
+        "name": "Q3B product 10mg boundary (ID 1-10mg band, qual 10-100mg band)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "identification_threshold.absolute_cap": 2,
+          "identification_threshold.absolute_unit": "mg_per_day",
+          "identification_threshold.effective_percent": 0.2,
+          "qualification_threshold.absolute_cap": 200,
+          "qualification_threshold.absolute_is_binding": true,
+          "qualification_threshold.absolute_unit": "ug_per_day",
+          "qualification_threshold.effective_percent": 0.4,
+          "reporting_threshold.effective_percent": 0.1
+        },
+        "function": "calculate_q3ab_thresholds",
+        "guideline_trace": "ICH Q3B(R2) Attachment 1, ID band >10mg-2g, qual band 10-100mg",
+        "inputs": {
+          "daily_dose_g": 0.05,
+          "substance_type": "drug_product"
+        },
+        "name": "Q3B product 50mg dose (ID >10mg-2g band, qual 10-100mg band capped)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "identification_threshold.effective_percent": 0.2,
+          "qualification_threshold.effective_percent": 0.2,
+          "reporting_threshold.effective_percent": 0.1
+        },
+        "function": "calculate_q3ab_thresholds",
+        "guideline_trace": "ICH Q3B(R2) Attachment 1, ID band >10mg-2g, qual band >100mg-2g",
+        "inputs": {
+          "daily_dose_g": 0.2,
+          "substance_type": "drug_product"
+        },
+        "name": "Q3B product 200mg dose (ID >10mg-2g band, qual >100mg-2g band)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "identification_threshold.absolute_cap": 2,
+          "identification_threshold.absolute_is_binding": true,
+          "identification_threshold.absolute_unit": "mg_per_day",
+          "identification_threshold.effective_percent": 0.1,
+          "qualification_threshold.absolute_cap": 3,
+          "qualification_threshold.absolute_is_binding": true,
+          "qualification_threshold.absolute_unit": "mg_per_day",
+          "qualification_threshold.effective_percent": 0.15,
+          "reporting_threshold.effective_percent": 0.05
+        },
+        "function": "calculate_q3ab_thresholds",
+        "guideline_trace": "ICH Q3B(R2) Attachment 1, ID/qual band >2g",
+        "inputs": {
+          "daily_dose_g": 2,
+          "substance_type": "drug_product"
+        },
+        "name": "Q3B product 2g boundary (reporting >1g band, ID/qual >2g band with caps)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "identification_threshold.absolute_is_binding": false,
+          "identification_threshold.effective_percent": 0.1,
+          "qualification_threshold.absolute_is_binding": false,
+          "qualification_threshold.effective_percent": 0.15,
+          "reporting_threshold.effective_percent": 0.05
+        },
+        "function": "calculate_q3ab_thresholds",
+        "guideline_trace": "ICH Q3B(R2) Attachment 1, band >2g",
+        "inputs": {
+          "daily_dose_g": 3,
+          "substance_type": "drug_product"
+        },
+        "name": "Q3B product 3g dose (>2g band, no absolute caps)",
+        "source": "validated_unit_test"
+      }
+    ]
+  },
+  "q3c": {
+    "invariants": [
+      {
+        "assertion_hint": "For any solvent with class_number==1: assert pde_mg_per_day is None; assert concentration_limit_ppm is not None and > 0; verify that check_residual_solvent_limits with different doses yields same permitted_ppm",
+        "description": "All Class 1 (avoid) solvents in the encoded table must have pde_mg_per_day=None and a positive concentration_limit_ppm that is dose-independent.",
+        "name": "Class 1 solvents have no PDE and fixed concentration limit"
+      },
+      {
+        "assertion_hint": "For any solvent with class_number==3: assert pde_mg_per_day == 50.0; assert concentration_limit_ppm == 5000.0",
+        "description": "All Class 3 (low toxic potential) solvents must have pde_mg_per_day exactly 50.0 and concentration_limit_ppm = 5000.0 (50 * 100).",
+        "name": "Class 3 solvents all share PDE = 50 mg/day"
+      },
+      {
+        "assertion_hint": "For any solvent with class_number in (2,3): assert concentration_limit_ppm == approx(pde_mg_per_day * 100.0); verify across all 39 Class 2/3 entries",
+        "description": "For Class 2 and Class 3 solvents, the reported concentration_limit_ppm (Option 1, at 10 g/day reference dose) must always equal the PDE scaled by 100.",
+        "name": "Class 2/3 Option 1 identity: concentration_limit_ppm = pde_mg_per_day * 100"
+      },
+      {
+        "assertion_hint": "For a Class 2 solvent (e.g., methanol PDE=30), call check_residual_solvent_limits with doses [0.5, 1.0, 2.0, 10.0] and same measured value; assert permitted_ppm values are [60000, 30000, 15000, 3000] respectively and inversely proportional",
+        "description": "For Class 2/3 solvents, Option 2 permitted_ppm = PDE * 1000 / daily_dose_g increases monotonically as daily_dose_g decreases. Measured pass/fail is deterministic.",
+        "name": "Option 2 dose-scaled limit scales monotonically with dose reduction"
+      },
+      {
+        "assertion_hint": "For benzene (Class 1, 2 ppm limit): call check_residual_solvent_limits with doses 0.1, 1, 10 g/day, same measured value; assert all yield permitted_ppm == 2.0",
+        "description": "Class 1 solvents use a fixed concentration limit regardless of daily_dose_g. Permitted ppm must remain constant.",
+        "name": "Class 1 limit does not scale with dose"
+      },
+      {
+        "assertion_hint": "For all ComplianceResult in output: assert margin_ppm == approx(permitted_ppm - measured_ppm); assert passed == (measured_ppm <= permitted_ppm) or passed is None for unknown solvents",
+        "description": "For any compliance check result: margin_ppm = permitted_ppm - measured_ppm; passed = (measured_ppm <= permitted_ppm).",
+        "name": "Margin equals permitted minus measured"
+      }
+    ],
+    "public_functions": [
+      "classify_solvent",
+      "check_residual_solvent_limits",
+      "q3c_rule_set"
+    ],
+    "worked_examples": [
+      {
+        "expected": {
+          "class_number": 1,
+          "concentration_limit_ppm": 2,
+          "matched": true,
+          "solvent_name": "Benzene"
+        },
+        "function": "classify_solvent",
+        "guideline_trace": "ICH Q3C(R8) Appendices 1-3, Class 1 Table",
+        "inputs": {
+          "route": "oral",
+          "solvent_identifier": "Benzene"
+        },
+        "name": "Classify Benzene (Class 1, fixed limit)",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "class_number": 2,
+          "concentration_limit_ppm": 410,
+          "matched": true,
+          "pde_mg_per_day": 4.1,
+          "solvent_name": "Acetonitrile"
+        },
+        "function": "classify_solvent",
+        "guideline_trace": "ICH Q3C(R8) Appendices 1-3, Class 2 Table",
+        "inputs": {
+          "route": "oral",
+          "solvent_identifier": "Acetonitrile"
+        },
+        "name": "Classify Acetonitrile (Class 2, PDE 4.1 mg/day)",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "class_number": 3,
+          "concentration_limit_ppm": 5000,
+          "matched": true,
+          "pde_mg_per_day": 50,
+          "solvent_name": "Ethanol"
+        },
+        "function": "classify_solvent",
+        "guideline_trace": "ICH Q3C(R8) Appendices 1-3, Class 3 Table",
+        "inputs": {
+          "route": "oral",
+          "solvent_identifier": "Ethanol"
+        },
+        "name": "Classify Ethanol (Class 3, PDE 50 mg/day)",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "class_number": 2,
+          "concentration_limit_ppm": 60,
+          "matched": true,
+          "pde_mg_per_day": 0.6,
+          "solvent_name": "Chloroform"
+        },
+        "function": "classify_solvent",
+        "guideline_trace": "ICH Q3C(R8) Appendices 1-3, Class 2 Table",
+        "inputs": {
+          "route": "oral",
+          "solvent_identifier": "Chloroform"
+        },
+        "name": "Classify Chloroform (Class 2, extreme low PDE 0.6 mg/day)",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "class_number": 2,
+          "concentration_limit_ppm": 3000,
+          "matched": true,
+          "pde_mg_per_day": 30,
+          "solvent_name": "Methanol"
+        },
+        "function": "classify_solvent",
+        "guideline_trace": "ICH Q3C(R8) Appendices 1-3, Class 2 Table",
+        "inputs": {
+          "route": "oral",
+          "solvent_identifier": "67-56-1"
+        },
+        "name": "Lookup by CAS (Methanol 67-56-1)",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "class_number": 2,
+          "concentration_limit_ppm": 880,
+          "matched": true,
+          "pde_mg_per_day": 8.8,
+          "solvent_name": "N,N-Dimethylformamide"
+        },
+        "function": "classify_solvent",
+        "guideline_trace": "ICH Q3C(R8) Appendices 1-3, Class 2 Table",
+        "inputs": {
+          "route": "oral",
+          "solvent_identifier": "DMF"
+        },
+        "name": "Lookup by alias (DMF resolves to N,N-Dimethylformamide)",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "0_class_number": 2,
+          "0_margin_ppm": 57000,
+          "0_measured_ppm": 3000,
+          "0_passed": true,
+          "0_permitted_ppm": 60000,
+          "0_solvent_name": "Methanol"
+        },
+        "function": "check_residual_solvent_limits",
+        "guideline_trace": "ICH Q3C(R8) Option 2 (dose-scaled): permitted_ppm = PDE * 1000 / daily_dose_g = 30 * 1000 / 0.5 = 60000",
+        "inputs": {
+          "daily_dose_g": 0.5,
+          "product_spec": {
+            "methanol": 3000
+          },
+          "route": "oral"
+        },
+        "name": "Compliance Class 2 dose-scaled (Methanol 3000 ppm @ 0.5 g/day dose)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "0_class_number": 1,
+          "0_margin_ppm": 1,
+          "0_measured_ppm": 1,
+          "0_passed": true,
+          "0_permitted_ppm": 2,
+          "0_solvent_name": "Benzene"
+        },
+        "function": "check_residual_solvent_limits",
+        "guideline_trace": "ICH Q3C(R8) Class 1 concentration limit (fixed, dose-independent)",
+        "inputs": {
+          "daily_dose_g": 10,
+          "product_spec": {
+            "benzene": 1
+          },
+          "route": "oral"
+        },
+        "name": "Compliance Class 1 fixed limit (Benzene @ 0.1, 1, 10 g/day all use 2 ppm)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "0_class_number": 1,
+          "0_margin_ppm": -3,
+          "0_measured_ppm": 5,
+          "0_passed": false,
+          "0_permitted_ppm": 2,
+          "0_solvent_name": "Benzene"
+        },
+        "function": "check_residual_solvent_limits",
+        "guideline_trace": "ICH Q3C(R8) Class 1 concentration limit (fixed, dose-independent)",
+        "inputs": {
+          "daily_dose_g": 1,
+          "product_spec": {
+            "benzene": 5
+          },
+          "route": "oral"
+        },
+        "name": "Compliance Class 1 fail (Benzene 5 ppm measured vs 2 ppm limit)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "0_class_number": 2,
+          "0_margin_ppm": 310,
+          "0_measured_ppm": 100,
+          "0_passed": true,
+          "0_permitted_ppm": 410,
+          "0_solvent_name": "Acetonitrile"
+        },
+        "function": "check_residual_solvent_limits",
+        "guideline_trace": "ICH Q3C(R8) Option 2 at reference dose (10 g/day): 4.1 * 1000 / 10 = 410 ppm (matches Option 1)",
+        "inputs": {
+          "daily_dose_g": 10,
+          "product_spec": {
+            "acetonitrile": 100
+          },
+          "route": "oral"
+        },
+        "name": "Compliance Option 2 == Option 1 at 10 g/day reference dose (Acetonitrile)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "matched": false
+        },
+        "function": "classify_solvent",
+        "guideline_trace": "Explicit unknown handling (not in ICH Q3C(R8) Appendices 1-3 subset)",
+        "inputs": {
+          "route": "oral",
+          "solvent_identifier": "unobtainium"
+        },
+        "name": "Unknown solvent returns explicit unmapped state",
+        "source": "validated_unit_test"
+      }
+    ]
+  },
+  "q3d": {
+    "invariants": [
+      {
+        "assertion_hint": "For all 72 test cases (24 elements \u00d7 3 encoded routes), assert get_element_pde(symbol, route).control_threshold_ug_per_day == pytest.approx(0.30 * get_element_pde(symbol, route).pde_ug_per_day)",
+        "description": "For any encoded route, the control_threshold_ug_per_day must equal 0.30 times the pde_ug_per_day. This is a regulatory constant from ICH Q3D(R2) section 3.2.",
+        "name": "Control threshold is exactly 30% of PDE"
+      },
+      {
+        "assertion_hint": "For any element, route, and two doses d1 < d2, assert calculate_concentration_limit(element, route, d1).permitted_concentration_ppm * d1 == pytest.approx(calculate_concentration_limit(element, route, d2).permitted_concentration_ppm * d2), i.e. the product PDE / dose must be constant",
+        "description": "For a fixed element and route, the permitted concentration in ppm is inversely proportional to the daily dose in grams. Doubling the daily dose must halve the concentration limit.",
+        "name": "Permitted concentration scales inversely with dose"
+      },
+      {
+        "assertion_hint": "Parse q3d_rule_set()['elements']; assert len(elements) == 24; assert all(e['element_class'] in ('1', '2A', '2B', '3') for e in elements); assert Counter([e['element_class'] for e in elements]) == {'1': 4, '2A': 3, '2B': 10, '3': 7}",
+        "description": "All 24 Q3D elements must have exactly one of four class values ('1', '2A', '2B', '3') and the distribution must match: 4 Class 1, 3 Class 2A, 10 Class 2B, 7 Class 3. The class is the same across all routes for a given element.",
+        "name": "Class classification is immutable and complete"
+      },
+      {
+        "assertion_hint": "For each element and route, assert (route in ('oral', 'parenteral', 'inhalation')) == (get_element_pde(element, route).pde_ug_per_day is not None and get_element_pde(element, route).route_data_available is True)",
+        "description": "For any element, get_element_pde returns pde_ug_per_day != None and route_data_available == True only if the route is in ('oral', 'parenteral', 'inhalation'). Cutaneous/transcutaneous always return None and route_data_available == False.",
+        "name": "Only encoded routes return non-None PDE"
+      },
+      {
+        "assertion_hint": "For any element and route, assert calculate_concentration_limit(element, route, 0.0) raises DataValidationError and calculate_concentration_limit(element, route, -1.0) raises DataValidationError",
+        "description": "calculate_concentration_limit and risk_assessment_report must reject non-positive daily doses with DataValidationError.",
+        "name": "Negative or zero dose is rejected"
+      },
+      {
+        "assertion_hint": "assert get_element_pde('Fe', 'oral') raises DataValidationError; assert get_element_pde('iron', 'oral') raises DataValidationError; assert get_element_pde('unobtanium', 'oral') raises DataValidationError",
+        "description": "get_element_pde must fail with DataValidationError if the element is not one of the 24 ICH Q3D-listed elements, whether looked up by symbol or name.",
+        "name": "Unknown element lookup fails"
+      }
+    ],
+    "public_functions": [
+      "get_element_pde",
+      "calculate_concentration_limit",
+      "risk_assessment_report",
+      "q3d_rule_set"
+    ],
+    "worked_examples": [
+      {
+        "expected": {
+          "control_threshold_ug_per_day": 4.5,
+          "element": "As",
+          "element_class": "1",
+          "element_name": "Arsenic",
+          "pde_ug_per_day": 15,
+          "route_data_available": true
+        },
+        "function": "get_element_pde",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Class 1, oral column",
+        "inputs": {
+          "element": "As",
+          "route": "oral"
+        },
+        "name": "Arsenic oral PDE",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "control_threshold_ug_per_day": 4.5,
+          "element": "As",
+          "element_class": "1",
+          "element_name": "Arsenic",
+          "pde_ug_per_day": 15,
+          "route_data_available": true
+        },
+        "function": "get_element_pde",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Class 1, parenteral column",
+        "inputs": {
+          "element": "As",
+          "route": "parenteral"
+        },
+        "name": "Arsenic parenteral PDE",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "control_threshold_ug_per_day": 0.6,
+          "element": "As",
+          "element_class": "1",
+          "pde_ug_per_day": 2,
+          "route_data_available": true
+        },
+        "function": "get_element_pde",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Class 1, inhalation column",
+        "inputs": {
+          "element": "As",
+          "route": "inhalation"
+        },
+        "name": "Arsenic inhalation PDE",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "control_threshold_ug_per_day": 1.5,
+          "element": "Cd",
+          "element_class": "1",
+          "pde_ug_per_day": 5,
+          "route_data_available": true
+        },
+        "function": "get_element_pde",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Class 1, oral column",
+        "inputs": {
+          "element": "Cd",
+          "route": "oral"
+        },
+        "name": "Cadmium oral PDE",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "control_threshold_ug_per_day": 1.5,
+          "element": "Pb",
+          "element_class": "1",
+          "element_name": "Lead",
+          "pde_ug_per_day": 5,
+          "route_data_available": true
+        },
+        "function": "get_element_pde",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Class 1, oral column",
+        "inputs": {
+          "element": "Pb",
+          "route": "oral"
+        },
+        "name": "Lead oral PDE",
+        "source": "encoded_rule_set_table"
+      },
+      {
+        "expected": {
+          "control_threshold_ug_per_day": 6,
+          "element": "Ni",
+          "element_class": "2A",
+          "pde_ug_per_day": 20,
+          "route_data_available": true
+        },
+        "function": "get_element_pde",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Class 2A, parenteral column",
+        "inputs": {
+          "element": "Ni",
+          "route": "parenteral"
+        },
+        "name": "Nickel parenteral PDE",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "control_threshold_ug_per_day": 3300,
+          "element": "Cr",
+          "element_class": "3",
+          "pde_ug_per_day": 11000,
+          "route_data_available": true
+        },
+        "function": "get_element_pde",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Class 3, oral column",
+        "inputs": {
+          "element": "Cr",
+          "route": "oral"
+        },
+        "name": "Chromium oral PDE (Class 3 high toxicity route)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "control_threshold_ppm": 2.25,
+          "element": "As",
+          "element_class": "1",
+          "pde_ug_per_day": 15,
+          "permitted_concentration_ppm": 7.5,
+          "route": "parenteral",
+          "route_data_available": true
+        },
+        "function": "calculate_concentration_limit",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Option 1 concentration formula: PDE / daily dose",
+        "inputs": {
+          "element": "As",
+          "max_daily_dose_g": 2,
+          "route": "parenteral"
+        },
+        "name": "Arsenic parenteral concentration at 2g daily dose",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "control_threshold_ppm": 1.5,
+          "element": "Pb",
+          "element_class": "1",
+          "pde_ug_per_day": 5,
+          "permitted_concentration_ppm": 5,
+          "route": "oral",
+          "route_data_available": true
+        },
+        "function": "calculate_concentration_limit",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Option 1 concentration: 5 microg/day / 1 g = 5 ppm",
+        "inputs": {
+          "element": "Pb",
+          "max_daily_dose_g": 1,
+          "route": "oral"
+        },
+        "name": "Lead oral concentration at 1g daily dose",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "control_threshold_ppm": 0.15,
+          "element": "Pb",
+          "element_class": "1",
+          "pde_ug_per_day": 5,
+          "permitted_concentration_ppm": 0.5,
+          "route": "oral",
+          "route_data_available": true
+        },
+        "function": "calculate_concentration_limit",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Option 1 concentration: 5 microg/day / 10 g = 0.5 ppm",
+        "inputs": {
+          "element": "Pb",
+          "max_daily_dose_g": 10,
+          "route": "oral"
+        },
+        "name": "Lead oral concentration at 10g daily dose (inverse scaling)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "element": "As",
+          "element_class": "1",
+          "route_data_available": false
+        },
+        "function": "get_element_pde",
+        "guideline_trace": "ICH Q3D(R2) cutaneous appendix (not encoded in rule-set)",
+        "inputs": {
+          "element": "As",
+          "route": "cutaneous"
+        },
+        "name": "Cutaneous route (not encoded)",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "route": "oral"
+        },
+        "function": "risk_assessment_report",
+        "guideline_trace": "ICH Q3D(R2) Class 3: low oral toxicity (oral PDE > 500 microg/day), may be excluded for oral route if not intentionally added",
+        "inputs": {
+          "drug_product_components": {
+            "API": 100
+          },
+          "manufacturing_equipment": [],
+          "max_daily_dose_g": 0.5,
+          "route": "oral"
+        },
+        "name": "Risk assessment - Class 3 element oral route excludable",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "route": "parenteral"
+        },
+        "function": "risk_assessment_report",
+        "guideline_trace": "ICH Q3D(R2) Class 3: assessed for parenteral/inhalation routes regardless of oral toxicity",
+        "inputs": {
+          "drug_product_components": {
+            "API": 100
+          },
+          "manufacturing_equipment": [],
+          "max_daily_dose_g": 0.5,
+          "route": "parenteral"
+        },
+        "name": "Risk assessment - Class 3 element parenteral route required",
+        "source": "validated_unit_test"
+      },
+      {
+        "expected": {
+          "route": "parenteral"
+        },
+        "function": "risk_assessment_report",
+        "guideline_trace": "ICH Q3D(R2) Table A.2.1, Pb parenteral PDE 5 microg/day / 2 g = 2.5 ppm; control threshold 30% of 5 = 1.5 microg/day",
+        "inputs": {
+          "drug_product_components": {
+            "API": 100
+          },
+          "manufacturing_equipment": [],
+          "max_daily_dose_g": 2,
+          "route": "parenteral"
+        },
+        "name": "Risk assessment - Lead parenteral concentration at 2g dose",
+        "source": "validated_unit_test"
+      }
+    ]
+  }
+}
