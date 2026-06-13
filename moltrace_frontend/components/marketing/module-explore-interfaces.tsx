@@ -871,12 +871,12 @@ export function RegulatoryExploreInterface({ onClose }: { onClose: () => void })
     <div
       className="rounded-xl border border-t-[3px] border-t-cyan-500 bg-card p-7 shadow-sm dark:border-t-cyan-400"
       role="region"
-      aria-label="Regulatory Intelligence Hub — explore the QA-RAG compliance check"
+      aria-label="ComplianceCore — explore the QA-RAG compliance check"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-600 dark:text-cyan-400">
-            Regulatory Intelligence Hub · Live preview
+            ComplianceCore · Live preview
           </p>
           <h3 className="text-2xl font-bold tracking-tight sm:text-3xl">
             Built-in Compliance and Safety.

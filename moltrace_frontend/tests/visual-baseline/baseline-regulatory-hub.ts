@@ -1,6 +1,6 @@
 #!/usr/bin/env -S pnpm tsx
 /**
- * Baseline regression test for the Regulatory Hub module.
+ * Baseline regression test for the ComplianceCore module.
  *
  * Captures CURRENT behavior across all 9 regulatory routes + cross-module
  * integration points (SpectraCheck → Regulatory, Regulatory → Reaction
@@ -152,7 +152,7 @@ async function main() {
   await installRegulatoryMocks(page)
   await installSpectracheckMocks(page)
 
-  console.log("\n── Regulatory Hub baseline regression ─────────")
+  console.log("\n── ComplianceCore baseline regression ─────────")
 
   // ── 9 main routes load + render module signal text ──
   for (const route of ROUTES) {
@@ -224,7 +224,7 @@ async function main() {
   console.log(`\n── Summary: ${passes} pass, ${fails} fail ──`)
 
   const md = [
-    `# Regulatory Hub baseline regression — ${new Date().toISOString()}`,
+    `# ComplianceCore baseline regression — ${new Date().toISOString()}`,
     "",
     `- Pass: ${passes}`,
     `- Fail: ${fails}`,

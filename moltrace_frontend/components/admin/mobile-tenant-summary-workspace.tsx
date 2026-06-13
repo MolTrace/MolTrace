@@ -46,7 +46,7 @@ type MobileTenantSummary = {
 }
 
 const LOCAL_TENANT_ID = "local-development"
-const DEFAULT_TASK_ORDER = ["SpectraCheck setup", "Regulatory Hub setup", "Reaction Optimization setup"]
+const DEFAULT_TASK_ORDER = ["SpectraCheck setup", "ComplianceCore setup", "Reaction Optimization setup"]
 
 function isRecord(value: unknown): value is Row {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value)

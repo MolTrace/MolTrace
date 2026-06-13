@@ -338,7 +338,7 @@ export function ValidationReadinessDashboardCards() {
   const activeProjects = snapshot.projects.filter((project) => readStatus(project) !== "archived")
   const moduleBadges = [
     ["SpectraCheck", moduleProjects(snapshot.projects, "spectracheck")],
-    ["Regulatory Hub", moduleProjects(snapshot.projects, "regulatory_hub")],
+    ["ComplianceCore", moduleProjects(snapshot.projects, "regulatory_hub")],
     ["Reaction Optimization", moduleProjects(snapshot.projects, "reaction_optimization")],
   ] as const
 

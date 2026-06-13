@@ -13,7 +13,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/platform", label: "Platform", icon: LineChart },
   { href: "/spectracheck", label: "SpectraCheck", icon: SpectraCheckLogoIcon },
-  { href: "/regulatory", label: "Regulatory Hub", icon: ShieldCheck },
+  { href: "/regulatory", label: "ComplianceCore", icon: ShieldCheck },
   { href: "/reactions", label: "Reaction Optimization", icon: FlaskConical },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/roi", label: "Automation ROI", icon: BarChart3 },

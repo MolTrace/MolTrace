@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 type JsonRecord = Record<string, unknown>
 
 type ModuleSummary = {
-  title: "SpectraCheck" | "Regulatory Hub" | "Reaction Optimization"
+  title: "SpectraCheck" | "ComplianceCore" | "Reaction Optimization"
   status: string
   openActionCount: number | null
   warnings: string[]
@@ -109,7 +109,7 @@ function buildModuleSummaries(root: JsonRecord): ModuleSummary[] {
       buttonLabel: "Open SpectraCheck",
     },
     {
-      title: "Regulatory Hub",
+      title: "ComplianceCore",
       status: readFirstString(regulatorySummary, ["status", "readiness_status", "overall_status"]) || "Unknown",
       openActionCount:
         readFirstNumber(regulatorySummary, [
@@ -124,7 +124,7 @@ function buildModuleSummaries(root: JsonRecord): ModuleSummary[] {
         readFirstString(regulatorySummary, ["next_recommended_action", "next_action", "recommended_next_action"]) ||
         globalNext,
       href: "/regulatory",
-      buttonLabel: "Open Regulatory Hub",
+      buttonLabel: "Open ComplianceCore",
     },
     {
       title: "Reaction Optimization",
@@ -266,7 +266,7 @@ export function MobileCommandCenter() {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Mobile Command Center</CardTitle>
         <CardDescription>
-          Cross-module status summary for mobile — active alerts, pending actions, and module health across SpectraCheck, Regulatory Hub, and Reaction Optimization.
+          Cross-module status summary for mobile — active alerts, pending actions, and module health across SpectraCheck, ComplianceCore, and Reaction Optimization.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

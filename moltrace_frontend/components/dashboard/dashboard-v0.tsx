@@ -1311,7 +1311,7 @@ export function DashboardV0() {
               <p className="text-sm font-medium">{crossModuleDisplay.latestSpectraCheckEvidenceStatus ?? "—"}</p>
             </div>
             <div className="rounded-md border bg-muted/20 p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">2. Regulatory Hub summary</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">2. ComplianceCore summary</p>
               <p className="mt-2 text-xs text-muted-foreground">linked regulatory action items</p>
               <p className="text-2xl font-bold tabular-nums">{fmtMlCount(crossModuleDisplay.linkedRegulatoryActionItems)}</p>
               <p className="mt-2 text-xs text-muted-foreground">open regulatory blockers</p>
@@ -1332,7 +1332,7 @@ export function DashboardV0() {
               <div>
                 <p className="text-xs font-medium uppercase text-muted-foreground">Core module activity</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Live opens logged from SpectraCheck, Regulatory Hub, and ReactionIQ in this testing phase.
+                  Live opens logged from SpectraCheck, ComplianceCore, and ReactionIQ in this testing phase.
                 </p>
               </div>
               <Badge variant="outline" className="w-fit">
@@ -1452,11 +1452,11 @@ export function DashboardV0() {
         <ModuleCard
           accent="cyan"
           eyebrow="Regulatory · Hub"
-          title="Regulatory Hub"
+          title="ComplianceCore"
           icon={FolderOpen}
           description="Active dossiers and review workload across your tenant — not a legal or compliance certification."
           href="/spectracheck?program=regulatory_hub"
-          ctaLabel="Open Regulatory Hub"
+          ctaLabel="Open ComplianceCore"
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>

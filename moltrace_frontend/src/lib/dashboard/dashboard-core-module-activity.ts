@@ -22,7 +22,7 @@ const MODULE_ORDER: DashboardCoreModuleKey[] = ["spectracheck", "regulatory_hub"
 
 const MODULE_LABELS: Record<DashboardCoreModuleKey, string> = {
   spectracheck: "SpectraCheck",
-  regulatory_hub: "Regulatory Hub",
+  regulatory_hub: "ComplianceCore",
   reactioniq: "ReactionIQ",
 }
 

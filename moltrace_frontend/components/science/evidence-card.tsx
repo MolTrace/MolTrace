@@ -69,7 +69,7 @@ function moduleLabel(module: EvidenceModule): string {
     case "spectracheck":
       return "SpectraCheck"
     case "regulatory":
-      return "Regulatory Hub"
+      return "ComplianceCore"
     case "reactions":
       return "Reaction Optimization"
     case "ai_services":

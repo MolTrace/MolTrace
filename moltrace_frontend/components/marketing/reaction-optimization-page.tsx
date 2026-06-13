@@ -66,7 +66,7 @@ const PIPELINE: Stage[] = [
     stage: "02",
     title: "Constrain",
     detail:
-      "Hard limits from Regulatory Hub auto-load: ICH Q3C residual-solvent ceilings, Q3D PDE limits, M7 nitrosamine alerts. Plus safety + cost guardrails from your operational profile.",
+      "Hard limits from ComplianceCore auto-load: ICH Q3C residual-solvent ceilings, Q3D PDE limits, M7 nitrosamine alerts. Plus safety + cost guardrails from your operational profile.",
     artifact: "objective_profile · cost · safety · regulatory_priors",
   },
   {
@@ -342,7 +342,7 @@ const CROSS_MODULE_LOOP: LoopStep[] = [
     body: "Round 4 shows acetic acid impurity at 2.10 ppm climbed to 5.8% — over the ICH Q3C Class 3 informational threshold for this drug substance.",
   },
   {
-    step: "Regulatory Hub routes",
+    step: "ComplianceCore routes",
     body: "Constraint flips from 'informational' to 'hard limit' for subsequent rounds. ReactionIQ receives the new constraint vector via the typed cross-module API.",
   },
   {
@@ -941,7 +941,7 @@ export function ReactionOptimizationPage() {
                 The whole platform, on one acetic-acid impurity.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Picking up the cross-module worked example from Spectroscopy + Regulatory Hub —
+                Picking up the cross-module worked example from Spectroscopy + ComplianceCore —
                 here's the role ReactionIQ plays when the impurity threshold is crossed mid-campaign.
               </p>
             </div>
@@ -1008,7 +1008,7 @@ export function ReactionOptimizationPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">← Regulatory Intelligence Hub</p>
+                    <p className="text-sm font-semibold">← ComplianceCore</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Translates compliance thresholds into hard constraints the optimiser respects
                       at proposal time.

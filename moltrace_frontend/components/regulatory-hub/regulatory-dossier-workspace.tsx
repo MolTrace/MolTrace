@@ -2295,7 +2295,7 @@ export function RegulatoryDossierWorkspace() {
         <Button variant="ghost" size="sm" asChild>
           <Link href="/spectracheck?program=regulatory_hub">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Regulatory Intelligence
+            ComplianceCore
           </Link>
         </Button>
       </div>
@@ -2318,7 +2318,7 @@ export function RegulatoryDossierWorkspace() {
       <AlertCard
         variant="warning"
         title="Important"
-        description="Regulatory Intelligence provides cited decision support and requires qualified human review. It is not legal advice or final regulatory approval."
+        description="ComplianceCore provides cited decision support and requires qualified human review. It is not legal advice or final regulatory approval."
       />
 
       <AlertCard

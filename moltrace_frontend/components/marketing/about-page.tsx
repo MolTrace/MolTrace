@@ -113,7 +113,7 @@ const PILLARS: Pillar[] = [
   },
   {
     icon: ShieldCheck,
-    name: "Regulatory Intelligence Hub",
+    name: "ComplianceCore",
     blurb:
       "Closes the loop between spectroscopy evidence and regulatory action. Dossiers, traceability, ALCOA+ audit ledger, ICH Q2(R2) alignment.",
     href: "https://docs.moltrace.co/guides/modules/regulatory/",
@@ -551,7 +551,7 @@ export function AboutPage() {
                                                                             │
                                                                             ▼
         ┌─►  Next experiment (ReactionIQ)  ◄─  Regulatory action items  ◄─┘
-        │                                            (Regulatory Hub)
+        │                                            (ComplianceCore)
         │
         └─  with impurity / solvent / nitrosamine constraints fed back as priors`}
               </pre>
