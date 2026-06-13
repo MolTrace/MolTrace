@@ -90,6 +90,33 @@ def test_content_hash_is_deterministic_and_change_sensitive() -> None:
     assert ingest(FdaGuidanceAdapter([changed])).docs[0].content_hash != h1
 
 
+def test_silent_section_edit_is_caught_by_the_hash_and_revision_gate() -> None:
+    # A doc with BOTH an explicit summary text AND served sections: a silent edit to a section
+    # (e.g. a 10x limit change) must change content_hash and trip revision_watch — the served
+    # content, not just the summary, is version-addressed.
+    def _doc(section_body: str):
+        return ingest(
+            IchGuidelineAdapter(
+                [{
+                    "document_id": "ICH-M7(R2)",
+                    "title": "M7",
+                    "revision": "R2",  # same revision + effective_date as the silent-edit attack
+                    "effective_date": "2023-04-03",
+                    "url": "https://database.ich.org/sites/default/files/M7_R2_Guideline.pdf",
+                    "text": "Assessment and Control of DNA Reactive (Mutagenic) Impurities.",
+                    "sections": [("II. Acceptable Intakes", section_body)],
+                }]
+            )
+        ).docs[0]
+
+    pinned = _doc("The TTC of 1.5 ug/day applies to lifetime exposure.")
+    edited = _doc("The TTC of 0.15 ug/day applies to lifetime exposure.")  # 10x lower limit
+    assert pinned.content_hash != edited.content_hash  # served-section edit changes the hash
+    alert = revision_watch(pinned, edited)
+    assert alert.changed is True and alert.hold is True and alert.serving_allowed is False
+    assert alert.change_control is not None
+
+
 def test_ndsri_adapter_renders_compound_rows() -> None:
     rows = [
         {

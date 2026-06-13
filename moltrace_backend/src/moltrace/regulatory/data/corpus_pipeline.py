@@ -175,9 +175,20 @@ class RawDocs:
 
 
 def _version_hash(
-    source: CorpusSource, document_id: str, revision: str, effective_date: str, url: str, text: str
+    source: CorpusSource,
+    document_id: str,
+    revision: str,
+    effective_date: str,
+    url: str,
+    text: str,
+    sections: Sequence[tuple[str, str]] = (),
 ) -> str:
-    """Deterministic content address over the version-defining fields (not the retrieval time)."""
+    """Deterministic content address over the version-defining fields (not the retrieval time).
+
+    Covers BOTH ``text`` and ``sections`` — the sections are the content that is actually chunked,
+    indexed, and served, so a silent edit to a section (e.g. a changed limit) must change the hash
+    and trip :func:`revision_watch`.
+    """
 
     return content_hash(
         {
@@ -187,6 +198,7 @@ def _version_hash(
             "effective_date": effective_date,
             "url": url,
             "text": text,
+            "sections": [[label, body] for label, body in sections],
         }
     )
 
@@ -233,7 +245,7 @@ class SourceAdapter:
             license=self.license,
             url=url,
             content_hash=_version_hash(
-                self.source, document_id, revision, effective_date, url, text
+                self.source, document_id, revision, effective_date, url, text, sections
             ),
             text=text,
             sections=sections,
@@ -378,8 +390,14 @@ def index(
     chunks: list[IndexChunk] = []
     for doc in docs.docs:
         for section, body in _chunk_doc(doc):
-            chunk_id = _version_hash(
-                doc.source, doc.document_id, doc.revision, section, doc.url, body
+            # Stable, unique chunk address: the doc's version hash + this section + its body.
+            chunk_id = content_hash(
+                {
+                    "document_id": doc.document_id,
+                    "version": doc.content_hash,
+                    "section": section,
+                    "text": body,
+                }
             )
             embedding = None
             if embedder is not None:
