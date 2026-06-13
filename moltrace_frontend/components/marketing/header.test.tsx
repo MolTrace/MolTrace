@@ -62,7 +62,7 @@ describe("Marketing Header — mobile sidebar refresh", () => {
     expect(within(sidebar).getByText("Solutions")).toBeInTheDocument()
 
     // Platform items
-    expect(within(sidebar).getByText("Spectroscopy Intelligence")).toBeInTheDocument()
+    expect(within(sidebar).getByText("SpectraCheck")).toBeInTheDocument()
     expect(within(sidebar).getByText("ComplianceCore")).toBeInTheDocument()
     expect(within(sidebar).getByText("Reaction Optimization")).toBeInTheDocument()
     expect(within(sidebar).getByText("Integrations")).toBeInTheDocument()

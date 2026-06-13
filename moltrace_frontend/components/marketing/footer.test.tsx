@@ -50,7 +50,7 @@ describe("Marketing Footer", () => {
     render(<Footer />)
     // Sample one item per section
     for (const link of [
-      "Spectroscopy",
+      "SpectraCheck",
       "Reaction Optimization",
       "About",
       "Documentation",
@@ -71,8 +71,8 @@ describe("Marketing Footer", () => {
     // ``footer.tsx`` for which slug was chosen and why.
     const expectedDestinations: Array<[label: string, href: string]> = [
       // ── Platform ────────────────────────────────────────────────────
-      // Spectroscopy is in-app at /spectroscopy (the SpectraCheck overview).
-      ["Spectroscopy", "/spectroscopy"],
+      // SpectraCheck is in-app at /spectroscopy.
+      ["SpectraCheck", "/spectroscopy"],
       // ComplianceCore is in-app at /regulatory-hub.
       ["ComplianceCore", "/regulatory-hub"],
       // Reaction Optimization is in-app at /reaction-optimization.

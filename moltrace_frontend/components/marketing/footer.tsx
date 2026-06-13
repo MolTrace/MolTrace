@@ -14,7 +14,7 @@ const navigation = {
     // All four Platform modules now have in-app marketing overviews.
     // Deeper technical references stay on docs.moltrace.co and
     // are linked from each module page directly.
-    { name: "Spectroscopy", href: "/spectroscopy" },
+    { name: "SpectraCheck", href: "/spectroscopy" },
     { name: "ComplianceCore", href: "/regulatory-hub" },
     { name: "Reaction Optimization", href: "/reaction-optimization" },
     { name: "Integrations", href: "/integrations" },
