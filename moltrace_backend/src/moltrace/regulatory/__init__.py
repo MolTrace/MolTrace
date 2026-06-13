@@ -1,6 +1,6 @@
-"""MolTrace Regulatory Hub (Roadmap Phase 7) — the second module to ship.
+"""MolTrace ComplianceCore (Roadmap Phase 7) — the second module to ship.
 
-The Regulatory Hub turns SpectraCheck's confirmed structures, impurity peaks, and
+The ComplianceCore turns SpectraCheck's confirmed structures, impurity peaks, and
 purity values into regulatory submission-**support** documentation — drafts for
 review and sign-off by qualified regulatory-affairs and toxicology professionals,
 **not** finished filings or regulatory determinations.

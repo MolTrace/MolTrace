@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from nmrcheck import tenant_saas_store as tenant_store
 
-PRODUCT_ORDER = ["SpectraCheck", "Regulatory Hub", "Reaction Optimization"]
+PRODUCT_ORDER = ["SpectraCheck", "ComplianceCore", "Reaction Optimization"]
 PRODUCT_PROGRAMS = ["spectracheck", "regulatory_hub", "reaction_optimization"]
 
 
@@ -122,7 +122,7 @@ def test_pilot_onboarding_seeds_tasks_in_program_order(client, api_headers):
         assert [row["program"] for row in task_rows[:3]] == PRODUCT_PROGRAMS
         assert [row["title"] for row in task_rows[:3]] == [
             "SpectraCheck setup",
-            "Regulatory Hub setup",
+            "ComplianceCore setup",
             "Reaction Optimization setup",
         ]
 

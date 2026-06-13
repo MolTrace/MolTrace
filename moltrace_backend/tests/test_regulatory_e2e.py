@@ -1,4 +1,4 @@
-"""Cross-module end-to-end smoke + determinism for the Regulatory Hub (Prompt 19).
+"""Cross-module end-to-end smoke + determinism for the ComplianceCore (Prompt 19).
 
 One SpectraCheck-style impurity input flows through the regulatory path — input
 validation → a deterministic ICH Q3A / Q3C / M7 evaluation → a CTD Module 3 stub —

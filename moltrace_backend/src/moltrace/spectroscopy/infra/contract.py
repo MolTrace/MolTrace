@@ -1,7 +1,7 @@
 """Versioned, content-addressed SpectraCheck output contract.
 
 The pipeline (Prompts 1-9) produces rich Python objects; downstream consumers
-(the Regulatory Hub, ICH reports, regression gates, the experiment tracker)
+(the ComplianceCore, ICH reports, regression gates, the experiment tracker)
 need a *stable, versioned, byte-reproducible* representation of that output.
 This module provides:
 

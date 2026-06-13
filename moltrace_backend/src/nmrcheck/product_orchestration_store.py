@@ -89,7 +89,7 @@ _PROGRAMS = (
     },
     {
         "program_key": "regulatory_hub",
-        "display_name": "Regulatory Hub",
+        "display_name": "ComplianceCore",
         "display_order": 2,
         "description": "Source-supported regulatory action and compliance review.",
     },
@@ -101,7 +101,7 @@ _PROGRAMS = (
     },
 )
 _PRODUCT_RULE_NOTE = (
-    "Spectroscopy generates evidence; Regulatory Intelligence converts evidence into "
+    "Spectroscopy generates evidence; ComplianceCore converts evidence into "
     "compliance action; Reaction Optimization uses compliance action as constraints."
 )
 _REVIEW_NOTE = (
@@ -942,7 +942,7 @@ def _ensure_defaults(session: Session) -> None:
 def _validated_program_order(order: list[str]) -> list[str]:
     if list(order) != DEFAULT_PROGRAM_ORDER:
         raise ProductOrchestrationError(
-            "Program order must preserve SpectraCheck, Regulatory Hub, Reaction Optimization."
+            "Program order must preserve SpectraCheck, ComplianceCore, Reaction Optimization."
         )
     return list(order)
 

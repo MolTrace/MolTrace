@@ -9,7 +9,7 @@ existing route changed, no migration.
 
 Work in `moltrace_frontend/` only. Do **not** edit `moltrace_backend/`.
 
-> **Design intent:** this folds into the existing **Regulatory Hub** dossier workspace
+> **Design intent:** this folds into the existing **ComplianceCore** dossier workspace
 > as one **cumulative-risk summary card** beside the nitrosamine-watch list. **No new
 > top-level nav.** It is the dossier-level companion to the per-call cumulative risk
 > already surfaced by the Impurity Assessment panel (`POST /regulatory/impurities/assess`).
@@ -109,7 +109,7 @@ nitrosamine, are still created — they are just listed under `excluded` in the 
 both a CPCA AI limit and a measured ng/day; cumulative risk is 0 by default."* Render this
 as a neutral "not yet assessed" state, **not** a green pass.
 
-## 5. Suggested UI (Regulatory Hub → dossier → nitrosamine section)
+## 5. Suggested UI (ComplianceCore → dossier → nitrosamine section)
 
 - A **cumulative-risk card** above/beside the existing nitrosamine-watch list:
   - Headline verdict from `passes` + `total_risk_ratio` — e.g. **"Cumulative risk
