@@ -41,6 +41,8 @@ Closes the loop between spectroscopy evidence and regulatory action: dossiers, t
 - **ICH M7(R2)** mutagenic-impurity classifier and the flagship **FDA/EMA CPCA nitrosamine** potency classifier with the FDA Rev-2 cumulative-risk rule (`sum(measured/AI) < 1`).
 - **Unified assessment** via `POST /regulatory/impurities/assess` plus per-dossier sub-resources, action queue, change/rule-update workspaces, source library + version timeline, and surveillance dashboard.
 - **CTD Module 3** bundle generation and a nitrosamine cumulative-risk rollup card.
+- **EU GMP _Draft_ Annex 22 AI-decision governance** — a tamper-evident, hash-chained per-dossier AI-decision log with human-in-the-loop gating on high-risk decisions (`GET`/`POST /regulatory/dossiers/{id}/ai-decisions`, `…/verify`); the CPCA, M7, and Q3D classifications auto-record their decisions, risk-tiered. The Annex is in draft and not in force — decision-support governance, not a compliance claim.
+- **Owner-scoped dossiers.** Dossier reads and writes are scoped per user (a system key or admin is unrestricted); a non-owner gets a non-leaking 404, so dossier evidence stays isolated.
 - Two **zero-tolerance hard gates** guard the engine: calculation error rate must be 0 and formula coverage must be 100%.
 
 ### ReactionIQ — Reaction Optimization
