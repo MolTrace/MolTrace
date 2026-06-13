@@ -14,7 +14,7 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
-## v0.24.9 — ComplianceCore: M7 + Q3D classifications auto-record AI decisions (2026-06-12)
+## v0.24.9 — Regentry: M7 + Q3D classifications auto-record AI decisions (2026-06-12)
 
 **Headline:** Extends v0.24.8 from CPCA to the other two deterministic regulatory classifications:
 an impurity register that runs an **ICH M7** mutagenicity classification, and an **ICH Q3D**
@@ -40,7 +40,7 @@ dossier's hash-chained log — risk-tiered, so the human-review queue reflects r
   from the request path. The decorator-based `with_annex22_governance` remains for callers that
   want the in-memory `GovernedResult` gate rather than dossier persistence.
 
-## v0.24.8 — ComplianceCore: nitrosamine watch auto-records its CPCA AI decision (2026-06-12)
+## v0.24.8 — Regentry: nitrosamine watch auto-records its CPCA AI decision (2026-06-12)
 
 **Headline:** Closes the loop from v0.24.7 — a nitrosamine watch that runs an FDA CPCA potency
 categorization now **automatically** records that categorization as an Annex 22 (draft) AI
@@ -66,7 +66,7 @@ required**.
 - First request-path producer of AI-decision records; other deterministic classifications (M7,
   Q3D, …) can be hooked the same way via `_record_ai_decision` when desired.
 
-## v0.24.7 — ComplianceCore: surface Annex 22 (draft) AI decisions on the dossier (2026-06-12)
+## v0.24.7 — Regentry: surface Annex 22 (draft) AI decisions on the dossier (2026-06-12)
 
 **Headline:** Wires the Prompt 12 EU GMP **Draft** Annex 22 governance records
 (`moltrace.regulatory.compliance.AIDecisionRecord`) into the live dossier API, so an
@@ -103,7 +103,7 @@ in force; these are decision-support governance records, never an "Annex 22 comp
   owner-scoped, tamper-evident API surface. The governance decorator is still applied per
   call-site separately (it changes a function's return type).
 
-## v0.24.6 — ComplianceCore: readiness reports carry a content hash (provenance) (2026-06-11)
+## v0.24.6 — Regentry: readiness reports carry a content hash (provenance) (2026-06-11)
 
 **Headline:** `create_readiness_report` passed `metadata_json` straight through, so the dossier
 workspace's readiness "report hash" field (it reads `metadata_json.report_hash` / `sha256` / `hash`)
@@ -130,7 +130,7 @@ substantive content, giving the snapshot a stable provenance fingerprint.
   (`test_regulatory_q3d.py`, `test_regulatory_compliance_engine_api.py`) the dossier workspace simply has
   not wired into a sub-tab yet. Kept as-is; FE wiring is the follow-up, not retirement.
 
-## v0.24.5 — ComplianceCore: readiness reports rehydrate (dossier-scoped list read) (2026-06-11)
+## v0.24.5 — Regentry: readiness reports rehydrate (dossier-scoped list read) (2026-06-11)
 
 **Headline:** The readiness report — the dossier pipeline's capstone (prompt 5) output — only had a
 `POST` create + `GET`-by-id, so the dossier workspace could not reload a persisted report. Revisiting a
@@ -159,7 +159,7 @@ stored. Adds the dossier-scoped list read so the UI can rehydrate the latest rep
   never populates; `GET/POST /regulatory/dossiers/{id}/elemental-impurity-assessment` has no FE consumer;
   and the Developer-JSON panel omits ~10 loaded payloads.
 
-## v0.24.4 — ComplianceCore: surveillance is a privileged (admin/system) process (security) (2026-06-11)
+## v0.24.4 — Regentry: surveillance is a privileged (admin/system) process (security) (2026-06-11)
 
 **Headline:** Closes the last item from the v0.24.3 convergence review. `POST /regulatory/surveillance/runs`
 was callable by any authenticated user, and a run fans out review **action-items / notifications** onto
@@ -181,7 +181,7 @@ system-key only (the platform's surveillance job runs under the system key).
 - Completes the dossier access-control epic (v0.23.6 + v0.24.0–.4). Remaining (separate, pre-existing,
   different module): `POST /regulatory/action-items` create + the generic cross-module resource-link model.
 
-## v0.24.3 — ComplianceCore: scope the cross-module bridge CREATE paths (security) (2026-06-11)
+## v0.24.3 — Regentry: scope the cross-module bridge CREATE paths (security) (2026-06-11)
 
 **Headline:** A convergence review confirmed the dossier read / dossier-path-write / by-child-id-write
 surface is fully owner-scoped (v0.24.0–.2), and surfaced two remaining **child-producing** entry
@@ -214,7 +214,7 @@ Both create paths are now owner-gated.
   child-writes to the system key), tracked as its own task. The generic cross-module resource-link model
   and `POST /regulatory/action-items` create remain a separate pre-existing pass.
 
-## v0.24.2 — ComplianceCore: scope by-child-id dossier writes (security) (2026-06-11)
+## v0.24.2 — Regentry: scope by-child-id dossier writes (security) (2026-06-11)
 
 **Headline:** Closes the last cross-tenant write gaps an adversarial review surfaced after v0.24.1:
 dossier *children* mutated by their OWN id (not under `/regulatory/dossiers/{dossier_id}/…`), so the
@@ -249,7 +249,7 @@ branch is gated the same way. Missing and unowned both return the same non-leaki
   cross-module action-item **create** paths, plus the generic cross-module resource-link model, remain
   a separate (different-module, pre-existing) hardening pass — not introduced or worsened here.
 
-## v0.24.1 — ComplianceCore: dossier writes + cross-module bridge reads scoped (security) (2026-06-11)
+## v0.24.1 — Regentry: dossier writes + cross-module bridge reads scoped (security) (2026-06-11)
 
 **Headline:** Completes the dossier access-control story (after v0.24.0 read-scoping) by closing
 the write side. The dossier gate is generalized to `require_dossier_access` (own-or-system/admin,
@@ -285,7 +285,7 @@ bridge by-id reads inherit the parent-dossier check. Same non-leaking 404. No mi
   model (derive ownership from the session / reaction-project / compound owner) is left for the
   cross-module pass.
 
-## v0.24.0 — ComplianceCore: dossier reads are user-scoped (security; migration 0015) (2026-06-10)
+## v0.24.0 — Regentry: dossier reads are user-scoped (security; migration 0015) (2026-06-10)
 
 **Headline:** Regulatory dossier **reads** are now scoped to the creating user. A dossier
 carries a new `created_by_user_id` owner (set from the acting user at create; NULL for a
@@ -349,7 +349,7 @@ pre-audit) stay NULL = system-visible-only. **No request/response model changed*
   *list* of spectroscopy bridges is scoped here).
 - **Decision-support unchanged;** every dossier remains a draft requiring qualified review.
 
-## v0.23.6 — ComplianceCore: dossier project link is user-scoped (security) (2026-06-10)
+## v0.23.6 — Regentry: dossier project link is user-scoped (security) (2026-06-10)
 
 **Headline:** `create_dossier` / `patch_dossier` now validate a referenced `project_id`
 against the **acting user**. A bearer-token caller may only link a workspace project they
@@ -384,7 +384,7 @@ The happy path (linking your own project, or none) is unchanged.
 - No migration; no behaviour change to the authenticated happy path or to system-key /
   admin flows.
 
-## v0.23.5 — ComplianceCore: dossier-level nitrosamine cumulative-risk rollup (net-new) (2026-06-09)
+## v0.23.5 — Regentry: dossier-level nitrosamine cumulative-risk rollup (net-new) (2026-06-09)
 
 **Headline:** A **net-new** dossier sub-resource `GET /regulatory/dossiers/{id}/nitrosamine-cumulative-risk`
 that rolls every nitrosamine watch on a dossier up into one FDA-Rev-2 cumulative-risk
@@ -430,7 +430,7 @@ rollup. New response models `DossierNitrosamineCumulativeRisk`, `DossierNitrosam
   regulatory framework — cumulative risk + FDA Rev 2 are already in the papers — so no paper
   trigger fires yet; the user-visible surface (and its PDF rebuild) lands with the FE panel.
 
-## v0.23.4 — ComplianceCore: Q3D elemental-impurity dossier endpoint + product route (Phase 2c) (2026-06-09)
+## v0.23.4 — Regentry: Q3D elemental-impurity dossier endpoint + product route (Phase 2c) (2026-06-09)
 
 **Headline:** The final "override the legacy brains" piece — a **net-new** dossier
 sub-resource `POST /regulatory/dossiers/{id}/elemental-impurity-assessment` (+ GET list)
@@ -478,7 +478,7 @@ adds `regulatory_dossiers.route` (nullable) + `batch_regulatory_assessments.elem
 
 ---
 
-## v0.23.3 — ComplianceCore: product dose on the dossier; impurity-register via Q3A/B + M7 (Phase 2b) (2026-06-09)
+## v0.23.3 — Regentry: product dose on the dossier; impurity-register via Q3A/B + M7 (Phase 2b) (2026-06-09)
 
 **Headline:** The third hollow dossier endpoint is retrofitted, **integrated properly with
 the dossier domain model**. A dossier is one drug product with one max daily dose, so the
@@ -532,7 +532,7 @@ per-call override**; when omitted the dossier dose is used.
 
 ---
 
-## v0.23.2 — ComplianceCore: legacy dossier endpoints now compute via the engines (Phase 2a) (2026-06-09)
+## v0.23.2 — Regentry: legacy dossier endpoints now compute via the engines (Phase 2a) (2026-06-09)
 
 **Headline:** The existing dossier assessment endpoints stop being hollow — they now
 **compute via the deterministic engines** instead of regex flags / tenant rule-row
@@ -578,12 +578,12 @@ them. Backward‑compatible (no contract change): the tenant `*RuleORM` rows rem
 
 ---
 
-## v0.23.1 — ComplianceCore: unified Impurity Assessment endpoint (2026-06-09)
+## v0.23.1 — Regentry: unified Impurity Assessment endpoint (2026-06-09)
 
 **Headline:** `POST /regulatory/impurities/assess` exposes the five impurity engines as
 **one cohesive capability** — one drug-product context (dose, route, substance type,
 treatment duration) + optional impurity lists → **one unified report**. This is the
-first customer-facing surface for the ComplianceCore's Tier A, deliberately shaped as a
+first customer-facing surface for the Regentry's Tier A, deliberately shaped as a
 **single endpoint / single panel** (not five separate screens) to avoid UI clutter. FE
 handoff included.
 
@@ -632,7 +632,7 @@ regulatory basis + the per-engine content-hashed `rule_set_version`.
 
 ---
 
-## v0.23.0 — ComplianceCore: Nitrosamine CPCA classifier (Prompt 5, flagship) (2026-06-09)
+## v0.23.0 — Regentry: Nitrosamine CPCA classifier (Prompt 5, flagship) (2026-06-09)
 
 **Headline:** `classify_cpca` implements the **canonical FDA Carcinogenic Potency
 Categorization Approach (CPCA)** — a deterministic structure-activity flowchart that
@@ -705,7 +705,7 @@ were artifacts of the non-canonical scheme; NDMA/NDEA->1 were correct. The slide
   `fda.gov/media/170794/download`); FDA `featurize-nitrosamines`
   (`github.com/FDA/featurize-nitrosamines`); FDA Nitrosamine Guidance Rev 2 (Sept 2024).
 - **White papers — trigger assessed, deferred.** CPCA is the first *major customer-relevant*
-  capability in the ComplianceCore, but it is not yet customer-*exposed* (no API endpoint /
+  capability in the Regentry, but it is not yet customer-*exposed* (no API endpoint /
   UI). Per the white-paper maintenance matrix, the six white papers are updated when a
   capability becomes customer-facing; that update is deferred to the CPCA endpoint + FE
   handoff (the natural next step), at which point the nitrosamine-AI capability + measured
@@ -713,7 +713,7 @@ were artifacts of the non-canonical scheme; NDMA/NDEA->1 were correct. The slide
 
 ---
 
-## v0.22.4 — ComplianceCore: ICH M7(R2) mutagenic-impurity classifier (Prompt 4) (2026-06-08)
+## v0.22.4 — Regentry: ICH M7(R2) mutagenic-impurity classifier (Prompt 4) (2026-06-08)
 
 **Headline:** `classify_m7` assesses a potential impurity under ICH **M7(R2)** using
 the five-class scheme of Mueller et al. (2006): a DNA-reactive structural-alert
@@ -789,7 +789,7 @@ expert-review. Staged TTC by `duration_months`: ≤1 mo → 120, >1–12 mo → 
 
 ---
 
-## v0.22.3 — ComplianceCore: ICH Q3D(R2) elemental-impurity engine (Prompt 3) (2026-06-08)
+## v0.22.3 — Regentry: ICH Q3D(R2) elemental-impurity engine (Prompt 3) (2026-06-08)
 
 **Headline:** The third deterministic regulatory engine completes the ICH impurity
 trio (Q3A/B → Q3C → **Q3D**). `get_element_pde` returns the ICH **Q3D(R2)** permitted
@@ -858,7 +858,7 @@ confirmed with the user). Extend the table once those values are confirmed.
 
 ---
 
-## v0.22.2 — ComplianceCore: ICH Q3C(R8) residual-solvent classifier (Prompt 2) (2026-06-08)
+## v0.22.2 — Regentry: ICH Q3C(R8) residual-solvent classifier (Prompt 2) (2026-06-08)
 
 **Headline:** The second deterministic regulatory engine — `classify_solvent` assigns a
 residual solvent to ICH **Q3C(R8)** Class 1 (avoid), Class 2 (limit by permitted daily
@@ -925,7 +925,7 @@ from the official ICH Q3C(R8) source as needed; verify every value before filing
 
 ---
 
-## v0.22.1 — ComplianceCore: ICH Q3A/B impurity threshold calculator (Prompt 1) (2026-06-08)
+## v0.22.1 — Regentry: ICH Q3A/B impurity threshold calculator (Prompt 1) (2026-06-08)
 
 **Headline:** The first deterministic regulatory calculator — `calculate_q3ab_thresholds`
 computes ICH **Q3A(R2)** (drug substances) and **Q3B(R2)** (drug products) reporting,
@@ -976,9 +976,9 @@ qualification at `0.05%`.
 
 ---
 
-## v0.22.0 — ComplianceCore: Phase 0 foundation (Prompt 19) (2026-06-08)
+## v0.22.0 — Regentry: Phase 0 foundation (Prompt 19) (2026-06-08)
 
-**Headline:** Opens the **ComplianceCore** — MolTrace's second module (Roadmap
+**Headline:** Opens the **Regentry** — MolTrace's second module (Roadmap
 Phase 7), which turns SpectraCheck's confirmed structures / impurity peaks /
 purity into regulatory submission-**support** drafts (for qualified
 regulatory-affairs + toxicology review and sign-off, never finished filings).
@@ -1138,7 +1138,7 @@ model + champion/challenger A/B are in place and green.)
 - **`docs/spectracheck_output_contract.md`** — documents the **versioned,
   content-addressed SpectraCheck output contract** (schema `1.0.0`, the
   `schema_version` + `content_hash` + `contract` envelope, the field set, and the
-  semver bump policy) so the downstream **ComplianceCore** and **ReactionIQ**
+  semver bump policy) so the downstream **Regentry** and **ReactionIQ**
   modules can depend on SpectraCheck without breaking.
 - **`.github/workflows/ci-cd.yml`** — new **`deployment-gate`** job: it `needs`
   both test suites (so "tests green" is satisfied by construction), runs

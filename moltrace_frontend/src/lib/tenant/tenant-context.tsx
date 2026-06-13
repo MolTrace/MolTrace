@@ -46,7 +46,7 @@ export type TenantFeatureFlagRecord = {
 
 export type TenantModuleAccess = {
   key: "spectracheck" | "regulatory_hub" | "reaction_optimization"
-  label: "SpectraCheck" | "ComplianceCore" | "Reaction Optimization"
+  label: "SpectraCheck" | "Regentry" | "Reaction Optimization"
   enabled: boolean
 }
 
@@ -83,7 +83,7 @@ const LOCAL_TENANT: TenantRecord = {
 
 const CORE_MODULES: Omit<TenantModuleAccess, "enabled">[] = [
   { key: "spectracheck", label: "SpectraCheck" },
-  { key: "regulatory_hub", label: "ComplianceCore" },
+  { key: "regulatory_hub", label: "Regentry" },
   { key: "reaction_optimization", label: "Reaction Optimization" },
 ]
 

@@ -33,7 +33,7 @@ __all__ = [
     "render_gamp5_d11_template",
 ]
 
-_SYSTEM_NAME = "MolTrace ComplianceCore"
+_SYSTEM_NAME = "MolTrace Regentry"
 _INTENDED_USE_DEFAULT = (
     "Decision-support for regulatory impurity assessment and submission drafting. "
     "All quantitative and classification outputs are produced by a deterministic, "

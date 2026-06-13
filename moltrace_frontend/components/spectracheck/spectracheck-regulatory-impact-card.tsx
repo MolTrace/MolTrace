@@ -109,7 +109,7 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
       if (createdRec) setLastBridge(createdRec)
       await load()
     } catch (e) {
-      setErr(formatApiError(e, "Send evidence to ComplianceCore failed."))
+      setErr(formatApiError(e, "Send evidence to Regentry failed."))
     } finally {
       setSending(false)
     }
@@ -135,9 +135,9 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
           <InfoTooltip label="Regulatory impact" content={TOOLTIP} />
         </span>
       }
-      description="Bridge handoff to ComplianceCore for review-required action items. Decision support only — not legal advice."
+      description="Bridge handoff to Regentry for review-required action items. Decision support only — not legal advice."
       href="/spectracheck?program=regulatory_hub"
-      ctaLabel="Open ComplianceCore"
+      ctaLabel="Open Regentry"
     >
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-2">
@@ -174,7 +174,7 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
 
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" onClick={() => void sendToRegulatoryHub()} disabled={sending || !hasSession}>
-            {sending ? "Sending…" : "Send evidence to ComplianceCore"}
+            {sending ? "Sending…" : "Send evidence to Regentry"}
           </Button>
         </div>
 

@@ -254,9 +254,9 @@ export default function AutomationRoiDashboard() {
       <ModuleCard
         accent="violet"
         eyebrow="Programs"
-        title="ComplianceCore events"
+        title="Regentry events"
         icon={ListChecks}
-        description="Privacy-safe activity events tracked in ComplianceCore — only metadata such as dossier ID, jurisdiction, status, and review state. No regulatory questions, answers, or raw scientific payloads are recorded."
+        description="Privacy-safe activity events tracked in Regentry — only metadata such as dossier ID, jurisdiction, status, and review state. No regulatory questions, answers, or raw scientific payloads are recorded."
       >
         <div className="text-xs text-muted-foreground">
           <ul className="list-inside list-disc space-y-1">

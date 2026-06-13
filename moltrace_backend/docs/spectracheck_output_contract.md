@@ -6,7 +6,7 @@
 SpectraCheck is the **first** MolTrace module (Roadmap Phase 2 alpha) and the
 upstream source of truth for the downstream modules:
 
-- **ComplianceCore** — consumes confirmed structures + impurity /
+- **Regentry** — consumes confirmed structures + impurity /
   purity calls.
 - **ReactionIQ** — consumes analytical verification in the closed optimisation
   loop.

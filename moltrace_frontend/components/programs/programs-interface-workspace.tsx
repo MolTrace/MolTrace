@@ -92,7 +92,7 @@ export function ProgramsInterfaceWorkspace({
           value="regulatory_hub"
           className="font-mono data-[state=active]:[background-color:var(--mt-cyan)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
         >
-          ComplianceCore
+          Regentry
         </TabsTrigger>
         <TabsTrigger
           value="reaction_optimization"

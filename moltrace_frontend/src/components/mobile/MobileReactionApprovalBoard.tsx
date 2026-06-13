@@ -355,7 +355,7 @@ export function MobileReactionApprovalBoard({
             Confirm execution status
           </Button>
           <Button type="button" size="sm" className="w-full sm:w-auto" asChild>
-            <Link href={regulatoryHref}>View linked ComplianceCore constraint</Link>
+            <Link href={regulatoryHref}>View linked Regentry constraint</Link>
           </Button>
           <Button type="button" size="sm" variant="secondary" className="w-full sm:w-auto" asChild>
             <Link href={reactionHref}>Open full reaction view</Link>

@@ -131,11 +131,11 @@ describe("mobile QA", () => {
     expect(screen.getByText("SpectraCheck")).toBeInTheDocument()
   })
 
-  it("renders program order as SpectraCheck, ComplianceCore, Reaction Optimization", async () => {
+  it("renders program order as SpectraCheck, Regentry, Reaction Optimization", async () => {
     render(<MobileCommandCenter />)
     await waitFor(() => {
       expect(screen.getByText("1. SpectraCheck")).toBeInTheDocument()
-      expect(screen.getByText("2. ComplianceCore")).toBeInTheDocument()
+      expect(screen.getByText("2. Regentry")).toBeInTheDocument()
       expect(screen.getByText("3. Reaction Optimization")).toBeInTheDocument()
     })
   })

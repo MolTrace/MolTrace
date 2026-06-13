@@ -31,7 +31,7 @@ Raw FID → processed spectrum → peaks classified by category, with audit-grad
 - **FAISS spectrum retrieval** (Gaussian-smoothed 256-D encoding + HNSW index, Kuhn–Munkres set similarity) via `POST /spectrum/retrieve`, plus retrieval-augmented reasoning via `POST /spectrum/reason`.
 - **Quantitative integration and qNMR purity** (Sum / Edited Sum / Peaks; internal-standard + PULCON with GUM uncertainty), NUS reconstruction (IST-S baseline + optional JTF-Net), and a Fulmer/Gottlieb-backed solvent/impurity classifier.
 
-### ComplianceCore — ICH · FDA · EMA
+### Regentry — ICH · FDA · EMA
 *Route: `/regulatory-hub` (in-app: a tab in the Programs workspace)*
 
 Closes the loop between spectroscopy evidence and regulatory action: dossiers, traceability, an ALCOA+ audit ledger, and ICH Q2(R2) alignment. Every classification is deterministic and tied to a content-hashed `rule_set_version`.
@@ -52,7 +52,7 @@ Closes the loop between spectroscopy evidence and regulatory action: dossiers, t
 Turns regulatory action items into reaction-optimization constraints: Bayesian, ML-guided next-experiment recommendations under impurity limits.
 
 - **Gaussian-process surrogate modelling** with Bayesian multi-objective optimization (yield / selectivity / impurity level).
-- **Regulatory impurity constraints as hard limits**, fed directly from ComplianceCore.
+- **Regulatory impurity constraints as hard limits**, fed directly from Regentry.
 - **Uncertainty quantification** on each iteration with model-diagnostics.
 - **Automated next-experiment recommendations** over a batch of candidate experiments per optimization cycle.
 - A **compound-linking panel** and regulatory-constraints panel tie experiments back to the evidence trail.

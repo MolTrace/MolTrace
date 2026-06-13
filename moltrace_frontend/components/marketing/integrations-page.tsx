@@ -906,7 +906,7 @@ export function IntegrationsPage() {
                 The full three-pillar loop, end to end.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Integrations is what connects the dots. Spectroscopy, ComplianceCore, and
+                Integrations is what connects the dots. Spectroscopy, Regentry, and
                 ReactionIQ deliver value individually — together, through connectors, they're a
                 closed evidence loop that survives inspection and outlasts personnel.
               </p>
@@ -973,7 +973,7 @@ export function IntegrationsPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">ComplianceCore →</p>
+                    <p className="text-sm font-semibold">Regentry →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Consumes regulatory-feed diffs; emits eCTD submission packages outbound.
                     </p>

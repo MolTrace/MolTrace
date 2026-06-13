@@ -1,4 +1,4 @@
-"""Experiment / run tracking for the ComplianceCore (Prompt 19).
+"""Experiment / run tracking for the Regentry (Prompt 19).
 
 Each evaluation or training run logs its params, the :class:`RegulatoryMetricVector`
 (Prompt 17), the rule-set + model versions (Prompt 13), the corpus version
@@ -33,7 +33,7 @@ def regulatory_tracker(
     tracking_root: str = "moltrace_runs",
     backend: str = "auto",
 ) -> ExperimentTracker:
-    """A tracker scoped to the ComplianceCore experiment (native store by default)."""
+    """A tracker scoped to the Regentry experiment (native store by default)."""
 
     return ExperimentTracker(experiment=experiment, tracking_root=tracking_root, backend=backend)
 

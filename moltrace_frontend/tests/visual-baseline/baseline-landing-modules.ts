@@ -124,9 +124,9 @@ async function main() {
   r = await safe(async () => {
     await page.getByRole("button", { name: /^MODULE 02$/i }).first().click()
     await page.waitForTimeout(400)
-    await page.locator("text=ComplianceCore").first().waitFor({ timeout: 10_000 })
+    await page.locator("text=Regentry").first().waitFor({ timeout: 10_000 })
   })
-  record("Switching to Module 02 swaps to 'ComplianceCore'", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
+  record("Switching to Module 02 swaps to 'Regentry'", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
   // Switch back to Module 01
   r = await safe(async () => {

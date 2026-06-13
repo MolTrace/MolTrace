@@ -362,7 +362,7 @@ export function RegulatorySourceLibraryWorkspace() {
         <Button variant="ghost" size="sm" asChild>
           <Link href="/spectracheck?program=regulatory_hub">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            ComplianceCore
+            Regentry
           </Link>
         </Button>
         <Button variant="outline" size="sm" asChild>

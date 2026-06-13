@@ -538,10 +538,10 @@ export function RegulatoryIntelligenceLanding() {
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
             style={{ color: "var(--mt-cyan)" }}
           >
-            MolTrace · ComplianceCore
+            MolTrace · Regentry
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">
-            ComplianceCore
+            Regentry
           </h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
             Review impurity, qNMR, nitrosamine, and jurisdictional action cards. Promote evidence into dossiers and dispatch reviewer actions.

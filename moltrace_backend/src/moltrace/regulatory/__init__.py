@@ -1,6 +1,6 @@
-"""MolTrace ComplianceCore (Roadmap Phase 7) — the second module to ship.
+"""MolTrace Regentry (Roadmap Phase 7) — the second module to ship.
 
-ComplianceCore turns SpectraCheck's confirmed structures, impurity peaks, and
+Regentry turns SpectraCheck's confirmed structures, impurity peaks, and
 purity values into regulatory submission-**support** documentation — drafts for
 review and sign-off by qualified regulatory-affairs and toxicology professionals,
 **not** finished filings or regulatory determinations.

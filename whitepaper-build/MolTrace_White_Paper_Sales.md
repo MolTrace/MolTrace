@@ -21,7 +21,7 @@ Pharmaceutical R&D, CRO, and academic analytical teams operate at a paradox: ins
 MolTrace is the answer: an end-to-end, AI-native scientific intelligence platform that closes the loop from raw analytical data to audit-ready regulatory decisions. It is composed of three integrated programs sharing one evidence engine, one immutable raw-data vault, and one regulatory-provenance layer:
 
 - **SpectraCheck** — 40-layer NMR + MS evidence engine for 1H, 13C, 2D NMR, raw FID, HRMS, MS/MS, and LC-MS feature data.
-- **ComplianceCore** — dossier scaffolding aligned with ICH Q2(R2), the FDA's January 2025 AI Credibility Framework, and the EMA AI reflection paper.
+- **Regentry** — dossier scaffolding aligned with ICH Q2(R2), the FDA's January 2025 AI Credibility Framework, and the EMA AI reflection paper.
 - **Reaction Optimization** — Bayesian optimisation and ML-guided design-of-experiments, integrated with the same evidence trail.
 
 **The business outcome:** a typical 8-FTE pharma analytical team handling 600 analyses/year recoups roughly **$300K/year** in FTE time, compresses time-to-dossier by **60–80 %**, and achieves **> 98 %** report-from-raw reproducibility — while passing the inspector's "show me the raw bytes that produced this number" test with a single click.
@@ -88,7 +88,7 @@ The core of the platform is a **40-layer evidence stack** built incrementally an
 
 Every layer's output is a typed contract with stable JSON keys so downstream integrations stay green as new layers land.
 
-### 4.2 ComplianceCore
+### 4.2 Regentry
 
 Dossier scaffolding, FDA / EMA / ICH-aligned audit packs, human-in-the-loop release gating, and AI-supported regulatory-question / answer routing. Integrated with the SpectraCheck evidence trail so any claim in a dossier hyperlinks back to its source evidence layer. A one-screen **Impurity Assessment** turns a dose and a list of observed impurities into a single report across five deterministic engines — ICH Q3A/B thresholds, Q3C residual solvents, Q3D elemental impurities, M7 mutagenic impurities, and the FDA CPCA nitrosamine classification with cumulative risk — each line traceable to its regulatory basis and gated behind qualified-reviewer sign-off. A companion **Process Capability & Trending** view charts a parameter's batch-to-batch series — Cp/Cpk capability plus Western Electric / CUSUM / EWMA control signals — and flags drift *before* a specification breach, mapping to the FDA's Stage-3 Continued Process Verification expectation; like every regulatory output it is decision-support behind reviewer sign-off, never a disposition.
 
@@ -116,7 +116,7 @@ MolTrace's regulatory posture is anchored in three external frameworks and reinf
 
 **EMA Reflection Paper on AI.** Reproducibility, human-in-the-loop, version control — all satisfied through MolTrace's human-review release gate, immutable raw archive, and versioned report records.
 
-**ICH Q2(R2) Validation of Analytical Procedures.** Expanded data-integrity acceptance criteria map onto MolTrace's `audit_events` ledger, immutable raw vault, recipe-hash-linked processing runs, and ALCOA+ data-integrity primitives. Each analysis also produces a deterministic ICH Q2(R2) report stub — keyed to the analysis's content hash — as the evidence handoff to the ComplianceCore.
+**ICH Q2(R2) Validation of Analytical Procedures.** Expanded data-integrity acceptance criteria map onto MolTrace's `audit_events` ledger, immutable raw vault, recipe-hash-linked processing runs, and ALCOA+ data-integrity primitives. Each analysis also produces a deterministic ICH Q2(R2) report stub — keyed to the analysis's content hash — as the evidence handoff to the Regentry.
 
 **GAMP 5 (Appendix D11) validation acceleration.** For teams running a risk-based Computerised System Validation, MolTrace generates a versioned, byte-reproducible GAMP 5 Appendix D11 CSV document skeleton (intended use, GxP-risk class, requirements-traceability matrix, IQ/OQ/PQ evidence slots). It accelerates the customer's validation; the overall compliance determination stays with the regulated user.
 

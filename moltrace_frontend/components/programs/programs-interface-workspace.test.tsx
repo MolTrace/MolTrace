@@ -22,7 +22,7 @@ vi.mock("@/components/ai/ai-module-prediction-augmentation", () => ({
 }))
 
 vi.mock("@/components/regulatory-hub/regulatory-intelligence-landing", () => ({
-  RegulatoryIntelligenceLanding: () => <section>ComplianceCore workspace placeholder</section>,
+  RegulatoryIntelligenceLanding: () => <section>Regentry workspace placeholder</section>,
 }))
 
 vi.mock("@/components/reaction-optimization/reaction-program-interface-workspace", () => ({
@@ -78,7 +78,7 @@ describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
     invalidateSpectraCheckSessionReadCache()
   })
 
-  it("logs privacy-safe core module openings for SpectraCheck, ComplianceCore, and ReactionIQ", async () => {
+  it("logs privacy-safe core module openings for SpectraCheck, Regentry, and ReactionIQ", async () => {
     const user = userEvent.setup()
     render(<ProgramsInterfaceWorkspace />)
 
@@ -93,7 +93,7 @@ describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
       ).toBe(true)
     })
 
-    await user.click(screen.getByRole("tab", { name: /^ComplianceCore$/i }))
+    await user.click(screen.getByRole("tab", { name: /^Regentry$/i }))
     await user.click(screen.getByRole("tab", { name: /^ReactionIQ$/i }))
 
     await waitFor(() => {
@@ -124,8 +124,8 @@ describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
     })
     expect(screen.getAllByText("program-processed.jdx").length).toBeGreaterThan(0)
 
-    await user.click(screen.getByRole("tab", { name: /^ComplianceCore$/i }))
-    expect(screen.getByText("ComplianceCore workspace placeholder")).toBeInTheDocument()
+    await user.click(screen.getByRole("tab", { name: /^Regentry$/i }))
+    expect(screen.getByText("Regentry workspace placeholder")).toBeInTheDocument()
 
     await user.click(screen.getByRole("tab", { name: /^ReactionIQ$/i }))
     expect(screen.getByText("ReactionIQ workspace placeholder")).toBeInTheDocument()
