@@ -392,7 +392,7 @@ def test_deployment_gate_cli_self_check_and_modes():
 # Criterion 4: versioned output contract documented for downstream modules
 # --------------------------------------------------------------------------- #
 def test_output_contract_is_versioned_and_addressable():
-    # The contract downstream modules (Regentry, ReactionIQ) depend on is
+    # The contract downstream modules (Regentry, Repho) depend on is
     # versioned and content-addressed; pin the schema version + envelope shape.
     assert SCHEMA_VERSION == "1.0.0"
     contract = build_spectracheck_contract(

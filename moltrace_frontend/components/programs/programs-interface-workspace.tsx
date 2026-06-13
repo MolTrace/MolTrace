@@ -98,7 +98,7 @@ export function ProgramsInterfaceWorkspace({
           value="reaction_optimization"
           className="font-mono data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
         >
-          ReactionIQ
+          Repho
         </TabsTrigger>
       </TabsList>
 

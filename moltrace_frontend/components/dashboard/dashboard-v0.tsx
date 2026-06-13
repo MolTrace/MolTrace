@@ -1332,7 +1332,7 @@ export function DashboardV0() {
               <div>
                 <p className="text-xs font-medium uppercase text-muted-foreground">Core module activity</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Live opens logged from SpectraCheck, Regentry, and ReactionIQ in this testing phase.
+                  Live opens logged from SpectraCheck, Regentry, and Repho in this testing phase.
                 </p>
               </div>
               <Badge variant="outline" className="w-fit">

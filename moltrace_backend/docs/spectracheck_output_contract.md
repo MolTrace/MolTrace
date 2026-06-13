@@ -8,7 +8,7 @@ upstream source of truth for the downstream modules:
 
 - **Regentry** — consumes confirmed structures + impurity /
   purity calls.
-- **ReactionIQ** — consumes analytical verification in the closed optimisation
+- **Repho** — consumes analytical verification in the closed optimisation
   loop.
 
 So that those modules can depend on SpectraCheck **without breaking when the

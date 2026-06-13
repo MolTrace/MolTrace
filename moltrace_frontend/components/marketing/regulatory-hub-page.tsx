@@ -334,7 +334,7 @@ const CROSS_MODULE_LOOP: LoopStep[] = [
     body: "Observed concentration below 5000 ppm threshold — informational only. Dossier section 3.2.S.3.2 updated; no human review queued.",
   },
   {
-    step: "ReactionIQ constraint",
+    step: "Repho constraint",
     body: "Impurity limit auto-propagates as a Bayesian prior on the next reaction run. Audit ledger records the cross-module handoff.",
   },
 ]
@@ -866,7 +866,7 @@ export function RegulatoryHubPage() {
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 The acetic-acid impurity from SpectraCheck's worked example — followed all the way
-                through regulatory routing and back into ReactionIQ as a constraint on the next
+                through regulatory routing and back into Repho as a constraint on the next
                 run. Audit ledger records every handoff.
               </p>
             </div>
@@ -934,7 +934,7 @@ export function RegulatoryHubPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">ReactionIQ →</p>
+                    <p className="text-sm font-semibold">Repho →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Receives the impurity limit as a Bayesian prior on the next reaction recipe.
                     </p>

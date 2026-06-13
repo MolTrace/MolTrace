@@ -26,7 +26,7 @@ vi.mock("@/components/regulatory-hub/regulatory-intelligence-landing", () => ({
 }))
 
 vi.mock("@/components/reaction-optimization/reaction-program-interface-workspace", () => ({
-  ReactionProgramInterfaceWorkspace: () => <section>ReactionIQ workspace placeholder</section>,
+  ReactionProgramInterfaceWorkspace: () => <section>Repho workspace placeholder</section>,
 }))
 
 vi.mock("@/src/components/mobile/MobileSpectraCheckReview", () => ({
@@ -78,7 +78,7 @@ describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
     invalidateSpectraCheckSessionReadCache()
   })
 
-  it("logs privacy-safe core module openings for SpectraCheck, Regentry, and ReactionIQ", async () => {
+  it("logs privacy-safe core module openings for SpectraCheck, Regentry, and Repho", async () => {
     const user = userEvent.setup()
     render(<ProgramsInterfaceWorkspace />)
 
@@ -94,7 +94,7 @@ describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
     })
 
     await user.click(screen.getByRole("tab", { name: /^Regentry$/i }))
-    await user.click(screen.getByRole("tab", { name: /^ReactionIQ$/i }))
+    await user.click(screen.getByRole("tab", { name: /^Repho$/i }))
 
     await waitFor(() => {
       const openedModules = analyticsPayloads()
@@ -127,8 +127,8 @@ describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
     await user.click(screen.getByRole("tab", { name: /^Regentry$/i }))
     expect(screen.getByText("Regentry workspace placeholder")).toBeInTheDocument()
 
-    await user.click(screen.getByRole("tab", { name: /^ReactionIQ$/i }))
-    expect(screen.getByText("ReactionIQ workspace placeholder")).toBeInTheDocument()
+    await user.click(screen.getByRole("tab", { name: /^Repho$/i }))
+    expect(screen.getByText("Repho workspace placeholder")).toBeInTheDocument()
 
     await user.click(screen.getByRole("tab", { name: /^SpectraCheck$/i }))
     await user.click(screen.getByRole("tab", { name: /Raw FID upload/i }))

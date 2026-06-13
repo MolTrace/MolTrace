@@ -46,7 +46,7 @@ Closes the loop between spectroscopy evidence and regulatory action: dossiers, t
 - **Owner-scoped dossiers.** Dossier reads and writes are scoped per user (a system key or admin is unrestricted); a non-owner gets a non-leaking 404, so dossier evidence stays isolated.
 - Two **zero-tolerance hard gates** guard the engine: calculation error rate must be 0 and formula coverage must be 100%.
 
-### ReactionIQ — Reaction Optimization
+### Repho — Reaction Optimization
 *Route: `/reaction-optimization`*
 
 Turns regulatory action items into reaction-optimization constraints: Bayesian, ML-guided next-experiment recommendations under impurity limits.

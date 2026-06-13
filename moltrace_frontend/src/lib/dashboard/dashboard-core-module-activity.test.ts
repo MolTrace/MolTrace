@@ -62,7 +62,7 @@ describe("fetchDashboardCoreModuleActivity", () => {
         },
         {
           module: "reactioniq",
-          label: "ReactionIQ",
+          label: "Repho",
           count: 2,
           latestAt: "2026-05-20T12:15:00Z",
         },
@@ -80,7 +80,7 @@ describe("fetchDashboardCoreModuleActivity", () => {
       rows: [
         { module: "spectracheck", label: "SpectraCheck", count: 0, latestAt: null },
         { module: "regulatory_hub", label: "Regentry", count: 0, latestAt: null },
-        { module: "reactioniq", label: "ReactionIQ", count: 0, latestAt: null },
+        { module: "reactioniq", label: "Repho", count: 0, latestAt: null },
       ],
     })
   })

@@ -14,7 +14,7 @@ processed-spectrum pipelines remain authoritative.
 - Processed 1H and 13C spectra must remain untouched by raw-FID promotion work.
 - Raw-FID upload vault records must remain immutable. Promotion may create
   derived metadata, but it must never rewrite uploaded archives.
-- Regentry and ReactionIQ behavior must not change as a side effect of
+- Regentry and Repho behavior must not change as a side effect of
   SpectraCheck raw-FID work.
 - The existing industry-standard visible raw-FID spectrum remains the fallback at every
   stage.
@@ -124,7 +124,7 @@ Required extra checks:
 
 - rollback to `legacy` can be done by configuration only.
 - analytics distinguish legacy, sidecar, candidate, and fallback paths.
-- dashboard, Regentry, and ReactionIQ regressions remain green.
+- dashboard, Regentry, and Repho regressions remain green.
 
 ### Stage 4: Default Promotion
 
@@ -145,7 +145,7 @@ Every promotion pull request must show:
 - processed 1H and 13C screenshots are unchanged.
 - peak count, ppm alignment, phase, baseline, and runtime gates are summarized.
 - failure fallback to legacy is tested.
-- Regentry and ReactionIQ smoke paths are unaffected.
+- Regentry and Repho smoke paths are unaffected.
 
 ## Rollback Plan
 

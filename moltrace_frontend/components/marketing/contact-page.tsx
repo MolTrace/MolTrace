@@ -43,7 +43,7 @@ const CHANNELS: Channel[] = [
     icon: Sparkles,
     eyebrow: "Sales · Demos",
     title: "See MolTrace in action",
-    description: "Walk through SpectraCheck, the Regentry, and ReactionIQ with our solutions team.",
+    description: "Walk through SpectraCheck, the Regentry, and Repho with our solutions team.",
     email: "sales@moltrace.com",
     responseTime: "Within 1 business day",
   },

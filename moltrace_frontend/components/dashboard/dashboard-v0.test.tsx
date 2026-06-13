@@ -116,7 +116,7 @@ vi.mock("@/src/lib/dashboard/dashboard-core-module-activity", () => ({
       },
       {
         module: "reactioniq",
-        label: "ReactionIQ",
+        label: "Repho",
         count: 2,
         latestAt: "2026-05-20T12:10:00Z",
       },
@@ -176,7 +176,7 @@ describe("DashboardV0 connector/ingestion fallback", () => {
       expect(screen.getByText("Core module activity")).toBeInTheDocument()
       expect(screen.getByText("SpectraCheck")).toBeInTheDocument()
       expect(screen.getByText("Regentry")).toBeInTheDocument()
-      expect(screen.getByText("ReactionIQ")).toBeInTheDocument()
+      expect(screen.getByText("Repho")).toBeInTheDocument()
       expect(screen.getByText("5 opens")).toBeInTheDocument()
     })
   })

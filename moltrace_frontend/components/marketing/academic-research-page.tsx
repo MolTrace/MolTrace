@@ -42,7 +42,7 @@ import { Header } from "@/components/marketing/header"
  *
  * Distinct visual identity vs the other solution/module pages:
  *   - Rose hero badge (Pharma=indigo, Spectroscopy=emerald,
- *     Regulatory=cyan, ReactionIQ=violet, Integrations=amber).
+ *     Regulatory=cyan, Repho=violet, Integrations=amber).
  *   - Hero visual is a live PUBLICATION-REPRODUCIBILITY card — an
  *     auto-generated methods / supporting-information snapshot — not a
  *     lifecycle rail, layer stack, or audit ledger.
@@ -197,7 +197,7 @@ const WORKFLOWS: UseCase[] = [
     icon: FlaskConical,
     name: "Methodology & reaction screening",
     blurb:
-      "Methodology groups developing new reactions use ReactionIQ to plan screens by Bayesian optimization over yield and selectivity — fewer reactions to find the conditions worth publishing.",
+      "Methodology groups developing new reactions use Repho to plan screens by Bayesian optimization over yield and selectivity — fewer reactions to find the conditions worth publishing.",
     inputs: "Reaction recipe · objectives · constraints",
     outputs: "Next experiment · Pareto front · rationale",
   },
@@ -832,7 +832,7 @@ export function AcademicResearchPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">ReactionIQ →</p>
+                    <p className="text-sm font-semibold">Repho →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Plan methodology screens with fewer reactions to publishable conditions.
                     </p>

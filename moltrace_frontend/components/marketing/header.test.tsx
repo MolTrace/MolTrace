@@ -64,7 +64,7 @@ describe("Marketing Header — mobile sidebar refresh", () => {
     // Platform items
     expect(within(sidebar).getByText("SpectraCheck")).toBeInTheDocument()
     expect(within(sidebar).getByText("Regentry")).toBeInTheDocument()
-    expect(within(sidebar).getByText("ReactionIQ")).toBeInTheDocument()
+    expect(within(sidebar).getByText("Repho")).toBeInTheDocument()
     expect(within(sidebar).getByText("Integrations")).toBeInTheDocument()
 
     // Solutions items

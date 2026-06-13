@@ -47,7 +47,7 @@ import { Header } from "@/components/marketing/header"
  *
  * Distinct visual identity vs every other page:
  *   - Blue hero badge (Pharma=indigo, Academic=rose, CRO=orange,
- *     Spectroscopy=emerald, Regentry=cyan, ReactionIQ=violet,
+ *     Spectroscopy=emerald, Regentry=cyan, Repho=violet,
  *     Integrations=amber).
  *   - Hero visual is a live SUBMISSION / CTD-dossier checklist card with
  *     jurisdiction chips — not the module page's audit-ledger event.
