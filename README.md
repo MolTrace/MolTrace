@@ -52,7 +52,7 @@ Closes the loop between spectroscopy evidence and regulatory action: dossiers, t
 Turns regulatory action items into reaction-optimization constraints: Bayesian, ML-guided next-experiment recommendations under impurity limits.
 
 - **Gaussian-process surrogate modelling** with Bayesian multi-objective optimization (yield / selectivity / impurity level).
-- **Regulatory impurity constraints as hard limits**, fed directly from the ComplianceCore.
+- **Regulatory impurity constraints as hard limits**, fed directly from ComplianceCore.
 - **Uncertainty quantification** on each iteration with model-diagnostics.
 - **Automated next-experiment recommendations** over a batch of candidate experiments per optimization cycle.
 - A **compound-linking panel** and regulatory-constraints panel tie experiments back to the evidence trail.
