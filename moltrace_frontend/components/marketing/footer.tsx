@@ -16,7 +16,7 @@ const navigation = {
     // are linked from each module page directly.
     { name: "SpectraCheck", href: "/spectroscopy" },
     { name: "ComplianceCore", href: "/regulatory-hub" },
-    { name: "Reaction Optimization", href: "/reaction-optimization" },
+    { name: "ReactionIQ", href: "/reaction-optimization" },
     { name: "Integrations", href: "/integrations" },
   ],
   // All four Company links are in-app routes so the manifesto / careers /
