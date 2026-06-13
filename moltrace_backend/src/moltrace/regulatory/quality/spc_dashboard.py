@@ -742,16 +742,20 @@ def analyze_series(
     *,
     rule_set: str = "nelson",
     warn_within_sigma: float = 1.0,
+    subgroup_size: int | None = None,
 ) -> TrendingReport:
     """Run capability + SPC + CUSUM/EWMA over *series* and raise pre-OOS trending alerts.
 
     The value of SPC trending is that drift/shift signals fire while points are still within
     specification — an early warning *before* an OOS event. ``warn_within_sigma`` controls the
-    proximity alert when the latest point is in-spec but within that many sigma of a limit.
+    proximity alert when the latest point is in-spec but within that many sigma of a limit;
+    ``subgroup_size`` is passed through to the capability calculation.
     """
 
     values = series.values()
-    cap = calculate_capability_indices(values, series.usl, series.lsl, series.target)
+    cap = calculate_capability_indices(
+        values, series.usl, series.lsl, series.target, subgroup_size=subgroup_size
+    )
     cl, sd = cap.mean, cap.sigma_within
 
     spc = tuple(detect_spc_signals(values, rule_set, center=cl, sigma=sd)) if sd > 0 else ()
