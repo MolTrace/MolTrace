@@ -69,6 +69,7 @@ import { RegulatoryDossierKnowledgeLinksCard } from "@/components/knowledge/know
 import { RegulatoryNotificationsCompactCard } from "@/components/regulatory-hub/regulatory-notifications-compact-card"
 import { RegulatoryActionQueue, RegulatoryActionQueueCard } from "@/components/regulatory-hub/regulatory-action-queue"
 import { BatchRegulatoryAssessmentPanel } from "@/components/regulatory-hub/batch-regulatory-assessment-panel"
+import { SPCProcessCapabilityPanel } from "@/components/regulatory-hub/spc-process-capability-panel"
 import { ReactionOptimizationHandoffCard } from "@/components/regulatory-hub/reaction-optimization-handoff-card"
 import { CtdModule3BundleCard } from "@/components/regulatory-hub/ctd-module3-bundle-card"
 
@@ -234,7 +235,7 @@ const DOSSIER_NAV: DossierNavGroup[] = [
   { id: "overview", label: "Overview", sections: ["overview"] },
   { id: "requirements", label: "Requirements & Evidence", sections: ["requirements", "evidence", "compliance-rules"] },
   { id: "impurity-safety", label: "Impurity & Safety", sections: ["impurity-register", "residual-solvents", "nitrosamine-watch"] },
-  { id: "quality", label: "Quality & Governance", sections: ["qnmr-method-validation", "ai-governance"] },
+  { id: "quality", label: "Quality & Governance", sections: ["qnmr-method-validation", "process-capability", "ai-governance"] },
   { id: "jurisdiction", label: "Jurisdiction", sections: ["jurisdictional-map", "change-impact"] },
   { id: "review", label: "Review & Readiness", sections: ["action-items", "qa", "risk", "review", "readiness"] },
   { id: "submission", label: "Submission", sections: ["submission-package"] },
@@ -252,6 +253,7 @@ const DOSSIER_SECTION_LABEL: Record<string, string> = {
   "residual-solvents": "Residual Solvent",
   "nitrosamine-watch": "Nitrosamine Watch",
   "qnmr-method-validation": "qNMR / Method Validation",
+  "process-capability": "Process Capability",
   "ai-governance": "AI Governance",
   "jurisdictional-map": "Jurisdictional Map",
   "change-impact": "Change Impact",
@@ -4880,6 +4882,24 @@ export function RegulatoryDossierWorkspace() {
                 onReviewed={refreshAiDecisions}
               />
             ) : null}
+          </TabsContent>
+
+          <TabsContent value="process-capability" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-cyan)" }}
+              >
+                Dossier · Process Capability
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Process capability &amp; SPC trending</h2>
+              <p className="text-sm text-muted-foreground">
+                Control-chart a measurement series for one parameter — capability indices (Cp/Cpk/Pp/Ppk/Cpm) and
+                Shewhart / CUSUM / EWMA signals catch drift before a specification breach. Caller-supplied data;
+                decision-support only.
+              </p>
+            </div>
+            <SPCProcessCapabilityPanel />
           </TabsContent>
 
           <TabsContent value="jurisdictional-map" className="min-w-0 max-w-full space-y-6">
