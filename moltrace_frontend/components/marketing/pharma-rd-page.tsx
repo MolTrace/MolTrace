@@ -36,7 +36,7 @@ import { Header } from "@/components/marketing/header"
  *
  * Solution pages differ from the Platform module pages by AXIS:
  *   - Platform pages answer "what does this module do?" (Spectroscopy,
- *     Regulatory Hub, ReactionIQ, Integrations).
+ *     ComplianceCore, ReactionIQ, Integrations).
  *   - Solution pages answer "what does MolTrace do for ME?" — they are
  *     audience-first, organised around a persona's jobs-to-be-done and
  *     the lifecycle they live in.
@@ -54,7 +54,7 @@ import { Header } from "@/components/marketing/header"
  *
  * All content grounded in real MolTrace capabilities: the 40-layer
  * evidence stack, SpectraCheck cross-modal confirmation, the ICH-aware
- * Regulatory Hub, ReactionIQ Bayesian optimization, recipe-hash
+ * ComplianceCore, ReactionIQ Bayesian optimization, recipe-hash
  * provenance, and the published validation numbers (94.4% solvent
  * auto-detect, 8.5× dense-¹³C speedup, ALCOA+ ledger).
  */
@@ -290,7 +290,7 @@ const WORKED_EXAMPLE: LoopStep[] = [
     body: "A peak at 2.10 ppm is auto-classified as acetic acid (residual), 93% confidence, and HRMS corroborates the implied formula. No mis-assignment slips through.",
   },
   {
-    step: "Regulatory Hub classifies",
+    step: "ComplianceCore classifies",
     body: "ICH Q3C: acetic acid is Class 3, no action below 5000 ppm. The finding lands in dossier section 3.2.S.3.2 as informational — no human review queued.",
   },
   {
@@ -850,7 +850,7 @@ export function PharmaRdPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">Regulatory Hub →</p>
+                    <p className="text-sm font-semibold">ComplianceCore →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Routes the finding to ICH classes and drafts the dossier section.
                     </p>

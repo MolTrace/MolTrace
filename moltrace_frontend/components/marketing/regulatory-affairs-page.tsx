@@ -34,7 +34,7 @@ import { Header } from "@/components/marketing/header"
  * /regulatory-affairs. Fourth of the four "Solutions" header pages.
  *
  * IMPORTANT — this is the PERSONA page, deliberately distinct from the
- * Regulatory Intelligence Hub MODULE page (/regulatory-hub):
+ * ComplianceCore MODULE page (/regulatory-hub):
  *   - /regulatory-hub answers "how does the module work?" — its
  *     Map→Classify→Assess→Cite→Compose→Sign→Ledger pipeline, the
  *     frameworks matrix, the anatomy of an ALCOA+ ledger entry.
@@ -47,7 +47,7 @@ import { Header } from "@/components/marketing/header"
  *
  * Distinct visual identity vs every other page:
  *   - Blue hero badge (Pharma=indigo, Academic=rose, CRO=orange,
- *     Spectroscopy=emerald, Regulatory Hub=cyan, ReactionIQ=violet,
+ *     Spectroscopy=emerald, ComplianceCore=cyan, ReactionIQ=violet,
  *     Integrations=amber).
  *   - Hero visual is a live SUBMISSION / CTD-dossier checklist card with
  *     jurisdiction chips — not the module page's audit-ledger event.
@@ -291,7 +291,7 @@ const WORKED_EXAMPLE: LoopStep[] = [
   },
   {
     step: "It classifies itself",
-    body: "The Regulatory Hub maps it to ICH Q3C Class 3 (no action below 5000 ppm) and slots it into dossier section 3.2.S.3.2 with the reference shift, observed shift, and delta cited.",
+    body: "The ComplianceCore maps it to ICH Q3C Class 3 (no action below 5000 ppm) and slots it into dossier section 3.2.S.3.2 with the reference shift, observed shift, and delta cited.",
   },
   {
     step: "The section drafts",
@@ -394,7 +394,7 @@ export function RegulatoryAffairsPage() {
                   </Button>
                   <Button asChild size="lg" variant="outline" className="gap-2">
                     <Link href="/regulatory">
-                      Open Regulatory Hub
+                      Open ComplianceCore
                       <PlayCircle className="h-4 w-4" />
                     </Link>
                   </Button>
@@ -844,7 +844,7 @@ export function RegulatoryAffairsPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">Regulatory Intelligence Hub →</p>
+                    <p className="text-sm font-semibold">ComplianceCore →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       The module you'll live in — pipeline, frameworks, and the ALCOA+ ledger.
                     </p>
@@ -976,7 +976,7 @@ export function RegulatoryAffairsPage() {
                 </Button>
                 <Button asChild size="lg" variant="outline" className="gap-2">
                   <Link href="/regulatory-hub">
-                    Explore Regulatory Hub
+                    Explore ComplianceCore
                     <Workflow className="h-4 w-4" />
                   </Link>
                 </Button>

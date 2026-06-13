@@ -136,7 +136,7 @@ async function main() {
 
   // After redesign: search shows real-data groups OR a Quick navigation fallback
   // Quick navigation entries always present
-  for (const item of ["Open SpectraCheck", "Open Regulatory Hub", "Open Reaction Optimization"]) {
+  for (const item of ["Open SpectraCheck", "Open ComplianceCore", "Open Reaction Optimization"]) {
     r = await safe(() => page.locator(`text=${item}`).first().waitFor({ timeout: 5_000 }))
     record(`Search 'Quick navigation' entry "${item}" present`, r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
   }

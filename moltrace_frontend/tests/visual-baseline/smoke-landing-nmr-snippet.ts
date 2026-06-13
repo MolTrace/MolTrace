@@ -432,8 +432,8 @@ async function main() {
   })
   record("Switching to Module 02 hides explore overlay (useEffect cleanup)", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
-  r = await safe(() => page.locator("text=Regulatory Intelligence Hub").first().waitFor({ timeout: 10_000 }))
-  record("Module 02 still renders 'Regulatory Intelligence Hub'", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
+  r = await safe(() => page.locator("text=ComplianceCore").first().waitFor({ timeout: 10_000 }))
+  record("Module 02 still renders 'ComplianceCore'", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
   r = await safe(async () => {
     await page.getByRole("button", { name: /^MODULE 01$/i }).first().click()

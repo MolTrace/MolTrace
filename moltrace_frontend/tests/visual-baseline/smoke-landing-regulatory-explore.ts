@@ -1,6 +1,6 @@
 #!/usr/bin/env -S pnpm tsx
 /**
- * Smoke test for the Regulatory Intelligence Hub "Explore Module" overlay.
+ * Smoke test for the ComplianceCore "Explore Module" overlay.
  *
  * The overlay opens when "Explore Module" is clicked on Module 02 (Regulatory).
  * Composed of:
@@ -69,7 +69,7 @@ async function gotoLandingHydrated(page: Page) {
 
 async function switchToRegulatory(page: Page) {
   await page.getByRole("button", { name: /^MODULE 02$/i }).first().click()
-  await page.locator("text=Regulatory Intelligence Hub").first().waitFor({ timeout: 10_000 })
+  await page.locator("text=ComplianceCore").first().waitFor({ timeout: 10_000 })
   await page.waitForTimeout(400)
 }
 
@@ -82,7 +82,7 @@ async function clickExploreOnActive(page: Page) {
   await exploreBtn.click()
   // Wait for the regulatory region to mount before continuing.
   await page
-    .locator('[role="region"][aria-label*="Regulatory Intelligence Hub"]')
+    .locator('[role="region"][aria-label*="ComplianceCore"]')
     .first()
     .waitFor({ timeout: 10_000 })
   await page.waitForTimeout(400)
@@ -127,9 +127,9 @@ async function main() {
   record("Headline 'Built-in Compliance and Safety.' rendered", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
   r = await safe(() =>
-    page.locator("text=/Regulatory Intelligence Hub · Live preview/i").first().waitFor({ timeout: 10_000 }),
+    page.locator("text=/ComplianceCore · Live preview/i").first().waitFor({ timeout: 10_000 }),
   )
-  record("Eyebrow 'Regulatory Intelligence Hub · Live preview' rendered", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
+  record("Eyebrow 'ComplianceCore · Live preview' rendered", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
   r = await safe(() =>
     page.locator("text=/QA-RAG grounds every answer in your regulatory corpus/i").first().waitFor({ timeout: 10_000 }),

@@ -331,7 +331,7 @@ export function InstrumentWatchFolderWorkspace() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Instrument Watch Folder</h1>
         <p className="text-sm text-muted-foreground">
-          Configure watch folders for connector-driven ingestion into SpectraCheck, Regulatory Hub, and Reaction Optimization.
+          Configure watch folders for connector-driven ingestion into SpectraCheck, ComplianceCore, and Reaction Optimization.
         </p>
       </div>
 

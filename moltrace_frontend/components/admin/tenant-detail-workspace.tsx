@@ -66,10 +66,10 @@ type SectionState = {
 
 const EMPTY_SECTION: SectionState = { payload: null, error: "" }
 
-const PROGRAM_ORDER = ["SpectraCheck", "Regulatory Hub", "Reaction Optimization"] as const
+const PROGRAM_ORDER = ["SpectraCheck", "ComplianceCore", "Reaction Optimization"] as const
 const ENTITLEMENT_PROGRAM_ORDER = [
   { label: "SpectraCheck", values: ["spectracheck"] },
-  { label: "Regulatory Hub", values: ["regulatory_hub"] },
+  { label: "ComplianceCore", values: ["regulatory_hub"] },
   { label: "Reaction Optimization", values: ["reaction_optimization"] },
   { label: "Validation Center", values: ["validation_center"] },
   { label: "Connectors", values: ["connectors"] },
@@ -139,7 +139,7 @@ const IMPLEMENTATION_TASK_PROGRAM_OPTIONS = [
 ] as const
 const DEFAULT_TASK_DISPLAY_ORDER = [
   "SpectraCheck setup",
-  "Regulatory Hub setup",
+  "ComplianceCore setup",
   "Reaction Optimization setup",
 ] as const
 const DATA_BOUNDARY_ISOLATION_OPTIONS = [
@@ -2098,7 +2098,7 @@ function UsageRoiPanel({
         />
         <UsageProgramCard
           order={2}
-          title="Regulatory Hub usage"
+          title="ComplianceCore usage"
           usage={regulatoryUsage}
           metrics={[
             {

@@ -73,8 +73,8 @@ describe("Marketing Footer", () => {
       // ── Platform ────────────────────────────────────────────────────
       // Spectroscopy is in-app at /spectroscopy (the SpectraCheck overview).
       ["Spectroscopy", "/spectroscopy"],
-      // Regulatory Intelligence Hub is in-app at /regulatory-hub.
-      ["Regulatory Intelligence Hub", "/regulatory-hub"],
+      // ComplianceCore is in-app at /regulatory-hub.
+      ["ComplianceCore", "/regulatory-hub"],
       // Reaction Optimization is in-app at /reaction-optimization.
       ["Reaction Optimization", "/reaction-optimization"],
       // Integrations is in-app at /integrations.

@@ -37,7 +37,7 @@ afterEach(() => {
 })
 
 describe("program auth copy", () => {
-  it("uses sanitized auth copy on Regulatory Hub backend failures", async () => {
+  it("uses sanitized auth copy on ComplianceCore backend failures", async () => {
     render(<RegulatoryIntelligenceLanding />)
 
     expect((await screen.findAllByText(LIVE_DATA_AUTH_COPY)).length).toBeGreaterThan(0)

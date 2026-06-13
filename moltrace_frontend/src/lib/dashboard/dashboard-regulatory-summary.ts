@@ -40,7 +40,7 @@ export type DashboardRegulatorySummary =
 
 /**
  * GET /regulatory/dossiers plus lightweight per-dossier requirement and risk GETs
- * (same derivation as Regulatory Intelligence landing summaries).
+ * (same derivation as ComplianceCore landing summaries).
  */
 export async function fetchDashboardRegulatorySummary(): Promise<DashboardRegulatorySummary> {
   try {

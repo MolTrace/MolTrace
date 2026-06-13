@@ -47,7 +47,7 @@ export const ROUTES: Route[] = [
   { name: "40-reactions", path: "/reactions", accent: "violet" },
   { name: "41-reactions-studio", path: "/reactions/studio", accent: "violet" },
 
-  // Regulatory Hub (cyan)
+  // ComplianceCore (cyan)
   { name: "50-regulatory", path: "/regulatory", accent: "cyan" },
   { name: "51-regulatory-action-queue", path: "/regulatory/action-queue", accent: "cyan" },
   { name: "52-regulatory-notifications", path: "/regulatory/notifications", accent: "cyan" },

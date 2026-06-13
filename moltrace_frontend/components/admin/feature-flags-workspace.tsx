@@ -38,7 +38,7 @@ type Row = Record<string, unknown>
 
 const PROGRAM_ORDER = [
   { label: "SpectraCheck", values: ["spectracheck"] },
-  { label: "Regulatory Hub", values: ["regulatory_hub"] },
+  { label: "ComplianceCore", values: ["regulatory_hub"] },
   { label: "Reaction Optimization", values: ["reaction_optimization"] },
   { label: "Validation Center", values: ["validation_center"] },
   { label: "Connectors", values: ["connectors"] },

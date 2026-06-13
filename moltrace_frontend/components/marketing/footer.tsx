@@ -15,7 +15,7 @@ const navigation = {
     // Deeper technical references stay on docs.moltrace.co and
     // are linked from each module page directly.
     { name: "Spectroscopy", href: "/spectroscopy" },
-    { name: "Regulatory Intelligence Hub", href: "/regulatory-hub" },
+    { name: "ComplianceCore", href: "/regulatory-hub" },
     { name: "Reaction Optimization", href: "/reaction-optimization" },
     { name: "Integrations", href: "/integrations" },
   ],

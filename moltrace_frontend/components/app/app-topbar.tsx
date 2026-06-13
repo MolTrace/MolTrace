@@ -538,7 +538,7 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
               }}
             >
               <Shield className="mr-2 h-4 w-4" />
-              <span>Open Regulatory Hub</span>
+              <span>Open ComplianceCore</span>
             </CommandItem>
             <CommandItem
               onSelect={() => {
