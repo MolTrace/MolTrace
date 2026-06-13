@@ -9,7 +9,7 @@
   :class:`~moltrace.spectroscopy.infra.contract.SpectraCheckContract`, embedding
   the contract content hash so the analytical evidence is traceable.  This is the
   lightweight handoff artefact the end-to-end pipeline produces for the
-  Regulatory Hub.
+  ComplianceCore.
 
 Everything here is pure (stdlib only) and timestamp-free, so the generated
 templates are byte-reproducible and safe to version-control as controlled
@@ -244,7 +244,7 @@ def build_ich_report_stub(
 
 
 def render_ich_report_stub(stub: Mapping[str, Any]) -> str:
-    """Render an ICH report stub as human-readable markdown for the Regulatory Hub."""
+    """Render an ICH report stub as human-readable markdown for the ComplianceCore."""
 
     spectrum = stub.get("spectrum", {})
     summary = stub.get("result_summary", {})

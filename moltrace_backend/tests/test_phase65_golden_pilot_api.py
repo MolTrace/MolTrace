@@ -2,7 +2,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-PRODUCT_ORDER = ["SpectraCheck", "Regulatory Hub", "Reaction Optimization"]
+PRODUCT_ORDER = ["SpectraCheck", "ComplianceCore", "Reaction Optimization"]
 
 
 def _tenant(client: TestClient, headers: dict[str, str]) -> dict:

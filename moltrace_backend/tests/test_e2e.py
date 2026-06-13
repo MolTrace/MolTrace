@@ -8,7 +8,7 @@ One *real* Bruker FID flows through the entire SpectraCheck pipeline (Prompts
       -> gsd_peak_pick -> auto_classify -> detect_multiplets -> integrate (3-9)
       -> data-validation gate (infra.validation)
       -> versioned output contract (infra.contract)
-      -> Regulatory Hub handoff: ICH Q2(R2) report stub + GAMP 5 D11 doc
+      -> ComplianceCore handoff: ICH Q2(R2) report stub + GAMP 5 D11 doc
       -> experiment tracking + content-addressed dataset pin (lineage)
 
 Two properties are asserted:
@@ -16,7 +16,7 @@ Two properties are asserted:
 * **smoke** -- the whole stack runs green on a genuine instrument file, the
   validation gate passes, the contract/ICH stub/GAMP doc are produced, and the
   run is tracked + the dataset pinned and restored with verified integrity; and
-* **determinism** -- the structured Regulatory Hub handoff is *byte-for-byte*
+* **determinism** -- the structured ComplianceCore handoff is *byte-for-byte*
   identical across 10 independent runs of the same FID.  This is the invariant
   the regression gates and the 21 CFR Part 11 audit trail depend on.
 
@@ -78,7 +78,7 @@ def _spectrum_validation_payload(spectrum: Any) -> dict[str, Any]:
 
 
 def _run_pipeline(fixture: Path) -> dict[str, Any]:
-    """Run the full real-FID pipeline once and assemble the Regulatory Hub handoff.
+    """Run the full real-FID pipeline once and assemble the ComplianceCore handoff.
 
     Re-reads the FID from disk on every call (so the determinism guarantee covers
     the ingestion + Fourier transform too, not just the analysis stack) and fails
@@ -106,7 +106,7 @@ def _run_pipeline(fixture: Path) -> dict[str, Any]:
     contract = contract_from_pipeline(spectrum, peaks, multiplets, integration)
     ich_stub = build_ich_report_stub(contract)
 
-    # The structured artefact handed to the Regulatory Hub.  Every field is a
+    # The structured artefact handed to the ComplianceCore.  Every field is a
     # pure function of the FID (no timestamps / run ids), so it is reproducible.
     handoff = {
         "contract": contract.to_envelope(),
@@ -165,7 +165,7 @@ def test_e2e_pipeline_runs_green(tmp_path) -> None:
     assert envelope["schema_version"] == SCHEMA_VERSION
     assert envelope["content_hash"] == chash
 
-    # -- Regulatory Hub handoff: ICH Q2(R2) stub is hash-traceable ------- #
+    # -- ComplianceCore handoff: ICH Q2(R2) stub is hash-traceable ------- #
     assert stub["ich_guideline"] == "Q2(R2)"
     assert stub["evidence"]["contract_content_hash"] == chash
     ich_md = render_ich_report_stub(stub)

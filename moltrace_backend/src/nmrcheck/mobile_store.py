@@ -96,7 +96,7 @@ class MobileActor:
 DEFAULT_MOBILE_PROGRAM_ORDER = ["spectracheck", "regulatory_hub", "reaction_optimization"]
 _PROGRAM_LABELS = {
     "spectracheck": "SpectraCheck",
-    "regulatory_hub": "Regulatory Hub",
+    "regulatory_hub": "ComplianceCore",
     "reaction_optimization": "Reaction Optimization",
 }
 _PROGRAM_ROUTES = {
@@ -331,7 +331,7 @@ def command_center_summary(session_factory: sessionmaker[Session]) -> MobileComm
         ),
         MobileCommandCenterSection(
             program_key="regulatory_hub",
-            display_name="Regulatory Hub",
+            display_name="ComplianceCore",
             display_order=2,
             summary_json=summary.regulatory_summary_json,
         ),
