@@ -120,6 +120,23 @@ def test_cohort_of_concern_uses_cpca_ai_limit() -> None:
     assert any(r.kind is SourceKind.CPCA for r in section.sources)
 
 
+def test_m7_path_surfaces_duration_band_and_uses_control_language() -> None:
+    # The engine's default-duration TTC is a STAGED (less-than-lifetime) value, not the lifetime
+    # 1.5 ug/day; the narrative must surface the duration band and use M7 control (not Q3A/B
+    # "qualification") language.
+    section, _ = _p55()
+    m7 = classify_m7(_EMS)
+    md = section.as_markdown()
+    assert m7.duration_band in md  # the staged-TTC duration is named, not a bare "TTC"
+    assert "staged TTC for the" in md
+    assert "Controlled at or below the ICH M7 acceptable intake" in md
+
+
+def test_dose_denominator_is_traceable() -> None:
+    section, _ = _p55()
+    assert any(r.kind is SourceKind.Q3AB and r.locator == "daily_dose_g" for r in section.sources)
+
+
 # --------------------------------------------------------------------------- #
 # Traceability — every [S#] marker resolves; batch data is sourced
 # --------------------------------------------------------------------------- #
@@ -154,10 +171,12 @@ def test_batch_total_impurities_traces_to_batch_data() -> None:
 def test_3p56_justifies_method_and_acceptance_criteria() -> None:
     section, _ = _p55()
     p56 = next(s for s in section.subsections if s.number == "3.2.P.5.6")
+    assert p56.title == "Justification of Specification(s)"  # exact ICH M4Q heading
     body = " ".join(p56.paragraphs)
     assert "ICH Q2(R2)" in body  # analytical-procedure validation
     assert "stability-indicating" in body
     assert "ICH Q6A" in body  # rationale for acceptance criteria
+    assert "total degradation products" in body.lower()  # Q3B scope (not "total impurities")
 
 
 def test_pharmacopoeial_comparison_when_monograph_supplied() -> None:
@@ -213,6 +232,30 @@ def test_3s32_drug_substance_section() -> None:
     assert "ICH M7" in md  # structural-alert cross-reference
     assert section.disclaimer == CTD_DRAFT_DISCLAIMER
     assert any(r.kind is SourceKind.Q3AB for r in section.sources)
+
+
+def test_3s32_pharmacopoeial_limit_is_traceable() -> None:
+    q3ab = calculate_q3ab_thresholds(1.0, "drug_substance", "oral")
+    substance = SubstanceProfile(
+        name="Examplinib", substance_type="drug_substance", max_daily_dose_g=1.0
+    )
+    profile = ImpurityProfile(
+        "Examplinib",
+        impurities=(
+            ImpurityEntry(
+                "Compendial impurity",
+                origin=ImpurityOrigin.PROCESS_RELATED,
+                observed_levels_percent=(0.08,),
+                pharmacopoeial_limit_percent=0.15,
+            ),
+        ),
+        pharmacopoeial_monograph="USP Examplinib",
+    )
+    section = generate_3s3_impurities_drug_substance(substance, profile, q3ab)
+    body = " ".join(section.subsections[0].paragraphs)
+    # the compendial limit carries a resolvable [S#] marker (no un-marked threshold)
+    assert re.search(r"NMT 0\.15% \[S\d+\]", body)
+    assert any(r.kind is SourceKind.PHARMACOPOEIA and "0.15%" in r.value for r in section.sources)
 
 
 # --------------------------------------------------------------------------- #

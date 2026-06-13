@@ -68,6 +68,7 @@ class SourceKind(StrEnum):
     M7 = "m7_classifier"
     CPCA = "cpca_classifier"
     BATCH = "batch_data"
+    PHARMACOPOEIA = "pharmacopoeial_monograph"
 
 
 @dataclass(frozen=True)
@@ -333,6 +334,14 @@ def _impurity_limit(
     ICH Q3A/B qualification threshold.
     """
 
+    def _dose_ref() -> str:
+        # Marked lazily so the dose source appears only when it is printed inline (the ppm paths).
+        return ledger.mark(
+            SourceRef(
+                SourceKind.Q3AB, "daily_dose_g", f"{_fmt(dose_g)} g/day", q3ab.regulatory_basis
+            )
+        )
+
     if cpca is not None and cpca.coc_flag:
         ppm = cpca.ai_limit_ng_per_day / dose_g / 1000.0
         ref = ledger.mark(
@@ -347,11 +356,11 @@ def _impurity_limit(
         basis = (
             f"Cohort-of-Concern N-nitrosamine; FDA CPCA category {cpca.category} acceptable intake "
             f"{_fmt(cpca.ai_limit_ng_per_day)} ng/day {ref}, divided by the maximum daily dose "
-            f"({_fmt(dose_g)} g/day)."
+            f"({_fmt(dose_g)} g/day {_dose_ref()})."
         )
         qual = (
-            f"Qualified against the FDA CPCA acceptable-intake limit (the TTC does not apply to "
-            f"Cohort-of-Concern compounds) {ref}; expert toxicological review required."
+            f"Controlled at or below the FDA CPCA acceptable-intake limit (the ICH M7 TTC does not "
+            f"apply to Cohort-of-Concern compounds) {ref}; expert toxicological review required."
         )
         return limit, basis, qual
 
@@ -362,17 +371,21 @@ def _impurity_limit(
                 SourceRef(
                     SourceKind.M7,
                     "ttc_ug_per_day",
-                    f"{_fmt(m7.ttc_ug_per_day)} ug/day",
+                    f"{_fmt(m7.ttc_ug_per_day)} ug/day ({m7.duration_band})",
                     m7.regulatory_basis,
                 )
             )
             limit = f"NMT {_fmt(ppm)} ppm {ref}"
             basis = (
-                f"Mutagenic impurity, ICH M7 Class {m7.m7_class}; the TTC of "
-                f"{_fmt(m7.ttc_ug_per_day)} ug/day {ref} divided by the maximum daily dose "
-                f"({_fmt(dose_g)} g/day)."
+                f"Mutagenic impurity, ICH M7 Class {m7.m7_class}; the acceptable intake "
+                f"{_fmt(m7.ttc_ug_per_day)} ug/day {ref} — the staged TTC for the "
+                f"{m7.duration_band} treatment duration — divided by the maximum daily dose "
+                f"({_fmt(dose_g)} g/day {_dose_ref()})."
             )
-            qual = f"Qualified at or below the ICH M7 TTC {ref}."
+            qual = (
+                f"Controlled at or below the ICH M7 acceptable intake for the {m7.duration_band} "
+                f"duration {ref} (M7 control obviates Q3A/B qualification for mutagenic potential)."
+            )
             return limit, basis, qual
         ref = ledger.mark(
             SourceRef(SourceKind.M7, "m7_class", str(m7.m7_class), m7.regulatory_basis)
@@ -512,7 +525,7 @@ def generate_3p5_impurities(
         "the ICH Q3A/B qualification threshold for ordinary impurities, the ICH M7 TTC-derived "
         "limit for mutagenic impurities, and the FDA CPCA acceptable intake for Cohort-of-Concern "
         "nitrosamines — and is not tighter than necessary given the observed batch levels, "
-        "consistent with ICH Q6A. Total impurities are limited per ICH Q3B.",
+        "consistent with ICH Q6A. Total degradation products are limited per ICH Q3B.",
     ]
     batch_totals = [
         (b.batch_id, b.total_impurities_percent)
@@ -538,7 +551,7 @@ def generate_3p5_impurities(
             for imp in compared:
                 mono_ref = ledger.mark(
                     SourceRef(
-                        SourceKind.Q3AB,
+                        SourceKind.PHARMACOPOEIA,
                         f"pharmacopoeial[{imp.name}]",
                         f"{_fmt(imp.pharmacopoeial_limit_percent)}%",
                         mono,
@@ -565,7 +578,7 @@ def generate_3p5_impurities(
 
     p56 = CTDSubsection(
         number="3.2.P.5.6",
-        title="Justification of Specifications",
+        title="Justification of Specification(s)",
         paragraphs=tuple(p56_paras),
     )
 
@@ -608,10 +621,18 @@ def generate_3s3_impurities_drug_substance(
             q3ab_thresholds.regulatory_basis,
         )
     )
+    dose_ref = ledger.mark(
+        SourceRef(
+            SourceKind.Q3AB,
+            "daily_dose_g",
+            f"{_fmt(dose_g)} g/day",
+            q3ab_thresholds.regulatory_basis,
+        )
+    )
     paras: list[str] = [
         f"This section describes the actual and potential impurities arising from the manufacture "
         f"and storage of {substance_profile.name}. Thresholds follow ICH Q3A for the maximum daily "
-        f"dose of {_fmt(dose_g)} g: reporting "
+        f"dose of {_fmt(dose_g)} g {dose_ref}: reporting "
         f"{_fmt(q3ab_thresholds.reporting_threshold.effective_percent)}% {rt_ref}, qualification "
         f"{_fmt(qt.effective_percent)}% {qual_ref} ({qt.table_reference}).",
         "Process-related impurities (starting materials, intermediates, reagents, by-products) and "
@@ -626,7 +647,15 @@ def generate_3s3_impurities_drug_substance(
         observed = _observed_clause(imp, ledger)
         observed_cap = observed[0].upper() + observed[1:]
         if imp.pharmacopoeial_limit_percent is not None:
-            limit = f"NMT {_fmt(imp.pharmacopoeial_limit_percent)}%"
+            ph_ref = ledger.mark(
+                SourceRef(
+                    SourceKind.PHARMACOPOEIA,
+                    f"pharmacopoeial[{imp.name}]",
+                    f"{_fmt(imp.pharmacopoeial_limit_percent)}%",
+                    impurity_profile.pharmacopoeial_monograph or "pharmacopoeial monograph",
+                )
+            )
+            limit = f"NMT {_fmt(imp.pharmacopoeial_limit_percent)}% {ph_ref}"
         else:
             limit = f"NMT {_fmt(qt.effective_percent)}% {qual_ref}"
         alert = " (structural alert — assess per ICH M7)" if imp.structure_smiles else ""
