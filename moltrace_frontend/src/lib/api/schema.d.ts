@@ -1869,6 +1869,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/regulatory/spc/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regulatory Spc Analyze
+         * @description Process-capability + SPC trending over a measurement series (ICH Q10 / SQC).
+         *
+         *     Takes a time-ordered series for one (product, parameter) plus its specification limits and
+         *     returns the process-capability indices (Cp/Cpk/Pp/Ppk/Cpm), the eight Shewhart SPC signals
+         *     (Western Electric / Nelson / Montgomery), the CUSUM and EWMA detectors, and pre-OOS trending
+         *     alerts with the early-warning lead (``first_signal_index`` before ``first_oos_index``).
+         *     Stateless and deterministic — decision-support requiring qualified sign-off; the engine never
+         *     dispositions a batch. Emits one ``regulatory.spc.analyze`` audit event per call.
+         */
+        post: operations["regulatory_spc_analyze_regulatory_spc_analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spectrum/reason": {
         parameters: {
             query?: never;
@@ -33229,6 +33256,191 @@ export interface components {
              */
             generated_at?: string;
         };
+        /**
+         * SPCAlertOut
+         * @description A trending alert raised over the series.
+         */
+        SPCAlertOut: {
+            /** Severity */
+            severity: string;
+            /** Category */
+            category: string;
+            /** Message */
+            message: string;
+            /** Indices */
+            indices?: number[];
+        };
+        /**
+         * SPCAnalyzeRequest
+         * @description Request body for ``POST /regulatory/spc/analyze``.
+         *
+         *     A time-ordered measurement series for one (product, parameter) plus its specification limits.
+         *     At least one of ``usl``/``lsl`` is required (a 400 is returned otherwise). ``rule_set`` selects
+         *     the Shewhart rule set; CUSUM and EWMA are always computed alongside.
+         */
+        SPCAnalyzeRequest: {
+            /**
+             * Product
+             * @default
+             */
+            product: string;
+            /**
+             * Parameter
+             * @default
+             */
+            parameter: string;
+            /** Measurements */
+            measurements: components["schemas"]["SPCMeasurementInput"][];
+            /** Usl */
+            usl?: number | null;
+            /** Lsl */
+            lsl?: number | null;
+            /** Target */
+            target?: number | null;
+            /**
+             * Unit
+             * @default
+             */
+            unit: string;
+            /**
+             * Rule Set
+             * @default western_electric
+             * @enum {string}
+             */
+            rule_set: "western_electric" | "western_electric_classic" | "nelson" | "montgomery";
+            /**
+             * Warn Within Sigma
+             * @default 1
+             */
+            warn_within_sigma: number;
+            /** Subgroup Size */
+            subgroup_size?: number | null;
+        };
+        /**
+         * SPCAnalyzeResult
+         * @description Response from ``POST /regulatory/spc/analyze`` — capability + SPC/CUSUM/EWMA + trending.
+         *
+         *     ``first_signal_index`` < ``first_oos_index`` (``lead_points`` > 0) is the early-warning lead: a
+         *     drift/shift signal fired before any point went out-of-specification.
+         */
+        SPCAnalyzeResult: {
+            /** Product */
+            product: string;
+            /** Parameter */
+            parameter: string;
+            /** N */
+            n: number;
+            /** Rule Set */
+            rule_set: string;
+            capability: components["schemas"]["SPCCapabilityOut"];
+            /** Spc Signals */
+            spc_signals?: components["schemas"]["SPCSignalOut"][];
+            /** Cusum Signals */
+            cusum_signals?: components["schemas"]["SPCSignalOut"][];
+            /** Ewma Signals */
+            ewma_signals?: components["schemas"]["SPCSignalOut"][];
+            /** Alerts */
+            alerts?: components["schemas"]["SPCAlertOut"][];
+            /** Oos Indices */
+            oos_indices?: number[];
+            /** First Signal Index */
+            first_signal_index?: number | null;
+            /** First Oos Index */
+            first_oos_index?: number | null;
+            /** Lead Points */
+            lead_points?: number | null;
+            /** Disclaimer */
+            disclaimer: string;
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
+        /**
+         * SPCCapabilityOut
+         * @description Process-capability / -performance indices. Non-finite values (zero process variation) are
+         *     reported as null; ``rating`` and ``warnings`` carry the meaning.
+         */
+        SPCCapabilityOut: {
+            /** N */
+            n: number;
+            /** Mean */
+            mean: number;
+            /** Sigma Within */
+            sigma_within: number;
+            /** Sigma Overall */
+            sigma_overall: number;
+            /** Usl */
+            usl?: number | null;
+            /** Lsl */
+            lsl?: number | null;
+            /** Target */
+            target?: number | null;
+            /** Cp */
+            cp?: number | null;
+            /** Cpk */
+            cpk?: number | null;
+            /** Cpu */
+            cpu?: number | null;
+            /** Cpl */
+            cpl?: number | null;
+            /** Pp */
+            pp?: number | null;
+            /** Ppk */
+            ppk?: number | null;
+            /** Cpm */
+            cpm?: number | null;
+            /** Rating */
+            rating: string;
+            /** Interpretation */
+            interpretation: string;
+            /** Is Capable */
+            is_capable: boolean;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /**
+         * SPCMeasurementInput
+         * @description One time-ordered measurement in an SPC series.
+         */
+        SPCMeasurementInput: {
+            /** Value */
+            value: number;
+            /**
+             * Timepoint
+             * @default
+             */
+            timepoint: string;
+            /**
+             * Batch Id
+             * @default
+             */
+            batch_id: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+        };
+        /**
+         * SPCSignalOut
+         * @description A fired Shewhart rule, CUSUM, or EWMA signal with the offending point indices.
+         */
+        SPCSignalOut: {
+            /** Rule Number */
+            rule_number?: number | null;
+            /** Rule Name */
+            rule_name: string;
+            /** Method */
+            method: string;
+            /** Description */
+            description: string;
+            /** Indices */
+            indices?: number[];
+            /** Side */
+            side: string;
+        };
         /** SampleAliquot */
         SampleAliquot: {
             /** Id */
@@ -43614,6 +43826,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImpurityAssessResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regulatory_spc_analyze_regulatory_spc_analyze_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SPCAnalyzeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SPCAnalyzeResult"];
                 };
             };
             /** @description Validation Error */
