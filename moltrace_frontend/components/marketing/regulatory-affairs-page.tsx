@@ -291,7 +291,7 @@ const WORKED_EXAMPLE: LoopStep[] = [
   },
   {
     step: "It classifies itself",
-    body: "The ComplianceCore maps it to ICH Q3C Class 3 (no action below 5000 ppm) and slots it into dossier section 3.2.S.3.2 with the reference shift, observed shift, and delta cited.",
+    body: "ComplianceCore maps it to ICH Q3C Class 3 (no action below 5000 ppm) and slots it into dossier section 3.2.S.3.2 with the reference shift, observed shift, and delta cited.",
   },
   {
     step: "The section drafts",
