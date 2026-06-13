@@ -183,7 +183,7 @@ async function main() {
   record("Search dialog loads real SpectraCheck sessions from /spectracheck/sessions", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
   // Quick navigation always present
-  for (const item of ["Open SpectraCheck", "Open ComplianceCore", "Open Reaction Optimization", "Open Action Queue"]) {
+  for (const item of ["Open SpectraCheck", "Open Regentry", "Open Reaction Optimization", "Open Action Queue"]) {
     r = await safe(() => page.locator(`text=${item}`).first().waitFor({ timeout: 5_000 }))
     record(`Search 'Quick navigation' shortcut "${item}" rendered`, r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
   }

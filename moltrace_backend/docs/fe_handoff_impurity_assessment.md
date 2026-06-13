@@ -2,14 +2,14 @@
 
 **From:** backend session · **To:** frontend session · **Scope:** one new
 authenticated route, `POST /regulatory/impurities/assess`, that exposes the
-ComplianceCore's five deterministic impurity engines (ICH Q3A/B, Q3C, Q3D, M7,
+Regentry's five deterministic impurity engines (ICH Q3A/B, Q3C, Q3D, M7,
 FDA CPCA) + nitrosamine cumulative risk as **one unified report**. Additive — no
 existing route changed. Includes the **single-panel UI redesign spec** (§5).
 
 Work in `moltrace_frontend/` only. Do **not** edit `moltrace_backend/`.
 
 > **Design intent:** this is deliberately **one endpoint → one panel**, not five
-> screens. It lands as a subsection of the existing **ComplianceCore** product
+> screens. It lands as a subsection of the existing **Regentry** product
 > (path `/regulatory/...`). **No new top-level nav.**
 
 ---
@@ -147,7 +147,7 @@ its list (an unknown *solvent* is still returned with `matched:false`). Render
 ## 5. UI redesign spec — one "Impurity Assessment" panel (no clutter)
 
 Goal: surface all five engines through **one input form → one tabbed report**, as a
-subsection of the **ComplianceCore**. Do **not** add five nav items.
+subsection of the **Regentry**. Do **not** add five nav items.
 
 **Input (one card):**
 - Daily dose (g/day), route (segmented control: oral / parenteral / inhalation /

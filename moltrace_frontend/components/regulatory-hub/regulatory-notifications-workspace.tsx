@@ -96,7 +96,7 @@ export function RegulatoryNotificationsWorkspace() {
         <Button variant="ghost" size="sm" asChild>
           <Link href="/spectracheck?program=regulatory_hub">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            ComplianceCore
+            Regentry
           </Link>
         </Button>
       </div>

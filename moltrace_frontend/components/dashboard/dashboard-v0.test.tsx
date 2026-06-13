@@ -110,7 +110,7 @@ vi.mock("@/src/lib/dashboard/dashboard-core-module-activity", () => ({
       },
       {
         module: "regulatory_hub",
-        label: "ComplianceCore",
+        label: "Regentry",
         count: 1,
         latestAt: "2026-05-20T12:05:00Z",
       },
@@ -175,7 +175,7 @@ describe("DashboardV0 connector/ingestion fallback", () => {
     await waitFor(() => {
       expect(screen.getByText("Core module activity")).toBeInTheDocument()
       expect(screen.getByText("SpectraCheck")).toBeInTheDocument()
-      expect(screen.getByText("ComplianceCore")).toBeInTheDocument()
+      expect(screen.getByText("Regentry")).toBeInTheDocument()
       expect(screen.getByText("ReactionIQ")).toBeInTheDocument()
       expect(screen.getByText("5 opens")).toBeInTheDocument()
     })

@@ -66,7 +66,7 @@ class GoldenPilotNotFoundError(GoldenPilotError):
     pass
 
 
-DEFAULT_PRODUCT_ORDER = ["SpectraCheck", "ComplianceCore", "Reaction Optimization"]
+DEFAULT_PRODUCT_ORDER = ["SpectraCheck", "Regentry", "Reaction Optimization"]
 DEFAULT_PRODUCT_KEYS = ["spectracheck", "regulatory_hub", "reaction_optimization"]
 DEMO_SOURCE_TYPES = {"internal_demo", "curated_literature", "synthetic_demo", "benchmark"}
 CUSTOMER_SOURCE_TYPES = {"customer_pilot"}
@@ -97,7 +97,7 @@ PROGRAM_LABEL_TO_MODULE = {
     "SpectraCheck": "spectracheck",
     "spectra_check": "spectracheck",
     "spectracheck": "spectracheck",
-    "ComplianceCore": "regulatory_hub",
+    "Regentry": "regulatory_hub",
     "regulatory": "regulatory_hub",
     "regulatory_hub": "regulatory_hub",
     "Reaction Optimization": "reaction_optimization",

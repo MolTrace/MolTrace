@@ -1,6 +1,6 @@
 """Impurity assessment & risk — the deterministic ICH/FDA impurity engine.
 
-Tier A of the ComplianceCore (Methods 1-10): ICH Q3A/B thresholds, Q3C residual
+Tier A of the Regentry (Methods 1-10): ICH Q3A/B thresholds, Q3C residual
 solvents, Q3D elemental impurities, ICH M7 mutagenicity, the FDA/EMA nitrosamine
 CPCA classifier, and cumulative risk. Every result is a deterministic, auditable
 calculation tied to a named guidance revision — decision-support that a qualified

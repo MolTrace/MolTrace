@@ -143,7 +143,7 @@ export function RegulatoryHubWorkspace() {
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
               style={{ color: "var(--mt-cyan)" }}
             >
-              MolTrace · ComplianceCore
+              MolTrace · Regentry
             </p>
             <h1 className="font-mono text-2xl font-bold tracking-tight">Submission readiness workspace</h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
@@ -445,7 +445,7 @@ export function RegulatoryHubWorkspace() {
 
       <Card className="border-dashed bg-muted/30">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4 text-xs text-muted-foreground">
-          <span>MolTrace ComplianceCore · UI scaffold · no regulatory AI inference executed</span>
+          <span>MolTrace Regentry · UI scaffold · no regulatory AI inference executed</span>
           <Badge variant="outline" className="font-normal">
             Citations + human review required for any production export
           </Badge>

@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 
 /**
- * Strong baseline render tests for the ComplianceCore components.
+ * Strong baseline render tests for the Regentry components.
  *
  * Locks in the user-visible contract for each major component so the reskin
  * cannot accidentally hide a section, drop a button, or break a heading.
@@ -50,7 +50,7 @@ beforeEach(() => {
   apiFetchMock.mockImplementation(async () => [])
 })
 
-describe("ComplianceCore Landing", () => {
+describe("Regentry Landing", () => {
   it("renders without crashing and shows a regulatory-related heading", async () => {
     const { RegulatoryIntelligenceLanding } = await import(
       "@/components/regulatory-hub/regulatory-intelligence-landing"
@@ -129,7 +129,7 @@ describe("Regulatory Notifications Workspace", () => {
   })
 })
 
-describe("ComplianceCore Workspace (CTD demo)", () => {
+describe("Regentry Workspace (CTD demo)", () => {
   it("renders the demo dossier metadata", async () => {
     const { RegulatoryHubWorkspace } = await import(
       "@/components/regulatory-hub/regulatory-hub-workspace"

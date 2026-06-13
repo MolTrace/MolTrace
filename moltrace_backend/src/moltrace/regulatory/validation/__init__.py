@@ -2,7 +2,7 @@
 
 Proves the deterministic ICH/FDA math is correct exhaustively (worked examples + property-based
 invariants + external reference reproductions), maps every formula to its guideline source, and
-auto-assembles the Computer-System-Validation evidence package per version. ComplianceCore must
+auto-assembles the Computer-System-Validation evidence package per version. Regentry must
 not launch until :func:`evaluate_launch_gate` is fully green.
 """
 

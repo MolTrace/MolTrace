@@ -857,7 +857,7 @@ export function CroAnalyticalPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">ComplianceCore →</p>
+                    <p className="text-sm font-semibold">Regentry →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Classifies impurities to ICH and drafts the sponsor's dossier section.
                     </p>

@@ -107,8 +107,8 @@ describe("AppTopbar sign out", () => {
     expect(screen.getByTestId("processed-analysis")).toHaveTextContent("has processed analysis")
 
     view.unmount()
-    const away = render(<div>ComplianceCore route</div>)
-    expect(screen.getByText("ComplianceCore route")).toBeInTheDocument()
+    const away = render(<div>Regentry route</div>)
+    expect(screen.getByText("Regentry route")).toBeInTheDocument()
     away.unmount()
 
     view = render(<TopbarHarness />)

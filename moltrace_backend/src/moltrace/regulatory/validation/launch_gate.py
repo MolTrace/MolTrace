@@ -1,7 +1,7 @@
 """Phase 7 launch gate (Prompt 21).
 
 ICH calculations are deterministic — an error is a code bug with regulatory consequences — so the
-ComplianceCore must NOT launch until every validation check is green: worked-example zero-error +
+Regentry must NOT launch until every validation check is green: worked-example zero-error +
 100% formula coverage, a complete formula->citation map (no untraceable formula), the ICH property
 invariants, and external reproductions (NDSRI + EMA). :func:`enforce_launch_gate`
 raises on any red; :func:`launch_gate_exit_code` maps the gate to a CI exit code.
@@ -122,7 +122,7 @@ def enforce_launch_gate() -> None:
     result = evaluate_launch_gate()
     if not result.passed:
         raise LaunchGateError(
-            f"ComplianceCore launch gate is RED — do not go live. Failed: {result.failed_checks()}"
+            f"Regentry launch gate is RED — do not go live. Failed: {result.failed_checks()}"
         )
 
 

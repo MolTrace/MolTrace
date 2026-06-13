@@ -63,7 +63,7 @@ describe("Marketing Header — mobile sidebar refresh", () => {
 
     // Platform items
     expect(within(sidebar).getByText("SpectraCheck")).toBeInTheDocument()
-    expect(within(sidebar).getByText("ComplianceCore")).toBeInTheDocument()
+    expect(within(sidebar).getByText("Regentry")).toBeInTheDocument()
     expect(within(sidebar).getByText("ReactionIQ")).toBeInTheDocument()
     expect(within(sidebar).getByText("Integrations")).toBeInTheDocument()
 
@@ -92,7 +92,7 @@ describe("Marketing Header — mobile sidebar refresh", () => {
       "Drug discovery & development", // Solutions · Pharmaceutical R&D
       "University & institute labs", //  Solutions · Academic Research
       "Dossier & submission teams", //   Solutions · Regulatory Affairs
-      "ICH · FDA · EMA compliance", //   Platform · ComplianceCore
+      "ICH · FDA · EMA compliance", //   Platform · Regentry
     ]
     for (const text of longDescriptions) {
       const node = within(sidebar).getByText(text)
@@ -101,7 +101,7 @@ describe("Marketing Header — mobile sidebar refresh", () => {
     }
 
     // Item titles must not be clipped either.
-    for (const text of ["Pharmaceutical R&D", "ComplianceCore"]) {
+    for (const text of ["Pharmaceutical R&D", "Regentry"]) {
       const node = within(sidebar).getByText(text)
       expect(node.className).not.toContain("truncate")
       expect(node.className).toContain("break-words")

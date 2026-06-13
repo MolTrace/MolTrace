@@ -378,7 +378,7 @@ export function ValidationCenterWorkspace() {
       >
         <div className="space-y-2 text-sm">
           <div className="rounded-md border bg-muted/20 px-3 py-2">1. SpectraCheck</div>
-          <div className="rounded-md border bg-muted/20 px-3 py-2">2. ComplianceCore</div>
+          <div className="rounded-md border bg-muted/20 px-3 py-2">2. Regentry</div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">3. Reaction Optimization</div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">4. Cross-module/system</div>
         </div>

@@ -52,7 +52,7 @@ import type { components } from "@/src/lib/api/schema"
  * nitrosamine cumulative risk, via a single POST /regulatory/impurities/assess.
  *
  * Deliberately one endpoint → one panel (not five screens). Lands as a
- * subsection of the ComplianceCore (/regulatory/impurities); no new top-level
+ * subsection of the Regentry (/regulatory/impurities); no new top-level
  * nav. The binding contract is the regenerated schema.d.ts.
  *
  * Decision-support only: the response is ALWAYS human_review_required, so the
@@ -294,14 +294,14 @@ export function ImpurityAssessmentWorkspace() {
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-8 pb-12">
-      {/* Back to the ComplianceCore tab in the Programs workspace — the
+      {/* Back to the Regentry tab in the Programs workspace — the
           ?program param restores the tab so the hub stays highlighted between
           SpectraCheck and ReactionIQ, matching where the user came from. */}
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/spectracheck?program=regulatory_hub">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            ComplianceCore
+            Regentry
           </Link>
         </Button>
       </div>
@@ -312,7 +312,7 @@ export function ImpurityAssessmentWorkspace() {
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
           style={{ color: "var(--mt-cyan)" }}
         >
-          MolTrace · ComplianceCore · Impurity Assessment
+          MolTrace · Regentry · Impurity Assessment
         </p>
         <h1 className="inline-flex items-center gap-2 font-mono text-2xl font-bold tracking-tight">
           <FlaskConical className="h-6 w-6" style={{ color: "var(--mt-cyan)" }} aria-hidden />

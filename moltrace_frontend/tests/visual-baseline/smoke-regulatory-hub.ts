@@ -1,6 +1,6 @@
 #!/usr/bin/env -S pnpm tsx
 /**
- * Smoke test for the redesigned ComplianceCore surfaces.
+ * Smoke test for the redesigned Regentry surfaces.
  *
  * Verifies that each redesigned surface now exposes:
  *   - The new eyebrow tagline (font-mono uppercase tracked)
@@ -80,8 +80,8 @@ const SPECS: Spec[] = [
   {
     path: "/regulatory",
     label: "Intelligence landing",
-    eyebrow: /MolTrace · ComplianceCore/i,
-    heading: /^ComplianceCore$/i,
+    eyebrow: /MolTrace · Regentry/i,
+    heading: /^Regentry$/i,
   },
   {
     path: "/regulatory/action-queue",
@@ -133,7 +133,7 @@ async function main() {
   const page = await context.newPage()
   await installMocks(page)
 
-  console.log("\n── ComplianceCore redesign smoke ─────────")
+  console.log("\n── Regentry redesign smoke ─────────")
 
   for (const spec of SPECS) {
     let r = await safe(async () => {
@@ -183,7 +183,7 @@ async function main() {
   console.log(`\n── Summary: ${passes} pass, ${fails} fail ──`)
 
   const md = [
-    `# ComplianceCore redesign — smoke ${new Date().toISOString()}`,
+    `# Regentry redesign — smoke ${new Date().toISOString()}`,
     "",
     `- Pass: ${passes}`,
     `- Fail: ${fails}`,

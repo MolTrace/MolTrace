@@ -1,4 +1,4 @@
-"""ComplianceCore Phase 0 foundation (Prompt 19) — measurement + reproducibility.
+"""Regentry Phase 0 foundation (Prompt 19) — measurement + reproducibility.
 
 The methodological bedrock for the whole module, built reuse-first over the
 spectroscopy Phase 0 foundation (``moltrace.spectroscopy.infra``):

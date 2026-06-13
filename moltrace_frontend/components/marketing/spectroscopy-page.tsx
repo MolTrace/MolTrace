@@ -814,7 +814,7 @@ export function SpectroscopyPage() {
                     aria-hidden
                   />
                   <div>
-                    <p className="text-sm font-semibold">ComplianceCore →</p>
+                    <p className="text-sm font-semibold">Regentry →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Routes the impurity to ICH Q3C / Q3D, raises action items, drafts dossier
                       section.

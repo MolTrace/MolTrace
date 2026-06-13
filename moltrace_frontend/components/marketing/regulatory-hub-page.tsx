@@ -25,7 +25,7 @@ import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
 
 /**
- * ComplianceCore module page — full marketing-shell route
+ * Regentry module page — full marketing-shell route
  * at /regulatory-hub.
  *
  * Differentiation from /spectroscopy (intentional — these are related
@@ -323,7 +323,7 @@ type LoopStep = {
 const CROSS_MODULE_LOOP: LoopStep[] = [
   {
     step: "SpectraCheck routes in",
-    body: "Peak at 2.10 ppm classified as acetic acid impurity (confidence 0.93). ComplianceCore receives the structured evidence object.",
+    body: "Peak at 2.10 ppm classified as acetic acid impurity (confidence 0.93). Regentry receives the structured evidence object.",
   },
   {
     step: "Framework lookup",
@@ -404,7 +404,7 @@ export function RegulatoryHubPage() {
                     className="border-cyan-300 bg-cyan-50 text-cyan-700 dark:border-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-300"
                   >
                     <ShieldCheck className="mr-1 h-3 w-3" aria-hidden />
-                    Module · ComplianceCore
+                    Module · Regentry
                   </Badge>
                   <Badge variant="outline" className="text-muted-foreground">
                     ICH · FDA · EMA · ALCOA+
@@ -422,7 +422,7 @@ export function RegulatoryHubPage() {
                 <div className="mt-10 flex flex-wrap items-center gap-4">
                   <Button asChild size="lg" className="gap-2">
                     <Link href="/regulatory">
-                      Open ComplianceCore
+                      Open Regentry
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                   </Button>
@@ -536,7 +536,7 @@ export function RegulatoryHubPage() {
                   inspectors. The spreadsheet-and-email toolchain doesn't satisfy any of those four.
                 </p>
                 <p className="font-medium text-foreground">
-                  ComplianceCore closes that gap programmatically. The dossier is a
+                  Regentry closes that gap programmatically. The dossier is a
                   by-product of the science — not a parallel document that gets reconciled in
                   week 11.
                 </p>
@@ -1008,12 +1008,12 @@ export function RegulatoryHubPage() {
               </h2>
               <p className="mt-4 text-base text-muted-foreground sm:text-lg">
                 Pick a dossier section that's currently a 40-hour reconciliation. We'll walk
-                through how the ComplianceCore would handle the same evidence, end-to-end.
+                through how the Regentry would handle the same evidence, end-to-end.
               </p>
               <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
                 <Button asChild size="lg" className="gap-2">
                   <Link href="/regulatory">
-                    Open ComplianceCore
+                    Open Regentry
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>

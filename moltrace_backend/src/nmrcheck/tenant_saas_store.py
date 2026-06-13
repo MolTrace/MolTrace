@@ -86,7 +86,7 @@ class TenantIsolationError(PermissionError):
     pass
 
 
-DEFAULT_PRODUCT_ORDER = ["SpectraCheck", "ComplianceCore", "Reaction Optimization"]
+DEFAULT_PRODUCT_ORDER = ["SpectraCheck", "Regentry", "Reaction Optimization"]
 DEFAULT_PRODUCT_KEYS = ["spectracheck", "regulatory_hub", "reaction_optimization"]
 SENSITIVE_KEY_MARKERS = (
     "secret",
@@ -710,7 +710,7 @@ def update_pilot_program(session_factory: sessionmaker[Session], pilot_id: int, 
 def _seed_default_onboarding_tasks(session: Session, project: CustomerOnboardingProjectORM) -> None:
     seeds = [
         ("SpectraCheck setup", "spectracheck_configuration", "spectracheck"),
-        ("ComplianceCore setup", "regulatory_configuration", "regulatory_hub"),
+        ("Regentry setup", "regulatory_configuration", "regulatory_hub"),
         ("Reaction Optimization setup", "reaction_configuration", "reaction_optimization"),
     ]
     for index, (title, task_type, program) in enumerate(seeds, start=1):

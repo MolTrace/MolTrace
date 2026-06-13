@@ -89,7 +89,7 @@ async function main() {
   record("Page h1 'Action Queue' rendered", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 
   r = await safe(() =>
-    page.locator("text=/Coordinate work across SpectraCheck, ComplianceCore, and Reaction Optimization/i").first().waitFor({ timeout: 5_000 }),
+    page.locator("text=/Coordinate work across SpectraCheck, Regentry, and Reaction Optimization/i").first().waitFor({ timeout: 5_000 }),
   )
   record("Page subtitle rendered", r.ok ? "pass" : "fail", r.ok ? undefined : r.error)
 

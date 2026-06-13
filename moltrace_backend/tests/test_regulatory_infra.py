@@ -1,4 +1,4 @@
-"""Unit tests for the ComplianceCore Phase 0 foundation (Prompt 19, regulatory/infra).
+"""Unit tests for the Regentry Phase 0 foundation (Prompt 19, regulatory/infra).
 
 Covers the acceptance criteria: every metric implemented + unit-tested with the two
 zero-tolerance hard gates (calculation-error rate 0, formula coverage 100%);
@@ -245,7 +245,7 @@ def test_gamp5_validation_document_versioned_and_deterministic():
     assert doc1 == doc2  # deterministic skeleton
     assert rsv in doc1  # pinned to the exact rule-set version (System Version)
     assert "Validation" in doc1
-    assert "MolTrace ComplianceCore" in doc1
+    assert "MolTrace Regentry" in doc1
     # decision-support framing present (no autonomous "compliant" claim about the product)
     assert "responsibility" in doc1.lower()
 

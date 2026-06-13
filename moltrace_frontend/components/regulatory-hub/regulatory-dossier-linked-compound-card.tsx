@@ -330,7 +330,7 @@ export function RegulatoryDossierLinkedCompoundCard({
           <AlertTitle className="text-sm">Provenance note</AlertTitle>
           <AlertDescription className="text-xs leading-relaxed">
             This card records which compound registry row is associated with this dossier for traceability. It does not
-            substitute cited sources, requirements, or human review outcomes shown elsewhere in ComplianceCore.
+            substitute cited sources, requirements, or human review outcomes shown elsewhere in Regentry.
           </AlertDescription>
         </Alert>
 
