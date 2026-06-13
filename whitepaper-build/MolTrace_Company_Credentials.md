@@ -47,7 +47,7 @@ Replace `assets/logo-bar.svg` with the production asset before publication. The 
 
 ## About MolTrace
 
-**MolTrace Technologies, Inc.** is a venture-backed scientific intelligence company building the audit-ready evidence engine for pharmaceutical R&D. Our platform — SpectraCheck, Regulatory Intelligence Hub, and Reaction Optimization — closes the loop between raw analytical data and regulatory-ready decisions, with every numerical claim along the way reachable and reproducible.
+**MolTrace Technologies, Inc.** is a venture-backed scientific intelligence company building the audit-ready evidence engine for pharmaceutical R&D. Our platform — SpectraCheck, ComplianceCore, and Reaction Optimization — closes the loop between raw analytical data and regulatory-ready decisions, with every numerical claim along the way reachable and reproducible.
 
 ### Quick facts (replace with current values)
 
@@ -217,7 +217,7 @@ Short, medium, and long-form About-MolTrace strings for use in different context
 
 **Medium (three sentences, 100 words):**
 
-> MolTrace builds the audit-ready evidence engine for pharmaceutical R&D. Our platform — SpectraCheck, Regulatory Intelligence Hub, and Reaction Optimization — closes the loop between raw analytical data and regulatory-ready decisions across NMR, LC-MS, HRMS, and MS/MS, with every numerical claim along the way reachable from a single click. The company is venture-backed, headquartered in [City], with SOC 2 Type II compliance, ICH Q2(R2) alignment, and an architecture engineered to satisfy the FDA's 2025 AI Credibility Framework and the EMA AI reflection paper.
+> MolTrace builds the audit-ready evidence engine for pharmaceutical R&D. Our platform — SpectraCheck, ComplianceCore, and Reaction Optimization — closes the loop between raw analytical data and regulatory-ready decisions across NMR, LC-MS, HRMS, and MS/MS, with every numerical claim along the way reachable from a single click. The company is venture-backed, headquartered in [City], with SOC 2 Type II compliance, ICH Q2(R2) alignment, and an architecture engineered to satisfy the FDA's 2025 AI Credibility Framework and the EMA AI reflection paper.
 
 **Long (six sentences, 200 words):**
 
