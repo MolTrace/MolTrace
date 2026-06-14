@@ -1,6 +1,6 @@
 [project]
 name = "nmrcheck"
-version = "0.42.0"
+version = "0.43.0"
 description = "Rule-based 1H NMR checker with Postgres persistence, account verification, password reset, and queued background jobs"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,6 +21,11 @@ dependencies = [
     "pyjwt[crypto]>=2.9",
     "pyotp>=2.9,<3.0",
     "webauthn>=2.8,<3.0",
+    # Runtime HTTP client for the enterprise OIDC/SSO flow (oidc_client.py —
+    # IdP token exchange + JWKS fetch). It is imported at app load via api.py,
+    # so it must be a runtime dependency, NOT dev-only, or the production build
+    # (`uv sync --no-dev`) starts uvicorn without it and crashes on import.
+    "httpx>=0.28",
 ]
 
 [project.scripts]
@@ -63,7 +68,6 @@ dev = [
     "hypothesis>=6.0",
     "mypy>=1.20",
     "ruff>=0.11",
-    "httpx>=0.28",
 ]
 # Phase 0 foundation (Prompt 19): heavy data-lineage / experiment-tracking /
 # data-validation tooling. These are OPTIONAL: every metric, the versioned
