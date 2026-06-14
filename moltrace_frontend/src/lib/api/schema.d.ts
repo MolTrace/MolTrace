@@ -1581,6 +1581,297 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/mfa/totp/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mfa Totp Enroll */
+        post: operations["mfa_totp_enroll_auth_mfa_totp_enroll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mfa Totp Confirm */
+        post: operations["mfa_totp_confirm_auth_mfa_totp_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Mfa Totp Delete */
+        delete: operations["mfa_totp_delete_auth_mfa_totp_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/register/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mfa Webauthn Register Options */
+        post: operations["mfa_webauthn_register_options_auth_mfa_webauthn_register_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/register/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mfa Webauthn Register Verify */
+        post: operations["mfa_webauthn_register_verify_auth_mfa_webauthn_register_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mfa Webauthn List */
+        get: operations["mfa_webauthn_list_auth_mfa_webauthn_credentials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/credentials/{credential_pk}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Mfa Webauthn Delete */
+        delete: operations["mfa_webauthn_delete_auth_mfa_webauthn_credentials__credential_pk__delete"];
+        options?: never;
+        head?: never;
+        /** Mfa Webauthn Rename */
+        patch: operations["mfa_webauthn_rename_auth_mfa_webauthn_credentials__credential_pk__patch"];
+        trace?: never;
+    };
+    "/auth/mfa/recovery/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mfa Recovery Regenerate */
+        post: operations["mfa_recovery_regenerate_auth_mfa_recovery_regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mfa Status */
+        get: operations["mfa_status_auth_mfa_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/login/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mfa Login Totp */
+        post: operations["mfa_login_totp_auth_mfa_login_totp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/login/webauthn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mfa Login Webauthn */
+        post: operations["mfa_login_webauthn_auth_mfa_login_webauthn_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/login/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mfa Login Recovery */
+        post: operations["mfa_login_recovery_auth_mfa_login_recovery_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/step-up/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step Up Options */
+        post: operations["step_up_options_auth_step_up_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/step-up/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step Up Totp */
+        post: operations["step_up_totp_auth_step_up_totp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/step-up/webauthn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step Up Webauthn */
+        post: operations["step_up_webauthn_auth_step_up_webauthn_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/step-up/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step Up Password */
+        post: operations["step_up_password_auth_step_up_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/mfa/policy/{organization_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mfa Policy Get */
+        get: operations["mfa_policy_get_admin_mfa_policy__organization_id__get"];
+        /** Mfa Policy Set */
+        put: operations["mfa_policy_set_admin_mfa_policy__organization_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/request-email-verification": {
         parameters: {
             query?: never;
@@ -24512,6 +24803,81 @@ export interface components {
             /** Cards */
             cards?: components["schemas"]["MetricCard"][];
         };
+        /** MfaLoginRecoveryRequest */
+        MfaLoginRecoveryRequest: {
+            /** Mfa Token */
+            mfa_token: string;
+            /** Code */
+            code: string;
+        };
+        /** MfaLoginTotpRequest */
+        MfaLoginTotpRequest: {
+            /** Mfa Token */
+            mfa_token: string;
+            /** Code */
+            code: string;
+        };
+        /** MfaLoginWebAuthnRequest */
+        MfaLoginWebAuthnRequest: {
+            /** Mfa Token */
+            mfa_token: string;
+            /** Assertion */
+            assertion: {
+                [key: string]: unknown;
+            };
+        };
+        /** MfaPolicyResponse */
+        MfaPolicyResponse: {
+            /** Organization Id */
+            organization_id: number;
+            /** Mfa Required */
+            mfa_required: boolean;
+            /** Grace Period Days */
+            grace_period_days: number;
+            /** Allowed Factors */
+            allowed_factors: string[];
+            /** Enforce For Sso */
+            enforce_for_sso: boolean;
+            /** Require Step Up For Signing */
+            require_step_up_for_signing: boolean;
+        };
+        /** MfaPolicyUpdate */
+        MfaPolicyUpdate: {
+            /** Mfa Required */
+            mfa_required: boolean;
+            /**
+             * Grace Period Days
+             * @default 7
+             */
+            grace_period_days: number;
+            /** Allowed Factors */
+            allowed_factors?: string[];
+            /**
+             * Enforce For Sso
+             * @default false
+             */
+            enforce_for_sso: boolean;
+            /**
+             * Require Step Up For Signing
+             * @default true
+             */
+            require_step_up_for_signing: boolean;
+        };
+        /** MfaStatusResponse */
+        MfaStatusResponse: {
+            /** Factors */
+            factors: string[];
+            /** Totp Confirmed */
+            totp_confirmed: boolean;
+            /** Passkey Count */
+            passkey_count: number;
+            /** Recovery Remaining */
+            recovery_remaining: number;
+            /** Org Mfa Required */
+            org_mfa_required: boolean;
+            /** In Grace */
+            in_grace: boolean;
+        };
         /** MobileActionDraft */
         MobileActionDraft: {
             /** Id */
@@ -31113,6 +31479,13 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** RecoveryRegenerateResponse */
+        RecoveryRegenerateResponse: {
+            /** Recovery Codes */
+            recovery_codes: string[];
+            /** Remaining */
+            remaining: number;
+        };
         /**
          * RegionIntegrationResult
          * @description Integral of one region with full provenance.
@@ -36269,6 +36642,46 @@ export interface components {
             /** Notes */
             notes?: string[];
         };
+        /** StepUpOptionsResponse */
+        StepUpOptionsResponse: {
+            /** Factors */
+            factors: string[];
+            /** Webauthn Options */
+            webauthn_options?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** StepUpPasswordRequest */
+        StepUpPasswordRequest: {
+            /** Password */
+            password: string;
+        };
+        /** StepUpResult */
+        StepUpResult: {
+            /** Stepped Up */
+            stepped_up: boolean;
+            /** Factor */
+            factor: string;
+            /** Aal */
+            aal: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /** StepUpTotpRequest */
+        StepUpTotpRequest: {
+            /** Code */
+            code: string;
+        };
+        /** StepUpWebAuthnRequest */
+        StepUpWebAuthnRequest: {
+            /** Assertion */
+            assertion: {
+                [key: string]: unknown;
+            };
+        };
         /** StoredAnalysisRecord */
         StoredAnalysisRecord: {
             /** Id */
@@ -37707,6 +38120,23 @@ export interface components {
             token?: string | null;
             /** Expires At */
             expires_at?: string | null;
+        };
+        /** TotpConfirmRequest */
+        TotpConfirmRequest: {
+            /** Code */
+            code: string;
+        };
+        /** TotpConfirmResponse */
+        TotpConfirmResponse: {
+            /** Confirmed */
+            confirmed: boolean;
+            /** Recovery Codes */
+            recovery_codes?: string[] | null;
+        };
+        /** TotpEnrollResponse */
+        TotpEnrollResponse: {
+            /** Otpauth Uri */
+            otpauth_uri: string;
         };
         /** TraceabilityMatrix */
         TraceabilityMatrix: {
@@ -39192,6 +39622,46 @@ export interface components {
             metadata?: {
                 [key: string]: unknown;
             };
+        };
+        /** WebAuthnCredentialList */
+        WebAuthnCredentialList: {
+            /** Credentials */
+            credentials: components["schemas"]["WebAuthnCredentialPublic"][];
+        };
+        /** WebAuthnCredentialPublic */
+        WebAuthnCredentialPublic: {
+            /** Id */
+            id: number;
+            /** Nickname */
+            nickname?: string | null;
+            /** Device Type */
+            device_type?: string | null;
+            /**
+             * Backed Up
+             * @default false
+             */
+            backed_up: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Used At */
+            last_used_at?: string | null;
+        };
+        /** WebAuthnCredentialRename */
+        WebAuthnCredentialRename: {
+            /** Nickname */
+            nickname: string;
+        };
+        /** WebAuthnRegisterVerifyRequest */
+        WebAuthnRegisterVerifyRequest: {
+            /** Credential */
+            credential: {
+                [key: string]: unknown;
+            };
+            /** Nickname */
+            nickname?: string | null;
         };
         /** WebhookSubscription */
         WebhookSubscription: {
@@ -43982,6 +44452,669 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccessTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_totp_enroll_auth_mfa_totp_enroll_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpEnrollResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_totp_confirm_auth_mfa_totp_confirm_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_totp_delete_auth_mfa_totp_delete: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_webauthn_register_options_auth_mfa_webauthn_register_options_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_webauthn_register_verify_auth_mfa_webauthn_register_verify_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebAuthnRegisterVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_webauthn_list_auth_mfa_webauthn_credentials_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebAuthnCredentialList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_webauthn_delete_auth_mfa_webauthn_credentials__credential_pk__delete: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                credential_pk: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_webauthn_rename_auth_mfa_webauthn_credentials__credential_pk__patch: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                credential_pk: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebAuthnCredentialRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_recovery_regenerate_auth_mfa_recovery_regenerate_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryRegenerateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_status_auth_mfa_status_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_login_totp_auth_mfa_login_totp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaLoginTotpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_login_webauthn_auth_mfa_login_webauthn_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaLoginWebAuthnRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_login_recovery_auth_mfa_login_recovery_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaLoginRecoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_up_options_auth_step_up_options_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepUpOptionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_up_totp_auth_step_up_totp_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepUpTotpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepUpResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_up_webauthn_auth_step_up_webauthn_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepUpWebAuthnRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepUpResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_up_password_auth_step_up_password_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepUpPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepUpResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_policy_get_admin_mfa_policy__organization_id__get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaPolicyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_policy_set_admin_mfa_policy__organization_id__put: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaPolicyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaPolicyResponse"];
                 };
             };
             /** @description Validation Error */

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
+import { useStepUp } from "@/components/auth/step-up-provider"
+import { withStepUp } from "@/lib/auth/with-step-up"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -116,6 +118,7 @@ export function ESignatureRecordsWorkspace() {
   const [targetId, setTargetId] = useState("")
   const [reason, setReason] = useState("")
   const [createBusy, setCreateBusy] = useState(false)
+  const { ensureStepUp } = useStepUp()
   const [createdRecord, setCreatedRecord] = useState<Row | null>(null)
 
   const loadRecords = useCallback(async () => {
@@ -187,17 +190,23 @@ export function ESignatureRecordsWorkspace() {
     setCreateBusy(true)
     setError("")
     try {
-      const payload = await apiFetch<unknown>("/esignatures/records", {
-        method: "POST",
-        body: {
-          signer_name: signerName.trim(),
-          signer_email: signerEmail.trim() || null,
-          signature_meaning: signatureMeaning,
-          target_type: targetType.trim(),
-          target_id: parsedTargetId,
-          reason: reason.trim(),
-        },
-      })
+      // Signing is step-up-gated: on a 401 step_up_required, run the ceremony and
+      // retry the create once (also proactively elevated if the user just verified).
+      const payload = await withStepUp(
+        () =>
+          apiFetch<unknown>("/esignatures/records", {
+            method: "POST",
+            body: {
+              signer_name: signerName.trim(),
+              signer_email: signerEmail.trim() || null,
+              signature_meaning: signatureMeaning,
+              target_type: targetType.trim(),
+              target_id: parsedTargetId,
+              reason: reason.trim(),
+            },
+          }),
+        ensureStepUp,
+      )
       const record = unwrapRecord(payload, ["signature_record", "e_signature_record"])
       setCreatedRecord(record)
       if (record) {

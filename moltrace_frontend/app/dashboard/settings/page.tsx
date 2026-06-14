@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ConnectorsCenterWorkspace } from "@/components/settings/connectors-center-workspace"
+import { MfaManagementWorkspace } from "@/components/settings/mfa-management-workspace"
 import { InstrumentWatchFolderWorkspace } from "@/components/settings/instrument-watch-folder-workspace"
 import { MappingTemplatesWorkspace } from "@/components/settings/mapping-templates-workspace"
 import { User, Bell, Shield, Key, Building2, Plug, FolderSearch, Link2 } from "lucide-react"
@@ -136,13 +137,7 @@ export default function SettingsPage() {
               <CardDescription>Manage your account security and authentication.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Two-Factor Authentication</div>
-                  <div className="text-sm text-muted-foreground">Add an extra layer of security</div>
-                </div>
-                <Badge className="bg-success text-success-foreground">Enabled</Badge>
-              </div>
+              <MfaManagementWorkspace />
               <Separator />
               <div className="flex items-center justify-between">
                 <div>

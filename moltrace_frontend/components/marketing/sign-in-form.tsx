@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ApiError, apiFetch, buildApiPath } from "@/lib/api/client"
 import { storeAuthSession } from "@/lib/auth/session"
+import { isMfaChallenge, type MfaChallenge } from "@/lib/auth/mfa"
+import { MfaChallengeForm } from "@/components/marketing/mfa-challenge-form"
 
 type AuthUser = {
   id: number
@@ -68,6 +70,7 @@ export function SignInForm({ ssoError = false, ssoSlug = "" }: SignInFormProps) 
   const [error, setError] = useState<string | null>(null)
   const [ssoRequired, setSsoRequired] = useState(false)
   const [slug, setSlug] = useState(ssoSlug)
+  const [challenge, setChallenge] = useState<MfaChallenge | null>(null)
 
   function startSso(orgSlug: string) {
     const clean = orgSlug.trim().toLowerCase()
@@ -94,6 +97,13 @@ export function SignInForm({ ssoError = false, ssoSlug = "" }: SignInFormProps) 
           password: formValue(formData, "password", false),
         },
       })
+
+      // 202 second-factor challenge: apiFetch returns the body for any 2xx, so
+      // detect the challenge by shape (the mfa_token is NOT a bearer).
+      if (isMfaChallenge(data)) {
+        setChallenge(data)
+        return
+      }
 
       if (!data.access_token) {
         setMessage(data.detail || "Check your email to finish signing in.")
@@ -123,6 +133,10 @@ export function SignInForm({ ssoError = false, ssoSlug = "" }: SignInFormProps) 
         <CardDescription>Enter your email and password to access your workspace.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {challenge ? (
+          <MfaChallengeForm challenge={challenge} onSuccess={() => router.push("/dashboard")} />
+        ) : (
+          <>
         {ssoError ? (
           <Alert variant="destructive" role="alert">
             <AlertDescription>{SSO_ERROR_MESSAGE}</AlertDescription>
@@ -204,6 +218,8 @@ export function SignInForm({ ssoError = false, ssoSlug = "" }: SignInFormProps) 
             Enter your organization&apos;s sign-in ID, or use the SSO link your administrator provided.
           </p>
         </form>
+          </>
+        )}
       </CardContent>
       <CardFooter className="flex flex-col gap-3 border-t pt-6">
         <p className="text-center text-sm text-muted-foreground">
