@@ -79,6 +79,8 @@ class Settings:
     password_reset_ttl_minutes: int = 60
 
     base_url: str = "http://127.0.0.1:8000"
+    frontend_base_url: str = "http://localhost:3000"
+    sso_encryption_key: str | None = None
     email_from: str = "noreply@nmrcheck.local"
     email_backend: str = "database"
 
@@ -160,6 +162,8 @@ def get_settings() -> Settings:
             os.getenv("PASSWORD_RESET_TTL_MINUTES"), 60
         ),
         base_url=os.getenv("BASE_URL", "http://127.0.0.1:8000").rstrip("/"),
+        frontend_base_url=os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/"),
+        sso_encryption_key=(os.getenv("SSO_ENCRYPTION_KEY") or None),
         email_from=os.getenv("EMAIL_FROM", "noreply@nmrcheck.local"),
         email_backend=(
             os.getenv("EMAIL_BACKEND", "database").strip().lower() or "database"

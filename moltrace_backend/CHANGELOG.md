@@ -14,6 +14,133 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.41.0 — Security Prompt 2: SCIM 2.0 provisioning + auto-deprovisioning (2026-06-13)
+
+**Headline:** Second build from the MolTrace Security & Data-Integrity Standard. Adds **SCIM 2.0
+user provisioning** bolted onto the per-organization SSO connections, so enterprise IdPs (Okta,
+Microsoft Entra ID) can auto-provision and — the part SSO alone leaves open — **auto-deprovision**
+users. Deprovisioning is always **soft** (no audit-linked row is ever deleted): it disables the
+account and cuts sessions immediately while preserving the user for 21 CFR Part 11 / GxP
+traceability. Backend-only; an FE/admin handoff covers token issuance.
+
+### Added
+- **`src/nmrcheck/scim_store.py`** — the SCIM service layer: per-connection bearer token
+  lifecycle (issue/rotate/revoke/resolve, SHA-256-digest stored, one live token per connection),
+  the `require_scim_context` resolver (token → exactly one connection → one organization, the sole
+  tenant key), three-way create/link, PATCH/PUT apply (op-case normalization, string-boolean
+  coercion, pathless + scalar `active` variants), soft deprovision / reactivation, a minimal SCIM
+  filter parser (`userName`/`externalId eq`), and the ListResponse / Error / discovery builders.
+- **ORM `SCIMTokenORM` / `SCIMUserORM`** (`orm.py`) + **migration `0018_scim_provisioning`** —
+  `scim_tokens` (digest-only bearer, partial-unique *one live token per connection* on Postgres +
+  SQLite) and `scim_users` (the per-connection tenant-isolation boundary; its `id` is the SCIM
+  resource id, **never** the global `users.id`, closing IDOR/enumeration).
+- **Routes** (`api.py`):
+  - Machine-facing `scim_router` at **`/scim/v2`** (auth: per-connection SCIM bearer): discovery
+    (`ServiceProviderConfig`, `ResourceTypes`, `Schemas`), and Users `GET`(list+filter)/`GET {id}`/
+    `POST`/`PUT`/`PATCH`/`DELETE`. All responses — including errors — are `application/scim+json`
+    via a `SCIMError` exception handler that renders the SCIM Error envelope.
+  - Admin-gated (`require_admin`) token management on the SSO connection: `POST`/`GET`/`DELETE`
+    `/auth/sso/connections/{id}/scim-token` (plaintext returned exactly once; status route never
+    re-exposes it) — all audit-logged with the real admin actor.
+- **Pydantic contracts** (`models.py`): `ScimTokenIssueResponse`, `ScimTokenInfo` (the FE-facing
+  admin surface; the SCIM resource JSON is machine-facing and built directly in the store).
+- **`tests/test_scim_provisioning_api.py`** — 18 tests against the real stack: discovery, auth +
+  admin gating, create/link/409-uniqueness/400, filter (case-insensitive, no-match→200-empty),
+  both Okta and Entra deprovision variants (incl. the string-`"False"` coercion), session
+  revocation on deprovision, the **cross-org `is_active` guard** (a contractor in two orgs isn't
+  locked out of one when deprovisioned from the other), soft DELETE, reactivation, **tenant
+  isolation** (a foreign resource id 404s under another connection's token), token rotation, and
+  audit attribution.
+
+### Security hardening (adversarial review)
+- **SCIM provisioning is domain-bound (fail closed):** a connection may only provision/link an
+  email whose domain is in its configured `email_domains` allowlist — an empty allowlist permits
+  nothing. This closes a cross-tenant vector where a connection could otherwise link, and then
+  deprovision (kill sessions / disable), a user belonging to another organization. The legitimate
+  contractor-in-two-orgs case works by each org explicitly allow-listing the shared domain.
+- **Valid `team_members` vocabulary:** IdP-provisioned members are written with the least-privilege
+  `role="viewer"` and deactivated with `status="disabled"` (the canonical `CollaborationRole` /
+  `TeamMemberStatus` values) — the earlier `"member"`/`"inactive"` placeholders broke the
+  org-members serializer. **This also corrects the same `role="member"` value in the v0.40.0 SSO
+  JIT path** (`sso_store._ensure_team_membership`).
+- **Robust SCIM error contract:** uniqueness collisions on create / PUT-rename / PATCH-externalId
+  now return a SCIM `409 uniqueness` envelope (not a generic 503); a malformed `startIndex`/`count`
+  returns a SCIM `400` (not FastAPI's `422 application/json`); a just-minted global user is cleaned
+  up if create then conflicts (no orphan / email shadow). Session revocation is committed in the
+  same transaction as the deactivation; a PUT that omits `active` no longer re-enables an
+  admin-disabled account.
+
+### Notes
+- **Deprovisioning is soft by design** (GxP/Part 11): `active:false` and DELETE flip the SCIM
+  mapping + this org's membership + revoke sessions, and only flip the global `users.is_active`
+  when no other org still has an active membership — no user/audit row is ever physically deleted.
+- **Groups are out of scope** for this build (User provisioning only); `ResourceTypes` advertises
+  only `User`, so an IdP won't attempt unsupported group push.
+- **Frontend handoff** (contracts-first, separate task): regenerate `schema.d.ts` for the admin
+  SCIM-token routes and add the admin token issue/rotate/revoke UI on the SSO connection panel.
+  See `moltrace_backend/docs/fe_handoff_scim_provisioning.md`.
+
+---
+
+## v0.40.0 — Security Prompt 1: Enterprise SSO (OIDC federation, JIT, enforce-SSO) (2026-06-13)
+
+**Headline:** First build from the new MolTrace Security & Data-Integrity Standard. Adds
+**per-organization OpenID Connect single sign-on** — Authorization Code + PKCE (S256), JWKS
+id_token validation, just-in-time user/team provisioning, and an optional **enforce-SSO**
+mode that blocks password login for governed email domains. Backend-only; the frontend wiring
+is handed off as a separate, contracts-first task (see the FE handoff note below).
+
+### Added
+- **`src/nmrcheck/oidc_client.py`** — a minimal, testable OIDC client. Discovery
+  (`.well-known/openid-configuration`), PKCE S256 challenge minting, authorization-URL builder,
+  token exchange, and id_token validation (signature via the IdP JWKS, plus issuer/audience/
+  expiry/nonce). The three network legs are module-level so a mock IdP can be injected in tests.
+- **`src/nmrcheck/sso_secret_crypto.py`** — AES-256-GCM authenticated encryption for IdP client
+  secrets at rest (`base64url(nonce‖ciphertext‖tag)`). A deliberate seam: Security Prompt 7 (KMS
+  envelope encryption) will replace the key-derivation without changing call sites.
+- **`src/nmrcheck/sso_store.py`** — the SSO service layer: admin connection CRUD plus the
+  three-leg login flow. No bearer token is ever minted inside a browser redirect — the callback
+  stamps a single-use **exchange code**, traded for an opaque session over a normal POST. Redirect
+  URIs are computed server-side from settings (never client-supplied) to foreclose open-redirect /
+  token-theft. JIT provisioning creates the user (unusable random password) + an active
+  `team_members` row in the connection's organization, gated by the connection's allowed email
+  domains. `is_sso_enforced_for_email` backs the enforce-SSO login block.
+- **ORM `SSOConnectionORM` / `SSOLoginFlowORM`** (`orm.py`) + **migration `0017_sso_connections`**
+  — `sso_connections` (org-scoped OIDC config, encrypted client secret, allowed domains, enabled /
+  enforce_sso flags) and `sso_login_flows` (short-lived PKCE/nonce/state, then one-time exchange
+  code; no token persisted). Additive and idempotent (table-existence guarded).
+- **Pydantic contracts** (`models.py`): `SSOConnectionCreate` / `SSOConnectionUpdate` /
+  `SSOConnectionOut` / `SSOConnectionList` / `SSOExchangeRequest`. `SSOConnectionOut` **never**
+  carries the client secret.
+- **Routes** (`api.py`):
+  - Admin-gated (`require_admin`) org-scoped CRUD: `GET/POST /auth/sso/connections`,
+    `GET/PATCH/DELETE /auth/sso/connections/{id}` — all audit-logged.
+  - Public login flow: `GET /auth/sso/{slug}/login` (302 → IdP), `GET /auth/sso/callback`
+    (validate → JIT → 302 to the SPA with a one-time code; failures redirect to
+    `/login?sso_error=1`), `POST /auth/sso/exchange` (one-time code → bearer session).
+- **`tests/test_auth_sso_oidc_api.py`** — 9 tests against a mock IdP: admin CRUD with
+  secret-never-leaked + encryption-at-rest assertions, admin-gating, duplicate-slug rejection,
+  the full JIT login flow, single-use exchange codes, email-domain gating, IdP-error handling,
+  and enforce-SSO blocking password login for a governed domain.
+
+### Changed
+- **`src/nmrcheck/settings.py`** — new `frontend_base_url` (SPA callback target) and
+  `sso_encryption_key` (`SSO_ENCRYPTION_KEY`; falls back to a dev-only key with a loud name).
+- **`src/nmrcheck/api.py`** — `/auth/login`, `/auth/sign-in`, and `/auth/token` now reject
+  password auth with **403** for any email under an enabled+enforced SSO connection.
+- **Dependency** — added `pyjwt[crypto]` (RS256/ES256 id_token verification + AES-GCM).
+
+### Notes
+- **Production requirement:** set `SSO_ENCRYPTION_KEY` (and `BASE_URL` / `FRONTEND_BASE_URL`)
+  before any tenant onboards SSO; the dev fallback key must not be used in production.
+- **Frontend handoff** (separate, contracts-first task): regenerate
+  `moltrace_frontend/src/lib/api/schema.d.ts` from the updated `/openapi.json`, add the two SPA
+  routes the flow lands on (`/auth/sso/callback` → POST `/auth/sso/exchange`, and `/login`
+  honoring `?sso_error=1`), and an admin SSO-connection management panel. See
+  `moltrace_backend/docs/fe_handoff_sso_oidc.md`.
+
+---
+
 ## v0.24.9 — Regentry: M7 + Q3D classifications auto-record AI decisions (2026-06-12)
 
 **Headline:** Extends v0.24.8 from CPCA to the other two deterministic regulatory classifications:

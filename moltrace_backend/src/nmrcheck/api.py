@@ -40,7 +40,13 @@ from fastapi import (
 )
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import select
@@ -71,7 +77,10 @@ from . import reaction_store as reaction_store
 from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
 from . import regulatory_surveillance_store as surveillance_store
+from . import oidc_client as oidc_client
+from . import scim_store as scim_store
 from . import spectracheck_store as sc_store
+from . import sso_store as sso_store
 from . import tenant_saas_store as tenant_store
 from . import validation_center_store as validation_store
 from . import workflow_store as wf_store
@@ -738,6 +747,13 @@ from .models import (
     SPCAnalyzeResult,
     SPCCapabilityOut,
     SPCSignalOut,
+    SSOConnectionCreate,
+    SSOConnectionList,
+    SSOConnectionOut,
+    SSOConnectionUpdate,
+    SSOExchangeRequest,
+    ScimTokenInfo,
+    ScimTokenIssueResponse,
     SpectraCheckAuditEventRecord,
     SpectraCheckEvidenceCreate,
     SpectraCheckEvidenceRecord,
@@ -923,6 +939,7 @@ from .upload import UploadParseError, parse_batch_upload
 from .visualization import normalize_artifact_record, normalize_visualization_request
 
 router = APIRouter()
+scim_router = APIRouter(prefix="/scim/v2", tags=["scim"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 logger = logging.getLogger(__name__)
 
@@ -935,6 +952,10 @@ INTERNAL_ERROR_DETAIL = "Internal server error."
 PUBLIC_AUTH_REQUIRED_DETAIL = "Sign in to access live MolTrace data."
 PUBLIC_ACCESS_DENIED_DETAIL = "You do not have access to perform this action."
 PUBLIC_REQUEST_FAILED_DETAIL = "Request could not be completed. Please try again."
+_SSO_ENFORCED_DETAIL = (
+    "Single sign-on is required for your organization. "
+    "Please sign in through your identity provider."
+)
 CORS_EXPOSE_HEADERS = (
     "Content-Disposition",
     "X-MolTrace-Backend-Version",
@@ -4836,6 +4857,8 @@ def sign_up(payload: UserSignUp, request: Request) -> AuthPageResponse:
 @router.post("/auth/login", response_model=AccessTokenResponse)
 def login_json(payload: UserLogin, request: Request) -> AccessTokenResponse:
     state = _state(request)
+    if sso_store.is_sso_enforced_for_email(state.session_factory, payload.email):
+        raise HTTPException(status_code=403, detail=_SSO_ENFORCED_DETAIL)
     user = authenticate_user(
         state.session_factory,
         email=payload.email,
@@ -4867,6 +4890,8 @@ def login_json(payload: UserLogin, request: Request) -> AccessTokenResponse:
 @router.post("/auth/sign-in", response_model=AuthPageResponse)
 def sign_in(payload: UserSignIn, request: Request) -> AuthPageResponse:
     state = _state(request)
+    if sso_store.is_sso_enforced_for_email(state.session_factory, payload.email):
+        raise HTTPException(status_code=403, detail=_SSO_ENFORCED_DETAIL)
     user = authenticate_user(
         state.session_factory,
         email=payload.email,
@@ -4901,6 +4926,8 @@ def login_form(
     request: Request, form_data: OAuth2PasswordRequestForm = Depends()
 ) -> AccessTokenResponse:
     state = _state(request)
+    if sso_store.is_sso_enforced_for_email(state.session_factory, form_data.username):
+        raise HTTPException(status_code=403, detail=_SSO_ENFORCED_DETAIL)
     user = authenticate_user(
         state.session_factory,
         email=form_data.username,
@@ -4941,6 +4968,413 @@ def auth_logout(
     if context.raw_token is not None:
         revoke_token(_state(request).session_factory, context.raw_token)
     return MessageResponse(detail="Logged out.")
+
+
+# --------------------------------------------------------------------------- SSO (OIDC)
+#
+# Admin-gated, per-organization OIDC connection management plus the public three-leg login
+# flow (redirect -> IdP callback -> one-time exchange). See sso_store for the security model.
+
+
+@router.get("/auth/sso/connections", response_model=SSOConnectionList)
+def sso_list_connections(
+    request: Request,
+    organization_id: int | None = None,
+    context: AccessContext = Depends(require_admin),
+) -> SSOConnectionList:
+    connections = sso_store.list_connections(
+        _state(request).session_factory, organization_id=organization_id
+    )
+    return SSOConnectionList(connections=connections)
+
+
+@router.post(
+    "/auth/sso/connections",
+    response_model=SSOConnectionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def sso_create_connection(
+    payload: SSOConnectionCreate,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> SSOConnectionOut:
+    state = _state(request)
+    created_by = context.user.id if context.user is not None else None
+    try:
+        connection = sso_store.create_connection(
+            state.session_factory,
+            payload,
+            created_by_user_id=created_by,
+            settings=state.settings,
+        )
+    except sso_store.SSOError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="auth.sso.connection_created",
+        message=f"SSO connection {connection.slug!r} created.",
+        entity_type="sso_connection",
+        entity_id=connection.id,
+        metadata={"organization_id": connection.organization_id, "slug": connection.slug},
+    )
+    return connection
+
+
+@router.get("/auth/sso/connections/{connection_id}", response_model=SSOConnectionOut)
+def sso_get_connection(
+    connection_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> SSOConnectionOut:
+    connection = sso_store.get_connection(_state(request).session_factory, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="SSO connection not found.")
+    return connection
+
+
+@router.patch("/auth/sso/connections/{connection_id}", response_model=SSOConnectionOut)
+def sso_update_connection(
+    connection_id: int,
+    payload: SSOConnectionUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> SSOConnectionOut:
+    state = _state(request)
+    connection = sso_store.update_connection(
+        state.session_factory, connection_id, payload, settings=state.settings
+    )
+    if connection is None:
+        raise HTTPException(status_code=404, detail="SSO connection not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="auth.sso.connection_updated",
+        message=f"SSO connection {connection.slug!r} updated.",
+        entity_type="sso_connection",
+        entity_id=connection.id,
+        metadata={"secret_rotated": payload.client_secret is not None},
+    )
+    return connection
+
+
+@router.delete("/auth/sso/connections/{connection_id}", response_model=MessageResponse)
+def sso_delete_connection(
+    connection_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> MessageResponse:
+    state = _state(request)
+    if not sso_store.delete_connection(state.session_factory, connection_id):
+        raise HTTPException(status_code=404, detail="SSO connection not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="auth.sso.connection_deleted",
+        message="SSO connection deleted.",
+        entity_type="sso_connection",
+        entity_id=connection_id,
+    )
+    return MessageResponse(detail="SSO connection deleted.")
+
+
+@router.post(
+    "/auth/sso/connections/{connection_id}/scim-token",
+    response_model=ScimTokenIssueResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def sso_issue_scim_token(
+    connection_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> ScimTokenIssueResponse:
+    """Mint a per-connection SCIM bearer for the IdP. Plaintext is returned exactly once."""
+    state = _state(request)
+    created_by = context.user.id if context.user is not None else None
+    result = scim_store.issue_token(
+        state.session_factory, connection_id=connection_id, created_by_user_id=created_by
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="SSO connection not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="auth.sso.scim_token_issued",
+        message=f"SCIM token issued for SSO connection {connection_id}.",
+        entity_type="sso_connection",
+        entity_id=connection_id,
+        metadata={"token_prefix": result.token_prefix},
+    )
+    return result
+
+
+@router.get(
+    "/auth/sso/connections/{connection_id}/scim-token", response_model=ScimTokenInfo
+)
+def sso_get_scim_token(
+    connection_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> ScimTokenInfo:
+    """Status of the live SCIM token (prefix + usage), never the plaintext."""
+    info = scim_store.get_token_info(_state(request).session_factory, connection_id=connection_id)
+    if info is None:
+        raise HTTPException(status_code=404, detail="No active SCIM token for this connection.")
+    return info
+
+
+@router.delete(
+    "/auth/sso/connections/{connection_id}/scim-token", response_model=MessageResponse
+)
+def sso_revoke_scim_token(
+    connection_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> MessageResponse:
+    state = _state(request)
+    if not scim_store.revoke_token(state.session_factory, connection_id=connection_id):
+        raise HTTPException(status_code=404, detail="No active SCIM token to revoke.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="auth.sso.scim_token_revoked",
+        message=f"SCIM token revoked for SSO connection {connection_id}.",
+        entity_type="sso_connection",
+        entity_id=connection_id,
+    )
+    return MessageResponse(detail="SCIM token revoked.")
+
+
+@router.get("/auth/sso/{slug}/login")
+def sso_begin_login(slug: str, request: Request) -> RedirectResponse:
+    """Public: redirect the browser to the organization's IdP authorization endpoint."""
+    state = _state(request)
+    try:
+        authorization_url = sso_store.begin_login(
+            state.session_factory, slug, settings=state.settings
+        )
+    except sso_store.SSONotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except sso_store.SSOError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except oidc_client.OIDCError as exc:
+        raise HTTPException(
+            status_code=502, detail="Could not reach the identity provider."
+        ) from exc
+    return RedirectResponse(authorization_url, status_code=302)
+
+
+@router.get("/auth/sso/callback")
+def sso_callback(
+    request: Request,
+    state: str | None = None,
+    code: str | None = None,
+    error: str | None = None,
+) -> RedirectResponse:
+    """Public: the IdP redirects here. Validate, JIT, then bounce to the SPA with a code."""
+    app_state = _state(request)
+    frontend = app_state.settings.frontend_base_url.rstrip("/")
+    if error or not state or not code:
+        return RedirectResponse(f"{frontend}/login?sso_error=1", status_code=302)
+    try:
+        exchange_code = sso_store.handle_callback(
+            app_state.session_factory, state=state, code=code, settings=app_state.settings
+        )
+    except (sso_store.SSOError, oidc_client.OIDCError):
+        return RedirectResponse(f"{frontend}/login?sso_error=1", status_code=302)
+    return RedirectResponse(
+        f"{frontend}/auth/sso/callback?code={exchange_code}", status_code=302
+    )
+
+
+@router.post("/auth/sso/exchange", response_model=AccessTokenResponse)
+def sso_exchange(payload: SSOExchangeRequest, request: Request) -> AccessTokenResponse:
+    """Public: trade the one-time callback code for an opaque bearer session."""
+    state = _state(request)
+    result = sso_store.consume_exchange(
+        state.session_factory, code=payload.code, settings=state.settings
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=400, detail="Invalid or expired SSO exchange code."
+        )
+    token, expires_at, user = result
+    _audit_from_context(
+        request,
+        context=AccessContext(user=user),
+        event_type="auth.sso.login",
+        message="User logged in via SSO.",
+        entity_type="user",
+        entity_id=user.id,
+    )
+    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+
+
+# --------------------------------------------------------------------------- SCIM 2.0
+#
+# Machine-facing provisioning API (Okta/Entra). Authenticated by a per-connection SCIM bearer
+# (require_scim_context), every op scoped to that connection's organization. All responses —
+# including errors — are application/scim+json; the store raises scim_store.SCIMError which the
+# app-level handler renders as the SCIM Error envelope. See scim_store for the security model.
+
+
+def require_scim_context(request: Request) -> scim_store.SCIMContext:
+    """Resolve the ``Authorization: Bearer`` SCIM token to exactly one connection/org, or 401."""
+    header = request.headers.get("authorization") or ""
+    bearer = header[7:].strip() if header[:7].lower() == "bearer " else None
+    ctx = scim_store.resolve_token(_state(request).session_factory, bearer=bearer)
+    if ctx is None:
+        raise scim_store.SCIMError("Invalid or missing SCIM bearer token.", 401)
+    return ctx
+
+
+def _scim_json(content: dict[str, object], status_code: int = 200) -> JSONResponse:
+    return JSONResponse(
+        content=content, status_code=status_code, media_type="application/scim+json"
+    )
+
+
+async def _read_scim_body(request: Request) -> dict[str, object]:
+    try:
+        body = await request.json()
+    except Exception as exc:  # noqa: BLE001 - any parse failure is a SCIM 400
+        raise scim_store.SCIMError("Request body must be valid JSON.", 400, "invalidSyntax") from exc
+    if not isinstance(body, dict):
+        raise scim_store.SCIMError("Request body must be a JSON object.", 400, "invalidSyntax")
+    return body
+
+
+@scim_router.get("/ServiceProviderConfig")
+def scim_service_provider_config(
+    request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> JSONResponse:
+    return _scim_json(scim_store.service_provider_config(_state(request).settings.base_url))
+
+
+@scim_router.get("/ResourceTypes")
+def scim_resource_types(
+    request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> JSONResponse:
+    return _scim_json(scim_store.resource_types(_state(request).settings.base_url))
+
+
+@scim_router.get("/ResourceTypes/User")
+def scim_resource_type_user(
+    request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> JSONResponse:
+    return _scim_json(scim_store.resource_type_user(_state(request).settings.base_url))
+
+
+@scim_router.get("/Schemas")
+def scim_schemas(
+    request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> JSONResponse:
+    return _scim_json(scim_store.schemas_list(_state(request).settings.base_url))
+
+
+@scim_router.get("/Schemas/{urn:path}")
+def scim_schema(
+    urn: str, request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> JSONResponse:
+    doc = scim_store.schema_by_id(urn, _state(request).settings.base_url)
+    if doc is None:
+        raise scim_store.SCIMError("Schema not found.", 404)
+    return _scim_json(doc)
+
+
+@scim_router.get("/Users")
+def scim_list_users(
+    request: Request,
+    ctx: scim_store.SCIMContext = Depends(require_scim_context),
+    filter: str | None = Query(default=None),
+    startIndex: str | None = Query(default=None),
+    count: str | None = Query(default=None),
+) -> JSONResponse:
+    # startIndex/count are accepted as raw strings so a malformed value renders as a SCIM 400
+    # (scim+json) inside list_users, rather than FastAPI's 422 application/json envelope.
+    state = _state(request)
+    body = scim_store.list_users(
+        state.session_factory,
+        ctx=ctx,
+        base_url=state.settings.base_url,
+        filter_str=filter,
+        start_index=startIndex,
+        count=count,
+    )
+    return _scim_json(body)
+
+
+@scim_router.get("/Users/{scim_id}")
+def scim_get_user(
+    scim_id: str, request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> JSONResponse:
+    state = _state(request)
+    resource = scim_store.get_user(
+        state.session_factory, ctx=ctx, base_url=state.settings.base_url, scim_id=scim_id
+    )
+    if resource is None:
+        raise scim_store.SCIMError("User not found.", 404)
+    return _scim_json(resource)
+
+
+@scim_router.post("/Users")
+async def scim_create_user(
+    request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> JSONResponse:
+    payload = await _read_scim_body(request)
+    state = _state(request)
+    resource = scim_store.create_user_scim(
+        state.session_factory, ctx=ctx, base_url=state.settings.base_url, payload=payload
+    )
+    response = _scim_json(resource, status_code=201)
+    response.headers["Location"] = resource["meta"]["location"]
+    return response
+
+
+@scim_router.put("/Users/{scim_id}")
+async def scim_replace_user(
+    scim_id: str, request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> JSONResponse:
+    payload = await _read_scim_body(request)
+    state = _state(request)
+    resource = scim_store.replace_user(
+        state.session_factory,
+        ctx=ctx,
+        base_url=state.settings.base_url,
+        scim_id=scim_id,
+        payload=payload,
+    )
+    if resource is None:
+        raise scim_store.SCIMError("User not found.", 404)
+    return _scim_json(resource)
+
+
+@scim_router.patch("/Users/{scim_id}")
+async def scim_patch_user(
+    scim_id: str, request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> JSONResponse:
+    payload = await _read_scim_body(request)
+    state = _state(request)
+    resource = scim_store.patch_user(
+        state.session_factory,
+        ctx=ctx,
+        base_url=state.settings.base_url,
+        scim_id=scim_id,
+        payload=payload,
+    )
+    if resource is None:
+        raise scim_store.SCIMError("User not found.", 404)
+    return _scim_json(resource)
+
+
+@scim_router.delete("/Users/{scim_id}")
+def scim_delete_user(
+    scim_id: str, request: Request, ctx: scim_store.SCIMContext = Depends(require_scim_context)
+) -> Response:
+    state = _state(request)
+    if not scim_store.delete_user(state.session_factory, ctx=ctx, scim_id=scim_id):
+        raise scim_store.SCIMError("User not found.", 404)
+    return Response(status_code=204)
 
 
 @router.post("/auth/request-email-verification", response_model=TokenActionPreview)
@@ -27681,6 +28115,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             headers=exc.headers,
         )
 
+    @app.exception_handler(scim_store.SCIMError)
+    async def scim_error_handler(
+        request: Request, exc: scim_store.SCIMError
+    ) -> JSONResponse:
+        # Render every SCIM failure (auth, validation, conflict, not-found) as the SCIM Error
+        # envelope with the application/scim+json media type Okta/Entra expect.
+        headers = {"WWW-Authenticate": "Bearer"} if exc.status == 401 else None
+        return JSONResponse(
+            status_code=exc.status,
+            content=scim_store.scim_error_body(exc.detail, exc.status, exc.scim_type),
+            media_type="application/scim+json",
+            headers=headers,
+        )
+
     @app.exception_handler(RequestValidationError)
     async def safe_validation_exception_handler(
         request: Request, exc: RequestValidationError
@@ -27698,6 +28146,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(router)
+    app.include_router(scim_router)
     from .nmr2d_routes import router as nmr2d_router
 
     app.include_router(nmr2d_router)

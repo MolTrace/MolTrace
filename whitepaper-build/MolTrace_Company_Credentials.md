@@ -119,7 +119,7 @@ MolTrace was founded to build **one platform** where the layers know about each 
 | MS ingestion | mzML / mzXML community standards |
 | Database | PostgreSQL (production) · SQLite (local dev) |
 | Background jobs | Queue + worker pool |
-| Authentication | Tenant-aware JWT + role-based access |
+| Authentication | Tenant-aware opaque bearer sessions · per-organization OpenID Connect SSO (PKCE · JIT provisioning · optional enforce-SSO) · SCIM 2.0 auto-provisioning/deprovisioning · role-based access |
 | Hosting | Vercel (frontend) · Render / Railway (backend) · S3-compatible raw vault |
 | Observability | Audit-event ledger · request-trace IDs · per-tenant dashboards |
 | Reproducibility & MLOps | Content-addressed dataset versioning · experiment / run tracking (params, metrics, dataset-version tag, git SHA, model checksum) · fail-loud data-validation gates (optional DVC · MLflow · Great Expectations) · versioned model registry + 5-layer inference router provenance · licence-clean public-datasets corpus with a frozen holdout · dominance-gated model promotion (ten-metric checksum-locked gold-set eval) · LoRA domain fine-tuning with Bayesian hyper-parameter optimisation (optional Optuna), a confidence-calibration head, and calibration as a hard promotion gate · learned contradiction detection feeding an active-learning queue |

@@ -12203,6 +12203,93 @@ class AuthPageResponse(BaseModel):
     detail: str
 
 
+class SSOConnectionCreate(BaseModel):
+    """Admin payload to register a per-organization OIDC connection (Prompt 1, SSO)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    organization_id: int = Field(gt=0)
+    slug: str = Field(min_length=2, max_length=64, pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
+    display_name: str = Field(min_length=1, max_length=200)
+    issuer: str = Field(min_length=8, max_length=500)
+    client_id: str = Field(min_length=1, max_length=500)
+    client_secret: str = Field(min_length=1, max_length=2000)
+    email_domains: list[str] = Field(default_factory=list, max_length=50)
+    enabled: bool = True
+    enforce_sso: bool = False
+
+
+class SSOConnectionUpdate(BaseModel):
+    """Partial update; ``client_secret`` is re-encrypted only when present."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str | None = Field(default=None, min_length=1, max_length=200)
+    issuer: str | None = Field(default=None, min_length=8, max_length=500)
+    client_id: str | None = Field(default=None, min_length=1, max_length=500)
+    client_secret: str | None = Field(default=None, min_length=1, max_length=2000)
+    email_domains: list[str] | None = Field(default=None, max_length=50)
+    enabled: bool | None = None
+    enforce_sso: bool | None = None
+
+
+class SSOConnectionOut(BaseModel):
+    """Connection as returned to admins — never includes the client secret."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    organization_id: int
+    slug: str
+    display_name: str
+    protocol: str
+    issuer: str
+    client_id: str
+    email_domains: list[str]
+    enabled: bool
+    enforce_sso: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class SSOConnectionList(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connections: list[SSOConnectionOut]
+
+
+class SSOExchangeRequest(BaseModel):
+    """One-time exchange-code → bearer session (the callback issues the code)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=10, max_length=128)
+
+
+class ScimTokenIssueResponse(BaseModel):
+    """The plaintext SCIM bearer is returned exactly once, at issue time (never re-readable)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: str
+    token_prefix: str
+    connection_id: int
+    created_at: datetime
+    expires_at: datetime | None = None
+
+
+class ScimTokenInfo(BaseModel):
+    """Status of the live SCIM token for a connection — never includes the plaintext."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    connection_id: int
+    token_prefix: str
+    created_at: datetime
+    last_used_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
 class MessageResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

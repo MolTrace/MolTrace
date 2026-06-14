@@ -651,7 +651,7 @@ The ALCOA+ principles map onto MolTrace architectural primitives:
 
 | ALCOA+ principle | MolTrace mechanism |
 |---|---|
-| **A**ttributable | Every audit event carries `user_id`, `tenant_id`, timestamp, IP, and user-agent; every AI-assisted result also carries the exact model ids + SHA-256 that produced it (§4.5 registry + router `model_versions`) |
+| **A**ttributable | Identity is established up front by authenticated, uniquely-identified users — opaque bearer sessions or per-organization OpenID Connect SSO (Authorization Code + PKCE, JWKS id_token validation, JIT provisioning, optional enforce-SSO), with SCIM 2.0 lifecycle management (auto-provision and soft auto-**deprovision** — disable + immediate session revocation, never deleting an audit-linked user) keeping the active-user set in sync with the IdP — the §11.10(d)/§11.200 access-control basis for attribution — then every audit event carries `user_id`, `tenant_id`, timestamp, IP, and user-agent; every AI-assisted result also carries the exact model ids + SHA-256 that produced it (§4.5 registry + router `model_versions`) |
 | **L**egible | Pydantic-typed responses with stable JSON keys; HTML report renders for human review |
 | **C**ontemporaneous | Audit events written synchronously in the same transaction as the analyze record |
 | **O**riginal | Immutable raw FID vault; original archive bytes never overwritten |
