@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { ArrowLeft, BarChart3, FileText, Hash } from "lucide-react"
 import { ApiError, apiFetch } from "@/lib/api/client"
+import { MfaPolicyPanel } from "@/components/admin/mfa-policy-panel"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -2912,6 +2913,7 @@ export function TenantDetailWorkspace() {
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="data_boundary">Data Boundary</TabsTrigger>
           <TabsTrigger value="security_profile">Security Profile</TabsTrigger>
+          <TabsTrigger value="mfa_policy">MFA Policy</TabsTrigger>
           <TabsTrigger value="validation_profile">Validation Profile</TabsTrigger>
           <TabsTrigger value="usage_roi">Usage / ROI</TabsTrigger>
           <TabsTrigger value="health_score">Health Score</TabsTrigger>
@@ -3028,6 +3030,12 @@ export function TenantDetailWorkspace() {
             error={sections.securityProfile.error}
             onReload={load}
           />
+        </TabsContent>
+
+        <TabsContent value="mfa_policy">
+          {/* organization_id source: the tenant route param. If a tenant and its
+              organization diverge, this is the value to revisit. */}
+          <MfaPolicyPanel organizationId={tenantId} />
         </TabsContent>
 
         <TabsContent value="validation_profile">

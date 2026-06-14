@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { MobileBottomNav } from "@/src/components/app-shell/MobileBottomNav"
 import { TenantProvider } from "@/src/lib/tenant/tenant-context"
+import { StepUpProvider } from "@/components/auth/step-up-provider"
 
 export function ResponsiveAppShell({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
@@ -17,6 +18,7 @@ export function ResponsiveAppShell({ children }: { children: React.ReactNode }) 
 
   return (
     <TenantProvider>
+      <StepUpProvider>
       <OverviewDataProvider>
         <div className="flex h-screen overflow-hidden overflow-x-hidden bg-background">
           {!isMobile ? (
@@ -40,6 +42,7 @@ export function ResponsiveAppShell({ children }: { children: React.ReactNode }) 
           {isMobile ? <MobileBottomNav /> : null}
         </div>
       </OverviewDataProvider>
+      </StepUpProvider>
     </TenantProvider>
   )
 }
