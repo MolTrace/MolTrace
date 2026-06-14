@@ -16,6 +16,8 @@ from moltrace.regulatory.compliance.annex22_wrapper import (
     Annex22Error,
     Annex22Log,
     Annex22PendingError,
+    DecisionInputs,
+    DecisionMeta,
     GovernedResult,
     RiskLevel,
     annex22_compliance_checklist,
@@ -23,18 +25,34 @@ from moltrace.regulatory.compliance.annex22_wrapper import (
     governance_context,
     with_annex22_governance,
 )
+from moltrace.regulatory.compliance.governed_engines import (
+    GOVERNED_ENGINES,
+    REQUIRED_P4_P8_DECISIONS,
+    Annex22GovernanceError,
+    assert_full_p4_p8_governance,
+    governed_engine,
+    ungoverned_p4_p8,
+)
 
 __all__ = [
     "DRAFT_DISCLAIMER",
     "GENESIS_HASH",
+    "GOVERNED_ENGINES",
+    "REQUIRED_P4_P8_DECISIONS",
     "AIDecisionRecord",
     "Annex22Error",
+    "Annex22GovernanceError",
     "Annex22Log",
     "Annex22PendingError",
+    "DecisionInputs",
+    "DecisionMeta",
     "GovernedResult",
     "RiskLevel",
     "annex22_compliance_checklist",
+    "assert_full_p4_p8_governance",
     "default_annex22_log",
     "governance_context",
+    "governed_engine",
+    "ungoverned_p4_p8",
     "with_annex22_governance",
 ]
