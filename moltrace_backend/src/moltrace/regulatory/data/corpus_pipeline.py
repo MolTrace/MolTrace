@@ -49,6 +49,7 @@ __all__ = [
     "RevisionAlert",
     "SourceAdapter",
     "VersionPin",
+    "WhoTechnicalReportAdapter",
     "guard_redistribution",
     "index",
     "ingest",
@@ -66,6 +67,7 @@ class CorpusLicense(StrEnum):
     FDA_PUBLIC_DOMAIN = "fda_public_domain"  # US-government work: redistributable
     ICH_COPYRIGHTED = "ich_copyrighted"  # free to access, NOT redistributable
     EMA_REUSE_TERMS = "ema_reuse_terms"  # reuse terms apply; internal-only handling
+    WHO_REUSE_TERMS = "who_reuse_terms"  # WHO TRS: freely available, copyrighted; internal-only
 
     @property
     def redistributable(self) -> bool:
@@ -87,6 +89,7 @@ class CorpusSource(StrEnum):
     ICH_GUIDELINE = "ich_guideline"
     EMA_GUIDANCE = "ema_guidance"
     FDA_NDSRI = "fda_ndsri"  # FDA Nitrosamine (NDSRI) database — the Prompt 21 validation set
+    WHO_TECHNICAL_REPORT = "who_technical_report"  # WHO TRS on pharmaceutical quality
 
 
 # The licence each source ships under (a source cannot silently change its licence).
@@ -95,6 +98,7 @@ _SOURCE_LICENSE: dict[CorpusSource, CorpusLicense] = {
     CorpusSource.ICH_GUIDELINE: CorpusLicense.ICH_COPYRIGHTED,
     CorpusSource.EMA_GUIDANCE: CorpusLicense.EMA_REUSE_TERMS,
     CorpusSource.FDA_NDSRI: CorpusLicense.FDA_PUBLIC_DOMAIN,
+    CorpusSource.WHO_TECHNICAL_REPORT: CorpusLicense.WHO_REUSE_TERMS,
 }
 
 
@@ -286,6 +290,15 @@ class EmaGuidanceAdapter(SourceAdapter):
     source = CorpusSource.EMA_GUIDANCE
 
 
+class WhoTechnicalReportAdapter(SourceAdapter):
+    """WHO technical reports (TRS) on pharmaceutical quality — freely available but copyrighted.
+
+    Stored for internal RAG, never redistributed; every citation links the official WHO source.
+    """
+
+    source = CorpusSource.WHO_TECHNICAL_REPORT
+
+
 class FdaNdsriAdapter(SourceAdapter):
     """FDA Nitrosamine (NDSRI) database — public domain; feeds the Prompt 21 validation set.
 
@@ -362,15 +375,54 @@ class IndexChunk:
         return f"{self.source.value} §{self.section} (effective {self.effective_date}) — {self.url}"
 
 
-def _chunk_doc(doc: RawDoc) -> list[tuple[str, str]]:
-    """Split a document into (section_label, text) chunks — by its sections, else by paragraph."""
+def _window(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
+    """Split ``text`` into ~``chunk_size``-token windows overlapping by ``chunk_overlap`` tokens.
+
+    Tokens are whitespace-delimited (a dependency-free approximation of the Prompt 10 "800 tokens,
+    200 overlap" spec). A body at or under ``chunk_size`` is returned unchanged.
+    """
+
+    tokens = text.split()
+    if chunk_size <= 0 or len(tokens) <= chunk_size:
+        return [text]
+    step = max(1, chunk_size - chunk_overlap)
+    windows: list[str] = []
+    for start in range(0, len(tokens), step):
+        window = tokens[start : start + chunk_size]
+        if not window:
+            break
+        windows.append(" ".join(window))
+        if start + chunk_size >= len(tokens):
+            break
+    return windows
+
+
+def _chunk_doc(
+    doc: RawDoc, *, chunk_size: int | None = None, chunk_overlap: int = 0
+) -> list[tuple[str, str]]:
+    """Split a document into (section_label, text) chunks — by its sections, else by paragraph.
+
+    When ``chunk_size`` is given, each section/paragraph body is further split into token windows of
+    that size overlapping by ``chunk_overlap`` (windows of a single body are suffixed ``#1``, ``#2``
+    … so each chunk keeps a distinct, citable section label). With ``chunk_size`` unset the body is
+    kept whole (one chunk per section/paragraph).
+    """
 
     if doc.sections:
-        return [(label, body) for label, body in doc.sections if body.strip()]
-    paras = [p.strip() for p in doc.text.split("\n\n") if p.strip()]
-    if not paras:
-        return []
-    return [(f"p{i + 1}", para) for i, para in enumerate(paras)]
+        base = [(label, body) for label, body in doc.sections if body.strip()]
+    else:
+        paras = [p.strip() for p in doc.text.split("\n\n") if p.strip()]
+        base = [(f"p{i + 1}", para) for i, para in enumerate(paras)]
+    if not base or chunk_size is None:
+        return base
+    out: list[tuple[str, str]] = []
+    for label, body in base:
+        windows = _window(body, chunk_size, chunk_overlap)
+        if len(windows) == 1:
+            out.append((label, windows[0]))
+        else:
+            out.extend((f"{label}#{j + 1}", w) for j, w in enumerate(windows))
+    return out
 
 
 def index(
@@ -378,6 +430,8 @@ def index(
     *,
     embedder: Callable[[str], Sequence[float]] | None = None,
     sink: Callable[[IndexChunk], None] | None = None,
+    chunk_size: int | None = None,
+    chunk_overlap: int = 0,
 ) -> list[IndexChunk]:
     """Chunk each document for the Prompt 14 retriever, preserving citation provenance.
 
@@ -385,11 +439,24 @@ def index(
     retrieved citation is exact and current. ``embedder`` (a callable ``str -> Sequence[float]``)
     attaches vectors when supplied; ``sink`` (a callable ``IndexChunk -> None``, e.g. the OpenSearch
     / vector-store writer) receives each chunk. Both are optional so indexing is testable offline.
+
+    Chunking is configurable: by default each section/paragraph becomes one chunk; pass
+    ``chunk_size`` (whitespace tokens, e.g. 800) and ``chunk_overlap`` (e.g. 200) to split large
+    bodies into overlapping windows. ``chunk_overlap`` must be ``0 <= overlap < chunk_size``.
     """
+
+    if chunk_size is not None:
+        if chunk_size <= 0:
+            raise ValueError(f"chunk_size must be positive, got {chunk_size}")
+        if not 0 <= chunk_overlap < chunk_size:
+            raise ValueError(
+                f"chunk_overlap must satisfy 0 <= overlap < chunk_size ({chunk_size}), "
+                f"got {chunk_overlap}"
+            )
 
     chunks: list[IndexChunk] = []
     for doc in docs.docs:
-        for section, body in _chunk_doc(doc):
+        for section, body in _chunk_doc(doc, chunk_size=chunk_size, chunk_overlap=chunk_overlap):
             # Stable, unique chunk address: the doc's version hash + this section + its body.
             chunk_id = content_hash(
                 {

@@ -41,6 +41,15 @@ fid = [
 docx = [
     "python-docx>=1.1.2",
 ]
+# RAG over the regulatory corpus (Prompt 10). OPTIONAL: regulatory_search runs on a zero-dependency
+# lexical retriever and synthesize_answer has a deterministic extractive path, so the engine and its
+# tests run with no extra deps. Installing this group enables the production backends — Claude
+# synthesis (anthropic) and OpenAI embeddings for the vector retriever. The default CI `test` job
+# does not install it; the LLM/embedding paths are injected in tests via fakes.
+rag = [
+    "anthropic>=0.40",
+    "openai>=1.40",
+]
 dev = [
     "pytest>=8.0",
     # Parallel test execution (`pytest -n auto`) — used by the CI backend job to
