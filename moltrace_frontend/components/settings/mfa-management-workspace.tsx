@@ -82,6 +82,12 @@ export function MfaManagementWorkspace() {
     void load()
   }, [load])
 
+  // Reset the transient "Copied" label whenever the recovery-codes modal closes,
+  // so re-opening a fresh set within the 1.5s window doesn't show a stale state.
+  useEffect(() => {
+    if (recoveryCodes === null) setCopied(false)
+  }, [recoveryCodes])
+
   /** Run a step-up-gated mutation (proactive ensureStepUp + reactive 401 retry). */
   async function gated(key: string, run: () => Promise<void>) {
     setBusy(key)
