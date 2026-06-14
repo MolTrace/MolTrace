@@ -14,6 +14,55 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.43.0 — Security Prompt 4: Session & token hardening (rotating refresh + reuse detection) (2026-06-14)
+
+**Headline:** Fourth build from the MolTrace Security & Data-Integrity Standard. Adds a long-lived,
+**rotating, single-use refresh token** alongside the existing access bearer, grouped into a login
+**family**: each refresh rotates to a fresh pair, presenting a spent refresh is **reuse** and
+revokes the whole family (OWASP/RFC 9700), with **idle + absolute timeouts**, optional **device
+binding**, and **immediate** server-side revocation (DB-checked on the hot path, no TTL wait).
+Fully backward-compatible — the access bearer contract is unchanged and `refresh_token` is an
+additive optional field, so the existing suite and the live FE keep working.
+
+### Added
+- **`src/nmrcheck/session_store.py`** — `mint_session` (family + access + first refresh),
+  `rotate_refresh` (validate → reuse-detect → mint new pair → **carry MFA/step-up state forward** →
+  atomically spend the old refresh), `revoke_family_by_*` / `revoke_all_user_families`, device
+  fingerprinting. Tokens are opaque, sha256-at-rest.
+- **ORM `SessionFamilyORM` + `RefreshTokenORM`** + 2 nullable `session_tokens` columns
+  (`family_id`, `refresh_id`) + **migration `0020`** (idempotent; `_ensure_sqlite_schema` backfill).
+- **Routes** (`api.py`): `POST /auth/refresh` (rotate), `POST /auth/refresh/revoke` (family),
+  family-aware `POST /auth/logout`. A `SessionError` handler preserves the machine code
+  (`token_invalid` | `token_expired` | `token_reuse_detected`) for the SPA.
+- **Pydantic**: `AccessTokenResponse` / `AuthPageResponse` gain optional `refresh_token` +
+  `refresh_expires_at`; `RefreshRequest` / `RefreshRevokeRequest`.
+- **`tests/test_session_hardening.py`** — 15 tests: rotation + old-invalidation, **reuse→family
+  revoke** (+ flag off), rotation-disabled, **MFA carry-forward**, immediate revocation (logout /
+  refresh-revoke / password-reset), **idle** (benign) + **absolute** cap, **configurable
+  lifetimes** (AC#2), **device binding**, legacy NULL-family back-compat, invalid-token.
+
+### Changed
+- **`get_user_by_token`** gains a family-revoked predicate → a revoked family's access bearers die
+  on the **next request** (AC#1). NULL `family_id` (legacy / pre-0020) no-ops, so behavior is
+  unchanged for existing rows.
+- **`revoke_all_user_tokens`** is now family-aware (revokes families + refresh tokens too), so a
+  global revoke (password reset) can't be undone by a held refresh token.
+- **All six login mint sites** (`/auth/login`, `/auth/token`, `/auth/sign-in`+`/auth/sign-up` via
+  `_issue_auth_page_session`, the MFA login-verify routes via `mfa_store._mint`, and SSO
+  `consume_exchange`) now mint through `session_store.mint_session` and return a refresh token.
+- **Settings**: `REFRESH_TOKEN_IDLE_MINUTES` (7d), `REFRESH_TOKEN_ABSOLUTE_MINUTES` (30d),
+  `REFRESH_ROTATION_ENABLED`, `REFRESH_REUSE_REVOKES_FAMILY`, `SESSION_DEVICE_BINDING_ENABLED`.
+  `ACCESS_TOKEN_TTL_MINUTES` default unchanged (7d) for back-compat — **recommend 15m in prod**.
+
+### Notes
+- Immediate revocation is delivered by the family predicate; the access-token TTL only bounds the
+  residual window. Set a short `ACCESS_TOKEN_TTL_MINUTES` in production.
+- **FE handoff** (contracts-first): regenerate `schema.d.ts`, store the refresh token, and call
+  `POST /auth/refresh` on access-expiry / `401` (treating `token_reuse_detected` as a hard logout).
+  See `moltrace_backend/docs/fe_handoff_session_hardening.md`.
+
+---
+
 ## v0.42.0 — Security Prompt 3: MFA & passkeys (TOTP + WebAuthn/FIDO2) + step-up (2026-06-14)
 
 **Headline:** Third build from the MolTrace Security & Data-Integrity Standard. Adds **multi-factor

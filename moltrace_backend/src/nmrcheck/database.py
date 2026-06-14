@@ -8,20 +8,20 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any, Iterator
 
-from sqlalchemy import create_engine, delete, select, func
+from sqlalchemy import create_engine, delete, func, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
     AdminSystemSummary,
-    AnalysisEvidenceReport,
     AdminUserRecord,
+    AnalysisEvidenceReport,
     AnalysisInputs,
     AnalysisReport,
     AuditEventRecord,
     EmailOutboxRecord,
-    FIDProcessingMetadata,
     FIDPreviewReport,
+    FIDProcessingMetadata,
     FIDRunRecord,
     FIDRunReport,
     FIDRunReviewDecisionRecord,
@@ -32,19 +32,19 @@ from .models import (
     NMR2DEvidenceReportSection,
     ProjectDashboardRecord,
     ProjectRecord,
-    SampleAnalysisComparison,
-    SampleAnalysisComparisonItem,
-    SampleDetailRecord,
-    SampleReportsRecord,
-    SampleTimelineRecord,
     ProjectSampleCreate,
     ProjectSampleRecord,
     RawArchivePreview,
     RawArchiveRecord,
     ReviewDecisionRecord,
     ReviewQueueItem,
-    StoredReportRecord,
+    SampleAnalysisComparison,
+    SampleAnalysisComparisonItem,
+    SampleDetailRecord,
+    SampleReportsRecord,
+    SampleTimelineRecord,
     StoredAnalysisRecord,
+    StoredReportRecord,
     UserPublic,
 )
 from .nmr2d_models import NMR2DAnalysisReport, NMR2DRunRecord
@@ -61,15 +61,22 @@ from .orm import (
     ProjectORM,
     ProjectSampleORM,
     RawArchiveORM,
+    RefreshTokenORM,
     ReportORM,
     ReviewDecisionORM,
+    SessionFamilyORM,
     SessionTokenORM,
     UserActionTokenORM,
     UserORM,
     utcnow,
 )
-from .security import create_access_token, create_action_token, hash_password, token_digest, verify_password
-
+from .security import (
+    create_access_token,
+    create_action_token,
+    hash_password,
+    token_digest,
+    verify_password,
+)
 
 
 def create_engine_for_url(database_url: str) -> Engine:
@@ -162,6 +169,9 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 "stepped_up_at": "TIMESTAMP",
                 "step_up_factor": "VARCHAR(16)",
                 "step_up_aal": "VARCHAR(8)",
+                # Session/token hardening (Prompt 4 / migration 0020).
+                "family_id": "INTEGER",
+                "refresh_id": "INTEGER",
             }
             for column, ddl in session_mfa_columns.items():
                 if column not in session_existing:
@@ -334,6 +344,17 @@ def get_user_by_token(session_factory: sessionmaker[Session], token: str) -> Use
         token_record = session.scalar(stmt)
         if token_record is None:
             return None
+        # Immediate family-wide revocation + absolute-cap enforcement (Prompt 4): a revoked family —
+        # or one past its hard absolute cap — kills its access bearers on the very next request, so a
+        # bearer minted by a late rotation can't outlive the cap. NULL family_id = legacy -> no-op.
+        if token_record.family_id is not None:
+            family = session.get(SessionFamilyORM, token_record.family_id)
+            if family is not None:
+                if family.revoked_at is not None:
+                    return None
+                cap = family.absolute_expires_at
+                if cap is not None and (cap if cap.tzinfo else cap.replace(tzinfo=UTC)) <= now:
+                    return None
         token_record.last_used_at = utcnow()
         user = session.get(UserORM, token_record.user_id)
         if user is None or not user.is_active:
@@ -352,11 +373,28 @@ def revoke_token(session_factory: sessionmaker[Session], token: str) -> None:
 
 
 def revoke_all_user_tokens(session_factory: sessionmaker[Session], user_id: int) -> None:
+    now = utcnow()
     with session_scope(session_factory) as session:
         rows = list(session.scalars(select(SessionTokenORM).where(SessionTokenORM.user_id == user_id)).all())
         for row in rows:
             if row.revoked_at is None:
-                row.revoked_at = utcnow()
+                row.revoked_at = now
+        # Family-aware (Prompt 4): also revoke the user's session families + refresh tokens, so a
+        # held refresh token can't mint a fresh session after a global revoke (e.g. password reset).
+        families = session.scalars(
+            select(SessionFamilyORM)
+            .where(SessionFamilyORM.user_id == user_id)
+            .where(SessionFamilyORM.revoked_at.is_(None))
+        ).all()
+        for family in families:
+            family.revoked_at = now
+            family.revoked_reason = "global_revoke"
+        session.execute(
+            update(RefreshTokenORM)
+            .where(RefreshTokenORM.user_id == user_id)
+            .where(RefreshTokenORM.revoked_at.is_(None))
+            .values(revoked_at=now)
+        )
 
 
 

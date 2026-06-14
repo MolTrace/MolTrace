@@ -19,10 +19,9 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
-from . import mfa_totp, mfa_webauthn
+from . import mfa_totp, mfa_webauthn, session_store
 from .database import (
     authenticate_user,
-    create_user_session,
     get_user_by_token,
     session_scope,
 )
@@ -43,6 +42,7 @@ from .security import (
     normalize_recovery_code,
     token_digest,
 )
+from .session_store import MintedSession
 from .settings import Settings
 
 # 'mfa' = IdP-asserted MFA at SSO; 'backup' = recovery code (valid for login, never for step-up).
@@ -283,17 +283,15 @@ def _burn_login_challenge(
 
 def _mint(
     session_factory: sessionmaker[Session], settings: Settings, user_id: int, amr: list[str]
-) -> tuple[str, datetime, UserPublic]:
-    token, expires = create_user_session(
-        session_factory,
-        user_id=user_id,
-        ttl_minutes=settings.access_token_ttl_minutes,
-        amr=",".join(amr),
+) -> tuple[MintedSession, UserPublic]:
+    """Mint a hardened session (access + rotating refresh, Prompt 4) carrying the MFA amr."""
+    minted = session_store.mint_session(
+        session_factory, settings, user_id=user_id, amr=",".join(amr) or None
     )
-    user = get_user_by_token(session_factory, token)
+    user = get_user_by_token(session_factory, minted.access_token)
     if user is None:  # pragma: no cover
         raise MFAError("Session creation failed.", 500)
-    return token, expires, user
+    return minted, user
 
 
 def complete_login_totp(
@@ -303,7 +301,7 @@ def complete_login_totp(
     mfa_token: str,
     code: str,
     for_time: datetime | None = None,
-) -> tuple[str, datetime, UserPublic]:
+) -> tuple[MintedSession, UserPublic]:
     now = utcnow()
     user_id, _ = _burn_login_challenge(session_factory, mfa_token, now)
     with session_scope(session_factory) as session:
@@ -324,7 +322,7 @@ def complete_login_webauthn(
     *,
     mfa_token: str,
     credential: dict,
-) -> tuple[str, datetime, UserPublic]:
+) -> tuple[MintedSession, UserPublic]:
     now = utcnow()
     user_id, webauthn_challenge = _burn_login_challenge(session_factory, mfa_token, now)
     if not webauthn_challenge:
@@ -346,7 +344,7 @@ def complete_login_recovery(
     *,
     mfa_token: str,
     code: str,
-) -> tuple[str, datetime, UserPublic]:
+) -> tuple[MintedSession, UserPublic]:
     now = utcnow()
     user_id, _ = _burn_login_challenge(session_factory, mfa_token, now)
     with session_scope(session_factory) as session:
