@@ -3,8 +3,9 @@
 ICH calculations are deterministic — an error is a code bug with regulatory consequences — so the
 Regentry must NOT launch until every validation check is green: worked-example zero-error +
 100% formula coverage, a complete formula->citation map (no untraceable formula), the ICH property
-invariants, and external reproductions (NDSRI + EMA). :func:`enforce_launch_gate`
-raises on any red; :func:`launch_gate_exit_code` maps the gate to a CI exit code.
+invariants, and external reproductions (NDSRI + EMA + CTD Module 3 structural/content).
+:func:`enforce_launch_gate` raises on any red; :func:`launch_gate_exit_code` maps it to a CI exit
+code.
 """
 
 from __future__ import annotations
@@ -17,7 +18,11 @@ from moltrace.regulatory.validation.citation_map import (
     implemented_formulas,
     untraceable_formulas,
 )
-from moltrace.regulatory.validation.external_validation import validate_ema_qa, validate_ndsri
+from moltrace.regulatory.validation.external_validation import (
+    validate_ctd_module3,
+    validate_ema_qa,
+    validate_ndsri,
+)
 from moltrace.regulatory.validation.property_invariants import run_property_invariants
 from moltrace.regulatory.validation.worked_examples import run_worked_examples
 
@@ -111,6 +116,17 @@ def evaluate_launch_gate() -> LaunchGateResult:
     )
     checks.append(
         CheckResult("external_ema", ema.ok, f"{ema.n_compounds} compounds; {ema.category_failures}")
+    )
+
+    # 5. CTD Module 3 structural + content reproduction (Prompt 8 generator output).
+    ctd = validate_ctd_module3()
+    checks.append(
+        CheckResult(
+            "external_ctd_module3",
+            ctd.ok,
+            f"{ctd.n_reports} report(s); structural {ctd.structural_failures}; "
+            f"content {ctd.content_failures}",
+        )
     )
 
     return LaunchGateResult(passed=all(c.passed for c in checks), checks=tuple(checks))

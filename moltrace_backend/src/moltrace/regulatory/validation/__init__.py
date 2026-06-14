@@ -22,8 +22,12 @@ from moltrace.regulatory.validation.csv_package import (
     build_csv_package,
 )
 from moltrace.regulatory.validation.external_validation import (
+    CTDValidationResult,
     ExternalCompound,
     ExternalValidationResult,
+    bundle_from_ctd_sections,
+    ctd_module3_missing_sections,
+    validate_ctd_module3,
     validate_ema_qa,
     validate_ndsri,
 )
@@ -45,6 +49,7 @@ from moltrace.regulatory.validation.worked_examples import (
 
 __all__ = [
     "CSVPackage",
+    "CTDValidationResult",
     "CitationError",
     "ExpertSignOff",
     "ExternalCompound",
@@ -54,6 +59,8 @@ __all__ = [
     "LaunchGateError",
     "LaunchGateResult",
     "build_csv_package",
+    "bundle_from_ctd_sections",
+    "ctd_module3_missing_sections",
     "enforce_launch_gate",
     "enforce_traceable_formulas",
     "evaluate_launch_gate",
@@ -63,6 +70,7 @@ __all__ = [
     "run_property_invariants",
     "run_worked_examples",
     "untraceable_formulas",
+    "validate_ctd_module3",
     "validate_ema_qa",
     "validate_ndsri",
     "worked_example_checks",

@@ -16,6 +16,7 @@ from moltrace.regulatory.validation import (
     CitationError,
     ExpertSignOff,
     build_csv_package,
+    ctd_module3_missing_sections,
     enforce_launch_gate,
     enforce_traceable_formulas,
     evaluate_launch_gate,
@@ -24,6 +25,7 @@ from moltrace.regulatory.validation import (
     run_property_invariants,
     run_worked_examples,
     untraceable_formulas,
+    validate_ctd_module3,
     validate_ema_qa,
     validate_ndsri,
     worked_example_checks,
@@ -117,6 +119,29 @@ def test_ema_qa_limits_reproduced_exactly() -> None:
     assert result.ok, result.category_failures
 
 
+def test_ctd_module3_built_in_self_check_passes() -> None:
+    # the real Prompt 8 generator output must carry the required section + impurity rows + sources
+    result = validate_ctd_module3()
+    assert result.ok, (result.structural_failures, result.content_failures)
+    assert result.n_reports >= 1
+
+
+def test_ctd_module3_structural_and_content_failures_are_caught() -> None:
+    # missing section (structural)
+    missing = ctd_module3_missing_sections({"sections": {}}, required=("3.2.S.3.2",))
+    assert missing == ["3.2.S.3.2"]
+    # a compound section number satisfies the bare required id (substring match — the bug fix)
+    assert ctd_module3_missing_sections(
+        {"sections": {"3.2.P.5.5 / 3.2.P.5.6": {"n_table_rows": 1, "n_sources": 1}}},
+        required=("3.2.P.5.5",),
+    ) == []
+    # present but empty content (no rows / no sources) is flagged, and the suite reports it red
+    empty = validate_ctd_module3(
+        [{"sections": {"3.2.S.3.2": {"n_table_rows": 0, "n_sources": 0}}}], required=("3.2.S.3.2",)
+    )
+    assert not empty.ok and len(empty.content_failures) == 2
+
+
 # --------------------------------------------------------------------------- #
 # 4. Formula -> citation map (untraceable formula fails the build)
 # --------------------------------------------------------------------------- #
@@ -184,4 +209,5 @@ def test_launch_gate_covers_all_validation_dimensions() -> None:
         "property_invariants",
         "external_ndsri",
         "external_ema",
+        "external_ctd_module3",
     } <= names
