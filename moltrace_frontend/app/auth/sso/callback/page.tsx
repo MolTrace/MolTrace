@@ -47,7 +47,10 @@ function SsoCallback() {
           router.replace("/login?sso_error=1")
           return
         }
-        storeAuthSession(res.access_token, res.user)
+        storeAuthSession(res.access_token, res.user, {
+          refreshToken: res.refresh_token,
+          accessExpiresAt: res.expires_at,
+        })
         setDone(true)
         router.replace("/dashboard")
       } catch {

@@ -26,6 +26,7 @@ type AuthPageResponse = {
   access_token: string | null
   token_type?: string | null
   expires_at?: string | null
+  refresh_token?: string | null
   user: AuthUser | null
   requires_email_verification?: boolean
   detail?: string
@@ -48,6 +49,8 @@ type SignInFormProps = {
   ssoError?: boolean
   /** `?sso=<slug>` deep link — pre-fills the organization SSO sign-in ID. */
   ssoSlug?: string
+  /** `?session_reset` — the session was force-ended (refresh expired/invalid/reuse). */
+  sessionReset?: string
 }
 
 function formValue(formData: FormData, key: string, trim = true) {
@@ -63,7 +66,7 @@ function authErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
-export function SignInForm({ ssoError = false, ssoSlug = "" }: SignInFormProps) {
+export function SignInForm({ ssoError = false, ssoSlug = "", sessionReset }: SignInFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -110,7 +113,10 @@ export function SignInForm({ ssoError = false, ssoSlug = "" }: SignInFormProps) 
         return
       }
 
-      storeAuthSession(data.access_token, data.user)
+      storeAuthSession(data.access_token, data.user, {
+        refreshToken: data.refresh_token,
+        accessExpiresAt: data.expires_at,
+      })
       setMessage(data.user?.is_admin ? "Signed in with admin access." : "Signed in.")
       router.push("/dashboard")
     } catch (submitError) {
@@ -137,6 +143,15 @@ export function SignInForm({ ssoError = false, ssoSlug = "" }: SignInFormProps) 
           <MfaChallengeForm challenge={challenge} onSuccess={() => router.push("/dashboard")} />
         ) : (
           <>
+        {sessionReset ? (
+          <Alert role="alert">
+            <AlertDescription>
+              {sessionReset === "reuse"
+                ? "For your security, you were signed out. Please sign in again."
+                : "Your session expired. Please sign in again."}
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {ssoError ? (
           <Alert variant="destructive" role="alert">
             <AlertDescription>{SSO_ERROR_MESSAGE}</AlertDescription>

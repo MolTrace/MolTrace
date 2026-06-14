@@ -19,10 +19,11 @@ export default async function SignInPage({
   const sp = await searchParams
   const ssoError = firstParam(sp.sso_error) === "1"
   const ssoSlug = firstParam(sp.sso) ?? ""
+  const sessionReset = firstParam(sp.session_reset)
 
   return (
     <AuthPageLayout title="Welcome back" description="Sign in to continue to your scientific intelligence workspace.">
-      <SignInForm ssoError={ssoError} ssoSlug={ssoSlug} />
+      <SignInForm ssoError={ssoError} ssoSlug={ssoSlug} sessionReset={sessionReset} />
     </AuthPageLayout>
   )
 }

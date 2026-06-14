@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ResponsiveAppShell } from "@/src/components/app-shell/ResponsiveAppShell"
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}))
+
 vi.mock("@/components/app/app-sidebar", () => ({
   AppSidebar: () => <aside data-testid="desktop-sidebar" />,
 }))
