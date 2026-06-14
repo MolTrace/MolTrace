@@ -9,12 +9,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
-import {
-  ApiError,
-  AUTH_TOKEN_STORAGE_KEY,
-  AUTH_USER_STORAGE_KEY,
-  apiFetch,
-} from "@/lib/api/client"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ApiError, apiFetch, buildApiPath } from "@/lib/api/client"
+import { storeAuthSession } from "@/lib/auth/session"
 
 type AuthUser = {
   id: number
@@ -35,27 +32,26 @@ type AuthPageResponse = {
 const SIGN_IN_FAILURE_MESSAGE =
   "We couldn't sign you in. Check your email and password, then try again."
 
+// The backend strips the specific enforce-SSO detail at the proxy (401/403 bodies
+// are sanitized), but the 403 status survives — and on the login endpoint a 403
+// means SSO is required (a bad password is 401). We supply the user-facing copy.
+const SSO_REQUIRED_MESSAGE =
+  "Single sign-on is required for your organization. Please sign in through your identity provider."
+
+const SSO_ERROR_MESSAGE =
+  "SSO sign-in could not be completed — please try again, or use your password."
+
+type SignInFormProps = {
+  /** `?sso_error=1` arrived on the URL (backend bounced a failed SSO round-trip). */
+  ssoError?: boolean
+  /** `?sso=<slug>` deep link — pre-fills the organization SSO sign-in ID. */
+  ssoSlug?: string
+}
+
 function formValue(formData: FormData, key: string, trim = true) {
   const value = formData.get(key)
   if (typeof value !== "string") return ""
   return trim ? value.trim() : value
-}
-
-function storeAuthSession(data: AuthPageResponse) {
-  if (!data.access_token) return
-
-  window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token)
-  if (data.user) {
-    window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(data.user))
-  }
-
-  // Drop any local SpectraCheck session belonging to the previous user / draft
-  // so the next workspace mount falls back to molecular defaults.
-  try {
-    window.localStorage.removeItem("moltrace:spectracheck:evidence-session")
-  } catch {
-    // Privacy-mode / quota — ignore.
-  }
 }
 
 function authErrorMessage(error: unknown, fallback: string) {
@@ -65,11 +61,22 @@ function authErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
-export function SignInForm() {
+export function SignInForm({ ssoError = false, ssoSlug = "" }: SignInFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [ssoRequired, setSsoRequired] = useState(false)
+  const [slug, setSlug] = useState(ssoSlug)
+
+  function startSso(orgSlug: string) {
+    const clean = orgSlug.trim().toLowerCase()
+    if (!clean) return
+    // Full-page navigation (NOT fetch): the backend 302s into the IdP authorize
+    // chain, which only works as a top-level browser navigation. Same-origin proxy
+    // path — the proxy forwards the 302 verbatim for /auth/sso/*.
+    window.location.assign(buildApiPath(`/auth/sso/${encodeURIComponent(clean)}/login`))
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -77,6 +84,7 @@ export function SignInForm() {
     setIsSubmitting(true)
     setMessage(null)
     setError(null)
+    setSsoRequired(false)
 
     try {
       const data = await apiFetch<AuthPageResponse>("/auth/sign-in", {
@@ -92,11 +100,17 @@ export function SignInForm() {
         return
       }
 
-      storeAuthSession(data)
+      storeAuthSession(data.access_token, data.user)
       setMessage(data.user?.is_admin ? "Signed in with admin access." : "Signed in.")
       router.push("/dashboard")
     } catch (submitError) {
-      setError(authErrorMessage(submitError, "Unable to sign in."))
+      // A 403 on the login endpoint = this org enforces SSO; steer to SSO instead
+      // of showing a generic "wrong password" error.
+      if (submitError instanceof ApiError && submitError.status === 403) {
+        setSsoRequired(true)
+      } else {
+        setError(authErrorMessage(submitError, "Unable to sign in."))
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -108,7 +122,18 @@ export function SignInForm() {
         <CardTitle>Sign in</CardTitle>
         <CardDescription>Enter your email and password to access your workspace.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {ssoError ? (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>{SSO_ERROR_MESSAGE}</AlertDescription>
+          </Alert>
+        ) : null}
+        {ssoRequired ? (
+          <Alert role="alert">
+            <AlertDescription>{SSO_REQUIRED_MESSAGE}</AlertDescription>
+          </Alert>
+        ) : null}
+
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <Label htmlFor="sign-in-email">Email</Label>
@@ -144,6 +169,40 @@ export function SignInForm() {
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Signing in..." : "Sign In"}
           </Button>
+        </form>
+
+        <div className="flex items-center gap-3" aria-hidden>
+          <span className="h-px flex-1 bg-border" />
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">or</span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            startSso(slug)
+          }}
+        >
+          <p className="text-sm font-medium">Single sign-on</p>
+          <div className="flex gap-2">
+            <Input
+              id="sso-slug"
+              name="sso-slug"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              placeholder="organization ID"
+              autoComplete="organization"
+              spellCheck={false}
+              aria-label="Organization sign-in ID"
+            />
+            <Button type="submit" variant="outline" disabled={!slug.trim()}>
+              Sign in with SSO
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Enter your organization&apos;s sign-in ID, or use the SSO link your administrator provided.
+          </p>
         </form>
       </CardContent>
       <CardFooter className="flex flex-col gap-3 border-t pt-6">

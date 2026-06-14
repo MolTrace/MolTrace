@@ -7,10 +7,22 @@ export const metadata: Metadata = {
   description: "Sign in to your MolTrace workspace.",
 }
 
-export default function SignInPage() {
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value
+}
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const sp = await searchParams
+  const ssoError = firstParam(sp.sso_error) === "1"
+  const ssoSlug = firstParam(sp.sso) ?? ""
+
   return (
     <AuthPageLayout title="Welcome back" description="Sign in to continue to your scientific intelligence workspace.">
-      <SignInForm />
+      <SignInForm ssoError={ssoError} ssoSlug={ssoSlug} />
     </AuthPageLayout>
   )
 }

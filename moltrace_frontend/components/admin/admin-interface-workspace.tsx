@@ -13,6 +13,7 @@ import { DebugBundlesWorkspace } from "@/components/admin/debug-bundles-workspac
 import { FeatureFlagsWorkspace } from "@/components/admin/feature-flags-workspace"
 import { FileIngestionNormalizationWorkspace } from "@/components/admin/file-ingestion-normalization-workspace"
 import { TenantAdminWorkspace } from "@/components/admin/tenant-admin-workspace"
+import { SSOConnectionsWorkspace } from "@/components/admin/sso-connections-workspace"
 import { DeploymentSettingsWorkspace } from "@/components/settings/deployment-settings-workspace"
 import { useTenant } from "@/src/lib/tenant/tenant-context"
 
@@ -57,6 +58,7 @@ export function AdminInterfaceWorkspace() {
           <TabsTrigger value="tenants">Tenant Admin</TabsTrigger>
           <TabsTrigger value="feature_flags">Feature Flags</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="sso">SSO</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
           <TabsTrigger value="debug">Debug</TabsTrigger>
           <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
@@ -75,6 +77,9 @@ export function AdminInterfaceWorkspace() {
         </TabsContent>
         <TabsContent value="security">
           <SecurityEventsWorkspace />
+        </TabsContent>
+        <TabsContent value="sso">
+          <SSOConnectionsWorkspace />
         </TabsContent>
         <TabsContent value="audit">
           <AuditSearchWorkspace />

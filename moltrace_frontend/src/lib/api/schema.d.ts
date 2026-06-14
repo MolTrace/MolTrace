@@ -1459,6 +1459,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/sso/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sso List Connections */
+        get: operations["sso_list_connections_auth_sso_connections_get"];
+        put?: never;
+        /** Sso Create Connection */
+        post: operations["sso_create_connection_auth_sso_connections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sso/connections/{connection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sso Get Connection */
+        get: operations["sso_get_connection_auth_sso_connections__connection_id__get"];
+        put?: never;
+        post?: never;
+        /** Sso Delete Connection */
+        delete: operations["sso_delete_connection_auth_sso_connections__connection_id__delete"];
+        options?: never;
+        head?: never;
+        /** Sso Update Connection */
+        patch: operations["sso_update_connection_auth_sso_connections__connection_id__patch"];
+        trace?: never;
+    };
+    "/auth/sso/{slug}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sso Begin Login
+         * @description Public: redirect the browser to the organization's IdP authorization endpoint.
+         */
+        get: operations["sso_begin_login_auth_sso__slug__login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sso/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sso Callback
+         * @description Public: the IdP redirects here. Validate, JIT, then bounce to the SPA with a code.
+         */
+        get: operations["sso_callback_auth_sso_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sso/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sso Exchange
+         * @description Public: trade the one-time callback code for an opaque bearer session.
+         */
+        post: operations["sso_exchange_auth_sso_exchange_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/request-email-verification": {
         parameters: {
             query?: never;
@@ -33441,6 +33538,105 @@ export interface components {
             /** Side */
             side: string;
         };
+        /**
+         * SSOConnectionCreate
+         * @description Admin payload to register a per-organization OIDC connection (Prompt 1, SSO).
+         */
+        SSOConnectionCreate: {
+            /** Organization Id */
+            organization_id: number;
+            /** Slug */
+            slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Issuer */
+            issuer: string;
+            /** Client Id */
+            client_id: string;
+            /** Client Secret */
+            client_secret: string;
+            /** Email Domains */
+            email_domains?: string[];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Enforce Sso
+             * @default false
+             */
+            enforce_sso: boolean;
+        };
+        /** SSOConnectionList */
+        SSOConnectionList: {
+            /** Connections */
+            connections: components["schemas"]["SSOConnectionOut"][];
+        };
+        /**
+         * SSOConnectionOut
+         * @description Connection as returned to admins — never includes the client secret.
+         */
+        SSOConnectionOut: {
+            /** Id */
+            id: number;
+            /** Organization Id */
+            organization_id: number;
+            /** Slug */
+            slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Protocol */
+            protocol: string;
+            /** Issuer */
+            issuer: string;
+            /** Client Id */
+            client_id: string;
+            /** Email Domains */
+            email_domains: string[];
+            /** Enabled */
+            enabled: boolean;
+            /** Enforce Sso */
+            enforce_sso: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SSOConnectionUpdate
+         * @description Partial update; ``client_secret`` is re-encrypted only when present.
+         */
+        SSOConnectionUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Issuer */
+            issuer?: string | null;
+            /** Client Id */
+            client_id?: string | null;
+            /** Client Secret */
+            client_secret?: string | null;
+            /** Email Domains */
+            email_domains?: string[] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Enforce Sso */
+            enforce_sso?: boolean | null;
+        };
+        /**
+         * SSOExchangeRequest
+         * @description One-time exchange-code → bearer session (the callback issues the code).
+         */
+        SSOExchangeRequest: {
+            /** Code */
+            code: string;
+        };
         /** SampleAliquot */
         SampleAliquot: {
             /** Id */
@@ -43218,6 +43414,283 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_list_connections_auth_sso_connections_get: {
+        parameters: {
+            query?: {
+                organization_id?: number | null;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSOConnectionList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_create_connection_auth_sso_connections_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SSOConnectionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSOConnectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_get_connection_auth_sso_connections__connection_id__get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                connection_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSOConnectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_delete_connection_auth_sso_connections__connection_id__delete: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                connection_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_update_connection_auth_sso_connections__connection_id__patch: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                connection_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SSOConnectionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSOConnectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_begin_login_auth_sso__slug__login_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_callback_auth_sso_callback_get: {
+        parameters: {
+            query?: {
+                state?: string | null;
+                code?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_exchange_auth_sso_exchange_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SSOExchangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessTokenResponse"];
                 };
             };
             /** @description Validation Error */
