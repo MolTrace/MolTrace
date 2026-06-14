@@ -56,3 +56,21 @@ def create_action_token(ttl_minutes: int) -> tuple[str, datetime]:
 
 def token_digest(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+RECOVERY_CODE_COUNT = 10
+
+
+def generate_recovery_codes(count: int = RECOVERY_CODE_COUNT) -> list[str]:
+    """One-time MFA recovery codes, formatted ``xxxxx-xxxxx`` (40 bits each). Returned once at
+    enrollment; only their :func:`token_digest` is persisted."""
+    codes: list[str] = []
+    for _ in range(count):
+        raw = secrets.token_hex(5)  # 10 hex chars
+        codes.append(f"{raw[:5]}-{raw[5:]}")
+    return codes
+
+
+def normalize_recovery_code(code: str) -> str:
+    """Canonicalize a user-entered recovery code before hashing (tolerate spaces / case)."""
+    return code.strip().lower().replace(" ", "")

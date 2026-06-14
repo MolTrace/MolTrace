@@ -12290,6 +12290,173 @@ class ScimTokenInfo(BaseModel):
     expires_at: datetime | None = None
 
 
+# --- MFA & passkeys (Prompt 3) ---------------------------------------------------------------
+
+
+class MfaChallengeResponse(BaseModel):
+    """Returned 202 mid-login when a second factor is required (no bearer yet)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mfa_required: bool = True
+    mfa_token: str
+    factors: list[str]
+    webauthn_options: dict[str, Any] | None = None
+    enrollment_required: bool = False
+
+
+class TotpEnrollResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    otpauth_uri: str
+
+
+class TotpConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=6, max_length=10)
+
+
+class TotpConfirmResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmed: bool
+    recovery_codes: list[str] | None = None
+
+
+class WebAuthnRegisterVerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    credential: dict[str, Any]
+    nickname: str | None = Field(default=None, max_length=120)
+
+
+class WebAuthnRegisterResponse(BaseModel):
+    """Passkey registered; ``recovery_codes`` is populated once if this is the user's first factor."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    detail: str
+    recovery_codes: list[str] | None = None
+
+
+class WebAuthnCredentialPublic(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    nickname: str | None = None
+    device_type: str | None = None
+    backed_up: bool = False
+    created_at: datetime
+    last_used_at: datetime | None = None
+
+
+class WebAuthnCredentialList(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    credentials: list[WebAuthnCredentialPublic]
+
+
+class WebAuthnCredentialRename(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nickname: str = Field(min_length=1, max_length=120)
+
+
+class MfaLoginTotpRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mfa_token: str = Field(min_length=10, max_length=128)
+    code: str = Field(min_length=6, max_length=10)
+
+
+class MfaLoginWebAuthnRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mfa_token: str = Field(min_length=10, max_length=128)
+    assertion: dict[str, Any]
+
+
+class MfaLoginRecoveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mfa_token: str = Field(min_length=10, max_length=128)
+    code: str = Field(min_length=6, max_length=32)
+
+
+class StepUpOptionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    factors: list[str]
+    webauthn_options: dict[str, Any] | None = None
+
+
+class StepUpTotpRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=6, max_length=10)
+
+
+class StepUpWebAuthnRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assertion: dict[str, Any]
+
+
+class StepUpPasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    password: str = Field(min_length=1, max_length=512)
+
+
+class StepUpResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stepped_up: bool
+    factor: str
+    aal: str
+    expires_at: datetime
+
+
+class RecoveryRegenerateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    recovery_codes: list[str]
+    remaining: int
+
+
+class MfaStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    factors: list[str]
+    totp_confirmed: bool
+    passkey_count: int
+    recovery_remaining: int
+    org_mfa_required: bool
+    in_grace: bool
+
+
+class MfaPolicyResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    organization_id: int
+    mfa_required: bool
+    grace_period_days: int
+    allowed_factors: list[str]
+    enforce_for_sso: bool
+    require_step_up_for_signing: bool
+
+
+class MfaPolicyUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mfa_required: bool
+    grace_period_days: int = Field(default=7, ge=0, le=365)
+    allowed_factors: list[str] = Field(default_factory=lambda: ["webauthn", "totp"])
+    enforce_for_sso: bool = False
+    require_step_up_for_signing: bool = True
+
+
 class MessageResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

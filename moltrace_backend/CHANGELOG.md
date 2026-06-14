@@ -14,6 +14,83 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.42.0 — Security Prompt 3: MFA & passkeys (TOTP + WebAuthn/FIDO2) + step-up (2026-06-14)
+
+**Headline:** Third build from the MolTrace Security & Data-Integrity Standard. Adds **multi-factor
+authentication** — RFC 6238 **TOTP** plus phishing-resistant **WebAuthn/passkeys (FIDO2)** — with
+one-time recovery codes, **per-tenant MFA enforcement**, and **step-up re-authentication** required
+before admin and e-signature/signing operations (21 CFR Part 11 §11.200 contemporaneous re-auth).
+Backend-only; the FE handoff covers the enrollment/challenge/step-up ceremonies.
+
+### Added
+- **`src/nmrcheck/mfa_totp.py`** — RFC 6238 TOTP over `pyotp`: secret gen, `otpauth://` provisioning
+  URI, verify with a ±1 step drift window + a `last_used_step` **replay guard**. Secret is
+  AES-256-GCM encrypted at rest (separate `MFA_ENCRYPTION_KEY`).
+- **`src/nmrcheck/mfa_webauthn.py`** — WebAuthn/FIDO2 over `py_webauthn` 2.8: registration +
+  authentication ceremonies with **server-pinned RP-ID/origin** (phishing resistance), **UV
+  required**, single-use TTL-bounded challenges, and **sign-count clone detection**. The two
+  `verify_*` calls are module-level seams (mockable with a synthetic authenticator in tests).
+- **`src/nmrcheck/mfa_store.py`** — orchestration: `begin_or_complete_login` (the MFA-at-login
+  decision), the MFA-pending challenge (in a **separate `mfa_login_challenges` table, invisible to
+  `get_user_by_token`** → "no MFA, no bearer" is structural), login-verify (TOTP/passkey/recovery),
+  the step-up ceremonies + `is_stepped_up`, per-org policy CRUD, recovery-code lifecycle, and the
+  fail-closed `mfa_required_for_user` / `mfa_satisfied_for_session` enforcement logic.
+- **6 ORM tables + migration `0019_mfa_passkeys`** — `mfa_totp_credentials` (one confirmed per user,
+  partial-unique), `mfa_webauthn_credentials`, `mfa_webauthn_challenges`, `mfa_recovery_codes`,
+  `mfa_login_challenges`, `mfa_policies` — plus 5 `session_tokens` columns (`amr`, `mfa_at`,
+  `stepped_up_at`, `step_up_factor`, `step_up_aal`). Idempotent (column-add + table guards).
+- **Routes** (`api.py`): `/auth/mfa/totp/{enroll,confirm}` + DELETE; `/auth/mfa/webauthn/register/
+  {options,verify}` + credential list/rename/delete; `/auth/mfa/recovery/regenerate`;
+  `/auth/mfa/status`; `/auth/mfa/login/{totp,webauthn,recovery}` (consume the 202 pending token);
+  `/auth/step-up/{options,totp,webauthn,password}`; `/admin/mfa/policy/{org}` GET/PUT.
+- **Pydantic contracts** (`models.py`): `MfaChallengeResponse` (the 202 login branch) + the enroll/
+  verify/step-up/policy/status models.
+- **`tests/test_mfa.py`** — 14 tests: TOTP enroll/confirm/replay-guard, enrolled-user login is gated
+  (AC#1), per-tenant contrast, recovery single-use, **step-up required before signing & admin
+  (AC#2)**, password-step-up-no-downgrade, TOTP step-up, WebAuthn register/login/step-up + **clone
+  detection** + UV enforcement (synthetic authenticator), policy CRUD, and the enforcement-eval unit.
+
+### Changed
+- **3 login routes** (`/auth/login`, `/auth/sign-in`, `/auth/token`) now route through
+  `begin_or_complete_login`: an enrolled user (or an MFA-required tenant) gets a **202 MFA challenge**
+  instead of a bearer. `create_user_session` records the `amr`.
+- **`require_step_up` / `require_admin_step_up`** dependencies added; the e-signature create route
+  (`POST /esignatures/records`) and the admin MFA-policy route now require a fresh step-up. The
+  `system_api_key` operator path is the audited break-glass (bypass) — existing api-key callers and
+  tests are unaffected.
+- **Deps**: `pyotp`, `webauthn` (py_webauthn). **Settings**: `MFA_ENCRYPTION_KEY`,
+  `WEBAUTHN_RP_ID`/`WEBAUTHN_RP_NAME`/`WEBAUTHN_ORIGIN`, `MFA_PENDING_TTL_MINUTES`,
+  `STEP_UP_TTL_MINUTES`.
+
+### Security hardening (adversarial review)
+- **Per-tenant enforcement is now wired** (was an unused helper): `require_access_context` calls
+  `mfa_satisfied_for_session`, so a user whose org requires MFA past grace is blocked on product
+  routes (`403 mfa_required`/`mfa_enrollment_required`) until MFA-proven — `/auth/*` stays open for
+  enrollment and the system api key bypasses. This applies to **every** session including SSO, so an
+  MFA-required tenant's policy can't be bypassed via federation; it's a no-op for tenants without a
+  policy.
+- **No brute-force oracle:** the MFA-pending `mfa_token` is now **consumed in its own committed
+  transaction before** the factor is verified (single-attempt), so a wrong code can't be retried.
+  Single-use consumption of pending tokens and recovery codes uses an atomic conditional `UPDATE`
+  (rowcount guard) — no double-consume race.
+- **Fail-closed config:** production startup now requires `SSO_ENCRYPTION_KEY` and
+  `MFA_ENCRYPTION_KEY` (no silent dev-fallback key in prod). `_ensure_sqlite_schema` backfills the 5
+  new `session_tokens` columns on a pre-0019 dev SQLite DB.
+- **No recovery-code lockout:** recovery codes are issued on the user's **first confirmed factor of
+  any type** (passkey-first users included), not only on first TOTP confirm.
+
+### Notes
+- **SSO-vs-MFA:** SSO entry may defer to the IdP, but signing/admin **always** require a fresh LOCAL
+  step-up, and an MFA-required tenant's SSO sessions are gated on product routes until a local factor
+  is proven — federation never bypasses the Part 11 re-auth. (`enforce_for_sso` as a distinct
+  "force a local factor even when the IdP asserted MFA" knob is a documented follow-on; the broader
+  `mfa_required` policy already enforces a local factor.)
+- **Production:** set `MFA_ENCRYPTION_KEY` and `WEBAUTHN_RP_ID`/`WEBAUTHN_ORIGIN` (must match the SPA
+  origin) before enabling MFA.
+- **FE handoff:** `moltrace_backend/docs/fe_handoff_mfa_passkeys.md`.
+
+---
+
 ## v0.41.0 — Security Prompt 2: SCIM 2.0 provisioning + auto-deprovisioning (2026-06-13)
 
 **Headline:** Second build from the MolTrace Security & Data-Integrity Standard. Adds **SCIM 2.0

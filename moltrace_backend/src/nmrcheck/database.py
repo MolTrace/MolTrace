@@ -148,6 +148,26 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
             for column, ddl in nmr2d_missing_columns.items():
                 if column not in nmr2d_existing:
                     connection.exec_driver_sql(f"ALTER TABLE nmr2d_runs ADD COLUMN {column} {ddl}")
+        if "session_tokens" in tables:
+            # MFA/step-up columns (Prompt 3 / migration 0019) on a pre-existing dev SQLite DB.
+            session_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(session_tokens)"
+                ).fetchall()
+            }
+            session_mfa_columns = {
+                "amr": "VARCHAR(64)",
+                "mfa_at": "TIMESTAMP",
+                "stepped_up_at": "TIMESTAMP",
+                "step_up_factor": "VARCHAR(16)",
+                "step_up_aal": "VARCHAR(8)",
+            }
+            for column, ddl in session_mfa_columns.items():
+                if column not in session_existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE session_tokens ADD COLUMN {column} {ddl}"
+                    )
         version_reference_columns = {
             "method_id": "INTEGER",
             "model_version_id": "INTEGER",
@@ -285,10 +305,17 @@ def create_user_session(
     *,
     user_id: int,
     ttl_minutes: int,
+    amr: str | None = None,
 ) -> tuple[str, datetime]:
     token, expires_at = create_access_token(ttl_minutes)
     with session_scope(session_factory) as session:
-        record = SessionTokenORM(user_id=user_id, token_hash=token_digest(token), expires_at=expires_at)
+        record = SessionTokenORM(
+            user_id=user_id,
+            token_hash=token_digest(token),
+            expires_at=expires_at,
+            amr=amr,
+            mfa_at=utcnow() if amr else None,
+        )
         session.add(record)
     return token, expires_at
 

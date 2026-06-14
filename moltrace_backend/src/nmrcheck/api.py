@@ -64,8 +64,11 @@ from . import golden_pilot_store as golden_pilot_store
 from . import interoperability_store as interop_store
 from . import knowledge_flywheel_store as knowledge_store
 from . import method_registry_store as method_store
+from . import mfa_store as mfa_store
+from . import mfa_webauthn as mfa_webauthn
 from . import ml_model_factory_store as ml_store
 from . import mobile_store as mobile_store
+from . import oidc_client as oidc_client
 from . import operations_store as ops_store
 from . import orchestration_store as orch_store
 from . import product_orchestration_store as product_store
@@ -77,7 +80,6 @@ from . import reaction_store as reaction_store
 from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
 from . import regulatory_surveillance_store as surveillance_store
-from . import oidc_client as oidc_client
 from . import scim_store as scim_store
 from . import spectracheck_store as sc_store
 from . import sso_store as sso_store
@@ -456,6 +458,13 @@ from .models import (
     MethodRegistryEntryCreate,
     MethodRegistryEntryUpdate,
     MetricsSummary,
+    MfaChallengeResponse,
+    MfaLoginRecoveryRequest,
+    MfaLoginTotpRequest,
+    MfaLoginWebAuthnRequest,
+    MfaPolicyResponse,
+    MfaPolicyUpdate,
+    MfaStatusResponse,
     MLEvaluationRun,
     MLEvaluationRunCreate,
     MLEvaluationRunResponse,
@@ -645,6 +654,7 @@ from .models import (
     ReactionVariableUpdate,
     RecordRetentionPolicy,
     RecordRetentionPolicyCreate,
+    RecoveryRegenerateResponse,
     RegulatoryActionItem,
     RegulatoryActionItemCreate,
     RegulatoryActionItemUpdate,
@@ -727,6 +737,8 @@ from .models import (
     ScientificKnowledgeGraph,
     ScientificKnowledgeGraphEdge,
     ScientificKnowledgeGraphEdgeCreate,
+    ScimTokenInfo,
+    ScimTokenIssueResponse,
     ScoringProfile,
     ScoringProfileCreate,
     ScoringProfileUpdate,
@@ -747,13 +759,6 @@ from .models import (
     SPCAnalyzeResult,
     SPCCapabilityOut,
     SPCSignalOut,
-    SSOConnectionCreate,
-    SSOConnectionList,
-    SSOConnectionOut,
-    SSOConnectionUpdate,
-    SSOExchangeRequest,
-    ScimTokenInfo,
-    ScimTokenIssueResponse,
     SpectraCheckAuditEventRecord,
     SpectraCheckEvidenceCreate,
     SpectraCheckEvidenceRecord,
@@ -799,6 +804,16 @@ from .models import (
     SpectrumRetrieveResult,
     SpectrumSolventCatalog,
     SpectrumSolventInfo,
+    SSOConnectionCreate,
+    SSOConnectionList,
+    SSOConnectionOut,
+    SSOConnectionUpdate,
+    SSOExchangeRequest,
+    StepUpOptionsResponse,
+    StepUpPasswordRequest,
+    StepUpResult,
+    StepUpTotpRequest,
+    StepUpWebAuthnRequest,
     StoredAnalysisRecord,
     StoredReportRecord,
     StructureElucidationReportRequest,
@@ -842,6 +857,9 @@ from .models import (
     ThresholdProfileCreate,
     ThresholdProfileUpdate,
     TokenActionPreview,
+    TotpConfirmRequest,
+    TotpConfirmResponse,
+    TotpEnrollResponse,
     TraceabilityMatrix,
     TrainingDatasetCandidate,
     TrainingDatasetCandidateCreate,
@@ -877,6 +895,10 @@ from .models import (
     ValidationTestProtocolCreate,
     VisualizationArtifact,
     VisualizationNormalizeRequest,
+    WebAuthnCredentialList,
+    WebAuthnCredentialRename,
+    WebAuthnRegisterResponse,
+    WebAuthnRegisterVerifyRequest,
     WebhookSubscription,
     WebhookSubscriptionCreate,
     WebhookSubscriptionUpdate,
@@ -1861,11 +1883,36 @@ async def get_optional_access_context(
     return None
 
 
+def _enforce_mfa_satisfied(request: Request, context: AccessContext) -> None:
+    """Per-tenant MFA gate (Prompt 3, AC#1): a user whose org requires MFA past grace must have an
+    MFA-proven session (a strong login factor or a fresh step-up) to reach product routes. The
+    ``/auth/*`` routes stay open so the user can still enroll/verify/step-up; the system api key
+    (operator) bypasses. No-op when the user's org has no enforcing MFA policy, so unenrolled tenants
+    and the existing test suite are unaffected. Applies to every session — including SSO — so
+    federation cannot bypass an MFA-required tenant's policy on product routes."""
+    if context.user is None or context.system_api_key:
+        return
+    if request.url.path.startswith("/auth/"):
+        return
+    state = _state(request)
+    ok, detail = mfa_store.mfa_satisfied_for_session(
+        state.session_factory,
+        state.settings,
+        user_id=context.user.id,
+        email=context.user.email,
+        raw_token=context.raw_token,
+    )
+    if not ok:
+        raise mfa_webauthn.MFAError(detail or "mfa_required", 403)
+
+
 async def require_access_context(
+    request: Request,
     context: AccessContext | None = Depends(get_optional_access_context),
 ) -> AccessContext:
     if context is None:
         raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
+    _enforce_mfa_satisfied(request, context)
     return context
 
 
@@ -2572,6 +2619,36 @@ async def require_admin(
         return context
     if context.user is None or not context.user.is_admin:
         raise HTTPException(status_code=403, detail=PUBLIC_ACCESS_DENIED_DETAIL)
+    return context
+
+
+def require_step_up(
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> AccessContext:
+    """Require a fresh MFA step-up on the current session before a privileged/signing action
+    (Prompt 3, AC#2). The ``system_api_key`` operator path is the audited break-glass (bypass).
+    A user bearer must have stepped up within ``step_up_ttl_minutes`` -> else 401 ``step_up_required``."""
+    if context.system_api_key:
+        return context
+    state = _state(request)
+    if mfa_store.is_stepped_up(state.session_factory, state.settings, context.raw_token):
+        return context
+    # MFAError (not HTTPException): the 401 detail must survive the safe-exception sanitizer so the
+    # SPA can distinguish "step up" from "re-login".
+    raise mfa_webauthn.MFAError("step_up_required", 401)
+
+
+async def require_admin_step_up(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> AccessContext:
+    """``require_admin`` plus a fresh step-up for admin-mutating actions (system api key bypasses)."""
+    if context.system_api_key:
+        return context
+    state = _state(request)
+    if not mfa_store.is_stepped_up(state.session_factory, state.settings, context.raw_token):
+        raise mfa_webauthn.MFAError("step_up_required", 401)
     return context
 
 
@@ -4854,6 +4931,19 @@ def sign_up(payload: UserSignUp, request: Request) -> AuthPageResponse:
     )
 
 
+def _mfa_challenge_response(decision: mfa_store.LoginDecision) -> JSONResponse:
+    """Render the HTTP 202 MFA-pending challenge (no bearer issued yet)."""
+    body = MfaChallengeResponse(
+        mfa_token=decision.challenge_token or "",
+        factors=decision.factors,
+        webauthn_options=(
+            json.loads(decision.webauthn_options) if decision.webauthn_options else None
+        ),
+        enrollment_required=decision.enrollment_required,
+    )
+    return JSONResponse(status_code=202, content=body.model_dump(mode="json"))
+
+
 @router.post("/auth/login", response_model=AccessTokenResponse)
 def login_json(payload: UserLogin, request: Request) -> AccessTokenResponse:
     state = _state(request)
@@ -4871,10 +4961,14 @@ def login_json(payload: UserLogin, request: Request) -> AccessTokenResponse:
         )
     if state.settings.is_admin_email(user.email) and not user.is_admin:
         user = set_user_admin_status(state.session_factory, user_id=user.id, is_admin=True)
+    decision = mfa_store.begin_or_complete_login(state.session_factory, state.settings, user)
+    if decision.needs_mfa:
+        return _mfa_challenge_response(decision)
     token, expires_at = create_user_session(
         state.session_factory,
         user_id=user.id,
         ttl_minutes=state.settings.access_token_ttl_minutes,
+        amr=",".join(decision.amr),
     )
     _audit_from_context(
         request,
@@ -4904,6 +4998,9 @@ def sign_in(payload: UserSignIn, request: Request) -> AuthPageResponse:
         )
     if state.settings.is_admin_email(user.email) and not user.is_admin:
         user = set_user_admin_status(state.session_factory, user_id=user.id, is_admin=True)
+    decision = mfa_store.begin_or_complete_login(state.session_factory, state.settings, user)
+    if decision.needs_mfa:
+        return _mfa_challenge_response(decision)
     response = _issue_auth_page_session(
         request,
         user=user,
@@ -4940,10 +5037,14 @@ def login_form(
         )
     if state.settings.is_admin_email(user.email) and not user.is_admin:
         user = set_user_admin_status(state.session_factory, user_id=user.id, is_admin=True)
+    decision = mfa_store.begin_or_complete_login(state.session_factory, state.settings, user)
+    if decision.needs_mfa:
+        return _mfa_challenge_response(decision)
     token, expires_at = create_user_session(
         state.session_factory,
         user_id=user.id,
         ttl_minutes=state.settings.access_token_ttl_minutes,
+        amr=",".join(decision.amr),
     )
     _audit_from_context(
         request,
@@ -5375,6 +5476,295 @@ def scim_delete_user(
     if not scim_store.delete_user(state.session_factory, ctx=ctx, scim_id=scim_id):
         raise scim_store.SCIMError("User not found.", 404)
     return Response(status_code=204)
+
+
+# --------------------------------------------------------------------------- MFA & passkeys
+#
+# TOTP + WebAuthn/passkey enrollment & management (require a fresh step-up — enrollment-hijack
+# guard), the MFA-at-login verify endpoints (consume the 202 mfa_token, no bearer), step-up
+# ceremonies, and the per-tenant policy admin. See mfa_store / mfa_totp / mfa_webauthn.
+
+
+def _mfa_user(context: AccessContext) -> UserPublic:
+    if context.user is None:
+        raise HTTPException(status_code=400, detail="MFA requires a user account.")
+    return context.user
+
+
+@router.post("/auth/mfa/totp/enroll", response_model=TotpEnrollResponse)
+def mfa_totp_enroll(
+    request: Request, context: AccessContext = Depends(require_step_up)
+) -> TotpEnrollResponse:
+    user = _mfa_user(context)
+    state = _state(request)
+    uri = mfa_store.totp_enroll(
+        state.session_factory, state.settings, user_id=user.id, email=user.email
+    )
+    return TotpEnrollResponse(otpauth_uri=uri)
+
+
+@router.post("/auth/mfa/totp/confirm", response_model=TotpConfirmResponse)
+def mfa_totp_confirm(
+    payload: TotpConfirmRequest,
+    request: Request,
+    context: AccessContext = Depends(require_step_up),
+) -> TotpConfirmResponse:
+    user = _mfa_user(context)
+    state = _state(request)
+    codes = mfa_store.totp_confirm(
+        state.session_factory, state.settings, user_id=user.id, code=payload.code
+    )
+    _audit_from_context(
+        request, context=context, event_type="auth.mfa.totp_confirmed",
+        message="TOTP factor confirmed.", entity_type="user", entity_id=user.id,
+    )
+    return TotpConfirmResponse(confirmed=True, recovery_codes=codes)
+
+
+@router.delete("/auth/mfa/totp", response_model=MessageResponse)
+def mfa_totp_delete(
+    request: Request, context: AccessContext = Depends(require_step_up)
+) -> MessageResponse:
+    user = _mfa_user(context)
+    if not mfa_store.totp_delete(_state(request).session_factory, user_id=user.id):
+        raise HTTPException(status_code=404, detail="No TOTP factor to remove.")
+    _audit_from_context(
+        request, context=context, event_type="auth.mfa.totp_removed",
+        message="TOTP factor removed.", entity_type="user", entity_id=user.id,
+    )
+    return MessageResponse(detail="TOTP removed.")
+
+
+@router.post("/auth/mfa/webauthn/register/options")
+def mfa_webauthn_register_options(
+    request: Request, context: AccessContext = Depends(require_step_up)
+) -> JSONResponse:
+    user = _mfa_user(context)
+    state = _state(request)
+    options = mfa_webauthn.begin_registration(state.session_factory, user=user, settings=state.settings)
+    return JSONResponse(content=json.loads(options))
+
+
+@router.post("/auth/mfa/webauthn/register/verify", response_model=WebAuthnRegisterResponse)
+def mfa_webauthn_register_verify(
+    payload: WebAuthnRegisterVerifyRequest,
+    request: Request,
+    context: AccessContext = Depends(require_step_up),
+) -> WebAuthnRegisterResponse:
+    user = _mfa_user(context)
+    state = _state(request)
+    mfa_webauthn.complete_registration(
+        state.session_factory,
+        user_id=user.id,
+        credential=payload.credential,
+        nickname=payload.nickname,
+        settings=state.settings,
+    )
+    # First-factor passkey users get recovery codes too (shown once) so they aren't lockout-prone.
+    recovery_codes = mfa_store.ensure_recovery_codes(state.session_factory, user_id=user.id)
+    _audit_from_context(
+        request, context=context, event_type="auth.mfa.passkey_registered",
+        message="Passkey registered.", entity_type="user", entity_id=user.id,
+    )
+    return WebAuthnRegisterResponse(detail="Passkey registered.", recovery_codes=recovery_codes)
+
+
+@router.get("/auth/mfa/webauthn/credentials", response_model=WebAuthnCredentialList)
+def mfa_webauthn_list(
+    request: Request, context: AccessContext = Depends(require_access_context)
+) -> WebAuthnCredentialList:
+    user = _mfa_user(context)
+    creds = mfa_webauthn.list_credentials(_state(request).session_factory, user_id=user.id)
+    return WebAuthnCredentialList(credentials=creds)
+
+
+@router.patch("/auth/mfa/webauthn/credentials/{credential_pk}", response_model=MessageResponse)
+def mfa_webauthn_rename(
+    credential_pk: int,
+    payload: WebAuthnCredentialRename,
+    request: Request,
+    context: AccessContext = Depends(require_step_up),
+) -> MessageResponse:
+    user = _mfa_user(context)
+    if not mfa_webauthn.rename_credential(
+        _state(request).session_factory, user_id=user.id, credential_pk=credential_pk,
+        nickname=payload.nickname,
+    ):
+        raise HTTPException(status_code=404, detail="Passkey not found.")
+    return MessageResponse(detail="Passkey renamed.")
+
+
+@router.delete("/auth/mfa/webauthn/credentials/{credential_pk}", response_model=MessageResponse)
+def mfa_webauthn_delete(
+    credential_pk: int,
+    request: Request,
+    context: AccessContext = Depends(require_step_up),
+) -> MessageResponse:
+    user = _mfa_user(context)
+    if not mfa_webauthn.delete_credential(
+        _state(request).session_factory, user_id=user.id, credential_pk=credential_pk
+    ):
+        raise HTTPException(status_code=404, detail="Passkey not found.")
+    _audit_from_context(
+        request, context=context, event_type="auth.mfa.passkey_removed",
+        message="Passkey removed.", entity_type="user", entity_id=user.id,
+    )
+    return MessageResponse(detail="Passkey removed.")
+
+
+@router.post("/auth/mfa/recovery/regenerate", response_model=RecoveryRegenerateResponse)
+def mfa_recovery_regenerate(
+    request: Request, context: AccessContext = Depends(require_step_up)
+) -> RecoveryRegenerateResponse:
+    user = _mfa_user(context)
+    codes = mfa_store.regenerate_recovery_codes(_state(request).session_factory, user_id=user.id)
+    _audit_from_context(
+        request, context=context, event_type="auth.mfa.recovery_regenerated",
+        message="Recovery codes regenerated.", entity_type="user", entity_id=user.id,
+    )
+    return RecoveryRegenerateResponse(recovery_codes=codes, remaining=len(codes))
+
+
+@router.get("/auth/mfa/status", response_model=MfaStatusResponse)
+def mfa_status(
+    request: Request, context: AccessContext = Depends(require_access_context)
+) -> MfaStatusResponse:
+    user = _mfa_user(context)
+    data = mfa_store.status(_state(request).session_factory, user_id=user.id, email=user.email)
+    return MfaStatusResponse(**data)
+
+
+@router.post("/auth/mfa/login/totp", response_model=AccessTokenResponse)
+def mfa_login_totp(payload: MfaLoginTotpRequest, request: Request) -> AccessTokenResponse:
+    state = _state(request)
+    token, expires_at, user = mfa_store.complete_login_totp(
+        state.session_factory, state.settings, mfa_token=payload.mfa_token, code=payload.code
+    )
+    _audit_from_context(
+        request, context=AccessContext(user=user), event_type="auth.mfa.login",
+        message="User completed MFA login (TOTP).", entity_type="user", entity_id=user.id,
+    )
+    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+
+
+@router.post("/auth/mfa/login/webauthn", response_model=AccessTokenResponse)
+def mfa_login_webauthn(payload: MfaLoginWebAuthnRequest, request: Request) -> AccessTokenResponse:
+    state = _state(request)
+    token, expires_at, user = mfa_store.complete_login_webauthn(
+        state.session_factory, state.settings, mfa_token=payload.mfa_token, credential=payload.assertion
+    )
+    _audit_from_context(
+        request, context=AccessContext(user=user), event_type="auth.mfa.login",
+        message="User completed MFA login (passkey).", entity_type="user", entity_id=user.id,
+    )
+    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+
+
+@router.post("/auth/mfa/login/recovery", response_model=AccessTokenResponse)
+def mfa_login_recovery(payload: MfaLoginRecoveryRequest, request: Request) -> AccessTokenResponse:
+    state = _state(request)
+    token, expires_at, user = mfa_store.complete_login_recovery(
+        state.session_factory, state.settings, mfa_token=payload.mfa_token, code=payload.code
+    )
+    _audit_from_context(
+        request, context=AccessContext(user=user), event_type="auth.mfa.login",
+        message="User completed MFA login (recovery code).", entity_type="user", entity_id=user.id,
+    )
+    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+
+
+@router.post("/auth/step-up/options", response_model=StepUpOptionsResponse)
+def step_up_options(
+    request: Request, context: AccessContext = Depends(require_access_context)
+) -> StepUpOptionsResponse:
+    user = _mfa_user(context)
+    data = mfa_store.step_up_options(_state(request).session_factory, _state(request).settings, user_id=user.id)
+    opts = data["webauthn_options"]
+    return StepUpOptionsResponse(
+        factors=data["factors"], webauthn_options=json.loads(opts) if opts else None
+    )
+
+
+@router.post("/auth/step-up/totp", response_model=StepUpResult)
+def step_up_totp(
+    payload: StepUpTotpRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> StepUpResult:
+    user = _mfa_user(context)
+    state = _state(request)
+    result = mfa_store.complete_step_up_totp(
+        state.session_factory, state.settings,
+        raw_token=context.raw_token, user_id=user.id, code=payload.code,
+    )
+    return StepUpResult(**result)
+
+
+@router.post("/auth/step-up/webauthn", response_model=StepUpResult)
+def step_up_webauthn(
+    payload: StepUpWebAuthnRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> StepUpResult:
+    user = _mfa_user(context)
+    state = _state(request)
+    result = mfa_store.complete_step_up_webauthn(
+        state.session_factory, state.settings,
+        raw_token=context.raw_token, user_id=user.id, credential=payload.assertion,
+    )
+    return StepUpResult(**result)
+
+
+@router.post("/auth/step-up/password", response_model=StepUpResult)
+def step_up_password(
+    payload: StepUpPasswordRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> StepUpResult:
+    user = _mfa_user(context)
+    state = _state(request)
+    result = mfa_store.complete_step_up_password(
+        state.session_factory, state.settings,
+        raw_token=context.raw_token, user=user, password=payload.password,
+    )
+    return StepUpResult(**result)
+
+
+@router.get("/admin/mfa/policy/{organization_id}", response_model=MfaPolicyResponse)
+def mfa_policy_get(
+    organization_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> MfaPolicyResponse:
+    data = mfa_store.get_policy(_state(request).session_factory, organization_id=organization_id)
+    return MfaPolicyResponse(**data)
+
+
+@router.put("/admin/mfa/policy/{organization_id}", response_model=MfaPolicyResponse)
+def mfa_policy_set(
+    organization_id: int,
+    payload: MfaPolicyUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_admin_step_up),
+) -> MfaPolicyResponse:
+    state = _state(request)
+    data = mfa_store.set_policy(
+        state.session_factory,
+        organization_id=organization_id,
+        mfa_required=payload.mfa_required,
+        grace_period_days=payload.grace_period_days,
+        allowed_factors=payload.allowed_factors,
+        enforce_for_sso=payload.enforce_for_sso,
+        require_step_up_for_signing=payload.require_step_up_for_signing,
+        updated_by_user_id=context.user.id if context.user is not None else None,
+    )
+    _audit_from_context(
+        request, context=context, event_type="auth.mfa.policy_updated",
+        message=f"MFA policy updated for organization {organization_id}.",
+        entity_type="organization", entity_id=organization_id,
+        metadata={"mfa_required": payload.mfa_required},
+    )
+    return MfaPolicyResponse(**data)
 
 
 @router.post("/auth/request-email-verification", response_model=TokenActionPreview)
@@ -13185,15 +13575,18 @@ def generate_traceability_matrix_route(
     "/esignatures/records",
     response_model=ElectronicSignatureRecord,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_step_up)],
 )
 def create_esignature_record_route(
     payload: ElectronicSignatureRecordCreate,
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> ElectronicSignatureRecord:
+    # AC#2: signing requires a fresh step-up re-auth (Part 11 §11.200 contemporaneous re-auth).
+    state = _state(request)
+    _, step_up_factor, step_up_aal = mfa_store.read_step_up(state.session_factory, context.raw_token)
     try:
-        record = validation_store.create_signature(_state(request).session_factory, payload)
+        record = validation_store.create_signature(state.session_factory, payload)
     except Exception as exc:
         _raise_validation_center_http_error(exc)
         raise
@@ -13208,6 +13601,8 @@ def create_esignature_record_route(
             "target_type": record.target_type,
             "target_id": record.target_id,
             "signature_meaning": record.signature_meaning,
+            "step_up_factor": step_up_factor,
+            "step_up_aal": step_up_aal,
         },
     )
     return record
@@ -28114,6 +28509,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content=content,
             headers=exc.headers,
         )
+
+    @app.exception_handler(mfa_webauthn.MFAError)
+    async def mfa_error_handler(
+        request: Request, exc: mfa_webauthn.MFAError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
 
     @app.exception_handler(scim_store.SCIMError)
     async def scim_error_handler(
