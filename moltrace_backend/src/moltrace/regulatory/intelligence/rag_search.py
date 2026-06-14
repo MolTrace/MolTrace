@@ -427,9 +427,14 @@ def _numbered_excerpts(result: RegulatorySearchResult) -> tuple[str, tuple[str, 
 
 
 # A regulated quantity = a number adjacent to a dose/concentration unit, optionally per day/kg/dose.
-# Used to catch an LLM stating a limit/threshold/PDE/TTC that is not present in the excerpts.
+# Used to catch an LLM stating a limit/threshold/PDE/TTC that is not present in the excerpts. Covers
+# abbreviated AND spelled-out units (kept in sync with rag_reasoner._NUMERIC_TOKEN_RE).
 _NUMERIC_LIMIT_RE = re.compile(
-    r"\d[\d,]*(?:\.\d+)?\s?(?:µg|ug|mcg|mg|ng|kg|ppm|ppb|%|g)\b(?:\s?/\s?(?:day|kg|ml|l|dose))?",
+    r"\d[\d,]*(?:\.\d+)?\s?"
+    r"(?:micrograms?|milligrams?|nanograms?|kilograms?|parts per million|parts per billion"
+    r"|percent|grams?|µg|mcg|ug|mg|ng|kg|ppm|ppb|%|g)"
+    r"(?![a-zA-Z])"
+    r"(?:\s?(?:/|per)\s?(?:day|kg|ml|l|dose))?",
     re.IGNORECASE,
 )
 
