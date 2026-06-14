@@ -26,7 +26,8 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { TenantSelector } from "@/components/app/tenant-selector"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useOptionalOverviewData } from "@/components/app/overview-data-context"
-import { apiFetch, AUTH_TOKEN_STORAGE_KEY } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { clearAuthSession } from "@/lib/auth/session"
 import { fetchAiEvidenceQueue } from "@/lib/api/ai-evidence"
 import { useTenant } from "@/src/lib/tenant/tenant-context"
 import { clearSpectraCheckRuntimeState } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
@@ -247,12 +248,15 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
     [searchProjects, searchReactions, searchSessions],
   )
 
-  // ── Sign out: clear auth token + tenant id + push to /sign-in ──
+  // ── Sign out: revoke the refresh family server-side, clear local state, redirect ──
   const handleSignOut = useCallback(() => {
+    // Best-effort family revoke (uses the current access bearer, captured before the
+    // local clear). Fire-and-forget so sign-out feels instant.
+    void apiFetch("/auth/logout", { method: "POST" }).catch(() => {})
     clearSpectraCheckRuntimeState()
+    clearAuthSession()
     if (typeof window !== "undefined") {
       try {
-        window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
         window.localStorage.removeItem("moltrace.tenant_id")
         window.sessionStorage.clear()
       } catch {

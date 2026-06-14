@@ -1459,6 +1459,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Auth Refresh
+         * @description Rotate a refresh token for a fresh access+refresh pair (Prompt 4). Reuse of a spent token
+         *     revokes the whole family. The refresh token is the credential — no bearer required.
+         */
+        post: operations["auth_refresh_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/refresh/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Auth Refresh Revoke
+         * @description Revoke the presenting refresh token's entire family (refresh lineage + access rows).
+         */
+        post: operations["auth_refresh_revoke_auth_refresh_revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/sso/connections": {
         parameters: {
             query?: never;
@@ -11704,6 +11745,10 @@ export interface components {
              */
             expires_at: string;
             user: components["schemas"]["UserPublic"];
+            /** Refresh Token */
+            refresh_token?: string | null;
+            /** Refresh Expires At */
+            refresh_expires_at?: string | null;
         };
         /** ActiveLearningCandidate */
         ActiveLearningCandidate: {
@@ -12445,6 +12490,10 @@ export interface components {
             requires_email_verification: boolean;
             /** Detail */
             detail: string;
+            /** Refresh Token */
+            refresh_token?: string | null;
+            /** Refresh Expires At */
+            refresh_expires_at?: string | null;
         };
         /** AutomationTaskDefinition */
         AutomationTaskDefinition: {
@@ -31486,6 +31535,16 @@ export interface components {
             /** Remaining */
             remaining: number;
         };
+        /** RefreshRequest */
+        RefreshRequest: {
+            /** Refresh Token */
+            refresh_token: string;
+        };
+        /** RefreshRevokeRequest */
+        RefreshRevokeRequest: {
+            /** Refresh Token */
+            refresh_token: string;
+        };
         /**
          * RegionIntegrationResult
          * @description Integral of one region with full provenance.
@@ -39654,6 +39713,16 @@ export interface components {
             /** Nickname */
             nickname: string;
         };
+        /**
+         * WebAuthnRegisterResponse
+         * @description Passkey registered; ``recovery_codes`` is populated once if this is the user's first factor.
+         */
+        WebAuthnRegisterResponse: {
+            /** Detail */
+            detail: string;
+            /** Recovery Codes */
+            recovery_codes?: string[] | null;
+        };
         /** WebAuthnRegisterVerifyRequest */
         WebAuthnRegisterVerifyRequest: {
             /** Credential */
@@ -44083,6 +44152,72 @@ export interface operations {
             };
         };
     };
+    auth_refresh_auth_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auth_refresh_revoke_auth_refresh_revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRevokeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     sso_list_connections_auth_sso_connections_get: {
         parameters: {
             query?: {
@@ -44624,7 +44759,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MessageResponse"];
+                    "application/json": components["schemas"]["WebAuthnRegisterResponse"];
                 };
             };
             /** @description Validation Error */

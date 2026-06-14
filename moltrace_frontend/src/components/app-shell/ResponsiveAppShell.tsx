@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { AppSidebar } from "@/components/app/app-sidebar"
 import { AppTopbar } from "@/components/app/app-topbar"
 import { AIEvidenceQueue } from "@/components/app/ai-evidence-queue"
@@ -13,8 +14,21 @@ import { StepUpProvider } from "@/components/auth/step-up-provider"
 
 export function ResponsiveAppShell({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
+  const router = useRouter()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [evidenceQueueOpen, setEvidenceQueueOpen] = useState(true)
+
+  // When a refresh fails (idle/absolute expiry, invalid, or reuse-detected), the
+  // client clears the token family and dispatches this event — send the user to a
+  // fresh login rather than leaving them on a now-unauthenticated page.
+  useEffect(() => {
+    function onAuthReset(event: Event) {
+      const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
+      router.replace(reason === "token_reuse_detected" ? "/sign-in?session_reset=reuse" : "/sign-in?session_reset=1")
+    }
+    window.addEventListener("moltrace:auth-reset", onAuthReset)
+    return () => window.removeEventListener("moltrace:auth-reset", onAuthReset)
+  }, [router])
 
   return (
     <TenantProvider>

@@ -9,12 +9,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
-import {
-  ApiError,
-  AUTH_TOKEN_STORAGE_KEY,
-  AUTH_USER_STORAGE_KEY,
-  apiFetch,
-} from "@/lib/api/client"
+import { ApiError, apiFetch } from "@/lib/api/client"
+import { storeAuthSession } from "@/lib/auth/session"
 
 type AuthUser = {
   id: number
@@ -27,6 +23,7 @@ type AuthPageResponse = {
   access_token: string | null
   token_type?: string | null
   expires_at?: string | null
+  refresh_token?: string | null
   user: AuthUser | null
   requires_email_verification?: boolean
   detail?: string
@@ -36,15 +33,6 @@ function formValue(formData: FormData, key: string, trim = true) {
   const value = formData.get(key)
   if (typeof value !== "string") return ""
   return trim ? value.trim() : value
-}
-
-function storeAuthSession(data: AuthPageResponse) {
-  if (!data.access_token) return
-
-  window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token)
-  if (data.user) {
-    window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(data.user))
-  }
 }
 
 function authErrorMessage(error: unknown, fallback: string) {
@@ -91,7 +79,10 @@ export function SignUpForm() {
         return
       }
 
-      storeAuthSession(data)
+      storeAuthSession(data.access_token, data.user, {
+        refreshToken: data.refresh_token,
+        accessExpiresAt: data.expires_at,
+      })
       setMessage(data.user?.is_admin ? "Account created with admin access." : "Account created.")
       router.push("/dashboard")
     } catch (submitError) {

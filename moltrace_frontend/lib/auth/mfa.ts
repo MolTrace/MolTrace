@@ -65,7 +65,10 @@ export function isMfaChallenge(body: unknown): body is MfaChallenge {
 
 // ── MFA-at-login verification (mfa_token is NOT a bearer) ───────────────────
 function persist(res: AccessTokenResponse) {
-  storeAuthSession(res.access_token, res.user as AuthSessionUser | null)
+  storeAuthSession(res.access_token, res.user as AuthSessionUser | null, {
+    refreshToken: res.refresh_token,
+    accessExpiresAt: res.expires_at,
+  })
   return res
 }
 
