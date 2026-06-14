@@ -50,6 +50,7 @@ __all__ = [
     "Annex22Log",
     "Annex22PendingError",
     "DecisionInputs",
+    "DecisionMeta",
     "GovernedResult",
     "RiskLevel",
     "annex22_compliance_checklist",
@@ -553,13 +554,18 @@ def _looks_like_routed_result(obj: Any) -> bool:
 
 
 @dataclass(frozen=True)
-class _DecisionMeta:
+class DecisionMeta:
+    """Decision metadata an ``extract`` callback returns for a governed function's result."""
+
     model_name: str
     model_version: str
     output: dict[str, Any]
     confidence: float
     feature_attribution: dict[str, Any]
     regulatory_basis: str
+
+
+_DecisionMeta = DecisionMeta  # backwards-compatible alias (the type was previously private)
 
 
 def _extract_smiles(args: tuple[Any, ...], kwargs: Mapping[str, Any]) -> str | None:
@@ -576,7 +582,7 @@ def _default_extract(
     result: Any,
     args: tuple[Any, ...],
     kwargs: Mapping[str, Any],
-) -> _DecisionMeta:
+) -> DecisionMeta:
     """Best-effort extraction of decision metadata from a governed function's result.
 
     Understands Prompt 13 ``RoutedResult`` (duck-typed), any engine result with ``as_dict()`` +
@@ -592,7 +598,7 @@ def _default_extract(
             if citations
             else getattr(result, "operation", "") or fn.__name__
         )
-        return _DecisionMeta(
+        return DecisionMeta(
             model_name=str(getattr(result, "engine", "") or fn.__name__),
             model_version=str(
                 getattr(result, "rule_set_version", None)
@@ -609,7 +615,7 @@ def _default_extract(
         )
 
     if hasattr(result, "as_dict") and hasattr(result, "rule_set_version"):
-        return _DecisionMeta(
+        return DecisionMeta(
             model_name=fn.__name__,
             model_version=str(getattr(result, "rule_set_version", None) or "unversioned"),
             output=_jsonable(result),
@@ -623,7 +629,7 @@ def _default_extract(
         )
 
     if isinstance(result, Mapping):
-        return _DecisionMeta(
+        return DecisionMeta(
             model_name=str(result.get("model_name", fn.__name__)),
             model_version=str(result.get("model_version", "unversioned")),
             output=_jsonable(result.get("output", result)),
@@ -632,7 +638,7 @@ def _default_extract(
             regulatory_basis=str(result.get("regulatory_basis", fn.__name__)),
         )
 
-    return _DecisionMeta(
+    return DecisionMeta(
         model_name=fn.__name__,
         model_version="unversioned",
         output={"value": _jsonable(result)},
@@ -649,7 +655,8 @@ def with_annex22_governance(
     regulatory_basis: str | None = None,
     model_name: str | None = None,
     log: Annex22Log | None = None,
-    extract: Callable[..., _DecisionMeta] | None = None,
+    extract: Callable[..., DecisionMeta] | None = None,
+    risk_fn: Callable[[Any], Any] | None = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., GovernedResult]]:
     """Decorator that governs an AI-assisted regulatory function under Draft Annex 22.
 
@@ -663,9 +670,13 @@ def with_annex22_governance(
     intended use documented, model version logged, calibrated confidence (ECE-gated upstream),
     feature attribution computed, HITL opportunity for high-risk, tamper-evident audit trail
     (hash chain), and regulatory basis cited.
+
+    ``risk_fn`` (optional) derives the risk level from the decision *result* (e.g. an M7 mutagenic
+    class 1-3 is high-risk while class 5 is low) — Annex 22 criticality is decision-dependent. When
+    omitted the fixed ``risk_level`` applies.
     """
 
-    risk = RiskLevel(risk_level)
+    base_risk = RiskLevel(risk_level)
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., GovernedResult]:
         @functools.wraps(fn)
@@ -676,6 +687,7 @@ def with_annex22_governance(
 
             result = fn(*args, **kwargs)  # the AI-assisted decision itself
 
+            risk = RiskLevel(risk_fn(result)) if risk_fn is not None else base_risk
             meta = (extract or _default_extract)(fn, result, args, kwargs)
             inputs = DecisionInputs(
                 input_data_hash=content_hash(
@@ -702,7 +714,7 @@ def with_annex22_governance(
             status = "logged" if risk == RiskLevel.LOW else "approved"
             return GovernedResult(status=status, record=record, output=result)
 
-        wrapper.__annex22_risk_level__ = risk.value  # type: ignore[attr-defined]
+        wrapper.__annex22_risk_level__ = "dynamic" if risk_fn else base_risk.value  # type: ignore[attr-defined]
         return wrapper
 
     return decorator
