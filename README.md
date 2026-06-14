@@ -73,6 +73,8 @@ MolTrace is a two-app monorepo:
 
 **The audit trail** (`moltrace.spectroscopy.audit`) is an HMAC-SHA256-chained, tamper-evident log with §11.50/§11.70 e-signatures, a 7-year retention floor, and model-weight checksum capture — controls built to *support* 21 CFR Part 11. The HMAC chain key is supplied via `MOLTRACE_AUDIT_HMAC_KEY`.
 
+**Identity & access** is opaque-bearer-token auth over hashed sessions, with per-user and per-tenant scoping enforced server-side (regulatory dossiers, for example, are owner-scoped with non-leaking 404s). For enterprise tenants, MolTrace federates identity via **per-organization OpenID Connect SSO** (`nmrcheck.oidc_client` / `nmrcheck.sso_store`): Authorization Code + PKCE (S256), JWKS id_token validation, just-in-time user/team provisioning gated by allowed email domains, and an optional **enforce-SSO** mode that blocks password login for governed domains. The same connections expose a **SCIM 2.0** endpoint (`nmrcheck.scim_store`, `/scim/v2`) so Okta/Entra can auto-provision and — critically — **auto-deprovision** users; deprovisioning is *soft* (disable + immediate session revocation, never deleting an audit-linked user) so the §11.10(d)/§11.200 access controls hold without breaking record traceability. IdP client secrets are held AES-256-GCM encrypted at rest; SCIM bearer tokens are stored as SHA-256 digests. Unique user identification plus enforced, lifecycle-managed access control are the controls that *support* 21 CFR Part 11.
+
 All browser→backend traffic is proxied same-origin; the binding FE↔BE contract is the generated `src/lib/api/schema.d.ts` (OpenAPI → TypeScript).
 
 ```
@@ -114,9 +116,10 @@ The FE↔BE contract pipeline: FastAPI `/openapi.json` → `pnpm generate:openap
 
 **Backend**
 - Python ≥3.11 (deployed on 3.13.5); FastAPI ≥0.115,<1.0, Pydantic v2
-- SQLAlchemy 2.x + Alembic (PostgreSQL via psycopg v3 in prod, SQLite in tests; 14 migrations)
+- SQLAlchemy 2.x + Alembic (PostgreSQL via psycopg v3 in prod, SQLite in tests; 18 migrations)
 - uv package manager + hatchling build backend; ruff + mypy (strict)
 - RQ ≥2.0 + Redis for queued background jobs
+- `pyjwt[crypto]` (RS256/ES256 OIDC id_token verification) + `cryptography` (AES-256-GCM secret encryption) for enterprise SSO
 
 **ML + science**
 - RDKit ≥2025.9.1 (structure parsing/standardisation), numpy/scipy/lmfit (deconvolution, fitting)
@@ -237,6 +240,8 @@ Key environment variables (see `render.yaml` for the full set):
 | `EMAIL_BACKEND` / `REQUIRE_VERIFIED_EMAIL` | backend | Email + account-verification behavior. |
 | `QUEUE_NAME` | backend | RQ queue name (default `moltrace`). |
 | `MOLTRACE_AUDIT_HMAC_KEY` | backend | Key for the HMAC-chained audit ledger. |
+| `SSO_ENCRYPTION_KEY` | backend | AES-256-GCM key for encrypting SSO IdP client secrets at rest. **Required before any tenant onboards SSO** (a loud dev-only fallback is used otherwise). |
+| `BASE_URL` / `FRONTEND_BASE_URL` | backend | API origin (used to compute the OIDC callback redirect URI) and SPA origin (where the SSO callback lands). |
 | `ANTHROPIC_API_KEY` | backend | Enables the optional RAG `/spectrum/reason` path (with the undeclared `anthropic` package). |
 | `API_BASE_URL` | frontend | Backend target for the same-origin proxy (local + root deploy). |
 | `NEXT_PUBLIC_API_BASE_URL` | frontend | Public API base. **Divergence to note:** `moltrace_frontend/render.yaml` sets it to `/api/backend`, while the root `render.yaml` points it at the full backend URL. |
@@ -284,7 +289,7 @@ Marketing metrics (e.g. accuracy and throughput figures) are positioning copy an
 
 ## Access, contributing & security
 
-- **Hosted product.** MolTrace runs as a multi-tenant hosted application at [moltrace.co](https://moltrace.co), with authentication, per-tenant scoping, identity+role e-signatures, and CORS allow-lists. Access is via the hosted product, not a public self-serve install.
+- **Hosted product.** MolTrace runs as a multi-tenant hosted application at [moltrace.co](https://moltrace.co), with authentication (password or per-organization OpenID Connect SSO, with optional enforce-SSO and SCIM 2.0 auto-provisioning/deprovisioning), per-tenant scoping, identity+role e-signatures, and CORS allow-lists. Access is via the hosted product, not a public self-serve install.
 - **Contributions.** This is a proprietary, all-rights-reserved repository (see below); external contributions and issues are not solicited here.
 - **Security.** Report any suspected security issue privately to the MolTrace maintainers rather than opening a public issue.
 

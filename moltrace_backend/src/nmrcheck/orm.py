@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -99,6 +100,138 @@ class UserActionTokenORM(Base):
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[UserORM] = relationship(back_populates="action_tokens")
+
+
+class SSOConnectionORM(Base):
+    """A per-organization OIDC identity-provider configuration (Prompt 1, SSO)."""
+
+    __tablename__ = "sso_connections"
+    __table_args__ = (Index("ix_sso_connections_org", "organization_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(200))
+    protocol: Mapped[str] = mapped_column(String(16), default="oidc")
+    issuer: Mapped[str] = mapped_column(String(500))
+    client_id: Mapped[str] = mapped_column(String(500))
+    client_secret_encrypted: Mapped[str] = mapped_column(Text)  # AES-256-GCM at rest
+    email_domains_json: Mapped[str] = mapped_column(Text, default="[]")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    enforce_sso: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class SSOLoginFlowORM(Base):
+    """Ephemeral state for one OIDC login (PKCE + nonce), then a one-time exchange code.
+
+    No session token is stored: the callback records the resolved ``user_id`` and a one-time
+    ``exchange_code``; the bearer session is minted only when the SPA calls the exchange route.
+    """
+
+    __tablename__ = "sso_login_flows"
+    __table_args__ = (
+        Index("ix_sso_login_flows_exchange", "exchange_code"),
+        Index("ix_sso_login_flows_expires", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connection_id: Mapped[int] = mapped_column(
+        ForeignKey("sso_connections.id", ondelete="CASCADE"), index=True
+    )
+    state: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    nonce: Mapped[str] = mapped_column(String(128))
+    code_verifier: Mapped[str] = mapped_column(String(128))
+    redirect_uri: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending|completed|consumed
+    exchange_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class SCIMTokenORM(Base):
+    """A long-lived SCIM bearer token for one SSO connection (SCIM 2.0 provisioning).
+
+    The token is stored as a SHA-256 digest only (``token_hash``) — the server compares a
+    presented token, never recovers it — exactly like ``session_tokens``/``user_action_tokens``.
+    At most one *live* token per connection (enforced in code on issue, plus a Postgres
+    partial-unique index); rotation is issue-then-revoke.
+    """
+
+    __tablename__ = "scim_tokens"
+    __table_args__ = (
+        Index(
+            "ix_scim_tokens_live",
+            "connection_id",
+            unique=True,
+            postgresql_where=text("revoked_at IS NULL"),
+            sqlite_where=text("revoked_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connection_id: Mapped[int] = mapped_column(
+        ForeignKey("sso_connections.id", ondelete="CASCADE"), index=True
+    )
+    token_prefix: Mapped[str] = mapped_column(String(16), index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SCIMUserORM(Base):
+    """The per-connection SCIM resource for one provisioned user (SCIM 2.0 provisioning).
+
+    This is the tenant-isolation boundary: the SCIM resource ``id`` returned to the IdP is this
+    row's ``id`` (never the global ``users.id``), so an id minted under one connection resolves
+    to no row under another connection's token — closing IDOR/enumeration. ``external_id`` /
+    ``scim_user_name`` are per-connection identifiers (``users.email`` is cross-org by design).
+    Deprovisioning is soft: ``active``/``deprovisioned_at`` flip, the underlying user row is kept.
+    """
+
+    __tablename__ = "scim_users"
+    __table_args__ = (
+        Index("ix_scim_users_user", "user_id"),
+        UniqueConstraint("connection_id", "external_id", name="uq_scim_users_conn_external"),
+        UniqueConstraint("connection_id", "scim_user_name", name="uq_scim_users_conn_username"),
+        UniqueConstraint("connection_id", "user_id", name="uq_scim_users_conn_user"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    connection_id: Mapped[int] = mapped_column(
+        ForeignKey("sso_connections.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    scim_user_name: Mapped[str] = mapped_column(String(255))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    raw_attributes_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+    deprovisioned_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class EmailOutboxORM(Base):

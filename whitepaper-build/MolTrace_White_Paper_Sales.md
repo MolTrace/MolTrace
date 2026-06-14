@@ -186,7 +186,7 @@ MolTrace offers three engagement tiers for new tenants:
 
 **Tier 2 — Department deployment (90 days).** Up to 25 analytical seats + 5 regulatory-affairs seats, instrumentation integration package (Bruker / Agilent / Waters / Thermo), tenant-private namespace, and SOC 2 / GDPR onboarding documentation.
 
-**Tier 3 — Enterprise (annual).** Multi-site multi-tenant deployment, federated tenant-private predicted-NMR models, dedicated regulatory-affairs onboarding for FDA AI Credibility Framework mapping, and an SLA-backed audit response.
+**Tier 3 — Enterprise (annual).** Multi-site multi-tenant deployment, per-organization single sign-on (OpenID Connect federation with your identity provider — Okta, Entra ID, Ping, etc. — with just-in-time provisioning and optional enforce-SSO) and SCIM 2.0 directory sync that auto-provisions and **auto-deprovisions** users (offboarding in your IdP revokes MolTrace access and active sessions immediately), federated tenant-private predicted-NMR models, dedicated regulatory-affairs onboarding for FDA AI Credibility Framework mapping, and an SLA-backed audit response.
 
 All tiers include the immutable raw vault, the evidence engine, the regulatory report composer, the Automation ROI dashboard, and the full citation-linked literature scaffold. The 30-day pilot exists specifically to convert order-of-magnitude ROI estimates into **measured tenant data** that the buying team can defend to procurement.
 
