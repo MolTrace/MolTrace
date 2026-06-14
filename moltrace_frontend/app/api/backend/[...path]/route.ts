@@ -65,6 +65,13 @@ async function proxy(request: NextRequest, context: RouteContext) {
   const method = request.method.toUpperCase()
   const hasBody = method !== "GET" && method !== "HEAD"
 
+  // SSO is the one flow where the backend answers with a 302 that the *browser*
+  // must follow (the IdP authorize hop on `/auth/sso/{slug}/login`). For those
+  // paths, forward the redirect verbatim instead of letting fetch chase it
+  // server-side (the default) — which would fetch the IdP page on the server and
+  // return its HTML, breaking the login. Every other path keeps follow semantics.
+  const forwardRedirect = path[0] === "auth" && path[1] === "sso"
+
   let response: Response
   try {
     response = await fetch(target, {
@@ -72,6 +79,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
       headers,
       body: hasBody ? await request.arrayBuffer() : undefined,
       cache: "no-store",
+      redirect: forwardRedirect ? "manual" : "follow",
     })
   } catch (err) {
     console.error("[api/backend proxy] fetch failed:", target.toString(), err)
