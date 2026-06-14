@@ -201,6 +201,14 @@ jobs:
       - name: Verify deployment gate fails closed
         run: uv run moltrace-deployment-gate --self-check
 
+      # The Prompt 18 REGULATORY release gate (rule-set / model lifecycle). Same fail-closed
+      # contract: `--self-check` exits non-zero unless the gate ALLOWS an all-pass candidate and
+      # BLOCKS every single-check failure (Prompt 17 eval gate · current GAMP 5 D11 validation
+      # record · Prompt 12 Annex 22 audit chain · tests green). Keeps the regulatory lifecycle
+      # gate machinery honest before any rule-set can reach production.
+      - name: Verify regulatory compliance-MLOps gate fails closed
+        run: uv run python -m moltrace.regulatory.ops --self-check
+
   deploy:
     name: Deploy · Vercel + Render (FE + BE)
     needs: [frontend-tests, backend-tests, deployment-gate]
