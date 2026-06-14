@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
     Float,
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -79,6 +81,12 @@ class SessionTokenORM(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # MFA state (Prompt 3): authentication methods carried + the rolling step-up proof.
+    amr: Mapped[str | None] = mapped_column(String(64), nullable=True)  # pwd,totp,webauthn,sso,backup
+    mfa_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    stepped_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    step_up_factor: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    step_up_aal: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
     user: Mapped[UserORM] = relationship(back_populates="tokens")
 
@@ -231,6 +239,145 @@ class SCIMUserORM(Base):
     )
     deprovisioned_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+
+class MFATotpCredentialORM(Base):
+    """A user's RFC 6238 TOTP authenticator. The base32 secret is AES-256-GCM encrypted at rest;
+    a secret is only usable once ``confirmed_at`` is set (a code was verified). At most one
+    confirmed TOTP per user (partial-unique, Postgres + SQLite)."""
+
+    __tablename__ = "mfa_totp_credentials"
+    __table_args__ = (
+        Index(
+            "ix_mfa_totp_confirmed",
+            "user_id",
+            unique=True,
+            postgresql_where=text("confirmed_at IS NOT NULL"),
+            sqlite_where=text("confirmed_at IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    secret_encrypted: Mapped[str] = mapped_column(Text)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_step: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # TOTP replay guard
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class MFAWebAuthnCredentialORM(Base):
+    """A registered WebAuthn/FIDO2 passkey. Stores only public material (no secret): the raw
+    ``credential_id``, the COSE ``public_key``, and the ``sign_count`` for clone detection."""
+
+    __tablename__ = "mfa_webauthn_credentials"
+    __table_args__ = (Index("ix_mfa_webauthn_cred_user", "user_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    credential_id: Mapped[bytes] = mapped_column(LargeBinary, unique=True, index=True)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary)
+    sign_count: Mapped[int] = mapped_column(BigInteger, default=0)
+    transports_json: Mapped[str] = mapped_column(Text, default="[]")
+    aaguid: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    device_type: Mapped[str | None] = mapped_column(String(16), nullable=True)  # single|multi device
+    backed_up: Mapped[bool] = mapped_column(Boolean, default=False)
+    nickname: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MFAWebAuthnChallengeORM(Base):
+    """Ephemeral, single-use WebAuthn challenge persisted server-side between the options and verify
+    legs (register / authenticate / step-up). The server-stored ``challenge`` + ``rp_id`` are the
+    only values trusted at verify — the client-returned challenge is ignored."""
+
+    __tablename__ = "mfa_webauthn_challenges"
+    __table_args__ = (Index("ix_mfa_webauthn_chal_expires", "expires_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    purpose: Mapped[str] = mapped_column(String(24))  # webauthn_register|webauthn_auth|step_up
+    challenge: Mapped[bytes] = mapped_column(LargeBinary)
+    rp_id: Mapped[str] = mapped_column(String(255))
+    webauthn_user_handle: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MFARecoveryCodeORM(Base):
+    """A one-time recovery/backup code, stored only as a SHA-256 digest. Valid as a login second
+    factor (never as a signing/admin step-up)."""
+
+    __tablename__ = "mfa_recovery_codes"
+    __table_args__ = (Index("ix_mfa_recovery_user_used", "user_id", "used_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    code_hash: Mapped[str] = mapped_column(String(64))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MFALoginChallengeORM(Base):
+    """The short-lived MFA-pending token issued mid-login. It is stored ONLY as a digest in this
+    separate table — invisible to ``get_user_by_token`` — so a pending token can never authorize an
+    API call ("no MFA -> no bearer" is structural). Traded for a real session at /auth/mfa/login/*."""
+
+    __tablename__ = "mfa_login_challenges"
+    __table_args__ = (Index("ix_mfa_login_chal_expires", "expires_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    organization_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    purpose: Mapped[str] = mapped_column(String(24), default="login")
+    factors_offered_json: Mapped[str] = mapped_column(Text, default="[]")
+    webauthn_challenge: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    sso_flow_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    amr_from_sso: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MFAPolicyORM(Base):
+    """Per-organization MFA enforcement policy (one row per org). The source of truth for the
+    fail-closed ``require_mfa_satisfied`` check."""
+
+    __tablename__ = "mfa_policies"
+    __table_args__ = (
+        UniqueConstraint("organization_id", name="uq_mfa_policies_org"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    mfa_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    mfa_required_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    allowed_factors_json: Mapped[str] = mapped_column(Text, default='["webauthn", "totp"]')
+    grace_period_days: Mapped[int] = mapped_column(Integer, default=7)
+    enforce_for_sso: Mapped[bool] = mapped_column(Boolean, default=False)
+    require_step_up_for_signing: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
 
 

@@ -81,6 +81,14 @@ class Settings:
     base_url: str = "http://127.0.0.1:8000"
     frontend_base_url: str = "http://localhost:3000"
     sso_encryption_key: str | None = None
+    # MFA (Prompt 3). Separate key from SSO for blast-radius isolation; WebAuthn RP/origin are
+    # pinned server-side (phishing resistance) and must match what the SPA serves from.
+    mfa_encryption_key: str | None = None
+    webauthn_rp_id: str = "localhost"
+    webauthn_rp_name: str = "MolTrace"
+    webauthn_origin: str = "http://localhost:3000"
+    mfa_pending_ttl_minutes: int = 5
+    step_up_ttl_minutes: int = 5
     email_from: str = "noreply@nmrcheck.local"
     email_backend: str = "database"
 
@@ -164,6 +172,15 @@ def get_settings() -> Settings:
         base_url=os.getenv("BASE_URL", "http://127.0.0.1:8000").rstrip("/"),
         frontend_base_url=os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/"),
         sso_encryption_key=(os.getenv("SSO_ENCRYPTION_KEY") or None),
+        mfa_encryption_key=(os.getenv("MFA_ENCRYPTION_KEY") or None),
+        webauthn_rp_id=os.getenv("WEBAUTHN_RP_ID", "localhost"),
+        webauthn_rp_name=os.getenv("WEBAUTHN_RP_NAME", "MolTrace"),
+        webauthn_origin=os.getenv(
+            "WEBAUTHN_ORIGIN",
+            os.getenv("FRONTEND_BASE_URL", "http://localhost:3000"),
+        ).rstrip("/"),
+        mfa_pending_ttl_minutes=_parse_int(os.getenv("MFA_PENDING_TTL_MINUTES"), 5),
+        step_up_ttl_minutes=_parse_int(os.getenv("STEP_UP_TTL_MINUTES"), 5),
         email_from=os.getenv("EMAIL_FROM", "noreply@nmrcheck.local"),
         email_backend=(
             os.getenv("EMAIL_BACKEND", "database").strip().lower() or "database"
@@ -206,6 +223,10 @@ def validate_startup_settings(settings: Settings) -> list[str]:
     issues: list[str] = []
     if settings.app_env == "production" and not settings.api_key:
         issues.append("API_KEY is not set for production.")
+    if settings.app_env == "production" and not settings.sso_encryption_key:
+        issues.append("SSO_ENCRYPTION_KEY must be set in production.")
+    if settings.app_env == "production" and not settings.mfa_encryption_key:
+        issues.append("MFA_ENCRYPTION_KEY must be set in production.")
     if settings.app_env == "production" and settings.disable_auth:
         issues.append("DISABLE_BACKEND_AUTH must not be enabled in production.")
     if settings.app_env == "production" and settings.debug:
