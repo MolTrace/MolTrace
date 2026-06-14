@@ -17,6 +17,11 @@ above -- returning a validated :class:`GroundedAnswer` flagged for qualified rev
 edit/override/adjudication as append-only labeled data with full provenance, routes borderline
 CPCA/M7 classifications to a toxicologist (and narrative drafts by disagreement sampling), and
 triggers a narrative-only retrain -- classifications never auto-retrain and are never re-classified.
+
+:mod:`finetune` (Prompt 15) LoRA fine-tunes the NARRATIVE model on approved narratives only (the
+regulated math is frozen): an approved-only, identifier-masked, hashed snapshot; leak-proof K-fold
+CV with narrative-quality metrics; a narrative adapter registered with lineage and promotion gated
+on citation no-regression. It never fine-tunes anything that produces a number or classification.
 """
 
 from __future__ import annotations
@@ -39,6 +44,24 @@ from moltrace.regulatory.ai.active_learning import (
     maybe_kickoff_narrative_retrain,
     narrative_disagreement,
     retraining_trigger,
+)
+from moltrace.regulatory.ai.finetune import (
+    FROZEN_DECISION_TYPES,
+    NARRATIVE_DECISION_TYPES,
+    FineTuneError,
+    FineTuneRun,
+    FineTuneUnavailable,
+    FoldMetrics,
+    FoldTrainer,
+    LoRAConfig,
+    NarrativeExample,
+    NarrativeOnlyError,
+    Snapshot,
+    build_snapshot,
+    finetune_narrative,
+    mask_identifiers,
+    narrative_promotion_gate,
+    register_narrative_adapter,
 )
 from moltrace.regulatory.ai.rag_reasoner import (
     Confidence,
@@ -78,10 +101,20 @@ __all__ = [
     "Citation",
     "ClassificationCandidate",
     "Confidence",
+    "FROZEN_DECISION_TYPES",
+    "FineTuneError",
+    "FineTuneRun",
+    "FineTuneUnavailable",
+    "FoldMetrics",
+    "FoldTrainer",
     "GroundedAnswer",
+    "NARRATIVE_DECISION_TYPES",
     "InvalidStatusTransition",
     "LabeledExample",
+    "LoRAConfig",
     "NarrativeCandidate",
+    "NarrativeExample",
+    "NarrativeOnlyError",
     "NarrativeRetrainHook",
     "Passage",
     "QueueItem",
@@ -97,19 +130,25 @@ __all__ = [
     "RoutedResult",
     "Router",
     "RoutingError",
+    "Snapshot",
     "StatusTransition",
     "TaskKind",
     "answer_with_citations",
     "borderline_queue",
     "build_registry_entry",
+    "build_snapshot",
     "capture_review",
     "classification_ambiguity",
     "default_regulatory_registry",
     "deterministic_operations",
     "evaluate_retraining",
+    "finetune_narrative",
+    "mask_identifiers",
     "maybe_kickoff_narrative_retrain",
     "narrative_disagreement",
+    "narrative_promotion_gate",
     "reason",
+    "register_narrative_adapter",
     "retraining_trigger",
     "retrieve",
     "router_backend",
