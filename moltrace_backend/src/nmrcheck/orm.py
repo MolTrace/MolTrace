@@ -82,13 +82,66 @@ class SessionTokenORM(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # MFA state (Prompt 3): authentication methods carried + the rolling step-up proof.
-    amr: Mapped[str | None] = mapped_column(String(64), nullable=True)  # pwd,totp,webauthn,sso,backup
+    # authentication methods reference (pwd / totp / webauthn / sso / backup)
+    amr: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mfa_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     stepped_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     step_up_factor: Mapped[str | None] = mapped_column(String(16), nullable=True)
     step_up_aal: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    # Session/token hardening (Prompt 4): the family this access row belongs to (NULL = legacy
+    # pre-0020 row, so the family-revocation predicate no-ops) + the refresh that minted it.
+    family_id: Mapped[int | None] = mapped_column(
+        ForeignKey("session_families.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    refresh_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user: Mapped[UserORM] = relationship(back_populates="tokens")
+
+
+class SessionFamilyORM(Base):
+    """A login lineage (Prompt 4): one row per login, constant across refresh rotations. Carries the
+    hard absolute-expiry cap, the MFA provenance, an optional device-binding fingerprint, and the
+    single revoked_at flag that the access read-path checks for IMMEDIATE family-wide revocation."""
+
+    __tablename__ = "session_families"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    absolute_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    idle_ttl_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    device_fingerprint_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    amr: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mfa_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class RefreshTokenORM(Base):
+    """A rotating, single-use refresh token (Prompt 4). Stored sha256-at-rest. Spent on rotation
+    (``rotated_at`` set, ``next_id`` chained); presenting a spent/revoked refresh is reuse and
+    revokes the whole family. Authorizes ONLY /auth/refresh — never a product API request."""
+
+    __tablename__ = "refresh_tokens"
+    __table_args__ = (Index("ix_refresh_tokens_family_rotated", "family_id", "rotated_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    family_id: Mapped[int] = mapped_column(
+        ForeignKey("session_families.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    prev_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class UserActionTokenORM(Base):
@@ -264,7 +317,7 @@ class MFATotpCredentialORM(Base):
     )
     secret_encrypted: Mapped[str] = mapped_column(Text)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    last_used_step: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # TOTP replay guard
+    last_used_step: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # replay guard
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
@@ -285,7 +338,7 @@ class MFAWebAuthnCredentialORM(Base):
     sign_count: Mapped[int] = mapped_column(BigInteger, default=0)
     transports_json: Mapped[str] = mapped_column(Text, default="[]")
     aaguid: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    device_type: Mapped[str | None] = mapped_column(String(16), nullable=True)  # single|multi device
+    device_type: Mapped[str | None] = mapped_column(String(16), nullable=True)  # single/multi
     backed_up: Mapped[bool] = mapped_column(Boolean, default=False)
     nickname: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -332,7 +385,7 @@ class MFARecoveryCodeORM(Base):
 class MFALoginChallengeORM(Base):
     """The short-lived MFA-pending token issued mid-login. It is stored ONLY as a digest in this
     separate table — invisible to ``get_user_by_token`` — so a pending token can never authorize an
-    API call ("no MFA -> no bearer" is structural). Traded for a real session at /auth/mfa/login/*."""
+    API call ("no MFA -> no bearer" is structural). Traded for a real session at the verify routes."""
 
     __tablename__ = "mfa_login_challenges"
     __table_args__ = (Index("ix_mfa_login_chal_expires", "expires_at"),)

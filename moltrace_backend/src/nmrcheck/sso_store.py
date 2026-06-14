@@ -8,8 +8,8 @@ browser redirect:
    return the IdP authorization URL.
 2. :func:`handle_callback` — verify state, exchange the code, validate the id_token, JIT the
    user + team membership, and stamp a single-use ``exchange_code`` on the flow.
-3. :func:`consume_exchange` — trade that one-time code (over a normal POST from the SPA) for
-   an opaque bearer session via the existing :func:`database.create_user_session`.
+3. :func:`consume_exchange` — trade that one-time code (over a normal POST from the SPA) for a
+   hardened session (access + rotating refresh) via :func:`session_store.mint_session`.
 
 Client secrets are stored AES-256-GCM encrypted (:mod:`sso_secret_crypto`) and decrypted only
 for the token exchange. Redirect URIs are computed server-side from settings — never taken
@@ -25,10 +25,9 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from . import oidc_client
+from . import oidc_client, session_store
 from .database import (
     create_user,
-    create_user_session,
     get_user_by_email,
     get_user_by_token,
     session_scope,
@@ -40,6 +39,7 @@ from .models import (
     UserPublic,
 )
 from .orm import SSOConnectionORM, SSOLoginFlowORM, TeamMemberORM, utcnow
+from .session_store import MintedSession
 from .settings import Settings
 from .sso_secret_crypto import decrypt_secret, encrypt_secret
 
@@ -362,8 +362,9 @@ def handle_callback(
 
 def consume_exchange(
     session_factory: sessionmaker[Session], *, code: str, settings: Settings
-) -> tuple[str, datetime, UserPublic] | None:
-    """Trade a one-time exchange code for a bearer session. Returns ``None`` if invalid."""
+) -> tuple[MintedSession, UserPublic] | None:
+    """Trade a one-time exchange code for a hardened session (access + rotating refresh, Prompt 4).
+    Returns ``None`` if invalid."""
     now = utcnow()
     with session_scope(session_factory) as session:
         flow = session.scalar(
@@ -376,13 +377,11 @@ def consume_exchange(
         flow.status = "consumed"  # single-use
         user_id = flow.user_id
 
-    token, expires_at = create_user_session(
-        session_factory, user_id=user_id, ttl_minutes=settings.access_token_ttl_minutes
-    )
-    user = get_user_by_token(session_factory, token)
+    minted = session_store.mint_session(session_factory, settings, user_id=user_id, amr="sso")
+    user = get_user_by_token(session_factory, minted.access_token)
     if user is None:  # pragma: no cover - the session was just created
         return None
-    return token, expires_at, user
+    return minted, user
 
 
 def _ensure_team_membership(

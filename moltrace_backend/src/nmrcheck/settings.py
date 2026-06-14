@@ -89,6 +89,13 @@ class Settings:
     webauthn_origin: str = "http://localhost:3000"
     mfa_pending_ttl_minutes: int = 5
     step_up_ttl_minutes: int = 5
+    # Session/token hardening (Prompt 4). Defaults are generous (access TTL unchanged for
+    # back-compat); shorten access in prod via ACCESS_TOKEN_TTL_MINUTES.
+    refresh_token_idle_minutes: int = 60 * 24 * 7  # 7-day sliding idle window
+    refresh_token_absolute_minutes: int = 60 * 24 * 30  # 30-day hard cap, never extended
+    refresh_rotation_enabled: bool = True
+    refresh_reuse_revokes_family: bool = True
+    session_device_binding_enabled: bool = False
     email_from: str = "noreply@nmrcheck.local"
     email_backend: str = "database"
 
@@ -181,6 +188,19 @@ def get_settings() -> Settings:
         ).rstrip("/"),
         mfa_pending_ttl_minutes=_parse_int(os.getenv("MFA_PENDING_TTL_MINUTES"), 5),
         step_up_ttl_minutes=_parse_int(os.getenv("STEP_UP_TTL_MINUTES"), 5),
+        refresh_token_idle_minutes=_parse_int(
+            os.getenv("REFRESH_TOKEN_IDLE_MINUTES"), 60 * 24 * 7
+        ),
+        refresh_token_absolute_minutes=_parse_int(
+            os.getenv("REFRESH_TOKEN_ABSOLUTE_MINUTES"), 60 * 24 * 30
+        ),
+        refresh_rotation_enabled=_parse_bool(os.getenv("REFRESH_ROTATION_ENABLED"), True),
+        refresh_reuse_revokes_family=_parse_bool(
+            os.getenv("REFRESH_REUSE_REVOKES_FAMILY"), True
+        ),
+        session_device_binding_enabled=_parse_bool(
+            os.getenv("SESSION_DEVICE_BINDING_ENABLED"), False
+        ),
         email_from=os.getenv("EMAIL_FROM", "noreply@nmrcheck.local"),
         email_backend=(
             os.getenv("EMAIL_BACKEND", "database").strip().lower() or "database"

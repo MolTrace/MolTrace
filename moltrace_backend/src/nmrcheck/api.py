@@ -81,6 +81,7 @@ from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
 from . import regulatory_surveillance_store as surveillance_store
 from . import scim_store as scim_store
+from . import session_store as session_store
 from . import spectracheck_store as sc_store
 from . import sso_store as sso_store
 from . import tenant_saas_store as tenant_store
@@ -655,6 +656,8 @@ from .models import (
     RecordRetentionPolicy,
     RecordRetentionPolicyCreate,
     RecoveryRegenerateResponse,
+    RefreshRequest,
+    RefreshRevokeRequest,
     RegulatoryActionItem,
     RegulatoryActionItemCreate,
     RegulatoryActionItemUpdate,
@@ -4846,17 +4849,21 @@ def _issue_auth_page_session(
     detail: str,
     requires_email_verification: bool = False,
 ) -> AuthPageResponse:
-    token, expires_at = create_user_session(
-        _state(request).session_factory,
+    state = _state(request)
+    minted = session_store.mint_session(
+        state.session_factory,
+        state.settings,
         user_id=user.id,
-        ttl_minutes=_state(request).settings.access_token_ttl_minutes,
+        device_fingerprint=_device_fingerprint(request, state.settings),
     )
     return AuthPageResponse(
-        access_token=token,
-        expires_at=expires_at,
+        access_token=minted.access_token,
+        expires_at=minted.expires_at,
         user=user,
         requires_email_verification=requires_email_verification,
         detail=detail,
+        refresh_token=minted.refresh_token,
+        refresh_expires_at=minted.refresh_expires_at,
     )
 
 
@@ -4931,6 +4938,16 @@ def sign_up(payload: UserSignUp, request: Request) -> AuthPageResponse:
     )
 
 
+def _device_fingerprint(request: Request, settings: Settings) -> str | None:
+    """Coarse, stable device signal for optional refresh-token binding (UA family + client id);
+    None when binding is disabled. Never includes IP (mobile/VPN roam -> false logouts)."""
+    if not settings.session_device_binding_enabled:
+        return None
+    ua = request.headers.get("user-agent") or ""
+    client_id = request.headers.get("x-client-id") or ""
+    return f"{ua}|{client_id}"
+
+
 def _mfa_challenge_response(decision: mfa_store.LoginDecision) -> JSONResponse:
     """Render the HTTP 202 MFA-pending challenge (no bearer issued yet)."""
     body = MfaChallengeResponse(
@@ -4964,11 +4981,12 @@ def login_json(payload: UserLogin, request: Request) -> AccessTokenResponse:
     decision = mfa_store.begin_or_complete_login(state.session_factory, state.settings, user)
     if decision.needs_mfa:
         return _mfa_challenge_response(decision)
-    token, expires_at = create_user_session(
+    minted = session_store.mint_session(
         state.session_factory,
+        state.settings,
         user_id=user.id,
-        ttl_minutes=state.settings.access_token_ttl_minutes,
-        amr=",".join(decision.amr),
+        amr=",".join(decision.amr) or None,
+        device_fingerprint=_device_fingerprint(request, state.settings),
     )
     _audit_from_context(
         request,
@@ -4978,7 +4996,13 @@ def login_json(payload: UserLogin, request: Request) -> AccessTokenResponse:
         entity_type="user",
         entity_id=user.id,
     )
-    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+    return AccessTokenResponse(
+        access_token=minted.access_token,
+        expires_at=minted.expires_at,
+        user=user,
+        refresh_token=minted.refresh_token,
+        refresh_expires_at=minted.refresh_expires_at,
+    )
 
 
 @router.post("/auth/sign-in", response_model=AuthPageResponse)
@@ -5040,11 +5064,12 @@ def login_form(
     decision = mfa_store.begin_or_complete_login(state.session_factory, state.settings, user)
     if decision.needs_mfa:
         return _mfa_challenge_response(decision)
-    token, expires_at = create_user_session(
+    minted = session_store.mint_session(
         state.session_factory,
+        state.settings,
         user_id=user.id,
-        ttl_minutes=state.settings.access_token_ttl_minutes,
-        amr=",".join(decision.amr),
+        amr=",".join(decision.amr) or None,
+        device_fingerprint=_device_fingerprint(request, state.settings),
     )
     _audit_from_context(
         request,
@@ -5054,7 +5079,13 @@ def login_form(
         entity_type="user",
         entity_id=user.id,
     )
-    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+    return AccessTokenResponse(
+        access_token=minted.access_token,
+        expires_at=minted.expires_at,
+        user=user,
+        refresh_token=minted.refresh_token,
+        refresh_expires_at=minted.refresh_expires_at,
+    )
 
 
 @router.get("/auth/me", response_model=UserPublic)
@@ -5067,8 +5098,46 @@ def auth_logout(
     request: Request, context: AccessContext = Depends(require_access_context)
 ) -> MessageResponse:
     if context.raw_token is not None:
-        revoke_token(_state(request).session_factory, context.raw_token)
+        state = _state(request)
+        # Prompt 4: revoke the whole session family (access + refresh lineage). Legacy NULL-family
+        # tokens fall back to single-token revocation.
+        if not session_store.revoke_family_by_access(
+            state.session_factory, access_token=context.raw_token
+        ):
+            revoke_token(state.session_factory, context.raw_token)
     return MessageResponse(detail="Logged out.")
+
+
+@router.post("/auth/refresh", response_model=AccessTokenResponse)
+def auth_refresh(payload: RefreshRequest, request: Request) -> AccessTokenResponse:
+    """Rotate a refresh token for a fresh access+refresh pair (Prompt 4). Reuse of a spent token
+    revokes the whole family. The refresh token is the credential — no bearer required."""
+    state = _state(request)
+    minted = session_store.rotate_refresh(
+        state.session_factory,
+        state.settings,
+        refresh_token=payload.refresh_token,
+        device_fingerprint=_device_fingerprint(request, state.settings),
+    )
+    user = get_user_by_token(state.session_factory, minted.access_token)
+    if user is None:  # pragma: no cover - just minted
+        raise session_store.SessionError("token_invalid", 401)
+    return AccessTokenResponse(
+        access_token=minted.access_token,
+        expires_at=minted.expires_at,
+        user=user,
+        refresh_token=minted.refresh_token,
+        refresh_expires_at=minted.refresh_expires_at,
+    )
+
+
+@router.post("/auth/refresh/revoke", response_model=MessageResponse)
+def auth_refresh_revoke(payload: RefreshRevokeRequest, request: Request) -> MessageResponse:
+    """Revoke the presenting refresh token's entire family (refresh lineage + access rows)."""
+    session_store.revoke_family_by_refresh(
+        _state(request).session_factory, refresh_token=payload.refresh_token
+    )
+    return MessageResponse(detail="Session revoked.")
 
 
 # --------------------------------------------------------------------------- SSO (OIDC)
@@ -5299,7 +5368,7 @@ def sso_exchange(payload: SSOExchangeRequest, request: Request) -> AccessTokenRe
         raise HTTPException(
             status_code=400, detail="Invalid or expired SSO exchange code."
         )
-    token, expires_at, user = result
+    minted, user = result
     _audit_from_context(
         request,
         context=AccessContext(user=user),
@@ -5308,7 +5377,13 @@ def sso_exchange(payload: SSOExchangeRequest, request: Request) -> AccessTokenRe
         entity_type="user",
         entity_id=user.id,
     )
-    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+    return AccessTokenResponse(
+        access_token=minted.access_token,
+        expires_at=minted.expires_at,
+        user=user,
+        refresh_token=minted.refresh_token,
+        refresh_expires_at=minted.refresh_expires_at,
+    )
 
 
 # --------------------------------------------------------------------------- SCIM 2.0
@@ -5637,40 +5712,58 @@ def mfa_status(
 @router.post("/auth/mfa/login/totp", response_model=AccessTokenResponse)
 def mfa_login_totp(payload: MfaLoginTotpRequest, request: Request) -> AccessTokenResponse:
     state = _state(request)
-    token, expires_at, user = mfa_store.complete_login_totp(
+    minted, user = mfa_store.complete_login_totp(
         state.session_factory, state.settings, mfa_token=payload.mfa_token, code=payload.code
     )
     _audit_from_context(
         request, context=AccessContext(user=user), event_type="auth.mfa.login",
         message="User completed MFA login (TOTP).", entity_type="user", entity_id=user.id,
     )
-    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+    return AccessTokenResponse(
+        access_token=minted.access_token,
+        expires_at=minted.expires_at,
+        user=user,
+        refresh_token=minted.refresh_token,
+        refresh_expires_at=minted.refresh_expires_at,
+    )
 
 
 @router.post("/auth/mfa/login/webauthn", response_model=AccessTokenResponse)
 def mfa_login_webauthn(payload: MfaLoginWebAuthnRequest, request: Request) -> AccessTokenResponse:
     state = _state(request)
-    token, expires_at, user = mfa_store.complete_login_webauthn(
+    minted, user = mfa_store.complete_login_webauthn(
         state.session_factory, state.settings, mfa_token=payload.mfa_token, credential=payload.assertion
     )
     _audit_from_context(
         request, context=AccessContext(user=user), event_type="auth.mfa.login",
         message="User completed MFA login (passkey).", entity_type="user", entity_id=user.id,
     )
-    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+    return AccessTokenResponse(
+        access_token=minted.access_token,
+        expires_at=minted.expires_at,
+        user=user,
+        refresh_token=minted.refresh_token,
+        refresh_expires_at=minted.refresh_expires_at,
+    )
 
 
 @router.post("/auth/mfa/login/recovery", response_model=AccessTokenResponse)
 def mfa_login_recovery(payload: MfaLoginRecoveryRequest, request: Request) -> AccessTokenResponse:
     state = _state(request)
-    token, expires_at, user = mfa_store.complete_login_recovery(
+    minted, user = mfa_store.complete_login_recovery(
         state.session_factory, state.settings, mfa_token=payload.mfa_token, code=payload.code
     )
     _audit_from_context(
         request, context=AccessContext(user=user), event_type="auth.mfa.login",
         message="User completed MFA login (recovery code).", entity_type="user", entity_id=user.id,
     )
-    return AccessTokenResponse(access_token=token, expires_at=expires_at, user=user)
+    return AccessTokenResponse(
+        access_token=minted.access_token,
+        expires_at=minted.expires_at,
+        user=user,
+        refresh_token=minted.refresh_token,
+        refresh_expires_at=minted.refresh_expires_at,
+    )
 
 
 @router.post("/auth/step-up/options", response_model=StepUpOptionsResponse)
@@ -28514,6 +28607,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def mfa_error_handler(
         request: Request, exc: mfa_webauthn.MFAError
     ) -> JSONResponse:
+        return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
+
+    @app.exception_handler(session_store.SessionError)
+    async def session_error_handler(
+        request: Request, exc: session_store.SessionError
+    ) -> JSONResponse:
+        # Preserve the machine code (token_invalid|token_expired|token_reuse_detected) past the
+        # safe-exception sanitizer so the SPA can react (re-login vs forced full logout).
         return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
 
     @app.exception_handler(scim_store.SCIMError)

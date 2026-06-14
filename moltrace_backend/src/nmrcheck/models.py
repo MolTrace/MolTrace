@@ -12190,6 +12190,9 @@ class AccessTokenResponse(BaseModel):
     token_type: Literal["bearer"] = "bearer"
     expires_at: datetime
     user: UserPublic
+    # Session hardening (Prompt 4): the rotating refresh token (additive; optional for back-compat).
+    refresh_token: str | None = None
+    refresh_expires_at: datetime | None = None
 
 
 class AuthPageResponse(BaseModel):
@@ -12201,6 +12204,20 @@ class AuthPageResponse(BaseModel):
     user: UserPublic
     requires_email_verification: bool = False
     detail: str
+    refresh_token: str | None = None
+    refresh_expires_at: datetime | None = None
+
+
+class RefreshRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    refresh_token: str = Field(min_length=10, max_length=512)
+
+
+class RefreshRevokeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    refresh_token: str = Field(min_length=10, max_length=512)
 
 
 class SSOConnectionCreate(BaseModel):
