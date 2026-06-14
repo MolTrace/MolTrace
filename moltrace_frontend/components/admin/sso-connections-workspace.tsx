@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { AlertCard } from "@/components/dashboard/alert-card"
+import { ScimProvisioningSection } from "@/components/admin/scim-provisioning-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -222,6 +223,9 @@ export function SSOConnectionsWorkspace() {
   }
 
   const enforceDomains = parseDomains(form.email_domains)
+  // The SAVED connection being edited — drives the SCIM gate off persisted
+  // `enabled`, not the form's unsaved toggle.
+  const editingConn = editingId != null ? connections.find((c) => c.id === editingId) ?? null : null
 
   return (
     <div className="space-y-6">
@@ -467,6 +471,19 @@ export function SSOConnectionsWorkspace() {
             ) : null}
           </div>
         </form>
+
+        {/* SCIM provisioning — token management for this connection (outside the
+            form so its actions never submit the connection). Edit view only. */}
+        {editingId != null ? (
+          <div className="mt-6 border-t pt-6">
+            <h3 className="text-sm font-semibold">SCIM provisioning</h3>
+            <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
+              Issue the bearer token your identity provider uses to auto-provision (and deprovision) users into this
+              organization via SCIM 2.0. The token is machine-facing — the IdP calls <code>/scim/v2</code> directly.
+            </p>
+            <ScimProvisioningSection connectionId={editingId} enabled={editingConn?.enabled ?? false} />
+          </div>
+        ) : null}
       </ModuleCard>
     </div>
   )
