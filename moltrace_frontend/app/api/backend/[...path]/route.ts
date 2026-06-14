@@ -99,6 +99,20 @@ async function proxy(request: NextRequest, context: RouteContext) {
 
   if (response.status === 401 || response.status === 403) {
     responseHeaders.set("content-type", "application/json")
+    // Preserve the `step_up_required` signal: it's a deliberate, non-sensitive 401
+    // detail the SPA MUST act on (run the re-auth ceremony, then retry). Every other
+    // 401/403 body is still sanitized to a generic message so internal auth details
+    // don't leak.
+    if (response.status === 401) {
+      const raw = await response.text()
+      if (/"detail"\s*:\s*"step_up_required"/.test(raw)) {
+        return new Response(raw, {
+          status: 401,
+          statusText: response.statusText,
+          headers: responseHeaders,
+        })
+      }
+    }
     return new Response(JSON.stringify({ detail: authFailureMessage(response.status) }), {
       status: response.status,
       statusText: response.statusText,
