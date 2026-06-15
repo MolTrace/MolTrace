@@ -2025,11 +2025,19 @@ def gate(
         resource_id: int | None = None
         if id_param is not None:
             raw = request.path_params.get(id_param)
-            try:
-                resource_id = int(raw) if raw is not None else None
-            except (TypeError, ValueError):
-                # Malformed id -> treat as a missing resource (deny), never a 500.
-                resource_id = None
+            if raw is not None:
+                try:
+                    resource_id = int(raw)
+                except (TypeError, ValueError):
+                    # A non-numeric path segment is never a valid resource id, so deny
+                    # explicitly with the gate's own deny_status — rendered exactly like a
+                    # missing/forbidden resource so it stays non-leaking — rather than
+                    # coercing to None and letting the PDP decide (which could allow), and
+                    # never an unhandled 500. This dependency-level cast runs BEFORE FastAPI
+                    # coerces the operation's own ``: int`` path param, so even an
+                    # ``: int``-typed handler would 500 here without this guard.
+                    detail = PUBLIC_ACCESS_DENIED_DETAIL if deny_status == 403 else "Not found."
+                    raise HTTPException(status_code=deny_status, detail=detail) from None
         owner_id = owner_resolver(request, resource_id) if owner_resolver is not None else None
         decision = authz.authorize(
             authz.principal_from_access_context(context),
@@ -5012,6 +5020,7 @@ def register(payload: UserCreate, request: Request) -> UserPublic:
             password=payload.password,
             is_verified=not state.settings.require_verified_email,
             is_admin=state.settings.is_admin_email(payload.email),
+            pepper=state.settings.password_pepper,
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -5039,6 +5048,7 @@ def sign_up(payload: UserSignUp, request: Request) -> AuthPageResponse:
             password=payload.password,
             is_verified=not state.settings.require_verified_email,
             is_admin=state.settings.is_admin_email(payload.email),
+            pepper=state.settings.password_pepper,
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -5106,6 +5116,7 @@ def login_json(payload: UserLogin, request: Request) -> AccessTokenResponse:
         email=payload.email,
         password=payload.password,
         require_verified=state.settings.require_verified_email,
+        pepper=state.settings.password_pepper,
     )
     if user is None:
         raise HTTPException(
@@ -5150,6 +5161,7 @@ def sign_in(payload: UserSignIn, request: Request) -> AuthPageResponse:
         email=payload.email,
         password=payload.password,
         require_verified=state.settings.require_verified_email,
+        pepper=state.settings.password_pepper,
     )
     if user is None:
         raise HTTPException(
@@ -5189,6 +5201,7 @@ def login_form(
         email=form_data.username,
         password=form_data.password,
         require_verified=state.settings.require_verified_email,
+        pepper=state.settings.password_pepper,
     )
     if user is None:
         raise HTTPException(
@@ -6076,7 +6089,12 @@ def reset_password(payload: PasswordResetConfirm, request: Request) -> MessageRe
     )
     if user is None:
         raise HTTPException(status_code=400, detail="Reset token is invalid or expired.")
-    set_user_password(state.session_factory, user_id=user.id, new_password=payload.new_password)
+    set_user_password(
+        state.session_factory,
+        user_id=user.id,
+        new_password=payload.new_password,
+        pepper=state.settings.password_pepper,
+    )
     revoke_all_user_tokens(state.session_factory, user.id)
     return MessageResponse(detail="Password reset successful. Existing sessions have been revoked.")
 
