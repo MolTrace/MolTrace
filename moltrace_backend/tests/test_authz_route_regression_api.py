@@ -179,6 +179,41 @@ def test_gate_factory_owns_resource_matrix(tmp_path):
         assert client.get("/__strwidget__/not-an-int", headers=owner).status_code == 404
 
 
+def test_gate_factory_malformed_id_renders_deny_status_not_500(tmp_path):
+    """A non-numeric path segment must render as the gate's OWN deny_status — 404 for an
+    existence-secret resource, 403 for a privilege/role gate — never an unhandled 500 (the
+    app has no generic ValueError handler) and never silently coerced to a None resource the
+    PDP might allow. The dependency-level int() cast runs before FastAPI coerces a ``: int``
+    handler param, so the guard lives in gate() itself; str-typed path params here ensure the
+    bad value actually reaches that cast (an int-typed route would 422 at routing first)."""
+    app = _app(tmp_path)
+    extra = APIRouter()
+
+    @extra.get(
+        "/__own2__/{rid}",
+        dependencies=[Depends(api_module.gate("owned", "owned:read", id_param="rid"))],
+    )
+    def _own(rid: str) -> dict[str, str]:  # deny_status defaults to 404
+        return {"rid": rid}
+
+    @extra.get(
+        "/__role2__/{rid}",
+        dependencies=[
+            Depends(api_module.gate("admin", "admin:read", id_param="rid", deny_status=403))
+        ],
+    )
+    def _role(rid: str) -> dict[str, str]:
+        return {"rid": rid}
+
+    app.include_router(extra, dependencies=[Depends(api_module._baseline_access_gate)])
+    with TestClient(app) as client:
+        user = _sign_up(client, "malformedid@example.com")
+        # existence-secret (404) gate: malformed id -> 404, not 500
+        assert client.get("/__own2__/not-an-int", headers=user).status_code == 404
+        # privilege (403) gate: malformed id -> 403 (the gate's deny_status), not 500/404
+        assert client.get("/__role2__/not-an-int", headers=user).status_code == 403
+
+
 # --------------------------------------------------------------------------- #
 # Public allow-list is pinned (adding/removing a public route must be deliberate)
 # --------------------------------------------------------------------------- #
