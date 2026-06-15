@@ -289,7 +289,7 @@ Marketing metrics (e.g. accuracy and throughput figures) are positioning copy an
 
 ## Access, contributing & security
 
-- **Hosted product.** MolTrace runs as a multi-tenant hosted application at [moltrace.co](https://moltrace.co), with authentication (password or per-organization OpenID Connect SSO, with optional enforce-SSO and SCIM 2.0 auto-provisioning/deprovisioning), MFA (TOTP + WebAuthn/passkeys) with per-tenant enforcement and step-up re-auth for signing/admin, rotating refresh tokens with reuse detection and immediate revocation, per-tenant scoping, identity+role e-signatures, and CORS allow-lists. Access is via the hosted product, not a public self-serve install.
+- **Hosted product.** MolTrace runs as a multi-tenant hosted application at [moltrace.co](https://moltrace.co), with authentication (password or per-organization OpenID Connect SSO, with optional enforce-SSO and SCIM 2.0 auto-provisioning/deprovisioning), MFA (TOTP + WebAuthn/passkeys) with per-tenant enforcement and step-up re-auth for signing/admin, rotating refresh tokens with reuse detection and immediate revocation, centralized policy-as-code authorization (a deny-by-default policy engine deciding every access server-side from the authenticated principal), per-tenant scoping, identity+role e-signatures, and CORS allow-lists. Access is via the hosted product, not a public self-serve install.
 - **Contributions.** This is a proprietary, all-rights-reserved repository (see below); external contributions and issues are not solicited here.
 - **Security.** Report any suspected security issue privately to the MolTrace maintainers rather than opening a public issue.
 

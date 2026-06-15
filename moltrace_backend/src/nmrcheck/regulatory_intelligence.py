@@ -366,6 +366,23 @@ def can_read_dossier(
         return dossier_owned_by(session, dossier_id, owner_scope_id)
 
 
+def dossier_owner_id(
+    session_factory: sessionmaker[Session], dossier_id: int | None
+) -> int | None:
+    """Resolve a dossier's owner (``created_by_user_id``) for the policy engine.
+
+    Returns ``None`` for a missing dossier, a ``None`` id, **and** a NULL-owner row — all
+    three collapse to "no user owner", which the PDP's ownership condition treats as
+    not-owned for a user-scoped caller (preserving the non-leaking 404). Pure read; used by
+    the centralized authz gate (:func:`nmrcheck.authz.authorize`) in ``api.require_dossier_access``.
+    """
+    if dossier_id is None:
+        return None
+    with session_scope(session_factory) as session:
+        row = session.get(RegulatoryDossierORM, dossier_id)
+        return row.created_by_user_id if row is not None else None
+
+
 def patch_dossier(
     session_factory: sessionmaker[Session],
     dossier_id: int,
