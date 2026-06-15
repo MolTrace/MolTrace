@@ -96,6 +96,12 @@ class Settings:
     refresh_rotation_enabled: bool = True
     refresh_reuse_revokes_family: bool = True
     session_device_binding_enabled: bool = False
+    # Credential hashing (Prompt 6). Passwords are Argon2id; this OPTIONAL application-wide
+    # pepper (a KMS-held secret, §7) is HMAC-mixed into the password before hashing so a stolen
+    # DB without the pepper can't be cracked offline. Default None = no pepper (back-compat).
+    # NOTE: set it once and keep it stable — rotating/removing a configured pepper invalidates
+    # all Argon2id hashes made with it (those users would need a password reset).
+    password_pepper: str | None = None
     email_from: str = "noreply@nmrcheck.local"
     email_backend: str = "database"
 
@@ -201,6 +207,7 @@ def get_settings() -> Settings:
         session_device_binding_enabled=_parse_bool(
             os.getenv("SESSION_DEVICE_BINDING_ENABLED"), False
         ),
+        password_pepper=(os.getenv("PASSWORD_PEPPER") or None),
         email_from=os.getenv("EMAIL_FROM", "noreply@nmrcheck.local"),
         email_backend=(
             os.getenv("EMAIL_BACKEND", "database").strip().lower() or "database"

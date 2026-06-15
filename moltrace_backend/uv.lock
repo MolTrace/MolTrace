@@ -3308,10 +3308,11 @@ wheels = [
 
 [[package]]
 name = "nmrcheck"
-version = "0.44.0"
+version = "0.45.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "argon2-cffi" },
     { name = "faiss-cpu" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -3361,6 +3362,7 @@ rag = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.14,<2.0" },
     { name = "anthropic", marker = "extra == 'rag'", specifier = ">=0.40" },
+    { name = "argon2-cffi", specifier = ">=23.1" },
     { name = "boto3", marker = "extra == 'infra'", specifier = ">=1.34" },
     { name = "dvc", extras = ["s3"], marker = "extra == 'infra'", specifier = ">=3.0,<4.0" },
     { name = "faiss-cpu", specifier = ">=1.14.2" },

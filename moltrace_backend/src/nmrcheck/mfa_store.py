@@ -468,7 +468,15 @@ def complete_step_up_password(
     with session_scope(session_factory) as session:
         if _user_factors(session, user.id):
             raise MFAError("A passkey or authenticator code is required for step-up.", 400)
-    if authenticate_user(session_factory, email=user.email, password=password) is None:
+    if (
+        authenticate_user(
+            session_factory,
+            email=user.email,
+            password=password,
+            pepper=settings.password_pepper,
+        )
+        is None
+    ):
         raise MFAError("Incorrect password.", 401)
     with session_scope(session_factory) as session:
         _stamp_step_up(session, raw_token, factor="pwd", aal="aal1", now=now)

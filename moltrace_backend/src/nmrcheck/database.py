@@ -74,6 +74,7 @@ from .security import (
     create_access_token,
     create_action_token,
     hash_password,
+    needs_rehash,
     token_digest,
     verify_password,
 )
@@ -260,6 +261,7 @@ def create_user(
     password: str,
     is_verified: bool = False,
     is_admin: bool = False,
+    pepper: str | None = None,
 ) -> UserPublic:
     normalized_email = email.strip().lower()
     with session_scope(session_factory) as session:
@@ -269,7 +271,7 @@ def create_user(
         verified_at = utcnow() if is_verified else None
         user = UserORM(
             email=normalized_email,
-            password_hash=hash_password(password),
+            password_hash=hash_password(password, pepper=pepper),
             is_active=True,
             is_admin=is_admin,
             is_verified=is_verified,
@@ -296,6 +298,7 @@ def authenticate_user(
     email: str,
     password: str,
     require_verified: bool = False,
+    pepper: str | None = None,
 ) -> UserPublic | None:
     normalized_email = email.strip().lower()
     with session_scope(session_factory) as session:
@@ -304,8 +307,14 @@ def authenticate_user(
             return None
         if require_verified and not user.is_verified:
             return None
-        if not verify_password(password, user.password_hash):
+        if not verify_password(password, user.password_hash, pepper=pepper):
             return None
+        # Transparent upgrade-on-login (Prompt 6): a legacy PBKDF2 hash or an out-of-policy
+        # Argon2id hash is re-hashed with the current Argon2id params (+ pepper) now that we
+        # hold the verified plaintext, and persisted on this session's commit. No migration.
+        if needs_rehash(user.password_hash, pepper=pepper):
+            user.password_hash = hash_password(password, pepper=pepper)
+            session.flush()
         return _user_to_public(user)
 
 
@@ -466,12 +475,18 @@ def mark_user_verified(session_factory: sessionmaker[Session], *, user_id: int) 
 
 
 
-def set_user_password(session_factory: sessionmaker[Session], *, user_id: int, new_password: str) -> UserPublic | None:
+def set_user_password(
+    session_factory: sessionmaker[Session],
+    *,
+    user_id: int,
+    new_password: str,
+    pepper: str | None = None,
+) -> UserPublic | None:
     with session_scope(session_factory) as session:
         user = session.get(UserORM, user_id)
         if user is None:
             return None
-        user.password_hash = hash_password(new_password)
+        user.password_hash = hash_password(new_password, pepper=pepper)
         session.flush()
         session.refresh(user)
         return _user_to_public(user)
