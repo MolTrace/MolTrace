@@ -55,6 +55,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from . import ai_evidence_store as ai_evidence_store
 from . import ai_inference_store as ai_store
 from . import analytics_store as analytics_store
+from . import authz as authz
 from . import collaboration_store as collab_store
 from . import compound_registry_store as compound_store
 
@@ -1927,6 +1928,121 @@ async def require_authenticated_user(
     return context.user
 
 
+# --------------------------------------------------------------------------------------------
+# Default-deny baseline (Security Prompt 5) — every route on the main ``router`` requires an
+# authenticated principal UNLESS its path template is in this explicit public allow-list. The
+# baseline is attached once at ``include_router`` time, so a NEW endpoint inherits the gate by
+# default: forgetting to add an auth dependency now fails closed (401) instead of shipping a
+# public hole. Resource-level ownership/role decisions still live in the route's own gate
+# (``require_dossier_access`` / ``require_admin`` / :func:`gate`), which reuse the same cached
+# context. To make a new route public you must add its path here — a deliberate, reviewed act
+# (pinned by ``test_authz_route_regression_api``).
+PUBLIC_ROUTE_PATHS: frozenset[str] = frozenset(
+    {
+        # health / system probes
+        "/health",
+        "/queue/status",
+        "/system/health",
+        "/system/version",
+        # auth: register / login / token / refresh (no session exists yet)
+        "/auth/register",
+        "/auth/sign-up",
+        "/auth/login",
+        "/auth/sign-in",
+        "/auth/token",
+        "/auth/refresh",
+        "/auth/refresh/revoke",
+        # auth: SSO / OIDC handshake (pre-session)
+        "/auth/sso/{slug}/login",
+        "/auth/sso/callback",
+        "/auth/sso/exchange",
+        # auth: MFA second-factor login completion (pre-session)
+        "/auth/mfa/login/totp",
+        "/auth/mfa/login/webauthn",
+        "/auth/mfa/login/recovery",
+        # auth: email verification / password reset (pre-session, token in body/query)
+        "/auth/request-email-verification",
+        "/auth/verify-email",
+        "/auth/request-password-reset",
+        "/auth/reset-password",
+        # misc public reads
+        "/fid/presets",
+        "/share-links/{token}",  # bearer is the unguessable share token in the path
+    }
+)
+
+
+async def _baseline_access_gate(request: Request) -> None:
+    """Router-level default-deny floor. For any non-public route, require an authenticated
+    principal (mirrors :func:`require_access_context` exactly) and enforce the per-tenant MFA
+    gate. Public routes (``PUBLIC_ROUTE_PATHS``) short-circuit.
+
+    Credentials are resolved **inside the body, AFTER the public-route check** — NOT as a
+    parameter ``Depends(get_optional_access_context)``. That ordering is load-bearing:
+    ``get_optional_access_context`` raises 401 on a *malformed/stale* credential, and a
+    parameter dependency would run before the short-circuit, so a stale credential riding along
+    on a public route (e.g. the SPA re-attaching an expired bearer to ``/auth/login``, or an LB
+    probe carrying a rotated api key) would be turned into a 401 lockout. Resolving manually
+    after the allow-list check preserves the pre-baseline behavior exactly: public routes ignore
+    stray credentials, non-public routes still fail closed.
+    """
+    route = request.scope.get("route")
+    if getattr(route, "path", None) in PUBLIC_ROUTE_PATHS:
+        return
+    context = await get_optional_access_context(
+        request,
+        request.headers.get("x-api-key"),
+        await oauth2_scheme(request),
+        request.query_params.get("access_token"),
+    )
+    if context is None:
+        raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
+    _enforce_mfa_satisfied(request, context)
+
+
+def gate(
+    resource_type: str,
+    action: str,
+    *,
+    id_param: str | None = None,
+    owner_resolver: Callable[[Request, int | None], int | None] | None = None,
+    deny_status: int = 404,
+) -> Callable[..., Awaitable[None]]:
+    """Build a FastAPI dependency that decides a resource-typed action via the central PDP.
+
+    The canonical way to gate a NEW owned/role-scoped endpoint: add
+    ``dependencies=[Depends(gate("dossier", "dossier:write", id_param="dossier_id",
+    owner_resolver=...))]`` instead of hand-rolling ``_user_scope_for_context`` + an inline
+    404. ``id_param`` names the path parameter carrying the resource id; ``owner_resolver``
+    loads the owner (``created_by_user_id``) when ownership matters. Deny renders as
+    ``deny_status`` (404 for ownership/existence-secret resources, 403 for privilege/role).
+    """
+
+    async def _dep(
+        request: Request,
+        context: AccessContext = Depends(require_access_context),
+    ) -> None:
+        resource_id: int | None = None
+        if id_param is not None:
+            raw = request.path_params.get(id_param)
+            try:
+                resource_id = int(raw) if raw is not None else None
+            except (TypeError, ValueError):
+                # Malformed id -> treat as a missing resource (deny), never a 500.
+                resource_id = None
+        owner_id = owner_resolver(request, resource_id) if owner_resolver is not None else None
+        decision = authz.authorize(
+            authz.principal_from_access_context(context),
+            authz.Action(action),
+            authz.Resource(resource_type, resource_id=resource_id, owner_id=owner_id),
+        )
+        if not decision.allowed:
+            detail = PUBLIC_ACCESS_DENIED_DETAIL if deny_status == 403 else "Not found."
+            raise HTTPException(status_code=deny_status, detail=detail)
+
+    return _dep
+
+
 def _estimate_hours_saved(settings: Settings, *, parsed_peak_count: int) -> float:
     baseline_minutes = settings.default_analysis_minutes_saved
     if parsed_peak_count <= 0:
@@ -2540,9 +2656,11 @@ def _audit_raw_fid_event(
 
 
 def _user_scope_for_context(context: AccessContext) -> int | None:
-    if context.system_api_key:
-        return None
-    if context.user is not None and context.user.is_admin:
+    """The owner-scope id for store queries: ``None`` (unrestricted) for a system key/admin,
+    else the user's id. Now derived from the central policy engine's principal reduction so it
+    shares one definition of "privileged" with :func:`authz.authorize` — output is identical to
+    the prior inline form (system/admin -> None; user -> user_id; anonymous -> None)."""
+    if authz.principal_from_access_context(context).is_unrestricted:
         return None
     return context.user_id
 
@@ -2560,12 +2678,18 @@ def require_dossier_access(
     dossiers they own. A missing dossier and one owned by another user both raise the same 404
     (non-leaking). The route's own store call still runs afterward. Access (own-or-admin) is
     the same for reads and writes in this model, so one gate serves both.
+
+    The decision is now made by the central policy engine (:func:`authz.authorize`): the owner
+    is resolved once and passed in, then the PDP applies the system/admin/owner rules. The
+    404 mapping (ownership-secret resource) is preserved exactly.
     """
-    if not regulatory_store.can_read_dossier(
-        _state(request).session_factory,
-        dossier_id,
-        owner_scope_id=_user_scope_for_context(context),
-    ):
+    owner_id = regulatory_store.dossier_owner_id(_state(request).session_factory, dossier_id)
+    decision = authz.authorize(
+        authz.principal_from_access_context(context),
+        authz.Action("dossier:read"),  # read == write access in this model; one gate
+        authz.Resource("dossier", resource_id=dossier_id, owner_id=owner_id),
+    )
+    if not decision.allowed:
         raise HTTPException(status_code=404, detail="Regulatory dossier not found.")
 
 
@@ -2578,15 +2702,17 @@ def _readable_via_parent_dossier(
     don't carry the dossier in the path. A system api key / admin reads anything; a
     user-scoped caller may read the child only if it belongs to a dossier they own — a
     child with no dossier (orphaned) is hidden from user-scoped callers.
+
+    Delegates to the central policy engine (:func:`authz.authorize`) and returns its boolean,
+    so the callers' ``if record is None or not _readable_via_parent_dossier(...)`` stays intact.
     """
-    scope = _user_scope_for_context(context)
-    if scope is None:
-        return True
-    if dossier_id is None:
-        return False
-    return regulatory_store.can_read_dossier(
-        _state(request).session_factory, dossier_id, owner_scope_id=scope
+    owner_id = regulatory_store.dossier_owner_id(_state(request).session_factory, dossier_id)
+    decision = authz.authorize(
+        authz.principal_from_access_context(context),
+        authz.Action("dossier:read"),
+        authz.Resource("dossier", resource_id=dossier_id, owner_id=owner_id),
     )
+    return decision.allowed
 
 
 def _health_response(request: Request | None = None) -> dict[str, object]:
@@ -2618,9 +2744,18 @@ def health_route(request: Request) -> dict[str, object]:
 async def require_admin(
     context: AccessContext = Depends(require_access_context),
 ) -> AccessContext:
-    if context.system_api_key:
-        return context
-    if context.user is None or not context.user.is_admin:
+    """Require an unrestricted (system key or admin) principal; else 403.
+
+    The decision is delegated to the central policy engine — only ``permit-system-all`` /
+    ``permit-admin-all`` grant ``admin:*``, so a non-admin user and an anonymous caller both
+    default-deny. The 403 mapping (privilege gate) is preserved exactly.
+    """
+    decision = authz.authorize(
+        authz.principal_from_access_context(context),
+        authz.Action("admin:read"),
+        authz.Resource("admin"),
+    )
+    if not decision.allowed:
         raise HTTPException(status_code=403, detail=PUBLIC_ACCESS_DENIED_DETAIL)
     return context
 
@@ -28647,7 +28782,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={"detail": _safe_validation_errors(exc)},
         )
 
-    app.include_router(router)
+    # Default-deny baseline (Security Prompt 5): every route on the main router inherits the
+    # authenticated-or-public gate, so a new endpoint fails closed unless explicitly listed in
+    # PUBLIC_ROUTE_PATHS. scim_router (SCIM-token auth) and nmr2d_router (per-route auth) keep
+    # their own schemes.
+    app.include_router(router, dependencies=[Depends(_baseline_access_gate)])
     app.include_router(scim_router)
     from .nmr2d_routes import router as nmr2d_router
 

@@ -14,6 +14,50 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.44.0 — Security Prompt 5: Policy-as-code authorization (centralized PDP + deny-by-default) (2026-06-14)
+
+**Headline:** Fifth build from the MolTrace Security & Data-Integrity Standard. Lifts the
+previously-scattered RBAC/ownership checks into a single **embedded, Cedar-style policy-decision
+point** (`authz.authorize`) — pure Python, **no OPA/Cedar sidecar** to deploy. The engine is
+**deny-by-default** with **forbid-overrides-permit** semantics and reproduces today's rules
+exactly: system api key + admin unrestricted; a user reads/writes only resources they own;
+non-owner reads stay a **non-leaking 404**; privilege gates stay **403**. A new **router-level
+default-deny baseline** means a NEW endpoint inherits authentication by default — forgetting a
+gate now fails closed (401) instead of shipping a public hole. **No DB/schema/migration change,
+no API contract change, no FE action** (`/openapi.json` unchanged).
+
+### Added
+- **`src/nmrcheck/authz.py`** — the PDP: `Principal`/`Resource`/`Action`/`Context`,
+  `Policy` (permit/forbid + condition), `Decision`, `authorize()` (order-independent,
+  deny-by-default, forbid-overrides-permit), `principal_from_access_context` adapter,
+  `_owns_resource` condition, and `POLICY_SET` (system/admin unrestricted; dossier-owner rw;
+  generic owned rw; surveillance read; authenticated floor). Pure logic, no I/O, no api import.
+- **Default-deny baseline** (`api.py`): `PUBLIC_ROUTE_PATHS` (23-route allow-list) +
+  `_baseline_access_gate`, wired via `include_router(router, dependencies=[…])`, so every
+  main-router route requires an authenticated principal unless explicitly public.
+- **`gate(resource_type, action, …)`** dependency factory — the canonical one-liner to gate a
+  new owned/role-scoped endpoint through the PDP.
+- **`regulatory_intelligence.dossier_owner_id`** — thin owner resolver feeding the PDP
+  (missing / NULL-owner / `None` id all collapse to `None`, preserving the non-leaking 404).
+- **`tests/test_authz_policy_matrix.py`** (tier-1 pure PDP truth table: principal × action ×
+  resource, non-leaking branch, default-deny, forbid-override, adapter) +
+  **`tests/test_authz_route_regression_api.py`** (tier-2 HTTP matrix, identical-body
+  non-leak proof, **fail-closed-by-default** proof on a brand-new route, public allow-list pin).
+
+### Changed
+- `require_dossier_access`, `_readable_via_parent_dossier`, `require_admin`, and
+  `_user_scope_for_context` now **delegate** to `authz.authorize` — same signatures, same
+  404/403/401 mappings, behavior byte-identical. `dossier_owned_by` / `can_read_dossier` are
+  retained (the in-session store mirrors still use them).
+
+### Notes
+- `scim_router` (SCIM-token auth) and `nmr2d_router` (per-route auth) keep their own schemes;
+  the baseline is scoped to the main router. The ~136 inline `_user_scope_for_context` store
+  sites are unchanged (they already enforce ownership correctly); migrating them to `gate()` is
+  staged for a follow-up so this diff stays reviewable and the suite stays green.
+
+---
+
 ## v0.43.0 — Security Prompt 4: Session & token hardening (rotating refresh + reuse detection) (2026-06-14)
 
 **Headline:** Fourth build from the MolTrace Security & Data-Integrity Standard. Adds a long-lived,
