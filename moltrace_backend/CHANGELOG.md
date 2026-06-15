@@ -14,6 +14,40 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.45.0 — Security Prompt 6: Argon2id credential hashing (memory-hard KDF + rehash-on-login) (2026-06-15)
+
+**Headline:** Sixth build from the MolTrace Security & Data-Integrity Standard. Passwords are now
+hashed with **Argon2id** — the memory-hard KDF mandated by the §7 crypto-binding table
+(Argon2id, 64–256 MB, t≥3, p≥1, unique salt, optional KMS-held pepper) — replacing the prior
+PBKDF2-HMAC-SHA256. Existing PBKDF2 hashes **still verify** (no lockout) and are **transparently
+re-hashed to Argon2id on the next successful login** (crypto-agility via argon2's self-describing
+hash string + `needs_rehash` — no migration, no forced reset). High-entropy random tokens
+(session/refresh/action tokens, MFA recovery codes, share links) intentionally keep their fast
+SHA-256 digest — a memory-hard KDF is for low-entropy passwords, not 256-bit random values.
+Fully backward-compatible; no DB/schema change, no API contract change, no FE action.
+
+### Added
+- **`argon2-cffi`** runtime dependency.
+- **`security.needs_rehash`** — flags any legacy (non-argon2) or out-of-policy Argon2id hash for
+  upgrade; **`_peppered`** — HMAC-SHA256 pre-hash applying an optional KMS-held pepper so a stolen
+  DB without the pepper can't be cracked offline.
+- **`settings.password_pepper`** (env `PASSWORD_PEPPER`, default None — set once and keep stable).
+- **`tests/test_password_hashing.py`** — Argon2id format/verify/uniqueness, §7 param check,
+  legacy-PBKDF2 verify + `needs_rehash`, pepper round-trip/isolation, malformed-hash reject,
+  `token_digest` unchanged, and integration: signup→argon2, **legacy→argon2 rehash-on-login**,
+  reset→argon2, pepper end-to-end (incl. legacy→peppered-argon2 migration).
+
+### Changed
+- **`security.hash_password`** → Argon2id (was PBKDF2); **`verify_password`** detects Argon2id vs
+  legacy `pbkdf2_sha256$…` and verifies both; all three gain an optional `pepper` kwarg.
+- **`database.authenticate_user`** re-hashes the verified plaintext to Argon2id on login when
+  `needs_rehash` (committed in the same session); **`create_user`** / **`set_user_password`** gain
+  a `pepper` kwarg. `settings.password_pepper` is threaded through the signup ×2 / login ×3 /
+  reset / MFA-step-up password paths. SSO/SCIM users keep their random unusable password (never
+  verified) and are correctly not peppered. **Version 0.45.0.**
+
+---
+
 ## v0.44.0 — Security Prompt 5: Policy-as-code authorization (centralized PDP + deny-by-default) (2026-06-14)
 
 **Headline:** Fifth build from the MolTrace Security & Data-Integrity Standard. Lifts the

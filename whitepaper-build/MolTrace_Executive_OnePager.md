@@ -47,7 +47,7 @@ A multi-tenant SaaS platform with three integrated programs sharing one evidence
 
 ## Compliance Posture
 
-SOC 2 Type II · ICH Compliant · GDPR Ready · GxP Validated · GAMP 5 (Appendix D11) & ICH Q2(R2) validation-document generation · enterprise single sign-on (per-organization OpenID Connect, optional enforce-SSO) + SCIM 2.0 auto-provisioning/deprovisioning + MFA (TOTP + WebAuthn/passkeys, step-up re-auth for signing) + rotating refresh tokens with reuse detection & immediate revocation + centralized policy-as-code authorization (deny-by-default) + role-based access control · content-hash reproducibility gate · fail-closed deployment gate (dominance + audit chain + no gold-set leakage) · production drift monitoring · ALCOA+ data-integrity primitives baked into every layer of the architecture.
+SOC 2 Type II · ICH Compliant · GDPR Ready · GxP Validated · GAMP 5 (Appendix D11) & ICH Q2(R2) validation-document generation · enterprise single sign-on (per-organization OpenID Connect, optional enforce-SSO) + SCIM 2.0 auto-provisioning/deprovisioning + MFA (TOTP + WebAuthn/passkeys, step-up re-auth for signing) + rotating refresh tokens with reuse detection & immediate revocation + centralized policy-as-code authorization (deny-by-default) + Argon2id password hashing (memory-hard KDF) + role-based access control · content-hash reproducibility gate · fail-closed deployment gate (dominance + audit chain + no gold-set leakage) · production drift monitoring · ALCOA+ data-integrity primitives baked into every layer of the architecture.
 
 ## What's Next
 

@@ -1,6 +1,6 @@
 [project]
 name = "nmrcheck"
-version = "0.44.0"
+version = "0.45.0"
 description = "Rule-based 1H NMR checker with Postgres persistence, account verification, password reset, and queued background jobs"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,6 +26,7 @@ dependencies = [
     # so it must be a runtime dependency, NOT dev-only, or the production build
     # (`uv sync --no-dev`) starts uvicorn without it and crashes on import.
     "httpx>=0.28",
+    "argon2-cffi>=23.1",
 ]
 
 [project.scripts]
