@@ -77,6 +77,7 @@ from . import quality_control_store as qc_store
 from . import reaction_advisor as reaction_advisor
 from . import reaction_bo as reaction_bo
 from . import reaction_execution as reaction_execution
+from . import reaction_green as reaction_green
 from . import reaction_store as reaction_store
 from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
@@ -617,6 +618,13 @@ from .models import (
     ReactionExperimentSpectraCheckLink,
     ReactionExperimentTableImportRequest,
     ReactionExperimentUpdate,
+    ReactionGreenAssessment,
+    ReactionGreenCompareRequest,
+    ReactionGreenCompareResult,
+    ReactionGreenMetricsRequest,
+    ReactionGreenProfile,
+    ReactionGreenProfileCreate,
+    ReactionGreenProfileUpdate,
     ReactionLiteraturePrior,
     ReactionLiteraturePriorCreate,
     ReactionMechanisticHypothesis,
@@ -3691,6 +3699,150 @@ def patch_reaction_safety_profile_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Reaction safety profile not found.")
     return record
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/green-profile",
+    response_model=ReactionGreenProfile,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_reaction_green_profile_route(
+    reaction_project_id: int,
+    payload: ReactionGreenProfileCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionGreenProfile:
+    try:
+        return reaction_green.create_green_profile(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/green-profile",
+    response_model=ReactionGreenProfile,
+    dependencies=[Depends(require_access_context)],
+)
+def get_reaction_green_profile_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionGreenProfile:
+    try:
+        record = reaction_green.get_green_profile(_state(request).session_factory, reaction_project_id)
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction green profile not found.")
+    return record
+
+
+@router.patch(
+    "/reaction-projects/{reaction_project_id}/green-profile",
+    response_model=ReactionGreenProfile,
+    dependencies=[Depends(require_access_context)],
+)
+def patch_reaction_green_profile_route(
+    reaction_project_id: int,
+    payload: ReactionGreenProfileUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionGreenProfile:
+    try:
+        record = reaction_green.patch_green_profile(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction green profile not found.")
+    return record
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/experiments/{experiment_id}/green-metrics",
+    response_model=ReactionGreenAssessment,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def compute_reaction_green_metrics_route(
+    reaction_project_id: int,
+    experiment_id: int,
+    payload: ReactionGreenMetricsRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionGreenAssessment:
+    try:
+        record = reaction_green.compute_green_metrics(
+            _state(request).session_factory,
+            reaction_project_id,
+            experiment_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction experiment not found.")
+    return record
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/experiments/{experiment_id}/green-metrics",
+    response_model=ReactionGreenAssessment,
+    dependencies=[Depends(require_access_context)],
+)
+def get_reaction_green_metrics_route(
+    reaction_project_id: int,
+    experiment_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionGreenAssessment:
+    try:
+        record = reaction_green.get_green_metrics(
+            _state(request).session_factory, reaction_project_id, experiment_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction green assessment not found.")
+    return record
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/green-compare",
+    response_model=ReactionGreenCompareResult,
+    dependencies=[Depends(require_access_context)],
+)
+def compare_reaction_green_route(
+    reaction_project_id: int,
+    payload: ReactionGreenCompareRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionGreenCompareResult:
+    try:
+        return reaction_green.compare_green(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
 
 
 @router.post(

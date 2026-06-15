@@ -66,6 +66,9 @@ _PERCENT_FIELDS = {
     "isolated_yield_percent",
     "lcms_area_percent",
     "nmr_purity_percent",
+    "atom_economy_percent",
+    "rme_percent",
+    "green_score",
 }
 
 
@@ -1138,6 +1141,16 @@ def _training_examples(
     return examples, warnings
 
 
+def _e_factor_to_score(e_factor: float) -> float:
+    """Frozen transform: E-factor (>= 0, lower is better, unbounded) -> 0-100 score.
+
+    score = 100 / (1 + max(0, E)). E=0 -> 100; E=1 -> 50; E=9 -> 10. Lets the
+    E-factor scalarize alongside the percent objectives. Green objectives carry a
+    default weight of 0.0, so existing multi_objective campaigns are unchanged.
+    """
+    return 100.0 / (1.0 + max(0.0, e_factor))
+
+
 def _score_outcome(outcome: dict[str, Any], objective_type: str, weights: dict[str, Any]) -> float | None:
     if objective_type == "maximize_yield":
         return _float_or_none(outcome.get("yield_percent"))
@@ -1148,6 +1161,13 @@ def _score_outcome(outcome: dict[str, Any], objective_type: str, weights: dict[s
     if objective_type == "minimize_impurity":
         impurity = _float_or_none(outcome.get("impurity_percent"))
         return 100.0 - impurity if impurity is not None else None
+    if objective_type == "maximize_atom_economy":
+        return _float_or_none(outcome.get("atom_economy_percent"))
+    if objective_type == "maximize_green_score":
+        return _float_or_none(outcome.get("green_score"))
+    if objective_type == "minimize_e_factor":
+        e_factor = _float_or_none(outcome.get("e_factor"))
+        return _e_factor_to_score(e_factor) if e_factor is not None else None
     if objective_type == "custom":
         custom = _float_or_none(outcome.get("objective_value"))
         if custom is not None:
@@ -1165,10 +1185,24 @@ def _score_outcome(outcome: dict[str, Any], objective_type: str, weights: dict[s
         weights.get("conversion_weight", weights.get("conversion", 0.10)),
         0.10,
     )
+    # Green objectives join the scalarization only when explicitly weighted; the
+    # default weight of 0.0 keeps existing multi_objective campaigns unchanged.
+    e_factor_weight = _float_or_default(weights.get("e_factor_weight", weights.get("e_factor", 0.0)), 0.0)
+    atom_economy_weight = _float_or_default(
+        weights.get("atom_economy_weight", weights.get("atom_economy", 0.0)),
+        0.0,
+    )
+    green_score_weight = _float_or_default(
+        weights.get("green_score_weight", weights.get("green_score", 0.0)),
+        0.0,
+    )
     yield_value = _float_or_none(outcome.get("yield_percent"))
     selectivity = _float_or_none(outcome.get("selectivity_percent"))
     impurity = _float_or_none(outcome.get("impurity_percent"))
     conversion = _float_or_none(outcome.get("conversion_percent"))
+    e_factor_value = _float_or_none(outcome.get("e_factor"))
+    atom_economy = _float_or_none(outcome.get("atom_economy_percent"))
+    green_score = _float_or_none(outcome.get("green_score"))
     available = [value for value in (yield_value, selectivity, impurity, conversion) if value is not None]
     if not available:
         return None
@@ -1177,6 +1211,9 @@ def _score_outcome(outcome: dict[str, Any], objective_type: str, weights: dict[s
         + (selectivity or 0.0) * selectivity_weight
         + (100.0 - (impurity or 100.0)) * impurity_weight
         + (conversion or 0.0) * conversion_weight
+        + (_e_factor_to_score(e_factor_value) if e_factor_value is not None else 0.0) * e_factor_weight
+        + (atom_economy or 0.0) * atom_economy_weight
+        + (green_score or 0.0) * green_score_weight
     )
 
 
@@ -2059,6 +2096,18 @@ def _objective_summary(objective_type: str, weights: dict[str, Any]) -> dict[str
             "conversion_weight": _float_or_default(
                 weights.get("conversion_weight", weights.get("conversion", 0.10)),
                 0.10,
+            ),
+            "e_factor_weight": _float_or_default(
+                weights.get("e_factor_weight", weights.get("e_factor", 0.0)),
+                0.0,
+            ),
+            "atom_economy_weight": _float_or_default(
+                weights.get("atom_economy_weight", weights.get("atom_economy", 0.0)),
+                0.0,
+            ),
+            "green_score_weight": _float_or_default(
+                weights.get("green_score_weight", weights.get("green_score", 0.0)),
+                0.0,
             ),
         }
     return {"method": objective_type}

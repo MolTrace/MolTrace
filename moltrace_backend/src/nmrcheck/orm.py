@@ -3724,6 +3724,61 @@ class ReactionSafetyConstraintProfileORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class ReactionGreenProfileORM(Base):
+    __tablename__ = "reaction_green_profiles"
+    __table_args__ = (
+        Index("ix_reaction_green_profiles_project_updated", "reaction_project_id", "updated_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    solvent_greenness_json: Mapped[str] = mapped_column(Text, default="{}")
+    default_assumptions_json: Mapped[str] = mapped_column(Text, default="{}")
+    solvent_table_version: Mapped[str] = mapped_column(String(64), default="chem21-2016")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ReactionGreenAssessmentORM(Base):
+    __tablename__ = "reaction_green_assessments"
+    __table_args__ = (
+        Index(
+            "ix_reaction_green_assessments_experiment_created",
+            "reaction_experiment_id",
+            "created_at",
+        ),
+        Index(
+            "ix_reaction_green_assessments_project_created",
+            "reaction_project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_experiment_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_experiments.id", ondelete="CASCADE"),
+        index=True,
+    )
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    metrics_json: Mapped[str] = mapped_column(Text, default="{}")
+    inputs_json: Mapped[str] = mapped_column(Text, default="{}")
+    provenance_json: Mapped[str] = mapped_column(Text, default="{}")
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class ReactionBayesianOptimizationRunORM(Base):
     __tablename__ = "reaction_bayesian_optimization_runs"
     __table_args__ = (
