@@ -71,6 +71,11 @@ _OUTCOME_FIELDS = {
     "isolated_yield_percent",
     "lcms_area_percent",
     "nmr_purity_percent",
+    "e_factor",
+    "atom_economy_percent",
+    "pmi",
+    "rme_percent",
+    "green_score",
     "notes",
 }
 

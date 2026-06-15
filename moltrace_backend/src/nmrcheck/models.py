@@ -10355,6 +10355,9 @@ ReactionObjective = Literal[
     "maximize_selectivity",
     "minimize_impurity",
     "maximize_conversion",
+    "minimize_e_factor",
+    "maximize_atom_economy",
+    "maximize_green_score",
     "multi_objective",
     "custom",
 ]
@@ -10405,6 +10408,11 @@ class ReactionOutcome(BaseModel):
     isolated_yield_percent: float | None = Field(default=None, ge=0, le=100)
     lcms_area_percent: float | None = Field(default=None, ge=0, le=100)
     nmr_purity_percent: float | None = Field(default=None, ge=0, le=100)
+    e_factor: float | None = Field(default=None, ge=0)
+    atom_economy_percent: float | None = Field(default=None, ge=0, le=100)
+    pmi: float | None = Field(default=None, ge=0)
+    rme_percent: float | None = Field(default=None, ge=0, le=100)
+    green_score: float | None = Field(default=None, ge=0, le=100)
     notes: str | None = Field(default=None, max_length=10_000)
 
 
@@ -10701,6 +10709,9 @@ ReactionObjectiveProfileType = Literal[
     "maximize_selectivity",
     "minimize_impurity",
     "maximize_conversion",
+    "minimize_e_factor",
+    "maximize_atom_economy",
+    "maximize_green_score",
     "multi_objective",
     "custom",
 ]
@@ -10915,6 +10926,116 @@ class ReactionSafetyConstraintProfile(BaseModel):
     created_at: datetime
     updated_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    human_review_required: bool = True
+
+
+ReactionGreenComponentRole = Literal[
+    "reactant",
+    "reagent",
+    "catalyst",
+    "solvent",
+    "workup",
+    "other",
+]
+
+
+class ReactionGreenComponent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=200)
+    role: ReactionGreenComponentRole = "reagent"
+    smiles: str | None = Field(default=None, max_length=10_000)
+    equivalents: float | None = Field(default=None, ge=0)
+    mass_g: float | None = Field(default=None, ge=0)
+
+
+class ReactionGreenProfileCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    solvent_greenness_json: dict[str, Any] = Field(default_factory=dict)
+    default_assumptions_json: dict[str, Any] = Field(default_factory=dict)
+    solvent_table_version: str = Field(default="chem21-2016", max_length=64)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReactionGreenProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    solvent_greenness_json: dict[str, Any] | None = None
+    default_assumptions_json: dict[str, Any] | None = None
+    solvent_table_version: str | None = Field(default=None, max_length=64)
+    metadata_json: dict[str, Any] | None = None
+
+
+class ReactionGreenProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    reaction_project_id: int
+    solvent_greenness_json: dict[str, Any] = Field(default_factory=dict)
+    default_assumptions_json: dict[str, Any] = Field(default_factory=dict)
+    solvent_table_version: str = "chem21-2016"
+    created_at: datetime
+    updated_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    human_review_required: bool = True
+
+
+class ReactionGreenMetricsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product_smiles: str | None = Field(default=None, max_length=10_000)
+    product_mw: float | None = Field(default=None, gt=0)
+    product_mass_g: float | None = Field(default=None, ge=0)
+    components: list[ReactionGreenComponent] = Field(default_factory=list)
+    energy_intensity_kwh_per_kg: float | None = Field(default=None, ge=0)
+    water_usage_l_per_kg: float | None = Field(default=None, ge=0)
+    hazardous_waste_kg_per_kg: float | None = Field(default=None, ge=0)
+    persist_to_outcome: bool = False
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReactionGreenAssessment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    reaction_experiment_id: int
+    reaction_project_id: int
+    metrics_json: dict[str, Any] = Field(default_factory=dict)
+    inputs_json: dict[str, Any] = Field(default_factory=dict)
+    provenance_json: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+    human_review_required: bool = True
+
+
+class ReactionGreenCompareRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    experiment_ids: list[int] = Field(default_factory=list, max_length=200)
+
+
+class ReactionGreenCompareEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reaction_experiment_id: int
+    experiment_code: str | None = None
+    metrics_json: dict[str, Any] = Field(default_factory=dict)
+    available: bool = False
+
+
+class ReactionGreenCompareResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reaction_project_id: int
+    entries: list[ReactionGreenCompareEntry] = Field(default_factory=list)
+    best_by_metric_json: dict[str, Any] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     human_review_required: bool = True
