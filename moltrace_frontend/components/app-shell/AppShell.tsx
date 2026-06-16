@@ -11,7 +11,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/platform", label: "Platform", icon: LineChart },
+  { href: "/platform", label: "Home", icon: LineChart },
   { href: "/spectracheck", label: "SpectraCheck", icon: SpectraCheckLogoIcon },
   { href: "/regulatory", label: "Regentry", icon: ShieldCheck },
   { href: "/reactions", label: "Reaction Optimization", icon: FlaskConical },
