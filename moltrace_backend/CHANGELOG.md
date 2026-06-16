@@ -14,6 +14,46 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.46.0 — Security Prompt 7: Field-level encryption via KMS envelope encryption (2026-06-15)
+
+**Headline:** Seventh build from the MolTrace Security & Data-Integrity Standard. Generalizes
+the ad-hoc SSO/MFA secret encryption into a reusable **envelope-encryption** framework: each
+field is encrypted with a fresh AES-256-GCM **data key (DEK)**, and that DEK is **wrapped by a
+key-encryption key (KEK)** from a pluggable provider. The ciphertext is a single self-describing
+envelope (`mtenc.v2.<key_id>.<header>.<wrapped_dek>.<nonce||ct>`) carrying the algorithm + KEK
+key id, so the KEK can be **rotated without re-encrypting data** and customer-managed keys
+(**BYOK**) drop in behind one seam. Pre-Prompt-7 ciphertext is transparently detected and still
+decrypts (then upgrades on next write). No DB/schema/migration change, no API contract change,
+no FE action (`/openapi.json` unchanged).
+
+### Added
+- **`src/nmrcheck/field_crypto.py`** — `encrypt_field` / `decrypt_field` (auto-detects legacy
+  headerless blobs) / `needs_rewrap` / `rewrap`; the versioned envelope binds the header as AAD
+  on **both** the DEK-wrap and the field payload (tampering with alg/purpose/key-id fails GCM
+  auth).
+- **`src/nmrcheck/kms.py`** — `KekProvider` Protocol + `LocalKekProvider` (KEK = SHA-256 of
+  configured material; non-secret fingerprint `key_id`; AES-256-GCM DEK wrap with header AAD) +
+  `build_local_provider`; documented AWS/GCP **BYOK seam** (no cloud SDK in v1).
+- **`tests/test_field_crypto.py`** — envelope round-trip, unique-DEK, header binding, legacy
+  back-compat (+ dev fallback), KEK rotation + rewrap (incl. legacy→envelope upgrade), wrong-key
+  / tampered-body / tampered-header auth failures, BYOK provider seam, and the unchanged
+  `sso_secret_crypto` / `mfa_totp` shim signatures + SSO/MFA key isolation.
+
+### Changed
+- **`src/nmrcheck/sso_secret_crypto.py`** is now a thin shim over `field_crypto`:
+  `encrypt_secret` / `decrypt_secret` keep their exact signatures, so all call sites
+  (`sso_store` client secret, `mfa_store` TOTP seed via `mfa_totp`) are untouched. SSO/MFA
+  blast-radius isolation is preserved (distinct `key_material` → distinct KEK + `key_id`).
+  **Version 0.46.0.**
+
+### Notes
+- Scoped to NEW modules + the self-contained crypto shim to avoid cross-wiring a concurrent
+  reaction-module session editing `orm.py`/`api.py`/`models.py`/migrations. White-paper/README
+  prose update for this item is deferred until that session's shared-doc edits land (then applied
+  cleanly).
+
+---
+
 ## v0.45.0 — Security Prompt 6: Argon2id credential hashing (memory-hard KDF + rehash-on-login) (2026-06-15)
 
 **Headline:** Sixth build from the MolTrace Security & Data-Integrity Standard. Passwords are now
