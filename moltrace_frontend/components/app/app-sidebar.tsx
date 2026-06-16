@@ -16,7 +16,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  LineChart,
+  Home,
   SlidersHorizontal,
   Users,
   ClipboardList,
@@ -49,7 +49,7 @@ const navigation: SidebarNavItem[] = [
   { name: "Action Queue", href: "/actions", icon: ClipboardList },
   { name: "Automation ROI", href: "/roi", icon: BarChart3 },
   { name: "ML / AI Governance", href: "/ai", icon: Bot },
-  { name: "Home", href: "/platform", icon: LineChart },
+  { name: "Home", href: "/platform", icon: Home },
 ]
 
 const adminNavigation: SidebarNavItem[] = [

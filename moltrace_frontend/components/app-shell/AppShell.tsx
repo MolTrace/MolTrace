@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, FileText, FlaskConical, Home, LineChart, Settings, ShieldCheck } from "lucide-react"
+import { BarChart3, FileText, FlaskConical, Home, LayoutDashboard, Settings, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { moltraceTraceClassName } from "@/components/branding/moltrace-wordmark"
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
@@ -10,8 +10,8 @@ import { SpectraCheckLogoIcon } from "@/components/branding/spectracheck-logo-ic
 import { useIsMobile } from "@/hooks/use-mobile"
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/platform", label: "Home", icon: LineChart },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/platform", label: "Home", icon: Home },
   { href: "/spectracheck", label: "SpectraCheck", icon: SpectraCheckLogoIcon },
   { href: "/regulatory", label: "Regentry", icon: ShieldCheck },
   { href: "/reactions", label: "Reaction Optimization", icon: FlaskConical },
