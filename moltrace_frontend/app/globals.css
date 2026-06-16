@@ -341,10 +341,6 @@
   color: var(--mt-cyan);
   animation: dev-banner-caret 0.85s step-end infinite;
 }
-.dev-banner-caret-done {
-  animation: none;
-  opacity: 0;
-}
 @media (prefers-reduced-motion: reduce) {
   .dev-banner-caret { animation: none; opacity: 0; }
   .dev-banner-ping,

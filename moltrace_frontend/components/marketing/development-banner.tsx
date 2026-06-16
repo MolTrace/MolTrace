@@ -8,50 +8,74 @@ import { useEffect, useState } from "react"
  * as a slim strip above the (sticky) Header so it is the first thing seen on
  * load, then scrolls away — a standard announcement-bar pattern.
  *
- * The statement "types itself out" on load via a small JS typewriter: a timer
- * reveals the text one character at a time behind a blinking terminal caret.
- * An invisible full-text copy is always rendered (so the text is present in the
- * server HTML for SEO and stays in the layout) and reserves the final single-
- * line width — the typed copy is absolutely positioned over it, so the centered
- * row never jitters while it types. `prefers-reduced-motion` shows the full text
- * immediately with no typing or caret. SSR and the first client render both
- * start empty, so there is no hydration mismatch and no flash of full text.
+ * The statement runs a looping JS typewriter: it types itself out character by
+ * character behind a blinking terminal caret, holds the full line so it can be
+ * read, then backspace-erases and types again — repeating indefinitely. An
+ * invisible full-text copy is always rendered (so the text is present in the
+ * server HTML for SEO and reserves the final single-line width), and the typed
+ * copy is absolutely positioned over it, so the centered row never jitters.
+ * `prefers-reduced-motion` shows the full text immediately with no typing,
+ * looping, or caret. SSR and the first client render both start empty, so there
+ * is no hydration mismatch and no flash of full text.
  */
 const KEY = "Actively in development"
 const REST = " — MolTrace is a live work-in-progress; features, data & pages may change."
 const FULL = KEY + REST
-const TYPE_MS = 28
+
+const TYPE_MS = 30 // per-character typing speed
+const ERASE_MS = 16 // per-character erase speed (snappier than typing)
+const HOLD_MS = 3000 // pause on the fully-typed line before erasing
+const BLANK_MS = 500 // pause on empty before typing again
 
 export function DevelopmentBanner() {
-  // Number of characters revealed so far. Starts at 0 on both server and client.
+  // Number of characters revealed. Starts at 0 on both server and client.
   const [shown, setShown] = useState(0)
-  // Length to type to: full line on >=md, just the key phrase on small screens.
-  const [target, setTarget] = useState(FULL.length)
 
   useEffect(() => {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    const wide = window.matchMedia("(min-width: 768px)").matches
-    const end = wide ? FULL.length : KEY.length
-    setTarget(end)
+    // Type the full line on >=md (Tailwind md = 768px); just the key phrase on small screens.
+    const end = window.matchMedia("(min-width: 768px)").matches ? FULL.length : KEY.length
 
     if (reduceMotion) {
       setShown(end)
       return
     }
 
-    setShown(0)
     let i = 0
-    const id = window.setInterval(() => {
-      i += 1
-      setShown(i)
-      if (i >= end) window.clearInterval(id)
-    }, TYPE_MS)
-    return () => window.clearInterval(id)
+    let erasing = false
+    let timer: ReturnType<typeof setTimeout>
+
+    const tick = () => {
+      if (!erasing) {
+        if (i < end) {
+          i += 1
+          setShown(i)
+          timer = setTimeout(tick, TYPE_MS)
+        } else {
+          // fully typed — hold so it can be read, then start erasing
+          erasing = true
+          timer = setTimeout(tick, HOLD_MS)
+        }
+      } else {
+        if (i > 0) {
+          i -= 1
+          setShown(i)
+          timer = setTimeout(tick, ERASE_MS)
+        } else {
+          // fully erased — brief pause, then type again
+          erasing = false
+          timer = setTimeout(tick, BLANK_MS)
+        }
+      }
+    }
+
+    setShown(0)
+    timer = setTimeout(tick, TYPE_MS)
+    return () => clearTimeout(timer)
   }, [])
 
   const keyShown = KEY.slice(0, Math.min(shown, KEY.length))
   const restShown = shown > KEY.length ? REST.slice(0, shown - KEY.length) : ""
-  const done = shown >= target
 
   return (
     <div
@@ -78,11 +102,11 @@ export function DevelopmentBanner() {
             {KEY}
             <span className="hidden md:inline">{REST}</span>
           </span>
-          {/* typed copy, revealed character-by-character over the reserved width */}
+          {/* typed copy, revealed/erased character-by-character over the reserved width */}
           <span className="absolute left-0 top-0">
             <span className="dev-banner-shimmer font-semibold">{keyShown}</span>
             <span className="text-muted-foreground">{restShown}</span>
-            <span className={done ? "dev-banner-caret dev-banner-caret-done" : "dev-banner-caret"}>▌</span>
+            <span className="dev-banner-caret">▌</span>
           </span>
         </span>
       </div>
