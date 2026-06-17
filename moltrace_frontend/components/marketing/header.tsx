@@ -241,7 +241,7 @@ export function Header() {
                           href={sectionHref}
                           onClick={() => setOpen(false)}
                           className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.22em] transition-colors hover:opacity-80"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           {sectionLabel}
                           <ChevronRight className="h-3 w-3" aria-hidden />

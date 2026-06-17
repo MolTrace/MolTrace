@@ -318,7 +318,7 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
               <Badge
                 variant="secondary"
                 className="ml-1 h-5 px-1.5 font-mono"
-                style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal)" }}
+                style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal-ink)" }}
               >
                 {badgeLabel}
               </Badge>
