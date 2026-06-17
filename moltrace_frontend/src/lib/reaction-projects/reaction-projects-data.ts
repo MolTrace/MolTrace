@@ -5,6 +5,9 @@ export type ReactionObjectiveValue =
   | "maximize_selectivity"
   | "minimize_impurity"
   | "maximize_conversion"
+  | "minimize_e_factor"
+  | "maximize_atom_economy"
+  | "maximize_green_score"
   | "multi_objective"
 
 export type ReactionProjectRow = {

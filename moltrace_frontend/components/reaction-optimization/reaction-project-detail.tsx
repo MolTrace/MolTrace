@@ -51,6 +51,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ModelDiagnosticsCard } from "@/components/reaction-optimization/model-diagnostics-card"
+import { GreenMetricsPanel } from "@/components/reaction-optimization/green-metrics-panel"
 import { ReactionResponseOverview } from "@/components/reaction-optimization/reaction-response-overview"
 import { ReactionRegulatoryConstraintsPanel } from "@/components/reaction-optimization/reaction-regulatory-constraints-panel"
 import {
@@ -115,6 +116,9 @@ const OBJECTIVE_TYPE_OPTIONS = [
   "maximize_selectivity",
   "minimize_impurity",
   "maximize_conversion",
+  "minimize_e_factor",
+  "maximize_atom_economy",
+  "maximize_green_score",
   "multi_objective",
   "custom",
 ] as const
@@ -927,6 +931,9 @@ export function ReactionProjectDetail() {
   const [weightImpurityPenalty, setWeightImpurityPenalty] = useState("")
   const [weightConversion, setWeightConversion] = useState("")
   const [weightCostPenalty, setWeightCostPenalty] = useState("")
+  const [weightEFactor, setWeightEFactor] = useState("")
+  const [weightAtomEconomy, setWeightAtomEconomy] = useState("")
+  const [weightGreenScore, setWeightGreenScore] = useState("")
   const [minimumYield, setMinimumYield] = useState("")
   const [minimumSelectivity, setMinimumSelectivity] = useState("")
   const [maximumImpurity, setMaximumImpurity] = useState("")
@@ -1158,6 +1165,9 @@ export function ReactionProjectDetail() {
         setWeightImpurityPenalty(wNum("impurity_penalty"))
         setWeightConversion(wNum("conversion"))
         setWeightCostPenalty(wNum("cost_penalty"))
+        setWeightEFactor(wNum("e_factor_weight"))
+        setWeightAtomEconomy(wNum("atom_economy_weight"))
+        setWeightGreenScore(wNum("green_score_weight"))
         const tt = isRecord(opRaw.target_thresholds) ? opRaw.target_thresholds : null
         const rMinY = readNum(opRaw.minimum_yield) ?? readNum(tt?.minimum_yield)
         const rMinS = readNum(opRaw.minimum_selectivity) ?? readNum(tt?.minimum_selectivity)
@@ -1809,6 +1819,9 @@ export function ReactionProjectDetail() {
     putW("impurity_penalty", weightImpurityPenalty)
     putW("conversion", weightConversion)
     putW("cost_penalty", weightCostPenalty)
+    putW("e_factor_weight", weightEFactor)
+    putW("atom_economy_weight", weightAtomEconomy)
+    putW("green_score_weight", weightGreenScore)
 
     const putThreshold = (s: string) => {
       const t = s.trim()
@@ -3682,6 +3695,9 @@ export function ReactionProjectDetail() {
             <TabsTrigger value="cost-safety" className={reactionProjectTabClass}>
               {"Cost & Safety"}
             </TabsTrigger>
+            <TabsTrigger value="green" className={reactionProjectTabClass}>
+              Green
+            </TabsTrigger>
             <TabsTrigger value="optimization" className={reactionProjectTabClass}>
               Optimization
             </TabsTrigger>
@@ -4057,6 +4073,7 @@ export function ReactionProjectDetail() {
                     <TableHead className="text-right text-xs">conversion</TableHead>
                     <TableHead className="text-right text-xs">selectivity</TableHead>
                     <TableHead className="text-right text-xs">impurity</TableHead>
+                    <TableHead className="text-right text-xs">green_score</TableHead>
                     <TableHead className="font-mono text-xs">linked_spectracheck_session_id</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">updated_at</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">SpectraCheck</TableHead>
@@ -4070,6 +4087,7 @@ export function ReactionProjectDetail() {
                     const conv = readOutcomeNumber(e, "conversion_percent")
                     const sel = readOutcomeNumber(e, "selectivity_percent")
                     const imp = readOutcomeNumber(e, "impurity_percent")
+                    const greenScore = readOutcomeNumber(e, "green_score")
                     const linked = readNum(e.linked_spectracheck_session_id)
                     return (
                       <TableRow key={String(e.id)}>
@@ -4095,6 +4113,9 @@ export function ReactionProjectDetail() {
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs tabular-nums">
                           {imp != null ? `${imp}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs tabular-nums">
+                          {greenScore != null ? greenScore.toLocaleString(undefined, { maximumFractionDigits: 1 }) : "—"}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {linked != null ? linked : "—"}
@@ -4122,7 +4143,7 @@ export function ReactionProjectDetail() {
                   {!loading && experimentsRec.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={9 + conditionColumnKeys.length}
+                        colSpan={10 + conditionColumnKeys.length}
                         className="text-muted-foreground"
                       >
                         No experiments.
@@ -4501,6 +4522,33 @@ export function ReactionProjectDetail() {
                         inputMode="decimal"
                         value={weightCostPenalty}
                         onChange={(e) => setWeightCostPenalty(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="w-efactor">E-factor</Label>
+                      <Input
+                        id="w-efactor"
+                        inputMode="decimal"
+                        value={weightEFactor}
+                        onChange={(e) => setWeightEFactor(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="w-ae">atom economy</Label>
+                      <Input
+                        id="w-ae"
+                        inputMode="decimal"
+                        value={weightAtomEconomy}
+                        onChange={(e) => setWeightAtomEconomy(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="w-green">green score</Label>
+                      <Input
+                        id="w-green"
+                        inputMode="decimal"
+                        value={weightGreenScore}
+                        onChange={(e) => setWeightGreenScore(e.target.value)}
                       />
                     </div>
                   </div>
@@ -4902,6 +4950,10 @@ export function ReactionProjectDetail() {
               </form>
             </div>
           </ModuleCard>
+        </TabsContent>
+
+        <TabsContent value="green" className="mt-4 space-y-6">
+          <GreenMetricsPanel projectId={reactionProjectId} experiments={experimentsRec} />
         </TabsContent>
 
         <TabsContent value="optimization" className="mt-4 space-y-6">
