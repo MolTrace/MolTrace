@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 
+from .secrets_provider import resolve_secret, resolve_secret_strict
+
 
 def _parse_bool(value: str | None, default: bool) -> bool:
     if value is None:
@@ -149,9 +151,9 @@ def get_settings() -> Settings:
         debug=_parse_bool(os.getenv("DEBUG"), True),
         log_level=os.getenv("LOG_LEVEL", "info"),
         database_url=normalize_database_url(
-            os.getenv("DATABASE_URL", "sqlite:///./nmrcheck.sqlite3")
+            resolve_secret_strict("DATABASE_URL", "sqlite:///./nmrcheck.sqlite3")
         ),
-        redis_url=(os.getenv("REDIS_URL") or None),
+        redis_url=resolve_secret("REDIS_URL"),
         queue_name=os.getenv("QUEUE_NAME", "nmrcheck"),
         max_batch_size=_parse_int(os.getenv("MAX_BATCH_SIZE"), 100),
         allowed_upload_types=tuple(
@@ -161,7 +163,7 @@ def get_settings() -> Settings:
         allowed_origins=_parse_csv(os.getenv("ALLOWED_ORIGINS"), ("*",)),
         default_solvent=(os.getenv("DEFAULT_SOLVENT") or "CDCl3"),
         default_smiles=os.getenv("DEFAULT_SMILES", ETHANOL_SMILES),
-        api_key=(os.getenv("API_KEY") or None),
+        api_key=resolve_secret("API_KEY"),
         disable_auth=_parse_bool(
             os.getenv("DISABLE_BACKEND_AUTH") or os.getenv("DISABLE_AUTH"),
             False,
@@ -184,8 +186,8 @@ def get_settings() -> Settings:
         ),
         base_url=os.getenv("BASE_URL", "http://127.0.0.1:8000").rstrip("/"),
         frontend_base_url=os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/"),
-        sso_encryption_key=(os.getenv("SSO_ENCRYPTION_KEY") or None),
-        mfa_encryption_key=(os.getenv("MFA_ENCRYPTION_KEY") or None),
+        sso_encryption_key=resolve_secret("SSO_ENCRYPTION_KEY"),
+        mfa_encryption_key=resolve_secret("MFA_ENCRYPTION_KEY"),
         webauthn_rp_id=os.getenv("WEBAUTHN_RP_ID", "localhost"),
         webauthn_rp_name=os.getenv("WEBAUTHN_RP_NAME", "MolTrace"),
         webauthn_origin=os.getenv(
@@ -207,7 +209,7 @@ def get_settings() -> Settings:
         session_device_binding_enabled=_parse_bool(
             os.getenv("SESSION_DEVICE_BINDING_ENABLED"), False
         ),
-        password_pepper=(os.getenv("PASSWORD_PEPPER") or None),
+        password_pepper=resolve_secret("PASSWORD_PEPPER"),
         email_from=os.getenv("EMAIL_FROM", "noreply@nmrcheck.local"),
         email_backend=(
             os.getenv("EMAIL_BACKEND", "database").strip().lower() or "database"

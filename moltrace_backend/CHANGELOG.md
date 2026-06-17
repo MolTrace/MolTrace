@@ -14,6 +14,45 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.47.0 — Security Prompt 8: Secrets management (scan gate + provider seam) (2026-06-16)
+
+**Headline:** Eighth (final Cryptography & Secrets) build from the MolTrace Security &
+Data-Integrity Standard. Adds a **secret-scanning gate that blocks the build on any committed
+secret** (gitleaks in CI + pre-commit) and a **secrets-provider seam** that becomes the single
+read-point for credential-class config — env-backed today, with a documented swap to a managed
+store (Vault / AWS / GCP Secrets Manager) and short-lived **dynamic DB credentials** behind one
+interface. A full-history audit confirmed **zero real committed secrets**; the gate lands green
+on the existing 268-commit history. Additive and backward-compatible — the env backend is
+byte-for-byte identical to the prior `os.getenv` reads. No DB/schema/migration change, no API
+contract change, no FE action (`/openapi.json` unchanged).
+
+### Added
+- **`.github/workflows/secret-scan.yml`** — standalone CI gate running **gitleaks v8.30.1**
+  (pinned binary + verified SHA-256) over the full git history (`gitleaks git .`, `--exit-code 1`);
+  blocks on any finding. Decoupled from `ci-cd.yml` so a test failure can't skip it.
+- **`.gitleaks.toml`** — `useDefault=true` + a tight allowlist for audit-confirmed dev
+  placeholders / test fixtures / templates / generated files only (never a live secret).
+- **`.pre-commit-config.yaml`** — same gitleaks version + config for local staged-change scans.
+- **`src/nmrcheck/secrets_provider.py`** — `resolve_secret` / `resolve_secret_strict`,
+  `EnvSecretsProvider`, a `SecretsProvider` Protocol, and a `SECRETS_BACKEND`-selected backend
+  registry (managed-store / BYO seam; no cloud SDK in v1).
+- **`tests/test_secrets_provider.py`** (14 tests) + **`docs/ops_secrets_management.md`**
+  (managed-store adoption + Vault dynamic-DB-credential runbook).
+
+### Changed
+- **`settings.py`** routes its six credential-class reads (DATABASE_URL strict; REDIS_URL,
+  API_KEY, SSO/MFA encryption keys, PASSWORD_PEPPER) through the seam — additive, with the env
+  backend preserving exact prior semantics (empty `API_KEY` → `None`; the prod startup guards
+  still fire). **Version 0.47.0.**
+
+### Notes
+- Managed-store adoption + dynamic short-lived DB credentials ship as a documented seam (ops
+  doc), not live infra — mirroring how Prompt 7 shipped the BYOK seam. Scoped to new files +
+  settings.py to avoid cross-wiring a concurrent reaction-module session; the white-paper/README
+  prose for this item is deferred until that session's shared-doc edits land.
+
+---
+
 ## v0.46.0 — Security Prompt 7: Field-level encryption via KMS envelope encryption (2026-06-15)
 
 **Headline:** Seventh build from the MolTrace Security & Data-Integrity Standard. Generalizes
