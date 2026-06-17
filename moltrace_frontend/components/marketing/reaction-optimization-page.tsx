@@ -428,7 +428,7 @@ export function ReactionOptimizationPage() {
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   The next experiment, chosen by{" "}
-                  <span style={{ color: "var(--mt-teal)" }}>the surrogate</span> — not by intuition.
+                  <span style={{ color: "var(--mt-teal-ink)" }}>the surrogate</span> — not by intuition.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                   Repho runs the closed-loop optimisation engine inside MolTrace. Bayesian
@@ -457,7 +457,7 @@ export function ReactionOptimizationPage() {
                 <div className="flex items-center justify-between">
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Campaign · live
                   </p>
@@ -466,7 +466,7 @@ export function ReactionOptimizationPage() {
                     style={{
                       borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
                       backgroundColor: "var(--mt-teal-soft)",
-                      color: "var(--mt-teal)",
+                      color: "var(--mt-teal-ink)",
                     }}
                   >
                     <span
@@ -493,7 +493,7 @@ export function ReactionOptimizationPage() {
                         <div className="flex items-center gap-2">
                           <span
                             className="font-mono text-[10px] font-bold tabular-nums"
-                            style={{ color: "var(--mt-teal)" }}
+                            style={{ color: "var(--mt-teal-ink)" }}
                           >
                             R{row.round}
                           </span>
@@ -532,7 +532,7 @@ export function ReactionOptimizationPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Why this exists
                 </p>
@@ -572,7 +572,7 @@ export function ReactionOptimizationPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The optimisation loop
               </p>
@@ -596,7 +596,7 @@ export function ReactionOptimizationPage() {
                   <div className="flex items-center gap-3">
                     <span
                       className="font-mono text-3xl font-bold tabular-nums tracking-tight"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {s.stage}
                     </span>
@@ -651,7 +651,7 @@ export function ReactionOptimizationPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Methods we ship
               </p>
@@ -677,7 +677,7 @@ export function ReactionOptimizationPage() {
                   <div className="flex items-baseline gap-4">
                     <span
                       className="font-mono text-3xl font-bold tabular-nums tracking-tight"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {m.acronym}
                     </span>
@@ -777,7 +777,7 @@ export function ReactionOptimizationPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Anatomy of a campaign
               </p>
@@ -818,7 +818,7 @@ export function ReactionOptimizationPage() {
                         <td className="px-5 py-3 align-top">
                           <span
                             className="font-mono text-base font-bold tabular-nums"
-                            style={{ color: "var(--mt-teal)" }}
+                            style={{ color: "var(--mt-teal-ink)" }}
                           >
                             R{row.round}
                           </span>
@@ -874,7 +874,7 @@ export function ReactionOptimizationPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The honest comparison
               </p>
@@ -933,7 +933,7 @@ export function ReactionOptimizationPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Three pillars, one loop
               </p>
@@ -957,7 +957,7 @@ export function ReactionOptimizationPage() {
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-[11px] font-bold tabular-nums"
                       style={{
                         backgroundColor: "var(--mt-teal-soft)",
-                        color: "var(--mt-teal)",
+                        color: "var(--mt-teal-ink)",
                       }}
                       aria-hidden
                     >
@@ -1032,7 +1032,7 @@ export function ReactionOptimizationPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Trust & reproducibility
                 </p>

@@ -95,7 +95,7 @@ function SummaryMetricCard({
       <CardContent className="pb-5">
         <div
           className="font-mono text-3xl font-bold leading-none tabular-nums"
-          style={{ color: "var(--mt-violet)" }}
+          style={{ color: "var(--mt-violet-ink)" }}
         >
           {value}
         </div>
@@ -220,7 +220,7 @@ export function ReactionOptimizationLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             MolTrace · Reaction Optimization
           </p>
@@ -252,7 +252,7 @@ export function ReactionOptimizationLanding() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Reaction · Campaign Summary
             </p>
@@ -326,7 +326,7 @@ export function ReactionOptimizationLanding() {
       <section className="space-y-3" aria-label="Validation readiness">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-violet)" }}
+          style={{ color: "var(--mt-violet-ink)" }}
         >
           Reaction · Validation Readiness
         </p>
@@ -337,7 +337,7 @@ export function ReactionOptimizationLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             Reaction · Recommendation Evidence
           </p>
@@ -388,7 +388,7 @@ export function ReactionOptimizationLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             Reaction · Create Project
           </p>
@@ -490,7 +490,7 @@ export function ReactionOptimizationLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             Reaction · Project Index
           </p>

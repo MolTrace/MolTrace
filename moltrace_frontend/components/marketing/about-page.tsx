@@ -259,13 +259,13 @@ export function AboutPage() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-6 lg:px-8 lg:py-28">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               About MolTrace
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
               Drug discovery deserves AI built like a{" "}
-              <span style={{ color: "var(--mt-teal)" }}>peer reviewer</span>.
+              <span style={{ color: "var(--mt-teal-ink)" }}>peer reviewer</span>.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
               MolTrace Technologies, Inc. is a venture-backed scientific intelligence company
@@ -301,7 +301,7 @@ export function AboutPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Why we exist
                 </p>
@@ -333,7 +333,7 @@ export function AboutPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The four commitments
               </p>
@@ -355,7 +355,7 @@ export function AboutPage() {
                   <div className="flex items-baseline gap-3">
                     <span
                       className="font-mono text-2xl font-bold tabular-nums tracking-tight"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {p.number}
                     </span>
@@ -374,7 +374,7 @@ export function AboutPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The numbers we publish
               </p>
@@ -395,7 +395,7 @@ export function AboutPage() {
                 >
                   <p
                     className="font-mono text-4xl font-bold tabular-nums tracking-tight sm:text-5xl"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {m.value}
                   </p>
@@ -489,7 +489,7 @@ export function AboutPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The product loop
               </p>
@@ -529,7 +529,7 @@ export function AboutPage() {
                     </p>
                     <span
                       className="mt-5 inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] transition-transform group-hover:translate-x-0.5"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       Open module
                       <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -566,7 +566,7 @@ export function AboutPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Under the hood
                 </p>
@@ -604,7 +604,7 @@ export function AboutPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Recent ships
               </p>
@@ -657,7 +657,7 @@ export function AboutPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Where we work
               </p>
@@ -697,7 +697,7 @@ export function AboutPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Compliance, in plain language
               </p>
@@ -714,7 +714,7 @@ export function AboutPage() {
                 >
                   <p
                     className="font-mono text-[11px] font-bold uppercase tracking-[0.14em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {c.badge}
                   </p>

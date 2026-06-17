@@ -310,7 +310,7 @@ export function ImpurityAssessmentWorkspace() {
       <header className="space-y-1">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-cyan)" }}
+          style={{ color: "var(--mt-cyan-ink)" }}
         >
           MolTrace · Regentry · Impurity Assessment
         </p>
@@ -938,7 +938,7 @@ function ThresholdStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border bg-muted/10 px-3 py-2">
       <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
-      <p className="font-mono text-lg font-bold tabular-nums" style={{ color: "var(--mt-cyan)" }}>
+      <p className="font-mono text-lg font-bold tabular-nums" style={{ color: "var(--mt-cyan-ink)" }}>
         {value}
       </p>
     </div>

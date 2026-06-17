@@ -179,13 +179,13 @@ export function BlogPage() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-6 lg:px-8 lg:py-24">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Field notes
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
               The work, written down{" "}
-              <span style={{ color: "var(--mt-teal)" }}>as we ship it</span>.
+              <span style={{ color: "var(--mt-teal-ink)" }}>as we ship it</span>.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
               Methodology essays, architecture decisions, validation deep-dives, and the regulatory
@@ -260,13 +260,13 @@ export function BlogPage() {
                 <div className="relative">
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Key finding
                   </p>
                   <p
                     className="mt-4 font-mono text-5xl font-bold tabular-nums tracking-tight sm:text-6xl"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Δ=17 → Δ=2
                   </p>
@@ -290,7 +290,7 @@ export function BlogPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Editorial streams
                 </p>

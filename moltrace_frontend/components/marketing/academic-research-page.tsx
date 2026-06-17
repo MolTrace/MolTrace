@@ -372,7 +372,7 @@ export function AcademicResearchPage() {
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   Science your students can{" "}
-                  <span style={{ color: "var(--mt-teal)" }}>see</span> — and your reviewers can
+                  <span style={{ color: "var(--mt-teal-ink)" }}>see</span> — and your reviewers can
                   reproduce.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
@@ -402,7 +402,7 @@ export function AcademicResearchPage() {
                 <div className="flex items-center justify-between">
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Supporting info · auto-generated
                   </p>
@@ -411,7 +411,7 @@ export function AcademicResearchPage() {
                     style={{
                       borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
                       backgroundColor: "var(--mt-teal-soft)",
-                      color: "var(--mt-teal)",
+                      color: "var(--mt-teal-ink)",
                     }}
                   >
                     <span
@@ -442,7 +442,7 @@ export function AcademicResearchPage() {
                     >
                       <span
                         className="w-20 shrink-0 font-mono text-[9px] font-bold uppercase tracking-[0.12em]"
-                        style={{ color: "var(--mt-teal)" }}
+                        style={{ color: "var(--mt-teal-ink)" }}
                       >
                         {row.k}
                       </span>
@@ -469,7 +469,7 @@ export function AcademicResearchPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Why academic labs
               </p>
@@ -518,7 +518,7 @@ export function AcademicResearchPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Across the academic workflow
               </p>
@@ -600,7 +600,7 @@ export function AcademicResearchPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Workflows we light up
               </p>
@@ -659,7 +659,7 @@ export function AcademicResearchPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Measured, not claimed
               </p>
@@ -681,7 +681,7 @@ export function AcademicResearchPage() {
                 >
                   <p
                     className="font-mono text-3xl font-bold tabular-nums tracking-tight sm:text-4xl"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {o.value}
                   </p>
@@ -701,7 +701,7 @@ export function AcademicResearchPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The honest comparison
               </p>
@@ -760,7 +760,7 @@ export function AcademicResearchPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 One worked example
               </p>
@@ -782,7 +782,7 @@ export function AcademicResearchPage() {
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-[11px] font-bold tabular-nums"
-                      style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal)" }}
+                      style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal-ink)" }}
                       aria-hidden
                     >
                       {idx + 1}
@@ -880,7 +880,7 @@ export function AcademicResearchPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Built for trust
                 </p>

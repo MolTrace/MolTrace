@@ -1314,7 +1314,7 @@ export function SpectraCheckRawFidSection({
                   <div className="flex w-full items-center justify-between">
                     <span
                       className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       <Eye className="h-3.5 w-3.5" aria-hidden />
                       Inspect
@@ -1361,7 +1361,7 @@ export function SpectraCheckRawFidSection({
                   <div className="flex w-full items-center justify-between">
                     <span
                       className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: analysisBackend === "gsd_prompt3" ? "#B45309" : "var(--mt-teal)" }}
+                      style={{ color: analysisBackend === "gsd_prompt3" ? "#B45309" : "var(--mt-teal-ink)" }}
                     >
                       {analysisBackend === "gsd_prompt3" ? (
                         <FlaskConical className="h-3.5 w-3.5" aria-hidden />
@@ -1372,7 +1372,7 @@ export function SpectraCheckRawFidSection({
                     </span>
                     <span
                       className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
-                      style={{ color: analysisBackend === "gsd_prompt3" ? "#B45309" : "var(--mt-teal)" }}
+                      style={{ color: analysisBackend === "gsd_prompt3" ? "#B45309" : "var(--mt-teal-ink)" }}
                     >
                       {analysisBackend === "gsd_prompt3" ? "Experimental" : "Generates spectrum"}
                     </span>
@@ -1508,7 +1508,7 @@ export function SpectraCheckRawFidSection({
             {(previewLoading || processLoading) ? (
               <div
                 className="flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-[11px]"
-                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+                style={{ borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)", backgroundColor: "var(--mt-teal-soft)" }}
                 data-testid="raw-fid-results-loading-badge"
                 aria-live="polite"
               >
@@ -1534,7 +1534,7 @@ export function SpectraCheckRawFidSection({
                       </p>
                       <p
                         className="font-mono text-base font-bold leading-tight uppercase tracking-wide"
-                        style={{ color: "var(--mt-teal)" }}
+                        style={{ color: "var(--mt-teal-ink)" }}
                       >
                         {vendorDetected}
                       </p>
@@ -1553,7 +1553,7 @@ export function SpectraCheckRawFidSection({
                       </p>
                       <p
                         className="font-mono text-base font-bold leading-tight"
-                        style={{ color: "var(--mt-teal)" }}
+                        style={{ color: "var(--mt-teal-ink)" }}
                       >
                         {nucleusMeta}
                       </p>
@@ -1572,7 +1572,7 @@ export function SpectraCheckRawFidSection({
                       </p>
                       <p
                         className="font-mono text-base font-bold leading-tight tabular-nums"
-                        style={{ color: "var(--mt-teal)" }}
+                        style={{ color: "var(--mt-teal-ink)" }}
                       >
                         {String(sw)}
                       </p>
@@ -1591,7 +1591,7 @@ export function SpectraCheckRawFidSection({
                       </p>
                       <p
                         className="font-mono text-base font-bold leading-tight tabular-nums"
-                        style={{ color: "var(--mt-teal)" }}
+                        style={{ color: "var(--mt-teal-ink)" }}
                       >
                         {String(td)}
                       </p>
@@ -1653,7 +1653,7 @@ export function SpectraCheckRawFidSection({
                   <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--mt-teal)" }} aria-hidden />
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Auto-FT preview · {autoPreviewPreset}
                   </p>
@@ -1746,7 +1746,7 @@ export function SpectraCheckRawFidSection({
                   <div>
                     <p
                       className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       Use in unified evidence
                     </p>
@@ -1784,7 +1784,7 @@ export function SpectraCheckRawFidSection({
                   <div>
                     <p
                       className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       Cross-tab link
                     </p>
@@ -1854,7 +1854,7 @@ export function SpectraCheckRawFidSection({
                             <Badge
                               variant="outline"
                               className="font-mono text-[10px]"
-                              style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                              style={{ borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)" }}
                             >
                               Vendor · {vendorDetected}
                             </Badge>
@@ -1863,7 +1863,7 @@ export function SpectraCheckRawFidSection({
                             <Badge
                               variant="outline"
                               className="font-mono text-[10px]"
-                              style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                              style={{ borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)" }}
                             >
                               Nucleus · {nucleusMeta}
                             </Badge>

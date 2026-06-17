@@ -208,7 +208,7 @@ export function ReactionStudioWorkspace() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               MolTrace · Reaction Studio (program-level)
             </p>
@@ -235,7 +235,7 @@ export function ReactionStudioWorkspace() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             Studio · Reaction Scheme
           </p>
@@ -265,7 +265,7 @@ export function ReactionStudioWorkspace() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             Studio · Run Data
           </p>
@@ -361,7 +361,7 @@ export function ReactionStudioWorkspace() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             Studio · ELN Connectors
           </p>
@@ -598,7 +598,7 @@ export function ReactionStudioWorkspace() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             Studio · Response Surface
           </p>
@@ -635,7 +635,7 @@ export function ReactionStudioWorkspace() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             Studio · Approval Gate
           </p>

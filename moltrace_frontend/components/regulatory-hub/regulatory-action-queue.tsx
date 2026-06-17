@@ -73,7 +73,7 @@ function severityBadgeStyle(severity: string | null | undefined) {
     return {
       borderColor: "var(--mt-cyan)",
       backgroundColor: "color-mix(in oklab, var(--mt-cyan) 10%, transparent)",
-      color: "var(--mt-cyan)",
+      color: "var(--mt-cyan-ink)",
     } as const
   }
   return {
@@ -88,7 +88,7 @@ function statusBadgeStyle(status: string | null | undefined) {
     return {
       borderColor: "var(--mt-cyan)",
       backgroundColor: "color-mix(in oklab, var(--mt-cyan) 10%, transparent)",
-      color: "var(--mt-cyan)",
+      color: "var(--mt-cyan-ink)",
     } as const
   }
   if (norm === "in_progress") {
@@ -109,7 +109,7 @@ function statusBadgeStyle(status: string | null | undefined) {
     return {
       borderColor: "var(--mt-violet)",
       backgroundColor: "color-mix(in oklab, var(--mt-violet) 10%, transparent)",
-      color: "var(--mt-violet)",
+      color: "var(--mt-violet-ink)",
     } as const
   }
   if (norm === "dismissed") {
@@ -354,7 +354,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-cyan-ink)" }}
           >
             Regulatory · Action Queue
           </p>
@@ -391,7 +391,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
             <div className="flex flex-wrap items-end justify-between gap-2 pt-2">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Action Queue · Filters
               </p>

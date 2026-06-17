@@ -283,7 +283,7 @@ export function KnowledgeLibraryLanding() {
               <Library className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errSources ? null : sources.length, Boolean(errSources))}
               </div>
               {statSub({
@@ -303,7 +303,7 @@ export function KnowledgeLibraryLanding() {
               <FileStack className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errRuns ? null : runs.length, Boolean(errRuns))}
               </div>
               {statSub({
@@ -323,7 +323,7 @@ export function KnowledgeLibraryLanding() {
               <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errReview ? null : taskCounts.pending, Boolean(errReview))}
               </div>
               {statSub({
@@ -343,7 +343,7 @@ export function KnowledgeLibraryLanding() {
               <BookMarked className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errReview ? null : taskCounts.accepted, Boolean(errReview))}
               </div>
               {statSub({
@@ -363,7 +363,7 @@ export function KnowledgeLibraryLanding() {
               <Database className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errTraining ? null : trainingCandidates.length, Boolean(errTraining))}
               </div>
               {statSub({
@@ -383,7 +383,7 @@ export function KnowledgeLibraryLanding() {
               <Layers className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errBenchmark ? null : benchmarkCandidates.length, Boolean(errBenchmark))}
               </div>
               {statSub({
@@ -403,7 +403,7 @@ export function KnowledgeLibraryLanding() {
               <Wrench className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errImprovement ? null : modelImprovement.length, Boolean(errImprovement))}
               </div>
               {statSub({

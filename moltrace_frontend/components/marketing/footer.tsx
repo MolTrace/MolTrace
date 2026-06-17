@@ -322,7 +322,7 @@ export function Footer() {
               <h3
                 data-testid={`footer-section-title-${section.title.toLowerCase()}`}
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 {section.title}
               </h3>
@@ -374,7 +374,7 @@ export function Footer() {
             <p
               data-testid="footer-social-title"
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Join our Community
             </p>
@@ -407,7 +407,7 @@ export function Footer() {
                 style={{
                   borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
                   backgroundColor: "var(--mt-teal-soft)",
-                  color: "var(--mt-teal)",
+                  color: "var(--mt-teal-ink)",
                 }}
               >
                 {badge}

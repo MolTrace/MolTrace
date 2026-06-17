@@ -178,7 +178,7 @@ export function BlogPostsGrid({ posts }: Props) {
                 {post.href ? (
                   <span
                     className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] transition-transform group-hover:translate-x-0.5"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Read
                     <ArrowRight className="h-3 w-3" aria-hidden />

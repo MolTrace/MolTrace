@@ -656,7 +656,7 @@ function KarplusControls({
           {karplus.method === "generic" && karplus.weighting === "boltzmann" ? (
             <span
               className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               ✓ recommended combo · slower (3D embed)
             </span>

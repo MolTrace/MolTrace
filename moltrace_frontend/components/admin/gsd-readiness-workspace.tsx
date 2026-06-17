@@ -26,7 +26,7 @@ export function GsdReadinessWorkspace() {
         <div className="flex flex-wrap items-center gap-2">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-teal)" }}
+            style={{ color: "var(--mt-teal-ink)" }}
           >
             Admin · GSD readiness
           </p>

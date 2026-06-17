@@ -37,7 +37,7 @@ export function SpectraCheckMsEvidenceStudio({
       <div className="space-y-1">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-teal)" }}
+          style={{ color: "var(--mt-teal-ink)" }}
         >
           Spectroscopy · MS Studio
         </p>
@@ -68,7 +68,7 @@ export function SpectraCheckMsEvidenceStudio({
             className="rounded-md border px-3 py-2"
             style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
           >
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
               Sample ID
             </p>
             <p className="mt-1 truncate font-mono text-xs">{sampleId.trim() || "(empty)"}</p>
@@ -77,7 +77,7 @@ export function SpectraCheckMsEvidenceStudio({
             className="rounded-md border px-3 py-2"
             style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
           >
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
               Candidates
             </p>
             <p className="mt-1 truncate font-mono text-xs">

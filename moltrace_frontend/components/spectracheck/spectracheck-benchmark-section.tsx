@@ -387,7 +387,7 @@ function BenchmarkResultPanels({ result }: { result: BenchmarkResponse }) {
                   <Badge
                     variant="outline"
                     className="font-mono text-xs"
-                    style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                    style={{ borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)" }}
                   >
                     Overall {percent(row.overall_score)}
                   </Badge>

@@ -2476,7 +2476,7 @@ function ReportComposerTab({
                   <CardHeader className="gap-1 pt-5 pb-2">
                     <span
                       className="font-mono text-[9px] font-bold uppercase tracking-[0.2em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       Result · HTML Preview
                     </span>
@@ -2754,7 +2754,7 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
             </p>
             <p
               className="font-mono text-2xl font-bold tabular-nums"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               {layersUsed.length > 0 ? layersUsed.length : "—"}
             </p>

@@ -372,7 +372,7 @@ export function CroAnalyticalPage() {
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   Defensible results, at the{" "}
-                  <span style={{ color: "var(--mt-teal)" }}>volume</span> your clients demand.
+                  <span style={{ color: "var(--mt-teal-ink)" }}>volume</span> your clients demand.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                   MolTrace gives contract and analytical labs one pipeline that runs every sponsor's
@@ -400,7 +400,7 @@ export function CroAnalyticalPage() {
                 <div className="flex items-center justify-between">
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Batch queue · live
                   </p>
@@ -409,7 +409,7 @@ export function CroAnalyticalPage() {
                     style={{
                       borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
                       backgroundColor: "var(--mt-teal-soft)",
-                      color: "var(--mt-teal)",
+                      color: "var(--mt-teal-ink)",
                     }}
                   >
                     <span
@@ -426,7 +426,7 @@ export function CroAnalyticalPage() {
                 <p className="mt-1 text-sm font-medium">
                   <span
                     className="font-mono text-2xl font-bold tabular-nums"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     128
                   </span>{" "}
@@ -453,7 +453,7 @@ export function CroAnalyticalPage() {
                         className="inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em]"
                         style={{
                           borderColor: "color-mix(in oklab, var(--mt-teal) 25%, transparent)",
-                          color: "var(--mt-teal)",
+                          color: "var(--mt-teal-ink)",
                         }}
                       >
                         client {row.client}
@@ -495,7 +495,7 @@ export function CroAnalyticalPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Why CROs &amp; analytical labs
               </p>
@@ -544,7 +544,7 @@ export function CroAnalyticalPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Across the service workflow
               </p>
@@ -625,7 +625,7 @@ export function CroAnalyticalPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Workflows we light up
               </p>
@@ -684,7 +684,7 @@ export function CroAnalyticalPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Measured, not claimed
               </p>
@@ -706,7 +706,7 @@ export function CroAnalyticalPage() {
                 >
                   <p
                     className="font-mono text-3xl font-bold tabular-nums tracking-tight sm:text-4xl"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {o.value}
                   </p>
@@ -726,7 +726,7 @@ export function CroAnalyticalPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The honest comparison
               </p>
@@ -785,7 +785,7 @@ export function CroAnalyticalPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 One worked example
               </p>
@@ -807,7 +807,7 @@ export function CroAnalyticalPage() {
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-[11px] font-bold tabular-nums"
-                      style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal)" }}
+                      style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal-ink)" }}
                       aria-hidden
                     >
                       {idx + 1}
@@ -903,7 +903,7 @@ export function CroAnalyticalPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Built for sponsors
                 </p>

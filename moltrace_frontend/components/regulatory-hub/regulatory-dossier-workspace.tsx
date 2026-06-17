@@ -2303,7 +2303,7 @@ export function RegulatoryDossierWorkspace() {
       <header className="space-y-1">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-cyan)" }}
+          style={{ color: "var(--mt-cyan-ink)" }}
         >
           MolTrace · Regulatory Dossier
         </p>
@@ -2374,7 +2374,7 @@ export function RegulatoryDossierWorkspace() {
                       <span
                         aria-hidden
                         className="shrink-0 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em]"
-                        style={{ color: "var(--mt-cyan)" }}
+                        style={{ color: "var(--mt-cyan-ink)" }}
                       >
                         {g.label}
                       </span>
@@ -2425,7 +2425,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Overview
               </p>
@@ -2549,7 +2549,7 @@ export function RegulatoryDossierWorkspace() {
                         Total:{" "}
                         <span
                           className="font-mono text-base font-bold"
-                          style={{ color: "var(--mt-cyan)" }}
+                          style={{ color: "var(--mt-cyan-ink)" }}
                         >
                           {requirementsSummary.total}
                         </span>
@@ -2558,7 +2558,7 @@ export function RegulatoryDossierWorkspace() {
                         Evidence needed:{" "}
                         <span
                           className="font-mono text-base font-bold"
-                          style={{ color: "var(--mt-cyan)" }}
+                          style={{ color: "var(--mt-cyan-ink)" }}
                         >
                           {requirementsSummary.need}
                         </span>
@@ -2660,7 +2660,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Requirements
               </p>
@@ -2864,7 +2864,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Evidence Links
               </p>
@@ -3040,7 +3040,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Compliance Rules
               </p>
@@ -3146,7 +3146,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Impurity Register
               </p>
@@ -3416,7 +3416,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Residual Solvents
               </p>
@@ -3701,7 +3701,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Nitrosamine Watch
               </p>
@@ -4082,7 +4082,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · qNMR Validation
               </p>
@@ -4544,7 +4544,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · AI Governance
               </p>
@@ -4888,7 +4888,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Process Capability
               </p>
@@ -4906,7 +4906,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Jurisdictional Map
               </p>
@@ -5293,7 +5293,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Change Impact
               </p>
@@ -5392,7 +5392,7 @@ export function RegulatoryDossierWorkspace() {
                         <CardContent className="space-y-1 pb-4 text-xs">
                           <p
                             className="font-mono text-2xl font-bold tabular-nums leading-none"
-                            style={{ color: "var(--mt-cyan)" }}
+                            style={{ color: "var(--mt-cyan-ink)" }}
                           >
                             {dossierMergedRequirementIds.length}
                           </p>
@@ -5434,7 +5434,7 @@ export function RegulatoryDossierWorkspace() {
                         <CardContent className="space-y-1 pb-4 text-xs">
                           <p
                             className="font-mono text-2xl font-bold tabular-nums leading-none"
-                            style={{ color: "var(--mt-cyan)" }}
+                            style={{ color: "var(--mt-cyan-ink)" }}
                           >
                             {dossierMergedRuleSetIds.length}
                           </p>
@@ -5480,7 +5480,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Action Items
               </p>
@@ -5510,7 +5510,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Cited Q&amp;A
               </p>
@@ -5783,7 +5783,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Risk Assessment
               </p>
@@ -5919,7 +5919,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Review
               </p>
@@ -6080,7 +6080,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Readiness Report
               </p>
@@ -6318,7 +6318,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Submission Package
               </p>
@@ -6547,7 +6547,7 @@ export function RegulatoryDossierWorkspace() {
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan)" }}
+                style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Developer JSON
               </p>

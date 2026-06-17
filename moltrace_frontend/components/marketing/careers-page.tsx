@@ -324,13 +324,13 @@ export function CareersPage() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-6 lg:px-8 lg:py-28">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Careers at MolTrace
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
               We hire the way we{" "}
-              <span style={{ color: "var(--mt-teal)" }}>ship</span> — deliberately, with clear gates.
+              <span style={{ color: "var(--mt-teal-ink)" }}>ship</span> — deliberately, with clear gates.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
               If you've worked in regulated science and been frustrated by the toolchain, you'll
@@ -360,7 +360,7 @@ export function CareersPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Why join MolTrace
               </p>
@@ -390,7 +390,7 @@ export function CareersPage() {
                       <div>
                         <span
                           className="font-mono text-xs font-bold tabular-nums tracking-tight"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           {reason.number}
                         </span>
@@ -413,7 +413,7 @@ export function CareersPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 What you'll actually work on
               </p>
@@ -434,7 +434,7 @@ export function CareersPage() {
                 >
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {work.area}
                   </p>
@@ -454,7 +454,7 @@ export function CareersPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 How we work
               </p>
@@ -495,7 +495,7 @@ export function CareersPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Our hiring philosophy
               </p>
@@ -507,7 +507,7 @@ export function CareersPage() {
               <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-7">
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   We test for
                 </p>
@@ -561,7 +561,7 @@ export function CareersPage() {
               <div className="max-w-3xl">
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Open roles
                 </p>
@@ -649,7 +649,7 @@ export function CareersPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Compensation & benefits
               </p>
@@ -690,7 +690,7 @@ export function CareersPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Interview process
               </p>
@@ -707,7 +707,7 @@ export function CareersPage() {
                 >
                   <span
                     className="font-mono text-3xl font-bold tabular-nums tracking-tight"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {stage.step}
                   </span>
@@ -730,7 +730,7 @@ export function CareersPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Hubs & remote
               </p>

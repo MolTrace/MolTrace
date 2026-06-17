@@ -376,7 +376,7 @@ export function PharmaRdPage() {
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   Move faster on the molecule.{" "}
-                  <span style={{ color: "var(--mt-teal)" }}>Never</span> on the evidence.
+                  <span style={{ color: "var(--mt-teal-ink)" }}>Never</span> on the evidence.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                   MolTrace gives pharmaceutical R&amp;D teams one audit-grade evidence stack from the
@@ -405,7 +405,7 @@ export function PharmaRdPage() {
                 <div className="flex items-center justify-between">
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Program lifecycle · live
                   </p>
@@ -414,7 +414,7 @@ export function PharmaRdPage() {
                     style={{
                       borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
                       backgroundColor: "var(--mt-teal-soft)",
-                      color: "var(--mt-teal)",
+                      color: "var(--mt-teal-ink)",
                     }}
                   >
                     <span
@@ -446,7 +446,7 @@ export function PharmaRdPage() {
                         className="inline-flex h-6 w-9 shrink-0 items-center justify-center rounded font-mono text-[9px] font-bold"
                         style={{
                           backgroundColor: "var(--mt-teal-soft)",
-                          color: "var(--mt-teal)",
+                          color: "var(--mt-teal-ink)",
                         }}
                       >
                         {row.code}
@@ -488,7 +488,7 @@ export function PharmaRdPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Why pharma R&amp;D
               </p>
@@ -537,7 +537,7 @@ export function PharmaRdPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Across the lifecycle
               </p>
@@ -619,7 +619,7 @@ export function PharmaRdPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Workflows we light up
               </p>
@@ -678,7 +678,7 @@ export function PharmaRdPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Measured, not claimed
               </p>
@@ -700,7 +700,7 @@ export function PharmaRdPage() {
                 >
                   <p
                     className="font-mono text-3xl font-bold tabular-nums tracking-tight sm:text-4xl"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {o.value}
                   </p>
@@ -720,7 +720,7 @@ export function PharmaRdPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The honest comparison
               </p>
@@ -778,7 +778,7 @@ export function PharmaRdPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 One worked example
               </p>
@@ -800,7 +800,7 @@ export function PharmaRdPage() {
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-[11px] font-bold tabular-nums"
-                      style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal)" }}
+                      style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal-ink)" }}
                       aria-hidden
                     >
                       {idx + 1}
@@ -896,7 +896,7 @@ export function PharmaRdPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Built for inspection
                 </p>

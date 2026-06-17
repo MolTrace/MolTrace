@@ -278,7 +278,7 @@ export function CompoundRegistryWorkspace() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-teal)" }}
+            style={{ color: "var(--mt-teal-ink)" }}
           >
             MolTrace · Compound Registry
           </p>
@@ -302,7 +302,7 @@ export function CompoundRegistryWorkspace() {
             <Boxes className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
           </CardHeader>
           <CardContent className="pb-5">
-            <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{summary.compounds}</div>
+            <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>{summary.compounds}</div>
             <p className="mt-2 text-xs text-muted-foreground">Listed compounds</p>
           </CardContent>
         </Card>
@@ -315,7 +315,7 @@ export function CompoundRegistryWorkspace() {
             <ListFilter className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
           </CardHeader>
           <CardContent className="pb-5">
-            <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+            <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
               {summary.activeBatches == null ? "—" : summary.activeBatches}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">When per-row batch counts are present</p>
