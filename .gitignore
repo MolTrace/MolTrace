@@ -80,3 +80,6 @@ week8_patch3_ui/
 week8_patch4_ui/
 week9/
 week10/
+
+# Internal Repho build spec — local only; never commit/push to GitHub (user directive 2026-06)
+/MolTrace_Repho_Build_Spec_v3.md
