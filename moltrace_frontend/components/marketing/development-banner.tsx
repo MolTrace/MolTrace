@@ -105,7 +105,9 @@ export function DevelopmentBanner() {
           {/* typed copy, revealed/erased character-by-character over the reserved width */}
           <span className="absolute left-0 top-0">
             <span className="dev-banner-shimmer font-semibold">{keyShown}</span>
-            <span className="text-muted-foreground">{restShown}</span>
+            {/* fixed light color: the banner surface is always dark, so this must not depend
+                on the theme (text-muted-foreground is dark in light mode -> invisible). */}
+            <span className="text-slate-400">{restShown}</span>
             <span className="dev-banner-caret">▌</span>
           </span>
         </span>
