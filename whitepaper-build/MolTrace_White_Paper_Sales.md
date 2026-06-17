@@ -94,7 +94,7 @@ Dossier scaffolding, FDA / EMA / ICH-aligned audit packs, human-in-the-loop rele
 
 ### 4.3 Reaction Optimization
 
-Bayesian optimisation, multi-objective response surface modelling, and mechanistic-insight-guided design-of-experiments — sharing the same SMILES candidates and the same audit-provenance manifest as SpectraCheck, so a "this reaction was optimised toward yield + selectivity" claim is reproducible end-to-end.
+Bayesian optimisation, multi-objective response surface modelling, and mechanistic-insight-guided design-of-experiments — sharing the same SMILES candidates and the same audit-provenance manifest as SpectraCheck, so a "this reaction was optimised toward yield + selectivity" claim is reproducible end-to-end. Per-experiment green-chemistry metrics (E-factor, atom economy, PMI, reaction mass efficiency, and a CHEM21-based solvent green-score) are computed and can be optimised alongside yield and selectivity.
 
 ---
 

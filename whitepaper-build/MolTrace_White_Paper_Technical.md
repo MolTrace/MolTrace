@@ -551,6 +551,8 @@ The MS evidence stack (Weeks 29–32, 35–39) is grounded in:
 
 **arXiv:2509.00103v2** — recent reaction-optimisation benchmark referenced in MolTrace's reaction-suite calibration.[^arxiv_2509]
 
+**Green-chemistry metrics** — Sheldon E-factor (simple & complete), Trost atom economy, ACS GCI process mass intensity, Constable/Curzons reaction mass efficiency, and the CHEM21 Safety/Health/Environment solvent criteria.[^green_chem_tech] Computed deterministically in `nmrcheck/reaction_green.py` (RDKit molecular weights + frozen arithmetic — no model produces the numbers) and exposed as first-class optimisation objectives (`minimize_e_factor`, `maximize_atom_economy`, `maximize_green_score`) that scalarise alongside yield/selectivity/impurity. Green objectives default to weight `0.0`, so existing multi-objective campaigns are unchanged; the CHEM21-derived 0–100 green-score is a MolTrace-defined, versioned transform recorded in each assessment's provenance.
+
 ### 8.10 Regulatory Foundations
 
 **FDA AI Credibility Framework (January 2025)** — *Considerations for the Use of Artificial Intelligence to Support Regulatory Decision-Making for Drug and Biological Products*.[^fda_ai_2025] Maps step-by-step onto MolTrace mechanisms (see §10).
@@ -810,6 +812,8 @@ For analytical-method validators, NMR / MS technical leads, regulatory-affairs r
 [^mech_insight_reactions]: *Reaction optimization through mechanistic insight and predictive modelling.*
 
 [^arxiv_2509]: arXiv:2509.00103v2 — reaction-optimisation benchmark.
+
+[^green_chem_tech]: Green-chemistry metrics. Sheldon RA, *Green Chem.* 9, 1273 (2007); Trost BM, *Science* 254, 1471 (1991); ACS GCI Pharmaceutical Roundtable (PMI); Constable DJC, Curzons AD, et al., *Green Chem.* 4, 521 (2002); Prat D et al., *Green Chem.* 18, 288 (2016) (CHEM21).
 
 [^fda_ai_2025]: U.S. Food and Drug Administration. *Considerations for the Use of Artificial Intelligence to Support Regulatory Decision-Making for Drug and Biological Products.* Draft Guidance, January 2025.
 

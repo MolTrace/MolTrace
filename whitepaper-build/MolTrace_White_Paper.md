@@ -271,6 +271,8 @@ Residual-solvent and trace-impurity windows come from the canonical Gottlieb (19
 
 The Reaction Optimization program is built on the well-developed literature for Bayesian optimisation of chemical reactions[^bayesian_reactions] and the broader ML-guided reaction-condition design space.[^ml_reaction_design] The platform exposes acquisition-function-driven design-of-experiments under reaction-mechanistic-insight constraints,[^mech_insight_reactions] integrates a recent benchmark suite,[^2509_benchmark] and links the reaction history into the regulatory provenance manifest so a "this reaction was optimised toward yield + selectivity" claim is reproducible.
 
+The program also computes per-experiment **green-chemistry metrics** — the Sheldon E-factor (simple and complete), atom economy, process mass intensity, reaction mass efficiency, and a solvent green-score derived from the CHEM21 Safety/Health/Environment criteria[^green_chem] — from RDKit and transparent, frozen arithmetic (no model produces the numbers). These surface both as a regulatory and scale-up deliverable and as first-class optimisation objectives (minimise E-factor, maximise atom economy, maximise solvent green-score) that can be weighted alongside yield, selectivity, and impurity in a multi-objective campaign.
+
 ### 5.5 Mass Spectrometry & LC-MS
 
 The MS evidence stack is calibrated against the standard exact-mass and adduct rules in the AI-MS market analysis,[^ai_ms_market] community fragmentation-tree literature, and the canonical mzML / mzXML open standards for vendor-agnostic raw ingestion. The LC-MS feature detection + EIC/XIC + peak purity work (Weeks 36–38) targets the same reviewer-readable evidence quality the qNMR community demands for quantitative work.[^qnmr_pharma]
@@ -507,6 +509,8 @@ For information on pilot deployments, integration with Bruker / Agilent instrume
 [^ml_reaction_design]: *Machine Learning-Guided Strategies for Reaction Condition Design and Optimization.* (Reference: Reaction Optimization/Machine Learning-Guided Strategies for Reaction Condition Design and Optimization.pdf)
 
 [^mech_insight_reactions]: *Reaction optimization through mechanistic insight and predictive modelling.* (Reference: Reaction Optimization/Reaction optimization through mechanistic insight and predictive modelling.pdf)
+
+[^green_chem]: Green-chemistry metrics. Sheldon RA, *Green Chem.* 9, 1273 (2007) (E-factor); Trost BM, *Science* 254, 1471 (1991) (atom economy); ACS GCI Pharmaceutical Roundtable (process mass intensity); Constable DJC, Curzons AD, et al., *Green Chem.* 4, 521 (2002) (reaction mass efficiency); Prat D et al., *Green Chem.* 18, 288 (2016) (CHEM21 solvent selection guide). Implemented deterministically in `nmrcheck/reaction_green.py`.
 
 [^2509_benchmark]: arXiv:2509.00103v2 — recent reaction-optimisation benchmark referenced in MolTrace's reaction-suite calibration.
 
