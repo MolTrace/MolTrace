@@ -55,8 +55,9 @@ Turns regulatory action items into reaction-optimization constraints: Bayesian, 
 - **Regulatory impurity constraints as hard limits**, fed directly from Regentry.
 - **Uncertainty quantification** on each iteration with model-diagnostics.
 - **Automated next-experiment recommendations** over a batch of candidate experiments per optimization cycle.
+- **Green-chemistry metrics** — Sheldon E-factor (simple & complete), atom economy, process mass intensity (PMI), reaction mass efficiency (RME), and a CHEM21-derived solvent green-score — computed per experiment from RDKit + transparent arithmetic, and selectable as optimization objectives (`minimize_e_factor`, `maximize_atom_economy`, `maximize_green_score`) alongside yield and selectivity.
 - A **compound-linking panel** and regulatory-constraints panel tie experiments back to the evidence trail.
-- Backend engine: `nmrcheck/reaction_bo.py` (`run_bayesian_optimization`).
+- Backend engines: `nmrcheck/reaction_bo.py` (`run_bayesian_optimization`) and `nmrcheck/reaction_green.py` (green-chemistry metrics).
 
 ## Architecture
 
