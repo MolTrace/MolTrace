@@ -49,6 +49,7 @@ from .orm import (
     ReactionVariableORM,
     utcnow,
 )
+from .reaction_pareto import pareto_summary
 from .reaction_store import ReactionActor, ReactionError
 
 
@@ -503,6 +504,7 @@ def run_bayesian_optimization(
                 "failed_or_excluded_included_as_negative": payload.include_negative_outcomes,
                 "guaranteed_optimum": False,
                 "human_review_required": True,
+                "pareto_front": _compute_pareto_front(training, objective_type, weights),
             }
         )
         run = ReactionBayesianOptimizationRunORM(
@@ -2078,6 +2080,96 @@ def _confidence_label(prediction: dict[str, Any], training_count: int) -> str:
     if uncertainty >= 0.35:
         return "moderate_uncertainty"
     return "lower_uncertainty"
+
+
+def _identity(value: float) -> float:
+    return value
+
+
+def _invert_percent(value: float) -> float:
+    return 100.0 - value
+
+
+# Active multi-objective dimensions, mapped to maximize-space (higher = better, 0 = worst):
+# (label, outcome_field, weight_key, weight_alias, default_weight, transform).
+_PARETO_SPECS: tuple[tuple[str, str, str, str, float, Any], ...] = (
+    ("yield", "yield_percent", "yield_weight", "yield", 0.45, _identity),
+    ("selectivity", "selectivity_percent", "selectivity_weight", "selectivity", 0.25, _identity),
+    ("impurity", "impurity_percent", "impurity_penalty", "impurity", 0.20, _invert_percent),
+    ("conversion", "conversion_percent", "conversion_weight", "conversion", 0.10, _identity),
+    ("e_factor", "e_factor", "e_factor_weight", "e_factor", 0.0, _e_factor_to_score),
+    ("atom_economy", "atom_economy_percent", "atom_economy_weight", "atom_economy", 0.0, _identity),
+    ("green_score", "green_score", "green_score_weight", "green_score", 0.0, _identity),
+)
+
+
+def _compute_pareto_front(
+    training: list[_TrainingExample],
+    objective_type: str,
+    weights: dict[str, Any],
+) -> dict[str, Any] | None:
+    """True Pareto front + hypervolume over the active multi-objective dimensions (R2).
+
+    Returns None for single-objective campaigns, when fewer than two objectives are
+    weighted, or when fewer than two completed experiments carry all active objective
+    values. Each active objective is mapped to maximize-space (impurity inverted to
+    100 - impurity; E-factor mapped through the frozen 0-100 score) so the non-dominated
+    set and the hypervolume are well-defined and comparable across runs of the same set.
+    Members carry the RAW outcome values for display; the front is advisory and requires
+    human review. Stored in the BO-run diagnostics (no separate table)."""
+    if objective_type != "multi_objective":
+        return None
+    active = [
+        (label, field, transform)
+        for (label, field, wkey, walias, default, transform) in _PARETO_SPECS
+        if _float_or_default(weights.get(wkey, weights.get(walias, default)), default) > 0
+    ]
+    if len(active) < 2:
+        return None
+    labels = [label for label, _, _ in active]
+    vectors: list[list[float]] = []
+    members: list[dict[str, Any]] = []
+    for example in training:
+        outcome = example.outcome or {}
+        raw = [_float_or_none(outcome.get(field)) for _, field, _ in active]
+        if any(value is None for value in raw):
+            continue  # an incomplete objective vector cannot be placed on the front
+        vectors.append(
+            [transform(float(value)) for (_, _, transform), value in zip(active, raw, strict=True)]
+        )
+        members.append(
+            {
+                "experiment_id": example.experiment_id,
+                "experiment_code": example.experiment_code,
+                "objectives": {
+                    label: round(float(value), 4)
+                    for label, value in zip(labels, raw, strict=True)
+                },
+            }
+        )
+    if len(vectors) < 2:
+        return None
+    summary = pareto_summary(vectors, ["max"] * len(active), labels=labels)
+    non_dominated = set(summary["non_dominated_indices"])
+    for index, member in enumerate(members):
+        member["non_dominated"] = index in non_dominated
+    knee_index = summary.get("knee_index")
+    return {
+        "objectives": labels,
+        "hypervolume": summary["hypervolume"],
+        "hypervolume_method": summary["hypervolume_method"],
+        "reference_point": summary["reference_point"],
+        "pareto_size": summary["pareto_size"],
+        "evaluated_experiment_count": len(vectors),
+        "knee_experiment_id": (
+            members[knee_index]["experiment_id"] if knee_index is not None else None
+        ),
+        "members": members,
+        "note": (
+            "Non-dominated set over the weighted multi-objective dimensions (impurity "
+            "inverted, E-factor scored). Advisory; requires human review."
+        ),
+    }
 
 
 def _objective_summary(objective_type: str, weights: dict[str, Any]) -> dict[str, Any]:
