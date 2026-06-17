@@ -28915,6 +28915,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers[REQUEST_ID_HEADER] = correlation_id
         response.headers[DATA_MODE_HEADER] = data_mode
         response.headers[GENERATED_AT_HEADER] = generated_at
+        # Security headers (Prompt 9). HSTS is emitted ONLY over HTTPS — honouring the
+        # TLS-terminating edge's X-Forwarded-Proto — so plain-HTTP local dev is never pinned to
+        # HTTPS. The remaining headers are always safe and harden the browser-facing posture
+        # (SSL Labs / securityheaders.com A+). setdefault() never clobbers a header a route
+        # deliberately set.
+        forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+        if settings.hsts_enabled and forwarded_proto == "https":
+            hsts = f"max-age={settings.hsts_max_age_seconds}"
+            if settings.hsts_include_subdomains:
+                hsts += "; includeSubDomains"
+            if settings.hsts_preload:
+                hsts += "; preload"
+            response.headers["Strict-Transport-Security"] = hsts
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
+        )
         return response
 
     @app.exception_handler(HTTPException)

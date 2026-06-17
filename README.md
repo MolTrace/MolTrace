@@ -52,6 +52,7 @@ Closes the loop between spectroscopy evidence and regulatory action: dossiers, t
 Turns regulatory action items into reaction-optimization constraints: Bayesian, ML-guided next-experiment recommendations under impurity limits.
 
 - **Gaussian-process surrogate modelling** with Bayesian multi-objective optimization (yield / selectivity / impurity level).
+- **True multi-objective Pareto front + hypervolume** — the non-dominated experiments, an exact 2-D / deterministic Monte-Carlo (≥3-D) hypervolume indicator, and a knee-point trade-off pick (pure NumPy, no BoTorch), surfaced in the BO-run diagnostics (`nmrcheck/reaction_pareto.py`; advisory).
 - **Regulatory impurity constraints as hard limits**, fed directly from Regentry.
 - **Uncertainty quantification** on each iteration with model-diagnostics.
 - **Automated next-experiment recommendations** over a batch of candidate experiments per optimization cycle.
@@ -290,7 +291,7 @@ Marketing metrics (e.g. accuracy and throughput figures) are positioning copy an
 
 ## Access, contributing & security
 
-- **Hosted product.** MolTrace runs as a multi-tenant hosted application at [moltrace.co](https://moltrace.co), with authentication (password or per-organization OpenID Connect SSO, with optional enforce-SSO and SCIM 2.0 auto-provisioning/deprovisioning), MFA (TOTP + WebAuthn/passkeys) with per-tenant enforcement and step-up re-auth for signing/admin, rotating refresh tokens with reuse detection and immediate revocation, centralized policy-as-code authorization (a deny-by-default policy engine deciding every access server-side from the authenticated principal), Argon2id password hashing (memory-hard, with transparent upgrade of legacy hashes), per-tenant scoping, identity+role e-signatures, and CORS allow-lists. Access is via the hosted product, not a public self-serve install.
+- **Hosted product.** MolTrace runs as a multi-tenant hosted application at [moltrace.co](https://moltrace.co), with authentication (password or per-organization OpenID Connect SSO, with optional enforce-SSO and SCIM 2.0 auto-provisioning/deprovisioning), MFA (TOTP + WebAuthn/passkeys) with per-tenant enforcement and step-up re-auth for signing/admin, rotating refresh tokens with reuse detection and immediate revocation, centralized policy-as-code authorization (a deny-by-default policy engine deciding every access server-side from the authenticated principal), Argon2id password hashing (memory-hard, with transparent upgrade of legacy hashes), field-level envelope encryption of secrets at rest (per-record AES-256-GCM data keys wrapped by a KMS key-encryption key, with key rotation and a customer-managed-key/BYOK seam), a secret-scanning gate (gitleaks in CI + pre-commit) that keeps credentials out of the repo, HSTS + security response headers over TLS 1.3, per-tenant scoping, identity+role e-signatures, and CORS allow-lists. Access is via the hosted product, not a public self-serve install.
 - **Contributions.** This is a proprietary, all-rights-reserved repository (see below); external contributions and issues are not solicited here.
 - **Security.** Report any suspected security issue privately to the MolTrace maintainers rather than opening a public issue.
 
