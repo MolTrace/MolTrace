@@ -117,11 +117,16 @@ def list_projects(
     *,
     status: str | None = None,
     limit: int = 200,
+    owner_scope_id: int | None = None,
 ) -> list[ReactionProject]:
     with session_scope(session_factory) as session:
         stmt = select(ReactionProjectORM).order_by(ReactionProjectORM.id.desc()).limit(limit)
         if status is not None:
             stmt = stmt.where(ReactionProjectORM.status == status)
+        if owner_scope_id is not None:
+            # Owner-scope the collection read: a user-scoped caller sees only their own
+            # projects; an unrestricted caller (system/admin) passes None and sees all.
+            stmt = stmt.where(ReactionProjectORM.owner_id == owner_scope_id)
         return [_project_to_record(row) for row in session.scalars(stmt).all()]
 
 
