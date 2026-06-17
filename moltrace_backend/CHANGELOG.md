@@ -14,6 +14,40 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.48.0 — Security Prompt 9: TLS / HSTS + security response headers (2026-06-16)
+
+**Headline:** Ninth build from the MolTrace Security & Data-Integrity Standard; completes the
+Cryptography & Secrets group. The API now emits standard browser-hardening response headers on
+every response and **HSTS over HTTPS** (2-year + `includeSubDomains` + `preload`), keyed off the
+TLS-terminating edge's `X-Forwarded-Proto` so plain-HTTP local dev is never pinned to HTTPS. TLS
+1.3 / modern ciphers / certificate issuance + rotation and service-to-service **mTLS** are the
+deployment edge's responsibility and are captured as a documented posture + adoption runbook.
+Additive — no DB/schema/migration change, no API contract change, no FE action
+(`/openapi.json` unchanged).
+
+### Added
+- **Security response headers** in the api.py response middleware: `Strict-Transport-Security`
+  (HTTPS-only, configurable via `HSTS_*`), `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`,
+  `Permissions-Policy: geolocation=(), microphone=(), camera=()` (set via `setdefault`, so a
+  route may override).
+- **`settings.py`**: `hsts_enabled` / `hsts_max_age_seconds` (2y) / `hsts_include_subdomains` /
+  `hsts_preload` (+ `HSTS_*` env).
+- **`tests/test_security_headers.py`** — headers always present; HSTS absent on plain HTTP,
+  present + correct on `X-Forwarded-Proto: https`, fully configurable, disableable; headers on
+  authed/401 responses.
+- **`docs/ops_tls_posture.md`** (edge TLS 1.3 / cipher / cert-rotation + mTLS adoption runbook)
+  and **`docs/fe_handoff_tls_security_headers.md`** (no-op; notes the app-origin CSP as an
+  optional FE follow-up).
+
+### Docs
+- Cleared the deferred white-paper/README prose for **Prompts 7–9** (field-level envelope
+  encryption, secrets management + scanning, TLS/HSTS) across README + the five security-posture
+  white papers, now that the concurrent reaction-module session released those shared files.
+  **Version 0.48.0.**
+
+---
+
 ## v0.47.0 — Security Prompt 8: Secrets management (scan gate + provider seam) (2026-06-16)
 
 **Headline:** Eighth (final Cryptography & Secrets) build from the MolTrace Security &

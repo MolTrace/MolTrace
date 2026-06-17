@@ -104,6 +104,13 @@ class Settings:
     # NOTE: set it once and keep it stable — rotating/removing a configured pepper invalidates
     # all Argon2id hashes made with it (those users would need a password reset).
     password_pepper: str | None = None
+    # Transport security (Prompt 9). HSTS is emitted ONLY on HTTPS requests (honours
+    # X-Forwarded-Proto behind the TLS-terminating edge), so plain-HTTP local dev is untouched.
+    # 2-year max-age + includeSubDomains + preload meets the hstspreload.org submission bar.
+    hsts_enabled: bool = True
+    hsts_max_age_seconds: int = 63072000  # 2 years
+    hsts_include_subdomains: bool = True
+    hsts_preload: bool = True
     email_from: str = "noreply@nmrcheck.local"
     email_backend: str = "database"
 
@@ -210,6 +217,10 @@ def get_settings() -> Settings:
             os.getenv("SESSION_DEVICE_BINDING_ENABLED"), False
         ),
         password_pepper=resolve_secret("PASSWORD_PEPPER"),
+        hsts_enabled=_parse_bool(os.getenv("HSTS_ENABLED"), True),
+        hsts_max_age_seconds=_parse_int(os.getenv("HSTS_MAX_AGE_SECONDS"), 63072000),
+        hsts_include_subdomains=_parse_bool(os.getenv("HSTS_INCLUDE_SUBDOMAINS"), True),
+        hsts_preload=_parse_bool(os.getenv("HSTS_PRELOAD"), True),
         email_from=os.getenv("EMAIL_FROM", "noreply@nmrcheck.local"),
         email_backend=(
             os.getenv("EMAIL_BACKEND", "database").strip().lower() or "database"
