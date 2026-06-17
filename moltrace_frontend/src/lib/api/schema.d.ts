@@ -579,6 +579,60 @@ export interface paths {
         patch: operations["patch_reaction_safety_profile_route_reaction_projects__reaction_project_id__safety_profile_patch"];
         trace?: never;
     };
+    "/reaction-projects/{reaction_project_id}/green-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Green Profile Route */
+        get: operations["get_reaction_green_profile_route_reaction_projects__reaction_project_id__green_profile_get"];
+        put?: never;
+        /** Create Reaction Green Profile Route */
+        post: operations["create_reaction_green_profile_route_reaction_projects__reaction_project_id__green_profile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Reaction Green Profile Route */
+        patch: operations["patch_reaction_green_profile_route_reaction_projects__reaction_project_id__green_profile_patch"];
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/experiments/{experiment_id}/green-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Green Metrics Route */
+        get: operations["get_reaction_green_metrics_route_reaction_projects__reaction_project_id__experiments__experiment_id__green_metrics_get"];
+        put?: never;
+        /** Compute Reaction Green Metrics Route */
+        post: operations["compute_reaction_green_metrics_route_reaction_projects__reaction_project_id__experiments__experiment_id__green_metrics_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/green-compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Compare Reaction Green Route */
+        post: operations["compare_reaction_green_route_reaction_projects__reaction_project_id__green_compare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reaction-projects/{reaction_project_id}/variables": {
         parameters: {
             query?: never;
@@ -30177,6 +30231,209 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ReactionGreenAssessment */
+        ReactionGreenAssessment: {
+            /** Id */
+            id: number;
+            /** Reaction Experiment Id */
+            reaction_experiment_id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Metrics Json */
+            metrics_json?: {
+                [key: string]: unknown;
+            };
+            /** Inputs Json */
+            inputs_json?: {
+                [key: string]: unknown;
+            };
+            /** Provenance Json */
+            provenance_json?: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings?: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes?: string[];
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
+        /** ReactionGreenCompareEntry */
+        ReactionGreenCompareEntry: {
+            /** Reaction Experiment Id */
+            reaction_experiment_id: number;
+            /** Experiment Code */
+            experiment_code?: string | null;
+            /** Metrics Json */
+            metrics_json?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Available
+             * @default false
+             */
+            available: boolean;
+        };
+        /** ReactionGreenCompareRequest */
+        ReactionGreenCompareRequest: {
+            /** Experiment Ids */
+            experiment_ids?: number[];
+        };
+        /** ReactionGreenCompareResult */
+        ReactionGreenCompareResult: {
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Entries */
+            entries?: components["schemas"]["ReactionGreenCompareEntry"][];
+            /** Best By Metric Json */
+            best_by_metric_json?: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings?: string[];
+            /** Notes */
+            notes?: string[];
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
+        /** ReactionGreenComponent */
+        ReactionGreenComponent: {
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @default reagent
+             * @enum {string}
+             */
+            role: "reactant" | "reagent" | "catalyst" | "solvent" | "workup" | "other";
+            /** Smiles */
+            smiles?: string | null;
+            /** Equivalents */
+            equivalents?: number | null;
+            /** Mass G */
+            mass_g?: number | null;
+        };
+        /** ReactionGreenMetricsRequest */
+        ReactionGreenMetricsRequest: {
+            /** Product Smiles */
+            product_smiles?: string | null;
+            /** Product Mw */
+            product_mw?: number | null;
+            /** Product Mass G */
+            product_mass_g?: number | null;
+            /** Components */
+            components?: components["schemas"]["ReactionGreenComponent"][];
+            /** Energy Intensity Kwh Per Kg */
+            energy_intensity_kwh_per_kg?: number | null;
+            /** Water Usage L Per Kg */
+            water_usage_l_per_kg?: number | null;
+            /** Hazardous Waste Kg Per Kg */
+            hazardous_waste_kg_per_kg?: number | null;
+            /**
+             * Persist To Outcome
+             * @default false
+             */
+            persist_to_outcome: boolean;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ReactionGreenProfile */
+        ReactionGreenProfile: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Solvent Greenness Json */
+            solvent_greenness_json?: {
+                [key: string]: unknown;
+            };
+            /** Default Assumptions Json */
+            default_assumptions_json?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Solvent Table Version
+             * @default chem21-2016
+             */
+            solvent_table_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings?: string[];
+            /** Notes */
+            notes?: string[];
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
+        /** ReactionGreenProfileCreate */
+        ReactionGreenProfileCreate: {
+            /** Solvent Greenness Json */
+            solvent_greenness_json?: {
+                [key: string]: unknown;
+            };
+            /** Default Assumptions Json */
+            default_assumptions_json?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Solvent Table Version
+             * @default chem21-2016
+             */
+            solvent_table_version: string;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ReactionGreenProfileUpdate */
+        ReactionGreenProfileUpdate: {
+            /** Solvent Greenness Json */
+            solvent_greenness_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Default Assumptions Json */
+            default_assumptions_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Solvent Table Version */
+            solvent_table_version?: string | null;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** ReactionLiteraturePrior */
         ReactionLiteraturePrior: {
             /** Id */
@@ -30360,7 +30617,7 @@ export interface components {
              * Objective Type
              * @enum {string}
              */
-            objective_type: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "multi_objective" | "custom";
+            objective_type: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "minimize_e_factor" | "maximize_atom_economy" | "maximize_green_score" | "multi_objective" | "custom";
             /** Weights Json */
             weights_json?: {
                 [key: string]: unknown;
@@ -30408,7 +30665,7 @@ export interface components {
              * @default maximize_yield
              * @enum {string}
              */
-            objective_type: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "multi_objective" | "custom";
+            objective_type: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "minimize_e_factor" | "maximize_atom_economy" | "maximize_green_score" | "multi_objective" | "custom";
             /** Weights Json */
             weights_json?: {
                 [key: string]: unknown;
@@ -30433,7 +30690,7 @@ export interface components {
         /** ReactionObjectiveProfileUpdate */
         ReactionObjectiveProfileUpdate: {
             /** Objective Type */
-            objective_type?: ("maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "multi_objective" | "custom") | null;
+            objective_type?: ("maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "minimize_e_factor" | "maximize_atom_economy" | "maximize_green_score" | "multi_objective" | "custom") | null;
             /** Weights Json */
             weights_json?: {
                 [key: string]: unknown;
@@ -30782,7 +31039,7 @@ export interface components {
              * Objective
              * @enum {string}
              */
-            objective: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "multi_objective" | "custom";
+            objective: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "minimize_e_factor" | "maximize_atom_economy" | "maximize_green_score" | "multi_objective" | "custom";
             /** Input Experiment Count */
             input_experiment_count: number;
             /** Recommendations Json */
@@ -30831,7 +31088,7 @@ export interface components {
              */
             model_type: "rule_based" | "response_surface" | "random_forest_placeholder" | "bayesian_placeholder";
             /** Objective */
-            objective?: ("maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "multi_objective" | "custom") | null;
+            objective?: ("maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "minimize_e_factor" | "maximize_atom_economy" | "maximize_green_score" | "multi_objective" | "custom") | null;
             /**
              * Max Recommendations
              * @default 5
@@ -30858,6 +31115,16 @@ export interface components {
             lcms_area_percent?: number | null;
             /** Nmr Purity Percent */
             nmr_purity_percent?: number | null;
+            /** E Factor */
+            e_factor?: number | null;
+            /** Atom Economy Percent */
+            atom_economy_percent?: number | null;
+            /** Pmi */
+            pmi?: number | null;
+            /** Rme Percent */
+            rme_percent?: number | null;
+            /** Green Score */
+            green_score?: number | null;
             /** Notes */
             notes?: string | null;
         };
@@ -30955,7 +31222,7 @@ export interface components {
              * Objective
              * @enum {string}
              */
-            objective: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "multi_objective" | "custom";
+            objective: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "minimize_e_factor" | "maximize_atom_economy" | "maximize_green_score" | "multi_objective" | "custom";
             /**
              * Status
              * @enum {string}
@@ -31006,7 +31273,7 @@ export interface components {
              * @default maximize_yield
              * @enum {string}
              */
-            objective: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "multi_objective" | "custom";
+            objective: "maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "minimize_e_factor" | "maximize_atom_economy" | "maximize_green_score" | "multi_objective" | "custom";
             /**
              * Status
              * @default draft
@@ -31031,7 +31298,7 @@ export interface components {
             /** Description */
             description?: string | null;
             /** Objective */
-            objective?: ("maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "multi_objective" | "custom") | null;
+            objective?: ("maximize_yield" | "maximize_selectivity" | "minimize_impurity" | "maximize_conversion" | "minimize_e_factor" | "maximize_atom_economy" | "maximize_green_score" | "multi_objective" | "custom") | null;
             /** Status */
             status?: ("draft" | "active" | "paused" | "completed" | "archived") | null;
             /** Target Product Name */
@@ -41783,6 +42050,234 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReactionSafetyConstraintProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_green_profile_route_reaction_projects__reaction_project_id__green_profile_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionGreenProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_reaction_green_profile_route_reaction_projects__reaction_project_id__green_profile_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionGreenProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionGreenProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_reaction_green_profile_route_reaction_projects__reaction_project_id__green_profile_patch: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionGreenProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionGreenProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_green_metrics_route_reaction_projects__reaction_project_id__experiments__experiment_id__green_metrics_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                experiment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionGreenAssessment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compute_reaction_green_metrics_route_reaction_projects__reaction_project_id__experiments__experiment_id__green_metrics_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                experiment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionGreenMetricsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionGreenAssessment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_reaction_green_route_reaction_projects__reaction_project_id__green_compare_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionGreenCompareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionGreenCompareResult"];
                 };
             };
             /** @description Validation Error */

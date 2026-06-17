@@ -55,6 +55,9 @@ const OBJECTIVES: { value: ReactionObjectiveValue; label: string }[] = [
   { value: "maximize_selectivity", label: "maximize_selectivity" },
   { value: "minimize_impurity", label: "minimize_impurity" },
   { value: "maximize_conversion", label: "maximize_conversion" },
+  { value: "minimize_e_factor", label: "minimize_e_factor" },
+  { value: "maximize_atom_economy", label: "maximize_atom_economy" },
+  { value: "maximize_green_score", label: "maximize_green_score" },
   { value: "multi_objective", label: "multi_objective" },
 ]
 
