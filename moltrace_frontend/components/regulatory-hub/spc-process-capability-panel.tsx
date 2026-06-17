@@ -136,7 +136,7 @@ function ratingBadge(rating: string): { cls: string; label: string } {
 const SEVERITY_META: Record<string, { color: string; label: string }> = {
   critical: { color: "var(--mt-red)", label: "critical" },
   warning: { color: "var(--mt-amber)", label: "warning" },
-  info: { color: "var(--mt-cyan)", label: "info" },
+  info: { color: "var(--mt-cyan-ink)", label: "info" },
 }
 
 /** 0-based indices → human "#1, #4" point references. */

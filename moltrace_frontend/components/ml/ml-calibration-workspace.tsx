@@ -182,7 +182,7 @@ export function MlCalibrationWorkspace() {
           </Button>
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-teal)" }}
+            style={{ color: "var(--mt-teal-ink)" }}
           >
             MolTrace · ML Calibration
           </p>

@@ -248,7 +248,7 @@ export function AiServicesDashboard() {
       <div className="space-y-1">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-teal)" }}
+          style={{ color: "var(--mt-teal-ink)" }}
         >
           MolTrace · AI Services
         </p>
@@ -306,7 +306,7 @@ export function AiServicesDashboard() {
         >
           <CardHeader className="pt-5 pb-5">
             <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Active services</CardDescription>
-            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{activeServices}</CardTitle>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>{activeServices}</CardTitle>
           </CardHeader>
         </Card>
         <Card
@@ -315,7 +315,7 @@ export function AiServicesDashboard() {
         >
           <CardHeader className="pt-5 pb-5">
             <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Predictions today</CardDescription>
-            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{predictionsToday}</CardTitle>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>{predictionsToday}</CardTitle>
           </CardHeader>
         </Card>
         <Card
@@ -324,7 +324,7 @@ export function AiServicesDashboard() {
         >
           <CardHeader className="pt-5 pb-5">
             <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Low-confidence predictions</CardDescription>
-            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{lowConfidencePredictions}</CardTitle>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>{lowConfidencePredictions}</CardTitle>
           </CardHeader>
         </Card>
         <Card
@@ -333,7 +333,7 @@ export function AiServicesDashboard() {
         >
           <CardHeader className="pt-5 pb-5">
             <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">OOD predictions</CardDescription>
-            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{oodPredictions}</CardTitle>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>{oodPredictions}</CardTitle>
           </CardHeader>
         </Card>
         <Card
@@ -342,7 +342,7 @@ export function AiServicesDashboard() {
         >
           <CardHeader className="pt-5 pb-5">
             <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Active-learning candidates</CardDescription>
-            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{activeLearningCandidates.length}</CardTitle>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>{activeLearningCandidates.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card
@@ -351,7 +351,7 @@ export function AiServicesDashboard() {
         >
           <CardHeader className="pt-5 pb-5">
             <CardDescription className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Services requiring review</CardDescription>
-            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>{servicesRequiringReview}</CardTitle>
+            <CardTitle className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>{servicesRequiringReview}</CardTitle>
           </CardHeader>
         </Card>
       </section>

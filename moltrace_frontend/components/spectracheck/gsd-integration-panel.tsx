@@ -392,7 +392,7 @@ export function GsdIntegrationPanel({
                         <td className="px-3 py-2">{formatRangePpm(r.region_ppm)}</td>
                         <td className="px-3 py-2 text-right">{r.value.toExponential(2)}</td>
                         <td className="px-3 py-2 text-right">
-                          <span className="font-bold" style={{ color: "var(--mt-teal)" }}>
+                          <span className="font-bold" style={{ color: "var(--mt-teal-ink)" }}>
                             {r.relative_value.toFixed(2)}
                           </span>
                           {hint ? (

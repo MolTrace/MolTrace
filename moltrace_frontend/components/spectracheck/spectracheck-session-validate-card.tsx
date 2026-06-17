@@ -77,7 +77,7 @@ const STATUS_STYLE: Record<FieldStatus, { label: string; bg: string; fg: string;
   modified: {
     label: "Your data",
     bg: "var(--mt-teal-soft)",
-    fg: "var(--mt-teal)",
+    fg: "var(--mt-teal-ink)",
     border: "var(--mt-teal)",
   },
   empty: {
@@ -306,7 +306,7 @@ function ValidationResultPanel({
   const tone = overallFailed
     ? { color: "var(--mt-red)", bg: "var(--mt-red-soft)", label: "Validation failed", Icon: XCircle }
     : overallPassed
-      ? { color: "var(--mt-teal)", bg: "var(--mt-teal-soft)", label: "Validation passed — analysis ready", Icon: CheckCircle2 }
+      ? { color: "var(--mt-teal-ink)", bg: "var(--mt-teal-soft)", label: "Validation passed — analysis ready", Icon: CheckCircle2 }
       : isPartial
         ? {
             color: "var(--mt-amber)",
@@ -518,7 +518,7 @@ function LayerChip({
   testId: string
 }) {
   const palette: Record<typeof state, { color: string; bg: string; prefix: string }> = {
-    ok: { color: "var(--mt-teal)", bg: "var(--mt-teal-soft)", prefix: "✓" },
+    ok: { color: "var(--mt-teal-ink)", bg: "var(--mt-teal-soft)", prefix: "✓" },
     fail: { color: "var(--mt-red)", bg: "var(--mt-red-soft)", prefix: "✗" },
     missing: { color: "var(--muted-foreground)", bg: "transparent", prefix: "–" },
     na: { color: "var(--muted-foreground)", bg: "transparent", prefix: "·" },

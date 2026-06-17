@@ -412,7 +412,7 @@ export function RegulatoryHubPage() {
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   Compliance as a{" "}
-                  <span style={{ color: "var(--mt-teal)" }}>side effect</span> — not a sprint.
+                  <span style={{ color: "var(--mt-teal-ink)" }}>side effect</span> — not a sprint.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                   Spectroscopy evidence flows into ICH-classified action items, dossier-section
@@ -440,7 +440,7 @@ export function RegulatoryHubPage() {
                 <div className="flex items-center justify-between">
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Audit ledger · live event
                   </p>
@@ -449,7 +449,7 @@ export function RegulatoryHubPage() {
                     style={{
                       borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
                       backgroundColor: "var(--mt-teal-soft)",
-                      color: "var(--mt-teal)",
+                      color: "var(--mt-teal-ink)",
                     }}
                   >
                     <span
@@ -485,7 +485,7 @@ export function RegulatoryHubPage() {
                         className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold"
                         style={{
                           backgroundColor: "var(--mt-teal-soft)",
-                          color: "var(--mt-teal)",
+                          color: "var(--mt-teal-ink)",
                         }}
                       >
                         {row.label}
@@ -514,7 +514,7 @@ export function RegulatoryHubPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Why this exists
                 </p>
@@ -551,7 +551,7 @@ export function RegulatoryHubPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The regulatory pipeline
               </p>
@@ -575,7 +575,7 @@ export function RegulatoryHubPage() {
                   <div className="flex items-center gap-3">
                     <span
                       className="font-mono text-3xl font-bold tabular-nums tracking-tight"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {s.stage}
                     </span>
@@ -611,7 +611,7 @@ export function RegulatoryHubPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Frameworks covered
               </p>
@@ -633,7 +633,7 @@ export function RegulatoryHubPage() {
                   <div className="flex items-baseline gap-4">
                     <span
                       className="font-mono text-3xl font-bold tabular-nums tracking-tight"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {fw.acronym}
                     </span>
@@ -671,7 +671,7 @@ export function RegulatoryHubPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Use cases shipped
               </p>
@@ -733,7 +733,7 @@ export function RegulatoryHubPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Anatomy of a ledger entry
               </p>
@@ -772,7 +772,7 @@ export function RegulatoryHubPage() {
                           style={{
                             borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
                             backgroundColor: "var(--mt-teal-soft)",
-                            color: "var(--mt-teal)",
+                            color: "var(--mt-teal-ink)",
                           }}
                         >
                           {row.field}
@@ -798,7 +798,7 @@ export function RegulatoryHubPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The honest comparison
               </p>
@@ -857,7 +857,7 @@ export function RegulatoryHubPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Cross-module loop
               </p>
@@ -882,7 +882,7 @@ export function RegulatoryHubPage() {
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-[11px] font-bold tabular-nums"
                       style={{
                         backgroundColor: "var(--mt-teal-soft)",
-                        color: "var(--mt-teal)",
+                        color: "var(--mt-teal-ink)",
                       }}
                       aria-hidden
                     >
@@ -957,7 +957,7 @@ export function RegulatoryHubPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Audit & data integrity
                 </p>

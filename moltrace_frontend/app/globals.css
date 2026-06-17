@@ -262,20 +262,25 @@
   --mt-green-soft: rgba(34, 197, 94, 0.10);
   --mt-slate-soft: rgba(100, 116, 139, 0.10);
 
-  /* "Ink" variant — for teal TEXT sitting on a light or soft background.
-     The bright brand teal --mt-teal (#00DFA0) is only ~1.6:1 against a
-     near-white page or a --mt-teal-soft chip, which fails WCAG AA, so teal
-     text must darken in light mode. This mirrors the MolTrace wordmark, which
-     already swaps its cyan "Trace" accent to a deeper variant in light mode.
-     Dark mode (override below) keeps the bright brand teal. #0B6E5A is the
-     deep sibling of --mt-teal (same green-teal hue): 5.6:1 on the soft chip. */
+  /* "Ink" variants — for brand-colored TEXT on a light or soft background.
+     The vivid accents above are tuned for fills/icons, not type: as text they
+     fail WCAG AA in at least one mode (teal #00DFA0 ~1.6:1 on light, cyan
+     #00B8D9 ~2.1:1 on light, violet #6B3FE0 ~2.7:1 on the *dark* chip). Each
+     ink picks a per-mode value that clears AA (~5:1+ small text) while staying
+     on-hue — same trick the MolTrace wordmark uses for its "Trace" accent.
+     Use --mt-*-ink for teal/cyan/violet TEXT; decorative icons keep the vivid
+     accent. Dark-mode values are overridden in .dark below. */
   --mt-teal-ink: #0B6E5A;
+  --mt-cyan-ink: #0B6E8C;
+  --mt-violet-ink: #5B3FB8;
 }
 
 .dark {
-  /* On a dark page the bright brand teal already clears AA (8.3:1 on the soft
-     chip), so teal text can stay vivid. */
+  /* Teal/cyan are already legible bright on a dark page, so keep them vivid;
+     violet must instead LIGHTEN (bright #6B3FE0 is only 2.7:1 on dark). */
   --mt-teal-ink: #00DFA0;
+  --mt-cyan-ink: #00B8D9;
+  --mt-violet-ink: #A78BFA;
 }
 
 /* Scientific grid background */

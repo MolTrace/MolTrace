@@ -260,7 +260,7 @@ export function MlModelFactoryDashboard() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-teal)" }}
+            style={{ color: "var(--mt-teal-ink)" }}
           >
             MolTrace · ML Model Factory
           </p>
@@ -332,7 +332,7 @@ export function MlModelFactoryDashboard() {
               <Cpu className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errTasks ? null : tasks.length, Boolean(errTasks))}
               </div>
               {statSub({
@@ -352,7 +352,7 @@ export function MlModelFactoryDashboard() {
               <PlayCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errTraining ? null : trainingRuns.length, Boolean(errTraining))}
               </div>
               {statSub({
@@ -372,7 +372,7 @@ export function MlModelFactoryDashboard() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errEval ? null : evaluationRuns.length, Boolean(errEval))}
               </div>
               {statSub({
@@ -392,7 +392,7 @@ export function MlModelFactoryDashboard() {
               <Package className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errHealth ? null : artifactCount, Boolean(errHealth))}
               </div>
               {statSub({
@@ -412,7 +412,7 @@ export function MlModelFactoryDashboard() {
               <Rocket className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(errDeploy ? null : deploymentCandidates.length, Boolean(errDeploy))}
               </div>
               {statSub({
@@ -432,7 +432,7 @@ export function MlModelFactoryDashboard() {
               <Eye className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(
                   errHealth && errDeploy ? null : reviewPendingCount,
                   Boolean(errHealth) && Boolean(errDeploy),
@@ -459,7 +459,7 @@ export function MlModelFactoryDashboard() {
               <Bug className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal)" }}>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
                 {statValue(
                   errHealth && errTasks ? null : errorAnalysisOpen,
                   Boolean(errHealth) && Boolean(errTasks),

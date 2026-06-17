@@ -1057,7 +1057,7 @@ export function SpectraCheckProcessedSpectrumSection({
                       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
                       style={{
                         backgroundColor: "var(--mt-teal-soft)",
-                        color: "var(--mt-teal)",
+                        color: "var(--mt-teal-ink)",
                       }}
                     >
                       <Eye className="h-3.5 w-3.5" aria-hidden />
@@ -1075,7 +1075,7 @@ export function SpectraCheckProcessedSpectrumSection({
                   </span>
                   <span
                     className="mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] transition-transform duration-200 group-hover:translate-x-1"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {previewLoading ? "Working" : "Click to preview"}
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -1123,7 +1123,7 @@ export function SpectraCheckProcessedSpectrumSection({
                         Experimental
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] shadow-sm" style={{ color: "var(--mt-teal)" }}>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] shadow-sm" style={{ color: "var(--mt-teal-ink)" }}>
                         ★ Recommended
                       </span>
                     )}
@@ -1251,7 +1251,7 @@ export function SpectraCheckProcessedSpectrumSection({
             {(previewLoading || analyzeLoading) ? (
               <div
                 className="flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-[11px]"
-                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+                style={{ borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)", backgroundColor: "var(--mt-teal-soft)" }}
                 data-testid="processed-results-loading-badge"
                 aria-live="polite"
               >
@@ -1268,7 +1268,7 @@ export function SpectraCheckProcessedSpectrumSection({
               >
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Linked from {state.linkedFromSource}
                 </p>
@@ -1299,7 +1299,7 @@ export function SpectraCheckProcessedSpectrumSection({
                       </p>
                       <p
                         className="font-mono text-2xl font-bold leading-none tabular-nums"
-                        style={{ color: "var(--mt-teal)" }}
+                        style={{ color: "var(--mt-teal-ink)" }}
                       >
                         {peakCount}
                       </p>
@@ -1435,7 +1435,7 @@ export function SpectraCheckProcessedSpectrumSection({
                   <div>
                     <p
                       className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       Use in unified evidence
                     </p>
@@ -1477,7 +1477,7 @@ export function SpectraCheckProcessedSpectrumSection({
                     <div>
                       <p
                         className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                        style={{ color: "var(--mt-teal)" }}
+                        style={{ color: "var(--mt-teal-ink)" }}
                       >
                         Cross-tab link
                       </p>

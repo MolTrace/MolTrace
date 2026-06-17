@@ -154,7 +154,7 @@ function SummaryMetricCard({
       <CardContent className="pb-5">
         <div
           className="font-mono text-3xl font-bold leading-none tabular-nums"
-          style={{ color: "var(--mt-cyan)" }}
+          style={{ color: "var(--mt-cyan-ink)" }}
         >
           {value}
         </div>
@@ -536,7 +536,7 @@ export function RegulatoryIntelligenceLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-cyan-ink)" }}
           >
             MolTrace · Regentry
           </p>
@@ -577,7 +577,7 @@ export function RegulatoryIntelligenceLanding() {
       <section className="space-y-3" aria-label="Summary">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-cyan)" }}
+          style={{ color: "var(--mt-cyan-ink)" }}
         >
           Regulatory · At a glance
         </p>
@@ -630,7 +630,7 @@ export function RegulatoryIntelligenceLanding() {
       <section className="space-y-3" aria-label="Validation readiness">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-cyan)" }}
+          style={{ color: "var(--mt-cyan-ink)" }}
         >
           Regulatory · Validation Readiness
         </p>
@@ -640,7 +640,7 @@ export function RegulatoryIntelligenceLanding() {
       <section className="space-y-3" aria-label="Notifications snapshot">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-cyan)" }}
+          style={{ color: "var(--mt-cyan-ink)" }}
         >
           Regulatory · Notifications snapshot
         </p>
@@ -652,7 +652,7 @@ export function RegulatoryIntelligenceLanding() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-cyan)" }}
+              style={{ color: "var(--mt-cyan-ink)" }}
             >
               Regulatory · Action Cards
             </p>
@@ -700,7 +700,7 @@ export function RegulatoryIntelligenceLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-cyan-ink)" }}
           >
             Regulatory · Evidence Queue
           </p>
@@ -763,7 +763,7 @@ export function RegulatoryIntelligenceLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-cyan-ink)" }}
           >
             Regulatory · Create Dossier
           </p>
@@ -938,7 +938,7 @@ export function RegulatoryIntelligenceLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-cyan-ink)" }}
           >
             Regulatory · Dossier Index
           </p>
@@ -1035,7 +1035,7 @@ export function RegulatoryIntelligenceLanding() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-cyan)" }}
+              style={{ color: "var(--mt-cyan-ink)" }}
             >
               Regulatory · Related Workspaces
             </p>
@@ -1093,7 +1093,7 @@ export function RegulatoryIntelligenceLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-cyan-ink)" }}
           >
             Regulatory · Source Library
           </p>
@@ -1147,7 +1147,7 @@ export function RegulatoryIntelligenceLanding() {
         <div className="space-y-1">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-cyan)" }}
+            style={{ color: "var(--mt-cyan-ink)" }}
           >
             Regulatory · Review Queue
           </p>

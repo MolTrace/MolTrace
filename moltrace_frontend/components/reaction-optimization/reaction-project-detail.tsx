@@ -3651,7 +3651,7 @@ export function ReactionProjectDetail() {
           </div>
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             MolTrace · Reaction Studio (project-level)
           </p>
@@ -3773,7 +3773,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Overview
             </p>
@@ -3795,7 +3795,7 @@ export function ReactionProjectDetail() {
               <CardContent className="pb-4">
                 <p
                   className="font-mono text-base font-bold"
-                  style={{ color: "var(--mt-violet)" }}
+                  style={{ color: "var(--mt-violet-ink)" }}
                 >
                   {objective ?? "—"}
                 </p>
@@ -3826,7 +3826,7 @@ export function ReactionProjectDetail() {
               <CardContent className="pb-4">
                 <p
                   className="font-mono text-3xl font-bold tabular-nums leading-none"
-                  style={{ color: "var(--mt-violet)" }}
+                  style={{ color: "var(--mt-violet-ink)" }}
                 >
                   {loading ? "…" : experimentCount}
                 </p>
@@ -3898,7 +3898,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Variables
             </p>
@@ -4043,7 +4043,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Experiments
             </p>
@@ -4439,7 +4439,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Objective
             </p>
@@ -4626,7 +4626,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Cost &amp; Safety
             </p>
@@ -4960,7 +4960,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Optimization
             </p>
@@ -5626,7 +5626,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Optimization Advisor
             </p>
@@ -6604,7 +6604,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Recommendations
             </p>
@@ -6926,7 +6926,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Execution
             </p>
@@ -8751,7 +8751,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Evidence Links
             </p>
@@ -8855,7 +8855,7 @@ export function ReactionProjectDetail() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet)" }}
+              style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Developer JSON
             </p>

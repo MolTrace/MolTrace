@@ -588,7 +588,7 @@ export function ValidationDashboardWorkspace() {
             <CardContent className="pb-5">
               <div
                 className="font-mono text-3xl font-bold tabular-nums leading-none"
-                style={{ color: "var(--mt-violet)" }}
+                style={{ color: "var(--mt-violet-ink)" }}
               >
                 {statMainText(errHealth ? null : healthCounts.experimental, Boolean(errHealth))}
               </div>

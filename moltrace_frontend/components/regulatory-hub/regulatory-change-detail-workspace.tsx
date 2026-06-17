@@ -283,7 +283,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       <header className="space-y-1">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-cyan)" }}
+          style={{ color: "var(--mt-cyan-ink)" }}
         >
           MolTrace · Regulatory · Change Detail
         </p>
@@ -530,7 +530,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted dossiers</p>
-                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan)" }}>{impactedDossierIds.length}</p>
+                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan-ink)" }}>{impactedDossierIds.length}</p>
                   </CardContent>
                 </Card>
                 <Card
@@ -539,7 +539,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted requirements</p>
-                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan)" }}>{impactedRequirementIds.length}</p>
+                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan-ink)" }}>{impactedRequirementIds.length}</p>
                   </CardContent>
                 </Card>
                 <Card
@@ -557,7 +557,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted rule sets</p>
-                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan)" }}>{impactedRuleSetIds.length}</p>
+                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan-ink)" }}>{impactedRuleSetIds.length}</p>
                   </CardContent>
                 </Card>
                 <Card
@@ -566,7 +566,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted AI governance records</p>
-                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-violet)" }}>{impactedAiGovIds.length}</p>
+                    <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-violet-ink)" }}>{impactedAiGovIds.length}</p>
                   </CardContent>
                 </Card>
                 <Card

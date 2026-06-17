@@ -449,7 +449,7 @@ export function IntegrationsPage() {
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   Your existing stack —{" "}
-                  <span style={{ color: "var(--mt-teal)" }}>spoken natively</span>, end to end.
+                  <span style={{ color: "var(--mt-teal-ink)" }}>spoken natively</span>, end to end.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                   Instruments. LIMS. ELN. Identity providers. Pharmacopoeia feeds. MolTrace
@@ -481,7 +481,7 @@ export function IntegrationsPage() {
                 <div className="flex items-center justify-between">
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Connector roster · live
                   </p>
@@ -490,7 +490,7 @@ export function IntegrationsPage() {
                     style={{
                       borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
                       backgroundColor: "var(--mt-teal-soft)",
-                      color: "var(--mt-teal)",
+                      color: "var(--mt-teal-ink)",
                     }}
                   >
                     <span
@@ -519,7 +519,7 @@ export function IntegrationsPage() {
                             className="inline-flex h-5 w-12 shrink-0 items-center justify-center rounded font-mono text-[9px] font-bold tracking-[0.12em]"
                             style={{
                               backgroundColor: "var(--mt-teal-soft)",
-                              color: "var(--mt-teal)",
+                              color: "var(--mt-teal-ink)",
                             }}
                           >
                             {row.category}
@@ -562,7 +562,7 @@ export function IntegrationsPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Why this exists
                 </p>
@@ -599,7 +599,7 @@ export function IntegrationsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Connector lifecycle
               </p>
@@ -624,7 +624,7 @@ export function IntegrationsPage() {
                   <div className="flex items-center gap-3">
                     <span
                       className="font-mono text-3xl font-bold tabular-nums tracking-tight"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {s.stage}
                     </span>
@@ -660,7 +660,7 @@ export function IntegrationsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Connectors shipped
               </p>
@@ -685,7 +685,7 @@ export function IntegrationsPage() {
                   <div className="flex items-baseline gap-4">
                     <span
                       className="font-mono text-3xl font-bold tabular-nums tracking-tight"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {cat.acronym}
                     </span>
@@ -723,7 +723,7 @@ export function IntegrationsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Use cases shipped
               </p>
@@ -785,7 +785,7 @@ export function IntegrationsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Topology at a glance
               </p>
@@ -840,7 +840,7 @@ export function IntegrationsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The honest comparison
               </p>
@@ -898,7 +898,7 @@ export function IntegrationsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 What integrations make possible
               </p>
@@ -923,7 +923,7 @@ export function IntegrationsPage() {
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-[11px] font-bold tabular-nums"
                       style={{
                         backgroundColor: "var(--mt-teal-soft)",
-                        color: "var(--mt-teal)",
+                        color: "var(--mt-teal-ink)",
                       }}
                       aria-hidden
                     >

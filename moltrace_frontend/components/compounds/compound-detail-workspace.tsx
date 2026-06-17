@@ -355,7 +355,7 @@ export function CompoundDetailWorkspace() {
           </div>
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-teal)" }}
+            style={{ color: "var(--mt-teal-ink)" }}
           >
             MolTrace · Compounds · Detail
           </p>

@@ -2129,7 +2129,7 @@ export function DashboardV0() {
                           <Badge
                             variant="outline"
                             className="gap-1"
-                            style={{ borderColor: "var(--mt-cyan)", color: "var(--mt-cyan)" }}
+                            style={{ borderColor: "var(--mt-cyan-ink)", color: "var(--mt-cyan-ink)" }}
                           >
                             <Activity className="h-3 w-3" />
                             Running

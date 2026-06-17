@@ -394,7 +394,7 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
       <CardContent className="space-y-2 py-3">
         <p
           className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-          style={{ color: "var(--mt-teal)" }}
+          style={{ color: "var(--mt-teal-ink)" }}
         >
           <Tag className="h-3 w-3" aria-hidden />
           Proton inventory (observed vs structural expectation)
@@ -487,7 +487,7 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
             {(asNumber(expected.oh) ?? 0) > 0 ? (
               <span
                 className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
-                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                style={{ borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)" }}
               >
                 {asNumber(expected.oh)} OH
               </span>
@@ -495,7 +495,7 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
             {(asNumber(expected.nh) ?? 0) > 0 ? (
               <span
                 className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
-                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                style={{ borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)" }}
               >
                 {asNumber(expected.nh)} NH
               </span>
@@ -503,7 +503,7 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
             {(asNumber(expected.sh) ?? 0) > 0 ? (
               <span
                 className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
-                style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)" }}
+                style={{ borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)" }}
               >
                 {asNumber(expected.sh)} SH
               </span>
@@ -946,7 +946,7 @@ export function DP4RankingPanel({ payload }: { payload: unknown }) {
               const slope = asNumber(row.scaling_slope)
               const intercept = asNumber(row.scaling_intercept)
               const isWinner = idx === 0 && prob > 0
-              const tint = isWinner ? "var(--mt-teal)" : "var(--muted-foreground, #888)"
+              const tint = isWinner ? "var(--mt-teal-ink)" : "var(--muted-foreground, #888)"
               return (
                 <TableRow key={idx} data-testid="dp4-ranking-row">
                   <TableCell className="font-mono text-xs" style={{ color: tint }}>

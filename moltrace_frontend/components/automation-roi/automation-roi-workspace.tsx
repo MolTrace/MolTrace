@@ -69,7 +69,7 @@ export default function AutomationRoiWorkspace() {
         <div className="space-y-2">
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-violet)" }}
+            style={{ color: "var(--mt-violet-ink)" }}
           >
             MolTrace · Automation ROI
           </p>
@@ -127,7 +127,7 @@ export default function AutomationRoiWorkspace() {
               <Bot className="h-4 w-4" style={{ color: "var(--mt-violet)" }} aria-hidden />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-violet)" }}>4,820</div>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-violet-ink)" }}>4,820</div>
               <p className="mt-2 text-xs text-muted-foreground">
                 Discrete pipeline substeps executed without manual intervention (demo definition).
               </p>
@@ -161,7 +161,7 @@ export default function AutomationRoiWorkspace() {
               <ListChecks className="h-4 w-4" style={{ color: "var(--mt-violet)" }} aria-hidden />
             </CardHeader>
             <CardContent className="pb-5">
-              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-violet)" }}>2,341</div>
+              <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-violet-ink)" }}>2,341</div>
               <p className="mt-2 text-xs text-muted-foreground">
                 Checkpoints bypassed when automation gates and evidence thresholds passed (demo).
               </p>

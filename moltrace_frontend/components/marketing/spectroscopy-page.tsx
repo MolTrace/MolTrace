@@ -346,7 +346,7 @@ export function SpectroscopyPage() {
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   Spectroscopy with an{" "}
-                  <span style={{ color: "var(--mt-teal)" }}>audit trail</span> — from raw FID to regulatory-ready.
+                  <span style={{ color: "var(--mt-teal-ink)" }}>audit trail</span> — from raw FID to regulatory-ready.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                   SpectraCheck is the spectroscopy intelligence engine inside MolTrace. NMR, LC-MS,
@@ -382,13 +382,13 @@ export function SpectroscopyPage() {
                 <div className="relative">
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Evidence stack · live snapshot
                   </p>
                   <p
                     className="mt-4 font-mono text-5xl font-bold tabular-nums tracking-tight sm:text-6xl"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     39
                   </p>
@@ -411,7 +411,7 @@ export function SpectroscopyPage() {
                       >
                         <span
                           className="font-mono text-[10px] font-bold tabular-nums"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           {layer.label}
                         </span>
@@ -439,7 +439,7 @@ export function SpectroscopyPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The pipeline, end-to-end
               </p>
@@ -463,7 +463,7 @@ export function SpectroscopyPage() {
                   <div className="flex items-center gap-3">
                     <span
                       className="font-mono text-3xl font-bold tabular-nums tracking-tight"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {s.stage}
                     </span>
@@ -520,7 +520,7 @@ export function SpectroscopyPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Modalities supported
               </p>
@@ -599,7 +599,7 @@ export function SpectroscopyPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Auto-classification
                 </p>
@@ -649,7 +649,7 @@ export function SpectroscopyPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Two detectors, one envelope
               </p>
@@ -718,7 +718,7 @@ export function SpectroscopyPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Measured, not claimed
               </p>
@@ -740,7 +740,7 @@ export function SpectroscopyPage() {
                 >
                   <p
                     className="font-mono text-4xl font-bold tabular-nums tracking-tight sm:text-5xl"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {v.value}
                   </p>
@@ -760,7 +760,7 @@ export function SpectroscopyPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The closing loop
               </p>
@@ -864,7 +864,7 @@ export function SpectroscopyPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Audit & compliance
                 </p>

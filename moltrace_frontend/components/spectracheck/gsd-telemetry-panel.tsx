@@ -348,7 +348,7 @@ export function GsdTelemetryPanel({
         <div>
           <p
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-            style={{ color: "var(--mt-teal)" }}
+            style={{ color: "var(--mt-teal-ink)" }}
           >
             {mode === "admin" ? "Readiness · live" : "Telemetry · live"}
           </p>
@@ -371,7 +371,7 @@ export function GsdTelemetryPanel({
             style={{
               borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
               backgroundColor: "var(--mt-teal-soft)",
-              color: "var(--mt-teal)",
+              color: "var(--mt-teal-ink)",
             }}
           >
             <span
@@ -396,7 +396,7 @@ export function GsdTelemetryPanel({
               Quarter readiness band
             </p>
             <p className="font-mono text-xs tabular-nums">
-              <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--mt-teal)" }}>
+              <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--mt-teal-ink)" }}>
                 {summary.invocations.toLocaleString()}
               </span>
               <span className="text-muted-foreground"> / {targetRuns.toLocaleString()} calls</span>
@@ -568,7 +568,7 @@ function AdoptionCallout({
       <div className="mt-2">
         <p
           className="font-mono text-3xl font-bold tabular-nums tracking-tight sm:text-4xl"
-          style={{ color: noneYet ? "var(--muted-foreground)" : "var(--mt-teal)" }}
+          style={{ color: noneYet ? "var(--muted-foreground)" : "var(--mt-teal-ink)" }}
         >
           {count.toLocaleString()}
         </p>

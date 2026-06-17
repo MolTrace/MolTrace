@@ -160,7 +160,7 @@ function AnalogueTable({ analogues }: { analogues: SpectrumReasonAnalogue[] }) {
                   {a.smiles}
                 </td>
                 <td className="px-3 py-1.5 text-right">
-                  <span className="font-bold" style={{ color: "var(--mt-cyan)" }}>
+                  <span className="font-bold" style={{ color: "var(--mt-cyan-ink)" }}>
                     {a.similarity.toFixed(3)}
                   </span>
                 </td>
@@ -194,7 +194,7 @@ function CandidateRow({ candidate, rank }: { candidate: SpectrumReasonCandidate;
         {posterior != null && Number.isFinite(posterior) ? (
           <span className="ml-auto font-mono text-xs tabular-nums">
             <span className="text-muted-foreground">posterior </span>
-            <span className="font-bold" style={{ color: "var(--mt-cyan)" }}>
+            <span className="font-bold" style={{ color: "var(--mt-cyan-ink)" }}>
               {posterior.toFixed(2)}
             </span>
           </span>

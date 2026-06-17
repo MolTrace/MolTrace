@@ -1096,7 +1096,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
       <div className="space-y-1">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-          style={{ color: "var(--mt-teal)" }}
+          style={{ color: "var(--mt-teal-ink)" }}
         >
           MolTrace · SpectraCheck
         </p>
@@ -1240,7 +1240,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               <div className="space-y-1">
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Spectroscopy · At a glance
                 </p>
@@ -1310,7 +1310,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Triage
               </p>
@@ -1364,7 +1364,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Session context
               </p>
@@ -1389,7 +1389,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · How it works
               </p>
@@ -1431,7 +1431,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Readiness & impact
               </p>
@@ -1452,7 +1452,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Activity
               </p>
@@ -1476,7 +1476,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · GSD telemetry
               </p>
@@ -1501,7 +1501,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Workflow Runner
               </p>
@@ -1559,7 +1559,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Shared Session
             </p>
@@ -1661,7 +1661,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     Sent to every analyze request as <span className="font-mono">compound_class</span>={" "}
                     <span
                       className="font-mono"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {compoundClass}
                     </span>
@@ -1727,7 +1727,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               <div className="flex flex-wrap items-center gap-2">
                 <span
                   className="rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
-                  style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
+                  style={{ borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)", backgroundColor: "var(--mt-teal-soft)" }}
                 >
                   {candidatesText.split("\n").filter((l) => l.trim()).length} line{candidatesText.split("\n").filter((l) => l.trim()).length === 1 ? "" : "s"}
                 </span>
@@ -1817,7 +1817,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   >
                     <p
                       className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       Linked from {protonLinkedFrom}
                     </p>
@@ -1910,7 +1910,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   >
                     <p
                       className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       Linked from {carbonLinkedFrom}
                     </p>
@@ -1973,7 +1973,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           >
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Tip
             </p>
@@ -2215,7 +2215,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                         <div className="flex w-full items-center justify-between">
                           <span
                             className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                            style={{ color: "var(--mt-teal)" }}
+                            style={{ color: "var(--mt-teal-ink)" }}
                           >
                             <Eye className="h-3.5 w-3.5" aria-hidden />
                             Preview
@@ -2259,14 +2259,14 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                         <div className="flex w-full items-center justify-between">
                           <span
                             className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                            style={{ color: "var(--mt-teal)" }}
+                            style={{ color: "var(--mt-teal-ink)" }}
                           >
                             <Sparkles className="h-3.5 w-3.5" aria-hidden />
                             Analyze
                           </span>
                           <span
                             className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
-                            style={{ color: "var(--mt-teal)" }}
+                            style={{ color: "var(--mt-teal-ink)" }}
                           >
                             Recommended
                           </span>
@@ -2712,14 +2712,14 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                       <div className="flex w-full items-center justify-between">
                         <span
                           className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           <Sparkles className="h-3.5 w-3.5" aria-hidden />
                           Analyze
                         </span>
                         <span
                           className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           Recommended
                         </span>
@@ -2810,7 +2810,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-6">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Evidence Match
             </p>
@@ -2830,7 +2830,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     className="rounded-md border px-3 py-2"
                     style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
                   >
-                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                       Candidates
                     </p>
                     <p className="mt-1 truncate font-mono text-xs">
@@ -2841,7 +2841,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     className="rounded-md border px-3 py-2"
                     style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
                   >
-                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                       NMR text
                     </p>
                     <p className="mt-1 truncate font-mono text-xs">
@@ -2903,14 +2903,14 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                       <div className="flex w-full items-center justify-between">
                         <span
                           className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           <Sparkles className="h-3.5 w-3.5" aria-hidden />
                           Match
                         </span>
                         <span
                           className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           Recommended
                         </span>
@@ -2964,7 +2964,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-6">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Similarity
             </p>
@@ -3262,14 +3262,14 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                       <div className="flex w-full items-center justify-between">
                         <span
                           className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           <Sparkles className="h-3.5 w-3.5" aria-hidden />
                           Score
                         </span>
                         <span
                           className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           Recommended
                         </span>
@@ -3323,7 +3323,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-6">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Candidate Compare
             </p>
@@ -3342,7 +3342,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   className="rounded-md border px-3 py-2 font-mono text-[11px]"
                   style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
                 >
-                  <span className="font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                  <span className="font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                     Tip:
                   </span>{" "}
                   No uploads needed for a baseline comparison — the analyzer already pulls from shared session inputs.
@@ -3612,14 +3612,14 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                       <div className="flex w-full items-center justify-between">
                         <span
                           className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           <Sparkles className="h-3.5 w-3.5" aria-hidden />
                           Compare
                         </span>
                         <span
                           className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
-                          style={{ color: "var(--mt-teal)" }}
+                          style={{ color: "var(--mt-teal-ink)" }}
                         >
                           Recommended
                         </span>
@@ -3682,7 +3682,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Review Queue
             </p>
@@ -3702,7 +3702,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Unified Evidence
               </p>
@@ -3718,7 +3718,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-3">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Unified · Regulatory impact
             </p>
@@ -3729,7 +3729,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-3">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Unified · Queue summary
             </p>
@@ -3740,7 +3740,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-3">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Unified · Confidence build
             </p>
@@ -3760,7 +3760,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-3">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Unified · Review & collaboration
             </p>
@@ -3773,7 +3773,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Report
               </p>
@@ -3789,7 +3789,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-3">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Report · Build & preview
             </p>
@@ -3809,7 +3809,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-3">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Report · Review & collaboration
             </p>
@@ -3825,7 +3825,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Developer JSON
             </p>
@@ -3869,7 +3869,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                       className="rounded-md border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
                       style={
                         s.available
-                          ? { borderColor: "var(--mt-teal)", color: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }
+                          ? { borderColor: "var(--mt-teal-ink)", color: "var(--mt-teal-ink)", backgroundColor: "var(--mt-teal-soft)" }
                           : { borderColor: "var(--border)", color: "var(--muted-foreground)" }
                       }
                     >
@@ -3893,7 +3893,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="space-y-6">
               {nmrResult != null && (
                 <div className="space-y-2">
-                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                     1H / 13C evidence
                   </p>
                   <DeveloperJsonPanel data={nmrResult} />
@@ -3901,7 +3901,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               )}
               {deptPreviewResult != null && (
                 <div className="space-y-2">
-                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                     DEPT preview
                   </p>
                   <DeveloperJsonPanel data={deptPreviewResult} />
@@ -3909,7 +3909,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               )}
               {deptAnalyzeResult != null && (
                 <div className="space-y-2">
-                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                     DEPT analyze
                   </p>
                   <DeveloperJsonPanel data={deptAnalyzeResult} />
@@ -3917,7 +3917,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               )}
               {nmr2dResult != null && (
                 <div className="space-y-2">
-                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                     2D NMR
                   </p>
                   <DeveloperJsonPanel data={nmr2dResult} />
@@ -3925,7 +3925,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               )}
               {simResult != null && (
                 <div className="space-y-2">
-                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                     Similarity
                   </p>
                   <DeveloperJsonPanel data={simResult} />
@@ -3933,7 +3933,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               )}
               {candResult != null && (
                 <div className="space-y-2">
-                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                     Candidates compare
                   </p>
                   <DeveloperJsonPanel data={candResult} />
@@ -3941,7 +3941,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               )}
               {Object.entries(devSnapshots).map(([k, v]) => (
                 <div key={k} className="space-y-2">
-                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal)" }}>
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: "var(--mt-teal-ink)" }}>
                     {k}
                   </p>
                   <DeveloperJsonPanel data={v} />

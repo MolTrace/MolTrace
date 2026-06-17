@@ -185,10 +185,10 @@ export function AiModelMonitoringWorkspace() {
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {[
-          { label: "prediction volume", value: predictionVolume, color: "var(--mt-teal)" },
+          { label: "prediction volume", value: predictionVolume, color: "var(--mt-teal-ink)" },
           { label: "low-confidence count", value: lowConfidenceCount, color: "var(--mt-amber)" },
           { label: "OOD count", value: oodCount, color: "var(--mt-amber)" },
-          { label: "fallback used count", value: fallbackUsedCount, color: "var(--mt-violet)" },
+          { label: "fallback used count", value: fallbackUsedCount, color: "var(--mt-violet-ink)" },
           { label: "human rejection count", value: humanRejectionCount, color: "var(--mt-amber)" },
           { label: "service failure count", value: serviceFailureCount, color: "var(--mt-red)" },
         ].map((kpi) => (

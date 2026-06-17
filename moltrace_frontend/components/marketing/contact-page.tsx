@@ -130,7 +130,7 @@ export function ContactPage() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-6 lg:px-8 lg:py-24">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-teal)" }}
+              style={{ color: "var(--mt-teal-ink)" }}
             >
               Get in touch
             </p>
@@ -168,7 +168,7 @@ export function ContactPage() {
                     </span>
                     <p
                       className="mt-4 font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                      style={{ color: "var(--mt-teal)" }}
+                      style={{ color: "var(--mt-teal-ink)" }}
                     >
                       {channel.eyebrow}
                     </p>
@@ -178,7 +178,7 @@ export function ContactPage() {
                     </p>
                     <a
                       href={`mailto:${channel.email}`}
-                      className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-[color:var(--mt-teal)]"
+                      className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-[color:var(--mt-teal-ink)]"
                     >
                       <Mail className="h-3.5 w-3.5" aria-hidden />
                       {channel.email}
@@ -197,7 +197,7 @@ export function ContactPage() {
             <div className="lg:col-span-2">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Send us a message
               </p>
@@ -218,7 +218,7 @@ export function ContactPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Offices
                 </p>
@@ -246,7 +246,7 @@ export function ContactPage() {
               <div className="rounded-2xl border bg-card p-5">
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Privacy &amp; security
                 </p>
@@ -276,7 +276,7 @@ export function ContactPage() {
               <div className="rounded-2xl border bg-muted/30 p-5">
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Other ways
                 </p>
@@ -287,7 +287,7 @@ export function ContactPage() {
                       href="https://docs.moltrace.co/guides/company/careers/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-foreground transition-colors hover:text-[color:var(--mt-teal)]"
+                      className="text-foreground transition-colors hover:text-[color:var(--mt-teal-ink)]"
                     >
                       Open roles &amp; careers
                     </Link>
@@ -298,7 +298,7 @@ export function ContactPage() {
                       href="https://docs.moltrace.co/guides/company/about/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-foreground transition-colors hover:text-[color:var(--mt-teal)]"
+                      className="text-foreground transition-colors hover:text-[color:var(--mt-teal-ink)]"
                     >
                       About MolTrace
                     </Link>
@@ -309,7 +309,7 @@ export function ContactPage() {
                       href="https://docs.moltrace.co/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-foreground transition-colors hover:text-[color:var(--mt-teal)]"
+                      className="text-foreground transition-colors hover:text-[color:var(--mt-teal-ink)]"
                     >
                       Documentation
                     </Link>

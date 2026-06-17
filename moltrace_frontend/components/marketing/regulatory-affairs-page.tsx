@@ -376,7 +376,7 @@ export function RegulatoryAffairsPage() {
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   Submissions that{" "}
-                  <span style={{ color: "var(--mt-teal)" }}>assemble themselves</span> from the
+                  <span style={{ color: "var(--mt-teal-ink)" }}>assemble themselves</span> from the
                   evidence.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
@@ -406,7 +406,7 @@ export function RegulatoryAffairsPage() {
                 <div className="flex items-center justify-between">
                   <p
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     Submission package · live
                   </p>
@@ -415,7 +415,7 @@ export function RegulatoryAffairsPage() {
                     style={{
                       borderColor: "color-mix(in oklab, var(--mt-teal) 30%, transparent)",
                       backgroundColor: "var(--mt-teal-soft)",
-                      color: "var(--mt-teal)",
+                      color: "var(--mt-teal-ink)",
                     }}
                   >
                     <span
@@ -439,7 +439,7 @@ export function RegulatoryAffairsPage() {
                       className="inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em]"
                       style={{
                         borderColor: "color-mix(in oklab, var(--mt-teal) 25%, transparent)",
-                        color: "var(--mt-teal)",
+                        color: "var(--mt-teal-ink)",
                       }}
                     >
                       {j}
@@ -464,7 +464,7 @@ export function RegulatoryAffairsPage() {
                         className="inline-flex h-5 min-w-[3.5rem] shrink-0 items-center justify-center rounded px-1 font-mono text-[9px] font-bold"
                         style={{
                           backgroundColor: "var(--mt-teal-soft)",
-                          color: "var(--mt-teal)",
+                          color: "var(--mt-teal-ink)",
                         }}
                       >
                         {row.sec}
@@ -506,7 +506,7 @@ export function RegulatoryAffairsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Why regulatory affairs
               </p>
@@ -555,7 +555,7 @@ export function RegulatoryAffairsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Across the submission lifecycle
               </p>
@@ -637,7 +637,7 @@ export function RegulatoryAffairsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Workflows we light up
               </p>
@@ -695,7 +695,7 @@ export function RegulatoryAffairsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 Measured, not claimed
               </p>
@@ -716,7 +716,7 @@ export function RegulatoryAffairsPage() {
                 >
                   <p
                     className="font-mono text-3xl font-bold tabular-nums tracking-tight sm:text-4xl"
-                    style={{ color: "var(--mt-teal)" }}
+                    style={{ color: "var(--mt-teal-ink)" }}
                   >
                     {o.value}
                   </p>
@@ -736,7 +736,7 @@ export function RegulatoryAffairsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 The honest comparison
               </p>
@@ -795,7 +795,7 @@ export function RegulatoryAffairsPage() {
             <div className="max-w-3xl">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-teal)" }}
+                style={{ color: "var(--mt-teal-ink)" }}
               >
                 One worked example
               </p>
@@ -817,7 +817,7 @@ export function RegulatoryAffairsPage() {
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-[11px] font-bold tabular-nums"
-                      style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal)" }}
+                      style={{ backgroundColor: "var(--mt-teal-soft)", color: "var(--mt-teal-ink)" }}
                       aria-hidden
                     >
                       {idx + 1}
@@ -913,7 +913,7 @@ export function RegulatoryAffairsPage() {
               <div>
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-teal)" }}
+                  style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Built for inspection
                 </p>

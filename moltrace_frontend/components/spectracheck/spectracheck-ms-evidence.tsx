@@ -2692,7 +2692,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="hrms-exact" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · HRMS Exact Mass
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -2804,11 +2804,11 @@ export function SpectraCheckMsEvidence({
                     }}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                         <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         Match
                       </span>
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                         Recommended
                       </span>
                     </div>
@@ -2867,7 +2867,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="formula-search" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · Formula Search
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -2955,11 +2955,11 @@ export function SpectraCheckMsEvidence({
                     }}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                         <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         Search
                       </span>
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                         Triage
                       </span>
                     </div>
@@ -3016,7 +3016,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="adduct" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · Adduct + Isotope
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -3157,11 +3157,11 @@ export function SpectraCheckMsEvidence({
                       }}
                     >
                       <div className="flex w-full items-center justify-between">
-                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                           <Sparkles className="h-3.5 w-3.5" aria-hidden />
                           Infer
                         </span>
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                           Recommended
                         </span>
                       </div>
@@ -3238,7 +3238,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="msms" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · Processed MS/MS
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -3381,11 +3381,11 @@ export function SpectraCheckMsEvidence({
                     }}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                         <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         Annotate
                       </span>
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                         Recommended
                       </span>
                     </div>
@@ -3442,7 +3442,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="frag-tree" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · Fragmentation Tree
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -3559,11 +3559,11 @@ export function SpectraCheckMsEvidence({
                     }}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                         <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         Build
                       </span>
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                         Recommended
                       </span>
                     </div>
@@ -3620,7 +3620,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-import" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Import Bridge
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -3722,11 +3722,11 @@ export function SpectraCheckMsEvidence({
                       }}
                     >
                       <div className="flex w-full items-center justify-between">
-                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                           <Sparkles className="h-3.5 w-3.5" aria-hidden />
                           Import
                         </span>
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                           Recommended
                         </span>
                       </div>
@@ -3830,7 +3830,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-features" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Features
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -3958,11 +3958,11 @@ export function SpectraCheckMsEvidence({
                       }}
                     >
                       <div className="flex w-full items-center justify-between">
-                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                        <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                           <Sparkles className="h-3.5 w-3.5" aria-hidden />
                           Detect
                         </span>
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                           Recommended
                         </span>
                       </div>
@@ -4044,7 +4044,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-adv-group" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Grouping
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -4169,11 +4169,11 @@ export function SpectraCheckMsEvidence({
                     }}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                         <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         Group
                       </span>
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                         Recommended
                       </span>
                     </div>
@@ -4230,7 +4230,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-adv-consensus" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Consensus
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -4360,11 +4360,11 @@ export function SpectraCheckMsEvidence({
                     }}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                         <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         Score
                       </span>
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                         Recommended
                       </span>
                     </div>
@@ -4421,7 +4421,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-adv-derep" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Dereplication
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -4579,11 +4579,11 @@ export function SpectraCheckMsEvidence({
                     }}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                         <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         Dereplicate
                       </span>
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                         Recommended
                       </span>
                     </div>
@@ -4640,7 +4640,7 @@ export function SpectraCheckMsEvidence({
 
         <TabsContent value="lcms-adv-bridge" className="mt-4 space-y-12">
           <div className="space-y-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal)" }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Confidence Bridge
             </p>
             <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
@@ -4766,11 +4766,11 @@ export function SpectraCheckMsEvidence({
                     }}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "var(--mt-teal-ink)" }}>
                         <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         Bridge
                       </span>
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal)" }}>
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--mt-teal-ink)" }}>
                         Recommended
                       </span>
                     </div>

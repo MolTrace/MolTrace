@@ -40,7 +40,7 @@ function severityBadgeStyle(severity: string) {
     return {
       borderColor: "var(--mt-cyan)",
       backgroundColor: "color-mix(in oklab, var(--mt-cyan) 10%, transparent)",
-      color: "var(--mt-cyan)",
+      color: "var(--mt-cyan-ink)",
     } as const
   }
   return {
@@ -394,7 +394,7 @@ function CrossModuleActionQueueWorkspace() {
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <p
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: "var(--mt-cyan)" }}
+                  style={{ color: "var(--mt-cyan-ink)" }}
                 >
                   Action Queue · Filters
                 </p>
@@ -599,7 +599,7 @@ export default function CrossModuleActionQueuePage() {
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-cyan)" }}
+              style={{ color: "var(--mt-cyan-ink)" }}
             >
               MolTrace · Cross-Module Action Queue
             </p>
