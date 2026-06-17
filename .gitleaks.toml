@@ -1,0 +1,28 @@
+# MolTrace secret-scan config (Security Prompt 8).
+# Extends gitleaks' default rule set. The allowlist is intentionally MINIMAL — it suppresses
+# only the exact false positives an unallowlisted full-history scan produces (verified: 62
+# generic-api-key hits, all benign), so the scanner still covers real source, tests, CI
+# workflows, render.yaml, and .env*.example. Never broaden an entry to mask a live secret —
+# rotate the credential instead, then add a precise allowlist entry for a confirmed false hit.
+title = "MolTrace gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Audit-confirmed benign matches only (generated data fixtures + two identifier strings)."
+
+# Generated regression/data fixtures (e.g. the GSD A/B JSON) — machine-generated numeric/hash
+# data, never a place a real credential is authored. Scoped to the fixtures dir only, NOT the
+# whole tests tree, so a secret accidentally pasted into real test code is still caught.
+paths = [
+  '''moltrace_backend/tests/fixtures/.*''',
+]
+
+# Exact benign identifiers that gitleaks' generic-api-key rule misreads as secrets. Matched
+# against the captured secret value (anchored), so these allowlist ONLY these two literals — not
+# any line or file that happens to contain them.
+regexes = [
+  '''^silverstein_2014_8e$''',  # literature-reference key in a frontend test fixture
+  '''^phase62-instrument$''',   # interoperability connector id in a backend test
+]

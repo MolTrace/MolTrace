@@ -1,0 +1,13 @@
+# MolTrace pre-commit hooks (Security Prompt 8).
+# Secret scanning at commit time, matching the CI gate. gitleaks is pinned to the SAME tag as
+# .github/workflows/secret-scan.yml, and both read the single-sourced .gitleaks.toml allowlist,
+# so local and CI verdicts agree. Opt in with:  pipx install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        name: gitleaks (scan staged changes for secrets)
+        # The hook runs `gitleaks git --pre-commit --redact --staged`; append our config so the
+        # same allowlist applies locally. Bump `rev` together with the workflow's pin.
+        args: ["--config", ".gitleaks.toml"]
