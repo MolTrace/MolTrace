@@ -74,6 +74,7 @@ from . import operations_store as ops_store
 from . import orchestration_store as orch_store
 from . import product_orchestration_store as product_store
 from . import quality_control_store as qc_store
+from . import reaction_access as reaction_access
 from . import reaction_advisor as reaction_advisor
 from . import reaction_bo as reaction_bo
 from . import reaction_execution as reaction_execution
@@ -2709,6 +2710,34 @@ def require_dossier_access(
         raise HTTPException(status_code=404, detail="Regulatory dossier not found.")
 
 
+def require_reaction_access(
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> None:
+    """Owner-scope a reaction (Repho) endpoint that addresses a project or one of its children.
+
+    Mirrors :func:`require_dossier_access`: the owning project's ``owner_id`` is resolved from
+    the route path params (via :mod:`nmrcheck.reaction_access`) and handed to the central PDP
+    (:func:`authz.authorize`). A system api key / admin may access any project; a user-scoped
+    caller may access only projects they own. A missing project and one owned by another user
+    both raise the same non-leaking 404. Read == write access in this model, so one gate serves
+    both. Attached to every id-bearing ``/reaction-*`` route; the ``/reaction-projects``
+    collection is owner-filtered (list) and owner-stamped (create) instead.
+    """
+    route = request.scope.get("route")
+    route_path = getattr(route, "path", request.url.path)
+    owner_id = reaction_access.reaction_route_owner_id(
+        _state(request).session_factory, route_path, dict(request.path_params)
+    )
+    decision = authz.authorize(
+        authz.principal_from_access_context(context),
+        authz.Action("owned:read"),
+        authz.Resource("reaction_project", resource_id=None, owner_id=owner_id),
+    )
+    if not decision.allowed:
+        raise HTTPException(status_code=404, detail="Not found.")
+
+
 def _readable_via_parent_dossier(
     request: Request, context: AccessContext, dossier_id: int | None
 ) -> bool:
@@ -3368,17 +3397,22 @@ def list_reaction_projects_route(
     limit: int = Query(default=200, ge=1, le=500),
     context: AccessContext = Depends(require_access_context),
 ) -> list[ReactionProject]:
+    # Owner-scope the collection read: a user sees only their own projects; a system
+    # api key / admin (unrestricted principal) sees all.
+    principal = authz.principal_from_access_context(context)
+    owner_scope_id = None if principal.is_unrestricted else principal.user_id
     return reaction_store.list_projects(
         _state(request).session_factory,
         status=status_filter,
         limit=limit,
+        owner_scope_id=owner_scope_id,
     )
 
 
 @router.get(
     "/reaction-projects/{reaction_project_id}",
     response_model=ReactionProject,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_project_route(
     reaction_project_id: int,
@@ -3394,7 +3428,7 @@ def get_reaction_project_route(
 @router.patch(
     "/reaction-projects/{reaction_project_id}",
     response_model=ReactionProject,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def update_reaction_project_route(
     reaction_project_id: int,
@@ -3421,7 +3455,7 @@ def update_reaction_project_route(
     "/reaction-projects/{reaction_project_id}/design-space",
     response_model=ReactionDesignSpace,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_design_space_route(
     reaction_project_id: int,
@@ -3444,7 +3478,7 @@ def create_reaction_design_space_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/design-space",
     response_model=ReactionDesignSpace,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_design_space_route(
     reaction_project_id: int,
@@ -3464,7 +3498,7 @@ def get_reaction_design_space_route(
 @router.patch(
     "/reaction-projects/{reaction_project_id}/design-space",
     response_model=ReactionDesignSpace,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def patch_reaction_design_space_route(
     reaction_project_id: int,
@@ -3491,7 +3525,7 @@ def patch_reaction_design_space_route(
     "/reaction-projects/{reaction_project_id}/objective-profile",
     response_model=ReactionObjectiveProfile,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_objective_profile_route(
     reaction_project_id: int,
@@ -3514,7 +3548,7 @@ def create_reaction_objective_profile_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/objective-profile",
     response_model=ReactionObjectiveProfile,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_objective_profile_route(
     reaction_project_id: int,
@@ -3536,7 +3570,7 @@ def get_reaction_objective_profile_route(
 @router.patch(
     "/reaction-projects/{reaction_project_id}/objective-profile",
     response_model=ReactionObjectiveProfile,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def patch_reaction_objective_profile_route(
     reaction_project_id: int,
@@ -3563,7 +3597,7 @@ def patch_reaction_objective_profile_route(
     "/reaction-projects/{reaction_project_id}/cost-profile",
     response_model=ReactionCostProfile,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_cost_profile_route(
     reaction_project_id: int,
@@ -3586,7 +3620,7 @@ def create_reaction_cost_profile_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/cost-profile",
     response_model=ReactionCostProfile,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_cost_profile_route(
     reaction_project_id: int,
@@ -3606,7 +3640,7 @@ def get_reaction_cost_profile_route(
 @router.patch(
     "/reaction-projects/{reaction_project_id}/cost-profile",
     response_model=ReactionCostProfile,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def patch_reaction_cost_profile_route(
     reaction_project_id: int,
@@ -3633,7 +3667,7 @@ def patch_reaction_cost_profile_route(
     "/reaction-projects/{reaction_project_id}/safety-profile",
     response_model=ReactionSafetyConstraintProfile,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_safety_profile_route(
     reaction_project_id: int,
@@ -3656,7 +3690,7 @@ def create_reaction_safety_profile_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/safety-profile",
     response_model=ReactionSafetyConstraintProfile,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_safety_profile_route(
     reaction_project_id: int,
@@ -3678,7 +3712,7 @@ def get_reaction_safety_profile_route(
 @router.patch(
     "/reaction-projects/{reaction_project_id}/safety-profile",
     response_model=ReactionSafetyConstraintProfile,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def patch_reaction_safety_profile_route(
     reaction_project_id: int,
@@ -3705,7 +3739,7 @@ def patch_reaction_safety_profile_route(
     "/reaction-projects/{reaction_project_id}/green-profile",
     response_model=ReactionGreenProfile,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_green_profile_route(
     reaction_project_id: int,
@@ -3728,7 +3762,7 @@ def create_reaction_green_profile_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/green-profile",
     response_model=ReactionGreenProfile,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_green_profile_route(
     reaction_project_id: int,
@@ -3748,7 +3782,7 @@ def get_reaction_green_profile_route(
 @router.patch(
     "/reaction-projects/{reaction_project_id}/green-profile",
     response_model=ReactionGreenProfile,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def patch_reaction_green_profile_route(
     reaction_project_id: int,
@@ -3775,7 +3809,7 @@ def patch_reaction_green_profile_route(
     "/reaction-projects/{reaction_project_id}/experiments/{experiment_id}/green-metrics",
     response_model=ReactionGreenAssessment,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def compute_reaction_green_metrics_route(
     reaction_project_id: int,
@@ -3803,7 +3837,7 @@ def compute_reaction_green_metrics_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/experiments/{experiment_id}/green-metrics",
     response_model=ReactionGreenAssessment,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_green_metrics_route(
     reaction_project_id: int,
@@ -3826,7 +3860,7 @@ def get_reaction_green_metrics_route(
 @router.post(
     "/reaction-projects/{reaction_project_id}/green-compare",
     response_model=ReactionGreenCompareResult,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def compare_reaction_green_route(
     reaction_project_id: int,
@@ -3849,7 +3883,7 @@ def compare_reaction_green_route(
     "/reaction-projects/{reaction_project_id}/variables",
     response_model=ReactionVariable,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_variable_route(
     reaction_project_id: int,
@@ -3872,7 +3906,7 @@ def create_reaction_variable_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/variables",
     response_model=list[ReactionVariable],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_variables_route(
     reaction_project_id: int,
@@ -3892,7 +3926,7 @@ def list_reaction_variables_route(
 @router.patch(
     "/reaction-variables/{variable_id}",
     response_model=ReactionVariable,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def update_reaction_variable_route(
     variable_id: int,
@@ -3919,7 +3953,7 @@ def update_reaction_variable_route(
     "/reaction-projects/{reaction_project_id}/experiments",
     response_model=ReactionExperiment,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_experiment_route(
     reaction_project_id: int,
@@ -3942,7 +3976,7 @@ def create_reaction_experiment_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/experiments",
     response_model=list[ReactionExperiment],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_experiments_route(
     reaction_project_id: int,
@@ -3964,7 +3998,7 @@ def list_reaction_experiments_route(
 @router.get(
     "/reaction-experiments/{experiment_id}",
     response_model=ReactionExperiment,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_experiment_route(
     experiment_id: int,
@@ -3980,7 +4014,7 @@ def get_reaction_experiment_route(
 @router.patch(
     "/reaction-experiments/{experiment_id}",
     response_model=ReactionExperiment,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def update_reaction_experiment_route(
     experiment_id: int,
@@ -4007,7 +4041,7 @@ def update_reaction_experiment_route(
     "/reaction-projects/{reaction_project_id}/optimization/run",
     response_model=ReactionOptimizationRun,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def run_reaction_optimization_route(
     reaction_project_id: int,
@@ -4030,7 +4064,7 @@ def run_reaction_optimization_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/optimization/runs",
     response_model=list[ReactionOptimizationRun],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_optimization_runs_route(
     reaction_project_id: int,
@@ -4050,7 +4084,7 @@ def list_reaction_optimization_runs_route(
 @router.get(
     "/reaction-optimization-runs/{run_id}",
     response_model=ReactionOptimizationRun,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_optimization_run_route(
     run_id: int,
@@ -4067,7 +4101,7 @@ def get_reaction_optimization_run_route(
     "/reaction-projects/{reaction_project_id}/optimization/bo/run",
     response_model=ReactionBayesianOptimizationRun,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def run_reaction_bayesian_optimization_route(
     reaction_project_id: int,
@@ -4090,7 +4124,7 @@ def run_reaction_bayesian_optimization_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/optimization/bo/runs",
     response_model=list[ReactionBayesianOptimizationRun],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_bayesian_optimization_runs_route(
     reaction_project_id: int,
@@ -4110,7 +4144,7 @@ def list_reaction_bayesian_optimization_runs_route(
 @router.get(
     "/reaction-optimization/bo-runs/{bo_run_id}",
     response_model=ReactionBayesianOptimizationRun,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_bayesian_optimization_run_route(
     bo_run_id: int,
@@ -4130,7 +4164,7 @@ def get_reaction_bayesian_optimization_run_route(
     "/reaction-projects/{reaction_project_id}/advisor/run",
     response_model=ReactionOptimizationAdvisorRun,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def run_reaction_optimization_advisor_route(
     reaction_project_id: int,
@@ -4153,7 +4187,7 @@ def run_reaction_optimization_advisor_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/advisor/runs",
     response_model=list[ReactionOptimizationAdvisorRun],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_optimization_advisor_runs_route(
     reaction_project_id: int,
@@ -4173,7 +4207,7 @@ def list_reaction_optimization_advisor_runs_route(
 @router.get(
     "/reaction-advisor-runs/{advisor_run_id}",
     response_model=ReactionOptimizationAdvisorRun,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_optimization_advisor_run_route(
     advisor_run_id: int,
@@ -4189,7 +4223,7 @@ def get_reaction_optimization_advisor_run_route(
 @router.post(
     "/reaction-advisor-runs/{advisor_run_id}/review",
     response_model=ReactionOptimizationAdvisorRun,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def review_reaction_optimization_advisor_run_route(
     advisor_run_id: int,
@@ -4212,7 +4246,7 @@ def review_reaction_optimization_advisor_run_route(
     "/reaction-projects/{reaction_project_id}/recommendations",
     response_model=ReactionRecommendation,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_recommendation_route(
     reaction_project_id: int,
@@ -4235,7 +4269,7 @@ def create_reaction_recommendation_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/recommendations",
     response_model=list[ReactionRecommendation],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_recommendations_route(
     reaction_project_id: int,
@@ -4258,7 +4292,7 @@ def list_reaction_recommendations_route(
     "/reaction-recommendations/{recommendation_id}/advisor/critique",
     response_model=ReactionConditionCritique,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_recommendation_advisor_critique_route(
     recommendation_id: int,
@@ -4284,7 +4318,7 @@ def create_reaction_recommendation_advisor_critique_route(
 @router.get(
     "/reaction-recommendations/{recommendation_id}/advisor/critique",
     response_model=ReactionConditionCritique,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_recommendation_advisor_critique_route(
     recommendation_id: int,
@@ -4304,7 +4338,7 @@ def get_reaction_recommendation_advisor_critique_route(
     "/reaction-projects/{reaction_project_id}/recommendation-batches",
     response_model=ReactionRecommendationBatch,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_recommendation_batch_route(
     reaction_project_id: int,
@@ -4327,7 +4361,7 @@ def create_reaction_recommendation_batch_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/recommendation-batches",
     response_model=list[ReactionRecommendationBatch],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_recommendation_batches_route(
     reaction_project_id: int,
@@ -4347,7 +4381,7 @@ def list_reaction_recommendation_batches_route(
 @router.get(
     "/reaction-recommendation-batches/{batch_id}",
     response_model=ReactionRecommendationBatch,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_recommendation_batch_route(
     batch_id: int,
@@ -4364,7 +4398,7 @@ def get_reaction_recommendation_batch_route(
     "/reaction-projects/{reaction_project_id}/mechanistic-hypotheses",
     response_model=ReactionMechanisticHypothesis,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_mechanistic_hypothesis_route(
     reaction_project_id: int,
@@ -4387,7 +4421,7 @@ def create_reaction_mechanistic_hypothesis_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/mechanistic-hypotheses",
     response_model=list[ReactionMechanisticHypothesis],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_mechanistic_hypotheses_route(
     reaction_project_id: int,
@@ -4407,7 +4441,7 @@ def list_reaction_mechanistic_hypotheses_route(
 @router.patch(
     "/reaction-mechanistic-hypotheses/{hypothesis_id}",
     response_model=ReactionMechanisticHypothesis,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def patch_reaction_mechanistic_hypothesis_route(
     hypothesis_id: int,
@@ -4430,7 +4464,7 @@ def patch_reaction_mechanistic_hypothesis_route(
     "/reaction-projects/{reaction_project_id}/literature-priors",
     response_model=ReactionLiteraturePrior,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_literature_prior_route(
     reaction_project_id: int,
@@ -4453,7 +4487,7 @@ def create_reaction_literature_prior_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/literature-priors",
     response_model=list[ReactionLiteraturePrior],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_literature_priors_route(
     reaction_project_id: int,
@@ -4474,7 +4508,7 @@ def list_reaction_literature_priors_route(
     "/reaction-projects/{reaction_project_id}/advisor/compare-bo-llm",
     response_model=ReactionOptimizationDebate,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def compare_reaction_bo_and_advisor_route(
     reaction_project_id: int,
@@ -4497,7 +4531,7 @@ def compare_reaction_bo_and_advisor_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/advisor/comparisons",
     response_model=list[ReactionOptimizationDebate],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_bo_advisor_comparisons_route(
     reaction_project_id: int,
@@ -4517,7 +4551,7 @@ def list_reaction_bo_advisor_comparisons_route(
 @router.post(
     "/reaction-recommendations/{recommendation_id}/approve",
     response_model=ReactionRecommendation,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def approve_reaction_recommendation_route(
     recommendation_id: int,
@@ -4543,7 +4577,7 @@ def approve_reaction_recommendation_route(
 @router.post(
     "/reaction-recommendations/{recommendation_id}/reject",
     response_model=ReactionRecommendation,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def reject_reaction_recommendation_route(
     recommendation_id: int,
@@ -4570,7 +4604,7 @@ def reject_reaction_recommendation_route(
     "/reaction-projects/{reaction_project_id}/execution-batches",
     response_model=ReactionExecutionBatch,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_execution_batch_route(
     reaction_project_id: int,
@@ -4593,7 +4627,7 @@ def create_reaction_execution_batch_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/execution-batches",
     response_model=list[ReactionExecutionBatch],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_execution_batches_route(
     reaction_project_id: int,
@@ -4613,7 +4647,7 @@ def list_reaction_execution_batches_route(
 @router.get(
     "/reaction-execution-batches/{batch_id}",
     response_model=ReactionExecutionBatch,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_execution_batch_route(
     batch_id: int,
@@ -4629,7 +4663,7 @@ def get_reaction_execution_batch_route(
 @router.patch(
     "/reaction-execution-batches/{batch_id}",
     response_model=ReactionExecutionBatch,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def patch_reaction_execution_batch_route(
     batch_id: int,
@@ -4656,7 +4690,7 @@ def patch_reaction_execution_batch_route(
     "/reaction-execution-batches/{batch_id}/items",
     response_model=ReactionExecutionItem,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_execution_item_route(
     batch_id: int,
@@ -4679,7 +4713,7 @@ def create_reaction_execution_item_route(
 @router.get(
     "/reaction-execution-batches/{batch_id}/items",
     response_model=list[ReactionExecutionItem],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_execution_items_route(
     batch_id: int,
@@ -4696,7 +4730,7 @@ def list_reaction_execution_items_route(
 @router.patch(
     "/reaction-execution-items/{item_id}",
     response_model=ReactionExecutionItem,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def patch_reaction_execution_item_route(
     item_id: int,
@@ -4723,7 +4757,7 @@ def patch_reaction_execution_item_route(
     "/reaction-recommendations/{recommendation_id}/convert-to-experiment",
     response_model=ReactionRecommendationConvertResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def convert_reaction_recommendation_to_experiment_route(
     recommendation_id: int,
@@ -4749,7 +4783,7 @@ def convert_reaction_recommendation_to_experiment_route(
 @router.post(
     "/reaction-execution-items/{item_id}/mark-running",
     response_model=ReactionExecutionItem,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def mark_reaction_execution_item_running_route(
     item_id: int,
@@ -4775,7 +4809,7 @@ def mark_reaction_execution_item_running_route(
 @router.post(
     "/reaction-execution-items/{item_id}/mark-completed",
     response_model=ReactionExecutionItem,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def mark_reaction_execution_item_completed_route(
     item_id: int,
@@ -4801,7 +4835,7 @@ def mark_reaction_execution_item_completed_route(
 @router.post(
     "/reaction-execution-items/{item_id}/mark-failed",
     response_model=ReactionExecutionItem,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def mark_reaction_execution_item_failed_route(
     item_id: int,
@@ -4828,7 +4862,7 @@ def mark_reaction_execution_item_failed_route(
     "/reaction-execution-items/{item_id}/analytical-results",
     response_model=ReactionAnalyticalResult,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def add_reaction_execution_item_analytical_result_route(
     item_id: int,
@@ -4854,7 +4888,7 @@ def add_reaction_execution_item_analytical_result_route(
 @router.get(
     "/reaction-execution-items/{item_id}/analytical-results",
     response_model=list[ReactionAnalyticalResult],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_execution_item_analytical_results_route(
     item_id: int,
@@ -4872,7 +4906,7 @@ def list_reaction_execution_item_analytical_results_route(
     "/reaction-execution-items/{item_id}/extract-outcome",
     response_model=ReactionOutcomeExtractionRun,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def extract_reaction_execution_item_outcome_route(
     item_id: int,
@@ -4898,7 +4932,7 @@ def extract_reaction_execution_item_outcome_route(
 @router.get(
     "/reaction-outcome-extraction-runs/{extraction_run_id}",
     response_model=ReactionOutcomeExtractionRun,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_outcome_extraction_run_route(
     extraction_run_id: int,
@@ -4916,7 +4950,7 @@ def get_reaction_outcome_extraction_run_route(
 @router.post(
     "/reaction-execution-items/{item_id}/confirm-outcome",
     response_model=ReactionExperiment,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def confirm_reaction_execution_item_outcome_route(
     item_id: int,
@@ -4943,7 +4977,7 @@ def confirm_reaction_execution_item_outcome_route(
     "/reaction-projects/{reaction_project_id}/optimization-cycles",
     response_model=ReactionOptimizationCycle,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_optimization_cycle_route(
     reaction_project_id: int,
@@ -4966,7 +5000,7 @@ def create_reaction_optimization_cycle_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/optimization-cycles",
     response_model=list[ReactionOptimizationCycle],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_optimization_cycles_route(
     reaction_project_id: int,
@@ -4986,7 +5020,7 @@ def list_reaction_optimization_cycles_route(
 @router.get(
     "/reaction-optimization-cycles/{cycle_id}",
     response_model=ReactionOptimizationCycle,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_reaction_optimization_cycle_route(
     cycle_id: int,
@@ -5003,7 +5037,7 @@ def get_reaction_optimization_cycle_route(
     "/reaction-optimization-cycles/{cycle_id}/decision",
     response_model=ReactionCycleDecisionRecord,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_optimization_cycle_decision_route(
     cycle_id: int,
@@ -5029,7 +5063,7 @@ def create_reaction_optimization_cycle_decision_route(
 @router.post(
     "/reaction-experiments/{experiment_id}/link-spectracheck-session",
     response_model=ReactionExperiment,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def link_reaction_experiment_spectracheck_route(
     experiment_id: int,
@@ -5055,7 +5089,7 @@ def link_reaction_experiment_spectracheck_route(
 @router.get(
     "/reaction-experiments/{experiment_id}/evidence",
     response_model=ReactionExperimentEvidence,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def reaction_experiment_evidence_route(
     experiment_id: int,
@@ -5072,7 +5106,7 @@ def reaction_experiment_evidence_route(
     "/reaction-projects/{reaction_project_id}/optimization/benchmark",
     response_model=ReactionOptimizationBenchmarkRun,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def run_reaction_optimization_benchmark_route(
     reaction_project_id: int,
@@ -5095,7 +5129,7 @@ def run_reaction_optimization_benchmark_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/optimization/benchmark-runs",
     response_model=list[ReactionOptimizationBenchmarkRun],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_optimization_benchmark_runs_route(
     reaction_project_id: int,
@@ -19683,7 +19717,7 @@ def get_mobile_regulatory_dossier_summary_route(
 @router.get(
     "/mobile/reactions/{reaction_project_id}/summary",
     response_model=MobileResourceSummary,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def get_mobile_reaction_project_summary_route(
     reaction_project_id: int,
@@ -20222,7 +20256,7 @@ def review_regulatory_to_reaction_bridge_route(
     "/reaction-projects/{reaction_project_id}/regulatory-constraints",
     response_model=RegulatoryConstraintSet,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_regulatory_constraint_route(
     reaction_project_id: int,
@@ -20245,7 +20279,7 @@ def create_reaction_regulatory_constraint_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/regulatory-constraints",
     response_model=list[RegulatoryConstraintSet],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_regulatory_constraints_route(
     reaction_project_id: int,
@@ -20265,7 +20299,7 @@ def list_reaction_regulatory_constraints_route(
 @router.patch(
     "/reaction-regulatory-constraints/{constraint_id}",
     response_model=RegulatoryConstraintSet,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def update_reaction_regulatory_constraint_route(
     constraint_id: int,
@@ -20292,7 +20326,7 @@ def update_reaction_regulatory_constraint_route(
     "/reaction-projects/{reaction_project_id}/compliance-objective",
     response_model=ComplianceDrivenOptimizationObjective,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def create_reaction_compliance_objective_route(
     reaction_project_id: int,
@@ -20315,7 +20349,7 @@ def create_reaction_compliance_objective_route(
 @router.get(
     "/reaction-projects/{reaction_project_id}/compliance-objective",
     response_model=list[ComplianceDrivenOptimizationObjective],
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def list_reaction_compliance_objectives_route(
     reaction_project_id: int,
@@ -22059,7 +22093,7 @@ def link_spectracheck_session_compound_route(
     "/reaction-experiments/{experiment_id}/link-compound",
     response_model=CompoundRegistryLinkResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
 )
 def link_reaction_experiment_compound_route(
     experiment_id: int,
