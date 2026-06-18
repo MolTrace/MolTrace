@@ -52,6 +52,13 @@ import {
 } from "@/components/ui/dialog"
 import { ModelDiagnosticsCard } from "@/components/reaction-optimization/model-diagnostics-card"
 import { GreenMetricsPanel } from "@/components/reaction-optimization/green-metrics-panel"
+import { ParetoFrontPanel } from "@/components/reaction-optimization/pareto-front-panel"
+import {
+  hypervolumeTrend,
+  nonDominatedExperimentIds,
+  objectivesKey,
+  paretoFrontFromRun,
+} from "@/lib/reaction/pareto"
 import { ReactionResponseOverview } from "@/components/reaction-optimization/reaction-response-overview"
 import { ReactionRegulatoryConstraintsPanel } from "@/components/reaction-optimization/reaction-regulatory-constraints-panel"
 import {
@@ -1386,6 +1393,19 @@ export function ReactionProjectDetail() {
     })
     return sorted[0] ?? null
   }, [lastBoRun, boRuns])
+
+  // Repho R2 — multi-objective Pareto front rides inside the latest BO run's
+  // diagnostics_json (null for single-objective campaigns / insufficient data).
+  const paretoFront = useMemo(
+    () => paretoFrontFromRun(execTabLatestBoRunRecord),
+    [execTabLatestBoRunRecord],
+  )
+  const paretoTrend = useMemo(
+    () => (paretoFront ? hypervolumeTrend(boRuns, objectivesKey(paretoFront.objectives)) : []),
+    [paretoFront, boRuns],
+  )
+  const paretoNonDominatedIds = useMemo(() => nonDominatedExperimentIds(paretoFront), [paretoFront])
+  const paretoKneeId = paretoFront?.kneeExperimentId ?? null
 
   const execTabLatestAdvisorRunRecord = useMemo((): Record<string, unknown> | null => {
     if (lastAdvisorRun != null && isRecord(lastAdvisorRun)) return lastAdvisorRun
@@ -4074,6 +4094,7 @@ export function ReactionProjectDetail() {
                     <TableHead className="text-right text-xs">selectivity</TableHead>
                     <TableHead className="text-right text-xs">impurity</TableHead>
                     <TableHead className="text-right text-xs">green_score</TableHead>
+                    <TableHead className="text-xs">pareto</TableHead>
                     <TableHead className="font-mono text-xs">linked_spectracheck_session_id</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">updated_at</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">SpectraCheck</TableHead>
@@ -4117,6 +4138,27 @@ export function ReactionProjectDetail() {
                         <TableCell className="text-right font-mono text-xs tabular-nums">
                           {greenScore != null ? greenScore.toLocaleString(undefined, { maximumFractionDigits: 1 }) : "—"}
                         </TableCell>
+                        <TableCell>
+                          {eid != null && eid === paretoKneeId ? (
+                            <Badge
+                              variant="secondary"
+                              className="whitespace-nowrap text-xs"
+                              style={{ backgroundColor: "var(--mt-amber-soft)", color: "var(--mt-amber)" }}
+                            >
+                              knee
+                            </Badge>
+                          ) : eid != null && paretoNonDominatedIds.has(eid) ? (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs"
+                              style={{ backgroundColor: "var(--mt-violet-soft)", color: "var(--mt-violet-ink)" }}
+                            >
+                              Pareto
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">
                           {linked != null ? linked : "—"}
                         </TableCell>
@@ -4143,7 +4185,7 @@ export function ReactionProjectDetail() {
                   {!loading && experimentsRec.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={10 + conditionColumnKeys.length}
+                        colSpan={11 + conditionColumnKeys.length}
                         className="text-muted-foreground"
                       >
                         No experiments.
@@ -5244,6 +5286,8 @@ export function ReactionProjectDetail() {
               notes, and diagnostics from the POST response.
             </p>
           )}
+
+          {paretoFront != null ? <ParetoFrontPanel front={paretoFront} trend={paretoTrend} /> : null}
 
           {lastOptimizationRun != null ? (
             <ModuleCard
