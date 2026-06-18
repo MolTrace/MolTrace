@@ -139,10 +139,14 @@ export function MobileBottomNav() {
             </Button>
           </SheetTrigger>
           <SheetContent side="bottom" className="max-h-[80vh] rounded-t-2xl px-0 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-            <SheetHeader className="px-4">
+            <SheetHeader className="shrink-0 px-4">
               <SheetTitle>More</SheetTitle>
             </SheetHeader>
-            <div className="mt-3 grid grid-cols-1 gap-1 px-2">
+            {/* Scrollable item list: SheetContent is a flex column capped at
+                max-h-[80vh]; flex-1 + min-h-0 + overflow-y-auto lets the items
+                scroll within the sheet instead of being clipped (the admin set
+                has 12 items, taller than the viewport). */}
+            <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-1 overflow-y-auto px-2">
               {moreNavItems.map((item) => {
                 const itemPath = hrefPath(item.href)
                 const isActive = pathname === itemPath || pathname.startsWith(`${itemPath}/`)
