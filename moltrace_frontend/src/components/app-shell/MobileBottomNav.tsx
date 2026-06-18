@@ -84,7 +84,12 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label="Mobile bottom navigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90"
+      // Solid, opaque background with NO backdrop-blur. `backdrop-filter: blur()` on a
+      // fixed bar forces the browser to re-blur the page behind it on every frame/tap,
+      // which janks badly on mobile Safari (this bar renders only on mobile). The
+      // marketing header gates blur to `md:` and the desktop sidebar is solid for the
+      // same reason; the bottom nav must too.
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background"
     >
       {/* grid-cols-6 splits the bar into six equal cells (5 primary tabs +
           More). Each cell is responsible for clipping its OWN label —
