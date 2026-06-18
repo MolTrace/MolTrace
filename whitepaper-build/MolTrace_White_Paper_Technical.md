@@ -545,6 +545,8 @@ The MS evidence stack (Weeks 29–32, 35–39) is grounded in:
 
 **Bayesian optimization for chemical reactions** — recent paper.[^bayesian_reactions] Drives the Reaction Optimization program's BO core.
 
+**True multi-objective Pareto front + hypervolume** — `nmrcheck/reaction_pareto.py` computes the non-dominated set, an exact 2-D / deterministic Monte-Carlo (≥3-D) hypervolume, and a max-min knee pick over the weighted objective vectors (impurity inverted, E-factor scored to 0–100). Recorded in the BO-run `diagnostics_json` (members carry raw values + a `non_dominated` flag); pure NumPy, frozen, unit-tested — no BoTorch — so multi-objective campaigns yield an auditable trade-off surface instead of a single scalarised score.
+
 **Machine-Learning-Guided Strategies for Reaction Condition Design and Optimization** — recent paper.[^ml_reaction_design] Drives the broader ML-guided reaction-condition design surface.
 
 **Reaction optimization through mechanistic insight and predictive modelling** — recent paper.[^mech_insight_reactions] Drives the mechanistic-constraint layer.
