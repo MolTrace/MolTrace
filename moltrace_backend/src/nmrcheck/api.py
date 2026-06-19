@@ -79,6 +79,7 @@ from . import reaction_advisor as reaction_advisor
 from . import reaction_bo as reaction_bo
 from . import reaction_execution as reaction_execution
 from . import reaction_green as reaction_green
+from . import reaction_hte as reaction_hte
 from . import reaction_store as reaction_store
 from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
@@ -128,7 +129,6 @@ from .database import (
     create_session_factory,
     create_user,
     create_user_action_token,
-    create_user_session,
     export_history_csv,
     export_job_csv,
     export_job_json,
@@ -649,6 +649,8 @@ from .models import (
     ReactionOutcomeConfirmRequest,
     ReactionOutcomeExtractionRequest,
     ReactionOutcomeExtractionRun,
+    ReactionPlateDesign,
+    ReactionPlateDesignRequest,
     ReactionProject,
     ReactionProjectCreate,
     ReactionProjectUpdate,
@@ -3908,6 +3910,87 @@ def compare_reaction_green_route(
     except Exception as exc:
         _raise_reaction_http_error(exc)
         raise
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/plate-designs",
+    response_model=ReactionPlateDesign,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def create_reaction_plate_design_route(
+    reaction_project_id: int,
+    payload: ReactionPlateDesignRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionPlateDesign:
+    try:
+        return reaction_hte.create_plate_design(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/plate-designs",
+    response_model=list[ReactionPlateDesign],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def list_reaction_plate_designs_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[ReactionPlateDesign]:
+    try:
+        return reaction_hte.list_plate_designs(_state(request).session_factory, reaction_project_id)
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/plate-designs/{plate_design_id}",
+    response_model=ReactionPlateDesign,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_plate_design_route(
+    reaction_project_id: int,
+    plate_design_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionPlateDesign:
+    record = reaction_hte.get_plate_design(
+        _state(request).session_factory, reaction_project_id, plate_design_id
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction plate design not found.")
+    return record
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/plate-designs/{plate_design_id}/export",
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def export_reaction_plate_design_route(
+    reaction_project_id: int,
+    plate_design_id: int,
+    request: Request,
+    target: str = Query(default="csv"),
+    context: AccessContext = Depends(require_access_context),
+) -> dict[str, str]:
+    if target not in ("csv", "json"):
+        raise HTTPException(status_code=422, detail="export target must be 'csv' or 'json'.")
+    content = reaction_hte.export_plate_design(
+        _state(request).session_factory, reaction_project_id, plate_design_id, target
+    )
+    if content is None:
+        raise HTTPException(status_code=404, detail="Reaction plate design not found.")
+    return {"target": target, "content": content}
 
 
 @router.post(
