@@ -53,6 +53,7 @@ import {
 import { ModelDiagnosticsCard } from "@/components/reaction-optimization/model-diagnostics-card"
 import { GreenMetricsPanel } from "@/components/reaction-optimization/green-metrics-panel"
 import { ParetoFrontPanel } from "@/components/reaction-optimization/pareto-front-panel"
+import { PlateDesignPanel } from "@/components/reaction-optimization/plate-design-panel"
 import {
   hypervolumeTrend,
   nonDominatedExperimentIds,
@@ -3718,6 +3719,9 @@ export function ReactionProjectDetail() {
             <TabsTrigger value="green" className={reactionProjectTabClass}>
               Green
             </TabsTrigger>
+            <TabsTrigger value="plates" className={reactionProjectTabClass}>
+              Plates
+            </TabsTrigger>
             <TabsTrigger value="optimization" className={reactionProjectTabClass}>
               Optimization
             </TabsTrigger>
@@ -4996,6 +5000,10 @@ export function ReactionProjectDetail() {
 
         <TabsContent value="green" className="mt-4 space-y-6">
           <GreenMetricsPanel projectId={reactionProjectId} experiments={experimentsRec} />
+        </TabsContent>
+
+        <TabsContent value="plates" className="mt-4 space-y-6">
+          <PlateDesignPanel projectId={reactionProjectId} variables={variableRecords} />
         </TabsContent>
 
         <TabsContent value="optimization" className="mt-4 space-y-6">

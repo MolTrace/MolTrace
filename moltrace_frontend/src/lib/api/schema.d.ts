@@ -226,6 +226,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/audit/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Audit Verify Route
+         * @description Full re-walk of the tamper-evident audit hash chain + anchor re-verification (admin-only).
+         */
+        get: operations["admin_audit_verify_route_admin_audit_verify_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/audit/anchor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Audit Anchor Route
+         * @description Seal a signed checkpoint over the audit chain since the last anchor (admin-only).
+         *     Returns null when nothing new is chained.
+         */
+        post: operations["admin_audit_anchor_route_admin_audit_anchor_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/debug-bundles": {
         parameters: {
             query?: never;
@@ -627,6 +668,127 @@ export interface paths {
         put?: never;
         /** Compare Reaction Green Route */
         post: operations["compare_reaction_green_route_reaction_projects__reaction_project_id__green_compare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/plate-designs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reaction Plate Designs Route */
+        get: operations["list_reaction_plate_designs_route_reaction_projects__reaction_project_id__plate_designs_get"];
+        put?: never;
+        /** Create Reaction Plate Design Route */
+        post: operations["create_reaction_plate_design_route_reaction_projects__reaction_project_id__plate_designs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/plate-designs/{plate_design_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Plate Design Route */
+        get: operations["get_reaction_plate_design_route_reaction_projects__reaction_project_id__plate_designs__plate_design_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/plate-designs/{plate_design_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Reaction Plate Design Route */
+        get: operations["export_reaction_plate_design_route_reaction_projects__reaction_project_id__plate_designs__plate_design_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/safety-screenings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reaction Safety Screenings Route */
+        get: operations["list_reaction_safety_screenings_route_reaction_projects__reaction_project_id__safety_screenings_get"];
+        put?: never;
+        /** Create Reaction Safety Screening Route */
+        post: operations["create_reaction_safety_screening_route_reaction_projects__reaction_project_id__safety_screenings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/safety-gate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Safety Gate Route */
+        get: operations["get_reaction_safety_gate_route_reaction_projects__reaction_project_id__safety_gate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/safety-screenings/{screening_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Safety Screening Route */
+        get: operations["get_reaction_safety_screening_route_reaction_projects__reaction_project_id__safety_screenings__screening_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/safety-screenings/{screening_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Reaction Safety Screening Route */
+        post: operations["review_reaction_safety_screening_route_reaction_projects__reaction_project_id__safety_screenings__screening_id__review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4009,6 +4171,40 @@ export interface paths {
         };
         /** Get Esignature Record Route */
         get: operations["get_esignature_record_route_esignatures_records__signature_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/esignatures/records/{signature_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Verify Esignature Record Route */
+        get: operations["verify_esignature_record_route_esignatures_records__signature_id__verify_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/esignatures/records/{signature_id}/manifestation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Esignature Record Manifestation Route */
+        get: operations["esignature_record_manifestation_route_esignatures_records__signature_id__manifestation_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12480,6 +12676,59 @@ export interface components {
             /** Uncertainty Ppm */
             uncertainty_ppm?: number | null;
         };
+        /**
+         * AuditAnchorRecord
+         * @description A signed checkpoint over the audit chain (Prompt 10).
+         */
+        AuditAnchorRecord: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Anchored At
+             * Format: date-time
+             */
+            anchored_at: string;
+            /** From Seq */
+            from_seq: number;
+            /** Tip Seq */
+            tip_seq: number;
+            /** Tip Hash */
+            tip_hash: string;
+            /** Row Count */
+            row_count: number;
+            /** Signature */
+            signature: string;
+            /** Key Id */
+            key_id: string;
+        };
+        /**
+         * AuditChainVerification
+         * @description Result of re-walking the tamper-evident audit hash chain (Prompt 10). ``ok`` is the bottom
+         *     line; ``first_break_seq`` + ``detail`` localize the first break (admin/compliance use).
+         */
+        AuditChainVerification: {
+            /** Ok */
+            ok: boolean;
+            /** Verified Count */
+            verified_count: number;
+            /** Total Chained */
+            total_chained: number;
+            /** First Break Seq */
+            first_break_seq?: number | null;
+            /** Anchors Ok */
+            anchors_ok: boolean;
+            /** Anchor Count */
+            anchor_count: number;
+            /** Detail */
+            detail: string;
+            /** Key Id */
+            key_id: string;
+        };
         /** AuditEventRecord */
         AuditEventRecord: {
             /** Id */
@@ -18439,6 +18688,67 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * ESignatureManifestation
+         * @description Durable §11.50 signature manifestation (printed name + UTC date/time + meaning).
+         */
+        ESignatureManifestation: {
+            /** Printed Name */
+            printed_name?: string | null;
+            /** Signer Email */
+            signer_email?: string | null;
+            /**
+             * Signature Meaning
+             * @enum {string}
+             */
+            signature_meaning: "reviewed" | "approved" | "rejected" | "authored" | "verified" | "released" | "locked" | "override" | "other";
+            /** Meaning Label */
+            meaning_label: string;
+            /** Signed At Utc */
+            signed_at_utc?: string | null;
+            /** Reason */
+            reason: string;
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: number;
+            /** Record Content Hash */
+            record_content_hash?: string | null;
+            /** Signature Digest */
+            signature_digest?: string | null;
+            /** Authentication Method */
+            authentication_method?: string | null;
+            /** Step Up Factor */
+            step_up_factor?: string | null;
+            /** Step Up Aal */
+            step_up_aal?: string | null;
+            /** Attestation Text */
+            attestation_text: string;
+            /** Compliance Notice */
+            compliance_notice: string;
+        };
+        /**
+         * ESignatureVerification
+         * @description Result of re-deriving a stored signature's digest (§11.70 integrity / non-transferability).
+         */
+        ESignatureVerification: {
+            /** Signature Id */
+            signature_id: number;
+            /** Bound */
+            bound: boolean;
+            /** Valid */
+            valid?: boolean | null;
+            /** Hash Matches */
+            hash_matches?: boolean | null;
+            /** Content Matches */
+            content_matches?: boolean | null;
+            /** Record Content Hash */
+            record_content_hash?: string | null;
+            /** Recomputed Content Hash */
+            recomputed_content_hash?: string | null;
+            /** Reason */
+            reason: string;
+        };
         /** ElectronicSignatureRecord */
         ElectronicSignatureRecord: {
             /** Id */
@@ -18467,6 +18777,12 @@ export interface components {
             authentication_method?: string | null;
             /** Signature Hash */
             signature_hash: string;
+            /** Signer User Id */
+            signer_user_id?: number | null;
+            /** Record Content Hash */
+            record_content_hash?: string | null;
+            /** Signature Digest */
+            signature_digest?: string | null;
             /** Metadata Json */
             metadata_json?: {
                 [key: string]: unknown;
@@ -31210,6 +31526,90 @@ export interface components {
              */
             human_review_required: boolean;
         };
+        /** ReactionPlateDesign */
+        ReactionPlateDesign: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Plate Format */
+            plate_format: string;
+            /** Strategy */
+            strategy: string;
+            /** Well Count */
+            well_count: number;
+            /** Design Json */
+            design_json?: {
+                [key: string]: unknown;
+            };
+            /** Inputs Json */
+            inputs_json?: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings?: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes?: string[];
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
+        /** ReactionPlateDesignRequest */
+        ReactionPlateDesignRequest: {
+            /**
+             * Plate Format
+             * @default 96
+             * @enum {string}
+             */
+            plate_format: "24" | "96" | "384";
+            /**
+             * Strategy
+             * @default sobol
+             * @enum {string}
+             */
+            strategy: "sobol" | "lhs" | "factorial" | "bo_init";
+            /** Numeric Json */
+            numeric_json?: {
+                [key: string]: [
+                    number,
+                    number
+                ];
+            };
+            /** Categorical Json */
+            categorical_json?: {
+                [key: string]: unknown[];
+            };
+            /** Boolean Json */
+            boolean_json?: string[];
+            /** Fixed Json */
+            fixed_json?: {
+                [key: string]: unknown;
+            };
+            /** Excluded Json */
+            excluded_json?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Seed
+             * @default 20260615
+             */
+            seed: number;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
         /** ReactionProject */
         ReactionProject: {
             /** Id */
@@ -31636,6 +32036,105 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** ReactionSafetyGateStatus */
+        ReactionSafetyGateStatus: {
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "clear" | "review_pending" | "blocked";
+            /**
+             * Screenings Total
+             * @default 0
+             */
+            screenings_total: number;
+            /** Blocking Screening Ids */
+            blocking_screening_ids?: number[];
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+        };
+        /**
+         * ReactionSafetyReviewRequest
+         * @description A qualified reviewer's verdict on a flagged screening.
+         */
+        ReactionSafetyReviewRequest: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * ReactionSafetyScreenRequest
+         * @description Inputs for a structural process-safety screen (R6).
+         *
+         *     Supply the reaction species as SMILES; an empty/invalid structure is not silently
+         *     cleared — it is screened fail-safe (``requires_expert_review=True``).
+         */
+        ReactionSafetyScreenRequest: {
+            /** Reactant Smiles */
+            reactant_smiles?: string[];
+            /** Reagent Smiles */
+            reagent_smiles?: string[];
+            /** Product Smiles */
+            product_smiles?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ReactionSafetyScreening */
+        ReactionSafetyScreening: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Label */
+            label?: string | null;
+            /** Overall Risk */
+            overall_risk: string;
+            /** Requires Expert Review */
+            requires_expert_review: boolean;
+            /** Review Status */
+            review_status: string;
+            /** Review Note */
+            review_note?: string | null;
+            /** Reviewed By User Id */
+            reviewed_by_user_id?: number | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Input Json */
+            input_json?: {
+                [key: string]: unknown;
+            };
+            /** Result Json */
+            result_json?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Disclaimer
+             * @default
+             */
+            disclaimer: string;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
         };
         /** ReactionVariable */
         ReactionVariable: {
@@ -40849,6 +41348,72 @@ export interface operations {
             };
         };
     };
+    admin_audit_verify_route_admin_audit_verify_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditChainVerification"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_audit_anchor_route_admin_audit_anchor_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditAnchorRecord"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_debug_bundle_route_admin_debug_bundles_post: {
         parameters: {
             query?: {
@@ -42278,6 +42843,340 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReactionGreenCompareResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reaction_plate_designs_route_reaction_projects__reaction_project_id__plate_designs_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionPlateDesign"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_reaction_plate_design_route_reaction_projects__reaction_project_id__plate_designs_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionPlateDesignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionPlateDesign"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_plate_design_route_reaction_projects__reaction_project_id__plate_designs__plate_design_id__get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                plate_design_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionPlateDesign"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_reaction_plate_design_route_reaction_projects__reaction_project_id__plate_designs__plate_design_id__export_get: {
+        parameters: {
+            query?: {
+                target?: string;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                plate_design_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reaction_safety_screenings_route_reaction_projects__reaction_project_id__safety_screenings_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionSafetyScreening"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_reaction_safety_screening_route_reaction_projects__reaction_project_id__safety_screenings_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionSafetyScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionSafetyScreening"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_safety_gate_route_reaction_projects__reaction_project_id__safety_gate_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionSafetyGateStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_safety_screening_route_reaction_projects__reaction_project_id__safety_screenings__screening_id__get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                screening_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionSafetyScreening"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_reaction_safety_screening_route_reaction_projects__reaction_project_id__safety_screenings__screening_id__review_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                screening_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionSafetyReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionSafetyScreening"];
                 };
             };
             /** @description Validation Error */
@@ -50879,6 +51778,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ElectronicSignatureRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_esignature_record_route_esignatures_records__signature_id__verify_get: {
+        parameters: {
+            query?: {
+                recompute?: boolean;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                signature_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ESignatureVerification"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    esignature_record_manifestation_route_esignatures_records__signature_id__manifestation_get: {
+        parameters: {
+            query?: {
+                format?: string;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                signature_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ESignatureManifestation"];
                 };
             };
             /** @description Validation Error */
