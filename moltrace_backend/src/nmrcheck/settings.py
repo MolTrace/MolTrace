@@ -111,6 +111,11 @@ class Settings:
     hsts_max_age_seconds: int = 63072000  # 2 years
     hsts_include_subdomains: bool = True
     hsts_preload: bool = True
+    # Tamper-evident audit chain (Prompt 10). The HMAC seal over periodic chain anchors uses
+    # this key; default None falls back to a dev key (NOT for prod — set AUDIT_SIGNING_KEY).
+    # audit_anchor_interval is the row count past which an anchor is suggested.
+    audit_signing_key: str | None = None
+    audit_anchor_interval: int = 1000
     email_from: str = "noreply@nmrcheck.local"
     email_backend: str = "database"
 
@@ -221,6 +226,8 @@ def get_settings() -> Settings:
         hsts_max_age_seconds=_parse_int(os.getenv("HSTS_MAX_AGE_SECONDS"), 63072000),
         hsts_include_subdomains=_parse_bool(os.getenv("HSTS_INCLUDE_SUBDOMAINS"), True),
         hsts_preload=_parse_bool(os.getenv("HSTS_PRELOAD"), True),
+        audit_signing_key=resolve_secret("AUDIT_SIGNING_KEY"),
+        audit_anchor_interval=_parse_int(os.getenv("AUDIT_ANCHOR_INTERVAL"), 1000),
         email_from=os.getenv("EMAIL_FROM", "noreply@nmrcheck.local"),
         email_backend=(
             os.getenv("EMAIL_BACKEND", "database").strip().lower() or "database"

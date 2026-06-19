@@ -14,6 +14,54 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.49.0 — Security Prompt 10: Tamper-evident audit chain (2026-06-18)
+
+**Headline:** First build in the Data Integrity & 21 CFR Part 11 group. Turns the append-only
+`audit_events` log into a **tamper-evident hash chain**: every row stores `prev_hash` +
+`entry_hash` over a canonical serialization of its fields, so any insert, edit, delete, or reorder
+breaks recomputation. Chaining is enforced by a single SQLAlchemy `before_flush` listener, so all
+~244 write sites (incl. ~22 direct `AuditEventORM(...)` constructions) are covered with no per-site
+change. Periodic **HMAC-signed anchors** (`audit_checkpoints`) make wholesale history-rewrite
+infeasible without the signing key; a **verification endpoint** + **reconciliation job** detect and
+**alert** on any break. Converts "we don't delete" into "you can prove we didn't." Additive +
+backward-compatible — the ~1500 existing tests stay green and the audit read model is unchanged.
+
+### Added
+- **`src/nmrcheck/audit_chain.py`** — canonical serialization + `compute_entry_hash` (keyless
+  SHA-256; UTC-normalized timestamps; raw `metadata_json`), HMAC anchor signer + non-secret
+  `key_id`, `_locked_tail` (Postgres `pg_advisory_xact_lock` + SQLite single-writer), and the
+  `before_flush` `install_audit_chain` listener (assigns `chain_seq`/`prev_hash`/`entry_hash`/
+  `chain_ts`, and `created_at` when unset since its default applies only at flush).
+- **ORM**: `chain_seq`/`prev_hash`/`entry_hash`/`chain_ts` (nullable) + `UNIQUE(chain_seq)` on
+  `AuditEventORM` (fork backstop); new `AuditCheckpointORM` anchor table; new
+  **`AuditChainHeadORM`** signed high-water mark (singleton, advanced per append) so deleting the
+  most-recent *unanchored* rows is detected — the live `MAX(chain_seq)` falls below the signed
+  head, which can't be lowered without the key. **Migration `0024`** (idempotent; down_revision
+  `0023`; sqlite dev backfill).
+- **`operations_store`**: `verify_audit_chain` (full O(n) walk + anchor re-verify),
+  `create_audit_anchor`, `reconcile_audit_chain(alert_fn)` (alerts + records a chained
+  `security.audit_chain.break`), and an O(1) `audit_chain_check` wired into `dependencies()` /
+  `/system/status`.
+- **Routes** (admin-only): `GET /admin/audit/verify`, `POST /admin/audit/anchor`; Pydantic
+  `AuditChainVerification` + `AuditAnchorRecord`.
+- **`settings`**: `audit_signing_key` (env `AUDIT_SIGNING_KEY`, dev fallback) + `audit_anchor_interval`.
+- **`tests/test_audit_chain.py`** (12 tests): append/verify, direct-construction chaining,
+  edit/delete detection, anchor verify + forged-tip + wrong-key, legacy-prefix tolerance,
+  reconcile-alerts-and-records-break + health reflects it.
+
+### Notes
+- Concurrency: the advisory lock serializes chain appends; `UNIQUE(chain_seq)` is the fork
+  backstop (a raced append fails + rolls back rather than forking — correct for an integrity log).
+- The O(1) health check catches tip tampering + anchor forgery + tail truncation (signed
+  high-water) + a recorded break; a middle-row partial tamper is caught by the full
+  `verify`/`reconcile` (cron/on-demand) — documented.
+- Adversarial review found one HIGH (unanchored-tail truncation undetectable); fixed in-build with
+  the signed high-water mark + a `test_unanchored_tail_truncation_detected` regression.
+- FE: admin-only endpoints; regenerate `schema.d.ts`, no component work. White-paper/README prose
+  deferred (reaction-module session holds those shared files). **Version 0.49.0.**
+
+---
+
 ## v0.48.0 — Security Prompt 9: TLS / HSTS + security response headers (2026-06-16)
 
 **Headline:** Ninth build from the MolTrace Security & Data-Integrity Standard; completes the
