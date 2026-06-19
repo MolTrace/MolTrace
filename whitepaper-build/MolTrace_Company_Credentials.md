@@ -138,6 +138,7 @@ MolTrace's posture is *build on open science where it exists, contribute back wh
 
 - **SOC 2 Type II** — independent audit on a 12-month cycle (auditor: [Auditor Name])
 - **ICH Q2(R2)** — analytical-procedures validation aligned, including the audit-event ledger, immutable raw vault, and ALCOA+ data-integrity primitives; the platform also generates a deterministic, content-hash-keyed ICH Q2(R2) report stub per analysis
+- **Tamper-evident audit ledger** — the `audit_events` log is a SHA-256 hash chain (per-row prev-hash over a canonical serialization) periodically sealed with organisation-keyed HMAC-signed anchors and a signed high-water mark, so any insert, edit, deletion, reordering, or truncation is detectable; an admin verification endpoint and a reconciliation job confirm integrity and alert on any break
 - **GAMP 5 (Appendix D11)** — the platform generates a versioned, byte-reproducible Computerised System Validation document skeleton (intended use, GxP-risk class, requirements-traceability matrix, IQ/OQ/PQ evidence slots) to accelerate customer CSV; the overall compliance determination remains the regulated user's responsibility
 - **GDPR** — tenant-private data segregation, right-to-erasure tooling, EU-region data residency
 - **GxP Validated** — Computer System Validation (CSV) documentation available under NDA
