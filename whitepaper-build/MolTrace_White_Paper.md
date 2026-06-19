@@ -273,6 +273,8 @@ The Reaction Optimization program is built on the well-developed literature for 
 
 The program also computes per-experiment **green-chemistry metrics** — the Sheldon E-factor (simple and complete), atom economy, process mass intensity, reaction mass efficiency, and a solvent green-score derived from the CHEM21 Safety/Health/Environment criteria[^green_chem] — from RDKit and transparent, frozen arithmetic (no model produces the numbers). These surface both as a regulatory and scale-up deliverable and as first-class optimisation objectives (minimise E-factor, maximise atom economy, maximise solvent green-score) that can be weighted alongside yield, selectivity, and impurity in a multi-objective campaign.
 
+For high-throughput experimentation, the program generates a **24/96/384-well plate design** over the campaign's variables — Sobol or Latin-hypercube space-filling, full-factorial enumeration, or a Bayesian-optimisation seed set — honouring fixed conditions and excluded combinations, and exporting CSV/JSON for lab-robotics handoff. The design is deterministic for a given seed (pure NumPy/SciPy; no model produces the layout), so the experiment matrix that goes to the bench is itself reproducible and auditable.
+
 ### 5.5 Mass Spectrometry & LC-MS
 
 The MS evidence stack is calibrated against the standard exact-mass and adduct rules in the AI-MS market analysis,[^ai_ms_market] community fragmentation-tree literature, and the canonical mzML / mzXML open standards for vendor-agnostic raw ingestion. The LC-MS feature detection + EIC/XIC + peak purity work (Weeks 36–38) targets the same reviewer-readable evidence quality the qNMR community demands for quantitative work.[^qnmr_pharma]

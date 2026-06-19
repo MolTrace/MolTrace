@@ -57,8 +57,9 @@ Turns regulatory action items into reaction-optimization constraints: Bayesian, 
 - **Uncertainty quantification** on each iteration with model-diagnostics.
 - **Automated next-experiment recommendations** over a batch of candidate experiments per optimization cycle.
 - **Green-chemistry metrics** — Sheldon E-factor (simple & complete), atom economy, process mass intensity (PMI), reaction mass efficiency (RME), and a CHEM21-derived solvent green-score — computed per experiment from RDKit + transparent arithmetic, and selectable as optimization objectives (`minimize_e_factor`, `maximize_atom_economy`, `maximize_green_score`) alongside yield and selectivity.
+- **HTE / DoE plate design** — generate a deterministic 24/96/384-well experiment plate over the project's design space (Sobol or Latin-hypercube space-filling, full-factorial, or a Bayesian-optimization seed set), with fixed conditions, excluded combinations, and CSV/JSON export for lab robotics (`nmrcheck/reaction_hte.py`; pure NumPy/SciPy, reproducible per seed).
 - A **compound-linking panel** and regulatory-constraints panel tie experiments back to the evidence trail.
-- Backend engines: `nmrcheck/reaction_bo.py` (`run_bayesian_optimization`) and `nmrcheck/reaction_green.py` (green-chemistry metrics).
+- Backend engines: `nmrcheck/reaction_bo.py` (`run_bayesian_optimization`), `nmrcheck/reaction_green.py` (green-chemistry metrics), and `nmrcheck/reaction_hte.py` (HTE/DoE plate design).
 
 ## Architecture
 
