@@ -58,8 +58,9 @@ Turns regulatory action items into reaction-optimization constraints: Bayesian, 
 - **Automated next-experiment recommendations** over a batch of candidate experiments per optimization cycle.
 - **Green-chemistry metrics** — Sheldon E-factor (simple & complete), atom economy, process mass intensity (PMI), reaction mass efficiency (RME), and a CHEM21-derived solvent green-score — computed per experiment from RDKit + transparent arithmetic, and selectable as optimization objectives (`minimize_e_factor`, `maximize_atom_economy`, `maximize_green_score`) alongside yield and selectivity.
 - **HTE / DoE plate design** — generate a deterministic 24/96/384-well experiment plate over the project's design space (Sobol or Latin-hypercube space-filling, full-factorial, or a Bayesian-optimization seed set), with fixed conditions, excluded combinations, and CSV/JSON export for lab robotics (`nmrcheck/reaction_hte.py`; pure NumPy/SciPy, reproducible per seed).
+- **Structural process-safety screening** — a deterministic RDKit-SMARTS screen for energetic/reactive functional groups (azide, peroxide, diazo, poly-nitro, perchlorate, tetrazole, …) with a conservative risk tier and a fail-safe, human-in-the-loop review gate: a flagged structure is never silently cleared, holds the project's `safety-gate` at *review_pending* until a qualified reviewer signs off, and a rejection hard-blocks (`nmrcheck/reaction_safety.py`; decision-support only, not a safety determination).
 - A **compound-linking panel** and regulatory-constraints panel tie experiments back to the evidence trail.
-- Backend engines: `nmrcheck/reaction_bo.py` (`run_bayesian_optimization`), `nmrcheck/reaction_green.py` (green-chemistry metrics), and `nmrcheck/reaction_hte.py` (HTE/DoE plate design).
+- Backend engines: `nmrcheck/reaction_bo.py` (`run_bayesian_optimization`), `nmrcheck/reaction_green.py` (green-chemistry metrics), `nmrcheck/reaction_hte.py` (HTE/DoE plate design), and `nmrcheck/reaction_safety.py` (structural safety screening).
 
 ## Architecture
 
