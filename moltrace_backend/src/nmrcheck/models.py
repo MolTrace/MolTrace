@@ -11041,6 +11041,37 @@ class ReactionGreenCompareResult(BaseModel):
     human_review_required: bool = True
 
 
+class ReactionPlateDesignRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plate_format: Literal["24", "96", "384"] = "96"
+    strategy: Literal["sobol", "lhs", "factorial", "bo_init"] = "sobol"
+    numeric_json: dict[str, tuple[float, float]] = Field(default_factory=dict)
+    categorical_json: dict[str, list[Any]] = Field(default_factory=dict)
+    boolean_json: list[str] = Field(default_factory=list)
+    fixed_json: dict[str, Any] = Field(default_factory=dict)
+    excluded_json: list[dict[str, Any]] = Field(default_factory=list)
+    seed: int = 20260615
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReactionPlateDesign(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    reaction_project_id: int
+    plate_format: str
+    strategy: str
+    well_count: int
+    design_json: dict[str, Any] = Field(default_factory=dict)
+    inputs_json: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    created_at: datetime
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+    human_review_required: bool = True
+
+
 class ReactionSurrogateModelRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

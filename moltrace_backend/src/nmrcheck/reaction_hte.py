@@ -18,6 +18,14 @@ import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session, sessionmaker
+
+from .database import session_scope
+from .models import ReactionPlateDesign, ReactionPlateDesignRequest
+from .orm import AuditEventORM, ReactionPlateDesignORM, ReactionProjectORM
+from .reaction_store import ReactionActor
+
 _PLATE_LAYOUTS: dict[str, tuple[int, int]] = {
     # plate_format -> (rows, cols)
     "24": (4, 6),
@@ -223,3 +231,165 @@ def export_plate(design: Mapping[str, Any], target: str = "csv") -> str:
         conditions = well.get("conditions", {})
         writer.writerow([well.get("well_id"), *[conditions.get(k, "") for k in keys]])
     return buffer.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Persistence layer (store) — mirrors reaction_green's self-contained helpers
+# ---------------------------------------------------------------------------
+_SAFE_NOTE = (
+    "HTE plate design is advisory; verify against the project's safety constraints and the "
+    "target instrument's capability, and obtain human review before execution."
+)
+
+
+def _json_dump(value: Any) -> str:
+    return json.dumps(
+        value if value is not None else {}, sort_keys=True, separators=(",", ":"), default=str
+    )
+
+
+def _json_dict(value: str | None) -> dict[str, Any]:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _json_list(value: str | None) -> list[Any]:
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _project_or_raise(session: Session, project_id: int) -> ReactionProjectORM:
+    row = session.get(ReactionProjectORM, project_id)
+    if row is None:
+        raise KeyError("Reaction project not found.")
+    return row
+
+
+def _audit(
+    session: Session,
+    *,
+    actor: ReactionActor,
+    event_type: str,
+    message: str,
+    entity_type: str,
+    entity_id: int | None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    session.add(
+        AuditEventORM(
+            event_type=event_type,
+            message=message,
+            actor_user_id=actor.user_id,
+            actor_email=actor.email,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            metadata_json=_json_dump(metadata or {}),
+        )
+    )
+
+
+def _plate_to_record(row: ReactionPlateDesignORM) -> ReactionPlateDesign:
+    return ReactionPlateDesign(
+        id=row.id,
+        reaction_project_id=row.reaction_project_id,
+        plate_format=row.plate_format,
+        strategy=row.strategy,
+        well_count=row.well_count,
+        design_json=_json_dict(row.design_json),
+        inputs_json=_json_dict(row.inputs_json),
+        warnings=[str(w) for w in _json_list(row.warnings_json)],
+        created_at=row.created_at,
+        metadata_json=_json_dict(row.metadata_json),
+        notes=[_SAFE_NOTE],
+        human_review_required=True,
+    )
+
+
+def create_plate_design(
+    session_factory: sessionmaker[Session],
+    project_id: int,
+    payload: ReactionPlateDesignRequest,
+    *,
+    actor: ReactionActor,
+) -> ReactionPlateDesign:
+    with session_scope(session_factory) as session:
+        _project_or_raise(session, project_id)
+        design = generate_plate_design(
+            numeric={k: tuple(v) for k, v in payload.numeric_json.items()},
+            categorical=payload.categorical_json,
+            boolean=payload.boolean_json,
+            fixed=payload.fixed_json,
+            excluded=payload.excluded_json,
+            plate_format=payload.plate_format,
+            strategy=payload.strategy,
+            seed=payload.seed,
+        )
+        row = ReactionPlateDesignORM(
+            reaction_project_id=project_id,
+            plate_format=payload.plate_format,
+            strategy=payload.strategy,
+            well_count=design["well_count"],
+            design_json=_json_dump(design),
+            inputs_json=_json_dump(payload.model_dump(mode="json")),
+            warnings_json=_json_dump(design["warnings"]),
+            metadata_json=_json_dump(payload.metadata_json),
+        )
+        session.add(row)
+        session.flush()
+        _audit(
+            session,
+            actor=actor,
+            event_type="reaction.hte.plate_design.create",
+            message="Reaction HTE plate design created.",
+            entity_type="reaction_plate_design",
+            entity_id=row.id,
+            metadata={
+                "project_id": project_id,
+                "well_count": design["well_count"],
+                "strategy": payload.strategy,
+            },
+        )
+        return _plate_to_record(row)
+
+
+def list_plate_designs(
+    session_factory: sessionmaker[Session], project_id: int
+) -> list[ReactionPlateDesign]:
+    with session_scope(session_factory) as session:
+        _project_or_raise(session, project_id)
+        rows = session.scalars(
+            select(ReactionPlateDesignORM)
+            .where(ReactionPlateDesignORM.reaction_project_id == project_id)
+            .order_by(ReactionPlateDesignORM.id.desc())
+        ).all()
+        return [_plate_to_record(row) for row in rows]
+
+
+def get_plate_design(
+    session_factory: sessionmaker[Session], project_id: int, plate_design_id: int
+) -> ReactionPlateDesign | None:
+    with session_scope(session_factory) as session:
+        row = session.get(ReactionPlateDesignORM, plate_design_id)
+        if row is None or row.reaction_project_id != project_id:
+            return None
+        return _plate_to_record(row)
+
+
+def export_plate_design(
+    session_factory: sessionmaker[Session], project_id: int, plate_design_id: int, target: str
+) -> str | None:
+    with session_scope(session_factory) as session:
+        row = session.get(ReactionPlateDesignORM, plate_design_id)
+        if row is None or row.reaction_project_id != project_id:
+            return None
+        return export_plate(_json_dict(row.design_json), target)

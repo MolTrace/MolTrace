@@ -3779,6 +3779,27 @@ class ReactionGreenAssessmentORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class ReactionPlateDesignORM(Base):
+    __tablename__ = "reaction_plate_designs"
+    __table_args__ = (
+        Index("ix_reaction_plate_designs_project_created", "reaction_project_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    plate_format: Mapped[str] = mapped_column(String(8), default="96")
+    strategy: Mapped[str] = mapped_column(String(32), default="sobol")
+    well_count: Mapped[int] = mapped_column(Integer, default=0)
+    design_json: Mapped[str] = mapped_column(Text, default="{}")
+    inputs_json: Mapped[str] = mapped_column(Text, default="{}")
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class ReactionBayesianOptimizationRunORM(Base):
     __tablename__ = "reaction_bayesian_optimization_runs"
     __table_args__ = (
