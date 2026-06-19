@@ -58,6 +58,7 @@ from . import analytics_store as analytics_store
 from . import authz as authz
 from . import collaboration_store as collab_store
 from . import compound_registry_store as compound_store
+from . import esign as esign
 
 # build_proton_inventory exported by peak_categorization — imported alongside
 # the other category builders below.
@@ -346,6 +347,8 @@ from .models import (
     DriftAlert,
     ElectronicSignatureRecord,
     ElectronicSignatureRecordCreate,
+    ESignatureManifestation,
+    ESignatureVerification,
     ElementalImpurityAssessmentRequest,
     EmailActionRequest,
     EmailOutboxRecord,
@@ -14242,11 +14245,25 @@ def create_esignature_record_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> ElectronicSignatureRecord:
-    # AC#2: signing requires a fresh step-up re-auth (Part 11 §11.200 contemporaneous re-auth).
+    # §11.200: signing requires a fresh step-up re-auth (enforced by the require_step_up dependency).
+    # §11.100: signer identity is the authenticated server principal — the client-supplied
+    #          signer_name/signer_email in the payload are ignored/overridden here.
+    # §11.70:  the record content hash is resolved server-side and bound into the signature digest.
     state = _state(request)
     _, step_up_factor, step_up_aal = mfa_store.read_step_up(state.session_factory, context.raw_token)
+    signer_user_id = context.user.id if context.user is not None else None
+    signer_email = context.user.email if context.user is not None else None
+    signer_display_name = signer_email  # UserPublic exposes no separate display name
     try:
-        record = validation_store.create_signature(state.session_factory, payload)
+        record = validation_store.create_record_signature(
+            state.session_factory,
+            payload,
+            signer_user_id=signer_user_id,
+            signer_display_name=signer_display_name,
+            signer_email=signer_email,
+            step_up_factor=step_up_factor,
+            step_up_aal=step_up_aal,
+        )
     except Exception as exc:
         _raise_validation_center_http_error(exc)
         raise
@@ -14254,13 +14271,16 @@ def create_esignature_record_route(
         request,
         context=context,
         event_type="esignature.create",
-        message="E-signature record created with server timestamp and signature hash.",
+        message="E-signature record created with server principal, content binding, and timestamp.",
         entity_type="electronic_signature",
         entity_id=record.id,
         metadata={
             "target_type": record.target_type,
             "target_id": record.target_id,
             "signature_meaning": record.signature_meaning,
+            "signer_user_id": signer_user_id,
+            "record_content_hash": record.record_content_hash,
+            "signature_digest": record.signature_digest,
             "step_up_factor": step_up_factor,
             "step_up_aal": step_up_aal,
         },
@@ -14302,6 +14322,49 @@ def get_esignature_record_route(
     if record is None:
         raise HTTPException(status_code=404, detail="E-signature record not found.")
     return record
+
+
+@router.get(
+    "/esignatures/records/{signature_id}/verify",
+    response_model=ESignatureVerification,
+    dependencies=[Depends(require_access_context)],
+)
+def verify_esignature_record_route(
+    signature_id: int,
+    request: Request,
+    recompute: bool = Query(default=False),
+    context: AccessContext = Depends(require_access_context),
+) -> ESignatureVerification:
+    # §11.70 integrity check: re-derive the stored digest (detects row tampering) and, with
+    # recompute=true, re-snapshot the live record to detect post-signing content changes.
+    result = validation_store.verify_record_signature(
+        _state(request).session_factory, signature_id, recompute=recompute
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="E-signature record not found.")
+    return ESignatureVerification(**result)
+
+
+@router.get(
+    "/esignatures/records/{signature_id}/manifestation",
+    response_model=ESignatureManifestation,
+    dependencies=[Depends(require_access_context)],
+)
+def esignature_record_manifestation_route(
+    signature_id: int,
+    request: Request,
+    format: str = Query(default="json", pattern="^(json|html)$"),
+    context: AccessContext = Depends(require_access_context),
+) -> ESignatureManifestation | HTMLResponse:
+    # §11.50 durable manifestation. format=html returns the printable inspection-copy stamp.
+    manifestation = validation_store.build_signature_manifestation(
+        _state(request).session_factory, signature_id
+    )
+    if manifestation is None:
+        raise HTTPException(status_code=404, detail="E-signature record not found.")
+    if format == "html":
+        return HTMLResponse(content=esign.render_manifestation_html(manifestation))
+    return ESignatureManifestation(**manifestation)
 
 
 @router.post(

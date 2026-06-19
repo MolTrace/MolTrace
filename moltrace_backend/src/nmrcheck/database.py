@@ -211,6 +211,33 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 "CREATE UNIQUE INDEX IF NOT EXISTS ux_audit_events_chain_seq "
                 "ON audit_events (chain_seq)"
             )
+        if "electronic_signature_records" in tables:
+            # Part 11 binding columns (Prompt 11 / migration 0027) on a pre-existing dev SQLite DB.
+            # Production Postgres picks these up via 0027.
+            esign_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(electronic_signature_records)"
+                ).fetchall()
+            }
+            esign_binding_columns = {
+                "signer_user_id": "INTEGER",
+                "record_content_hash": "VARCHAR(71)",
+                "signature_digest": "VARCHAR(71)",
+            }
+            for column, ddl in esign_binding_columns.items():
+                if column not in esign_existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE electronic_signature_records ADD COLUMN {column} {ddl}"
+                    )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_esignatures_signer_user "
+                "ON electronic_signature_records (signer_user_id)"
+            )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_esignatures_record_content "
+                "ON electronic_signature_records (target_type, target_id, record_content_hash)"
+            )
         version_reference_columns = {
             "method_id": "INTEGER",
             "model_version_id": "INTEGER",

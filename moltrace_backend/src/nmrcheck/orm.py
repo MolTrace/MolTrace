@@ -1909,6 +1909,8 @@ class ElectronicSignatureRecordORM(Base):
         Index("ix_esignatures_target", "target_type", "target_id"),
         Index("ix_esignatures_signer_signed", "signer_email", "signed_at"),
         Index("ix_esignatures_meaning_signed", "signature_meaning", "signed_at"),
+        Index("ix_esignatures_signer_user", "signer_user_id"),
+        Index("ix_esignatures_record_content", "target_type", "target_id", "record_content_hash"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -1922,6 +1924,18 @@ class ElectronicSignatureRecordORM(Base):
     authentication_method: Mapped[str | None] = mapped_column(String(120), nullable=True)
     signature_hash: Mapped[str] = mapped_column(String(64), index=True)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    # --- 21 CFR Part 11 binding (Security Prompt 11). All nullable/additive: legacy rows predate
+    #     content binding and verify as "unbound" (honest), never as tampered. ---
+    # §11.100 attribution — the authenticated server principal, never the client-supplied name.
+    signer_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # §11.70 record linking — SHA-256 ("sha256:"+64) of the exact signed record snapshot; binding
+    # this into the digest makes the signature non-transferable to a different record/version.
+    record_content_hash: Mapped[str | None] = mapped_column(String(71), nullable=True)
+    # Content-bound signature digest ("sha256:"+64). The legacy String(64) signature_hash is kept
+    # unchanged for back-compat with existing rows and the exactly-64 response-model contract.
+    signature_digest: Mapped[str | None] = mapped_column(String(71), nullable=True)
 
 
 class ControlledRecordORM(Base):

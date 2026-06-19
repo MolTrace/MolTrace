@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import esign
 from .database import session_scope
 from .models import (
     CAPARecord,
@@ -305,6 +306,9 @@ def _signature_to_record(row: ElectronicSignatureRecordORM) -> ElectronicSignatu
         signed_at=row.signed_at,
         authentication_method=row.authentication_method,
         signature_hash=row.signature_hash,
+        signer_user_id=row.signer_user_id,
+        record_content_hash=row.record_content_hash,
+        signature_digest=row.signature_digest,
         metadata_json=_json_dict(row.metadata_json),
     )
 
@@ -1024,11 +1028,28 @@ def get_latest_traceability(
 def _create_signature_row(
     session: Session,
     payload: ElectronicSignatureRecordCreate,
+    *,
+    signer_user_id: int | None = None,
+    signer_display_name: str | None = None,
+    signer_email: str | None = None,
+    record_content_hash: str | None = None,
+    step_up_factor: str | None = None,
+    step_up_aal: str | None = None,
 ) -> ElectronicSignatureRecordORM:
+    """Persist an electronic-signature row.
+
+    When ``signer_user_id`` / ``record_content_hash`` are supplied (the server-authoritative route
+    path), the row carries the §11.100 principal attribution and a content-bound ``signature_digest``
+    (§11.70). The inline callers (system-release approval, pilot signoff) may omit them; identity
+    then falls back to the payload fields and the legacy ``signature_hash`` is computed exactly as
+    before so existing rows and the exactly-64 response contract stay valid."""
     signed_at = utcnow()
+    effective_name = signer_display_name or payload.signer_name
+    effective_email = signer_email if signer_email is not None else payload.signer_email
+    # Legacy hash (unchanged shape) — back-compat with String(64) column + existing tests.
     signature_payload = {
-        "signer_name": payload.signer_name,
-        "signer_email": payload.signer_email,
+        "signer_name": effective_name,
+        "signer_email": effective_email,
         "signature_meaning": payload.signature_meaning,
         "target_type": payload.target_type,
         "target_id": payload.target_id,
@@ -1036,9 +1057,40 @@ def _create_signature_row(
         "signed_at": signed_at.isoformat(),
         "authentication_method": payload.authentication_method,
     }
+    # Content-bound digest (§11.70) — computed only when a record content hash is available; a None
+    # binding leaves the row "unbound" (honest) rather than binding a meaningless hash.
+    signature_digest: str | None = None
+    if record_content_hash is not None:
+        signature_digest = esign.compute_signature_digest(
+            esign.canonical_signature_payload(
+                signer_user_id=signer_user_id,
+                signer_email=effective_email,
+                signer_display_name=effective_name,
+                signature_meaning=payload.signature_meaning,
+                target_type=payload.target_type,
+                target_id=payload.target_id,
+                record_content_hash=record_content_hash,
+                reason=payload.reason,
+                signed_at=signed_at,
+                step_up_factor=step_up_factor,
+                step_up_aal=step_up_aal,
+            )
+        )
+    metadata = {
+        **payload.metadata_json,
+        "server_validated": True,
+        "readiness_notice": _SAFE_NOTICE,
+    }
+    if step_up_factor is not None:
+        metadata["step_up_factor"] = step_up_factor
+    if step_up_aal is not None:
+        metadata["step_up_aal"] = step_up_aal
+    if signer_user_id is not None and effective_name != payload.signer_name:
+        # Record what the client declared vs the server-authoritative identity that was used.
+        metadata["client_declared_signer_name"] = payload.signer_name
     row = ElectronicSignatureRecordORM(
-        signer_name=payload.signer_name,
-        signer_email=payload.signer_email,
+        signer_name=effective_name,
+        signer_email=effective_email,
         signature_meaning=payload.signature_meaning,
         target_type=payload.target_type,
         target_id=payload.target_id,
@@ -1046,18 +1098,64 @@ def _create_signature_row(
         signed_at=signed_at,
         authentication_method=payload.authentication_method,
         signature_hash=_hash_json(signature_payload),
-        metadata_json=_json_dump(
-            {
-                **payload.metadata_json,
-                "server_validated": True,
-                "readiness_notice": _SAFE_NOTICE,
-            },
-            default={},
-        ),
+        signer_user_id=signer_user_id,
+        record_content_hash=record_content_hash,
+        signature_digest=signature_digest,
+        metadata_json=_json_dump(metadata, default={}),
     )
     session.add(row)
     session.flush()
     return row
+
+
+def _resolve_record_content_hash(
+    session: Session, target_type: str, target_id: int
+) -> str | None:
+    """Server-side snapshot -> content hash for a signable record (§11.70). Returns None for target
+    types without a deterministic snapshot, so the signature is stored unbound (honest) rather than
+    bound to a guessed/volatile value. Extend per target type as deterministic snapshots are
+    defined."""
+    if target_type == "controlled_record":
+        row = session.get(ControlledRecordORM, target_id)
+        if row is None:
+            return None
+        base = row.content_hash or _hash_json(
+            {"id": row.id, "title": row.title, "version": row.version, "status": row.status}
+        )
+        return esign.compute_record_content_hash(
+            {"controlled_record_id": row.id, "version": row.version, "content_hash": base}
+        )
+    if target_type == "system_release":
+        row = session.get(SystemReleaseRecordORM, target_id)
+        if row is None:
+            return None
+        return esign.compute_record_content_hash(
+            {
+                "system_release_id": row.id,
+                "test_summary": _json_dict(row.test_summary_json),
+                "risk_summary": _json_dict(row.risk_summary_json),
+            }
+        )
+    return None
+
+
+def _signature_binding_dict(row: ElectronicSignatureRecordORM) -> dict[str, Any]:
+    """Flatten an ORM row into the binding dict ``esign.verify_signature`` consumes."""
+    meta = _json_dict(row.metadata_json)
+    return {
+        "signature_digest": row.signature_digest,
+        "signer_user_id": row.signer_user_id,
+        "signer_email": row.signer_email,
+        "signer_name": row.signer_name,
+        "signature_meaning": row.signature_meaning,
+        "target_type": row.target_type,
+        "target_id": row.target_id,
+        "record_content_hash": row.record_content_hash,
+        "reason": row.reason,
+        "signed_at": row.signed_at,
+        "step_up_factor": meta.get("step_up_factor"),
+        "step_up_aal": meta.get("step_up_aal"),
+    }
 
 
 def create_signature(
@@ -1068,6 +1166,91 @@ def create_signature(
         row = _create_signature_row(session, payload)
         session.refresh(row)
         return _signature_to_record(row)
+
+
+def create_record_signature(
+    session_factory: sessionmaker[Session],
+    payload: ElectronicSignatureRecordCreate,
+    *,
+    signer_user_id: int | None,
+    signer_display_name: str | None,
+    signer_email: str | None,
+    step_up_factor: str | None = None,
+    step_up_aal: str | None = None,
+) -> ElectronicSignatureRecord:
+    """Server-authoritative signing entry point (the ``/esignatures/records`` route).
+
+    Identity is taken from the authenticated principal (never the client payload — §11.100) and the
+    record content hash is resolved server-side and bound into the digest (§11.70)."""
+    with session_scope(session_factory) as session:
+        record_content_hash = _resolve_record_content_hash(
+            session, payload.target_type, payload.target_id
+        )
+        row = _create_signature_row(
+            session,
+            payload,
+            signer_user_id=signer_user_id,
+            signer_display_name=signer_display_name,
+            signer_email=signer_email,
+            record_content_hash=record_content_hash,
+            step_up_factor=step_up_factor,
+            step_up_aal=step_up_aal,
+        )
+        session.refresh(row)
+        return _signature_to_record(row)
+
+
+def verify_record_signature(
+    session_factory: sessionmaker[Session],
+    signature_id: int,
+    *,
+    recompute: bool = False,
+) -> dict[str, Any] | None:
+    """Verify a stored signature's integrity (§11.70). With ``recompute=True``, re-snapshot the
+    current record and report whether the signed content has since changed. Returns None if the
+    signature does not exist."""
+    with session_scope(session_factory) as session:
+        row = session.get(ElectronicSignatureRecordORM, signature_id)
+        if row is None:
+            return None
+        recomputed_content_hash: str | None = None
+        if recompute and row.record_content_hash is not None:
+            recomputed_content_hash = _resolve_record_content_hash(
+                session, row.target_type, row.target_id
+            )
+        result = esign.verify_signature(
+            _signature_binding_dict(row), recomputed_content_hash=recomputed_content_hash
+        )
+        result["signature_id"] = row.id
+        result["record_content_hash"] = row.record_content_hash
+        result["recomputed_content_hash"] = recomputed_content_hash
+        return result
+
+
+def build_signature_manifestation(
+    session_factory: sessionmaker[Session],
+    signature_id: int,
+) -> dict[str, Any] | None:
+    """Structured §11.50 manifestation for a stored signature (the inspection-copy stamp)."""
+    with session_scope(session_factory) as session:
+        row = session.get(ElectronicSignatureRecordORM, signature_id)
+        if row is None:
+            return None
+        meta = _json_dict(row.metadata_json)
+        return esign.build_manifestation(
+            signer_display_name=row.signer_name,
+            signer_email=row.signer_email,
+            signature_meaning=row.signature_meaning,
+            reason=row.reason,
+            signed_at=row.signed_at,
+            target_type=row.target_type,
+            target_id=row.target_id,
+            record_content_hash=row.record_content_hash,
+            signature_digest=row.signature_digest,
+            authentication_method=row.authentication_method,
+            step_up_factor=meta.get("step_up_factor"),
+            step_up_aal=meta.get("step_up_aal"),
+        )
 
 
 def list_signatures(
@@ -1408,6 +1591,22 @@ def create_inspection_package(
                     "target_id": row.target_id,
                     "signature_meaning": row.signature_meaning,
                     "signature_hash": row.signature_hash,
+                    # Part 11 binding (§11.70 / §11.100) + §11.50 manifestation on the inspection copy.
+                    "signer_user_id": row.signer_user_id,
+                    "record_content_hash": row.record_content_hash,
+                    "signature_digest": row.signature_digest,
+                    "manifestation": esign.build_manifestation(
+                        signer_display_name=row.signer_name,
+                        signer_email=row.signer_email,
+                        signature_meaning=row.signature_meaning,
+                        reason=row.reason,
+                        signed_at=row.signed_at,
+                        target_type=row.target_type,
+                        target_id=row.target_id,
+                        record_content_hash=row.record_content_hash,
+                        signature_digest=row.signature_digest,
+                        authentication_method=row.authentication_method,
+                    ),
                 }
                 for row in signatures
                 if row is not None
@@ -1565,6 +1764,13 @@ def approve_system_release(
         risk_summary = _json_dict(row.risk_summary_json)
         if not test_summary or not risk_summary:
             raise ValidationCenterError("System release approval requires validation test and risk summaries.")
+        release_content_hash = esign.compute_record_content_hash(
+            {
+                "system_release_id": row.id,
+                "test_summary": test_summary,
+                "risk_summary": risk_summary,
+            }
+        )
         signature = _create_signature_row(
             session,
             ElectronicSignatureRecordCreate(
@@ -1577,6 +1783,7 @@ def approve_system_release(
                 authentication_method=payload.authentication_method,
                 metadata_json=payload.metadata_json,
             ),
+            record_content_hash=release_content_hash,
         )
         row.approval_status = "released" if payload.release else "approved"
         row.released_at = utcnow() if payload.release else row.released_at
