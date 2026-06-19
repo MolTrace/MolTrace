@@ -47,6 +47,7 @@ from .models import (
     StoredReportRecord,
     UserPublic,
 )
+from .audit_chain import install_audit_chain
 from .nmr2d_models import NMR2DAnalysisReport, NMR2DRunRecord
 from .orm import (
     AnalysisORM,
@@ -94,12 +95,19 @@ def create_session_factory(database_url: str) -> sessionmaker[Session]:
 
 
 
-def init_db(session_factory: sessionmaker[Session]) -> None:
+def init_db(
+    session_factory: sessionmaker[Session], *, audit_signing_key: str | None = None
+) -> None:
     engine = session_factory.kw["bind"]
     if engine is None:
         raise RuntimeError("Session factory is missing a bound engine.")
     Base.metadata.create_all(engine)
     _ensure_sqlite_schema(engine)
+    # Tamper-evident audit hash chain (Prompt 10): register the before_flush listener that links
+    # every new audit_events row into the chain + advances the signed high-water mark. Idempotent
+    # per factory. ``audit_signing_key`` keys the high-water HMAC; pass it (from settings) so the
+    # listener's writes verify against the same key used by operations_store.verify_audit_chain.
+    install_audit_chain(session_factory, signing_key=audit_signing_key)
 
 
 def _ensure_sqlite_schema(engine: Engine) -> None:
@@ -179,6 +187,30 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                     connection.exec_driver_sql(
                         f"ALTER TABLE session_tokens ADD COLUMN {column} {ddl}"
                     )
+        if "audit_events" in tables:
+            # Tamper-evident hash-chain columns (Prompt 10 / migration 0024) on a pre-existing
+            # dev SQLite DB. Production Postgres picks these up via 0024.
+            audit_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(audit_events)"
+                ).fetchall()
+            }
+            audit_chain_columns = {
+                "chain_seq": "INTEGER",
+                "prev_hash": "VARCHAR(71)",
+                "entry_hash": "VARCHAR(71)",
+                "chain_ts": "TIMESTAMP",
+            }
+            for column, ddl in audit_chain_columns.items():
+                if column not in audit_existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE audit_events ADD COLUMN {column} {ddl}"
+                    )
+            connection.exec_driver_sql(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_audit_events_chain_seq "
+                "ON audit_events (chain_seq)"
+            )
         version_reference_columns = {
             "method_id": "INTEGER",
             "model_version_id": "INTEGER",

@@ -6795,6 +6795,9 @@ class AuditEventORM(Base):
     __table_args__ = (
         Index("ix_audit_events_created", "created_at"),
         Index("ix_audit_events_type_created", "event_type", "created_at"),
+        # Tamper-evident chain monotonicity guard (Prompt 10): UNIQUE forces a forked
+        # chain to fail at INSERT on both Postgres and SQLite (the concurrency backstop).
+        Index("ux_audit_events_chain_seq", "chain_seq", unique=True),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -6809,7 +6812,58 @@ class AuditEventORM(Base):
     entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
+    # --- Tamper-evident hash chain (Prompt 10) ---
+    # All nullable: legacy rows pre-date the chain (chain_seq IS NULL => pre-chain, skipped
+    # by the verifier). New rows are auto-populated by the before_flush listener in
+    # audit_chain.py. chain_seq is a dedicated monotonic ordering key (not id, which is only
+    # known post-flush); chain_ts is a server-trusted timestamp captured + hashed at seal
+    # time (created_at stays the app clock for back-compat). String(71) = "sha256:" + 64 hex.
+    chain_seq: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prev_hash: Mapped[str | None] = mapped_column(String(71), nullable=True)
+    entry_hash: Mapped[str | None] = mapped_column(String(71), nullable=True)
+    chain_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     actor_user: Mapped[UserORM | None] = relationship(back_populates="audit_events")
+
+
+class AuditCheckpointORM(Base):
+    """Periodic signed anchor over the audit hash chain (Prompt 10). Each row attests that
+    rows ``from_seq..tip_seq`` had tip ``entry_hash == tip_hash`` at trusted ``anchored_at``,
+    sealed with an HMAC over the canonical anchor payload. Forging history then requires forging
+    every overlapping anchor's HMAC — which needs the audit signing key."""
+
+    __tablename__ = "audit_checkpoints"
+    __table_args__ = (
+        Index("ix_audit_checkpoints_created", "created_at"),
+        UniqueConstraint("tip_seq", name="uq_audit_checkpoints_tip_seq"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    anchored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    from_seq: Mapped[int] = mapped_column(Integer)
+    tip_seq: Mapped[int] = mapped_column(Integer)
+    tip_hash: Mapped[str] = mapped_column(String(71))
+    row_count: Mapped[int] = mapped_column(Integer)
+    signature: Mapped[str] = mapped_column(String(80))  # "hmac-sha256:" (12) + 64 hex = 76
+    key_id: Mapped[str] = mapped_column(String(32))
+
+
+class AuditChainHeadORM(Base):
+    """Signed high-water mark of the audit chain (Prompt 10). A singleton (id=1) updated on every
+    append with the current max chain_seq + tip entry_hash, HMAC-signed. Verification compares it
+    to the live MAX(chain_seq): deleting the most-recent (as-yet-unanchored) rows lowers the live
+    max below this signed mark, so tail-truncation is detected — and the mark cannot be lowered
+    without the signing key."""
+
+    __tablename__ = "audit_chain_head"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # always 1 (singleton)
+    max_seq: Mapped[int] = mapped_column(Integer)
+    tip_hash: Mapped[str] = mapped_column(String(71))
+    signature: Mapped[str] = mapped_column(String(80))  # HMAC over (max_seq, tip_hash)
+    key_id: Mapped[str] = mapped_column(String(32))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class AppMetricDailyORM(Base):

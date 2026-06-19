@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import time
@@ -11,8 +12,18 @@ from typing import Any, cast
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from .database import session_scope
+from .audit_chain import (
+    GENESIS_HASH,
+    anchor_payload,
+    compute_entry_hash,
+    key_id,
+    sign_anchor,
+    sign_head,
+)
+from .database import audit_event, session_scope
 from .models import (
+    AuditAnchorRecord,
+    AuditChainVerification,
     AuditEventRecord,
     DataMode,
     DebugBundle,
@@ -31,6 +42,8 @@ from .models import (
 from .orm import (
     AnalysisJobORM,
     ArtifactRecordORM,
+    AuditChainHeadORM,
+    AuditCheckpointORM,
     AuditEventORM,
     DebugBundleORM,
     JobORM,
@@ -126,6 +139,286 @@ def system_status(
     )
 
 
+# --------------------------------------------------------------------------- audit hash chain
+
+
+def _chain_tip(session: Session) -> tuple[int, str] | None:
+    """(chain_seq, entry_hash) of the newest chained row, or None if nothing is chained."""
+    row = session.execute(
+        select(AuditEventORM.chain_seq, AuditEventORM.entry_hash)
+        .where(AuditEventORM.chain_seq.is_not(None))
+        .order_by(AuditEventORM.chain_seq.desc())
+        .limit(1)
+    ).first()
+    return (int(row[0]), str(row[1])) if row is not None else None
+
+
+def _anchor_to_record(chk: AuditCheckpointORM) -> AuditAnchorRecord:
+    return AuditAnchorRecord(
+        id=chk.id,
+        created_at=chk.created_at,
+        anchored_at=chk.anchored_at,
+        from_seq=chk.from_seq,
+        tip_seq=chk.tip_seq,
+        tip_hash=chk.tip_hash,
+        row_count=chk.row_count,
+        signature=chk.signature,
+        key_id=chk.key_id,
+    )
+
+
+def create_audit_anchor(
+    session_factory: sessionmaker[Session], *, settings: Settings
+) -> AuditAnchorRecord | None:
+    """Seal a signed checkpoint over the audit chain since the last anchor. Returns None when
+    nothing new is chained."""
+    with session_scope(session_factory) as session:
+        tip = _chain_tip(session)
+        if tip is None:
+            return None
+        last_anchor = session.execute(
+            select(func.coalesce(func.max(AuditCheckpointORM.tip_seq), 0))
+        ).scalar_one()
+        from_seq = int(last_anchor) + 1
+        tip_seq, tip_hash = tip
+        if tip_seq < from_seq:
+            return None  # no new chained rows since the last anchor
+        anchored_at = utcnow()
+        payload = anchor_payload(
+            from_seq=from_seq,
+            tip_seq=tip_seq,
+            tip_hash=tip_hash,
+            row_count=tip_seq - from_seq + 1,
+            anchored_at=anchored_at,
+        )
+        chk = AuditCheckpointORM(
+            anchored_at=anchored_at,
+            from_seq=from_seq,
+            tip_seq=tip_seq,
+            tip_hash=tip_hash,
+            row_count=tip_seq - from_seq + 1,
+            signature=sign_anchor(payload, settings.audit_signing_key),
+            key_id=key_id(settings.audit_signing_key),
+        )
+        session.add(chk)
+        session.flush()
+        # The audit_checkpoints row IS the record of the anchor; we deliberately do NOT emit a
+        # separate audit_event here — that would advance the chain tip past every anchor and make
+        # the "nothing new" short-circuit unreachable (anchors chasing their own tail).
+        return _anchor_to_record(chk)
+
+
+def _verify_anchors(session: Session, settings: Settings) -> tuple[bool, int, str]:
+    """Re-check every checkpoint: HMAC signature valid AND the row at tip_seq still carries the
+    anchored tip_hash. Returns (ok, anchor_count, detail)."""
+    anchors = session.execute(
+        select(AuditCheckpointORM).order_by(AuditCheckpointORM.tip_seq.asc())
+    ).scalars().all()
+    for chk in anchors:
+        payload = anchor_payload(
+            from_seq=chk.from_seq,
+            tip_seq=chk.tip_seq,
+            tip_hash=chk.tip_hash,
+            row_count=chk.row_count,
+            anchored_at=chk.anchored_at,
+        )
+        if not hmac.compare_digest(sign_anchor(payload, settings.audit_signing_key), chk.signature):
+            return False, len(anchors), f"anchor_signature_invalid@{chk.tip_seq}"
+        row = session.execute(
+            select(AuditEventORM.entry_hash).where(AuditEventORM.chain_seq == chk.tip_seq)
+        ).first()
+        if row is None or str(row[0]) != chk.tip_hash:
+            return False, len(anchors), f"anchor_tip_mismatch@{chk.tip_seq}"
+    return True, len(anchors), "ok"
+
+
+def _verify_head(session: Session, settings: Settings, live_rows: list) -> tuple[bool, str]:
+    """Verify the signed high-water mark vs the live chain. Catches truncation of the most-recent
+    (as-yet-unanchored) rows, which the genesis-forward walk alone cannot see: deleting the tail
+    lowers the live MAX(chain_seq) below the signed head, and the head can't be lowered without the
+    key. Returns (ok, detail). No head yet (empty/pre-head DB) -> ok."""
+    head = session.get(AuditChainHeadORM, 1)
+    if head is None:
+        return True, "ok"
+    if not hmac.compare_digest(
+        sign_head(head.max_seq, head.tip_hash, settings.audit_signing_key), head.signature
+    ):
+        return False, "head_signature_invalid"
+    live_max = int(live_rows[-1].chain_seq) if live_rows else 0
+    if live_max < head.max_seq:
+        return False, f"tail_truncated@{live_max}_expected_{head.max_seq}"
+    if live_max > head.max_seq:
+        return False, "head_behind_chain"  # rows written without advancing the head
+    if live_rows and str(live_rows[-1].entry_hash) != head.tip_hash:
+        return False, "head_tip_mismatch"
+    return True, "ok"
+
+
+def verify_audit_chain(
+    session_factory: sessionmaker[Session], *, settings: Settings
+) -> AuditChainVerification:
+    """Full re-walk of the hash chain + anchor + high-water-mark re-verification. Skips the legacy
+    pre-chain prefix (chain_seq IS NULL). O(n) — for on-demand / reconciliation use, not health."""
+    with session_scope(session_factory) as session:
+        rows = session.execute(
+            select(AuditEventORM)
+            .where(AuditEventORM.chain_seq.is_not(None))
+            .order_by(AuditEventORM.chain_seq.asc())
+        ).scalars().all()
+        verified = 0
+        prev = GENESIS_HASH
+        expected_seq: int | None = None
+        first_break_seq: int | None = None
+        detail = "ok"
+        for row in rows:
+            if expected_seq is not None and row.chain_seq != expected_seq:
+                first_break_seq, detail = row.chain_seq, "sequence_gap"
+                break
+            if row.prev_hash != prev:
+                first_break_seq, detail = row.chain_seq, "prev_hash_mismatch"
+                break
+            if compute_entry_hash(row, chain_ts=row.chain_ts) != row.entry_hash:
+                first_break_seq, detail = row.chain_seq, "entry_hash_mismatch"
+                break
+            prev = str(row.entry_hash)
+            verified += 1
+            expected_seq = int(row.chain_seq) + 1
+        anchors_ok, anchor_count, anchor_detail = _verify_anchors(session, settings)
+        head_ok, head_detail = _verify_head(session, settings, rows)
+        ok = first_break_seq is None and anchors_ok and head_ok
+        if first_break_seq is not None:
+            final_detail = detail
+        elif not head_ok:
+            final_detail = head_detail
+        else:
+            final_detail = anchor_detail
+        return AuditChainVerification(
+            ok=ok,
+            verified_count=verified,
+            total_chained=len(rows),
+            first_break_seq=first_break_seq,
+            anchors_ok=anchors_ok,
+            anchor_count=anchor_count,
+            detail=final_detail,
+            key_id=key_id(settings.audit_signing_key),
+        )
+
+
+def reconcile_audit_chain(
+    session_factory: sessionmaker[Session],
+    *,
+    settings: Settings,
+    alert_fn: Any = None,
+) -> AuditChainVerification:
+    """Run full verification and, on a break, alert: invoke ``alert_fn(report)`` if given and emit
+    a (chained) ``security.audit_chain.break`` audit event. For cron / background reconciliation."""
+    report = verify_audit_chain(session_factory, settings=settings)
+    if not report.ok:
+        if alert_fn is not None:
+            alert_fn(report)
+        audit_event(
+            session_factory,
+            event_type="security.audit_chain.break",
+            message=f"Audit chain integrity check failed: {report.detail}.",
+            entity_type="audit_chain",
+            metadata={
+                "first_break_seq": report.first_break_seq,
+                "detail": report.detail,
+                "anchors_ok": report.anchors_ok,
+            },
+        )
+    return report
+
+
+def audit_chain_check(
+    session_factory: sessionmaker[Session], *, settings: Settings
+) -> DependencyCheck:
+    """Lightweight, O(1) health signal for /system/status: recompute the chain TIP row and verify
+    the most recent anchor. Full O(n) verification is /admin/audit/verify + reconcile_audit_chain,
+    so health polls never re-walk the whole chain."""
+    start = time.perf_counter()
+    try:
+        with session_scope(session_factory) as session:
+            tip_row = session.execute(
+                select(AuditEventORM)
+                .where(AuditEventORM.chain_seq.is_not(None))
+                .order_by(AuditEventORM.chain_seq.desc())
+                .limit(1)
+            ).scalars().first()
+            if tip_row is None:
+                return DependencyCheck(
+                    name="audit_chain",
+                    status="ok",
+                    latency_ms=_elapsed_ms(start),
+                    message="No chained audit events yet.",
+                )
+            if compute_entry_hash(tip_row, chain_ts=tip_row.chain_ts) != tip_row.entry_hash:
+                return DependencyCheck(
+                    name="audit_chain",
+                    status="error",
+                    latency_ms=_elapsed_ms(start),
+                    message=f"Audit chain tip hash mismatch at seq {tip_row.chain_seq}.",
+                )
+            # High-water mark: a signed head above the live tip means recent rows were truncated.
+            head = session.get(AuditChainHeadORM, 1)
+            if head is not None:
+                if not hmac.compare_digest(
+                    sign_head(head.max_seq, head.tip_hash, settings.audit_signing_key),
+                    head.signature,
+                ):
+                    return DependencyCheck(
+                        name="audit_chain",
+                        status="error",
+                        latency_ms=_elapsed_ms(start),
+                        message="Audit chain head signature invalid.",
+                    )
+                if int(tip_row.chain_seq) < head.max_seq:
+                    return DependencyCheck(
+                        name="audit_chain",
+                        status="error",
+                        latency_ms=_elapsed_ms(start),
+                        message=f"Audit chain tail truncated: live seq {tip_row.chain_seq} < "
+                        f"signed high-water {head.max_seq}.",
+                    )
+            anchors_ok, anchor_count, anchor_detail = _verify_anchors(session, settings)
+            if not anchors_ok:
+                return DependencyCheck(
+                    name="audit_chain",
+                    status="error",
+                    latency_ms=_elapsed_ms(start),
+                    message=f"Audit anchor verification failed: {anchor_detail}.",
+                )
+            # A full reconciliation (cron / on-demand) is what catches a MIDDLE-row tamper the
+            # O(1) tip+anchor check above cannot; once it records a break, surface it here so the
+            # continuous health signal reflects the authoritative finding (indexed lookup).
+            break_seen = session.execute(
+                select(AuditEventORM.id)
+                .where(AuditEventORM.event_type == "security.audit_chain.break")
+                .limit(1)
+            ).first()
+            if break_seen is not None:
+                return DependencyCheck(
+                    name="audit_chain",
+                    status="error",
+                    latency_ms=_elapsed_ms(start),
+                    message="A prior reconciliation recorded an audit-chain break; run "
+                    "/admin/audit/verify.",
+                )
+            return DependencyCheck(
+                name="audit_chain",
+                status="ok",
+                latency_ms=_elapsed_ms(start),
+                message=f"Audit chain tip + {anchor_count} anchor(s) verified.",
+            )
+    except Exception as exc:
+        return DependencyCheck(
+            name="audit_chain",
+            status="error",
+            latency_ms=_elapsed_ms(start),
+            message=f"Audit chain check failed: {exc}",
+        )
+
+
 def dependencies(
     session_factory: sessionmaker[Session],
     *,
@@ -139,6 +432,7 @@ def dependencies(
         openapi_check(openapi_available),
         job_queue_check(session_factory, settings),
         worker_check(settings),
+        audit_chain_check(session_factory, settings=settings),
     ]
 
 

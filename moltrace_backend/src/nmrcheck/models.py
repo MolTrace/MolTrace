@@ -12738,6 +12738,38 @@ class AuditEventRecord(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class AuditChainVerification(BaseModel):
+    """Result of re-walking the tamper-evident audit hash chain (Prompt 10). ``ok`` is the bottom
+    line; ``first_break_seq`` + ``detail`` localize the first break (admin/compliance use)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    verified_count: int
+    total_chained: int
+    first_break_seq: int | None = None
+    anchors_ok: bool
+    anchor_count: int
+    detail: str
+    key_id: str
+
+
+class AuditAnchorRecord(BaseModel):
+    """A signed checkpoint over the audit chain (Prompt 10)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    created_at: datetime
+    anchored_at: datetime
+    from_seq: int
+    tip_seq: int
+    tip_hash: str
+    row_count: int
+    signature: str
+    key_id: str
+
+
 class NMR2DEvidenceReportSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -236,6 +236,8 @@ from .models import (
     ApprovalRecordCreate,
     ArtifactRecord,
     AsyncJobAccepted,
+    AuditAnchorRecord,
+    AuditChainVerification,
     AuditEventRecord,
     AuthPageResponse,
     AutomationTaskDefinition,
@@ -3032,6 +3034,35 @@ def admin_audit_search_route(
         q=q,
         limit=limit,
     )
+
+
+@router.get(
+    "/admin/audit/verify",
+    response_model=AuditChainVerification,
+    dependencies=[Depends(require_admin)],
+)
+def admin_audit_verify_route(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> AuditChainVerification:
+    """Full re-walk of the tamper-evident audit hash chain + anchor re-verification (admin-only)."""
+    state = _state(request)
+    return ops_store.verify_audit_chain(state.session_factory, settings=state.settings)
+
+
+@router.post(
+    "/admin/audit/anchor",
+    response_model=AuditAnchorRecord | None,
+    dependencies=[Depends(require_admin)],
+)
+def admin_audit_anchor_route(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> AuditAnchorRecord | None:
+    """Seal a signed checkpoint over the audit chain since the last anchor (admin-only).
+    Returns null when nothing new is chained."""
+    state = _state(request)
+    return ops_store.create_audit_anchor(state.session_factory, settings=state.settings)
 
 
 @router.post(
@@ -28861,7 +28892,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def app_lifespan(_: FastAPI) -> AsyncIterator[None]:
-        init_db(session_factory)
+        init_db(session_factory, audit_signing_key=settings.audit_signing_key)
         method_store.ensure_builtin_methods(session_factory)
         analytics_store.ensure_default_tasks(session_factory)
         ml_store.ensure_builtin_ml_tasks(session_factory)
