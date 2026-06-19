@@ -14054,7 +14054,48 @@ class ElectronicSignatureRecord(BaseModel):
     signed_at: datetime
     authentication_method: str | None = None
     signature_hash: str = Field(min_length=64, max_length=64)
+    # 21 CFR Part 11 binding (Security Prompt 11). Additive/optional — legacy rows leave these null.
+    signer_user_id: int | None = None  # §11.100 server-principal attribution
+    record_content_hash: str | None = None  # §11.70 bound record snapshot ("sha256:"+64)
+    signature_digest: str | None = None  # content-bound digest ("sha256:"+64)
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ESignatureVerification(BaseModel):
+    """Result of re-deriving a stored signature's digest (§11.70 integrity / non-transferability)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    signature_id: int
+    bound: bool  # False = legacy signature written before content binding existed
+    valid: bool | None = None  # null when unbound (cannot be cryptographically verified)
+    hash_matches: bool | None = None  # digest re-derivation matches the stored digest
+    content_matches: bool | None = None  # bound hash still matches the current record (recompute=true)
+    record_content_hash: str | None = None
+    recomputed_content_hash: str | None = None
+    reason: str
+
+
+class ESignatureManifestation(BaseModel):
+    """Durable §11.50 signature manifestation (printed name + UTC date/time + meaning)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    printed_name: str | None = None
+    signer_email: str | None = None
+    signature_meaning: SignatureMeaning
+    meaning_label: str
+    signed_at_utc: str | None = None
+    reason: str
+    target_type: str
+    target_id: int
+    record_content_hash: str | None = None
+    signature_digest: str | None = None
+    authentication_method: str | None = None
+    step_up_factor: str | None = None
+    step_up_aal: str | None = None
+    attestation_text: str
+    compliance_notice: str
 
 
 class ControlledRecordCreate(BaseModel):

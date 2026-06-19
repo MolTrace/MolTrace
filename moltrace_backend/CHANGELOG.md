@@ -14,6 +14,61 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.50.0 — Security Prompt 11: 21 CFR Part 11 e-signature hardening (2026-06-19)
+
+**Headline:** Second build in the Data Integrity & 21 CFR Part 11 group. The platform already
+persisted electronic-signature *records* and gated signing behind a fresh MFA step-up; this build
+closes the two Part 11 gaps that remained, **without a new parallel feature** (it hardens the
+existing `/esignatures/records` path):
+
+- **§11.100 attribution** — signer identity is now taken from the **authenticated server principal**
+  (`context.user`); the client-supplied `signer_name`/`signer_email` are ignored (the declared value
+  is recorded in metadata for transparency). Previously anyone could sign as anyone.
+- **§11.70 record linking** — the new `signature_digest` binds a SHA-256 `record_content_hash` of the
+  exact signed record snapshot, so a signature is **non-transferable** to a different record or
+  version. The legacy `signature_hash` (which covered only signer + meaning + target id) is preserved.
+- **§11.50 manifestation** — a durable, human-readable manifestation (printed name + UTC date/time +
+  meaning + bound-record hash + attestation) is rendered as JSON and printable HTML and embedded in
+  the inspection-package copy.
+- **§11.200 re-auth** — unchanged: the POST route stays gated by `require_step_up`; the step-up
+  factor/AAL are captured into the signature and the audit event.
+
+Each signing emits an `esignature.create` audit event that is auto-chained by the Prompt-10
+`before_flush` listener, so signatures inherit tamper-evidence. Additive + backward-compatible:
+legacy rows verify as **unbound** (`valid=null`) — never as tampered — and the inline callers
+(system-release approval, pilot signoff) keep working (system-release approval is now content-bound).
+Framing remains "**supports** Part 11, not compliant-for-you". The existing tests stay green; 16 new
+e-signature tests added.
+
+### Added
+- **`src/nmrcheck/esign.py`** — pure (no DB/FastAPI) signing core: `compute_record_content_hash`,
+  `canonical_signature_payload`, `compute_signature_digest`, `verify_signature` (bound/valid/
+  hash_matches/content_matches), `build_manifestation`, `render_manifestation_html`. Canonicalization
+  mirrors `audit_chain.py` so digests reproduce identically across SQLite and Postgres.
+- **`GET /esignatures/records/{id}/verify`** (`?recompute=true`) — §11.70 integrity check; re-derives
+  the digest (detects row tampering) and optionally re-snapshots the live record (detects post-sign change).
+- **`GET /esignatures/records/{id}/manifestation`** (`?format=json|html`) — §11.50 durable manifestation.
+- **ORM** `ElectronicSignatureRecordORM`: nullable `signer_user_id` (FK users, SET NULL),
+  `record_content_hash` (String 71), `signature_digest` (String 71) + two indexes.
+- **Pydantic** `ESignatureVerification`, `ESignatureManifestation`; additive optional fields on
+  `ElectronicSignatureRecord`.
+- **Migration `0027_e_signature_record_binding`** — additive, idempotent, dialect-aware FK
+  (Postgres only); `_ensure_sqlite_schema` dev backfill mirrors it.
+- **`tests/test_esign_part11.py`** — server-authoritative identity, content non-transferability,
+  manifestation JSON/HTML, step-up gate, audit-chain linkage, unbound-honesty, back-compat, migration.
+
+### Changed
+- **`validation_center_store._create_signature_row`** — accepts server-authoritative identity +
+  record content hash + step-up proof; computes the content-bound digest; preserves the legacy
+  64-char `signature_hash`. New `create_record_signature` / `verify_record_signature` /
+  `build_signature_manifestation` / `_resolve_record_content_hash`. `approve_system_release` now
+  content-binds its inline signature. Inspection-package manifest emits the binding fields +
+  manifestation per signature.
+- **`POST /esignatures/records`** — derives signer identity from the authenticated principal and
+  resolves the record content hash server-side.
+
+---
+
 ## v0.49.0 — Security Prompt 10: Tamper-evident audit chain (2026-06-18)
 
 **Headline:** First build in the Data Integrity & 21 CFR Part 11 group. Turns the append-only
