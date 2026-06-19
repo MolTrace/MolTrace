@@ -11072,6 +11072,60 @@ class ReactionPlateDesign(BaseModel):
     human_review_required: bool = True
 
 
+class ReactionSafetyScreenRequest(BaseModel):
+    """Inputs for a structural process-safety screen (R6).
+
+    Supply the reaction species as SMILES; an empty/invalid structure is not silently
+    cleared — it is screened fail-safe (``requires_expert_review=True``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    reactant_smiles: list[str] = Field(default_factory=list)
+    reagent_smiles: list[str] = Field(default_factory=list)
+    product_smiles: str | None = None
+    label: str | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReactionSafetyScreening(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    reaction_project_id: int
+    label: str | None = None
+    overall_risk: str
+    requires_expert_review: bool
+    review_status: str
+    review_note: str | None = None
+    reviewed_by_user_id: int | None = None
+    reviewed_at: datetime | None = None
+    created_at: datetime
+    input_json: dict[str, Any] = Field(default_factory=dict)
+    result_json: dict[str, Any] = Field(default_factory=dict)
+    disclaimer: str = ""
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReactionSafetyReviewRequest(BaseModel):
+    """A qualified reviewer's verdict on a flagged screening."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["approved", "rejected"]
+    note: str | None = None
+
+
+class ReactionSafetyGateStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reaction_project_id: int
+    status: Literal["clear", "review_pending", "blocked"]
+    screenings_total: int = 0
+    blocking_screening_ids: list[int] = Field(default_factory=list)
+    summary: str = ""
+
+
 class ReactionSurrogateModelRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

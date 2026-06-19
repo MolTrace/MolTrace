@@ -3800,6 +3800,43 @@ class ReactionPlateDesignORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class ReactionSafetyScreeningORM(Base):
+    """A persisted structural process-safety screening (R6) + its expert-review state.
+
+    Distinct from ``ReactionSafetyConstraintProfileORM`` (manual operating constraints):
+    this is the deterministic RDKit-SMARTS energetic-group screen, retained with a
+    human-in-the-loop review verdict so a flagged structure can be gated before execution.
+    """
+
+    __tablename__ = "reaction_safety_screenings"
+    __table_args__ = (
+        Index(
+            "ix_reaction_safety_screenings_project_created",
+            "reaction_project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    label: Mapped[str] = mapped_column(String(200), default="")
+    input_json: Mapped[str] = mapped_column(Text, default="{}")
+    result_json: Mapped[str] = mapped_column(Text, default="{}")
+    overall_risk: Mapped[str] = mapped_column(String(16), default="unknown")
+    requires_expert_review: Mapped[bool] = mapped_column(Boolean, default=True)
+    review_status: Mapped[str] = mapped_column(String(16), default="pending")
+    review_note: Mapped[str] = mapped_column(Text, default="")
+    reviewed_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class ReactionBayesianOptimizationRunORM(Base):
     __tablename__ = "reaction_bayesian_optimization_runs"
     __table_args__ = (

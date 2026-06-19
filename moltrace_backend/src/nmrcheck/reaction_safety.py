@@ -9,13 +9,35 @@ Analysis (PHA) before execution.
 The hazard motifs below are well-known explosophore / reactive classes encoded from public
 GHS and structural-chemistry knowledge — NOT the copyrighted Bretherick's compiled dataset.
 Quantitative predictions (exothermicity, gas evolution, DSC onset) are deliberately out of
-this slice; they require thermochemical data and land in a follow-up. Pure RDKit/stdlib, no
-ORM/HTTP imports, deterministic.
+this slice; they require thermochemical data and land in a follow-up.
+
+The screening functions (``screen_smiles`` / ``screen_reaction``) are pure RDKit/stdlib and
+deterministic. A thin persistence/store layer below adds the ORM access needed for the
+human-in-the-loop review gate (persist a screen, record an expert verdict, report whether the
+project is blocked) — it does not touch the screening math.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session, sessionmaker
+
+from .database import session_scope
+from .models import (
+    ReactionSafetyGateStatus,
+    ReactionSafetyReviewRequest,
+    ReactionSafetyScreening,
+    ReactionSafetyScreenRequest,
+)
+from .orm import (
+    AuditEventORM,
+    ReactionProjectORM,
+    ReactionSafetyScreeningORM,
+    utcnow,
+)
+from .reaction_store import ReactionActor
 
 _DISCLAIMER = (
     "Decision-support only; NOT a safety determination and never the sole basis for one. "
@@ -182,3 +204,207 @@ def screen_reaction(
         "disclaimer": _DISCLAIMER,
         "screen_version": _SCREEN_VERSION,
     }
+
+
+# --------------------------------------------------------------------------------------
+# Persistence / store layer (R6 wiring): persist a screen + a human-in-the-loop verdict,
+# and report a fail-safe project gate. The screening math above stays import-pure.
+# --------------------------------------------------------------------------------------
+
+import json  # noqa: E402  (kept beside the store layer it serves)
+
+# A screening still awaiting a decision, or one a reviewer rejected, blocks the project gate.
+_BLOCKING_REVIEW_STATES = ("pending", "rejected")
+
+
+def _json_dump(value: Any) -> str:
+    return json.dumps(
+        value if value is not None else {}, sort_keys=True, separators=(",", ":"), default=str
+    )
+
+
+def _json_dict(value: str | None) -> dict[str, Any]:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _project_or_raise(session: Session, project_id: int) -> ReactionProjectORM:
+    row = session.get(ReactionProjectORM, project_id)
+    if row is None:
+        raise KeyError("Reaction project not found.")
+    return row
+
+
+def _audit(
+    session: Session,
+    *,
+    actor: ReactionActor,
+    event_type: str,
+    message: str,
+    entity_id: int | None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    session.add(
+        AuditEventORM(
+            event_type=event_type,
+            message=message,
+            actor_user_id=actor.user_id,
+            actor_email=actor.email,
+            entity_type="reaction_safety_screening",
+            entity_id=entity_id,
+            metadata_json=_json_dump(metadata or {}),
+        )
+    )
+
+
+def _screening_to_record(row: ReactionSafetyScreeningORM) -> ReactionSafetyScreening:
+    return ReactionSafetyScreening(
+        id=row.id,
+        reaction_project_id=row.reaction_project_id,
+        label=row.label or None,
+        overall_risk=row.overall_risk,
+        requires_expert_review=row.requires_expert_review,
+        review_status=row.review_status,
+        review_note=row.review_note or None,
+        reviewed_by_user_id=row.reviewed_by_user_id,
+        reviewed_at=row.reviewed_at,
+        created_at=row.created_at,
+        input_json=_json_dict(row.input_json),
+        result_json=_json_dict(row.result_json),
+        disclaimer=_DISCLAIMER,
+        metadata_json=_json_dict(row.metadata_json),
+    )
+
+
+def create_screening(
+    session_factory: sessionmaker[Session],
+    project_id: int,
+    payload: ReactionSafetyScreenRequest,
+    *,
+    actor: ReactionActor,
+) -> ReactionSafetyScreening:
+    with session_scope(session_factory) as session:
+        _project_or_raise(session, project_id)
+        result = screen_reaction(
+            reactant_smiles=payload.reactant_smiles,
+            reagent_smiles=payload.reagent_smiles,
+            product_smiles=payload.product_smiles,
+        )
+        requires_review = bool(result["requires_expert_review"])
+        row = ReactionSafetyScreeningORM(
+            reaction_project_id=project_id,
+            label=payload.label or "",
+            input_json=_json_dump(payload.model_dump(mode="json")),
+            result_json=_json_dump(result),
+            overall_risk=str(result["overall_risk"]),
+            requires_expert_review=requires_review,
+            review_status="pending" if requires_review else "not_required",
+            metadata_json=_json_dump(payload.metadata_json),
+        )
+        session.add(row)
+        session.flush()
+        _audit(
+            session,
+            actor=actor,
+            event_type="reaction.safety.screen.create",
+            message="Reaction safety screening recorded.",
+            entity_id=row.id,
+            metadata={
+                "project_id": project_id,
+                "overall_risk": row.overall_risk,
+                "requires_expert_review": requires_review,
+                "energetic_groups_found": result["energetic_groups_found"],
+            },
+        )
+        return _screening_to_record(row)
+
+
+def list_screenings(
+    session_factory: sessionmaker[Session], project_id: int
+) -> list[ReactionSafetyScreening]:
+    with session_scope(session_factory) as session:
+        _project_or_raise(session, project_id)
+        rows = session.scalars(
+            select(ReactionSafetyScreeningORM)
+            .where(ReactionSafetyScreeningORM.reaction_project_id == project_id)
+            .order_by(ReactionSafetyScreeningORM.id.desc())
+        ).all()
+        return [_screening_to_record(row) for row in rows]
+
+
+def get_screening(
+    session_factory: sessionmaker[Session], project_id: int, screening_id: int
+) -> ReactionSafetyScreening | None:
+    with session_scope(session_factory) as session:
+        row = session.get(ReactionSafetyScreeningORM, screening_id)
+        if row is None or row.reaction_project_id != project_id:
+            return None
+        return _screening_to_record(row)
+
+
+def review_screening(
+    session_factory: sessionmaker[Session],
+    project_id: int,
+    screening_id: int,
+    payload: ReactionSafetyReviewRequest,
+    *,
+    actor: ReactionActor,
+) -> ReactionSafetyScreening | None:
+    with session_scope(session_factory) as session:
+        row = session.get(ReactionSafetyScreeningORM, screening_id)
+        if row is None or row.reaction_project_id != project_id:
+            return None
+        row.review_status = payload.decision
+        row.review_note = payload.note or ""
+        row.reviewed_by_user_id = actor.user_id
+        row.reviewed_at = utcnow()
+        session.flush()
+        _audit(
+            session,
+            actor=actor,
+            event_type="reaction.safety.screen.review",
+            message=f"Reaction safety screening {payload.decision} by reviewer.",
+            entity_id=row.id,
+            metadata={"project_id": project_id, "decision": payload.decision},
+        )
+        return _screening_to_record(row)
+
+
+def gate_status(
+    session_factory: sessionmaker[Session], project_id: int
+) -> ReactionSafetyGateStatus:
+    """Fail-safe project gate: blocked if any screen is rejected, else pending if any awaits
+    review, else clear. A rejected screen is a definitive 'do not proceed'."""
+    with session_scope(session_factory) as session:
+        _project_or_raise(session, project_id)
+        rows = session.scalars(
+            select(ReactionSafetyScreeningORM).where(
+                ReactionSafetyScreeningORM.reaction_project_id == project_id
+            )
+        ).all()
+        blocking = [r for r in rows if r.review_status in _BLOCKING_REVIEW_STATES]
+        rejected = [r for r in blocking if r.review_status == "rejected"]
+        if rejected:
+            status_value = "blocked"
+            summary = (
+                f"{len(rejected)} screening(s) rejected by review — do not proceed without a "
+                "qualified process-safety sign-off."
+            )
+        elif blocking:
+            status_value = "review_pending"
+            summary = f"{len(blocking)} screening(s) await expert review before execution."
+        else:
+            status_value = "clear"
+            summary = "No screenings require review."
+        return ReactionSafetyGateStatus(
+            reaction_project_id=project_id,
+            status=status_value,
+            screenings_total=len(rows),
+            blocking_screening_ids=sorted(r.id for r in blocking),
+            summary=summary,
+        )
