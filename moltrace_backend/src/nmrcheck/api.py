@@ -80,6 +80,7 @@ from . import reaction_bo as reaction_bo
 from . import reaction_execution as reaction_execution
 from . import reaction_green as reaction_green
 from . import reaction_hte as reaction_hte
+from . import reaction_safety as reaction_safety
 from . import reaction_store as reaction_store
 from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
@@ -664,6 +665,10 @@ from .models import (
     ReactionSafetyConstraintProfile,
     ReactionSafetyConstraintProfileCreate,
     ReactionSafetyConstraintProfileUpdate,
+    ReactionSafetyGateStatus,
+    ReactionSafetyReviewRequest,
+    ReactionSafetyScreening,
+    ReactionSafetyScreenRequest,
     ReactionVariable,
     ReactionVariableCreate,
     ReactionVariableUpdate,
@@ -3991,6 +3996,115 @@ def export_reaction_plate_design_route(
     if content is None:
         raise HTTPException(status_code=404, detail="Reaction plate design not found.")
     return {"target": target, "content": content}
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/safety-screenings",
+    response_model=ReactionSafetyScreening,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def create_reaction_safety_screening_route(
+    reaction_project_id: int,
+    payload: ReactionSafetyScreenRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionSafetyScreening:
+    try:
+        return reaction_safety.create_screening(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/safety-screenings",
+    response_model=list[ReactionSafetyScreening],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def list_reaction_safety_screenings_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[ReactionSafetyScreening]:
+    try:
+        return reaction_safety.list_screenings(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/safety-gate",
+    response_model=ReactionSafetyGateStatus,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_safety_gate_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionSafetyGateStatus:
+    try:
+        return reaction_safety.gate_status(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/safety-screenings/{screening_id}",
+    response_model=ReactionSafetyScreening,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_safety_screening_route(
+    reaction_project_id: int,
+    screening_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionSafetyScreening:
+    record = reaction_safety.get_screening(
+        _state(request).session_factory, reaction_project_id, screening_id
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction safety screening not found.")
+    return record
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/safety-screenings/{screening_id}/review",
+    response_model=ReactionSafetyScreening,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def review_reaction_safety_screening_route(
+    reaction_project_id: int,
+    screening_id: int,
+    payload: ReactionSafetyReviewRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionSafetyScreening:
+    try:
+        record = reaction_safety.review_screening(
+            _state(request).session_factory,
+            reaction_project_id,
+            screening_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction safety screening not found.")
+    return record
 
 
 @router.post(
