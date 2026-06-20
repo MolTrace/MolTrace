@@ -14154,6 +14154,10 @@ class ControlledRecord(BaseModel):
     retention_policy_id: int | None = None
     created_at: datetime
     updated_at: datetime
+    # ALCOA+ (Security Prompt 12). Additive/optional. No timestamp INPUT field — server-authoritative.
+    reason_for_change: str | None = None
+    deleted_at: datetime | None = None
+    deleted_by: str | None = None
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
 

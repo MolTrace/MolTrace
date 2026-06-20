@@ -14,6 +14,61 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.51.0 — Security Prompt 12: ALCOA+ hardening (2026-06-19)
+
+**Headline:** Third build in the Data Integrity & 21 CFR Part 11 group. A scope-bounded hardening
+that completes ALCOA+ for regulated records — most of which P10 (server-timestamped, hash-chained
+audit) and P11 (record-bound e-signatures) already covered:
+
+- **Attributable / *why*** — a regulated change now records its reason in a **queryable
+  `reason_for_change` column** (not buried in `metadata_json`), enforced by a shared
+  `alcoa.require_reason_for_change` primitive (defense-in-depth beyond the model's `min_length=1`:
+  a whitespace-only reason is rejected with 422).
+- **Enduring / reversible-by-record** — archiving a controlled record is now an explicit
+  **soft-delete** (`deleted_at` + `deleted_by` + `reason_for_change`, the row retained and never
+  `session.delete`d); soft-deleted records are excluded from the default list and retrievable via
+  `?include_deleted=true` for the audit trail. `deleted_by` is the **authenticated principal**,
+  never client-supplied.
+- **Contemporaneous** — verified already satisfied (every regulated mutation stamps server-side
+  `utcnow()`; request models exclude timestamp fields). No new code — a verify-only test pins it
+  (a client-supplied `created_at` is rejected by `extra="forbid"`).
+- **Original / raw vault** — the write-once guarantee can no longer silently degrade: a failure to
+  set the raw archive read-only (`chmod 0o444`) now **raises** in settings-gated strict mode
+  (`ALCOA_RAW_VAULT_STRICT_IMMUTABLE`, default off) instead of warning. Integrity-on-read
+  (SHA-256 re-verify + 409 + audited `raw_fid.integrity_failure`) was already enforced.
+- **Immutable audit trail** — `audit_events`/`audit_checkpoints` are declared immutable-by-design
+  (no DELETE route, no soft-delete) and a regression test guards that no audit-targeting DELETE
+  route exists.
+
+Deliberately bounded: no retention-purge scheduler, no S3 object-lock, and the non-regulated DELETE
+routes (MFA factors, SSO config, comments, file links) are untouched — out of the prompt's
+regulated-mutation bar. Additive + backward-compatible; framing stays "**supports** ALCOA+ / 21 CFR
+Part 11, not compliant-for-you". Existing tests stay green; 11 new ALCOA+ tests added.
+
+### Added
+- **`src/nmrcheck/alcoa.py`** — pure ALCOA+ primitives: `require_reason_for_change`,
+  `apply_soft_delete`, `is_soft_deleted`, `REGULATED_IMMUTABLE_TABLES`, `ReasonForChangeRequired`.
+- **ORM** `ControlledRecordORM`: nullable `reason_for_change` (String 2000), `deleted_at`
+  (DateTime, indexed), `deleted_by` (String 200).
+- **Migration `0028_alcoa_reason_soft_delete`** — additive, idempotent; `_ensure_sqlite_schema`
+  dev backfill mirrors it.
+- **Setting** `alcoa_raw_vault_strict_immutable` (env `ALCOA_RAW_VAULT_STRICT_IMMUTABLE`, default off).
+- **`GET /controlled-records?include_deleted=`** query param.
+- **`tests/test_p12_alcoa_hardening.py`** — reason enforcement, soft-delete reversibility +
+  non-leaking default list, contemporaneous verify-only, raw-vault strict chmod, audit-immutability
+  regression, migration isolation + sqlite-schema parity.
+
+### Changed
+- **`validation_center_store`** — `archive_controlled_record` soft-deletes via `alcoa.apply_soft_delete`
+  (server-supplied `deleted_by`); `lock_controlled_record` persists the reason to the column;
+  `list_controlled_records` gains `include_deleted` (default False, filters `deleted_at IS NOT NULL`).
+- **`raw_vault`** — `_make_read_only(strict=)` raises on chmod failure; `save` /
+  `ingest_raw_archive` / `build_raw_upload_provenance` thread `strict_immutable`.
+- **`api.py`** — archive route attributes the soft-delete to the principal; list route exposes
+  `include_deleted`; `ReasonForChangeRequired` → 422; raw-upload wires the strict-immutable setting.
+
+---
+
 ## v0.50.0 — Security Prompt 11: 21 CFR Part 11 e-signature hardening (2026-06-19)
 
 **Headline:** Second build in the Data Integrity & 21 CFR Part 11 group. The platform already

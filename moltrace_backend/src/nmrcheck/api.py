@@ -57,6 +57,7 @@ from . import ai_inference_store as ai_store
 from . import analytics_store as analytics_store
 from . import authz as authz
 from . import collaboration_store as collab_store
+from . import alcoa as alcoa
 from . import compound_registry_store as compound_store
 from . import esign as esign
 
@@ -1119,6 +1120,7 @@ def _raw_fid_upload_provenance(
             max_files=_state(request).settings.raw_archive_max_files,
             allowed_extensions=_state(request).settings.raw_archive_allowed_extensions,
             immutable=_state(request).settings.raw_archive_immutable,
+            strict_immutable=_state(request).settings.alcoa_raw_vault_strict_immutable,
         )
     except RawVaultError as exc:
         raise HTTPException(
@@ -12637,6 +12639,8 @@ def _raise_interoperability_http_error(exc: Exception) -> None:
 def _raise_validation_center_http_error(exc: Exception) -> None:
     if isinstance(exc, KeyError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, alcoa.ReasonForChangeRequired):
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if isinstance(exc, validation_store.ControlledRecordLockedError):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if isinstance(exc, validation_store.ValidationCenterError):
@@ -14404,13 +14408,17 @@ def list_controlled_records_route(
     request: Request,
     status_filter: str | None = Query(default=None, alias="status"),
     record_type: str | None = Query(default=None),
+    include_deleted: bool = Query(default=False),
     limit: int = Query(default=200, ge=1, le=500),
     context: AccessContext = Depends(require_access_context),
 ) -> list[ControlledRecord]:
+    # ALCOA+: soft-deleted (archived) records are excluded by default; include_deleted=true returns
+    # them for the reversible-by-record audit trail.
     return validation_store.list_controlled_records(
         _state(request).session_factory,
         status_filter=status_filter,
         record_type=record_type,
+        include_deleted=include_deleted,
         limit=limit,
     )
 
@@ -14507,11 +14515,14 @@ def archive_controlled_record_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> ControlledRecord:
+    # §ALCOA+: the soft-delete is attributed to the authenticated principal, never client-supplied.
+    deleted_by = context.user.email if context.user is not None else None
     try:
         record = validation_store.archive_controlled_record(
             _state(request).session_factory,
             record_id,
             payload,
+            deleted_by=deleted_by,
         )
     except Exception as exc:
         _raise_validation_center_http_error(exc)
@@ -14520,10 +14531,15 @@ def archive_controlled_record_route(
         request,
         context=context,
         event_type="controlled_record.archive",
-        message="Controlled record archived.",
+        message="Controlled record archived (soft-deleted, retained).",
         entity_type="controlled_record",
         entity_id=record.id,
-        metadata={"status": record.status},
+        metadata={
+            "status": record.status,
+            "deleted_at": record.deleted_at.isoformat() if record.deleted_at else None,
+            "deleted_by": record.deleted_by,
+            "reason_for_change": record.reason_for_change,
+        },
     )
     return record
 
