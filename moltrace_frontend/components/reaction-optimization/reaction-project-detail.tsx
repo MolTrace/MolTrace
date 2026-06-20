@@ -4287,7 +4287,7 @@ export function ReactionProjectDetail() {
               <form className="space-y-6" onSubmit={(e) => void submitExperiment(e)}>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="ex-code">experiment_code</Label>
+                    <Label htmlFor="ex-code">Experiment code</Label>
                     <Input id="ex-code" value={expCode} onChange={(e) => setExpCode(e.target.value)} maxLength={120} />
                   </div>
                   <div className="space-y-2">
@@ -4389,7 +4389,7 @@ export function ReactionProjectDetail() {
                   <p className="text-sm font-medium">outcome_json</p>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="space-y-2">
-                      <Label htmlFor="ex-yield">yield_percent</Label>
+                      <Label htmlFor="ex-yield">Yield (%)</Label>
                       <Input
                         id="ex-yield"
                         inputMode="decimal"
@@ -4398,7 +4398,7 @@ export function ReactionProjectDetail() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ex-conv">conversion_percent</Label>
+                      <Label htmlFor="ex-conv">Conversion (%)</Label>
                       <Input
                         id="ex-conv"
                         inputMode="decimal"
@@ -4407,7 +4407,7 @@ export function ReactionProjectDetail() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ex-sel">selectivity_percent</Label>
+                      <Label htmlFor="ex-sel">Selectivity (%)</Label>
                       <Input
                         id="ex-sel"
                         inputMode="decimal"
@@ -4416,7 +4416,7 @@ export function ReactionProjectDetail() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ex-imp">impurity_percent</Label>
+                      <Label htmlFor="ex-imp">Impurity (%)</Label>
                       <Input
                         id="ex-imp"
                         inputMode="decimal"
@@ -4425,7 +4425,7 @@ export function ReactionProjectDetail() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ex-iso">isolated_yield_percent</Label>
+                      <Label htmlFor="ex-iso">Isolated yield (%)</Label>
                       <Input
                         id="ex-iso"
                         inputMode="decimal"
@@ -4434,7 +4434,7 @@ export function ReactionProjectDetail() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ex-lcms">lcms_area_percent</Label>
+                      <Label htmlFor="ex-lcms">LC-MS area (%)</Label>
                       <Input
                         id="ex-lcms"
                         inputMode="decimal"
@@ -4443,7 +4443,7 @@ export function ReactionProjectDetail() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ex-nmr">nmr_purity_percent</Label>
+                      <Label htmlFor="ex-nmr">NMR purity (%)</Label>
                       <Input
                         id="ex-nmr"
                         inputMode="decimal"
@@ -4464,7 +4464,7 @@ export function ReactionProjectDetail() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="ex-sc">linked_spectracheck_session_id</Label>
+                  <Label htmlFor="ex-sc">Linked SpectraCheck session</Label>
                   <p className="text-xs text-muted-foreground">optional</p>
                   <Input
                     id="ex-sc"
@@ -4694,7 +4694,7 @@ export function ReactionProjectDetail() {
           >
               <form className="space-y-6" onSubmit={(e) => void saveCostProfile(e)}>
                 <div className="space-y-2">
-                  <Label htmlFor="cp-reagent-costs">reagent_costs_json</Label>
+                  <Label htmlFor="cp-reagent-costs">Reagent costs</Label>
                   <p className="text-xs text-muted-foreground">JSON or table (advanced).</p>
                   <Textarea
                     id="cp-reagent-costs"
@@ -4705,7 +4705,7 @@ export function ReactionProjectDetail() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cp-solvent-costs">solvent_costs_json</Label>
+                  <Label htmlFor="cp-solvent-costs">Solvent costs</Label>
                   <p className="text-xs text-muted-foreground">JSON or table (advanced).</p>
                   <Textarea
                     id="cp-solvent-costs"
@@ -4716,7 +4716,7 @@ export function ReactionProjectDetail() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cp-catalyst-costs">catalyst_costs_json</Label>
+                  <Label htmlFor="cp-catalyst-costs">Catalyst costs</Label>
                   <p className="text-xs text-muted-foreground">JSON or table (advanced).</p>
                   <Textarea
                     id="cp-catalyst-costs"
@@ -4727,7 +4727,7 @@ export function ReactionProjectDetail() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cp-ligand-costs">ligand_costs_json</Label>
+                  <Label htmlFor="cp-ligand-costs">Ligand costs</Label>
                   <p className="text-xs text-muted-foreground">JSON or table (advanced).</p>
                   <Textarea
                     id="cp-ligand-costs"
@@ -4738,7 +4738,7 @@ export function ReactionProjectDetail() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cp-availability">availability_notes</Label>
+                  <Label htmlFor="cp-availability">Availability notes</Label>
                   <Textarea
                     id="cp-availability"
                     rows={3}
@@ -4748,7 +4748,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="cp-max-cost">max_cost_per_experiment</Label>
+                    <Label htmlFor="cp-max-cost">Max cost per experiment</Label>
                     <Input
                       id="cp-max-cost"
                       inputMode="decimal"
@@ -4757,7 +4757,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cp-penalty-weight">cost_penalty_weight</Label>
+                    <Label htmlFor="cp-penalty-weight">Cost penalty weight</Label>
                     <Input
                       id="cp-penalty-weight"
                       inputMode="decimal"
@@ -4786,7 +4786,7 @@ export function ReactionProjectDetail() {
               <form className="space-y-6" onSubmit={(e) => void saveSafetyProfile(e)}>
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Label htmlFor="sp-blocked-reagents">blocked_reagents</Label>
+                    <Label htmlFor="sp-blocked-reagents">Blocked reagents</Label>
                     {blockedReagentsText.trim() ? (
                       <Badge variant="destructive" className="text-[10px] font-normal">
                         blocked list active
@@ -4804,7 +4804,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Label htmlFor="sp-blocked-solvents">blocked_solvents</Label>
+                    <Label htmlFor="sp-blocked-solvents">Blocked solvents</Label>
                     {blockedSolventsText.trim() ? (
                       <Badge variant="destructive" className="text-[10px] font-normal">
                         blocked list active
@@ -4822,7 +4822,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="sp-max-temp">max_temperature_c</Label>
+                    <Label htmlFor="sp-max-temp">Max temperature (°C)</Label>
                     <p className="text-xs text-muted-foreground">Maximum temperature (°C).</p>
                     <Input
                       id="sp-max-temp"
@@ -4832,7 +4832,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sp-max-pressure">max_pressure_bar</Label>
+                    <Label htmlFor="sp-max-pressure">Max pressure (bar)</Label>
                     <p className="text-xs text-muted-foreground">Maximum pressure (bar).</p>
                     <Input
                       id="sp-max-pressure"
@@ -4843,7 +4843,7 @@ export function ReactionProjectDetail() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sp-incompatible">incompatible_pairs</Label>
+                  <Label htmlFor="sp-incompatible">Incompatible pairs</Label>
                   <p className="text-xs text-muted-foreground">JSON (advanced).</p>
                   <Textarea
                     id="sp-incompatible"
@@ -4854,7 +4854,7 @@ export function ReactionProjectDetail() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sp-controls">required_controls</Label>
+                  <Label htmlFor="sp-controls">Required controls</Label>
                   <p className="text-xs text-muted-foreground">JSON (advanced).</p>
                   <Textarea
                     id="sp-controls"
@@ -4865,7 +4865,7 @@ export function ReactionProjectDetail() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sp-notes">safety_notes</Label>
+                  <Label htmlFor="sp-notes">Safety notes</Label>
                   <Textarea
                     id="sp-notes"
                     rows={4}
@@ -5115,7 +5115,7 @@ export function ReactionProjectDetail() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="bo-batch">batch_size</Label>
+                  <Label htmlFor="bo-batch">Batch size</Label>
                   <Input
                     id="bo-batch"
                     inputMode="numeric"
@@ -5125,7 +5125,7 @@ export function ReactionProjectDetail() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bo-explore">exploration_weight</Label>
+                  <Label htmlFor="bo-explore">Exploration weight</Label>
                   <Input
                     id="bo-explore"
                     inputMode="decimal"
@@ -5408,7 +5408,7 @@ export function ReactionProjectDetail() {
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="bench-name">benchmark_name</Label>
+                  <Label htmlFor="bench-name">Benchmark name</Label>
                   <Input
                     id="bench-name"
                     value={benchmarkName}
@@ -5447,7 +5447,7 @@ export function ReactionProjectDetail() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bench-budget">experiment_budget</Label>
+                  <Label htmlFor="bench-budget">Experiment budget</Label>
                   <Input
                     id="bench-budget"
                     inputMode="numeric"
@@ -5702,7 +5702,7 @@ export function ReactionProjectDetail() {
               <div className="grid gap-4 md:grid-cols-2">
                 {boRuns.filter(isRecord).length > 0 ? (
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="adv-bo-run">bo_run_id</Label>
+                    <Label htmlFor="adv-bo-run">BO run</Label>
                     <Select
                       value={advBoRunId.trim() === "" ? "__none__" : advBoRunId.trim()}
                       onValueChange={(v) => setAdvBoRunId(v === "__none__" ? "" : v)}
@@ -5731,7 +5731,7 @@ export function ReactionProjectDetail() {
 
                 {recommendationBatchesList.filter(isRecord).length > 0 ? (
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="adv-batch">recommendation_batch_id</Label>
+                    <Label htmlFor="adv-batch">Recommendation batch</Label>
                     <Select
                       value={advBatchId.trim() === "" ? "__none__" : advBatchId.trim()}
                       onValueChange={(v) => setAdvBatchId(v === "__none__" ? "" : v)}
@@ -5759,7 +5759,7 @@ export function ReactionProjectDetail() {
                 ) : null}
 
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="adv-mode">advisor_mode</Label>
+                  <Label htmlFor="adv-mode">Advisor mode</Label>
                   <Select value={advisorMode} onValueChange={setAdvisorMode}>
                     <SelectTrigger id="adv-mode">
                       <SelectValue />
@@ -6037,7 +6037,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="mh-confidence">confidence_label</Label>
+                    <Label htmlFor="mh-confidence">Confidence label</Label>
                     <Select value={mhConfidence} onValueChange={setMhConfidence}>
                       <SelectTrigger id="mh-confidence">
                         <SelectValue />
@@ -6052,7 +6052,7 @@ export function ReactionProjectDetail() {
                     </Select>
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="mh-supporting">supporting_observations_json</Label>
+                    <Label htmlFor="mh-supporting">Supporting observations</Label>
                     <p className="text-xs text-muted-foreground">JSON array or object; leave empty for none.</p>
                     <Textarea
                       id="mh-supporting"
@@ -6064,7 +6064,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="mh-contradicting">contradicting_observations_json</Label>
+                    <Label htmlFor="mh-contradicting">Contradicting observations</Label>
                     <p className="text-xs text-muted-foreground">JSON array or object; leave empty for none.</p>
                     <Textarea
                       id="mh-contradicting"
@@ -6205,7 +6205,7 @@ export function ReactionProjectDetail() {
               <form className="space-y-4" onSubmit={(e) => void createLiteraturePrior(e)}>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="lp-source">source_type</Label>
+                    <Label htmlFor="lp-source">Source type</Label>
                     <Select value={lpSourceType} onValueChange={setLpSourceType}>
                       <SelectTrigger id="lp-source">
                         <SelectValue />
@@ -6252,7 +6252,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="lp-tags">relevance_tags_json</Label>
+                    <Label htmlFor="lp-tags">Relevance tags</Label>
                     <p className="text-xs text-muted-foreground">
                       JSON array (e.g. [&quot;solvent&quot;, &quot;amidation&quot;]) or object; leave empty for none.
                     </p>
@@ -6349,7 +6349,7 @@ export function ReactionProjectDetail() {
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="cmp-bo-run">bo_run_id</Label>
+                  <Label htmlFor="cmp-bo-run">BO run</Label>
                   <Select
                     value={cmpBoRunId.trim() === "" ? "__none__" : cmpBoRunId.trim()}
                     onValueChange={(v) => setCmpBoRunId(v === "__none__" ? "" : v)}
@@ -6372,7 +6372,7 @@ export function ReactionProjectDetail() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cmp-advisor-run">advisor_run_id</Label>
+                  <Label htmlFor="cmp-advisor-run">Advisor run</Label>
                   <Select
                     value={cmpAdvisorRunId.trim() === "" ? "__none__" : cmpAdvisorRunId.trim()}
                     onValueChange={(v) => setCmpAdvisorRunId(v === "__none__" ? "" : v)}
@@ -6555,7 +6555,7 @@ export function ReactionProjectDetail() {
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="advisor-review-run">advisor_run_id</Label>
+                  <Label htmlFor="advisor-review-run">Advisor run</Label>
                   <Select
                     value={advisorReviewRunId.trim() === "" ? "__none__" : advisorReviewRunId.trim()}
                     onValueChange={(v) => setAdvisorReviewRunId(v === "__none__" ? "" : v)}
@@ -6578,7 +6578,7 @@ export function ReactionProjectDetail() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="advisor-reviewer-name">reviewer_name</Label>
+                  <Label htmlFor="advisor-reviewer-name">Reviewer name</Label>
                   <Input
                     id="advisor-reviewer-name"
                     autoComplete="name"
@@ -6683,7 +6683,7 @@ export function ReactionProjectDetail() {
             }
           >
             <div className="space-y-2">
-              <Label htmlFor="rec-reviewer-name">reviewer_name</Label>
+              <Label htmlFor="rec-reviewer-name">Reviewer name</Label>
               <Input
                 id="rec-reviewer-name"
                 autoComplete="name"
@@ -7102,7 +7102,7 @@ export function ReactionProjectDetail() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="conv-exec-batch">execution_batch_id</Label>
+                  <Label htmlFor="conv-exec-batch">Execution batch</Label>
                   <Select value={convertRecExecutionBatchId || "__none__"} onValueChange={setConvertRecExecutionBatchId}>
                     <SelectTrigger id="conv-exec-batch">
                       <SelectValue placeholder="Optional" />
@@ -7284,7 +7284,7 @@ export function ReactionProjectDetail() {
                 <p className="text-sm font-medium">Create execution batch</p>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="eb-pl-batch-code">batch_code</Label>
+                    <Label htmlFor="eb-pl-batch-code">Batch code</Label>
                     <Input
                       id="eb-pl-batch-code"
                       value={plEbBatchCode}
@@ -7302,7 +7302,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="eb-pl-planned-start">planned_start</Label>
+                    <Label htmlFor="eb-pl-planned-start">Planned start</Label>
                     <Input
                       id="eb-pl-planned-start"
                       type="datetime-local"
@@ -7312,7 +7312,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="eb-pl-planned-end">planned_end</Label>
+                    <Label htmlFor="eb-pl-planned-end">Planned end</Label>
                     <Input
                       id="eb-pl-planned-end"
                       type="datetime-local"
@@ -7480,7 +7480,7 @@ export function ReactionProjectDetail() {
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="eb-pl-item-code">item_code</Label>
+                        <Label htmlFor="eb-pl-item-code">Item code</Label>
                         <Input
                           id="eb-pl-item-code"
                           value={execPlannerItemCode}
@@ -7489,7 +7489,7 @@ export function ReactionProjectDetail() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="eb-pl-operator">operator_name</Label>
+                        <Label htmlFor="eb-pl-operator">Operator name</Label>
                         <Input
                           id="eb-pl-operator"
                           value={execPlannerOperatorName}
@@ -7499,7 +7499,7 @@ export function ReactionProjectDetail() {
                         />
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="eb-pl-checklist">checklist_json</Label>
+                        <Label htmlFor="eb-pl-checklist">Checklist</Label>
                         <Textarea
                           id="eb-pl-checklist"
                           rows={3}
@@ -7874,7 +7874,7 @@ export function ReactionProjectDetail() {
               <form className="space-y-4" onSubmit={(e) => void addAnalyticalResultToExecutionItem(e)}>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="ar-item">execution_item_id</Label>
+                    <Label htmlFor="ar-item">Execution item</Label>
                     <Select value={arExecutionItemId || "__none__"} onValueChange={setArExecutionItemId}>
                       <SelectTrigger id="ar-item">
                         <SelectValue placeholder="Select execution item" />
@@ -7895,7 +7895,7 @@ export function ReactionProjectDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ar-type">result_type</Label>
+                    <Label htmlFor="ar-type">Result type</Label>
                     <Select value={arResultType} onValueChange={setArResultType}>
                       <SelectTrigger id="ar-type">
                         <SelectValue />
@@ -7911,7 +7911,7 @@ export function ReactionProjectDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ar-sc">spectracheck_session_id</Label>
+                    <Label htmlFor="ar-sc">SpectraCheck session</Label>
                     <Input
                       id="ar-sc"
                       inputMode="numeric"
@@ -7922,7 +7922,7 @@ export function ReactionProjectDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ar-file">file_id</Label>
+                    <Label htmlFor="ar-file">File</Label>
                     <Input
                       id="ar-file"
                       inputMode="numeric"
@@ -7933,7 +7933,7 @@ export function ReactionProjectDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ar-artifact">artifact_id</Label>
+                    <Label htmlFor="ar-artifact">Artifact</Label>
                     <Input
                       id="ar-artifact"
                       inputMode="numeric"
@@ -7944,7 +7944,7 @@ export function ReactionProjectDetail() {
                   </div>
 
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="ar-hash">source_hash</Label>
+                    <Label htmlFor="ar-hash">Source hash</Label>
                     <Input
                       id="ar-hash"
                       value={arSourceHash}
@@ -7955,7 +7955,7 @@ export function ReactionProjectDetail() {
                   </div>
 
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="ar-summary">summary_json</Label>
+                    <Label htmlFor="ar-summary">Summary</Label>
                     <Textarea
                       id="ar-summary"
                       rows={5}
@@ -8081,7 +8081,7 @@ export function ReactionProjectDetail() {
               <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="oe-exec-item">execution_item_id</Label>
+                    <Label htmlFor="oe-exec-item">Execution item</Label>
                     <Select value={oeExecutionItemId || "__none__"} onValueChange={setOeExecutionItemId}>
                       <SelectTrigger id="oe-exec-item">
                         <SelectValue placeholder="Select execution item" />
@@ -8102,7 +8102,7 @@ export function ReactionProjectDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="oe-method">extraction_method</Label>
+                    <Label htmlFor="oe-method">Extraction method</Label>
                     <Select value={oeExtractionMethod} onValueChange={setOeExtractionMethod}>
                       <SelectTrigger id="oe-method">
                         <SelectValue />
@@ -8118,7 +8118,7 @@ export function ReactionProjectDetail() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="oe-ar-id">analytical_result_id</Label>
+                    <Label htmlFor="oe-ar-id">Analytical result</Label>
                     <Select
                       value={oeAnalyticalResultIdChoice}
                       onValueChange={setOeAnalyticalResultIdChoice}
@@ -8246,7 +8246,7 @@ export function ReactionProjectDetail() {
 
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <div className="space-y-2">
-                          <Label htmlFor="oe-yield">yield_percent</Label>
+                          <Label htmlFor="oe-yield">Yield (%)</Label>
                           <Input
                             id="oe-yield"
                             inputMode="decimal"
@@ -8257,7 +8257,7 @@ export function ReactionProjectDetail() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="oe-conv">conversion_percent</Label>
+                          <Label htmlFor="oe-conv">Conversion (%)</Label>
                           <Input
                             id="oe-conv"
                             inputMode="decimal"
@@ -8268,7 +8268,7 @@ export function ReactionProjectDetail() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="oe-sel">selectivity_percent</Label>
+                          <Label htmlFor="oe-sel">Selectivity (%)</Label>
                           <Input
                             id="oe-sel"
                             inputMode="decimal"
@@ -8279,7 +8279,7 @@ export function ReactionProjectDetail() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="oe-imp">impurity_percent</Label>
+                          <Label htmlFor="oe-imp">Impurity (%)</Label>
                           <Input
                             id="oe-imp"
                             inputMode="decimal"
@@ -8290,7 +8290,7 @@ export function ReactionProjectDetail() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="oe-iso">isolated_yield_percent</Label>
+                          <Label htmlFor="oe-iso">Isolated yield (%)</Label>
                           <Input
                             id="oe-iso"
                             inputMode="decimal"
@@ -8301,7 +8301,7 @@ export function ReactionProjectDetail() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="oe-lcms">lcms_area_percent</Label>
+                          <Label htmlFor="oe-lcms">LC-MS area (%)</Label>
                           <Input
                             id="oe-lcms"
                             inputMode="decimal"
@@ -8312,7 +8312,7 @@ export function ReactionProjectDetail() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="oe-nmr">nmr_purity_percent</Label>
+                          <Label htmlFor="oe-nmr">NMR purity (%)</Label>
                           <Input
                             id="oe-nmr"
                             inputMode="decimal"
@@ -8337,7 +8337,7 @@ export function ReactionProjectDetail() {
 
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                          <Label htmlFor="oe-reviewer">reviewer_name</Label>
+                          <Label htmlFor="oe-reviewer">Reviewer name</Label>
                           <Input
                             id="oe-reviewer"
                             value={oeReviewerName}
@@ -8450,7 +8450,7 @@ export function ReactionProjectDetail() {
               <form className="space-y-4" onSubmit={(e) => void createOptimizationCycleRecord(e)}>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-2 lg:col-span-2">
-                    <Label htmlFor="opt-cc-eb">execution_batch_id</Label>
+                    <Label htmlFor="opt-cc-eb">Execution batch</Label>
                     <Select value={optCcExecutionBatchId || "__none__"} onValueChange={setOptCcExecutionBatchId}>
                       <SelectTrigger id="opt-cc-eb">
                         <SelectValue placeholder="Optional linkage" />
@@ -8489,7 +8489,7 @@ export function ReactionProjectDetail() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="opt-cc-num">cycle_number</Label>
+                    <Label htmlFor="opt-cc-num">Cycle number</Label>
                     <Input
                       id="opt-cc-num"
                       inputMode="numeric"
@@ -8500,7 +8500,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="opt-cc-bo">bo_run_id</Label>
+                    <Label htmlFor="opt-cc-bo">BO run</Label>
                     <Input
                       id="opt-cc-bo"
                       inputMode="numeric"
@@ -8511,7 +8511,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="opt-cc-ad">advisor_run_id</Label>
+                    <Label htmlFor="opt-cc-ad">Advisor run</Label>
                     <Input
                       id="opt-cc-ad"
                       inputMode="numeric"
@@ -8522,7 +8522,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="opt-cc-rb">recommendation_batch_id</Label>
+                    <Label htmlFor="opt-cc-rb">Recommendation batch</Label>
                     <Input
                       id="opt-cc-rb"
                       inputMode="numeric"
@@ -8730,7 +8730,7 @@ export function ReactionProjectDetail() {
                                         />
                                       </div>
                                       <div className="space-y-2 md:col-span-2">
-                                        <Label htmlFor={`opt-rev-${cid}`}>reviewer_name</Label>
+                                        <Label htmlFor={`opt-rev-${cid}`}>Reviewer name</Label>
                                         <Input
                                           id={`opt-rev-${cid}`}
                                           value={occReviewer}
@@ -8955,7 +8955,7 @@ export function ReactionProjectDetail() {
             }}
           >
             <div className="space-y-2">
-              <Label htmlFor="link-sc-session-id">session_id</Label>
+              <Label htmlFor="link-sc-session-id">Session</Label>
               <Input
                 id="link-sc-session-id"
                 inputMode="numeric"
@@ -9047,7 +9047,7 @@ export function ReactionProjectDetail() {
                 {(boardDialog.kind === "run" || boardDialog.kind === "done") && (
                   <>
                     <div className="space-y-2">
-                      <Label htmlFor="ebd-operator">operator_name</Label>
+                      <Label htmlFor="ebd-operator">Operator name</Label>
                       <Input
                         id="ebd-operator"
                         autoComplete="name"
@@ -9076,7 +9076,7 @@ export function ReactionProjectDetail() {
                 {boardDialog.kind === "fail" && (
                   <>
                     <div className="space-y-2">
-                      <Label htmlFor="ebd-failure">failure_reason</Label>
+                      <Label htmlFor="ebd-failure">Failure reason</Label>
                       <Textarea
                         id="ebd-failure"
                         required
@@ -9088,7 +9088,7 @@ export function ReactionProjectDetail() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ebd-fail-operator">operator_name</Label>
+                      <Label htmlFor="ebd-fail-operator">Operator name</Label>
                       <Input
                         id="ebd-fail-operator"
                         autoComplete="name"
@@ -9101,7 +9101,7 @@ export function ReactionProjectDetail() {
                 )}
                 {boardDialog.kind === "checklist" && (
                   <div className="space-y-2">
-                    <Label htmlFor="ebd-checklist">checklist_json</Label>
+                    <Label htmlFor="ebd-checklist">Checklist</Label>
                     <Textarea
                       id="ebd-checklist"
                       rows={10}
