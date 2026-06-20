@@ -51,8 +51,13 @@ from .orm import (
     SpectraCheckSessionORM,
     utcnow,
 )
+from . import reaction_safety
 from .reaction_store import ReactionActor, ReactionError
 
+
+# Statuses that commit a batch to physical execution — gated by the R6 safety hard-block.
+# 'draft' (planning) and terminal/record-keeping states (completed/failed/canceled/…) are not.
+_EXECUTION_COMMIT_STATUSES = frozenset({"planned", "running"})
 
 _SAFE_NOTE = (
     "Execution records are planning and analytical feedback records. A reaction becomes a "
@@ -79,6 +84,8 @@ def create_execution_batch(
 ) -> ReactionExecutionBatch:
     with session_scope(session_factory) as session:
         _project_or_raise(session, project_id)
+        if payload.status in _EXECUTION_COMMIT_STATUSES:
+            reaction_safety.assert_execution_allowed(session, project_id)
         row = ReactionExecutionBatchORM(
             reaction_project_id=project_id,
             batch_code=payload.batch_code,
@@ -141,6 +148,8 @@ def patch_execution_batch(
         if row is None:
             return None
         update = payload.model_dump(exclude_unset=True)
+        if update.get("status") in _EXECUTION_COMMIT_STATUSES:
+            reaction_safety.assert_execution_allowed(session, row.reaction_project_id)
         previous_status = row.status
         for field in ("batch_code", "title", "status", "planned_start", "planned_end", "created_by"):
             if field in update:
@@ -1144,16 +1153,26 @@ def _refresh_batch_status(session: Session, batch: ReactionExecutionBatchORM) ->
     if not rows:
         return
     statuses = {row.status for row in rows}
+    target = batch.status
     if "running" in statuses:
-        batch.status = "running"
+        target = "running"
     elif statuses <= {"completed", "skipped", "canceled"}:
-        batch.status = "completed" if "completed" in statuses else "canceled"
+        target = "completed" if "completed" in statuses else "canceled"
     elif statuses <= {"failed"}:
-        batch.status = "failed"
+        target = "failed"
     elif statuses & {"completed", "failed", "skipped", "canceled"}:
-        batch.status = "partially_completed"
+        target = "partially_completed"
     elif statuses <= {"planned"} and batch.status == "draft":
-        batch.status = "planned"
+        target = "planned"
+    if target != batch.status:
+        # An item-driven auto-promotion INTO a commit status (planned/running) is itself a
+        # bench commitment — gate it exactly like the direct batch endpoints, so item-level
+        # paths (add/patch item, mark-running, recommendation→experiment) cannot bypass the
+        # rejected-screening hard-block. Completing/failing items and already-active batches
+        # carry no new commitment and are not re-gated.
+        if target in _EXECUTION_COMMIT_STATUSES:
+            reaction_safety.assert_execution_allowed(session, batch.reaction_project_id)
+        batch.status = target
     batch.updated_at = utcnow()
 
 

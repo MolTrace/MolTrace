@@ -2349,6 +2349,9 @@ def _reaction_actor(context: AccessContext) -> reaction_store.ReactionActor:
 def _raise_reaction_http_error(exc: Exception) -> None:
     if isinstance(exc, KeyError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, reaction_safety.ReactionSafetyGateBlockedError):
+        # Subclass of ReactionError — must be checked first so it maps to 409, not 400.
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if isinstance(exc, reaction_store.ReactionError):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     raise exc
