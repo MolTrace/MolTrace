@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect } from "react"
+import { History } from "lucide-react"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
 
 function RecentJobPanel({ jobId }: { jobId: string }) {
@@ -32,7 +34,18 @@ export function RecentAnalysisJobsSection({ jobIds }: { jobIds: readonly string[
       </CardHeader>
       <CardContent className="space-y-4">
         {jobIds.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No analysis jobs started yet.</p>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <History />
+              </EmptyMedia>
+              <EmptyTitle>No analysis jobs yet</EmptyTitle>
+              <EmptyDescription>
+                Jobs you start from Overview or the upload tabs will appear here and poll
+                automatically until they complete.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           jobIds.map((id) => <RecentJobPanel key={id} jobId={id} />)
         )}

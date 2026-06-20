@@ -11,6 +11,7 @@ import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -534,7 +535,26 @@ export function CompoundRegistryWorkspace() {
         <div>
           {loading ? <p className="text-sm text-muted-foreground">Loading compounds…</p> : null}
           {!loading && rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No compounds returned.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  {searchActive ? <Search /> : <Database />}
+                </EmptyMedia>
+                <EmptyTitle>{searchActive ? "No matches" : "No compounds yet"}</EmptyTitle>
+                <EmptyDescription>
+                  {searchActive
+                    ? "No compounds matched these filters. Try broadening or clearing the search."
+                    : "Register your first compound to start tracking batches, evidence, and dossiers."}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                {searchActive ? (
+                  <Button type="button" variant="outline" size="sm" onClick={clearSearch}>
+                    Clear search
+                  </Button>
+                ) : null}
+              </EmptyContent>
+            </Empty>
           ) : null}
           {!loading && rows.length > 0 ? (
             <div className="table-scroll">

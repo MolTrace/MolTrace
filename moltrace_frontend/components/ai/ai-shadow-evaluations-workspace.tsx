@@ -15,6 +15,7 @@ import { GitCompare, ListChecks } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react"
 
 type Row = Record<string, unknown>
@@ -204,7 +205,19 @@ export function AiShadowEvaluationsWorkspace() {
                   </TableRow>
                 )
               })}
-              {rows.length === 0 ? <TableRow><TableCell colSpan={5} className="text-muted-foreground">No shadow evaluations returned.</TableCell></TableRow> : null}
+              {rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5}>
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon"><ListChecks /></EmptyMedia>
+                        <EmptyTitle>No shadow runs yet</EmptyTitle>
+                        <EmptyDescription>Start a candidate-vs-production comparison above to populate this table.</EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
+                  </TableCell>
+                </TableRow>
+              ) : null}
             </TableBody>
           </Table>
           {detailErr ? <p className="mt-3 text-sm text-destructive">{detailErr}</p> : null}

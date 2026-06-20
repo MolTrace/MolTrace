@@ -19,7 +19,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertTriangle, ArrowLeft, Bell, Loader2 } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Bell, BellOff, Loader2 } from "lucide-react"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -146,7 +153,18 @@ export function RegulatoryNotificationsWorkspace() {
               <AlertDescription className="text-sm">{loadErr}</AlertDescription>
             </Alert>
           ) : rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No notifications returned.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <BellOff />
+                </EmptyMedia>
+                <EmptyTitle>No notifications</EmptyTitle>
+                <EmptyDescription>
+                  No regulatory-change notifications match the current scope — check back after the next
+                  surveillance run.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <div className="table-scroll">
               <Table>

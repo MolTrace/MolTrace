@@ -19,9 +19,18 @@ import {
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import {
   BarChart3,
   BookMarked,
+  BookText,
   ClipboardCheck,
+  Cpu,
   Database,
   FileStack,
   Layers,
@@ -457,7 +466,17 @@ export function KnowledgeLibraryLanding() {
           ) : errSources ? (
             <p className="text-sm text-muted-foreground">{errSources}</p>
           ) : sources.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sources returned.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <BookText />
+                </EmptyMedia>
+                <EmptyTitle>No knowledge sources yet</EmptyTitle>
+                <EmptyDescription>
+                  Add a literature, patent, or document source to start building the knowledge library.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <Table>
               <TableHeader>
@@ -507,7 +526,17 @@ export function KnowledgeLibraryLanding() {
           ) : errRuns ? (
             <p className="text-sm text-muted-foreground">{errRuns}</p>
           ) : runs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No extraction runs returned.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Cpu />
+                </EmptyMedia>
+                <EmptyTitle>No extraction runs yet</EmptyTitle>
+                <EmptyDescription>
+                  Runs appear here once a source has been processed through the extraction pipeline.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <Table>
               <TableHeader>

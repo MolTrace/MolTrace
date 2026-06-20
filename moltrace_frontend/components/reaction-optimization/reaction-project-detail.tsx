@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { ArrowLeft, ChevronDown, ExternalLink, FlaskConical, Info } from "lucide-react"
+import { ArrowLeft, ChevronDown, ExternalLink, FlaskConical, Info, Lightbulb } from "lucide-react"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { MlModelProvenanceSummary } from "@/components/ml/ml-model-provenance-summary"
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 
 const reactionProjectTabClass =
   "font-mono text-xs sm:text-sm data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#EBF4F8] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
@@ -6193,7 +6194,15 @@ export function ReactionProjectDetail() {
                   )
                 })}
                 {!loading && mechanisticHypotheses.filter(isRecord).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No mechanistic hypotheses yet.</p>
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Lightbulb />
+                      </EmptyMedia>
+                      <EmptyTitle>No mechanistic hypotheses yet</EmptyTitle>
+                      <EmptyDescription>Record a hypothesis to track proposed mechanisms.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
                 ) : null}
               </div>
             </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useCallback, useMemo, useState } from "react"
+import { Atom } from "lucide-react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber as readRecordNumberField, readRecordString } from "@/components/projects/project-workspace-utils"
@@ -9,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -575,8 +577,18 @@ export function ReactionStudioCompoundLinkingPanel({
               })}
               {!loading && experiments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground">
-                    No experiments.
+                  <TableCell colSpan={5}>
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <Atom />
+                        </EmptyMedia>
+                        <EmptyTitle>No experiments</EmptyTitle>
+                        <EmptyDescription>
+                          Experiments and their compound links appear here once added.
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   </TableCell>
                 </TableRow>
               ) : null}

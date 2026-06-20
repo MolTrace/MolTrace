@@ -8,6 +8,13 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -456,7 +463,17 @@ export function KnowledgeSourceLibraryWorkspace() {
           ) : listErr ? (
             <p className="text-sm text-muted-foreground">{listErr}</p>
           ) : sources.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sources returned.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Library />
+                </EmptyMedia>
+                <EmptyTitle>No sources match</EmptyTitle>
+                <EmptyDescription>
+                  No knowledge sources found for the current filters — clear filters or create a new source.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <Table>
               <TableHeader>
@@ -656,7 +673,17 @@ export function KnowledgeSourceLibraryWorkspace() {
             ) : filesErr ? (
               <p className="text-sm text-muted-foreground">{filesErr}</p>
             ) : files.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No files returned.</p>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <FileText />
+                  </EmptyMedia>
+                  <EmptyTitle>No files attached</EmptyTitle>
+                  <EmptyDescription>
+                    Upload a file to this source to make it available for extraction.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="table-scroll min-w-0">
                 <Table>

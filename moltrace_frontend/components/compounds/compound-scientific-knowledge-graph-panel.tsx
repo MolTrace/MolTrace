@@ -19,7 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Loader2 } from "lucide-react"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Loader2, Network } from "lucide-react"
 import { trackCompoundGraphViewed } from "@/src/lib/analytics/analytics-client"
 
 const GRAPH_TOOLTIP =
@@ -293,7 +294,15 @@ export function CompoundScientificKnowledgeGraphPanel({
         </CardHeader>
         <CardContent className="space-y-4">
           {nodesByType.length === 0 && !loading && !err ? (
-            <p className="text-sm text-muted-foreground">No nodes in this graph payload.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Network />
+                </EmptyMedia>
+                <EmptyTitle>No nodes</EmptyTitle>
+                <EmptyDescription>This compound&apos;s graph payload contains no nodes to display.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : null}
           {nodesByType.map(([type, rows]) => (
             <div key={type} className="rounded-lg border bg-muted/10 p-3">

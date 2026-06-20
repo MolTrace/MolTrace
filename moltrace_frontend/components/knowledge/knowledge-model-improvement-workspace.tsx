@@ -37,7 +37,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { AlertTriangle, ArrowLeft, Layers, ListChecks, Loader2, Plus } from "lucide-react"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { AlertTriangle, ArrowLeft, Layers, ListChecks, Loader2, Plus, Sparkles } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -302,6 +303,18 @@ export function KnowledgeModelImprovementWorkspace() {
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                 Loading…
               </p>
+            ) : rows.length === 0 ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Sparkles />
+                  </EmptyMedia>
+                  <EmptyTitle>No model-improvement items</EmptyTitle>
+                  <EmptyDescription>
+                    Nominate records or sources for model improvement to populate this list.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="table-scroll min-w-0">
                 <Table>
@@ -366,7 +379,6 @@ export function KnowledgeModelImprovementWorkspace() {
                     })}
                   </TableBody>
                 </Table>
-                {rows.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No rows returned.</p> : null}
               </div>
             )}
           </div>

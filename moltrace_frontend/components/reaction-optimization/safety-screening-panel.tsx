@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { cn } from "@/lib/utils"
 import {
   createScreening,
@@ -421,9 +422,17 @@ export function SafetyScreeningPanel({
         ) : loading ? (
           <p className="text-sm text-muted-foreground">Loading safety screenings…</p>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            No safety screenings yet — run one above to screen species for energetic/reactive groups.
-          </p>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ShieldAlert />
+              </EmptyMedia>
+              <EmptyTitle>No safety screenings yet</EmptyTitle>
+              <EmptyDescription>
+                Run a screen above to check species for energetic/reactive groups.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </div>
     </ModuleCard>

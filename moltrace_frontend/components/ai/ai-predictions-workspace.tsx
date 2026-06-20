@@ -12,7 +12,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { ClipboardList, ListChecks, Play } from "lucide-react"
+import { ClipboardList, ListChecks, Play, Sparkles } from "lucide-react"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -390,8 +391,18 @@ export function AiPredictionsWorkspace() {
               })}
               {predictions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground">
-                    No predictions returned.
+                  <TableCell colSpan={7}>
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <Sparkles />
+                        </EmptyMedia>
+                        <EmptyTitle>No predictions yet</EmptyTitle>
+                        <EmptyDescription>
+                          Run a prediction above to see inference results, confidence, and OOD flags here.
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   </TableCell>
                 </TableRow>
               ) : null}
