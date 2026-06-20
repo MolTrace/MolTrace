@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -26,6 +27,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { TenantSelector } from "@/components/app/tenant-selector"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useOptionalOverviewData } from "@/components/app/overview-data-context"
+import { useDeveloperMode } from "@/components/developer-mode-provider"
 import { apiFetch } from "@/lib/api/client"
 import { clearAuthSession } from "@/lib/auth/session"
 import { fetchAiEvidenceQueue } from "@/lib/api/ai-evidence"
@@ -47,6 +49,7 @@ import {
   Inbox,
   Brain,
   Shield,
+  Code2,
 } from "lucide-react"
 
 interface AppTopbarProps {
@@ -99,6 +102,7 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
   const router = useRouter()
   const isMobile = useIsMobile()
   const overview = useOptionalOverviewData()
+  const { enabled: developerMode, setEnabled: setDeveloperMode } = useDeveloperMode()
   const tenantContext = useTenant()
   const tenantDisplayName = tenantContext.tenantDisplayName
 
@@ -421,6 +425,18 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
                   Help & Support
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={developerMode}
+                onCheckedChange={(checked) => setDeveloperMode(Boolean(checked))}
+                onSelect={(e) => e.preventDefault()}
+              >
+                <Code2 className="mr-2 h-4 w-4" />
+                Developer mode
+              </DropdownMenuCheckboxItem>
+              <p className="px-2 pb-1.5 pl-8 text-xs text-muted-foreground">
+                Show raw API payloads &amp; developer JSON.
+              </p>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive"
