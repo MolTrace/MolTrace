@@ -137,9 +137,24 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
             <ModuleCard
               accent="teal"
               eyebrow="Inputs"
-              title={readRecordString(prediction, "model_artifact_id") ?? "-"}
+              title={
+                (() => {
+                  const artifactId = readRecordString(prediction, "model_artifact_id")
+                  return artifactId ? (
+                    <Link
+                      href={`/ml/models/${encodeURIComponent(artifactId)}`}
+                      className="underline-offset-2 hover:underline"
+                      style={{ color: "var(--mt-teal-ink)" }}
+                    >
+                      {artifactId}
+                    </Link>
+                  ) : (
+                    "-"
+                  )
+                })()
+              }
               icon={ArrowRight}
-              description="model artifact ID"
+              description="model artifact"
             />
             <ModuleCard
               accent="teal"

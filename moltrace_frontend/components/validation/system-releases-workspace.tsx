@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -78,6 +79,20 @@ function readStr(value: unknown): string {
   if (typeof value === "number" && Number.isFinite(value)) return String(value)
   if (typeof value === "boolean") return String(value)
   return ""
+}
+
+function validationProjectRef(value: unknown) {
+  const s = readStr(value)
+  if (!s) return "-"
+  return (
+    <Link
+      href={`/validation-center/projects/${encodeURIComponent(s)}`}
+      className="underline-offset-2 hover:underline"
+      style={{ color: "var(--mt-cyan-ink)" }}
+    >
+      {s}
+    </Link>
+  )
 }
 
 function readInt(value: unknown): number | null {
@@ -405,7 +420,7 @@ export function SystemReleasesWorkspace() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">validation project ID</p>
-                    <p className="font-medium">{readStr(detailRelease.validation_project_id) || "-"}</p>
+                    <p className="font-medium">{validationProjectRef(detailRelease.validation_project_id)}</p>
                   </div>
                 </div>
 
@@ -516,7 +531,7 @@ export function SystemReleasesWorkspace() {
                       <TableCell className="font-medium">{readStr(release.release_version) || "-"}</TableCell>
                       <TableCell>{readStr(release.release_type) || "-"}</TableCell>
                       <TableCell><StatusBadge status={release.approval_status} /></TableCell>
-                      <TableCell>{readStr(release.validation_project_id) || "-"}</TableCell>
+                      <TableCell>{validationProjectRef(release.validation_project_id)}</TableCell>
                       <TableCell>{formatDate(release.created_at)}</TableCell>
                       <TableCell>{formatDate(release.released_at)}</TableCell>
                       <TableCell className="text-right">
