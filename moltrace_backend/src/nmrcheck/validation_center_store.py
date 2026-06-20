@@ -1384,6 +1384,10 @@ def create_controlled_record_version(
         source = session.get(ControlledRecordORM, record_id)
         if source is None:
             raise KeyError("Controlled record not found.")
+        if alcoa.is_soft_deleted(source):
+            raise ControlledRecordLockedError(
+                "Soft-deleted (archived) records are immutable; restore before further changes."
+            )
         content_hash = payload.content_hash or (
             _hash_json(payload.content_json) if payload.content_json is not None else source.content_hash
         )
@@ -1420,6 +1424,10 @@ def lock_controlled_record(
         row = session.get(ControlledRecordORM, record_id)
         if row is None:
             raise KeyError("Controlled record not found.")
+        if alcoa.is_soft_deleted(row):
+            raise ControlledRecordLockedError(
+                "Soft-deleted (archived) records are immutable; restore before further changes."
+            )
         if row.status == "locked":
             raise ControlledRecordLockedError("Controlled record is already locked; create a new version.")
         row.status = "locked"
@@ -1463,6 +1471,12 @@ def archive_controlled_record(
         row = session.get(ControlledRecordORM, record_id)
         if row is None:
             raise KeyError("Controlled record not found.")
+        if alcoa.is_soft_deleted(row):
+            # Already soft-deleted: re-archiving would re-stamp deleted_at/deleted_by/reason and
+            # erase the original deletion attribution. Reject (idempotent-safe).
+            raise ControlledRecordLockedError(
+                "Controlled record is already archived (soft-deleted); restore before re-archiving."
+            )
         if row.status == "locked":
             raise ControlledRecordLockedError(
                 "Locked controlled records cannot be silently modified; create a new version."
