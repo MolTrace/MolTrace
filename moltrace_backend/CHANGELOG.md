@@ -14,6 +14,44 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.53.0 — Security Prompt 14: Secure-SDLC CI gates (2026-06-20)
+
+**Headline:** Opens the secure-SDLC / signed-supply-chain pillar (P2). Adds automated security
+scanning as CI gates, alongside the existing P8 secret-scanning (gitleaks) gate — a new **standalone
+`security-scan.yml`** workflow (mirroring `secret-scan.yml`'s no-`needs:`-coupling design so a test
+failure can never skip a security gate):
+
+- **SAST** — Semgrep (`p/python`, `p/javascript`, `p/typescript`, `p/owasp-top-ten`, `p/react`).
+- **SCA** — Trivy filesystem scan (vuln + license) over `uv.lock` + `pnpm-lock.yaml`.
+- **IaC** — Trivy config scan over the `render.yaml` blueprints + the workflows themselves.
+
+**Severity policy:** CRITICAL findings **block** (each job runs a gate pass that exits non-zero on a
+critical / Semgrep ERROR-severity finding); HIGH/MEDIUM/LOW are uploaded as **SARIF to the GitHub
+Security → Code scanning tab** and **tracked to closure** under documented triage SLAs (critical 7d,
+high 30d, medium 90d). This matches the prompt's "criticals block merge/deploy and findings are
+tracked to closure" without red-lining the build on pre-existing lower-severity advisories.
+
+All three runs trigger on push + PR + dispatch. To **block merge/deploy**, add each job as a required
+status check in `main` branch protection (one-time, same as the gitleaks gate); `deploy` only fires on
+a green push to `main`, so a blocked PR cannot reach production. **No application code changed** —
+this is CI/repo config only.
+
+**Deferred (honest scope):** DAST on preview deploys — the deploy model is Vercel + Render
+*production* (no ephemeral preview env), so there is no isolated URL to scan; the seam is documented
+for when a staging environment exists. Exact tool-version pinning (Semgrep via `uvx`, Trivy via the
+action tag) is noted as a supply-chain hardening follow-up.
+
+### Added
+- **`.github/workflows/security-scan.yml`** — SAST + SCA + IaC gates (CRITICAL-blocking, SARIF report).
+- **`docs/security_sdlc_gates.md`** — the gate suite, severity policy, triage SLAs, findings-to-closure
+  flow, branch-protection wiring, and the DAST/pinning deferrals.
+
+### Notes
+- `pnpm audit` surfaces HIGH advisories at introduction (incl. a Next.js middleware-bypass fixed in
+  `next >= 16.2.5`) — HIGH, so tracked (not blocking); remediate via a frontend dependency bump per SLA.
+
+---
+
 ## v0.52.0 — Security Prompt 13: Validation lifecycle (GAMP 5 / CSA) (2026-06-20)
 
 **Headline:** Closes the P1–P2 security/data-integrity backlog. A scope-bounded build that turns the
