@@ -82,6 +82,7 @@ from . import reaction_bo as reaction_bo
 from . import reaction_execution as reaction_execution
 from . import reaction_green as reaction_green
 from . import reaction_hte as reaction_hte
+from . import reaction_regulatory_compliance as reaction_regulatory_compliance
 from . import reaction_safety as reaction_safety
 from . import reaction_store as reaction_store
 from . import regulatory_compliance_store as compliance_store
@@ -20706,6 +20707,27 @@ def update_reaction_regulatory_constraint_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Regulatory constraint set not found.")
     return record
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/regulatory-compliance",
+    response_model=reaction_regulatory_compliance.ReactionRegulatoryComplianceReport,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_regulatory_compliance_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_regulatory_compliance.ReactionRegulatoryComplianceReport:
+    """Evaluate the project's recorded experiment outcomes against its active regulatory
+    constraints (R4 enforcement, read side). Owner-scoped, non-leaking 404."""
+    try:
+        return reaction_regulatory_compliance.evaluate_project_compliance(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
 
 
 @router.post(
