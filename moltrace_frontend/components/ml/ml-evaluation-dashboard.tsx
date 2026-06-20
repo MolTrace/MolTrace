@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Fragment, useCallback, useEffect, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
@@ -10,7 +10,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
@@ -20,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { EntityPicker, type EntityOption } from "@/components/ui/entity-picker"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
@@ -123,6 +123,26 @@ export function MlEvaluationDashboard() {
   const [dataMode, setDataMode] = useState<"dataset_version" | "benchmark_registry">("dataset_version")
   const [datasetVersionId, setDatasetVersionId] = useState("")
   const [benchmarkDatasetId, setBenchmarkDatasetId] = useState("")
+
+  // Promoted benchmark-dataset candidates → pickable options (value = the
+  // metadata benchmark_dataset_id, the same id the old free-text input wanted).
+  const benchmarkOptions = useMemo<EntityOption[]>(() => {
+    const out: EntityOption[] = []
+    for (const row of benchmarkCandidates) {
+      const metaId = readMetadataBenchmarkId(row)
+      if (metaId == null) continue
+      const cid = readRecordNumber(row, "id")
+      const rt = readRecordString(row, "record_type") ?? ""
+      const rid = readRecordNumber(row, "record_id")
+      const bt = readRecordString(row, "benchmark_type") ?? ""
+      out.push({
+        id: metaId,
+        label: `candidate #${cid ?? "?"} · ${rt}/${rid ?? "?"}${bt ? ` · ${bt}` : ""}`,
+        description: `benchmark_dataset_id ${metaId}`,
+      })
+    }
+    return out
+  }, [benchmarkCandidates])
   const [split, setSplit] = useState<string>("validation")
   const [notes, setNotes] = useState("")
 
@@ -428,48 +448,20 @@ export function MlEvaluationDashboard() {
           ) : (
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label htmlFor="benchmark-id">benchmark_dataset_id</Label>
-                <Input
+                <Label htmlFor="benchmark-id">Benchmark dataset</Label>
+                <EntityPicker
                   id="benchmark-id"
-                  inputMode="numeric"
-                  value={benchmarkDatasetId}
-                  onChange={(e) => setBenchmarkDatasetId(e.target.value)}
-                  placeholder="Registry benchmark_dataset_id"
-                  autoComplete="off"
+                  ariaLabel="Benchmark dataset"
+                  value={benchmarkDatasetId || null}
+                  onChange={(id) => setBenchmarkDatasetId(id == null ? "" : String(id))}
+                  options={benchmarkOptions}
+                  placeholder="Select a benchmark dataset"
+                  searchPlaceholder="Search candidates…"
+                  emptyText="No promoted benchmark datasets yet."
                 />
                 <p className="text-xs text-muted-foreground">
-                  Candidates from GET /knowledge/benchmark-dataset-candidates may expose{" "}
-                  <code className="text-[11px]">metadata_json.benchmark_dataset_id</code> when promoted — paste or pick a
-                  helper id below.
+                  Promoted benchmark-dataset candidates from the knowledge registry.
                 </p>
-              </div>
-              <div className="space-y-2">
-                <Label>Candidate reference (optional)</Label>
-                <Select
-                  onValueChange={(v) => {
-                    const row = benchmarkCandidates.find((r) => String(readRecordNumber(r, "id")) === v)
-                    const metaId = row ? readMetadataBenchmarkId(row) : null
-                    if (metaId != null) setBenchmarkDatasetId(String(metaId))
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Fill benchmark_dataset_id from candidate metadata when present" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {benchmarkCandidates.map((row) => {
-                      const cid = readRecordNumber(row, "id")
-                      if (cid == null) return null
-                      const rt = readRecordString(row, "record_type") ?? ""
-                      const rid = readRecordNumber(row, "record_id")
-                      const bt = readRecordString(row, "benchmark_type") ?? ""
-                      return (
-                        <SelectItem key={cid} value={String(cid)}>
-                          candidate #{cid} · {rt}/{rid} · {bt}
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           )}
