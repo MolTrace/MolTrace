@@ -21,6 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { ScalarListField } from "@/components/ui/scalar-list-field"
+import { ObjectArrayField } from "@/components/ui/object-array-field"
 import { ArrowLeft, Inbox, Layers3, ServerOff, ShieldCheck } from "lucide-react"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { DeveloperOnly } from "@/components/developer-mode-provider"
@@ -165,6 +167,13 @@ function parseJsonField(raw: string, label: string): unknown {
   } catch {
     throw new Error(`${label} must be valid JSON.`)
   }
+}
+
+// Map an array editor's emitted array back to the "[]"-defaulted string state
+// the submit already parses via parseJsonField. Empty → "[]" → []; otherwise the
+// JSON of the array — the wire payload is unchanged.
+function jsonArrayString(arr: unknown[]): string {
+  return arr.length > 0 ? JSON.stringify(arr) : "[]"
 }
 
 function Field({ label, value }: { label: string; value: unknown }) {
@@ -429,6 +438,7 @@ export function ValidationProjectDetailWorkspace() {
   const [testCaseBusy, setTestCaseBusy] = useState(false)
   const [testCaseError, setTestCaseError] = useState("")
   const [selectedTestCaseId, setSelectedTestCaseId] = useState("")
+  const [testCaseFormNonce, setTestCaseFormNonce] = useState(0)
 
   const [executionsRaw, setExecutionsRaw] = useState<unknown>(null)
   const [executionsLoading, setExecutionsLoading] = useState(false)
@@ -440,6 +450,7 @@ export function ValidationProjectDetailWorkspace() {
   const [executedBy, setExecutedBy] = useState("")
   const [executionStatus, setExecutionStatus] = useState<string>("pass")
   const [actualResults, setActualResults] = useState("")
+  const [executionFormNonce, setExecutionFormNonce] = useState(0)
   const [evidenceFileIdsJson, setEvidenceFileIdsJson] = useState("[]")
   const [evidenceArtifactIdsJson, setEvidenceArtifactIdsJson] = useState("[]")
   const [executionBusy, setExecutionBusy] = useState(false)
@@ -895,6 +906,7 @@ export function ValidationProjectDetailWorkspace() {
       setTestCaseExpectedResults("")
       setTestCaseLinkedRequirementsJson("[]")
       setTestCaseLinkedRisksJson("[]")
+      setTestCaseFormNonce((n) => n + 1)
       await loadTestCases(protocolId)
     } catch (err) {
       setTestCaseError(formatErr(err, "Create test case failed."))
@@ -938,6 +950,7 @@ export function ValidationProjectDetailWorkspace() {
       setActualResults("")
       setEvidenceFileIdsJson("[]")
       setEvidenceArtifactIdsJson("[]")
+      setExecutionFormNonce((n) => n + 1)
       await loadExecutions()
       if (selectedProtocolId) await loadTestCases(selectedProtocolId)
     } catch (err) {
@@ -1570,13 +1583,14 @@ export function ValidationProjectDetailWorkspace() {
                     />
                   </div>
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                    <Label htmlFor="test-case-steps-json">steps JSON</Label>
-                    <Textarea
-                      id="test-case-steps-json"
-                      value={testCaseStepsJson}
-                      onChange={(event) => setTestCaseStepsJson(event.target.value)}
-                      rows={4}
-                      className="font-mono text-xs"
+                    <ObjectArrayField
+                      key={`steps-${testCaseFormNonce}`}
+                      idPrefix="test-case-steps"
+                      label="steps"
+                      itemLabel="Step"
+                      addLabel="Add step"
+                      description="Add each procedure step; use raw JSON within a step for nested detail."
+                      onChange={(arr) => setTestCaseStepsJson(jsonArrayString(arr))}
                     />
                   </div>
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
@@ -1589,23 +1603,19 @@ export function ValidationProjectDetailWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="test-case-linked-requirements">linked requirements</Label>
-                    <Textarea
-                      id="test-case-linked-requirements"
-                      value={testCaseLinkedRequirementsJson}
-                      onChange={(event) => setTestCaseLinkedRequirementsJson(event.target.value)}
-                      rows={3}
-                      className="font-mono text-xs"
+                    <ScalarListField
+                      key={`linked-req-${testCaseFormNonce}`}
+                      idPrefix="test-case-linked-requirements"
+                      label="linked requirement IDs"
+                      onChange={(arr) => setTestCaseLinkedRequirementsJson(jsonArrayString(arr))}
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="test-case-linked-risks">linked risks</Label>
-                    <Textarea
-                      id="test-case-linked-risks"
-                      value={testCaseLinkedRisksJson}
-                      onChange={(event) => setTestCaseLinkedRisksJson(event.target.value)}
-                      rows={3}
-                      className="font-mono text-xs"
+                    <ScalarListField
+                      key={`linked-risk-${testCaseFormNonce}`}
+                      idPrefix="test-case-linked-risks"
+                      label="linked risk IDs"
+                      onChange={(arr) => setTestCaseLinkedRisksJson(jsonArrayString(arr))}
                     />
                   </div>
                 </div>
@@ -1738,23 +1748,19 @@ export function ValidationProjectDetailWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="execution-evidence-file-ids">evidence file IDs</Label>
-                    <Textarea
-                      id="execution-evidence-file-ids"
-                      value={evidenceFileIdsJson}
-                      onChange={(event) => setEvidenceFileIdsJson(event.target.value)}
-                      rows={3}
-                      className="font-mono text-xs"
+                    <ScalarListField
+                      key={`evidence-file-${executionFormNonce}`}
+                      idPrefix="execution-evidence-file-ids"
+                      label="evidence file IDs"
+                      onChange={(arr) => setEvidenceFileIdsJson(jsonArrayString(arr))}
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="execution-evidence-artifact-ids">evidence artifact IDs</Label>
-                    <Textarea
-                      id="execution-evidence-artifact-ids"
-                      value={evidenceArtifactIdsJson}
-                      onChange={(event) => setEvidenceArtifactIdsJson(event.target.value)}
-                      rows={3}
-                      className="font-mono text-xs"
+                    <ScalarListField
+                      key={`evidence-artifact-${executionFormNonce}`}
+                      idPrefix="execution-evidence-artifact-ids"
+                      label="evidence artifact IDs"
+                      onChange={(arr) => setEvidenceArtifactIdsJson(jsonArrayString(arr))}
                     />
                   </div>
                 </div>
