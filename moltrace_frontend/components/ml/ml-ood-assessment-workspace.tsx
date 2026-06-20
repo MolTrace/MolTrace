@@ -296,12 +296,12 @@ export function MlOodAssessmentWorkspace() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>ood_summary_json</Label>
-            <Textarea className="min-h-[88px] font-mono text-xs" value={summaryJson} onChange={(e) => setSummaryJson(e.target.value)} spellCheck={false} />
+            <Label htmlFor="ood-summary-json">ood_summary_json</Label>
+            <Textarea id="ood-summary-json" className="min-h-[88px] font-mono text-xs" value={summaryJson} onChange={(e) => setSummaryJson(e.target.value)} spellCheck={false} />
           </div>
           <div className="space-y-2">
-            <Label>high_risk_regions_json</Label>
-            <Textarea className="min-h-[100px] font-mono text-xs" value={regionsJson} onChange={(e) => setRegionsJson(e.target.value)} spellCheck={false} />
+            <Label htmlFor="ood-high-risk-regions-json">high_risk_regions_json</Label>
+            <Textarea id="ood-high-risk-regions-json" className="min-h-[100px] font-mono text-xs" value={regionsJson} onChange={(e) => setRegionsJson(e.target.value)} spellCheck={false} />
           </div>
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-muted-foreground">{formOk}</p> : null}

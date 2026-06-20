@@ -898,6 +898,7 @@ export function RegulatoryIntelligenceLanding() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Input
                     id="reg-compound"
+                    aria-label="compound name"
                     value={compoundName}
                     onChange={(e) => setCompoundName(e.target.value)}
                     placeholder="compound_name"
@@ -906,6 +907,7 @@ export function RegulatoryIntelligenceLanding() {
                   />
                   <Input
                     id="reg-product"
+                    aria-label="product name"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
                     placeholder="product_name"

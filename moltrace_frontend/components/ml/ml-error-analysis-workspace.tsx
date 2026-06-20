@@ -304,12 +304,13 @@ export function MlErrorAnalysisWorkspace() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>metrics_json</Label>
-            <Textarea className="min-h-[72px] font-mono text-xs" value={metricsJson} onChange={(e) => setMetricsJson(e.target.value)} spellCheck={false} />
+            <Label htmlFor="error-analysis-metrics-json">metrics_json</Label>
+            <Textarea id="error-analysis-metrics-json" className="min-h-[72px] font-mono text-xs" value={metricsJson} onChange={(e) => setMetricsJson(e.target.value)} spellCheck={false} />
           </div>
           <div className="space-y-2">
-            <Label>representative_errors_json (summary entries)</Label>
+            <Label htmlFor="error-analysis-rep-errors-json">representative_errors_json (summary entries)</Label>
             <Textarea
+              id="error-analysis-rep-errors-json"
               className="min-h-[100px] font-mono text-xs"
               value={repErrorsJson}
               onChange={(e) => setRepErrorsJson(e.target.value)}
