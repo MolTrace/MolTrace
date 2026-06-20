@@ -101,6 +101,12 @@ def upgrade() -> None:
         op.create_index(_OWNER_UPDATED_IX, _TABLE, ["owner_id", "updated_at"])
 
     # Backfill legacy rows from the audit trail (only when the audit table is present).
+    # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text
+    # _BACKFILL_SQL is a module-level constant — a static correlated UPDATE with no
+    # interpolation, no parameters, no user input. The Semgrep rule guards against
+    # injection via dynamic text(); here the SQL string is fully literal and runs in
+    # the alembic migration context (admin-only deploy step), so the injection vector
+    # the rule warns about does not exist. Mirrors the 0015 dossier backfill pattern.
     bind = op.get_bind()
     if "audit_events" in sa.inspect(bind).get_table_names():
         bind.execute(sa.text(_BACKFILL_SQL))
