@@ -18716,6 +18716,11 @@ export interface components {
             record_content_hash?: string | null;
             /** Signature Digest */
             signature_digest?: string | null;
+            /**
+             * Binding Status
+             * @enum {string}
+             */
+            binding_status: "bound" | "unbound";
             /** Authentication Method */
             authentication_method?: string | null;
             /** Step Up Factor */
