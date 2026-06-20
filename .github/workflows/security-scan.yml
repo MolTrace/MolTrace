@@ -82,7 +82,7 @@ jobs:
       # Filesystem scan picks up Python (uv.lock) and JS (pnpm-lock.yaml) dependency advisories plus
       # license findings. Report pass → SARIF (HIGH+CRITICAL, tracked); gate pass → blocks on CRITICAL.
       - name: Trivy — report (HIGH,CRITICAL → SARIF)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scanners: vuln,license
@@ -101,7 +101,7 @@ jobs:
         continue-on-error: true
 
       - name: Trivy — gate (block on CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scanners: vuln
@@ -122,7 +122,7 @@ jobs:
       # Scans declarative infra (render.yaml blueprints + the GitHub Actions workflows themselves)
       # for misconfigurations. Report pass → SARIF; gate pass → blocks on CRITICAL.
       - name: Trivy — IaC report (→ SARIF)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: config
           severity: HIGH,CRITICAL
@@ -139,7 +139,7 @@ jobs:
         continue-on-error: true
 
       - name: Trivy — IaC gate (block on CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: config
           severity: CRITICAL
