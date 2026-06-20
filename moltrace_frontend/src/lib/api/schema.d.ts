@@ -17199,6 +17199,12 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Reason For Change */
+            reason_for_change?: string | null;
+            /** Deleted At */
+            deleted_at?: string | null;
+            /** Deleted By */
+            deleted_by?: string | null;
             /** Metadata Json */
             metadata_json?: {
                 [key: string]: unknown;
@@ -51873,6 +51879,7 @@ export interface operations {
             query?: {
                 status?: string | null;
                 record_type?: string | null;
+                include_deleted?: boolean;
                 limit?: number;
                 access_token?: string | null;
             };
