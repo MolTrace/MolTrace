@@ -122,3 +122,19 @@ _Inventory of UI that surfaces the backend (raw IDs/JSON, internal enums, dev-JS
 - `/batches` — covered by Compounds & Batches today → leave unless a distinct registry destination is wanted.
 
 _Sequencing: P3 (highest-traffic raw-ID create forms) → P4 → P5 → P6 → P7. Tackle high-severity first within each phase._
+
+## Backend-gap raw-IDs (can't become FE pickers yet — need a list endpoint)
+
+Discovered during Phase 3: several `raw_id_input` findings have **no list endpoint** to populate a
+picker, so they stay typed inputs until the backend adds one (re-tag → MOVE_TO_API / backend handoff):
+- Knowledge — extraction `run_id` (`/knowledge/extraction-runs` 404), dataset `record_id`
+  (`/knowledge/records` 404), `source_id` (`/knowledge/sources` returns empty), and the type-scoped
+  `target_id` (entity depends on `target_type`).
+- Admin tenant-detail — `data_integrity_assessment_ids` / `inspection_package_ids` (404; only
+  `validation_project_ids` has `/validation-center/projects`, now a multi-picker).
+- Validation / e-Signatures — `target_id` + controlled-record `resource_id` are type-scoped
+  (`record_type`/`target_type` determines the entity) → need per-type list endpoints or a unified
+  search endpoint before a clean picker.
+
+The cleanly FE-convertible single-FK pickers are largely done (Phases 3.1–3.3). Remaining Phase-3 work
+is the **JSON-textarea → structured-editor** items, best handled per-field or rolled into P5/P6.
