@@ -25,9 +25,11 @@ import {
   type Summary,
 } from "@/components/spectracheck/spectracheck-summary"
 import { compactLargePayloadForDisplay } from "@/src/lib/spectracheck/compact-json"
+import { useDeveloperMode } from "@/components/developer-mode-provider"
 import type { SpectraCheckUnifiedEvidenceMeta } from "@/src/lib/spectracheck/evidence-enqueue"
 
 function DeveloperJsonPanelImpl({ data }: { data: unknown }) {
+  const { enabled: developerMode } = useDeveloperMode()
   const [open, setOpen] = useState(false)
   // ``JSON.stringify`` of a large analyze payload is expensive, and putting
   // tens of thousands of x/y samples into a <pre> can make the dashboard
@@ -37,6 +39,9 @@ function DeveloperJsonPanelImpl({ data }: { data: unknown }) {
     () => (open ? JSON.stringify(compactLargePayloadForDisplay(data), null, 2) : ""),
     [data, open],
   )
+  // Raw API payloads are noise for scientists/reviewers — keep them hidden
+  // unless the user has opted into developer mode from the profile menu.
+  if (!developerMode) return null
   return (
     <details
       className="rounded-lg border bg-card p-4"

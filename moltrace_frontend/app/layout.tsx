@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
+import { DeveloperModeProvider } from '@/components/developer-mode-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { OfflineBanner } from '@/src/components/pwa/OfflineBanner'
 import { InstallAppPrompt } from '@/src/components/pwa/InstallAppPrompt'
@@ -60,11 +61,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <PWAUpdateManager />
-          <OfflineBanner />
-          {children}
-          <InstallAppPrompt />
-          <Toaster />
+          <DeveloperModeProvider>
+            <PWAUpdateManager />
+            <OfflineBanner />
+            {children}
+            <InstallAppPrompt />
+            <Toaster />
+          </DeveloperModeProvider>
         </ThemeProvider>
         {/* Vercel injects /_vercel/insights/script.js only when hosted on Vercel.
             On other platforms (e.g. Render) the script 404s and logs a noisy error.
