@@ -1,0 +1,50 @@
+# Trivy SCA suppressions — documented VEX (Vulnerability Exploitability eXchange) register.
+#
+# Read by the `SCA · Trivy (deps + license)` gate in .github/workflows/security-scan.yml,
+# which scans the filesystem from the repo root (scan-ref ".", severity CRITICAL,
+# --ignore-unfixed). Each CVE below is CRITICAL but assessed not_affected for MolTrace's
+# real deployment: the vulnerable code is not in the execute path. Reachability for every
+# entry was confirmed by code inspection AND an independent adversarial re-check (each
+# returned "no reachable path found"). Bump-vs-suppress was decided per CVE; the
+# jupyter-server CVE was instead FIXED by bumping to 2.20.0 (see moltrace_backend/pyproject.toml
+# [tool.uv] constraint-dependencies) and is deliberately NOT listed here.
+#
+# Re-evaluate these whenever the relevant component moves into a deployed install path.
+
+# --- torch (moltrace_backend/nmrnet_service/requirements.txt) ---
+# CVE-2025-32434 — torch.load RCE via an untrusted checkpoint (fixed in torch 2.6.0).
+# Status: not_affected. Justification: vulnerable_code_not_in_execute_path.
+#   * torch is NOT a dependency of the MolTrace backend (absent from pyproject.toml; the
+#     backend is deliberately torch-free). It is pinned only in nmrnet_service/, an
+#     unfinished GPU-inference scaffold: nmrnet_service/app.py _load_model()/_run_inference()
+#     raise NotImplementedError and the only torch.load there is a commented-out example.
+#   * No Dockerfile/render/CI config references nmrnet_service — it is not wired into any deploy.
+#   * The in-backend torch.load sites (nmrnet_wrapper.py, nus/reconstruct.py) are guarded by an
+#     `import torch` that fails first in prod, and each is immediately followed by raising
+#     *Unavailable() (unfilled integration stubs).
+#   * The checkpoint path is operator-pinned (MOLTRACE_NMRNET_WEIGHTS / a Zenodo URL with
+#     optional SHA-256 verification), never a user upload; the request contract carries only
+#     molecular geometry / SMILES, never a checkpoint file.
+#   * Bumping is not viable without breakage: the prebuilt Uni-Core wheel is compiled for
+#     cu116/torch1.12/py3.8; torch 2.6 drops cu116, requires py>=3.9, and changes the ATen ABI.
+#   Re-evaluate (drop this and bump to torch>=2.6.0 with a rebuilt Uni-Core wheel) once
+#   nmrnet_service is actually implemented and wired into a deployment.
+CVE-2025-32434
+
+# --- mlflow (moltrace_backend/pyproject.toml [project.optional-dependencies] infra; uv.lock) ---
+# Status: not_affected for all four. Justification: vulnerable_code_not_in_execute_path.
+#   * mlflow is declared ONLY in the optional `infra` extra and present in uv.lock solely
+#     because uv locks all optional groups (marker extra=='infra'). It is intentionally never
+#     installed: prod deploy is `uv sync --no-dev --extra fid`; CI is `--extra fid --extra dev`.
+#   * MolTrace uses mlflow ONLY as a client logging adapter (src/moltrace/spectroscopy/infra/
+#     tracking.py): set_tracking_uri/start_run/log_params/log_metrics/log_artifact to a local
+#     file store. It never starts a tracking server, never serves models, never sets
+#     enable_mlserver, and never instantiates MlflowClient (verified by grep across src/).
+#   * All four CVEs require running mlflow's SERVER / model-SERVING components, which MolTrace
+#     does not run.
+#   Re-evaluate (and bump infra to mlflow>=3.9.0) only if MolTrace ever ships the `infra`
+#   extra in a deploy target or runs an mlflow server/serving process.
+CVE-2025-15036
+CVE-2025-15379
+CVE-2026-0596
+CVE-2026-2635

@@ -91,6 +91,16 @@ infra = [
     "boto3>=1.34",
 ]
 
+# Transitive-dependency security constraint. jupyter-server enters only via the optional
+# `infra` group's great-expectations -> notebook -> jupyterlab -> jupyter-server chain
+# (never installed in prod/CI), but 2.19.0 carries CVE-2026-44727 (stored XSS in
+# NbconvertFileHandler, fixed in 2.20.0). We pin the CVE-fixed minor at the source rather
+# than suppress: the bump is low-risk (2.20.0 satisfies every parent cap <3,>=2.4.0 and
+# requires-python >=3.10, well within our >=3.11) and fixes the finding instead of masking
+# it. See .trivyignore (repo root) for the torch/mlflow CVEs that are suppressed instead.
+[tool.uv]
+constraint-dependencies = ["jupyter-server>=2.20.0"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
