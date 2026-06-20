@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Table,
   TableBody,
@@ -82,7 +83,16 @@ function rowId(row: Row | null | undefined): string {
 
 function formatErr(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
-    if (isRecord(err.data) && typeof err.data.detail === "string") return err.data.detail
+    const detail = isRecord(err.data) ? err.data.detail : undefined
+    if (typeof detail === "string") return detail
+    // FastAPI 422 validation errors (e.g. blank/whitespace reason) arrive as an
+    // array of { msg, loc } — surface the joined messages.
+    if (Array.isArray(detail)) {
+      const msgs = detail
+        .map((d) => (isRecord(d) && typeof d.msg === "string" ? d.msg : ""))
+        .filter(Boolean)
+      if (msgs.length) return msgs.join("; ")
+    }
     return err.message || fallback
   }
   if (err instanceof Error) return err.message
@@ -134,12 +144,18 @@ export function ControlledRecordsWorkspace() {
   const [lockHash, setLockHash] = useState("")
   const [archiveReason, setArchiveReason] = useState("")
   const [actionBusy, setActionBusy] = useState("")
+  // ALCOA+ : archive is a soft-delete (retained, reversible-by-record). The default
+  // list hides archived rows; this toggle re-fetches with ?include_deleted=true.
+  const [includeDeleted, setIncludeDeleted] = useState(false)
 
   const loadRecords = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      const payload = await apiFetch<unknown>("/controlled-records", { method: "GET" })
+      const payload = await apiFetch<unknown>(
+        includeDeleted ? "/controlled-records?include_deleted=true" : "/controlled-records",
+        { method: "GET" },
+      )
       const rows = asRows(payload, ["controlled_records", "records"])
       setRecords(rows)
       if (!selectedId && rows.length > 0) setSelectedId(rowId(rows[0]!))
@@ -149,7 +165,7 @@ export function ControlledRecordsWorkspace() {
     } finally {
       setLoading(false)
     }
-  }, [selectedId])
+  }, [selectedId, includeDeleted])
 
   useEffect(() => {
     void loadRecords()
@@ -477,6 +493,22 @@ export function ControlledRecordsWorkspace() {
                     <p className="text-xs text-muted-foreground">content hash</p>
                     <p className="break-all font-mono text-xs">{readStr(detailRecord.content_hash) || "-"}</p>
                   </div>
+                  {readStr(detailRecord.reason_for_change) ? (
+                    <div className="sm:col-span-2">
+                      <p className="text-xs text-muted-foreground">reason for change</p>
+                      <p className="whitespace-pre-wrap text-sm">{readStr(detailRecord.reason_for_change)}</p>
+                    </div>
+                  ) : null}
+                  {readStr(detailRecord.deleted_at) ? (
+                    <div className="sm:col-span-2 rounded-md border border-dashed border-border bg-muted/30 p-3">
+                      <p className="text-xs font-medium">Archived — retained &amp; reversible-by-record</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Soft-deleted {formatDate(detailRecord.deleted_at)} by{" "}
+                        {readStr(detailRecord.deleted_by) || "—"}. Retained for the ALCOA+ audit trail, not
+                        destroyed.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="space-y-3 rounded-lg border p-3">
@@ -555,7 +587,7 @@ export function ControlledRecordsWorkspace() {
                 <div className="space-y-3 rounded-lg border p-3">
                   <div>
                     <h3 className="text-sm font-medium">Archive record</h3>
-                    <p className="text-xs text-muted-foreground">Archive this record and remove it from active controlled document workflows — provide a reason for audit trail.</p>
+                    <p className="text-xs text-muted-foreground">Archive (soft-delete) this record: it is removed from the default list but retained and reversible-by-record for the ALCOA+ audit trail. A reason is required.</p>
                   </div>
                   <Textarea
                     aria-label="archive reason"
@@ -591,7 +623,15 @@ export function ControlledRecordsWorkspace() {
         description="All controlled documents across this environment — SOPs, validation plans, analytical methods, and other GxP-controlled records."
       >
         <div className="space-y-3">
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                checked={includeDeleted}
+                onCheckedChange={(value) => setIncludeDeleted(value === true)}
+                aria-label="Include archived/deleted records"
+              />
+              Include archived / deleted
+            </label>
             <Button type="button" variant="outline" size="sm" onClick={() => void loadRecords()} disabled={loading}>
               Refresh
             </Button>
@@ -605,6 +645,7 @@ export function ControlledRecordsWorkspace() {
                   <TableHead>resource ID</TableHead>
                   <TableHead>version</TableHead>
                   <TableHead>status</TableHead>
+                  <TableHead>reason for change</TableHead>
                   <TableHead>content hash</TableHead>
                   <TableHead>locked by</TableHead>
                   <TableHead>updated date</TableHead>
@@ -614,13 +655,24 @@ export function ControlledRecordsWorkspace() {
               <TableBody>
                 {records.map((record) => {
                   const id = rowId(record)
+                  const archived = Boolean(readStr(record.deleted_at)) || readStr(record.status) === "archived"
                   return (
-                    <TableRow key={id || JSON.stringify(record)}>
+                    <TableRow key={id || JSON.stringify(record)} className={archived ? "opacity-70" : undefined}>
                       <TableCell className="font-medium">{readStr(record.title) || "-"}</TableCell>
                       <TableCell>{readStr(record.record_type) || "-"}</TableCell>
                       <TableCell>{readStr(record.resource_id) || "-"}</TableCell>
                       <TableCell>{readStr(record.version) || "-"}</TableCell>
-                      <TableCell>{readStr(record.status) || "-"}</TableCell>
+                      <TableCell>
+                        {readStr(record.status) || "-"}
+                        {archived ? (
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                            retained · {readStr(record.deleted_by) || "—"} · {formatDate(record.deleted_at)}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] text-xs text-muted-foreground">
+                        {readStr(record.reason_for_change) || "-"}
+                      </TableCell>
                       <TableCell className="font-mono text-xs">{shortHash(record.content_hash)}</TableCell>
                       <TableCell>{readStr(record.locked_by) || "-"}</TableCell>
                       <TableCell>{formatDate(record.updated_at)}</TableCell>
@@ -640,7 +692,7 @@ export function ControlledRecordsWorkspace() {
                 })}
                 {!records.length ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-6 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={10} className="py-6 text-center text-sm text-muted-foreground">
                       {loading ? "Loading controlled records..." : "No controlled records found."}
                     </TableCell>
                   </TableRow>
