@@ -11,6 +11,7 @@ import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
+import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -743,17 +744,19 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       </ModuleCard>
 
       {/* 9. Developer JSON collapsed */}
-      <ModuleCard
-        accent="cyan"
-        eyebrow="Audit"
-        title="Developer JSON"
-        icon={FileSearch}
-        description="Collapsed raw payloads for debugging and audit."
-      >
-        <div className="space-y-3">
-          <DeveloperJsonPanel data={{ change, source_versions: { old: oldVersion, new: newVersion }, impactRows, proposalRows }} />
-        </div>
-      </ModuleCard>
+      <DeveloperOnly>
+        <ModuleCard
+          accent="cyan"
+          eyebrow="Audit"
+          title="Developer JSON"
+          icon={FileSearch}
+          description="Collapsed raw payloads for debugging and audit."
+        >
+          <div className="space-y-3">
+            <DeveloperJsonPanel data={{ change, source_versions: { old: oldVersion, new: newVersion }, impactRows, proposalRows }} />
+          </div>
+        </ModuleCard>
+      </DeveloperOnly>
     </div>
   )
 }

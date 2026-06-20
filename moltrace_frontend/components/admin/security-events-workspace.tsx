@@ -18,6 +18,7 @@ import {
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
+import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import {
@@ -551,20 +552,22 @@ export function SecurityEventsWorkspace() {
       </div>
 
       {/* 4. Developer JSON */}
-      <div>
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Developer JSON</h2>
-        <Collapsible className="group rounded-md border">
-          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-            Raw responses (redacted)
-            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <pre className="max-h-[24rem] overflow-auto border-t bg-muted/30 p-3 font-mono text-[10px] leading-relaxed">
-              {JSON.stringify(developerBundle, null, 2)}
-            </pre>
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
+      <DeveloperOnly>
+        <div>
+          <h2 className="mb-3 text-sm font-medium text-muted-foreground">Developer JSON</h2>
+          <Collapsible className="group rounded-md border">
+            <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
+              Raw responses (redacted)
+              <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <pre className="max-h-[24rem] overflow-auto border-t bg-muted/30 p-3 font-mono text-[10px] leading-relaxed">
+                {JSON.stringify(developerBundle, null, 2)}
+              </pre>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </DeveloperOnly>
     </div>
   )
 }

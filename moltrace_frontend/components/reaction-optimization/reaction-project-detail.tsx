@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { ArrowLeft, ChevronDown, ExternalLink, FlaskConical, Info } from "lucide-react"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
+import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { MlModelProvenanceSummary } from "@/components/ml/ml-model-provenance-summary"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { apiFetch } from "@/lib/api/client"
@@ -787,15 +788,17 @@ function RecommendationAdvisorCritiqueCard({ payload }: { payload: Record<string
           )}
         </div>
 
-        <Collapsible className="rounded-md border border-border">
-          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-            Developer JSON
-            <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="border-t border-border px-3 py-3">
-            <DeveloperJsonPanel data={payload} />
-          </CollapsibleContent>
-        </Collapsible>
+        <DeveloperOnly>
+          <Collapsible className="rounded-md border border-border">
+            <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
+              Developer JSON
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-t border-border px-3 py-3">
+              <DeveloperJsonPanel data={payload} />
+            </CollapsibleContent>
+          </Collapsible>
+        </DeveloperOnly>
       </CardContent>
     </Card>
   )
@@ -3789,9 +3792,11 @@ export function ReactionProjectDetail() {
             <TabsTrigger value="evidence" className={reactionProjectTabClass}>
               Evidence Links
             </TabsTrigger>
-            <TabsTrigger value="developer" className={reactionProjectTabClass}>
-              Developer JSON
-            </TabsTrigger>
+            <DeveloperOnly>
+              <TabsTrigger value="developer" className={reactionProjectTabClass}>
+                Developer JSON
+              </TabsTrigger>
+            </DeveloperOnly>
           </TabsList>
         </div>
 
@@ -5282,15 +5287,17 @@ export function ReactionProjectDetail() {
                 ) : (
                   <p className="text-sm text-muted-foreground">Run response could not be parsed as an object.</p>
                 )}
-                <Collapsible className="rounded-md border border-border">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-                    Developer JSON
-                    <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="border-t border-border px-3 py-3">
-                    <DeveloperJsonPanel data={lastBoRun} />
-                  </CollapsibleContent>
-                </Collapsible>
+                <DeveloperOnly>
+                  <Collapsible className="rounded-md border border-border">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
+                      Developer JSON
+                      <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="border-t border-border px-3 py-3">
+                      <DeveloperJsonPanel data={lastBoRun} />
+                    </CollapsibleContent>
+                  </Collapsible>
+                </DeveloperOnly>
               </div>
             </ModuleCard>
           ) : (
@@ -5984,15 +5991,17 @@ export function ReactionProjectDetail() {
                     </div>
                   </div>
 
-                  <Collapsible className="rounded-md border border-border">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-                      Developer JSON
-                      <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="border-t border-border px-3 py-3">
-                      <DeveloperJsonPanel data={lastAdvisorRun} />
-                    </CollapsibleContent>
-                  </Collapsible>
+                  <DeveloperOnly>
+                    <Collapsible className="rounded-md border border-border">
+                      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
+                        Developer JSON
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="border-t border-border px-3 py-3">
+                        <DeveloperJsonPanel data={lastAdvisorRun} />
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </DeveloperOnly>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -6475,15 +6484,17 @@ export function ReactionProjectDetail() {
                     </p>
                   </div>
 
-                  <Collapsible className="rounded-md border border-border">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-                      Developer JSON
-                      <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="border-t border-border px-3 py-3">
-                      <DeveloperJsonPanel data={lastComparison} />
-                    </CollapsibleContent>
-                  </Collapsible>
+                  <DeveloperOnly>
+                    <Collapsible className="rounded-md border border-border">
+                      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
+                        Developer JSON
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="border-t border-border px-3 py-3">
+                        <DeveloperJsonPanel data={lastComparison} />
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </DeveloperOnly>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -8784,22 +8795,24 @@ export function ReactionProjectDetail() {
             </div>
           </ModuleCard>
 
-          <ModuleCard
-            accent="violet"
-            eyebrow="Execution · Developer JSON"
-            title="Developer JSON"
-            description="Aggregated execution-oriented snapshot for debugging (same API fields as elsewhere)."
-          >
-            <Collapsible className="rounded-md border border-border">
-              <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-                Developer JSON
-                <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="border-t border-border px-3 py-3">
-                <DeveloperJsonPanel data={executionDevPayload} />
-              </CollapsibleContent>
-            </Collapsible>
-          </ModuleCard>
+          <DeveloperOnly>
+            <ModuleCard
+              accent="violet"
+              eyebrow="Execution · Developer JSON"
+              title="Developer JSON"
+              description="Aggregated execution-oriented snapshot for debugging (same API fields as elsewhere)."
+            >
+              <Collapsible className="rounded-md border border-border">
+                <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
+                  Developer JSON
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="border-t border-border px-3 py-3">
+                  <DeveloperJsonPanel data={executionDevPayload} />
+                </CollapsibleContent>
+              </Collapsible>
+            </ModuleCard>
+          </DeveloperOnly>
         </TabsContent>
 
         <TabsContent value="evidence" className="mt-4 space-y-6">
@@ -8907,26 +8920,28 @@ export function ReactionProjectDetail() {
         </TabsContent>
 
         <TabsContent value="developer" className="mt-4 space-y-6">
-          <div className="space-y-1">
-            <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-              style={{ color: "var(--mt-violet-ink)" }}
+          <DeveloperOnly>
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                style={{ color: "var(--mt-violet-ink)" }}
+              >
+                Project · Developer JSON
+              </p>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Raw payloads for debugging</h2>
+              <p className="text-sm text-muted-foreground">
+                Aggregated reaction-project payloads in this browser session — use to inspect backend response shape, audit fields, and warnings.
+              </p>
+            </div>
+            <ModuleCard
+              accent="violet"
+              eyebrow="Reaction · Developer JSON"
+              title="Developer JSON"
+              description="Aggregated payloads from this reaction project workspace (debugging only)."
             >
-              Project · Developer JSON
-            </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Raw payloads for debugging</h2>
-            <p className="text-sm text-muted-foreground">
-              Aggregated reaction-project payloads in this browser session — use to inspect backend response shape, audit fields, and warnings.
-            </p>
-          </div>
-          <ModuleCard
-            accent="violet"
-            eyebrow="Reaction · Developer JSON"
-            title="Developer JSON"
-            description="Aggregated payloads from this reaction project workspace (debugging only)."
-          >
-            <DeveloperJsonPanel data={devPayload} />
-          </ModuleCard>
+              <DeveloperJsonPanel data={devPayload} />
+            </ModuleCard>
+          </DeveloperOnly>
         </TabsContent>
       </Tabs>
 

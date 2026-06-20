@@ -10,6 +10,7 @@ import { CompoundBatchesAliquotsPanel } from "@/components/batches/compound-batc
 import { CompoundScientificKnowledgeGraphPanel } from "@/components/compounds/compound-scientific-knowledge-graph-panel"
 import { CompoundDetailKnowledgeLinksCard } from "@/components/knowledge/knowledge-links-integration"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
+import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
@@ -402,9 +403,11 @@ export function CompoundDetailWorkspace() {
             <TabsTrigger value="graph" className="text-xs sm:text-sm">
               Knowledge Graph
             </TabsTrigger>
-            <TabsTrigger value="developer" className="text-xs sm:text-sm">
-              Developer JSON
-            </TabsTrigger>
+            <DeveloperOnly>
+              <TabsTrigger value="developer" className="text-xs sm:text-sm">
+                Developer JSON
+              </TabsTrigger>
+            </DeveloperOnly>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -817,19 +820,21 @@ export function CompoundDetailWorkspace() {
             </ModuleCard>
           </TabsContent>
 
-          <TabsContent value="developer" className="space-y-4">
-            <ModuleCard
-              accent="teal"
-              eyebrow="Detail"
-              title="Developer JSON"
-              icon={Code2}
-              description="Raw payloads for debugging."
-            >
-              <div>
-                <DeveloperJsonPanel data={devPayload} />
-              </div>
-            </ModuleCard>
-          </TabsContent>
+          <DeveloperOnly>
+            <TabsContent value="developer" className="space-y-4">
+              <ModuleCard
+                accent="teal"
+                eyebrow="Detail"
+                title="Developer JSON"
+                icon={Code2}
+                description="Raw payloads for debugging."
+              >
+                <div>
+                  <DeveloperJsonPanel data={devPayload} />
+                </div>
+              </ModuleCard>
+            </TabsContent>
+          </DeveloperOnly>
         </Tabs>
       ) : null}
 

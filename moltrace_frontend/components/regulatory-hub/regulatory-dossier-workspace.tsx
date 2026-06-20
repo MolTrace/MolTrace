@@ -24,6 +24,7 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { cn } from "@/lib/utils"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
+import { DeveloperOnly, useDeveloperMode } from "@/components/developer-mode-provider"
 import { MlModelProvenanceSummary } from "@/components/ml/ml-model-provenance-summary"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -241,8 +242,6 @@ const DOSSIER_NAV: DossierNavGroup[] = [
   { id: "submission", label: "Submission", sections: ["submission-package"] },
   { id: "developer", label: "Developer JSON", sections: ["json"] },
 ]
-
-const DOSSIER_SECTIONS = DOSSIER_NAV.flatMap((g) => g.sections)
 
 const DOSSIER_SECTION_LABEL: Record<string, string> = {
   overview: "Overview",
@@ -752,6 +751,18 @@ export function RegulatoryDossierWorkspace() {
   const [changeImpact, setChangeImpact] = useState<Record<string, unknown> | null>(null)
   const [changeImpactErr, setChangeImpactErr] = useState("")
   const [activeTab, setActiveTab] = useState("overview")
+  // Developer-mode gate: the "Developer JSON" nav group / section is raw-payload
+  // debugging surface — hide it (and drop it from keyboard roaming) unless the
+  // user has opted into developer mode.
+  const developerModeEnabled = useDeveloperMode().enabled
+  const visibleDossierNav = useMemo(
+    () => (developerModeEnabled ? DOSSIER_NAV : DOSSIER_NAV.filter((g) => g.id !== "developer")),
+    [developerModeEnabled],
+  )
+  const visibleDossierSections = useMemo(
+    () => visibleDossierNav.flatMap((g) => g.sections),
+    [visibleDossierNav],
+  )
 
   const [submissionPackageByDossier, setSubmissionPackageByDossier] = useState<Record<string, unknown> | null>(null)
   const [submissionPackageById, setSubmissionPackageById] = useState<Record<string, unknown> | null>(null)
@@ -2350,9 +2361,9 @@ export function RegulatoryDossierWorkspace() {
                 aria-label="Dossier sections"
                 className="inline-flex w-max items-center gap-1 rounded-lg border bg-muted/20 p-1"
                 onKeyDown={(e) => {
-                  const all = DOSSIER_SECTIONS
+                  const all = visibleDossierSections
                   const idx = all.indexOf(activeTab)
-                  let next = -1
+                  let next: number
                   if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % all.length
                   else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + all.length) % all.length
                   else if (e.key === "Home") next = 0
@@ -2363,7 +2374,7 @@ export function RegulatoryDossierWorkspace() {
                   e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
                 }}
               >
-                {DOSSIER_NAV.map((g, gi) => (
+                {visibleDossierNav.map((g, gi) => (
                   <div key={g.id} className="inline-flex items-center gap-1">
                     {gi > 0 ? <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" /> : null}
                     {/* Single-tab groups skip the label: it would duplicate (or add
@@ -4522,20 +4533,22 @@ export function RegulatoryDossierWorkspace() {
                   </div>
                 </div>
 
-                <Collapsible className="rounded-lg border">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/40">
-                    Developer JSON
-                    <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="border-t px-4 pb-4 pt-2">
-                    <DeveloperJsonPanel
-                      data={{
-                        latest_qnmr_compliance_profile: latestQnmrProfile,
-                        latest_method_validation_profile: latestMethodProfile,
-                      }}
-                    />
-                  </CollapsibleContent>
-                </Collapsible>
+                <DeveloperOnly>
+                  <Collapsible className="rounded-lg border">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/40">
+                      Developer JSON
+                      <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="border-t px-4 pb-4 pt-2">
+                      <DeveloperJsonPanel
+                        data={{
+                          latest_qnmr_compliance_profile: latestQnmrProfile,
+                          latest_method_validation_profile: latestMethodProfile,
+                        }}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
+                </DeveloperOnly>
               </div>
             </ModuleCard>
           </TabsContent>
@@ -6531,12 +6544,14 @@ export function RegulatoryDossierWorkspace() {
                         </div>
                       </div>
 
-                      <details className="rounded-md border p-2">
-                        <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
-                        <pre className="mt-2 max-h-72 overflow-auto text-[11px] leading-relaxed">
-                          {JSON.stringify(pkg, null, 2)}
-                        </pre>
-                      </details>
+                      <DeveloperOnly>
+                        <details className="rounded-md border p-2">
+                          <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                          <pre className="mt-2 max-h-72 overflow-auto text-[11px] leading-relaxed">
+                            {JSON.stringify(pkg, null, 2)}
+                          </pre>
+                        </details>
+                      </DeveloperOnly>
                     </div>
                   )
                 })()}
@@ -6544,26 +6559,28 @@ export function RegulatoryDossierWorkspace() {
           </TabsContent>
 
           <TabsContent value="json" className="min-w-0 max-w-full space-y-6">
-            <div className="space-y-1">
-              <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: "var(--mt-cyan-ink)" }}
+            <DeveloperOnly>
+              <div className="space-y-1">
+                <p
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                  style={{ color: "var(--mt-cyan-ink)" }}
+                >
+                  Dossier · Developer JSON
+                </p>
+                <h2 className="font-mono text-xl font-bold tracking-tight">Raw payloads for debugging</h2>
+                <p className="text-sm text-muted-foreground">
+                  Aggregated dossier payloads in this browser session — use to inspect backend response shape, warnings, and audit fields.
+                </p>
+              </div>
+              <ModuleCard
+                accent="cyan"
+                eyebrow="Dossier · Developer JSON"
+                title="Developer JSON"
+                description="Aggregated payloads from this workspace (no automatic refresh on tab change)."
               >
-                Dossier · Developer JSON
-              </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Raw payloads for debugging</h2>
-              <p className="text-sm text-muted-foreground">
-                Aggregated dossier payloads in this browser session — use to inspect backend response shape, warnings, and audit fields.
-              </p>
-            </div>
-            <ModuleCard
-              accent="cyan"
-              eyebrow="Dossier · Developer JSON"
-              title="Developer JSON"
-              description="Aggregated payloads from this workspace (no automatic refresh on tab change)."
-            >
-              <DeveloperJsonPanel data={devPayload} />
-            </ModuleCard>
+                <DeveloperJsonPanel data={devPayload} />
+              </ModuleCard>
+            </DeveloperOnly>
           </TabsContent>
         </Tabs>
       ) : !loadErr ? (

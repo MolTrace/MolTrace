@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { extractFirstSmiles, formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { DeveloperOnly, useDeveloperMode } from "@/components/developer-mode-provider"
 import {
   SpectraCheckConfidenceAdvProvider,
   SpectraCheckConfidenceSuite,
@@ -290,6 +291,19 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   const urlSessionHandledRef = useRef<string | null>(null)
 
   const [activeTab, setActiveTab] = useState(defaultTab)
+  // Developer-mode gate: hide the raw "Developer JSON" nav group + section when off.
+  const developerModeEnabled = useDeveloperMode().enabled
+  const visibleSpectraNav = useMemo(
+    () =>
+      developerModeEnabled
+        ? SPECTRACHECK_NAV
+        : SPECTRACHECK_NAV.filter((g) => g.id !== "developer"),
+    [developerModeEnabled],
+  )
+  const visibleSpectraSections = useMemo(
+    () => visibleSpectraNav.flatMap((g) => g.sections),
+    [visibleSpectraNav],
+  )
   // Active section's metadata, for the relocated description caption.
   const activeSpectraSection = SPECTRACHECK_SECTIONS.find((s) => s.value === activeTab)
   const [sessionRecord, setSessionRecord] = useState<unknown>(null)
@@ -1179,9 +1193,9 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               aria-label="SpectraCheck sections"
               className="inline-flex w-max items-center gap-1 rounded-lg border bg-muted/20 p-1"
               onKeyDown={(e) => {
-                const all = SPECTRACHECK_SECTIONS
+                const all = visibleSpectraSections
                 const idx = all.findIndex((s) => s.value === activeTab)
-                let next = -1
+                let next: number
                 if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % all.length
                 else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + all.length) % all.length
                 else if (e.key === "Home") next = 0
@@ -1192,7 +1206,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
               }}
             >
-              {SPECTRACHECK_NAV.map((g, gi) => (
+              {visibleSpectraNav.map((g, gi) => (
                 <div key={g.id} className="inline-flex items-center gap-1">
                   {gi > 0 ? <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" /> : null}
                   <span
@@ -3822,6 +3836,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         </TabsContent>
 
         <TabsContent value="tab-dev-json" className="mt-4 space-y-8">
+          <DeveloperOnly>
           <div className="space-y-1">
             <p
               className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
@@ -3966,6 +3981,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 )}
             </div>
           </ModuleCard>
+          </DeveloperOnly>
         </TabsContent>
       </Tabs>
       </div>
