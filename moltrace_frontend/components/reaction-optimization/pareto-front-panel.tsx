@@ -228,7 +228,7 @@ export function ParetoFrontPanel({
             <div className="space-y-1">
               <Label className="text-xs">X objective</Label>
               <Select value={xObj} onValueChange={setXSel}>
-                <SelectTrigger className="h-9 w-44">
+                <SelectTrigger className="h-9 w-44" aria-label="X objective">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -243,7 +243,7 @@ export function ParetoFrontPanel({
             <div className="space-y-1">
               <Label className="text-xs">Y objective</Label>
               <Select value={yObj} onValueChange={setYSel}>
-                <SelectTrigger className="h-9 w-44">
+                <SelectTrigger className="h-9 w-44" aria-label="Y objective">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

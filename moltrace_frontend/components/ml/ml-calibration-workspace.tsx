@@ -293,8 +293,8 @@ export function MlCalibrationWorkspace() {
             />
           </div>
           <div className="space-y-2">
-            <Label>notes_json (single line → one entry)</Label>
-            <Textarea value={notesLine} onChange={(e) => setNotesLine(e.target.value)} rows={2} />
+            <Label htmlFor="calibration-notes">notes_json (single line → one entry)</Label>
+            <Textarea id="calibration-notes" value={notesLine} onChange={(e) => setNotesLine(e.target.value)} rows={2} />
           </div>
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-muted-foreground">{formOk}</p> : null}

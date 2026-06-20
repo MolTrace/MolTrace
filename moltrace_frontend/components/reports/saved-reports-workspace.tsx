@@ -539,34 +539,36 @@ export default function SavedReportsWorkspace() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Report title</TableHead>
-                  <TableHead>Sample ID</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Reviewer</TableHead>
-                  <TableHead>Generated</TableHead>
-                  <TableHead>Report hash</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {DEMO_ILLUSTRATION_ROWS.map((r, i) => (
-                  <TableRow key={`demo-${i}`}>
-                    <TableCell>{r.reportTitle}</TableCell>
-                    <TableCell className="font-mono text-sm">{r.sampleId}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{r.projectLabel}</Badge>
-                    </TableCell>
-                    <TableCell>{bucketBadge(r.filterBucket)}</TableCell>
-                    <TableCell>{r.reviewer}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.generatedAt}</TableCell>
-                    <TableCell className="font-mono text-[11px]">{r.hashPreview}</TableCell>
+            <div className="table-scroll">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Report title</TableHead>
+                    <TableHead>Sample ID</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Reviewer</TableHead>
+                    <TableHead>Generated</TableHead>
+                    <TableHead>Report hash</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {DEMO_ILLUSTRATION_ROWS.map((r, i) => (
+                    <TableRow key={`demo-${i}`}>
+                      <TableCell>{r.reportTitle}</TableCell>
+                      <TableCell className="font-mono text-sm">{r.sampleId}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{r.projectLabel}</Badge>
+                      </TableCell>
+                      <TableCell>{bucketBadge(r.filterBucket)}</TableCell>
+                      <TableCell>{r.reviewer}</TableCell>
+                      <TableCell className="text-muted-foreground">{r.generatedAt}</TableCell>
+                      <TableCell className="font-mono text-[11px]">{r.hashPreview}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       ) : null}

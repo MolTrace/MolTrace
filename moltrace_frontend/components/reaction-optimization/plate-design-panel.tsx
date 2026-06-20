@@ -321,7 +321,7 @@ export function PlateDesignPanel({
             <div className="space-y-1">
               <Label className="text-xs">Plate format</Label>
               <Select value={format} onValueChange={(v) => setFormat(v as PlateFormat)}>
-                <SelectTrigger className="h-9 w-40">
+                <SelectTrigger className="h-9 w-40" aria-label="Plate format">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -336,7 +336,7 @@ export function PlateDesignPanel({
             <div className="space-y-1">
               <Label className="text-xs">Strategy</Label>
               <Select value={strategy} onValueChange={(v) => setStrategy(v as PlateStrategy)}>
-                <SelectTrigger className="h-9 w-44">
+                <SelectTrigger className="h-9 w-44" aria-label="Strategy">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

@@ -204,7 +204,7 @@ export function AIEvidenceQueue({ onClose }: AIEvidenceQueueProps) {
             <h2 className="font-semibold">AI Evidence Queue</h2>
             <Badge variant="secondary">{badgeCount}</Badge>
           </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} aria-label="Close AI Evidence Queue">
             <X className="h-4 w-4" />
           </Button>
         </div>
