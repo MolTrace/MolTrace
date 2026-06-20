@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from . import alcoa, esign
+from . import alcoa, esign, validation_package
 from .database import session_scope
 from .models import (
     CAPARecord,
@@ -153,6 +153,41 @@ def _ensure_project(session: Session, validation_project_id: int) -> ValidationP
     if row is None:
         raise KeyError("Validation project not found.")
     return row
+
+
+def _gate_validated_state_mutation(
+    session: Session, validation_project_id: int | None, reason: str | None
+) -> None:
+    """GAMP 5 / Annex 11 change control (Prompt 13): block a silent change to a validated-state
+    validation project — one that is approved/archived, or attached to an approved/released system
+    release — unless a ``reason_for_change`` is supplied. Draft / in-progress projects are
+    unaffected. A None project, or one not yet validated, is a no-op."""
+    if validation_project_id is None:
+        return
+    project = session.get(ValidationProjectORM, validation_project_id)
+    if project is None:
+        return
+    linked_release = session.scalar(
+        select(SystemReleaseRecordORM)
+        .where(SystemReleaseRecordORM.validation_project_id == validation_project_id)
+        .where(SystemReleaseRecordORM.approval_status.in_(("approved", "released")))
+        .limit(1)
+    )
+    release_status = linked_release.approval_status if linked_release is not None else None
+    try:
+        validation_package.assert_change_control(project.status, release_status, reason)
+    except validation_package.ValidatedStateChangeError as exc:
+        # Surface through the existing Validation Center HTTP error mapper.
+        raise ValidationCenterError(str(exc)) from exc
+
+
+def _change_reason(metadata_json: dict[str, Any] | None) -> str | None:
+    """The change-control reason a client supplies (in a create/update payload's metadata_json) when
+    modifying a validated-state project."""
+    if not metadata_json:
+        return None
+    value = metadata_json.get("reason_for_change")
+    return value if isinstance(value, str) else None
 
 
 def _risk_priority(
@@ -503,6 +538,9 @@ def update_validation_project(
         row = session.get(ValidationProjectORM, validation_project_id)
         if row is None:
             return None
+        _gate_validated_state_mutation(
+            session, validation_project_id, _change_reason(getattr(payload, "metadata_json", None))
+        )
         data = payload.model_dump(exclude_unset=True)
         for field in (
             "title",
@@ -531,6 +569,9 @@ def create_urs(
 ) -> UserRequirementSpecification:
     with session_scope(session_factory) as session:
         _ensure_project(session, validation_project_id)
+        _gate_validated_state_mutation(
+            session, validation_project_id, _change_reason(payload.metadata_json)
+        )
         row = UserRequirementSpecificationORM(
             validation_project_id=validation_project_id,
             requirement_code=payload.requirement_code,
@@ -571,6 +612,9 @@ def create_functional_spec(
 ) -> FunctionalSpecification:
     with session_scope(session_factory) as session:
         _ensure_project(session, validation_project_id)
+        _gate_validated_state_mutation(
+            session, validation_project_id, _change_reason(payload.metadata_json)
+        )
         if payload.requirement_id is not None:
             requirement = session.get(UserRequirementSpecificationORM, payload.requirement_id)
             if requirement is None or requirement.validation_project_id != validation_project_id:
@@ -616,6 +660,9 @@ def create_risk_assessment(
 ) -> ValidationRiskAssessment:
     with session_scope(session_factory) as session:
         _ensure_project(session, validation_project_id)
+        _gate_validated_state_mutation(
+            session, validation_project_id, _change_reason(payload.metadata_json)
+        )
         row = ValidationRiskAssessmentORM(
             validation_project_id=validation_project_id,
             target_type=payload.target_type,
@@ -665,6 +712,9 @@ def create_test_protocol(
 ) -> ValidationTestProtocol:
     with session_scope(session_factory) as session:
         _ensure_project(session, validation_project_id)
+        _gate_validated_state_mutation(
+            session, validation_project_id, _change_reason(payload.metadata_json)
+        )
         row = ValidationTestProtocolORM(
             validation_project_id=validation_project_id,
             protocol_code=payload.protocol_code,
@@ -715,6 +765,9 @@ def create_test_case(
         protocol = session.get(ValidationTestProtocolORM, protocol_id)
         if protocol is None:
             raise KeyError("Validation test protocol not found.")
+        _gate_validated_state_mutation(
+            session, protocol.validation_project_id, _change_reason(payload.metadata_json)
+        )
         row = ValidationTestCaseORM(
             protocol_id=protocol_id,
             test_case_code=payload.test_case_code,
@@ -1815,6 +1868,130 @@ def get_system_release(
     with session_scope(session_factory) as session:
         row = session.get(SystemReleaseRecordORM, release_id)
         return _release_to_record(row) if row is not None else None
+
+
+def ingest_release_evidence(
+    session_factory: sessionmaker[Session],
+    release_id: int,
+    *,
+    test_summary_json: dict[str, Any],
+    risk_summary_json: dict[str, Any],
+    source: str = "ci",
+    metadata: dict[str, Any] | None = None,
+) -> SystemReleaseRecord:
+    """CI-evidence ingestion seam (Prompt 13): write structured test/risk summaries into the
+    release's existing evidence slots. Refused once the release is approved/released — that snapshot
+    is §11.70-bound by the approval signature, so changing it requires a new release (change
+    control)."""
+    with session_scope(session_factory) as session:
+        row = session.get(SystemReleaseRecordORM, release_id)
+        if row is None:
+            raise KeyError("System release record not found.")
+        if row.approval_status in ("approved", "released"):
+            raise ValidationCenterError(
+                "Cannot ingest evidence into an approved/released release; create a new release."
+            )
+        row.test_summary_json = _json_dump(test_summary_json, default={})
+        row.risk_summary_json = _json_dump(risk_summary_json, default={})
+        meta = {**_json_dict(row.metadata_json), "evidence_source": source}
+        if metadata:
+            meta.update(metadata)
+        row.metadata_json = _json_dump(meta, default={})
+        session.flush()
+        session.refresh(row)
+        return _release_to_record(row)
+
+
+def build_validation_package(
+    session_factory: sessionmaker[Session],
+    release_id: int,
+) -> dict[str, Any]:
+    """Assemble a regenerable GAMP 5 / CSA validation package for a release: latest traceability
+    matrix + requirement/risk/test counts + IQ/OQ/PQ-from-CI evidence + change-control state +
+    release approval signatures. Read-only; re-runnable on every CI build / inspection."""
+    with session_scope(session_factory) as session:
+        release = session.get(SystemReleaseRecordORM, release_id)
+        if release is None:
+            raise KeyError("System release record not found.")
+
+        project_section: dict[str, Any] = {}
+        traceability: dict[str, Any] | None = None
+        counts: dict[str, Any] = {}
+        deviation_summary = {"open_count": 0, "total_count": 0}
+
+        if release.validation_project_id is not None:
+            project = session.get(ValidationProjectORM, release.validation_project_id)
+            if project is not None:
+                project_section = {
+                    "id": project.id,
+                    "title": project.title,
+                    "status": project.status,
+                    "validation_type": project.validation_type,
+                }
+                components = _traceability_components(session, project.id)
+                counts = {key: len(rows) for key, rows in components.items()}
+                matrix_row = session.scalar(
+                    select(TraceabilityMatrixORM)
+                    .where(TraceabilityMatrixORM.validation_project_id == project.id)
+                    .order_by(TraceabilityMatrixORM.id.desc())
+                    .limit(1)
+                )
+                if matrix_row is not None:
+                    tr = _traceability_to_record(matrix_row)
+                    traceability = {
+                        "status": tr.status,
+                        "matrix_json": tr.matrix_json,
+                        "coverage_summary_json": tr.coverage_summary_json,
+                        "missing_coverage_json": tr.missing_coverage_json,
+                        "generated_at": tr.created_at,
+                    }
+                dev_ids = sorted(
+                    {e.deviation_id for e in components["executions"] if e.deviation_id is not None}
+                )
+                if dev_ids:
+                    devs = session.scalars(
+                        select(DeviationRecordORM).where(DeviationRecordORM.id.in_(dev_ids))
+                    ).all()
+                    open_count = sum(
+                        1 for d in devs if d.status not in ("closed", "resolved", "verified")
+                    )
+                    deviation_summary = {"open_count": open_count, "total_count": len(devs)}
+
+        signature_rows = session.scalars(
+            select(ElectronicSignatureRecordORM)
+            .where(ElectronicSignatureRecordORM.target_type == "system_release")
+            .where(ElectronicSignatureRecordORM.target_id == release.id)
+            .order_by(ElectronicSignatureRecordORM.id.asc())
+        ).all()
+        signatures = [
+            esign.build_manifestation(
+                signer_display_name=s.signer_name,
+                signer_email=s.signer_email,
+                signature_meaning=s.signature_meaning,
+                reason=s.reason,
+                signed_at=s.signed_at,
+                target_type=s.target_type,
+                target_id=s.target_id,
+                record_content_hash=s.record_content_hash,
+                signature_digest=s.signature_digest,
+                authentication_method=s.authentication_method,
+            )
+            for s in signature_rows
+        ]
+
+        components_payload = {
+            "project": project_section,
+            "release": _release_to_record(release).model_dump(mode="json"),
+            "traceability": traceability,
+            "signatures": signatures,
+            "test_summary": _json_dict(release.test_summary_json),
+            "risk_summary": _json_dict(release.risk_summary_json),
+            "deviation_summary": deviation_summary,
+            "counts": counts,
+        }
+        return validation_package.assemble_validation_package(
+            components_payload, generated_at=utcnow()
+        )
 
 
 def approve_system_release(
