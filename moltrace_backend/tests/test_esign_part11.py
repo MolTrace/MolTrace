@@ -22,7 +22,12 @@ from nmrcheck import validation_center_store as validation_store
 from nmrcheck.api import create_app
 from nmrcheck.database import init_db
 from nmrcheck.models import SystemReleaseApproveRequest, SystemReleaseRecordCreate
-from nmrcheck.orm import AuditEventORM, ControlledRecordORM, ElectronicSignatureRecordORM
+from nmrcheck.orm import (
+    AuditEventORM,
+    ControlledRecordORM,
+    ElectronicSignatureRecordORM,
+    SystemReleaseRecordORM,
+)
 from nmrcheck.settings import Settings
 
 
@@ -257,6 +262,105 @@ def test_unbound_target_is_honest(tmp_path):
         assert sig["record_content_hash"] is None and sig["signature_digest"] is None
         v = client.get(f"/esignatures/records/{sig['id']}/verify", headers=bearer).json()
         assert v["bound"] is False and v["valid"] is None
+        # The manifestation must flag the unbound/unverifiable status, not present it as verified.
+        m = client.get(f"/esignatures/records/{sig['id']}/manifestation", headers=bearer).json()
+        assert m["binding_status"] == "unbound"
+        h = client.get(
+            f"/esignatures/records/{sig['id']}/manifestation?format=html", headers=bearer
+        ).text
+        assert "legacy signature" in h.lower() and "cannot be cryptographically verified" in h.lower()
+
+
+def test_sign_missing_bindable_record_is_rejected(tmp_path):
+    """Review fix (medium): signing a bindable target that does not exist returns 404 — never a
+    201 unbound signature that would mask the missing record and defeat §11.70 binding."""
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        bearer = _signup(client, "x@acme.com")
+        _step_up(client, bearer)
+        res = client.post(
+            "/esignatures/records",
+            headers=bearer,
+            json={
+                "signer_name": "x",
+                "signature_meaning": "approved",
+                "target_type": "controlled_record",
+                "target_id": 999999,
+                "reason": "r",
+            },
+        )
+        assert res.status_code == 404
+
+
+def test_manifestation_binding_status_bound(tmp_path):
+    """Review fix (nit): a content-bound signature's manifestation reports binding_status='bound'."""
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        bearer = _signup(client, "b@acme.com")
+        rid = _make_controlled_record(client, bearer)
+        _step_up(client, bearer)
+        sid = client.post(
+            "/esignatures/records",
+            headers=bearer,
+            json={
+                "signer_name": "x",
+                "signature_meaning": "approved",
+                "target_type": "controlled_record",
+                "target_id": rid,
+                "reason": "r",
+            },
+        ).json()["id"]
+        m = client.get(f"/esignatures/records/{sid}/manifestation", headers=bearer).json()
+        assert m["binding_status"] == "bound"
+        h = client.get(
+            f"/esignatures/records/{sid}/manifestation?format=html", headers=bearer
+        ).text
+        assert "Binding status" in h
+
+
+def test_system_release_approval_binds_principal_and_detects_change(tmp_path):
+    """Review fix (high + medium): approve_system_release attributes to the authenticated principal
+    (§11.100) and binds the identifying release columns (§11.70), so a post-sign change is detected."""
+    app = _app(tmp_path)
+    sf = app.state.session_factory
+    release = validation_store.create_system_release(
+        sf,
+        SystemReleaseRecordCreate(
+            release_version="1.0.0",
+            release_type="backend",
+            change_summary="initial",
+            test_summary_json={"passed": 10},
+            risk_summary_json={"high": 0},
+        ),
+    )
+    validation_store.approve_system_release(
+        sf,
+        release.id,
+        SystemReleaseApproveRequest(signer_name="QA Lead", reason="approved", release=True),
+        signer_user_id=42,
+        signer_display_name="qa@acme.com",
+        signer_email="qa@acme.com",
+    )
+    with sf() as s:
+        row = (
+            s.execute(
+                select(ElectronicSignatureRecordORM).where(
+                    ElectronicSignatureRecordORM.target_type == "system_release"
+                )
+            )
+            .scalars()
+            .first()
+        )
+        sid = row.id
+        assert row.signer_user_id == 42  # §11.100 — bound to the principal, not the typed-in name
+        assert row.signature_digest and row.record_content_hash
+    # §11.70 — changing an identifying release column breaks the binding on recompute.
+    with sf() as s:
+        rel = s.get(SystemReleaseRecordORM, release.id)
+        rel.release_version = "9.9.9"
+        s.commit()
+    result = validation_store.verify_record_signature(sf, sid, recompute=True)
+    assert result["content_matches"] is False and result["valid"] is False
 
 
 def test_signing_emits_chained_audit_event(tmp_path):

@@ -14091,6 +14091,7 @@ class ESignatureManifestation(BaseModel):
     target_id: int
     record_content_hash: str | None = None
     signature_digest: str | None = None
+    binding_status: Literal["bound", "unbound"]
     authentication_method: str | None = None
     step_up_factor: str | None = None
     step_up_aal: str | None = None
