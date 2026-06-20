@@ -57,6 +57,33 @@ describe("StructuredJsonObjectEditor", () => {
     expect(onChange.mock.calls.at(-1)![0]).toEqual({ r2: 0.987 })
   })
 
+  it("auto-detects value types (number vs string) for custom rows", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<StructuredJsonObjectEditor onChange={onChange} allowCustomKeys customValueType="auto" addLabel="Add" />)
+
+    await user.click(screen.getByRole("button", { name: "Add" }))
+    await user.type(screen.getByPlaceholderText("key"), "loq")
+    await user.type(screen.getByPlaceholderText("value"), "0.05")
+    expect(onChange.mock.calls.at(-1)![0]).toEqual({ loq: 0.05 })
+
+    await user.clear(screen.getByPlaceholderText("value"))
+    await user.type(screen.getByPlaceholderText("value"), "pass")
+    expect(onChange.mock.calls.at(-1)![0]).toEqual({ loq: "pass" })
+  })
+
+  it("keeps identifier-like values as strings (lossless round-trip only)", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<StructuredJsonObjectEditor onChange={onChange} allowCustomKeys customValueType="auto" addLabel="Add" />)
+
+    await user.click(screen.getByRole("button", { name: "Add" }))
+    await user.type(screen.getByPlaceholderText("key"), "lot")
+    // "007" would lose its leading zeros if coerced — must stay a string.
+    await user.type(screen.getByPlaceholderText("value"), "007")
+    expect(onChange.mock.calls.at(-1)![0]).toEqual({ lot: "007" })
+  })
+
   it("seeds fields from initialValue", () => {
     const onChange = vi.fn()
     render(

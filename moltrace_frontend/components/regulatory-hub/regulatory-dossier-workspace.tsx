@@ -64,6 +64,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
 import { AlertTriangle, ArrowLeft, ChevronDown, Loader2 } from "lucide-react"
 import { RegulatoryDossierLinkedCompoundCard } from "@/components/regulatory-hub/regulatory-dossier-linked-compound-card"
 import { RegulatoryDossierKnowledgeLinksCard } from "@/components/knowledge/knowledge-links-integration"
@@ -539,6 +540,13 @@ function parseOptionalJsonObjectInput(
   const t = raw.trim()
   if (!t) return { ok: true, value: undefined }
   return parseJsonObjectInput(raw, label)
+}
+
+// Map a JsonObjectField's emitted object back to the string state the existing
+// submit logic parses. An empty object → "" so optional fields stay omitted and
+// required fields parse to {} exactly as before — the wire payload is unchanged.
+function jsonStringFromObject(obj: Record<string, unknown>): string {
+  return Object.keys(obj).length > 0 ? JSON.stringify(obj) : ""
 }
 
 function parseCommaSeparatedInts(raw: string): number[] {
@@ -4139,25 +4147,18 @@ export function RegulatoryDossierWorkspace() {
                       </Select>
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="mv-atp">analytical_target_profile_json</Label>
-                      <Textarea
-                        id="mv-atp"
-                        rows={4}
-                        className="font-mono text-xs"
-                        value={mvAtpJson}
-                        onChange={(e) => setMvAtpJson(e.target.value)}
-                        placeholder="{}"
+                      <JsonObjectField
+                        idPrefix="mv-atp"
+                        label="Analytical target profile"
+                        onChange={(obj) => setMvAtpJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="mv-valp">validation_parameters_json</Label>
-                      <Textarea
-                        id="mv-valp"
-                        rows={4}
-                        className="font-mono text-xs"
-                        value={mvValParamsJson}
-                        onChange={(e) => setMvValParamsJson(e.target.value)}
-                        placeholder='e.g. {"specificity": {}, "accuracy": {}, "precision": {}}'
+                      <JsonObjectField
+                        idPrefix="mv-valp"
+                        label="Validation parameters"
+                        description="e.g. specificity, accuracy, precision — switch to raw JSON for nested sub-objects."
+                        onChange={(obj) => setMvValParamsJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2">
@@ -4179,36 +4180,24 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="mv-acq">acquisition_parameters_json</Label>
-                      <Textarea
-                        id="mv-acq"
-                        rows={3}
-                        className="font-mono text-xs"
-                        value={mvAcqJson}
-                        onChange={(e) => setMvAcqJson(e.target.value)}
-                        placeholder="{}"
+                      <JsonObjectField
+                        idPrefix="mv-acq"
+                        label="Acquisition parameters"
+                        onChange={(obj) => setMvAcqJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="mv-unc">uncertainty_summary_json</Label>
-                      <Textarea
-                        id="mv-unc"
-                        rows={3}
-                        className="font-mono text-xs"
-                        value={mvUncJson}
-                        onChange={(e) => setMvUncJson(e.target.value)}
-                        placeholder="{}"
+                      <JsonObjectField
+                        idPrefix="mv-unc"
+                        label="Uncertainty summary"
+                        onChange={(obj) => setMvUncJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="mv-qmeta">metadata_json (qNMR row — audit trail / hashes)</Label>
-                      <Textarea
-                        id="mv-qmeta"
-                        rows={3}
-                        className="font-mono text-xs"
-                        value={mvQnmrMetaJson}
-                        onChange={(e) => setMvQnmrMetaJson(e.target.value)}
-                        placeholder='e.g. {"audit_trail": true}'
+                      <JsonObjectField
+                        idPrefix="mv-qmeta"
+                        label="qNMR metadata (audit trail / hashes)"
+                        onChange={(obj) => setMvQnmrMetaJson(jsonStringFromObject(obj))}
                       />
                       <p className="text-xs text-muted-foreground">
                         Optional <span className="font-mono">spectracheck_session_id</span> is added from the dossier when
@@ -4254,14 +4243,10 @@ export function RegulatoryDossierWorkspace() {
                       </p>
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="mv-mmeta">metadata_json (method-validation-profile)</Label>
-                      <Textarea
-                        id="mv-mmeta"
-                        rows={3}
-                        className="font-mono text-xs"
-                        value={mvMethodMetaJson}
-                        onChange={(e) => setMvMethodMetaJson(e.target.value)}
-                        placeholder="{}"
+                      <JsonObjectField
+                        idPrefix="mv-mmeta"
+                        label="Method-validation metadata"
+                        onChange={(obj) => setMvMethodMetaJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
@@ -4275,80 +4260,52 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mv-acc">accuracy_json</Label>
-                      <Textarea
-                        id="mv-acc"
-                        rows={2}
-                        className="font-mono text-xs"
-                        value={mvAccuracyJson}
-                        onChange={(e) => setMvAccuracyJson(e.target.value)}
-                        placeholder="Optional object JSON"
+                      <JsonObjectField
+                        idPrefix="mv-acc"
+                        label="Accuracy"
+                        onChange={(obj) => setMvAccuracyJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mv-prec">precision_json</Label>
-                      <Textarea
-                        id="mv-prec"
-                        rows={2}
-                        className="font-mono text-xs"
-                        value={mvPrecisionJson}
-                        onChange={(e) => setMvPrecisionJson(e.target.value)}
-                        placeholder="Optional object JSON"
+                      <JsonObjectField
+                        idPrefix="mv-prec"
+                        label="Precision"
+                        onChange={(obj) => setMvPrecisionJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mv-spec">specificity_json</Label>
-                      <Textarea
-                        id="mv-spec"
-                        rows={2}
-                        className="font-mono text-xs"
-                        value={mvSpecificityJson}
-                        onChange={(e) => setMvSpecificityJson(e.target.value)}
-                        placeholder="Optional object JSON"
+                      <JsonObjectField
+                        idPrefix="mv-spec"
+                        label="Specificity"
+                        onChange={(obj) => setMvSpecificityJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mv-lin">linearity_json</Label>
-                      <Textarea
-                        id="mv-lin"
-                        rows={2}
-                        className="font-mono text-xs"
-                        value={mvLinearityJson}
-                        onChange={(e) => setMvLinearityJson(e.target.value)}
-                        placeholder="Optional object JSON"
+                      <JsonObjectField
+                        idPrefix="mv-lin"
+                        label="Linearity"
+                        onChange={(obj) => setMvLinearityJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mv-range">range_json</Label>
-                      <Textarea
-                        id="mv-range"
-                        rows={2}
-                        className="font-mono text-xs"
-                        value={mvRangeJson}
-                        onChange={(e) => setMvRangeJson(e.target.value)}
-                        placeholder="Optional object JSON"
+                      <JsonObjectField
+                        idPrefix="mv-range"
+                        label="Range"
+                        onChange={(obj) => setMvRangeJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mv-rob">robustness_json</Label>
-                      <Textarea
-                        id="mv-rob"
-                        rows={2}
-                        className="font-mono text-xs"
-                        value={mvRobustnessJson}
-                        onChange={(e) => setMvRobustnessJson(e.target.value)}
-                        placeholder="Optional object JSON"
+                      <JsonObjectField
+                        idPrefix="mv-rob"
+                        label="Robustness"
+                        onChange={(obj) => setMvRobustnessJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="mv-lod">lod_loq_json</Label>
-                      <Textarea
-                        id="mv-lod"
-                        rows={2}
-                        className="font-mono text-xs"
-                        value={mvLodLoqJson}
-                        onChange={(e) => setMvLodLoqJson(e.target.value)}
-                        placeholder="Optional object JSON"
+                      <JsonObjectField
+                        idPrefix="mv-lod"
+                        label="LOD / LOQ"
+                        onChange={(obj) => setMvLodLoqJson(jsonStringFromObject(obj))}
                       />
                     </div>
                   </div>

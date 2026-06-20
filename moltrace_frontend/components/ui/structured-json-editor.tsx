@@ -37,12 +37,28 @@ export type StructuredJsonField = {
 
 type CustomRow = { id: number; key: string; value: string }
 
-function coerce(raw: string, asNumber: boolean): unknown | undefined {
+export type JsonValueType = "text" | "number" | "auto"
+
+function coerce(raw: string, valueType: JsonValueType): unknown | undefined {
   const trimmed = raw.trim()
   if (trimmed === "") return undefined
-  if (!asNumber) return raw
-  const n = Number(trimmed)
-  return Number.isFinite(n) ? n : undefined
+  if (valueType === "text") return raw
+  if (valueType === "number") {
+    const n = Number(trimmed)
+    return Number.isFinite(n) ? n : undefined
+  }
+  // "auto": detect number / boolean / null, else keep the raw string. Only
+  // coerce to a number when it round-trips losslessly (String(n) === input), so
+  // identifier-like values keep their exact text — "007" stays "007", "1e3"
+  // stays "1e3", "0.50" keeps its trailing zero — while "98.5" becomes a number.
+  if (/^[+-]?(\d|\.)/.test(trimmed)) {
+    const n = Number(trimmed)
+    if (Number.isFinite(n) && String(n) === trimmed) return n
+  }
+  if (trimmed === "true") return true
+  if (trimmed === "false") return false
+  if (trimmed === "null") return null
+  return raw
 }
 
 export function StructuredJsonObjectEditor({
@@ -61,7 +77,7 @@ export function StructuredJsonObjectEditor({
   initialValue?: Record<string, unknown>
   onChange: (next: Record<string, unknown>) => void
   allowCustomKeys?: boolean
-  customValueType?: "text" | "number"
+  customValueType?: JsonValueType
   addLabel?: string
   keyPlaceholder?: string
   valuePlaceholder?: string
@@ -93,13 +109,13 @@ export function StructuredJsonObjectEditor({
   function assemble(nextDrafts: Record<string, string>, nextRows: CustomRow[]): Record<string, unknown> {
     const obj: Record<string, unknown> = {}
     for (const f of fields) {
-      const v = coerce(nextDrafts[f.key] ?? "", f.type === "number")
+      const v = coerce(nextDrafts[f.key] ?? "", f.type === "number" ? "number" : "text")
       if (v !== undefined) obj[f.key] = v
     }
     for (const row of nextRows) {
       const key = row.key.trim()
       if (!key) continue
-      const v = coerce(row.value, customValueType === "number")
+      const v = coerce(row.value, customValueType)
       if (v !== undefined) obj[key] = v
     }
     return obj
