@@ -1,0 +1,147 @@
+name: security-scan
+
+# Security Prompt 14 — Secure-SDLC CI gates: SAST (Semgrep), SCA (dependency + license), and
+# IaC scanning. Companion to secret-scan.yml (Prompt 8, gitleaks) — together they form the
+# secure-SDLC scan suite. Standalone workflow (no `needs:` coupling to ci-cd.yml), mirroring
+# secret-scan.yml's design so a test failure can never skip these gates and the files never contend.
+#
+# POLICY (see docs/security_sdlc_gates.md): CRITICAL findings BLOCK; HIGH/MEDIUM are reported as
+# SARIF to the GitHub Security tab (Code scanning) and tracked to closure per the triage SLAs.
+#
+# To make these BLOCK merge: add each job (SAST · Semgrep, SCA · Trivy, IaC · Trivy) as a REQUIRED
+# status check under Settings → Branches → branch protection for `main` (same one-time step as the
+# gitleaks gate). Because `deploy` in ci-cd.yml only runs on a green push to `main`, a blocked PR
+# cannot merge and therefore cannot deploy.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write # upload SARIF to the Security tab (Code scanning)
+
+jobs:
+  sast:
+    name: SAST · Semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13.5"
+
+      # Curated public rulesets (no Semgrep account/token needed). The report pass emits SARIF for
+      # ALL severities (tracked in the Security tab); the gate pass blocks ONLY on ERROR-severity
+      # (critical) findings, so HIGH/MEDIUM are surfaced without breaking the build. Run via `uvx`
+      # (uv's tool runner) — consistent with the repo's uv toolchain; pin the version for prod
+      # hardening (see docs/security_sdlc_gates.md).
+      - name: Semgrep — report (all severities → SARIF)
+        run: |
+          uvx --from semgrep semgrep scan \
+            --config p/python --config p/javascript --config p/typescript \
+            --config p/owasp-top-ten --config p/react \
+            --sarif --output semgrep.sarif \
+            --exclude moltrace_frontend/.next --exclude '**/node_modules' || true
+
+      - name: Upload Semgrep SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+        continue-on-error: true
+
+      - name: Semgrep — gate (block on CRITICAL / ERROR-severity)
+        run: |
+          uvx --from semgrep semgrep scan \
+            --config p/python --config p/javascript --config p/typescript \
+            --config p/owasp-top-ten --config p/react \
+            --severity ERROR --error -q \
+            --exclude moltrace_frontend/.next --exclude '**/node_modules'
+
+  sca:
+    name: SCA · Trivy (deps + license)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Filesystem scan picks up Python (uv.lock) and JS (pnpm-lock.yaml) dependency advisories plus
+      # license findings. Report pass → SARIF (HIGH+CRITICAL, tracked); gate pass → blocks on CRITICAL.
+      - name: Trivy — report (HIGH,CRITICAL → SARIF)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,license
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-sca.sarif
+          exit-code: "0"
+          skip-dirs: moltrace_frontend/.next,**/node_modules
+
+      - name: Upload Trivy SCA SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-sca.sarif
+          category: trivy-sca
+        continue-on-error: true
+
+      - name: Trivy — gate (block on CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"
+          skip-dirs: moltrace_frontend/.next,**/node_modules
+
+  iac:
+    name: IaC · Trivy config
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Scans declarative infra (render.yaml blueprints + the GitHub Actions workflows themselves)
+      # for misconfigurations. Report pass → SARIF; gate pass → blocks on CRITICAL.
+      - name: Trivy — IaC report (→ SARIF)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-iac.sarif
+          exit-code: "0"
+
+      - name: Upload Trivy IaC SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-iac.sarif
+          category: trivy-iac
+        continue-on-error: true
+
+      - name: Trivy — IaC gate (block on CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          severity: CRITICAL
+          format: table
+          exit-code: "1"
