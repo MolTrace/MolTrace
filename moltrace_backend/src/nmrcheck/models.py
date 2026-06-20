@@ -14302,6 +14302,32 @@ class SystemReleaseRecord(BaseModel):
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReleaseEvidenceIngestRequest(BaseModel):
+    """CI-evidence ingestion (Prompt 13): structured test/risk summaries posted into a release's
+    evidence slots (e.g. from a CI step parsing pytest/coverage output)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    test_summary_json: dict[str, Any] = Field(default_factory=dict)
+    risk_summary_json: dict[str, Any] = Field(default_factory=dict)
+    source: Literal["ci", "manual"] = "ci"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationPackage(BaseModel):
+    """A regenerable GAMP 5 / CSA validation package assembled for a release (Prompt 13)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    package_metadata: dict[str, Any]
+    requirement_risk_test_traceability: dict[str, Any]
+    iq_oq_pq_evidence: dict[str, Any]
+    risk_summary: dict[str, Any] | None = None
+    change_control_state: dict[str, Any]
+    signatures: list[dict[str, Any]] = Field(default_factory=list)
+    notice: str
+
+
 class DeviationRecordCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
