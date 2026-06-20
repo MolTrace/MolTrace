@@ -37,6 +37,18 @@ export async function loadReactionProjects(): Promise<EntityOption[]> {
   return out
 }
 
+export async function loadValidationProjects(): Promise<EntityOption[]> {
+  const raw = await apiFetch<unknown>("/validation-center/projects", { method: "GET" })
+  const out: EntityOption[] = []
+  for (const r of asArray(raw)) {
+    if (!isRecord(r)) continue
+    const id = readId(r.id ?? r.validation_project_id)
+    if (id == null) continue
+    out.push({ id, label: str(r.title) || `Validation project ${id}`, description: str(r.validation_type) || undefined })
+  }
+  return out
+}
+
 export async function loadOrganizations(): Promise<EntityOption[]> {
   const raw = await apiFetch<unknown>("/organizations", { method: "GET" })
   const out: EntityOption[] = []

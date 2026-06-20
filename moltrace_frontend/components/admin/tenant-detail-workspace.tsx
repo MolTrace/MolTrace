@@ -31,6 +31,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { MultiEntityPicker } from "@/components/ui/multi-entity-picker"
+import { loadValidationProjects } from "@/lib/ui/entity-options"
 import { GsdReadinessVerdictCard } from "@/components/spectracheck/gsd-telemetry-panel"
 import {
   trackDataBoundaryCreated,
@@ -248,6 +250,16 @@ function parseJsonObjectField(raw: string, label: string): Row {
   const value = parseJsonField(raw, label)
   if (isRecord(value)) return value
   throw new Error(`${label} must be a JSON object.`)
+}
+
+/** Non-throwing parse of a JSON id-array string → ids, for picker `value`. */
+function safeIdArray(raw: string): (number | string)[] {
+  try {
+    const a = JSON.parse(raw)
+    return Array.isArray(a) ? a.filter((x): x is number | string => typeof x === "number" || typeof x === "string") : []
+  } catch {
+    return []
+  }
 }
 
 function parseIdArrayField(raw: string, label: string): number[] {
@@ -1939,12 +1951,15 @@ function ValidationProfilePanel({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-validation-project-ids">validation project IDs</Label>
-            <Textarea
+            <Label htmlFor="tenant-validation-project-ids">validation projects</Label>
+            <MultiEntityPicker
               id="tenant-validation-project-ids"
-              value={validationProjectIdsJson}
-              onChange={(event) => setValidationProjectIdsJson(event.target.value)}
-              rows={4}
+              ariaLabel="Validation projects"
+              value={safeIdArray(validationProjectIdsJson)}
+              onChange={(ids) => setValidationProjectIdsJson(JSON.stringify(ids))}
+              load={loadValidationProjects}
+              placeholder="Select validation projects"
+              searchPlaceholder="Search projects…"
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
