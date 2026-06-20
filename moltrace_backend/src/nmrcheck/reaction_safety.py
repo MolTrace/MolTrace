@@ -37,7 +37,7 @@ from .orm import (
     ReactionSafetyScreeningORM,
     utcnow,
 )
-from .reaction_store import ReactionActor
+from .reaction_store import ReactionActor, ReactionError
 
 _DISCLAIMER = (
     "Decision-support only; NOT a safety determination and never the sole basis for one. "
@@ -407,4 +407,39 @@ def gate_status(
             screenings_total=len(rows),
             blocking_screening_ids=sorted(r.id for r in blocking),
             summary=summary,
+        )
+
+
+class ReactionSafetyGateBlockedError(ReactionError):
+    """A rejected safety screening blocks committing the project's reactions to execution.
+
+    Subclasses ``ReactionError`` but is mapped to HTTP **409 (conflict)** at the API boundary
+    (not the plain 400) — the request is well-formed; the project is simply under a safety hold.
+    Only the execution-gate check raises this; the screening math never does.
+    """
+
+
+def assert_execution_allowed(session: Session, project_id: int) -> None:
+    """Fail-safe execution gate: raise if any of the project's safety screenings was *rejected*.
+
+    A reviewer's rejection is a definitive "do not proceed", so it hard-blocks committing the
+    project's reactions to the bench (an execution batch moving to ``planned``/``running``). A
+    merely *pending* screening does **not** block here — that stays advisory (the project
+    safety-gate banner nudges, but does not halt work). Operates on the caller's open ``Session``
+    so it never nests a second ``session_scope``.
+    """
+    rejected = session.scalars(
+        select(ReactionSafetyScreeningORM.id)
+        .where(
+            ReactionSafetyScreeningORM.reaction_project_id == project_id,
+            ReactionSafetyScreeningORM.review_status == "rejected",
+        )
+        .order_by(ReactionSafetyScreeningORM.id)
+    ).all()
+    if rejected:
+        raise ReactionSafetyGateBlockedError(
+            f"Execution is blocked by the safety gate: {len(rejected)} screening(s) were "
+            "rejected in review. Obtain process-safety clearance (or revise and re-review the "
+            "screening) before committing reactions to the bench. Rejected screening id(s): "
+            f"{list(rejected)}."
         )
