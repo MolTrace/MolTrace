@@ -21,7 +21,7 @@ Ultramodern, standard, and instantly understandable. A first-time user should ne
 need a tour. Use conventional SaaS patterns (no bespoke widgets where a standard one exists), generous
 whitespace, one clear primary action per surface, and **concise microcopy** — cut long descriptions to
 a short line; let structure and labels carry meaning. The three flagship modules — **SpectraCheck**,
-**Repho**, **Regentry** — are first-class throughout and get the redesign treatment, not just the
+**Regentry**, **Repho** — are first-class throughout and get the redesign treatment, not just the
 compliance surfaces.
 
 ## Operating principles (the rules every phase enforces)
@@ -39,7 +39,7 @@ compliance surfaces.
    surfaces hide behind an explicit toggle, off by default.
 6. **Some "features" are an endpoint with a form.** Fold them into the real workflow, or move them out
    of the human UI entirely (e.g. CI evidence ingest is a pipeline action, not a paste box).
-7. **Modules are the product.** SpectraCheck, Repho, Regentry are named, top-level, and consistent with
+7. **Modules are the product.** SpectraCheck, Regentry, Repho are named, top-level, and consistent with
    each other in layout, header, and interaction — the same skeleton, themed per module.
 
 ## How we run each phase (same loop as the handoffs)
@@ -63,7 +63,7 @@ sidebar becomes job-based groups instead of a growing flat list.
 **e-Signatures** have **no nav entry at all** — they're URL-only.
 
 **Shipped structure** (grouped, module-forward):
-- **Modules** — SpectraCheck `/spectracheck`, Repho `/reactions`, Regentry `/regulatory` (each with a one-line descriptor)
+- **Modules** — SpectraCheck `/spectracheck`, Regentry `/regulatory`, Repho `/reactions` (each with a one-line descriptor)
 - **Workspace** — Dashboard, Projects, Compounds & Batches, Action Queue, Review
 - **Validation Center** — Overview `/validation-center`, Controlled Records, e-Signatures, System Releases
 - **AI / ML** — AI / ML Governance `/ai`, Model Factory `/ml`
