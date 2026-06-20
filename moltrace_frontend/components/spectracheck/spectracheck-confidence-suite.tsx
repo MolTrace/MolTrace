@@ -3,6 +3,7 @@
 import { createContext, FormEvent, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
+import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -693,25 +694,27 @@ function UnifiedConfidenceTab({
         </Button>
       </div>
 
-      {selectedQueueItems.length > 0 && (
-        <Collapsible className="rounded-lg border bg-muted/20">
-          <CollapsibleTrigger className="flex w-full items-center px-4 py-3 text-left text-sm font-medium hover:bg-muted/40">
-            Source evidence details
-          </CollapsibleTrigger>
-          <CollapsibleContent className="border-t px-4 pb-4">
-            <p className="mb-2 text-xs text-muted-foreground">
-              Raw JSON payloads from selected queue items — not the full MS Evidence workspace tables.
-            </p>
-            <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-3 text-[10px] leading-relaxed">
-              {JSON.stringify(
-                selectedQueueItems.map((i) => ({ id: i.id, layer: i.layer, title: i.title, response: i.response })),
-                null,
-                2,
-              )}
-            </pre>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
+      <DeveloperOnly>
+        {selectedQueueItems.length > 0 && (
+          <Collapsible className="rounded-lg border bg-muted/20">
+            <CollapsibleTrigger className="flex w-full items-center px-4 py-3 text-left text-sm font-medium hover:bg-muted/40">
+              Source evidence details
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-t px-4 pb-4">
+              <p className="mb-2 text-xs text-muted-foreground">
+                Raw JSON payloads from selected queue items — not the full MS Evidence workspace tables.
+              </p>
+              <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-3 text-[10px] leading-relaxed">
+                {JSON.stringify(
+                  selectedQueueItems.map((i) => ({ id: i.id, layer: i.layer, title: i.title, response: i.response })),
+                  null,
+                  2,
+                )}
+              </pre>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </DeveloperOnly>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
         <ModuleCard
@@ -2086,12 +2089,14 @@ function ReportComposerTab({
         </div>
       </ModuleCard>
 
-      <details className="rounded-lg border bg-card p-4">
-        <summary className="cursor-pointer text-sm font-medium">Compose request (developer JSON)</summary>
-        <pre className="mt-4 max-h-[360px] overflow-x-auto overflow-y-auto whitespace-pre-wrap rounded-md bg-muted/40 p-4 text-xs leading-5">
-          {JSON.stringify(reportPayloadJson, null, 2)}
-        </pre>
-      </details>
+      <DeveloperOnly>
+        <details className="rounded-lg border bg-card p-4">
+          <summary className="cursor-pointer text-sm font-medium">Compose request (developer JSON)</summary>
+          <pre className="mt-4 max-h-[360px] overflow-x-auto overflow-y-auto whitespace-pre-wrap rounded-md bg-muted/40 p-4 text-xs leading-5">
+            {JSON.stringify(reportPayloadJson, null, 2)}
+          </pre>
+        </details>
+      </DeveloperOnly>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <ModuleCard

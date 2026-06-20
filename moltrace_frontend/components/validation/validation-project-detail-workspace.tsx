@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Layers3, ServerOff, ShieldCheck } from "lucide-react"
+import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { ValidationTraceabilityMatrixPanel } from "@/components/validation/validation-traceability-matrix-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
@@ -1002,7 +1003,9 @@ export function ValidationProjectDetailWorkspace() {
             <TabsTrigger value="esignatures" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">e-Signatures</TabsTrigger>
             <TabsTrigger value="deviations_capa" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Deviations / CAPA</TabsTrigger>
             <TabsTrigger value="inspection_package" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Inspection Package</TabsTrigger>
-            <TabsTrigger value="developer_json" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Developer JSON</TabsTrigger>
+            <DeveloperOnly>
+              <TabsTrigger value="developer_json" className="font-mono data-[state=active]:[background-color:var(--mt-green)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Developer JSON</TabsTrigger>
+            </DeveloperOnly>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -1947,17 +1950,19 @@ export function ValidationProjectDetailWorkspace() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="developer_json">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Developer JSON</CardTitle>
-                <CardDescription>Raw payloads from the validation project detail endpoints.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <JsonBlock value={developerBundle} />
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <DeveloperOnly>
+            <TabsContent value="developer_json">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Developer JSON</CardTitle>
+                  <CardDescription>Raw payloads from the validation project detail endpoints.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <JsonBlock value={developerBundle} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </DeveloperOnly>
         </Tabs>
       ) : null}
     </div>

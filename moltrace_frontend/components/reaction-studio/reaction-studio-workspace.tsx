@@ -34,6 +34,7 @@ import {
   Target,
 } from "lucide-react"
 import { EvidenceCard } from "@/components/science/evidence-card"
+import { DeveloperOnly } from "@/components/developer-mode-provider"
 
 /** Static fictional numbers for layout only — not computed by MolTrace or any backend. */
 const DEMO_CONDITION_ROWS = [
@@ -448,10 +449,12 @@ export function ReactionStudioWorkspace() {
                   <p>
                     <span className="text-muted-foreground">warnings:</span> {readWarnings(importResult).join("; ") || "—"}
                   </p>
-                  <details className="rounded-md border p-2">
-                    <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
-                    <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(importResult, null, 2)}</pre>
-                  </details>
+                  <DeveloperOnly>
+                    <details className="rounded-md border p-2">
+                      <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                      <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(importResult, null, 2)}</pre>
+                    </details>
+                  </DeveloperOnly>
                 </div>
               ) : null}
             </div>
@@ -517,10 +520,12 @@ export function ReactionStudioWorkspace() {
                     <span className="text-muted-foreground">warnings:</span>{" "}
                     {readWarnings(exportResult).join("; ") || "—"}
                   </p>
-                  <details className="rounded-md border p-2">
-                    <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
-                    <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(exportResult, null, 2)}</pre>
-                  </details>
+                  <DeveloperOnly>
+                    <details className="rounded-md border p-2">
+                      <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                      <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(exportResult, null, 2)}</pre>
+                    </details>
+                  </DeveloperOnly>
                 </div>
               ) : null}
             </div>

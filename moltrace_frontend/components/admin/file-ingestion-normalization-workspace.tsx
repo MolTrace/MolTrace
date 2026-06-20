@@ -7,6 +7,7 @@ import {
   trackIngestionRunCompleted,
   trackIngestionRunStarted,
 } from "@/src/lib/analytics/analytics-client"
+import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -621,10 +622,12 @@ export function FileIngestionNormalizationWorkspace() {
               <span className="font-semibold">requires review:</span> yes
             </p>
           </div>
-          <details className="rounded-md border p-3">
-            <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
-            <pre className="mt-3 max-h-[24rem] overflow-auto text-[10px]">{JSON.stringify(developerJson, null, 2)}</pre>
-          </details>
+          <DeveloperOnly>
+            <details className="rounded-md border p-3">
+              <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
+              <pre className="mt-3 max-h-[24rem] overflow-auto text-[10px]">{JSON.stringify(developerJson, null, 2)}</pre>
+            </details>
+          </DeveloperOnly>
         </div>
       </ModuleCard>
     </div>

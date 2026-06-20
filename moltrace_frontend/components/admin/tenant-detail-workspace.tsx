@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 import { ArrowLeft, BarChart3, FileText, Hash } from "lucide-react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { MfaPolicyPanel } from "@/components/admin/mfa-policy-panel"
+import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -2563,14 +2564,16 @@ function ProcurementPackagesPanel({
         {warningValue ? <JsonBlock value={warningValue} /> : <p className="text-sm text-muted-foreground">No warnings returned.</p>}
       </SectionCard>
 
-      <SectionCard title="Developer JSON">
-        <details className="rounded-md border bg-muted/20 p-3">
-          <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
-          <div className="mt-3">
-            <JsonBlock value={developerJson ?? { status: "No procurement package selected." }} />
-          </div>
-        </details>
-      </SectionCard>
+      <DeveloperOnly>
+        <SectionCard title="Developer JSON">
+          <details className="rounded-md border bg-muted/20 p-3">
+            <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
+            <div className="mt-3">
+              <JsonBlock value={developerJson ?? { status: "No procurement package selected." }} />
+            </div>
+          </details>
+        </SectionCard>
+      </DeveloperOnly>
     </div>
   )
 }
@@ -2745,14 +2748,16 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
         {warnings ? <JsonBlock value={warnings} /> : <p className="text-sm text-muted-foreground">No warnings returned.</p>}
       </SectionCard>
 
-      <SectionCard title="Developer JSON">
-        <details className="rounded-md border bg-muted/20 p-3">
-          <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
-          <div className="mt-3">
-            <JsonBlock value={selectedExport ?? { status: "No audit export selected." }} />
-          </div>
-        </details>
-      </SectionCard>
+      <DeveloperOnly>
+        <SectionCard title="Developer JSON">
+          <details className="rounded-md border bg-muted/20 p-3">
+            <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
+            <div className="mt-3">
+              <JsonBlock value={selectedExport ?? { status: "No audit export selected." }} />
+            </div>
+          </details>
+        </SectionCard>
+      </DeveloperOnly>
     </div>
   )
 }
@@ -2934,7 +2939,9 @@ export function TenantDetailWorkspace() {
           <TabsTrigger value="health_score">Health Score</TabsTrigger>
           <TabsTrigger value="procurement_packages">Procurement Packages</TabsTrigger>
           <TabsTrigger value="audit_export">Audit Export</TabsTrigger>
-          <TabsTrigger value="developer_json">Developer JSON</TabsTrigger>
+          <DeveloperOnly>
+            <TabsTrigger value="developer_json">Developer JSON</TabsTrigger>
+          </DeveloperOnly>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -3093,11 +3100,13 @@ export function TenantDetailWorkspace() {
           <AuditExportPanel tenantId={tenantId} />
         </TabsContent>
 
-        <TabsContent value="developer_json">
-          <SectionCard title="Developer JSON">
-            <JsonBlock value={developerBundle} />
-          </SectionCard>
-        </TabsContent>
+        <DeveloperOnly>
+          <TabsContent value="developer_json">
+            <SectionCard title="Developer JSON">
+              <JsonBlock value={developerBundle} />
+            </SectionCard>
+          </TabsContent>
+        </DeveloperOnly>
       </Tabs>
     </div>
   )
