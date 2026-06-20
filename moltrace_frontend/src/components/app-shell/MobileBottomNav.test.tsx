@@ -44,8 +44,8 @@ describe("MobileBottomNav", () => {
       "Home",
       "Dashboard",
       "SpectraCheck",
-      "Regulatory",
-      "Reactions",
+      "Regentry",
+      "Repho",
     ])
     expect(labels).not.toContain("Landing")
   })

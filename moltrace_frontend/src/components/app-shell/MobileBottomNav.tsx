@@ -43,8 +43,8 @@ const primaryNavItems: PrimaryNavItem[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/spectracheck", label: "SpectraCheck", icon: SpectraCheckLogoIcon },
-  { href: "/regulatory", label: "Regulatory", icon: Scale },
-  { href: "/reactions", label: "Reactions", icon: FlaskConical },
+  { href: "/regulatory", label: "Regentry", icon: Scale },
+  { href: "/reactions", label: "Repho", icon: FlaskConical },
 ]
 
 const baseMoreNavItems: MoreNavItem[] = [
