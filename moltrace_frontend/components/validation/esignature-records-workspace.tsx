@@ -21,7 +21,16 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { FileText, PenTool, Signature } from "lucide-react"
+import { FileText, PenTool, Printer, ShieldCheck, Signature } from "lucide-react"
+import {
+  getManifestationJson,
+  printManifestation,
+  verifySignature,
+  verifyStatus,
+  type ESignatureManifestation,
+  type ESignatureVerification,
+} from "@/lib/validation/esignature-verify"
+import { cn } from "@/lib/utils"
 
 type Row = Record<string, unknown>
 
@@ -111,8 +120,6 @@ export function ESignatureRecordsWorkspace() {
   const [selectedRecord, setSelectedRecord] = useState<Row | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  const [signerName, setSignerName] = useState("")
-  const [signerEmail, setSignerEmail] = useState("")
   const [signatureMeaning, setSignatureMeaning] = useState("reviewed")
   const [targetType, setTargetType] = useState("")
   const [targetId, setTargetId] = useState("")
@@ -120,6 +127,13 @@ export function ESignatureRecordsWorkspace() {
   const [createBusy, setCreateBusy] = useState(false)
   const { ensureStepUp } = useStepUp()
   const [createdRecord, setCreatedRecord] = useState<Row | null>(null)
+
+  // Part 11 hardening: §11.70 integrity verify + §11.50 manifestation for the open record.
+  const [verification, setVerification] = useState<ESignatureVerification | null>(null)
+  const [verifyBusy, setVerifyBusy] = useState(false)
+  const [manifestation, setManifestation] = useState<ESignatureManifestation | null>(null)
+  const [manifestBusy, setManifestBusy] = useState(false)
+  const [printBusy, setPrintBusy] = useState(false)
 
   const loadRecords = useCallback(async () => {
     setLoading(true)
@@ -153,6 +167,8 @@ export function ESignatureRecordsWorkspace() {
     setSelectedId(id)
     setDetailLoading(true)
     setError("")
+    setVerification(null)
+    setManifestation(null)
     try {
       const payload = await apiFetch<unknown>(`/esignatures/records/${encodeURIComponent(id)}`, { method: "GET" })
       setSelectedRecord(unwrapRecord(payload, ["signature_record", "e_signature_record"]))
@@ -164,6 +180,46 @@ export function ESignatureRecordsWorkspace() {
     }
   }
 
+  async function handleVerify(id: string) {
+    if (!id) return
+    setVerifyBusy(true)
+    setError("")
+    try {
+      setVerification(await verifySignature(id))
+    } catch (err) {
+      setError(formatErr(err, "Could not verify signature integrity."))
+    } finally {
+      setVerifyBusy(false)
+    }
+  }
+
+  async function handleManifest(id: string) {
+    if (!id) return
+    setManifestBusy(true)
+    setError("")
+    try {
+      setManifestation(await getManifestationJson(id))
+    } catch (err) {
+      setError(formatErr(err, "Could not load the signature manifestation."))
+    } finally {
+      setManifestBusy(false)
+    }
+  }
+
+  async function handlePrint(id: string) {
+    if (!id) return
+    setPrintBusy(true)
+    setError("")
+    try {
+      const ok = await printManifestation(id)
+      if (!ok) setError("Could not open the print view — check that pop-ups are allowed.")
+    } catch (err) {
+      setError(formatErr(err, "Could not print the signature manifestation."))
+    } finally {
+      setPrintBusy(false)
+    }
+  }
+
   async function createSignatureRecord() {
     const parsedTargetId = readInt(targetId)
     if (!signatureMeaning.trim()) {
@@ -172,10 +228,6 @@ export function ESignatureRecordsWorkspace() {
     }
     if (!reason.trim()) {
       setError("reason is required.")
-      return
-    }
-    if (!signerName.trim()) {
-      setError("signer name is required.")
       return
     }
     if (!targetType.trim()) {
@@ -194,11 +246,12 @@ export function ESignatureRecordsWorkspace() {
       // retry the create once (also proactively elevated if the user just verified).
       const payload = await withStepUp(
         () =>
+          // Signer identity is server-authoritative (§11.100): the backend ignores any
+          // signer_name/signer_email in the body and signs as the authenticated user, so
+          // we no longer collect or send them.
           apiFetch<unknown>("/esignatures/records", {
             method: "POST",
             body: {
-              signer_name: signerName.trim(),
-              signer_email: signerEmail.trim() || null,
               signature_meaning: signatureMeaning,
               target_type: targetType.trim(),
               target_id: parsedTargetId,
@@ -213,9 +266,9 @@ export function ESignatureRecordsWorkspace() {
         const id = rowId(record)
         setSelectedId(id)
         setSelectedRecord(record)
+        setVerification(null)
+        setManifestation(null)
       }
-      setSignerName("")
-      setSignerEmail("")
       setSignatureMeaning("reviewed")
       setTargetType("")
       setTargetId("")
@@ -265,24 +318,11 @@ export function ESignatureRecordsWorkspace() {
           description="Reason and signature meaning are required."
         >
           <div className="space-y-4">
+            <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              You sign as the authenticated user — signer identity is recorded server-side from your
+              session (§11.100), not from this form. Provide the meaning and reason for the signature.
+            </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor="signature-signer-name">signer name</Label>
-                <Input
-                  id="signature-signer-name"
-                  value={signerName}
-                  onChange={(event) => setSignerName(event.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="signature-signer-email">signer email optional</Label>
-                <Input
-                  id="signature-signer-email"
-                  type="email"
-                  value={signerEmail}
-                  onChange={(event) => setSignerEmail(event.target.value)}
-                />
-              </div>
               <div className="space-y-1">
                 <Label htmlFor="signature-meaning">signature meaning</Label>
                 <Select value={signatureMeaning} onValueChange={setSignatureMeaning}>
@@ -365,9 +405,98 @@ export function ESignatureRecordsWorkspace() {
                   <p className="text-xs text-muted-foreground">signature hash</p>
                   <p className="break-all font-mono text-xs">{readStr(detailRecord.signature_hash) || "-"}</p>
                 </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">signer_user_id (§11.100)</p>
+                  <p className="font-mono text-xs">{readStr(detailRecord.signer_user_id) || "—"}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-muted-foreground">record content hash (§11.70)</p>
+                  <p className="break-all font-mono text-xs">
+                    {readStr(detailRecord.record_content_hash) || "— (unbound / legacy)"}
+                  </p>
+                </div>
                 <div className="sm:col-span-2">
                   <p className="text-xs text-muted-foreground">reason</p>
                   <p className="whitespace-pre-wrap text-sm">{readStr(detailRecord.reason) || "-"}</p>
+                </div>
+
+                {/* §11.70 integrity verify + §11.50 manifestation */}
+                <div className="space-y-3 border-t border-border pt-3 sm:col-span-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => void handleVerify(rowId(detailRecord))}
+                      disabled={verifyBusy || !rowId(detailRecord)}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+                      {verifyBusy ? "Verifying…" : "Verify integrity"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => void handleManifest(rowId(detailRecord))}
+                      disabled={manifestBusy || !rowId(detailRecord)}
+                    >
+                      <FileText className="h-3.5 w-3.5" aria-hidden />
+                      {manifestBusy ? "Loading…" : "View signature"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => void handlePrint(rowId(detailRecord))}
+                      disabled={printBusy || !rowId(detailRecord)}
+                    >
+                      <Printer className="h-3.5 w-3.5" aria-hidden />
+                      {printBusy ? "Opening…" : "Print"}
+                    </Button>
+                  </div>
+
+                  {verification ? (
+                    (() => {
+                      const status = verifyStatus(verification)
+                      const toneClass =
+                        status.tone === "success"
+                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+                          : status.tone === "error"
+                            ? "border-red-500/50 bg-red-500/10 text-red-900 dark:text-red-200"
+                            : "border-border bg-muted/40 text-muted-foreground"
+                      return (
+                        <div className={cn("rounded-md border p-3 text-sm", toneClass)}>
+                          <p className="font-medium">{status.label}</p>
+                          <p className="mt-0.5 text-xs opacity-90">{status.detail}</p>
+                          <p className="mt-1 font-mono text-[11px] opacity-70">reason: {verification.reason}</p>
+                        </div>
+                      )
+                    })()
+                  ) : null}
+
+                  {manifestation ? (
+                    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3 text-xs">
+                      <p className="text-sm font-medium">{manifestation.meaningLabel}</p>
+                      <p className="text-muted-foreground">
+                        {manifestation.printedName || "—"}
+                        {manifestation.signerEmail ? ` <${manifestation.signerEmail}>` : ""}
+                        {manifestation.signedAtUtc ? ` · signed (UTC) ${manifestation.signedAtUtc}` : ""}
+                      </p>
+                      <p className="whitespace-pre-wrap">{manifestation.attestationText}</p>
+                      <p className="text-muted-foreground">
+                        binding: {manifestation.bindingStatus}
+                        {manifestation.authenticationMethod ? ` · auth: ${manifestation.authenticationMethod}` : ""}
+                        {manifestation.stepUpAal ? ` · AAL: ${manifestation.stepUpAal}` : ""}
+                      </p>
+                      {/* §11 grounding: surface the backend compliance notice verbatim. */}
+                      <p className="border-t border-border pt-2 italic text-muted-foreground">
+                        {manifestation.complianceNotice}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : (
