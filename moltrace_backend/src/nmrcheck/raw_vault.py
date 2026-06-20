@@ -176,9 +176,18 @@ class LocalRawStorageBackend(RawStorageBackend):
                         temp_path.unlink()
                     except OSError:
                         pass
-        read_only = (
-            _make_read_only(target, warning_list, strict=strict_immutable) if immutable else False
-        )
+        try:
+            read_only = (
+                _make_read_only(target, warning_list, strict=strict_immutable)
+                if immutable
+                else False
+            )
+        except RawVaultError:
+            # Strict-mode chmod failure: don't leave a freshly-written, still-writable object in the
+            # vault that a later same-hash ingest would accept via the hash-only reused path.
+            if not reused and target.exists():
+                target.unlink(missing_ok=True)
+            raise
         _verify_file_hash(target, sha256)
         return {
             "storage_path": str(target),

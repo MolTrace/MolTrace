@@ -155,6 +155,47 @@ def test_archive_is_soft_delete_and_non_leaking(tmp_path):
             assert s.get(ControlledRecordORM, rid) is not None
 
 
+def test_soft_deleted_record_is_immutable(tmp_path):
+    """Review fix (high): a soft-deleted (archived) record is inert — lock / re-archive / new-version
+    are all rejected (409) so the original deletion attribution can't be erased."""
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        bearer = _signup(client, "imm@acme.com")
+        rid = _make_record(client, bearer, "to-archive")["id"]
+        archived = client.post(
+            f"/controlled-records/{rid}/archive", headers=bearer, json={"reason": "Superseded."}
+        ).json()
+        assert archived["reason_for_change"] == "Superseded."
+        # Every mutation path refuses a soft-deleted record.
+        assert (
+            client.post(
+                f"/controlled-records/{rid}/lock",
+                headers=bearer,
+                json={"locked_by": "x", "reason": "relock"},
+            ).status_code
+            == 409
+        )
+        assert (
+            client.post(
+                f"/controlled-records/{rid}/archive", headers=bearer, json={"reason": "re-archive"}
+            ).status_code
+            == 409
+        )
+        assert (
+            client.post(
+                f"/controlled-records/{rid}/new-version",
+                headers=bearer,
+                json={"content_json": {"v": 2}},
+            ).status_code
+            == 409
+        )
+        # The original deletion attribution survived (lock did not overwrite reason_for_change).
+        with app.state.session_factory() as s:
+            row = s.get(ControlledRecordORM, rid)
+            assert row.reason_for_change == "Superseded."
+            assert row.status == "archived" and row.deleted_at is not None
+
+
 # --------------------------------------------------------------------------- contemporaneous (verify-only)
 
 
@@ -193,6 +234,9 @@ def test_raw_vault_strict_chmod_raises(tmp_path, monkeypatch):
         strict_backend.save(
             content=content, sha256=sha, filename="a.bin", strict_immutable=True
         )
+    # Review fix: the vault is left clean — no orphaned, still-writable object that a later
+    # same-hash ingest would accept via the hash-only reused path.
+    assert not (tmp_path / "vault_strict" / sha / "a.bin").exists()
     # Non-strict (default) preserves the legacy warn-only behavior on chmod failure.
     warnings: list[str] = []
     lenient_backend = LocalRawStorageBackend(tmp_path / "vault_lenient")
