@@ -75,7 +75,13 @@ overall_risk}`), `energetic_groups_found[]`, where each flagged group is
   screen + review `rejected` → gate `blocked`.
 
 ## 7. Notes
-- Screening is **deterministic** (RDKit SMARTS; no model). The gate does NOT yet hard-block the
-  execution endpoints server-side — it is an advisory/visible gate; wiring it into the
-  execution-batch launch as a server-side precondition is a deliberate follow-up slice.
+- Screening is **deterministic** (RDKit SMARTS; no model).
+- **The gate is now enforced server-side at the execution-commit point.** While any screening
+  for the project stands **rejected** (gate `blocked`), committing a reaction execution batch to
+  `planned`/`running` is refused with **HTTP 409** — at the batch endpoints *and* at the
+  item-driven auto-promotion path (adding/marking a `planned`/`running` item that would promote a
+  draft batch). `draft` batches, outcome-recording transitions (`completed`/`failed`/…), and
+  projects with no rejected screening are unaffected. A merely *pending* screening stays advisory
+  (it does not 409). On a 409, surface the `safety-gate` banner and the `detail` message (it names
+  the rejected screening ids). BO-run *recommendation generation* remains advisory by design.
 - Quantitative predictions (exothermicity, gas evolution, DSC onset) are out of this slice.
