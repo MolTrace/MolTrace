@@ -41,6 +41,27 @@ Findings live in the **Security → Code scanning** tab (SARIF) and are closed t
 risk-accepted with justification, or dismissed as false-positive with a reason). A committed secret
 (gitleaks) is always treated as a Critical: rotate the credential, then purge history.
 
+## Documented exceptions (VEX register)
+
+A CRITICAL that genuinely cannot be reached in MolTrace's deployment, or whose only fix is a
+disproportionately risky bump, may be risk-accepted in lieu of remediation (per the Critical SLA's
+"documented compensating control + risk acceptance"). Exceptions are recorded **in the repo**, not
+just in the GitHub UI, so the gate stays green deterministically and the justification travels with
+the code:
+
+- **SCA (Trivy)** — `.trivyignore` at the repo root (auto-read by the `fs` scan, whose `scan-ref`
+  is `.`). Every entry carries a VEX-style block: the CVE id, a `not_affected` status with a
+  `vulnerable_code_not_in_execute_path` justification grounded in code evidence, and a
+  *re-evaluate-when* condition. **Prefer a real fix over a suppression** when the bump is low-risk:
+  e.g. jupyter-server's CVE-2026-44727 was fixed by constraining it to `2.20.0`
+  (`pyproject.toml` `[tool.uv].constraint-dependencies`), not suppressed; only torch and mlflow
+  (both confined to never-installed/optional install paths, with high-risk or no viable bumps) are
+  suppressed. Each suppression should be reachability-assessed and adversarially re-checked before
+  it is added, and revisited whenever the component moves into a deployed install path.
+- **Semgrep** — inline `# nosemgrep: <full-rule-id>` on (or immediately above) the flagged line,
+  with a justification comment. Used only for true false-positives (e.g. static, no-user-input SQL
+  in an admin-only migration).
+
 ## Making the gates block merge
 
 Each job is a normal status check. To **block merge** on a gate, add it as a *required status check*
