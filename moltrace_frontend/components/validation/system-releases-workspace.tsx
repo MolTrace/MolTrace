@@ -17,6 +17,21 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  StructuredJsonObjectEditor,
+  type StructuredJsonField,
+} from "@/components/ui/structured-json-editor"
+
+const TEST_SUMMARY_FIELDS: StructuredJsonField[] = [
+  { key: "summary", label: "Summary", type: "text", placeholder: "e.g. all suites green" },
+  { key: "passed", label: "Passed", type: "number" },
+  { key: "failed", label: "Failed", type: "number" },
+]
+
+const RISK_SUMMARY_FIELDS: StructuredJsonField[] = [
+  { key: "summary", label: "Summary", type: "text", placeholder: "e.g. no blocking risks" },
+  { key: "open_risks", label: "Open risks", type: "number" },
+]
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { ValidationPackagePanel } from "@/components/validation/validation-package-panel"
@@ -101,20 +116,6 @@ function sanitizeForDeveloperJson(value: unknown, key = ""): unknown {
   return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [entryKey, sanitizeForDeveloperJson(entryValue, entryKey)]))
 }
 
-function parseJsonObject(value: string, label: string): Row | null {
-  const trimmed = value.trim()
-  if (!trimmed) return {}
-  try {
-    const parsed = JSON.parse(trimmed)
-    if (isRecord(parsed)) return parsed
-    throw new Error(`${label} must be a JSON object.`)
-  } catch (err) {
-    if (err instanceof Error) throw err
-    throw new Error(`${label} must be valid JSON.`, { cause: err })
-  }
-}
-
-
 export function SystemReleasesWorkspace() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -128,8 +129,9 @@ export function SystemReleasesWorkspace() {
   const [releaseType, setReleaseType] = useState("frontend")
   const [changeSummary, setChangeSummary] = useState("")
   const [validationProjectId, setValidationProjectId] = useState("")
-  const [testSummary, setTestSummary] = useState("")
-  const [riskSummary, setRiskSummary] = useState("")
+  const [testSummary, setTestSummary] = useState<Record<string, unknown>>({})
+  const [riskSummary, setRiskSummary] = useState<Record<string, unknown>>({})
+  const [summaryFormNonce, setSummaryFormNonce] = useState(0)
   const [createBusy, setCreateBusy] = useState(false)
 
   const [reviewerName, setReviewerName] = useState("")
@@ -197,16 +199,6 @@ export function SystemReleasesWorkspace() {
       return
     }
 
-    let parsedTestSummary: Row
-    let parsedRiskSummary: Row
-    try {
-      parsedTestSummary = parseJsonObject(testSummary, "test summary") ?? {}
-      parsedRiskSummary = parseJsonObject(riskSummary, "risk summary") ?? {}
-    } catch (err) {
-      setError(formatErr(err, "Summary JSON is invalid."))
-      return
-    }
-
     setCreateBusy(true)
     setError("")
     setMessage("")
@@ -218,8 +210,8 @@ export function SystemReleasesWorkspace() {
           release_type: releaseType,
           change_summary: changeSummary.trim(),
           validation_project_id: parsedValidationProjectId,
-          test_summary_json: parsedTestSummary,
-          risk_summary_json: parsedRiskSummary,
+          test_summary_json: testSummary,
+          risk_summary_json: riskSummary,
         },
       })
       const record = unwrapRecord(payload, ["system_release"])
@@ -231,8 +223,9 @@ export function SystemReleasesWorkspace() {
       setReleaseType("frontend")
       setChangeSummary("")
       setValidationProjectId("")
-      setTestSummary("")
-      setRiskSummary("")
+      setTestSummary({})
+      setRiskSummary({})
+      setSummaryFormNonce((n) => n + 1)
       setMessage("System release record created.")
       await loadReleases()
     } catch (err) {
@@ -359,23 +352,25 @@ export function SystemReleasesWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="system-release-test-summary">test summary</Label>
-                <Textarea
-                  id="system-release-test-summary"
-                  placeholder='{"summary":"", "passed":0, "failed":0}'
-                  value={testSummary}
-                  onChange={(event) => setTestSummary(event.target.value)}
-                  rows={5}
+                <Label>test summary</Label>
+                <StructuredJsonObjectEditor
+                  key={`test-summary-${summaryFormNonce}`}
+                  idPrefix="system-release-test-summary"
+                  fields={TEST_SUMMARY_FIELDS}
+                  onChange={setTestSummary}
+                  allowCustomKeys
+                  addLabel="Add field"
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="system-release-risk-summary">risk summary</Label>
-                <Textarea
-                  id="system-release-risk-summary"
-                  placeholder='{"summary":"", "open_risks":0}'
-                  value={riskSummary}
-                  onChange={(event) => setRiskSummary(event.target.value)}
-                  rows={5}
+                <Label>risk summary</Label>
+                <StructuredJsonObjectEditor
+                  key={`risk-summary-${summaryFormNonce}`}
+                  idPrefix="system-release-risk-summary"
+                  fields={RISK_SUMMARY_FIELDS}
+                  onChange={setRiskSummary}
+                  allowCustomKeys
+                  addLabel="Add field"
                 />
               </div>
             </div>
