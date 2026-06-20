@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -165,15 +165,6 @@ function parseJsonField(raw: string, label: string): unknown {
   }
 }
 
-function statusBadgeClass(status: string): string {
-  const s = status.toLowerCase()
-  if (s.includes("fail") || s.includes("error") || s.includes("rejected")) return "border-destructive/40 text-destructive"
-  if (s.includes("review") || s.includes("warning") || s.includes("open") || s.includes("blocked")) {
-    return "border-warning/50 text-warning"
-  }
-  return "text-muted-foreground"
-}
-
 function Field({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
@@ -292,9 +283,7 @@ function GenericTable({
                   return (
                     <TableCell key={column.key} className="max-w-[24rem] text-xs">
                       {statusLike && value !== "-" ? (
-                        <Badge variant="outline" className={`font-normal ${statusBadgeClass(value)}`}>
-                          {value}
-                        </Badge>
+                        <StatusBadge status={value} />
                       ) : (
                         value
                       )}
@@ -968,9 +957,7 @@ export function ValidationProjectDetailWorkspace() {
             {readFirst(project, ["title", "name"]) || "Validation project"}
           </h1>
           <p className="font-mono text-xs text-muted-foreground break-all">{validationProjectId || "-"}</p>
-          <p className="text-sm text-muted-foreground">
-            Validation readiness details. Status labels are shown as returned by the API.
-          </p>
+          <p className="text-sm text-muted-foreground">Validation readiness details.</p>
         </div>
         <BackendStatusIndicator />
       </div>
@@ -1036,7 +1023,12 @@ export function ValidationProjectDetailWorkspace() {
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="validation scope" value={readFirst(project, ["scope"])} />
-                <Field label="status" value={readFirst(project, ["status"])} />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">status</p>
+                  <div className="mt-1">
+                    <StatusBadge status={readFirst(project, ["status"])} />
+                  </div>
+                </div>
                 <Field label="intended use" value={readFirst(project, ["intended_use"])} />
                 <Field label="regulated context" value={readFirst(project, ["regulated_context"])} />
               </div>
@@ -1467,9 +1459,7 @@ export function ValidationProjectDetailWorkspace() {
                               <TableCell className="text-xs">{readFirst(row, ["protocol_type"]) || "-"}</TableCell>
                               <TableCell className="text-xs">
                                 {status ? (
-                                  <Badge variant="outline" className={`font-normal ${statusBadgeClass(status)}`}>
-                                    {status}
-                                  </Badge>
+                                  <StatusBadge status={status} />
                                 ) : (
                                   "-"
                                 )}
@@ -1511,7 +1501,12 @@ export function ValidationProjectDetailWorkspace() {
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <Field label="protocol id" value={selectedProtocolId} />
                     <Field label="protocol code" value={readFirst(protocolDetail ?? selectedProtocol, ["protocol_code"])} />
-                    <Field label="status" value={readFirst(protocolDetail ?? selectedProtocol, ["status"])} />
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">status</p>
+                      <div className="mt-1">
+                        <StatusBadge status={readFirst(protocolDetail ?? selectedProtocol, ["status"])} />
+                      </div>
+                    </div>
                     <Field label="title" value={readFirst(protocolDetail ?? selectedProtocol, ["title"])} />
                     <Field label="module" value={readFirst(protocolDetail ?? selectedProtocol, ["module"])} />
                     <Field label="protocol type" value={readFirst(protocolDetail ?? selectedProtocol, ["protocol_type"])} />
@@ -1661,9 +1656,7 @@ export function ValidationProjectDetailWorkspace() {
                               <TableCell className="max-w-[18rem] text-xs">{readFirst(row, ["title"]) || "-"}</TableCell>
                               <TableCell className="text-xs">
                                 {status ? (
-                                  <Badge variant="outline" className={`font-normal ${statusBadgeClass(status)}`}>
-                                    {status}
-                                  </Badge>
+                                  <StatusBadge status={status} />
                                 ) : (
                                   "-"
                                 )}
@@ -1806,9 +1799,7 @@ export function ValidationProjectDetailWorkspace() {
                               </TableCell>
                               <TableCell className="text-xs">
                                 {status ? (
-                                  <Badge variant="outline" className={`font-normal ${statusBadgeClass(status)}`}>
-                                    {status}
-                                  </Badge>
+                                  <StatusBadge status={status} />
                                 ) : (
                                   "-"
                                 )}
