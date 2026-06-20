@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
+from fastapi.testclient import TestClient
 
 from nmrcheck import validation_center_store as vcs
 from nmrcheck import validation_package as vp
@@ -33,12 +34,16 @@ from nmrcheck.models import (
 from nmrcheck.settings import Settings
 
 
-def _sf(tmp_path):
+def _app(tmp_path):
     app = create_app(
         Settings(database_url=f"sqlite:///{tmp_path / 'p13.sqlite3'}", api_key="k")
     )
     init_db(app.state.session_factory)
-    return app.state.session_factory
+    return app
+
+
+def _sf(tmp_path):
+    return _app(tmp_path).state.session_factory
 
 
 def _project(sf):
@@ -263,3 +268,54 @@ def test_ingest_evidence_then_blocked_after_approval(tmp_path):
         vcs.ingest_release_evidence(
             sf, release.id, test_summary_json={"passed": 1}, risk_summary_json={"high": 9}
         )
+
+
+# --------------------------------------------------------------------------- HTTP routes
+
+
+def test_routes_evidence_and_package(tmp_path):
+    app = _app(tmp_path)
+    sf = app.state.session_factory
+    project = _project(sf)
+    release = _release(sf, project.id, summaries=False)
+    with TestClient(app) as client:
+        headers = {"x-api-key": "k"}
+        ingested = client.post(
+            f"/system-releases/{release.id}/evidence",
+            headers=headers,
+            json={"test_summary_json": {"passed": 5, "failed": 0}, "risk_summary_json": {"high": 0}},
+        )
+        assert ingested.status_code == 200, ingested.text
+        assert ingested.json()["test_summary_json"]["passed"] == 5
+        pkg = client.get(f"/system-releases/{release.id}/validation-package", headers=headers)
+        assert pkg.status_code == 200, pkg.text
+        body = pkg.json()
+        assert body["iq_oq_pq_evidence"]["oq"]["passed"] == 5
+        assert "SUPPORTS" in body["notice"]
+        assert client.get("/system-releases/999999/validation-package", headers=headers).status_code == 404
+
+
+def test_change_control_gate_via_http(tmp_path):
+    app = _app(tmp_path)
+    sf = app.state.session_factory
+    project = _project(sf)
+    vcs.update_validation_project(sf, project.id, ValidationProjectUpdate(status="approved"))
+    with TestClient(app) as client:
+        headers = {"x-api-key": "k"}
+        body = {
+            "requirement_code": "URS-HTTP",
+            "module": "spectracheck",
+            "requirement_text": "recorded",
+            "criticality": "high",
+            "gxp_impact": "direct",
+        }
+        blocked = client.post(
+            f"/validation-center/projects/{project.id}/urs", headers=headers, json=body
+        )
+        assert blocked.status_code == 400, blocked.text  # change control: reason required
+        ok = client.post(
+            f"/validation-center/projects/{project.id}/urs",
+            headers=headers,
+            json={**body, "metadata_json": {"reason_for_change": "Post-approval addition (CR-9)."}},
+        )
+        assert ok.status_code == 201, ok.text

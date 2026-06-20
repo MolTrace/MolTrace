@@ -848,9 +848,11 @@ from .models import (
     SubscriptionPlan,
     SubscriptionPlanCreate,
     SystemHealthResponse,
+    ReleaseEvidenceIngestRequest,
     SystemReleaseApproveRequest,
     SystemReleaseRecord,
     SystemReleaseRecordCreate,
+    ValidationPackage,
     SystemStatusResponse,
     TeamMemberCreate,
     TeamMemberRecord,
@@ -14838,6 +14840,74 @@ def approve_system_release_route(
         },
     )
     return record
+
+
+@router.post(
+    "/system-releases/{release_id}/evidence",
+    response_model=SystemReleaseRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def ingest_release_evidence_route(
+    release_id: int,
+    payload: ReleaseEvidenceIngestRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SystemReleaseRecord:
+    # GAMP 5 / CSA: CI-evidence ingestion seam — a CI step POSTs parsed test/risk summaries here.
+    # Refused once the release is approved/released (the §11.70-bound snapshot is change-controlled).
+    try:
+        record = validation_store.ingest_release_evidence(
+            _state(request).session_factory,
+            release_id,
+            test_summary_json=payload.test_summary_json,
+            risk_summary_json=payload.risk_summary_json,
+            source=payload.source,
+            metadata=payload.metadata_json or None,
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="system_release.evidence_ingest",
+        message="CI validation evidence ingested into system release.",
+        entity_type="system_release",
+        entity_id=record.id,
+        metadata={"source": payload.source},
+    )
+    return record
+
+
+@router.get(
+    "/system-releases/{release_id}/validation-package",
+    response_model=ValidationPackage,
+    dependencies=[Depends(require_access_context)],
+)
+def get_validation_package_route(
+    release_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ValidationPackage:
+    # GAMP 5 / CSA: regenerable validation package for the release (traceability + IQ/OQ/PQ evidence
+    # + change-control state + release signatures). Read-only; re-runnable on every CI build.
+    try:
+        package = validation_store.build_validation_package(
+            _state(request).session_factory, release_id
+        )
+    except Exception as exc:
+        _raise_validation_center_http_error(exc)
+        raise
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="validation_package.generate",
+        message="Validation package assembled for system release.",
+        entity_type="system_release",
+        entity_id=release_id,
+        metadata={"package_schema_version": package["package_metadata"]["package_schema_version"]},
+    )
+    return ValidationPackage(**package)
 
 
 @router.post(
