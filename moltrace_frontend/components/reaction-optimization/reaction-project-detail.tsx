@@ -54,6 +54,7 @@ import { ModelDiagnosticsCard } from "@/components/reaction-optimization/model-d
 import { GreenMetricsPanel } from "@/components/reaction-optimization/green-metrics-panel"
 import { ParetoFrontPanel } from "@/components/reaction-optimization/pareto-front-panel"
 import { PlateDesignPanel } from "@/components/reaction-optimization/plate-design-panel"
+import { SafetyScreeningPanel } from "@/components/reaction-optimization/safety-screening-panel"
 import {
   hypervolumeTrend,
   nonDominatedExperimentIds,
@@ -4996,6 +4997,11 @@ export function ReactionProjectDetail() {
               </form>
             </div>
           </ModuleCard>
+
+          <SafetyScreeningPanel
+            projectId={reactionProjectId}
+            productSmilesHint={typeof project?.target_product_smiles === "string" ? project.target_product_smiles : null}
+          />
         </TabsContent>
 
         <TabsContent value="green" className="mt-4 space-y-6">
