@@ -34,9 +34,17 @@ import {
 import { trackRegulatoryDossierCreated } from "@/src/lib/analytics/analytics-client"
 import { RegulatoryNotificationsCompactCard } from "@/components/regulatory-hub/regulatory-notifications-compact-card"
 import { RegulatoryHubValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
-import { AlertTriangle, BookOpen, ClipboardList, Eye, FolderOpen, Loader2 } from "lucide-react"
+import { AlertTriangle, BookOpen, ClipboardList, Eye, FileText, FolderOpen, Library, Loader2 } from "lucide-react"
 import { EvidenceCard } from "@/components/science/evidence-card"
 import { DataState, DataStateBadge, type DataStateKind } from "@/components/science/data-state"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 
 type DossierRow = Record<string, unknown>
 type JurisdictionRow = { id: number; name: string }
@@ -968,7 +976,17 @@ export function RegulatoryIntelligenceLanding() {
             ) : dossierListError ? (
               <p className="text-sm text-muted-foreground">Dossier list could not be loaded.</p>
             ) : dossiers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No dossiers yet.</p>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <FileText />
+                  </EmptyMedia>
+                  <EmptyTitle>No dossiers yet</EmptyTitle>
+                  <EmptyDescription>
+                    Create a regulatory dossier to start tracking requirements, evidence, and risk.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="table-scroll">
                 <Table>
@@ -1117,7 +1135,22 @@ export function RegulatoryIntelligenceLanding() {
             ) : sourcesUnavailable && !sources.length ? (
               <p className="text-sm text-muted-foreground">Source list could not be loaded.</p>
             ) : sources.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No source documents registered.</p>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Library />
+                  </EmptyMedia>
+                  <EmptyTitle>No source documents registered</EmptyTitle>
+                  <EmptyDescription>
+                    Register a guideline, monograph, or FAQ in the source library to enable citations.
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/regulatory/sources">Open source library</Link>
+                  </Button>
+                </EmptyContent>
+              </Empty>
             ) : (
               <div className="table-scroll">
                 <Table>

@@ -38,6 +38,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import {
@@ -600,6 +607,18 @@ export function KnowledgeDatasetsDashboard() {
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                 Loading…
               </p>
+            ) : training.length === 0 ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Database />
+                  </EmptyMedia>
+                  <EmptyTitle>No training candidates</EmptyTitle>
+                  <EmptyDescription>
+                    Nominate curated knowledge claims for ML training to see them here.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="table-scroll min-w-0">
                 <Table>
@@ -658,7 +677,6 @@ export function KnowledgeDatasetsDashboard() {
                     })}
                   </TableBody>
                 </Table>
-                {training.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No rows returned.</p> : null}
               </div>
             )}
 
@@ -810,6 +828,18 @@ export function KnowledgeDatasetsDashboard() {
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                 Loading…
               </p>
+            ) : benchmark.length === 0 ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Database />
+                  </EmptyMedia>
+                  <EmptyTitle>No benchmark candidates</EmptyTitle>
+                  <EmptyDescription>
+                    Nominate reviewed knowledge claims for ML benchmark evaluation to see them here.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="table-scroll min-w-0">
                 <Table>
@@ -873,7 +903,6 @@ export function KnowledgeDatasetsDashboard() {
                     })}
                   </TableBody>
                 </Table>
-                {benchmark.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No rows returned.</p> : null}
               </div>
             )}
 
@@ -1120,6 +1149,18 @@ export function KnowledgeDatasetsDashboard() {
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                 Loading…
               </p>
+            ) : versions.length === 0 ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <GitBranch />
+                  </EmptyMedia>
+                  <EmptyTitle>No dataset versions</EmptyTitle>
+                  <EmptyDescription>
+                    Lock candidate splits into a versioned snapshot to see it here.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="table-scroll min-w-0">
                 <Table>
@@ -1192,7 +1233,6 @@ export function KnowledgeDatasetsDashboard() {
                     })}
                   </TableBody>
                 </Table>
-                {versions.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No rows returned.</p> : null}
               </div>
             )}
 

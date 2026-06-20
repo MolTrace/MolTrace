@@ -28,7 +28,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { KNOWLEDGE_EXTRACTION_TYPES } from "@/components/knowledge/knowledge-constants"
-import { Activity, AlertTriangle, ArrowLeft, FileText, Loader2, PlayCircle } from "lucide-react"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import { Activity, AlertTriangle, ArrowLeft, FileText, Loader2, PlayCircle, Workflow } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -371,7 +378,15 @@ export function KnowledgeExtractionsWorkspace() {
           ) : runsErr ? (
             <p className="text-sm text-muted-foreground">{runsErr}</p>
           ) : runs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No extraction runs returned.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Workflow />
+                </EmptyMedia>
+                <EmptyTitle>No extraction runs</EmptyTitle>
+                <EmptyDescription>Start an extraction from a source to populate this list.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <Table>
               <TableHeader>

@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/table"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
-import { ChevronDown, Loader2 } from "lucide-react"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { ChevronDown, Loader2, Scale } from "lucide-react"
 
 const CONSTRAINT_TYPES = [
   "impurity_limit",
@@ -350,8 +351,16 @@ export function ReactionRegulatoryConstraintsPanel({
                   </TableRow>
                 ) : constraints.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-sm text-muted-foreground">
-                      No regulatory constraints.
+                    <TableCell colSpan={7}>
+                      <Empty>
+                        <EmptyHeader>
+                          <EmptyMedia variant="icon">
+                            <Scale />
+                          </EmptyMedia>
+                          <EmptyTitle>No regulatory constraints</EmptyTitle>
+                          <EmptyDescription>Add a constraint above to enforce it on the optimizer.</EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
                     </TableCell>
                   </TableRow>
                 ) : (

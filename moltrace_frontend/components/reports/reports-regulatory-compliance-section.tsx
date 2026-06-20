@@ -1,12 +1,14 @@
 "use client"
 
 import Link from "next/link"
+import { ShieldCheck } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import {
   asArray,
   findDossierBySpectraCheckSessionId,
@@ -138,11 +140,18 @@ export function ReportsRegulatoryComplianceSection({ reportRows, live }: Props) 
         {loading ? <p className="text-xs text-muted-foreground">Loading…</p> : null}
         {err ? <p className="text-xs text-destructive">{err}</p> : null}
         {!loading && lines.length === 0 ? (
-          <p className="text-muted-foreground">
-            No regulatory dossier uses the same <span className="font-mono">spectracheck_session_id</span> as your
-            listed reports. Link a dossier from SpectraCheck or create one from a report session when the backend
-            supports it.
-          </p>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ShieldCheck />
+              </EmptyMedia>
+              <EmptyTitle>No linked dossiers</EmptyTitle>
+              <EmptyDescription>
+                None of your listed reports share a session with a regulatory dossier yet. Link a dossier from
+                SpectraCheck or create one from a report session when the backend supports it.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : null}
         {lines.map((row) => (
           <div key={`${row.sessionId}-${row.dossierId}`} className="rounded-md border bg-muted/15 px-3 py-2">

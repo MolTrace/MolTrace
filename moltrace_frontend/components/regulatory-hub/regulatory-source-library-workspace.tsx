@@ -29,6 +29,13 @@ import {
 } from "@/components/ui/table"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { ArrowLeft, Download, Library, Loader2, Quote, Search, Upload } from "lucide-react"
 
 const SOURCE_TYPES = [
@@ -634,7 +641,17 @@ export function RegulatorySourceLibraryWorkspace() {
             ) : sourcesErr ? (
               <AlertCard variant="error" title="Error" description={sourcesErr} />
             ) : sources.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No sources registered.</p>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Library />
+                  </EmptyMedia>
+                  <EmptyTitle>No sources registered</EmptyTitle>
+                  <EmptyDescription>
+                    Upload a document or import from a connector to register your first regulatory source.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="table-scroll">
                 <Table>

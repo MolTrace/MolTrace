@@ -12,7 +12,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import { ScatterChart as ScatterChartIcon } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -224,10 +232,16 @@ export function ReactionResponseOverview({
       <CardContent className="space-y-4">
         {loading ? (
           <p className="text-sm text-muted-foreground">…</p>
-        ) : numericVars.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{EMPTY_COPY}</p>
-        ) : primaryPoints.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{EMPTY_COPY}</p>
+        ) : numericVars.length === 0 || primaryPoints.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ScatterChartIcon />
+              </EmptyMedia>
+              <EmptyTitle>Nothing to plot yet</EmptyTitle>
+              <EmptyDescription>{EMPTY_COPY}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : null}
 
         {numericVars.length > 0 && !loading && primaryPoints.length > 0 ? (

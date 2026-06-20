@@ -21,7 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Layers3, ServerOff, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Inbox, Layers3, ServerOff, ShieldCheck } from "lucide-react"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { ValidationTraceabilityMatrixPanel } from "@/components/validation/validation-traceability-matrix-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
@@ -271,8 +272,16 @@ function GenericTable({
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={columns.length} className="text-xs text-muted-foreground">
-                {empty}
+              <TableCell colSpan={columns.length} className="p-0">
+                <Empty className="border-0">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <Inbox />
+                    </EmptyMedia>
+                    <EmptyTitle>No rows yet</EmptyTitle>
+                    <EmptyDescription>{empty}</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               </TableCell>
             </TableRow>
           ) : (

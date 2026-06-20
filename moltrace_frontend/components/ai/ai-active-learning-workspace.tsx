@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { ListChecks, MessageSquare, Plus } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
@@ -551,8 +552,16 @@ export function AiActiveLearningWorkspace() {
               })}
               {queueRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-muted-foreground">
-                    No active-learning candidates returned.
+                  <TableCell colSpan={8}>
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <ListChecks />
+                        </EmptyMedia>
+                        <EmptyTitle>No candidates in the queue</EmptyTitle>
+                        <EmptyDescription>Low-confidence predictions queued for review will appear here.</EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   </TableCell>
                 </TableRow>
               ) : null}

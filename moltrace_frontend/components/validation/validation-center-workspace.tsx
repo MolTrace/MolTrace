@@ -17,6 +17,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import {
@@ -412,8 +419,18 @@ export function ValidationCenterWorkspace() {
                 <TableBody>
                   {projects.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-xs text-muted-foreground">
-                        No validation projects returned.
+                      <TableCell colSpan={8}>
+                        <Empty>
+                          <EmptyHeader>
+                            <EmptyMedia variant="icon">
+                              <ClipboardCheck />
+                            </EmptyMedia>
+                            <EmptyTitle>No validation projects yet</EmptyTitle>
+                            <EmptyDescription>
+                              Create a validation project to begin IQ/OQ/PQ tracking.
+                            </EmptyDescription>
+                          </EmptyHeader>
+                        </Empty>
                       </TableCell>
                     </TableRow>
                   ) : (

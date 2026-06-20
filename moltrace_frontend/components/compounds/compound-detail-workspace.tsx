@@ -23,6 +23,13 @@ import { loadCompounds } from "@/lib/ui/entity-options"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty"
+import {
   Table,
   TableBody,
   TableCell,
@@ -502,7 +509,15 @@ export function CompoundDetailWorkspace() {
             >
               <div>
                 {structures.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No structure records returned.</p>
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Layers />
+                      </EmptyMedia>
+                      <EmptyTitle>No structures</EmptyTitle>
+                      <EmptyDescription>This compound has no structure records yet.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
                 ) : (
                   <div className="table-scroll">
                     <Table>
@@ -574,7 +589,15 @@ export function CompoundDetailWorkspace() {
             >
               <div>
                 {aliases.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No aliases returned.</p>
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Tags />
+                      </EmptyMedia>
+                      <EmptyTitle>No aliases</EmptyTitle>
+                      <EmptyDescription>Add an alias above to register an alternate name for this compound.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
                 ) : (
                   <div className="table-scroll">
                     <Table>
@@ -626,7 +649,15 @@ export function CompoundDetailWorkspace() {
             >
               <div className="space-y-6">
                 {evidenceLinks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No evidence links returned.</p>
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Link2 />
+                      </EmptyMedia>
+                      <EmptyTitle>No evidence links</EmptyTitle>
+                      <EmptyDescription>No linked sessions, evidence, experiments, reports, dossiers, or files for this compound yet.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
                 ) : (
                   <>
                     {(
@@ -730,7 +761,15 @@ export function CompoundDetailWorkspace() {
             >
               <div>
                 {relationships.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No relationships returned.</p>
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Network />
+                      </EmptyMedia>
+                      <EmptyTitle>No relationships</EmptyTitle>
+                      <EmptyDescription>Add a relationship above to link this compound to others.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
                 ) : (
                   <div className="table-scroll">
                     <Table>

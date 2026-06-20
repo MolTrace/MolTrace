@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CheckCircle2, FlaskConical, ListChecks, Plus, ShieldCheck } from "lucide-react"
+import { CheckCircle2, FlaskConical, FolderOpen, ListChecks, Plus, ShieldCheck } from "lucide-react"
 import { apiFetch } from "@/lib/api/client"
 import { formatStableUtcDateTime } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
@@ -41,6 +41,13 @@ import { trackReactionProjectCreated } from "@/src/lib/analytics/analytics-clien
 import { ReactionValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
 import { EvidenceCard } from "@/components/science/evidence-card"
 import { DataState, DataStateBadge, type DataStateKind } from "@/components/science/data-state"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 
 function readCreatedReactionProjectId(raw: unknown): number | undefined {
   if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return undefined
@@ -534,8 +541,22 @@ export function ReactionOptimizationLanding() {
                   </TableRow>
                 ) : projects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                      {showListUnavailable ? "No data — backend unavailable." : "No reaction projects yet."}
+                    <TableCell colSpan={7} className="p-0">
+                      <Empty className="border-0">
+                        <EmptyHeader>
+                          <EmptyMedia variant="icon">
+                            {showListUnavailable ? <FolderOpen /> : <FlaskConical />}
+                          </EmptyMedia>
+                          <EmptyTitle>
+                            {showListUnavailable ? "Project list unavailable" : "No reaction projects yet"}
+                          </EmptyTitle>
+                          <EmptyDescription>
+                            {showListUnavailable
+                              ? "The reaction project list could not be reached, so no projects are shown."
+                              : "Create a reaction project above to start tracking experiments and recommendations."}
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
                     </TableCell>
                   </TableRow>
                 ) : (

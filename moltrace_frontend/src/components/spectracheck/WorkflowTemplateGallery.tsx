@@ -15,6 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { LayoutGrid } from "lucide-react"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -253,7 +255,17 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
       ) : null}
 
       {load.status === "ok" && load.templates.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No workflow templates were returned.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <LayoutGrid />
+            </EmptyMedia>
+            <EmptyTitle>No workflow templates</EmptyTitle>
+            <EmptyDescription>
+              No predefined workflows are available for this tenant yet. Templates appear here once published.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       {load.status === "ok" && load.templates.length > 0 ? (

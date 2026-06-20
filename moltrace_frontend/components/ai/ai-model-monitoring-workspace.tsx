@@ -11,6 +11,7 @@ import { Activity, ListChecks } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react"
 
 type Row = Record<string, unknown>
@@ -257,7 +258,19 @@ export function AiModelMonitoringWorkspace() {
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatWhen(readStr(row, ["created_at", "timestamp"]))}</TableCell>
                 </TableRow>
               ))}
-              {events.length === 0 ? <TableRow><TableCell colSpan={4} className="text-muted-foreground">No monitoring events returned.</TableCell></TableRow> : null}
+              {events.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4}>
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon"><ListChecks /></EmptyMedia>
+                        <EmptyTitle>No monitoring events</EmptyTitle>
+                        <EmptyDescription>Operational events across monitored AI services will appear here.</EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
+                  </TableCell>
+                </TableRow>
+              ) : null}
             </TableBody>
           </Table>
         </div>

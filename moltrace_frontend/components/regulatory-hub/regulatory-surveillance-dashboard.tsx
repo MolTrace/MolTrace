@@ -30,6 +30,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import type { LucideIcon } from "lucide-react"
@@ -379,8 +386,18 @@ export function RegulatorySurveillanceDashboard() {
               <TableBody>
                 {watchers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-sm text-muted-foreground">
-                      No watched sources yet.
+                    <TableCell colSpan={8}>
+                      <Empty>
+                        <EmptyHeader>
+                          <EmptyMedia variant="icon">
+                            <Eye />
+                          </EmptyMedia>
+                          <EmptyTitle>No watched sources yet</EmptyTitle>
+                          <EmptyDescription>
+                            Register a regulatory source below to begin automated surveillance.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -573,8 +590,18 @@ export function RegulatorySurveillanceDashboard() {
               <TableBody>
                 {changes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-sm text-muted-foreground">
-                      No change events yet.
+                    <TableCell colSpan={8}>
+                      <Empty>
+                        <EmptyHeader>
+                          <EmptyMedia variant="icon">
+                            <Activity />
+                          </EmptyMedia>
+                          <EmptyTitle>No change events yet</EmptyTitle>
+                          <EmptyDescription>
+                            Detected changes from watched sources will appear here after the next surveillance run.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -622,7 +649,17 @@ export function RegulatorySurveillanceDashboard() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : notifications.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No notifications.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Bell />
+                </EmptyMedia>
+                <EmptyTitle>No notifications</EmptyTitle>
+                <EmptyDescription>
+                  Workflow signals for detected regulatory changes will appear here.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <ul className="space-y-2">
               {notifications.slice(0, 25).map((row, idx) => {

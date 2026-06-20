@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react"
 
 type Row = Record<string, unknown>
@@ -355,8 +356,16 @@ export function AiServiceRegistryWorkspace() {
               })}
               {services.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-muted-foreground">
-                    No services returned.
+                  <TableCell colSpan={8}>
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <Server />
+                        </EmptyMedia>
+                        <EmptyTitle>No AI services registered</EmptyTitle>
+                        <EmptyDescription>Register a service below to begin routing predictions.</EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   </TableCell>
                 </TableRow>
               ) : null}

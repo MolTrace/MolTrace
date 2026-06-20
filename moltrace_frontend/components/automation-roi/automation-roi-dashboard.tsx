@@ -32,6 +32,13 @@ import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import {
   Table,
@@ -298,8 +305,18 @@ export default function AutomationRoiDashboard() {
                     </TableRow>
                   ) : topTasks.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                        No task definitions loaded.
+                      <TableCell colSpan={5} className="p-0">
+                        <Empty className="border-0">
+                          <EmptyHeader>
+                            <EmptyMedia variant="icon">
+                              <Bot />
+                            </EmptyMedia>
+                            <EmptyTitle>No automation tasks yet</EmptyTitle>
+                            <EmptyDescription>
+                              Task definitions populate here once automation tasks are configured for your tenant.
+                            </EmptyDescription>
+                          </EmptyHeader>
+                        </Empty>
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -351,8 +368,18 @@ export default function AutomationRoiDashboard() {
                   </TableRow>
                 ) : feedback.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
-                      No feedback rows loaded.
+                    <TableCell colSpan={4} className="p-0">
+                      <Empty className="border-0">
+                        <EmptyHeader>
+                          <EmptyMedia variant="icon">
+                            <MessageSquare />
+                          </EmptyMedia>
+                          <EmptyTitle>No feedback yet</EmptyTitle>
+                          <EmptyDescription>
+                            Reviewer feedback events will appear here as programs are reviewed.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
                     </TableCell>
                   </TableRow>
                 ) : (

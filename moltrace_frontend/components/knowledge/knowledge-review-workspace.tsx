@@ -10,6 +10,7 @@ import { KNOWLEDGE_TASK_STATUSES } from "@/components/knowledge/knowledge-consta
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -247,7 +248,15 @@ export function KnowledgeReviewWorkspace() {
           ) : listErr ? (
             <p className="text-sm text-destructive">{listErr}</p>
           ) : tasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tasks returned.</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ListChecks />
+                </EmptyMedia>
+                <EmptyTitle>No review tasks</EmptyTitle>
+                <EmptyDescription>There are no records awaiting review right now.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <Table>
               <TableHeader>
