@@ -37,6 +37,34 @@ export async function loadReactionProjects(): Promise<EntityOption[]> {
   return out
 }
 
+export async function loadOrganizations(): Promise<EntityOption[]> {
+  const raw = await apiFetch<unknown>("/organizations", { method: "GET" })
+  const out: EntityOption[] = []
+  for (const r of asArray(raw)) {
+    if (!isRecord(r)) continue
+    const id = readId(r.id ?? r.organization_id)
+    if (id == null) continue
+    out.push({ id, label: str(r.name) || `Organization ${id}`, description: str(r.slug) || undefined })
+  }
+  return out
+}
+
+export async function loadDossiers(): Promise<EntityOption[]> {
+  const raw = await apiFetch<unknown>("/regulatory/dossiers", { method: "GET" })
+  const out: EntityOption[] = []
+  for (const r of asArray(raw)) {
+    if (!isRecord(r)) continue
+    const id = readId(r.id ?? r.dossier_id)
+    if (id == null) continue
+    out.push({
+      id,
+      label: str(r.title) || str(r.product_name) || `Dossier ${id}`,
+      description: str(r.product_name) || str(r.compound_name) || undefined,
+    })
+  }
+  return out
+}
+
 export async function loadCompounds(): Promise<EntityOption[]> {
   const raw = await apiFetch<unknown>("/compound-registry/compounds", { method: "GET" })
   const out: EntityOption[] = []

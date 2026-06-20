@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
+import { EntityPicker } from "@/components/ui/entity-picker"
+import { loadOrganizations } from "@/lib/ui/entity-options"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -357,15 +359,18 @@ export function RenewalValueReportSection() {
           ) : null}
           {scope === "organization" ? (
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="renewal-org">Organization id (scope_id)</Label>
-              <Input
-                id="renewal-org"
-                value={organizationId}
-                onChange={(e) => setOrganizationId(e.target.value)}
-                placeholder="organization identifier"
-                className="max-w-md"
-                autoComplete="off"
-              />
+              <Label htmlFor="renewal-org">Organization</Label>
+              <div className="max-w-md">
+                <EntityPicker
+                  id="renewal-org"
+                  ariaLabel="Organization"
+                  value={organizationId || null}
+                  onChange={(id) => setOrganizationId(id == null ? "" : String(id))}
+                  load={loadOrganizations}
+                  placeholder="Select an organization"
+                  searchPlaceholder="Search organizations…"
+                />
+              </div>
             </div>
           ) : null}
           <div className="space-y-2">

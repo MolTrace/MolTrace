@@ -6,6 +6,8 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { EntityPicker } from "@/components/ui/entity-picker"
+import { loadDossiers } from "@/lib/ui/entity-options"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -264,7 +266,15 @@ export function ReactionRegulatoryConstraintsPanel({
             </div>
             <div className="space-y-2">
               <Label>source dossier</Label>
-              <Input value={sourceDossierId} onChange={(e) => setSourceDossierId(e.target.value)} />
+              <EntityPicker
+                ariaLabel="Source dossier"
+                value={sourceDossierId || null}
+                onChange={(id) => setSourceDossierId(id == null ? "" : String(id))}
+                load={loadDossiers}
+                placeholder="Select a dossier"
+                searchPlaceholder="Search dossiers…"
+                allowClear
+              />
             </div>
             <div className="space-y-2">
               <Label>source action item</Label>
