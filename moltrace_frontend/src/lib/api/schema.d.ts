@@ -4456,6 +4456,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system-releases/{release_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ingest Release Evidence Route */
+        post: operations["ingest_release_evidence_route_system_releases__release_id__evidence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system-releases/{release_id}/validation-package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Validation Package Route */
+        get: operations["get_validation_package_route_system_releases__release_id__validation_package_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/deviations": {
         parameters: {
             query?: never;
@@ -34304,6 +34338,31 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * ReleaseEvidenceIngestRequest
+         * @description CI-evidence ingestion (Prompt 13): structured test/risk summaries posted into a release's
+         *     evidence slots (e.g. from a CI step parsing pytest/coverage output).
+         */
+        ReleaseEvidenceIngestRequest: {
+            /** Test Summary Json */
+            test_summary_json?: {
+                [key: string]: unknown;
+            };
+            /** Risk Summary Json */
+            risk_summary_json?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Source
+             * @default ci
+             * @enum {string}
+             */
+            source: "ci" | "manual";
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
         /** RenewalValueReport */
         RenewalValueReport: {
             /** Id */
@@ -39881,6 +39940,38 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ValidationPackage
+         * @description A regenerable GAMP 5 / CSA validation package assembled for a release (Prompt 13).
+         */
+        ValidationPackage: {
+            /** Package Metadata */
+            package_metadata: {
+                [key: string]: unknown;
+            };
+            /** Requirement Risk Test Traceability */
+            requirement_risk_test_traceability: {
+                [key: string]: unknown;
+            };
+            /** Iq Oq Pq Evidence */
+            iq_oq_pq_evidence: {
+                [key: string]: unknown;
+            };
+            /** Risk Summary */
+            risk_summary?: {
+                [key: string]: unknown;
+            } | null;
+            /** Change Control State */
+            change_control_state: {
+                [key: string]: unknown;
+            };
+            /** Signatures */
+            signatures?: {
+                [key: string]: unknown;
+            }[];
+            /** Notice */
+            notice: string;
         };
         /** ValidationProject */
         ValidationProject: {
@@ -52551,6 +52642,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemReleaseRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ingest_release_evidence_route_system_releases__release_id__evidence_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseEvidenceIngestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemReleaseRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_validation_package_route_system_releases__release_id__validation_package_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationPackage"];
                 };
             };
             /** @description Validation Error */

@@ -363,6 +363,10 @@ export function ValidationProjectDetailWorkspace() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [projectRaw, setProjectRaw] = useState<unknown>(null)
+  // P13 change control: once the project is in a validated state (approved/archived,
+  // or attached to an approved/released release), child edits require a reason that
+  // is sent as metadata_json.reason_for_change. Draft/in-progress are unaffected.
+  const [reasonForChange, setReasonForChange] = useState("")
   const [ursRaw, setUrsRaw] = useState<unknown>(null)
   const [functionalSpecsRaw, setFunctionalSpecsRaw] = useState<unknown>(null)
   const [riskRaw, setRiskRaw] = useState<unknown>(null)
@@ -569,6 +573,28 @@ export function ValidationProjectDetailWorkspace() {
   }, [loadExecutions])
 
   const project = useMemo(() => unwrapRecord(projectRaw, ["validation_project", "project"]), [projectRaw])
+  // Validated state from the project status. The "attached to an approved/released
+  // release" case isn't always visible here — the server 400 is the backstop and is
+  // surfaced inline via formatErr.
+  const projectValidated = useMemo(() => {
+    const st = readStr(project?.status).toLowerCase()
+    return st === "approved" || st === "archived"
+  }, [project])
+
+  /**
+   * Change-control guard for validated-project child edits. Returns the body
+   * fragment to merge (metadata_json.reason_for_change) when a reason is present,
+   * or null after setting an inline error when a reason is required but missing.
+   * Returns an empty fragment (no gating) for draft/in-progress projects.
+   */
+  function changeReasonGuard(setErr: (message: string) => void): Record<string, unknown> | null {
+    if (!projectValidated) return {}
+    if (!reasonForChange.trim()) {
+      setErr("This project is in a validated state — a reason for change is required before editing its records.")
+      return null
+    }
+    return { metadata_json: { reason_for_change: reasonForChange.trim() } }
+  }
   const ursRows = useMemo(() => asRows(ursRaw, ["urs", "requirements", "user_requirements"]), [ursRaw])
   const functionalSpecRows = useMemo(
     () => asRows(functionalSpecsRaw, ["functional_specs", "specs", "functional_specifications"]),
@@ -702,6 +728,8 @@ export function ValidationProjectDetailWorkspace() {
   async function createUrsRequirement() {
     const id = validationProjectId.trim()
     if (!id) return
+    const meta = changeReasonGuard(setUrsError)
+    if (meta == null) return
     setUrsBusy(true)
     setUrsError("")
     try {
@@ -714,6 +742,7 @@ export function ValidationProjectDetailWorkspace() {
           criticality: ursCriticality,
           gxp_impact: ursGxpImpact,
           status: ursStatus,
+          ...meta,
         },
       })
       setUrsRequirementCode("")
@@ -729,6 +758,8 @@ export function ValidationProjectDetailWorkspace() {
   async function createFunctionalSpec() {
     const id = validationProjectId.trim()
     if (!id) return
+    const meta = changeReasonGuard(setFsError)
+    if (meta == null) return
     setFsBusy(true)
     setFsError("")
     try {
@@ -742,6 +773,7 @@ export function ValidationProjectDetailWorkspace() {
           expected_behavior: fsExpectedBehavior.trim(),
           module: fsModule,
           status: fsStatus,
+          ...meta,
         },
       })
       setFsRequirementId("__none__")
@@ -760,6 +792,8 @@ export function ValidationProjectDetailWorkspace() {
   async function createRiskAssessment() {
     const id = validationProjectId.trim()
     if (!id) return
+    const meta = changeReasonGuard(setRiskError)
+    if (meta == null) return
     setRiskBusy(true)
     setRiskError("")
     try {
@@ -775,6 +809,7 @@ export function ValidationProjectDetailWorkspace() {
           mitigation: riskMitigation.trim(),
           testing_rigor: riskTestingRigor,
           status: riskStatus,
+          ...meta,
         },
       })
       setRiskTargetId("")
@@ -791,6 +826,8 @@ export function ValidationProjectDetailWorkspace() {
   async function createTestProtocol() {
     const id = validationProjectId.trim()
     if (!id) return
+    const meta = changeReasonGuard(setProtocolError)
+    if (meta == null) return
     setProtocolBusy(true)
     setProtocolError("")
     try {
@@ -802,6 +839,7 @@ export function ValidationProjectDetailWorkspace() {
           module: protocolModule,
           protocol_type: protocolType,
           status: protocolStatus,
+          ...meta,
         },
       })
       setProtocolCode("")
@@ -832,6 +870,8 @@ export function ValidationProjectDetailWorkspace() {
       return
     }
 
+    const meta = changeReasonGuard(setTestCaseError)
+    if (meta == null) return
     setTestCaseBusy(true)
     setTestCaseError("")
     try {
@@ -846,6 +886,7 @@ export function ValidationProjectDetailWorkspace() {
           linked_requirement_ids_json: linkedRequirementIdsJson,
           linked_risk_ids_json: linkedRiskIdsJson,
           status: testCaseStatus,
+          ...meta,
         },
       })
       setTestCaseCode("")
@@ -937,6 +978,28 @@ export function ValidationProjectDetailWorkspace() {
       {loading ? <p className="text-sm text-muted-foreground">Loading validation project...</p> : null}
       {!loading && error ? (
         <AlertCard variant="error" icon={ServerOff} title="Could not load project" description={error} />
+      ) : null}
+
+      {!loading && !error && projectValidated ? (
+        <div className="space-y-2 rounded-md border border-amber-500/45 bg-amber-500/10 p-3">
+          <p className="text-sm font-medium">Validated state — change control active</p>
+          <p className="text-xs text-muted-foreground">
+            This project is <span className="font-mono">{readStr(project?.status)}</span>. Edits to its records (URS,
+            functional specs, risk, test protocols, test cases) require a documented reason — enter it here before
+            editing; it is recorded as the change-control reason. Draft / in-progress projects are unaffected.
+          </p>
+          <div className="space-y-1">
+            <Label htmlFor="change-reason" className="text-xs">
+              Reason for change
+            </Label>
+            <Input
+              id="change-reason"
+              value={reasonForChange}
+              onChange={(event) => setReasonForChange(event.target.value)}
+              placeholder="e.g. CR-1043: corrected expected result per deviation DEV-22"
+            />
+          </div>
+        </div>
       ) : null}
 
       {!loading && !error ? (

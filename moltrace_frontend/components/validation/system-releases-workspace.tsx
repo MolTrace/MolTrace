@@ -19,6 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { ValidationPackagePanel } from "@/components/validation/validation-package-panel"
 import { FileText, GitBranch, Plus } from "lucide-react"
 
 type Row = Record<string, unknown>
@@ -490,6 +491,10 @@ export function SystemReleasesWorkspace() {
           </div>
         </ModuleCard>
       </div>
+
+      {detailRelease && rowId(detailRelease) ? (
+        <ValidationPackagePanel releaseId={rowId(detailRelease)} />
+      ) : null}
 
       <ModuleCard
         accent="cyan"
