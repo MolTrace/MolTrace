@@ -62,8 +62,8 @@ const navGroups: SidebarGroup[] = [
     label: "Modules",
     items: [
       { name: "SpectraCheck", href: "/spectracheck", icon: SpectraCheckLogoIcon, sub: "NMR · MS · structure" },
-      { name: "Repho", href: "/reactions", icon: FlaskConical, sub: "Reaction optimization" },
       { name: "Regentry", href: "/regulatory", icon: ShieldCheck, sub: "Dossiers & submissions" },
+      { name: "Repho", href: "/reactions", icon: FlaskConical, sub: "Reaction optimization" },
     ],
   },
   {
