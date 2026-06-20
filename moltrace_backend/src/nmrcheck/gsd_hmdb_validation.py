@@ -37,12 +37,13 @@ import json
 import re
 import shutil
 import tempfile
-import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+import defusedxml.ElementTree as ET  # XXE-safe parser for HMDB reference XML fixtures
 
 from moltrace.spectroscopy.io.fid_reader import (
     FIDReaderError,
