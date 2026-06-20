@@ -11,6 +11,8 @@ import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { EntityPicker } from "@/components/ui/entity-picker"
+import { loadReactionProjects } from "@/lib/ui/entity-options"
 import { Separator } from "@/components/ui/separator"
 import {
   Table,
@@ -395,11 +397,15 @@ export function ReactionStudioWorkspace() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rxn-import-project-id">reaction project ID</Label>
-                  <Input
+                  <Label htmlFor="rxn-import-project-id">reaction project</Label>
+                  <EntityPicker
                     id="rxn-import-project-id"
-                    value={importReactionProjectId}
-                    onChange={(e) => setImportReactionProjectId(e.target.value)}
+                    ariaLabel="Reaction project"
+                    value={importReactionProjectId || null}
+                    onChange={(id) => setImportReactionProjectId(id == null ? "" : String(id))}
+                    load={loadReactionProjects}
+                    placeholder="Select a reaction project"
+                    searchPlaceholder="Search projects…"
                   />
                 </div>
                 <div className="space-y-2">
@@ -466,11 +472,15 @@ export function ReactionStudioWorkspace() {
                   <Input id="rxn-export-connector" value={exportConnector} onChange={(e) => setExportConnector(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rxn-export-project-id">reaction project ID</Label>
-                  <Input
+                  <Label htmlFor="rxn-export-project-id">reaction project</Label>
+                  <EntityPicker
                     id="rxn-export-project-id"
-                    value={exportReactionProjectId}
-                    onChange={(e) => setExportReactionProjectId(e.target.value)}
+                    ariaLabel="Reaction project"
+                    value={exportReactionProjectId || null}
+                    onChange={(id) => setExportReactionProjectId(id == null ? "" : String(id))}
+                    load={loadReactionProjects}
+                    placeholder="Select a reaction project"
+                    searchPlaceholder="Search projects…"
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
