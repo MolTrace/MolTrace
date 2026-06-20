@@ -1962,6 +1962,15 @@ class ControlledRecordORM(Base):
         default=utcnow,
         onupdate=utcnow,
     )
+    # --- ALCOA+ (Security Prompt 12). All nullable/additive. ---
+    # The *why* of a regulated change, as a queryable column (not buried in metadata_json).
+    reason_for_change: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    # Reversible-by-record soft delete: a deleted_at stamp marks the row removed-but-retained
+    # (never physically deleted); deleted_by is the authenticated principal (server-set).
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    deleted_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 

@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from . import esign
+from . import alcoa, esign
 from .database import session_scope
 from .models import (
     CAPARecord,
@@ -327,6 +327,9 @@ def _controlled_record_to_record(row: ControlledRecordORM) -> ControlledRecord:
         retention_policy_id=row.retention_policy_id,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        reason_for_change=row.reason_for_change,
+        deleted_at=row.deleted_at,
+        deleted_by=row.deleted_by,
         metadata_json=_json_dict(row.metadata_json),
     )
 
@@ -1347,6 +1350,7 @@ def list_controlled_records(
     *,
     status_filter: str | None = None,
     record_type: str | None = None,
+    include_deleted: bool = False,
     limit: int = 200,
 ) -> list[ControlledRecord]:
     with session_scope(session_factory) as session:
@@ -1355,6 +1359,10 @@ def list_controlled_records(
             stmt = stmt.where(ControlledRecordORM.status == status_filter)
         if record_type:
             stmt = stmt.where(ControlledRecordORM.record_type == record_type)
+        if not include_deleted:
+            # ALCOA+: soft-deleted records are retained but non-leaking by default (still
+            # retrievable for the reversible-by-record audit trail via include_deleted=True).
+            stmt = stmt.where(ControlledRecordORM.deleted_at.is_(None))
         return [_controlled_record_to_record(row) for row in session.scalars(stmt).all()]
 
 
@@ -1426,6 +1434,9 @@ def lock_controlled_record(
                 "metadata_json": _json_dict(row.metadata_json),
             }
         )
+        # ALCOA+: capture the *why* as a queryable column (defense-in-depth via the shared primitive)
+        # in addition to the metadata_json key kept for back-compat.
+        row.reason_for_change = alcoa.require_reason_for_change(payload.reason)
         row.metadata_json = _json_dump(
             {
                 **_json_dict(row.metadata_json),
@@ -1445,6 +1456,8 @@ def archive_controlled_record(
     session_factory: sessionmaker[Session],
     record_id: int,
     payload: ControlledRecordArchiveRequest,
+    *,
+    deleted_by: str | None = None,
 ) -> ControlledRecord:
     with session_scope(session_factory) as session:
         row = session.get(ControlledRecordORM, record_id)
@@ -1455,6 +1468,9 @@ def archive_controlled_record(
                 "Locked controlled records cannot be silently modified; create a new version."
             )
         row.status = "archived"
+        # ALCOA+: archive IS the soft-delete of a controlled record — reversible-by-record. The row
+        # is retained; deleted_at/deleted_by/reason_for_change are set in one place (never deleted).
+        alcoa.apply_soft_delete(row, reason=payload.reason, actor=deleted_by, now=utcnow())
         row.metadata_json = _json_dump(
             {
                 **_json_dict(row.metadata_json),

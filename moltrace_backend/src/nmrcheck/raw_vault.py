@@ -151,6 +151,7 @@ class LocalRawStorageBackend(RawStorageBackend):
         filename: str,
         immutable: bool = True,
         warnings: list[str] | None = None,
+        strict_immutable: bool = False,
     ) -> dict[str, Any]:
         warning_list = warnings if warnings is not None else []
         target_dir = self.vault_dir / sha256
@@ -175,7 +176,9 @@ class LocalRawStorageBackend(RawStorageBackend):
                         temp_path.unlink()
                     except OSError:
                         pass
-        read_only = _make_read_only(target, warning_list) if immutable else False
+        read_only = (
+            _make_read_only(target, warning_list, strict=strict_immutable) if immutable else False
+        )
         _verify_file_hash(target, sha256)
         return {
             "storage_path": str(target),
@@ -769,11 +772,17 @@ def _verify_file_hash(path: Path, expected_sha256: str) -> None:
         raise RawVaultError(RAW_ARCHIVE_HASH_MISMATCH_MESSAGE)
 
 
-def _make_read_only(path: Path, warnings: list[str]) -> bool:
+def _make_read_only(path: Path, warnings: list[str], *, strict: bool = False) -> bool:
     try:
         path.chmod(0o444)
         return True
     except OSError as exc:
+        # ALCOA+ (Prompt 12): in strict mode write-once must not silently degrade to warn-only —
+        # a chmod failure means the archive is not enforceably read-only, so fail the ingest.
+        if strict:
+            raise RawVaultError(
+                f"Could not enforce read-only permissions on the raw archive: {exc}"
+            ) from exc
         warnings.append(f"Could not set raw archive read-only permissions: {exc}")
         return False
 
@@ -787,6 +796,7 @@ def ingest_raw_archive(
     max_files: int = DEFAULT_RAW_ARCHIVE_MAX_FILES,
     allowed_extensions: tuple[str, ...] | list[str] | set[str] | None = None,
     immutable: bool = True,
+    strict_immutable: bool = False,
     backend: RawStorageBackend | None = None,
 ) -> RawArchiveRecord:
     """Validate and store raw NMR archive bytes in an immutable development vault."""
@@ -807,6 +817,7 @@ def ingest_raw_archive(
         filename=safe_name,
         immutable=immutable,
         warnings=warnings,
+        strict_immutable=strict_immutable,
     )
     return RawArchiveRecord(
         raw_archive_id=digest,
@@ -839,6 +850,7 @@ def build_raw_upload_provenance(
     max_files: int = DEFAULT_RAW_ARCHIVE_MAX_FILES,
     allowed_extensions: tuple[str, ...] | list[str] | set[str] | None = None,
     immutable: bool = True,
+    strict_immutable: bool = False,
     backend: RawStorageBackend | None = None,
 ) -> dict[str, Any]:
     if storage_dir is None or not str(storage_dir).strip():
@@ -879,6 +891,7 @@ def build_raw_upload_provenance(
         max_files=max_files,
         allowed_extensions=allowed_extensions,
         immutable=immutable,
+        strict_immutable=strict_immutable,
         backend=backend,
     ).to_provenance_dict()
 

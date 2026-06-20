@@ -131,6 +131,10 @@ class Settings:
     raw_archive_allowed_extensions: tuple[str, ...] = (".zip", ".tar.gz", ".tgz")
     raw_archive_immutable: bool = True
     raw_archive_require_hash_verification: bool = True
+    # ALCOA+ (Prompt 12): when True, a failure to set the raw-archive file read-only (chmod 0o444)
+    # raises instead of warning, so write-once cannot silently degrade to warn-only. Default off to
+    # preserve dev/test filesystems where chmod is a no-op; ops enables it on production.
+    alcoa_raw_vault_strict_immutable: bool = False
     enable_2d_nmr: bool = True
     enable_2d_contour_preview: bool = True
     enable_raw_2d_fid_beta: bool = False
@@ -257,6 +261,9 @@ def get_settings() -> Settings:
         raw_archive_immutable=_parse_bool(os.getenv("RAW_ARCHIVE_IMMUTABLE"), True),
         raw_archive_require_hash_verification=_parse_bool(
             os.getenv("RAW_ARCHIVE_REQUIRE_HASH_VERIFICATION"), True
+        ),
+        alcoa_raw_vault_strict_immutable=_parse_bool(
+            os.getenv("ALCOA_RAW_VAULT_STRICT_IMMUTABLE"), False
         ),
         enable_2d_nmr=_parse_bool(os.getenv("ENABLE_2D_NMR"), True),
         enable_2d_contour_preview=_parse_bool(os.getenv("ENABLE_2D_CONTOUR_PREVIEW"), True),

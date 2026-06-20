@@ -238,6 +238,29 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 "CREATE INDEX IF NOT EXISTS ix_esignatures_record_content "
                 "ON electronic_signature_records (target_type, target_id, record_content_hash)"
             )
+        if "controlled_records" in tables:
+            # ALCOA+ reason-for-change + soft-delete columns (Prompt 12 / migration 0028) on a
+            # pre-existing dev SQLite DB. Production Postgres picks these up via 0028.
+            controlled_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(controlled_records)"
+                ).fetchall()
+            }
+            controlled_alcoa_columns = {
+                "reason_for_change": "VARCHAR(2000)",
+                "deleted_at": "TIMESTAMP",
+                "deleted_by": "VARCHAR(200)",
+            }
+            for column, ddl in controlled_alcoa_columns.items():
+                if column not in controlled_existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE controlled_records ADD COLUMN {column} {ddl}"
+                    )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_controlled_records_deleted_at "
+                "ON controlled_records (deleted_at)"
+            )
         version_reference_columns = {
             "method_id": "INTEGER",
             "model_version_id": "INTEGER",
