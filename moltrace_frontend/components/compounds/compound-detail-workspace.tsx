@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { EntityPicker } from "@/components/ui/entity-picker"
+import { loadCompounds } from "@/lib/ui/entity-options"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -200,6 +202,12 @@ export function CompoundDetailWorkspace() {
   const [relErr, setRelErr] = useState("")
 
   const base = compoundId ? `/compound-registry/compounds/${encodeURIComponent(compoundId)}` : ""
+
+  // Compound options for the "Add relationship" picker — exclude this compound (no self-relation).
+  const loadRelatedCompoundOptions = useCallback(
+    async () => (await loadCompounds()).filter((o) => String(o.id) !== String(compoundId)),
+    [compoundId],
+  )
 
   const reloadAll = useCallback(async () => {
     if (!compoundId) {
@@ -682,8 +690,16 @@ export function CompoundDetailWorkspace() {
               <div>
                 <form className="grid gap-4 sm:grid-cols-2" onSubmit={submitRelationship}>
                   <div className="space-y-2">
-                    <Label htmlFor="cd-rel-target">related compound id</Label>
-                    <Input id="cd-rel-target" value={relTargetId} onChange={(e) => setRelTargetId(e.target.value)} inputMode="numeric" />
+                    <Label htmlFor="cd-rel-target">related compound</Label>
+                    <EntityPicker
+                      id="cd-rel-target"
+                      ariaLabel="Related compound"
+                      value={relTargetId || null}
+                      onChange={(id) => setRelTargetId(id == null ? "" : String(id))}
+                      load={loadRelatedCompoundOptions}
+                      placeholder="Select a compound"
+                      searchPlaceholder="Search compounds…"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cd-rel-type">relationship type</Label>
