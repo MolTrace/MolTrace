@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -114,13 +114,6 @@ function parseJsonObject(value: string, label: string): Row | null {
   }
 }
 
-function statusVariant(value: unknown): "default" | "secondary" | "destructive" | "outline" {
-  const status = readStr(value)
-  if (status === "rejected") return "destructive"
-  if (status === "approved" || status === "released") return "default"
-  if (status === "ready_for_qa") return "secondary"
-  return "outline"
-}
 
 export function SystemReleasesWorkspace() {
   const [loading, setLoading] = useState(true)
@@ -413,9 +406,7 @@ export function SystemReleasesWorkspace() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">approval status</p>
-                    <Badge variant={statusVariant(detailRelease.approval_status)}>
-                      {readStr(detailRelease.approval_status) || "-"}
-                    </Badge>
+                    <StatusBadge status={detailRelease.approval_status} />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">validation project ID</p>
@@ -529,7 +520,7 @@ export function SystemReleasesWorkspace() {
                     <TableRow key={id || JSON.stringify(release)}>
                       <TableCell className="font-medium">{readStr(release.release_version) || "-"}</TableCell>
                       <TableCell>{readStr(release.release_type) || "-"}</TableCell>
-                      <TableCell>{readStr(release.approval_status) || "-"}</TableCell>
+                      <TableCell><StatusBadge status={release.approval_status} /></TableCell>
                       <TableCell>{readStr(release.validation_project_id) || "-"}</TableCell>
                       <TableCell>{formatDate(release.created_at)}</TableCell>
                       <TableCell>{formatDate(release.released_at)}</TableCell>

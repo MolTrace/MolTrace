@@ -11,6 +11,7 @@ import { apiFetch } from "@/lib/api/client"
 import { formatStableUtcDateTime } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
@@ -4119,9 +4120,7 @@ export function ReactionProjectDetail() {
                       <TableRow key={String(e.id)}>
                         <TableCell className="font-mono text-xs">{String(e.experiment_code ?? "")}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-normal">
-                            {String(e.status ?? "")}
-                          </Badge>
+                          <StatusBadge status={e.status} />
                         </TableCell>
                         {conditionColumnKeys.map((k) => (
                           <TableCell key={k} className="max-w-[100px] truncate text-xs">
@@ -7820,9 +7819,7 @@ export function ReactionProjectDetail() {
                       <TableRow key={String(e.id)}>
                         <TableCell className="font-mono text-xs">{String(e.experiment_code ?? "")}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-normal">
-                            {String(e.status ?? "")}
-                          </Badge>
+                          <StatusBadge status={e.status} />
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs tabular-nums">
                           {yld != null ? `${yld}` : "—"}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -471,7 +471,7 @@ export function ControlledRecordsWorkspace() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">status</p>
-                    <Badge variant="secondary">{readStr(detailRecord.status) || "-"}</Badge>
+                    <StatusBadge status={detailRecord.status} />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">record type</p>
@@ -663,7 +663,7 @@ export function ControlledRecordsWorkspace() {
                       <TableCell>{readStr(record.resource_id) || "-"}</TableCell>
                       <TableCell>{readStr(record.version) || "-"}</TableCell>
                       <TableCell>
-                        {readStr(record.status) || "-"}
+                        <StatusBadge status={record.status} />
                         {archived ? (
                           <span className="mt-0.5 block text-[11px] text-muted-foreground">
                             retained · {readStr(record.deleted_by) || "—"} · {formatDate(record.deleted_at)}
