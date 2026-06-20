@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { StructuredJsonObjectEditor } from "@/components/ui/structured-json-editor"
 import {
   Table,
   TableBody,
@@ -80,7 +81,7 @@ export function MlCalibrationWorkspace() {
   const [artifactId, setArtifactId] = useState("")
   const [evalRunId, setEvalRunId] = useState("")
   const [method, setMethod] = useState<string>("not_assessed")
-  const [metricsJson, setMetricsJson] = useState("{}")
+  const [calibrationMetrics, setCalibrationMetrics] = useState<Record<string, unknown>>({})
   const [statusDraft, setStatusDraft] = useState<string>("not_assessed")
   const [notesLine, setNotesLine] = useState("")
 
@@ -114,18 +115,7 @@ export function MlCalibrationWorkspace() {
       setFormErr("model_artifact_id is required.")
       return
     }
-    let calibration_metrics_json: Record<string, unknown>
-    try {
-      const o = JSON.parse(metricsJson.trim() || "{}") as unknown
-      if (!o || typeof o !== "object" || Array.isArray(o)) {
-        setFormErr("calibration_metrics_json must be a JSON object.")
-        return
-      }
-      calibration_metrics_json = o as Record<string, unknown>
-    } catch {
-      setFormErr("calibration_metrics_json must be valid JSON.")
-      return
-    }
+    const calibration_metrics_json = calibrationMetrics
 
     const eid = Number.parseInt(evalRunId, 10)
     const body: Record<string, unknown> = {
@@ -290,8 +280,17 @@ export function MlCalibrationWorkspace() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>calibration_metrics_json</Label>
-            <Textarea className="min-h-[88px] font-mono text-xs" value={metricsJson} onChange={(e) => setMetricsJson(e.target.value)} spellCheck={false} />
+            <Label>Calibration metrics</Label>
+            <StructuredJsonObjectEditor
+              idPrefix="calibration-metrics"
+              onChange={setCalibrationMetrics}
+              allowCustomKeys
+              customValueType="number"
+              addLabel="Add metric"
+              keyPlaceholder="metric (e.g. ece)"
+              valuePlaceholder="value"
+              description="Numeric calibration metrics such as ECE, MCE, or Brier score."
+            />
           </div>
           <div className="space-y-2">
             <Label>notes_json (single line → one entry)</Label>
