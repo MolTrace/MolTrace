@@ -14,6 +14,51 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.52.0 — Security Prompt 13: Validation lifecycle (GAMP 5 / CSA) (2026-06-20)
+
+**Headline:** Closes the P1–P2 security/data-integrity backlog. A scope-bounded build that turns the
+already-shipped Validation Center into a **regenerable, change-controlled validation package** — most
+of the lifecycle (the requirement→risk→test→execution traceability chain + content-bound release
+signatures) already existed, so this is assembly + one gate, not new subsystems:
+
+- **Validated-state change control (GAMP 5 §14 / Annex 11):** a change to a project that is
+  approved/archived **or** attached to an approved/released system release now requires a
+  `reason_for_change` (sourced from the payload `metadata_json`), reusing the P12
+  `alcoa.require_reason_for_change`. Enforced by a new pure primitive
+  (`validation_package.assert_change_control`) wired into the six child-mutation entry points
+  (`update_validation_project`, `create_urs` / `_functional_spec` / `_risk_assessment` /
+  `_test_protocol` / `_test_case`). Draft / in-progress projects stay freely mutable. Already
+  enforced end-to-end through the existing Validation Center routes.
+- **Regenerable validation package:** `GET /system-releases/{id}/validation-package` assembles the
+  latest traceability matrix + requirement/risk/test counts + **IQ/OQ/PQ-from-CI evidence** (OQ from
+  the CI test summary; IQ/PQ honestly marked *customer-supplied* rather than fabricated) +
+  change-control state + release approval signature manifestations into one deterministic artifact
+  per release (re-runnable on every CI build / inspection).
+- **CI-evidence ingestion seam:** `POST /system-releases/{id}/evidence` writes structured test/risk
+  summaries into the release's existing slots (a CI step POSTs parsed pytest/coverage results);
+  refused once the release is approved/released (the §11.70-bound snapshot is change-controlled).
+
+**No new ORM tables and no migration** — the package reads existing rows and the gate reads existing
+status columns. Framing stays "**supports** GAMP 5 / CSA, not compliant-for-you" (accelerates the
+customer's IQ/OQ/PQ evidence + change control; does not replace their CSV). Deliberately bounded:
+deviation/CAPA gating (fragile deep join), a package-certify e-signature, and retention-purge
+scheduling are deferred. Existing tests stay green; 10 new tests added.
+
+### Added
+- **`src/nmrcheck/validation_package.py`** — pure (no DB/FastAPI) assembler `assemble_validation_package`
+  + change-control gate `assert_change_control` / `is_validated_state` / `ValidatedStateChangeError`.
+- **`POST /system-releases/{id}/evidence`** (CI ingestion) and **`GET /system-releases/{id}/validation-package`**.
+- **Pydantic** `ReleaseEvidenceIngestRequest`, `ValidationPackage`.
+- **`tests/test_p13_validation_lifecycle.py`** — gate truth table, deterministic/honest package
+  assembly, full-project package over a release, change-control gate (store + HTTP), CI-evidence
+  ingestion + post-approval refusal.
+
+### Changed
+- **`validation_center_store`** — `_gate_validated_state_mutation` + `_change_reason` inserted into the
+  six child-mutation entry points; new `ingest_release_evidence` + `build_validation_package`.
+
+---
+
 ## v0.51.0 — Security Prompt 12: ALCOA+ hardening (2026-06-19)
 
 **Headline:** Third build in the Data Integrity & 21 CFR Part 11 group. A scope-bounded hardening

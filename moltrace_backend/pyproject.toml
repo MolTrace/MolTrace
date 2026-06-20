@@ -1,6 +1,6 @@
 [project]
 name = "nmrcheck"
-version = "0.51.0"
+version = "0.52.0"
 description = "Rule-based 1H NMR checker with Postgres persistence, account verification, password reset, and queued background jobs"
 readme = "README.md"
 requires-python = ">=3.11"
