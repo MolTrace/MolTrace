@@ -1,12 +1,13 @@
 "use client"
 
+import { useMemo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { moltraceTraceClassName } from "@/components/branding/moltrace-wordmark"
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
-import { ProgramsLogoIcon } from "@/components/branding/programs-logo-icon"
+import { SpectraCheckLogoIcon } from "@/components/branding/spectracheck-logo-icon"
 import type { LucideIcon } from "lucide-react"
 import {
   LayoutDashboard,
@@ -16,17 +17,26 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Home,
   SlidersHorizontal,
   Users,
   ClipboardList,
+  ClipboardCheck,
   Boxes,
   Server,
   Shield,
+  ShieldCheck,
   ScrollText,
   Bug,
   Rocket,
   Activity,
+  FlaskConical,
+  FileCheck2,
+  FileText,
+  FileSpreadsheet,
+  Signature,
+  Package,
+  Library,
+  Cpu,
 } from "lucide-react"
 import {
   Tooltip,
@@ -38,19 +48,64 @@ import {
 export type SidebarNavItem = {
   name: string
   href: string
-  icon: LucideIcon | typeof ProgramsLogoIcon
+  icon: LucideIcon | typeof SpectraCheckLogoIcon
+  /** Optional one-line descriptor, shown under the name (modules only). */
+  sub?: string
 }
 
-const navigation: SidebarNavItem[] = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Projects", href: "/projects", icon: FolderOpen },
-  { name: "Compound / Batch", href: "/compounds", icon: Boxes },
-  { name: "Programs", href: "/spectracheck", icon: ProgramsLogoIcon },
-  { name: "Action Queue", href: "/actions", icon: ClipboardList },
-  { name: "Automation ROI", href: "/roi", icon: BarChart3 },
-  { name: "ML / AI Governance", href: "/ai", icon: Bot },
-  { name: "Home", href: "/platform", icon: Home },
+type SidebarGroup = { label: string; items: SidebarNavItem[] }
+
+// Grouped, module-forward navigation. The three flagship modules lead; the rest
+// is grouped by job so every surface has a discoverable home.
+const navGroups: SidebarGroup[] = [
+  {
+    label: "Modules",
+    items: [
+      { name: "SpectraCheck", href: "/spectracheck", icon: SpectraCheckLogoIcon, sub: "NMR · MS · structure" },
+      { name: "Repho", href: "/reactions", icon: FlaskConical, sub: "Reaction optimization" },
+      { name: "Regentry", href: "/regulatory", icon: ShieldCheck, sub: "Dossiers & submissions" },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { name: "Projects", href: "/projects", icon: FolderOpen },
+      { name: "Compounds & Batches", href: "/compounds", icon: Boxes },
+      { name: "Action Queue", href: "/actions", icon: ClipboardList },
+      { name: "Review", href: "/review", icon: ClipboardCheck },
+    ],
+  },
+  {
+    // Group name is the hub; "Overview" is the hub landing, the rest are its sections.
+    label: "Validation Center",
+    items: [
+      { name: "Overview", href: "/validation-center", icon: FileCheck2 },
+      { name: "Controlled Records", href: "/validation-center/controlled-records", icon: FileText },
+      { name: "e-Signatures", href: "/validation-center/esignatures", icon: Signature },
+      { name: "System Releases", href: "/validation-center/releases", icon: Package },
+    ],
+  },
+  {
+    label: "AI / ML",
+    items: [
+      { name: "AI / ML Governance", href: "/ai", icon: Bot },
+      { name: "Model Factory", href: "/ml", icon: Cpu },
+    ],
+  },
+  {
+    label: "Knowledge & Analytics",
+    items: [
+      { name: "Knowledge Library", href: "/knowledge", icon: Library },
+      { name: "Reports", href: "/reports", icon: FileSpreadsheet },
+      { name: "Automation ROI", href: "/roi", icon: BarChart3 },
+    ],
+  },
 ]
+
+const teamNav: SidebarNavItem[] = [{ name: "Team", href: "/settings/team", icon: Users }]
+const bottomNav: SidebarNavItem[] = [{ name: "Settings", href: "/dashboard/settings", icon: Settings }]
+const adminItem: SidebarNavItem = { name: "Admin", href: "/admin/system", icon: SlidersHorizontal }
 
 const adminNavigation: SidebarNavItem[] = [
   { name: "System", href: "/admin/system", icon: Server },
@@ -61,17 +116,9 @@ const adminNavigation: SidebarNavItem[] = [
   { name: "Deployment", href: "/settings/deployment", icon: Rocket },
 ]
 
-export const appNavigation = navigation
+// Back-compat exports (flattened primary nav).
+export const appNavigation: SidebarNavItem[] = navGroups.flatMap((g) => g.items)
 export const appAdminNavigation = adminNavigation
-
-const teamNav: SidebarNavItem[] = [
-  { name: "Team", href: "/settings/team", icon: Users },
-]
-
-const bottomNav: SidebarNavItem[] = [
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-]
-
 export const appTeamNavigation = teamNav
 export const appBottomNavigation = bottomNav
 
@@ -80,48 +127,58 @@ interface AppSidebarProps {
   onToggle: () => void
 }
 
-function adminPathActive(pathname: string, href: string) {
+/** Boundary-safe prefix match: pathname is exactly href or a child segment of it. */
+function isUnder(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/")
+}
+
+/** The single most-specific nav href the current path falls under, so nested
+ *  routes (e.g. /validation-center/esignatures) light up exactly one item. */
+function mostSpecificActiveHref(pathname: string, hrefs: string[]): string | null {
+  return hrefs.filter((h) => isUnder(pathname, h)).sort((a, b) => b.length - a.length)[0] ?? null
 }
 
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   const pathname = usePathname()
 
-  const NavLink = ({
-    item,
-    nested,
-  }: {
-    item: SidebarNavItem
-    nested?: boolean
-  }) => {
-    const isActive = adminPathActive(pathname, item.href)
+  const primaryHrefs = useMemo(
+    () => [...navGroups.flatMap((g) => g.items), ...teamNav, ...bottomNav].map((i) => i.href),
+    [],
+  )
+  const activeHref = useMemo(
+    () => mostSpecificActiveHref(pathname, primaryHrefs),
+    [pathname, primaryHrefs],
+  )
+  const adminActive = isUnder(pathname, "/admin")
 
+  const NavLink = ({ item, active }: { item: SidebarNavItem; active: boolean }) => {
     const linkContent = (
       <Link
         href={item.href}
+        aria-current={active ? "page" : undefined}
+        aria-label={collapsed ? item.name : undefined}
         className={cn(
           "group/navlink relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold tracking-tight transition-all duration-200",
-          isActive
+          active
             ? "bg-secondary text-foreground shadow-sm"
             : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground hover:shadow-sm",
           collapsed && "justify-center px-2",
-          nested && !collapsed && "ml-2 border-l border-border pl-3"
         )}
-        style={
-          isActive
-            ? {
-                boxShadow: collapsed
-                  ? `inset 2px 0 0 0 var(--mt-teal)`
-                  : `inset 3px 0 0 0 var(--mt-teal)`,
-              }
-            : undefined
-        }
+        style={active ? { boxShadow: `inset ${collapsed ? 2 : 3}px 0 0 0 var(--mt-teal)` } : undefined}
       >
         <item.icon
           className="h-4 w-4 shrink-0"
-          style={isActive ? { color: "var(--mt-teal)" } : undefined}
+          style={active ? { color: "var(--mt-teal)" } : undefined}
+          aria-hidden
         />
-        {!collapsed && <span>{item.name}</span>}
+        {!collapsed && (
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{item.name}</span>
+            {item.sub ? (
+              <span className="block truncate text-[11px] font-normal text-muted-foreground">{item.sub}</span>
+            ) : null}
+          </span>
+        )}
       </Link>
     )
 
@@ -129,36 +186,34 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
       return (
         <Tooltip>
           <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-          <TooltipContent side="right">{item.name}</TooltipContent>
+          <TooltipContent side="right">{item.sub ? `${item.name} — ${item.sub}` : item.name}</TooltipContent>
         </Tooltip>
       )
     }
-
     return linkContent
   }
+
+  const SectionLabel = ({ label }: { label: string }) =>
+    collapsed ? null : (
+      <p className="px-3 pt-1 pb-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
+    )
 
   return (
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          // Solid bg-sidebar (no /95 alpha) + no backdrop-blur. The blurred
-          // frosted-glass sidebar promoted itself to a persistent GPU
-          // compositor layer the full height of the viewport. With the main
-          // scroll column next to it, Chrome/Safari can fail to keep both
-          // layers stable as the user scrolls — culling the main content
-          // intermittently and re-promoting it on the next paint, producing
-          // the "entire area disappears and reappears" symptom. Solid
-          // background stays in document flow and never triggers promotion.
+          // Solid bg-sidebar (no alpha) + no backdrop-blur — a blurred sidebar
+          // promotes itself to a persistent GPU layer and can cull/repaint the
+          // main scroll column. Solid stays in flow and never triggers promotion.
           "flex h-full flex-col border-r border-border/70 bg-sidebar transition-[width] duration-200",
-          collapsed ? "w-14" : "w-56"
+          collapsed ? "w-14" : "w-56",
         )}
       >
-        {/* Logo */}
-        <div className={cn(
-          "flex h-14 items-center border-b border-border/70 px-3",
-          collapsed ? "justify-center" : "justify-between"
-        )}>
-          <Link href="/" className="flex items-center gap-2">
+        {/* Logo / home */}
+        <div className={cn("flex h-14 items-center border-b border-border/70 px-3", collapsed ? "justify-center" : "justify-between")}>
+          <Link href="/" className="flex items-center gap-2" aria-label="MolTrace home">
             <MoleculeLogoMark className="h-7 w-7" />
             {!collapsed && (
               <span className="text-[15px] font-semibold tracking-tight">
@@ -171,59 +226,44 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
             variant="ghost"
             size="icon"
             onClick={onToggle}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={cn("h-7 w-7", collapsed && "absolute -right-3.5 top-3.5 z-10 rounded-full border border-border/70 bg-background/95 shadow-sm backdrop-blur-sm")}
           >
-            {collapsed ? (
-              <ChevronRight className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronLeft className="h-3.5 w-3.5" />
-            )}
+            {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
           </Button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 overflow-y-auto p-2">
-          {!collapsed ? (
-            <p className="px-3 pt-1 pb-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
-              Workspace
-            </p>
-          ) : null}
-          {navigation.map((item) => (
-            <NavLink key={item.name} item={item} />
+        {/* Primary navigation — grouped by job */}
+        <nav className="flex-1 space-y-3 overflow-y-auto p-2" aria-label="Primary">
+          {navGroups.map((group) => (
+            <div key={group.label} role="group" aria-label={group.label} className="space-y-1">
+              <SectionLabel label={group.label} />
+              {group.items.map((item) => (
+                <NavLink key={item.href} item={item} active={item.href === activeHref} />
+              ))}
+            </div>
           ))}
         </nav>
 
-        {/* Team — above Admin */}
-        <div className="border-t border-border/70 p-2">
-          {!collapsed ? (
-            <p className="px-3 pt-1 pb-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
-              Team
-            </p>
-          ) : null}
+        {/* Team */}
+        <div role="group" aria-label="Team" className="border-t border-border/70 p-2">
+          <SectionLabel label="Team" />
           {teamNav.map((item) => (
-            <NavLink key={item.name} item={item} />
+            <NavLink key={item.href} item={item} active={item.href === activeHref} />
           ))}
         </div>
 
-        {/* Admin — collapsible, above Settings */}
-        <div className="border-t border-border/70 p-2">
-          {!collapsed ? (
-            <p className="px-3 pt-1 pb-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
-              Admin
-            </p>
-          ) : null}
-          <NavLink item={{ name: "Admin", href: "/admin/system", icon: SlidersHorizontal }} />
+        {/* Admin */}
+        <div role="group" aria-label="Admin" className="border-t border-border/70 p-2">
+          <SectionLabel label="Admin" />
+          <NavLink item={adminItem} active={adminActive} />
         </div>
 
-        {/* Bottom Navigation */}
-        <div className="border-t border-border/70 p-2">
-          {!collapsed ? (
-            <p className="px-3 pt-1 pb-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
-              Settings
-            </p>
-          ) : null}
+        {/* Settings */}
+        <div role="group" aria-label="Settings" className="border-t border-border/70 p-2">
+          <SectionLabel label="Settings" />
           {bottomNav.map((item) => (
-            <NavLink key={item.name} item={item} />
+            <NavLink key={item.href} item={item} active={item.href === activeHref} />
           ))}
         </div>
       </aside>
