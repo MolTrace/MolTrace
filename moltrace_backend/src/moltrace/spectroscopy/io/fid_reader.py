@@ -14,8 +14,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from xml.etree import ElementTree
+from xml.etree.ElementTree import ParseError  # exception type only; parsing uses defusedxml
 
+import defusedxml.ElementTree as ET  # XXE-safe parser for user-supplied Bruker peaklist XML
 import numpy as np
 
 _ZERO_FILL_POINTS = 65_536
@@ -468,8 +469,8 @@ def _processed_peaklist_ppm(dataset_root: Path, *, nucleus: str) -> list[float]:
     if not peaklist.exists():
         return []
     try:
-        root = ElementTree.parse(peaklist).getroot()
-    except ElementTree.ParseError:
+        root = ET.parse(peaklist).getroot()
+    except ParseError:
         return []
     references: list[float] = []
     if nucleus == "13C":

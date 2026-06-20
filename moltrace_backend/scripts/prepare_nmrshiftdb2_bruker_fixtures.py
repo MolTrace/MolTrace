@@ -10,8 +10,8 @@ import sys
 import urllib.request
 import zipfile
 from pathlib import Path
-from xml.etree import ElementTree
 
+import defusedxml.ElementTree as ET  # XXE-safe parser (defense-in-depth; dev fixture script)
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = ROOT / "tests" / "fixtures" / "nmrshiftdb2"
@@ -31,13 +31,18 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=45)
     parser.add_argument(
         "--verify-tls",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help=(
-            "Verify TLS certificates while downloading. Disabled by default because "
-            "the legacy NMRShiftDB2 raw-data endpoint can present an incomplete chain."
+            "Verify TLS certificates while downloading (default: on). Pass --no-verify-tls only "
+            "for the legacy NMRShiftDB2 raw-data endpoint, which can present an incomplete chain."
         ),
     )
     args = parser.parse_args()
+    # TLS is verified by DEFAULT (secure-by-default); this unverified context is built ONLY on an
+    # explicit --no-verify-tls opt-out for the legacy NMRShiftDB2 endpoint (incomplete cert chain).
+    # Dev-only fixture-download CLI; never imported by the application.
+    # nosemgrep: python.lang.security.unverified-ssl-context.unverified-ssl-context
     ssl_context = None if args.verify_tls else ssl._create_unverified_context()
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -55,7 +60,9 @@ def main() -> int:
         extracted = EXTRACTED_DIR / f"{archive.stem}_bruker"
         try:
             if not archive.exists():
-                _download(candidate["source_url"], archive, timeout=args.timeout, context=ssl_context)
+                _download(
+                    candidate["source_url"], archive, timeout=args.timeout, context=ssl_context
+                )
             if not zipfile.is_zipfile(archive):
                 archive.unlink(missing_ok=True)
                 continue
@@ -159,7 +166,7 @@ def _find_bruker_dataset(root: Path) -> Path | None:
 
 
 def _reference_peaks_from_peaklist(peaklist: Path, nucleus: str) -> list[float]:
-    root = ElementTree.parse(peaklist).getroot()
+    root = ET.parse(peaklist).getroot()
     peaks: list[float] = []
     if nucleus == "13C":
         for peak in root.findall(".//Peak1D"):
