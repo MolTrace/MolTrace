@@ -36,22 +36,26 @@ externally-held content)?
 
 ---
 
-## 2. validation-project `steps_json` → array-of-steps editor (Phase 7 — bespoke)
+## 2. validation-project id-lists → named pickers (mostly DONE; named upgrade pending)
 
-`components/validation/validation-project-detail-workspace.tsx` (~883–932) posts
-`steps_json` (an **array of step objects**) plus FK-id arrays
-`linked_requirement_ids_json`, `linked_risk_ids_json`, `evidence_file_ids_json`,
-`evidence_artifact_ids_json`. The structured `JsonObjectField` built in Phase 7
-handles flat objects, **not arrays of objects**, so this needs a bespoke editor.
+**DONE (FE, commit `f30b20a`):** the five raw-JSON-array textareas on the
+test-case + execution forms are now structured editors — `steps_json` →
+`ObjectArrayField` (array of `JsonObjectField` rows), and the four integer-ID
+lists (`linked_requirement_ids_json`, `linked_risk_ids_json`,
+`evidence_file_ids_json`, `evidence_artifact_ids_json`) → `ScalarListField`
+(typed-number chips). Payload byte-equivalent. New reusable components:
+`components/ui/scalar-list-field.tsx`, `components/ui/object-array-field.tsx`.
 
-**Question for backend:** (a) confirm the **shape of one step object** (which
-fields, types, which required); (b) do owner-scoped **list endpoints** exist for
-requirements, risks, evidence files, and evidence artifacts (to drive
-`MultiEntityPicker`s for the id arrays)?
+**Still pending (needs backend):** the id-lists today show **numbers**, not
+names. To upgrade `ScalarListField` → `MultiEntityPicker` (named chips), the FE
+needs owner-scoped **GET list endpoints** for requirements, risks, evidence
+files, and evidence artifacts (id + label). Also worth confirming the canonical
+**step object shape** so `ObjectArrayField` can offer guided fields instead of
+free-form key/value rows.
 
-**FE follow-up:** build a repeatable step-row editor (add/remove/reorder step
-objects) + `MultiEntityPicker`s for the four id arrays; keep the assembled JSON
-byte-equivalent.
+**FE follow-up once endpoints exist:** add loaders in `lib/ui/entity-options.ts`
+and swap each `ScalarListField` for a `MultiEntityPicker`; optionally pass a
+`fields` schema to the steps `ObjectArrayField`.
 
 ---
 
