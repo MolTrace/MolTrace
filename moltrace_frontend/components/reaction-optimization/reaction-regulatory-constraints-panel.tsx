@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { EntityPicker } from "@/components/ui/entity-picker"
 import { loadDossiers } from "@/lib/ui/entity-options"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -93,6 +93,13 @@ function parseJsonOrText(v: string): unknown {
   } catch {
     return { text: t }
   }
+}
+
+// Map a JsonObjectField's emitted object back to the string state the submit
+// already parses via parseJsonOrText. Empty object → "" → parseJsonOrText → {},
+// identical to leaving the old textarea blank; the wire payload is unchanged.
+function jsonStringFromObject(obj: Record<string, unknown>): string {
+  return Object.keys(obj).length > 0 ? JSON.stringify(obj) : ""
 }
 
 export function ReactionRegulatoryConstraintsPanel({
@@ -309,12 +316,10 @@ export function ReactionRegulatoryConstraintsPanel({
               </Select>
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>constraint details</Label>
-              <Textarea
-                rows={4}
-                value={constraintDetails}
-                onChange={(e) => setConstraintDetails(e.target.value)}
-                className="font-mono text-xs"
+              <JsonObjectField
+                idPrefix="constraint-details"
+                label="constraint details"
+                onChange={(obj) => setConstraintDetails(jsonStringFromObject(obj))}
               />
             </div>
           </div>
@@ -415,21 +420,17 @@ export function ReactionRegulatoryConstraintsPanel({
               <Input value={nitrosaminePenalty} onChange={(e) => setNitrosaminePenalty(e.target.value)} />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>hard constraints</Label>
-              <Textarea
-                rows={3}
-                className="font-mono text-xs"
-                value={objectiveHardConstraints}
-                onChange={(e) => setObjectiveHardConstraints(e.target.value)}
+              <JsonObjectField
+                idPrefix="hard-constraints"
+                label="hard constraints"
+                onChange={(obj) => setObjectiveHardConstraints(jsonStringFromObject(obj))}
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>soft constraints</Label>
-              <Textarea
-                rows={3}
-                className="font-mono text-xs"
-                value={objectiveSoftConstraints}
-                onChange={(e) => setObjectiveSoftConstraints(e.target.value)}
+              <JsonObjectField
+                idPrefix="soft-constraints"
+                label="soft constraints"
+                onChange={(obj) => setObjectiveSoftConstraints(jsonStringFromObject(obj))}
               />
             </div>
             <div className="space-y-2">
