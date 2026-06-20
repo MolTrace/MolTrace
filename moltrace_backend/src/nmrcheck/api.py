@@ -14791,11 +14791,17 @@ def approve_system_release_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> SystemReleaseRecord:
+    # §11.100: bind the signature to the authenticated principal, not the client-supplied name.
+    signer_user_id = context.user.id if context.user is not None else None
+    signer_email = context.user.email if context.user is not None else None
     try:
         record = validation_store.approve_system_release(
             _state(request).session_factory,
             release_id,
             payload,
+            signer_user_id=signer_user_id,
+            signer_display_name=signer_email,
+            signer_email=signer_email,
         )
     except Exception as exc:
         _raise_validation_center_http_error(exc)

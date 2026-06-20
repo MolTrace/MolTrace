@@ -219,7 +219,11 @@ def build_manifestation(
     signed_at_iso = (
         signed_at if isinstance(signed_at, str) or signed_at is None else _iso_utc(signed_at)
     )
-    bound_desc = record_content_hash or "unbound (legacy signature)"
+    is_bound = record_content_hash is not None
+    binding_status = "bound" if is_bound else "unbound"
+    bound_desc = record_content_hash or (
+        "unbound (legacy signature — not cryptographically verifiable)"
+    )
     email_suffix = f" <{signer_email}>" if signer_email else ""
     attestation = (
         f"{label} {signer_display_name or 'unknown signer'}{email_suffix} — "
@@ -237,6 +241,9 @@ def build_manifestation(
         "target_id": target_id,
         "record_content_hash": record_content_hash,
         "signature_digest": signature_digest,
+        # "bound" = digest covers a SHA-256 of the signed record (verifiable); "unbound" = legacy
+        # signature written before content binding existed (cannot be cryptographically verified).
+        "binding_status": binding_status,
         "authentication_method": authentication_method,
         "step_up_factor": step_up_factor,
         "step_up_aal": step_up_aal,
@@ -254,6 +261,10 @@ def render_manifestation_html(manifestation: dict[str, Any]) -> str:
 
     meaning = f"{esc(manifestation.get('meaning_label'))} ({esc(manifestation.get('signature_meaning'))})"  # noqa: E501
     bound = f"{esc(manifestation.get('target_type'))} #{esc(manifestation.get('target_id'))}"
+    is_bound = manifestation.get("binding_status") == "bound"
+    binding_label = (
+        "Bound (SHA-256 record binding)" if is_bound else "Unbound — legacy, not verifiable"
+    )
     rows: list[tuple[str, str]] = [
         ("Signed by", esc(manifestation.get("printed_name"))),
         ("Email", esc(manifestation.get("signer_email"))),
@@ -261,6 +272,7 @@ def render_manifestation_html(manifestation: dict[str, Any]) -> str:
         ("Date / time (UTC)", esc(manifestation.get("signed_at_utc"))),
         ("Reason", esc(manifestation.get("reason"))),
         ("Bound record", bound),
+        ("Binding status", esc(binding_label)),
         ("Record content hash", esc(manifestation.get("record_content_hash"))),
         ("Signature digest", esc(manifestation.get("signature_digest"))),
         ("Authentication", esc(manifestation.get("authentication_method"))),
@@ -271,6 +283,15 @@ def render_manifestation_html(manifestation: dict[str, Any]) -> str:
         f'<td style="padding:2px 0;word-break:break-all">{value}</td></tr>'
         for label, value in rows
     )
+    warning = (
+        ""
+        if is_bound
+        else (
+            '<p style="margin:8px 0 0;padding:6px 10px;border-radius:6px;background:#fef3c7;'
+            'color:#92400e;font-size:12px">⚠ This is a legacy signature with no record-content '
+            "binding; its integrity cannot be cryptographically verified.</p>"
+        )
+    )
     attestation = esc(manifestation.get("attestation_text"))
     notice = esc(manifestation.get("compliance_notice"))
     return (
@@ -279,6 +300,7 @@ def render_manifestation_html(manifestation: dict[str, Any]) -> str:
         'font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:13px;color:#0f172a">'
         '<h3 style="margin:0 0 8px;font-size:14px">Electronic signature</h3>'
         f'<table style="border-collapse:collapse">{row_html}</table>'
+        f"{warning}"
         f'<p style="margin:10px 0 4px;font-style:italic">{attestation}</p>'
         f'<p style="margin:0;font-size:11px;color:#475569">{notice}</p>'
         "</section>"

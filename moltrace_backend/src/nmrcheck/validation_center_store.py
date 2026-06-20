@@ -1108,34 +1108,63 @@ def _create_signature_row(
     return row
 
 
+# Target types for which a deterministic server-side content snapshot exists. Signing one of these
+# against a missing record is an error (see ``create_record_signature``); any other target type is
+# stored unbound (honest) — the digest simply omits a content binding.
+_BINDABLE_TARGET_TYPES = frozenset({"controlled_record", "system_release"})
+
+
+def _controlled_record_snapshot(row: ControlledRecordORM) -> dict[str, Any]:
+    """Deterministic §11.70 content snapshot for a controlled record. Covers identity + version +
+    the body (via the record's own ``content_hash`` when present, else a hash of identity fields).
+    ``status``, ``locked_at``/``locked_by`` and ``retention_policy_id`` are **intentionally
+    excluded**: they change through the normal lock/retention lifecycle of an already-signed record
+    and must not retroactively invalidate the signature."""
+    base = row.content_hash or _hash_json(
+        {"id": row.id, "title": row.title, "version": row.version, "status": row.status}
+    )
+    return {
+        "controlled_record_id": row.id,
+        "record_type": row.record_type,
+        "resource_id": row.resource_id,
+        "version": row.version,
+        "content_hash": base,
+    }
+
+
+def _system_release_snapshot(row: SystemReleaseRecordORM) -> dict[str, Any]:
+    """Deterministic §11.70 content snapshot for a system release. Covers the identifying NOT-NULL
+    columns plus the test/risk summaries the approval attests to. ``approval_status``/``released_at``
+    and timestamps are excluded — they change *as part of* the approval being signed."""
+    return {
+        "system_release_id": row.id,
+        "release_version": row.release_version,
+        "release_type": row.release_type,
+        "change_summary": row.change_summary,
+        "test_summary": _json_dict(row.test_summary_json),
+        "risk_summary": _json_dict(row.risk_summary_json),
+    }
+
+
 def _resolve_record_content_hash(
     session: Session, target_type: str, target_id: int
 ) -> str | None:
     """Server-side snapshot -> content hash for a signable record (§11.70). Returns None for target
-    types without a deterministic snapshot, so the signature is stored unbound (honest) rather than
-    bound to a guessed/volatile value. Extend per target type as deterministic snapshots are
-    defined."""
+    types not in ``_BINDABLE_TARGET_TYPES`` (genuinely unsupported — stored unbound, honest) **and**
+    when a bindable record is missing; the route treats a None for a bindable type as a not-found
+    error rather than minting an unbound signature (see ``create_record_signature``). The create-time
+    snapshot here is byte-identical to the verify-time one (same helper), so a genuine signature
+    always re-verifies."""
     if target_type == "controlled_record":
         row = session.get(ControlledRecordORM, target_id)
         if row is None:
             return None
-        base = row.content_hash or _hash_json(
-            {"id": row.id, "title": row.title, "version": row.version, "status": row.status}
-        )
-        return esign.compute_record_content_hash(
-            {"controlled_record_id": row.id, "version": row.version, "content_hash": base}
-        )
+        return esign.compute_record_content_hash(_controlled_record_snapshot(row))
     if target_type == "system_release":
         row = session.get(SystemReleaseRecordORM, target_id)
         if row is None:
             return None
-        return esign.compute_record_content_hash(
-            {
-                "system_release_id": row.id,
-                "test_summary": _json_dict(row.test_summary_json),
-                "risk_summary": _json_dict(row.risk_summary_json),
-            }
-        )
+        return esign.compute_record_content_hash(_system_release_snapshot(row))
     return None
 
 
@@ -1186,6 +1215,13 @@ def create_record_signature(
         record_content_hash = _resolve_record_content_hash(
             session, payload.target_type, payload.target_id
         )
+        if record_content_hash is None and payload.target_type in _BINDABLE_TARGET_TYPES:
+            # A bindable target that resolved to no content means the record doesn't exist. Refuse
+            # rather than minting an unbound signature that would silently mask the missing target
+            # and defeat the §11.70 binding promise. KeyError -> 404 at the route.
+            raise KeyError(
+                f"Cannot sign {payload.target_type} {payload.target_id}: record not found."
+            )
         row = _create_signature_row(
             session,
             payload,
@@ -1755,6 +1791,10 @@ def approve_system_release(
     session_factory: sessionmaker[Session],
     release_id: int,
     payload: SystemReleaseApproveRequest,
+    *,
+    signer_user_id: int | None = None,
+    signer_display_name: str | None = None,
+    signer_email: str | None = None,
 ) -> SystemReleaseRecord:
     with session_scope(session_factory) as session:
         row = session.get(SystemReleaseRecordORM, release_id)
@@ -1764,13 +1804,8 @@ def approve_system_release(
         risk_summary = _json_dict(row.risk_summary_json)
         if not test_summary or not risk_summary:
             raise ValidationCenterError("System release approval requires validation test and risk summaries.")
-        release_content_hash = esign.compute_record_content_hash(
-            {
-                "system_release_id": row.id,
-                "test_summary": test_summary,
-                "risk_summary": risk_summary,
-            }
-        )
+        # §11.70: bind the same snapshot the verify path recomputes (shared helper -> byte-identical).
+        release_content_hash = esign.compute_record_content_hash(_system_release_snapshot(row))
         signature = _create_signature_row(
             session,
             ElectronicSignatureRecordCreate(
@@ -1783,6 +1818,10 @@ def approve_system_release(
                 authentication_method=payload.authentication_method,
                 metadata_json=payload.metadata_json,
             ),
+            # §11.100: attribute to the authenticated principal when the route supplies it.
+            signer_user_id=signer_user_id,
+            signer_display_name=signer_display_name,
+            signer_email=signer_email,
             record_content_hash=release_content_hash,
         )
         row.approval_status = "released" if payload.release else "approved"
