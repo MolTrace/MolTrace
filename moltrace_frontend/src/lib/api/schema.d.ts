@@ -7737,6 +7737,27 @@ export interface paths {
         patch: operations["update_reaction_regulatory_constraint_route_reaction_regulatory_constraints__constraint_id__patch"];
         trace?: never;
     };
+    "/reaction-projects/{reaction_project_id}/regulatory-compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Reaction Regulatory Compliance Route
+         * @description Evaluate the project's recorded experiment outcomes against its active regulatory
+         *     constraints (R4 enforcement, read side). Owner-scoped, non-leaking 404.
+         */
+        get: operations["get_reaction_regulatory_compliance_route_reaction_projects__reaction_project_id__regulatory_compliance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reaction-projects/{reaction_project_id}/compliance-objective": {
         parameters: {
             query?: never;
@@ -31965,6 +31986,55 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+        };
+        /** ReactionRegulatoryComplianceItem */
+        ReactionRegulatoryComplianceItem: {
+            /** Experiment Id */
+            experiment_id: number;
+            /** Experiment Code */
+            experiment_code: string;
+            /** Status */
+            status: string;
+            /** Feasible */
+            feasible: boolean;
+            /** Hard Block */
+            hard_block: boolean;
+            /** Penalty */
+            penalty: number;
+            /** Violations */
+            violations?: {
+                [key: string]: unknown;
+            }[];
+            /** Unmeasured */
+            unmeasured?: string[];
+        };
+        /** ReactionRegulatoryComplianceReport */
+        ReactionRegulatoryComplianceReport: {
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /**
+             * Enforced Constraint Count
+             * @default 0
+             */
+            enforced_constraint_count: number;
+            /** Active Constraint Ids */
+            active_constraint_ids?: number[];
+            /** Constraint Bases */
+            constraint_bases?: string[];
+            /**
+             * Experiments Evaluated
+             * @default 0
+             */
+            experiments_evaluated: number;
+            /**
+             * Non Compliant Experiment Count
+             * @default 0
+             */
+            non_compliant_experiment_count: number;
+            /** Items */
+            items?: components["schemas"]["ReactionRegulatoryComplianceItem"][];
+            /** Notes */
+            notes?: string[];
         };
         /** ReactionSafetyConstraintProfile */
         ReactionSafetyConstraintProfile: {
@@ -62063,6 +62133,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RegulatoryConstraintSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_regulatory_compliance_route_reaction_projects__reaction_project_id__regulatory_compliance_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionRegulatoryComplianceReport"];
                 };
             };
             /** @description Validation Error */
