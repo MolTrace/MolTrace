@@ -3668,7 +3668,7 @@ export function ReactionProjectDetail() {
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href="/spectracheck?program=reaction_optimization">
+              <Link href="/reactions">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Link>

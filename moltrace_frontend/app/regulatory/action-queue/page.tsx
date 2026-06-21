@@ -42,7 +42,7 @@ export default function RegulatoryActionQueuePage() {
               <CardDescription>
                 GET /regulatory/action-items · PATCH /regulatory/action-items/{"{action_item_id}"} · POST
                 /regulatory/action-items. Dossier context:{" "}
-                <Link href="/spectracheck?program=regulatory_hub" className="underline-offset-4 hover:underline">
+                <Link href="/regulatory" className="underline-offset-4 hover:underline">
                   Regulatory home
                 </Link>
                 .
