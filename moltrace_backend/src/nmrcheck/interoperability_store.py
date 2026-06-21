@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from . import orchestration_store as orch_store
+from . import reaction_access
 from .database import session_scope
 from .models import (
     ConnectorCredentialReference,
@@ -1686,7 +1687,16 @@ def import_reaction_experiment_table(
     payload: ReactionExperimentTableImportRequest,
     *,
     storage_root: Path,
+    owner_scope_id: int | None = None,
 ) -> IntegrationImportResponse:
+    # Owner-scope the body-supplied reaction_project_id (the path gate cannot reach it): a
+    # non-owner importing into another tenant's project gets a non-leaking 404.
+    if payload.reaction_project_id is not None:
+        with session_scope(session_factory) as session:
+            if not reaction_access.reaction_project_owned_by(
+                session, payload.reaction_project_id, owner_scope_id
+            ):
+                raise KeyError("Reaction project not found.")
     normalization = normalize_file(
         session_factory,
         payload.file_id,
@@ -1736,7 +1746,18 @@ def import_reaction_experiment_table(
 def export_reaction_experiments(
     session_factory: sessionmaker[Session],
     payload: ReactionApprovedExperimentsExportRequest,
+    *,
+    owner_scope_id: int | None = None,
 ) -> IntegrationImportResponse:
+    # Owner-scope every body-supplied experiment id (each resolves to a project): a non-owner
+    # cannot export another tenant's experiments. Non-leaking 404 on the first unowned id.
+    if owner_scope_id is not None and payload.experiment_ids_json:
+        with session_scope(session_factory) as session:
+            for experiment_id in payload.experiment_ids_json:
+                if not reaction_access.reaction_experiment_owned_by(
+                    session, experiment_id, owner_scope_id
+                ):
+                    raise KeyError("Reaction experiment not found.")
     sync = create_outbound_sync_job(
         session_factory,
         OutboundSyncJobCreate(

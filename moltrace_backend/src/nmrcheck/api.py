@@ -13679,6 +13679,7 @@ def import_reaction_experiment_table_route(
             _state(request).session_factory,
             payload,
             storage_root=_orchestration_storage_root(request),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_interoperability_http_error(exc)
@@ -13707,7 +13708,9 @@ def export_reaction_experiments_route(
     context: AccessContext = Depends(require_access_context),
 ) -> IntegrationImportResponse:
     try:
-        record = interop_store.export_reaction_experiments(_state(request).session_factory, payload)
+        record = interop_store.export_reaction_experiments(
+            _state(request).session_factory, payload, owner_scope_id=_user_scope_for_context(context)
+        )
     except Exception as exc:
         _raise_interoperability_http_error(exc)
         raise
@@ -20592,6 +20595,7 @@ def list_regulatory_to_reaction_bridges_route(
         _state(request).session_factory,
         reaction_project_id=reaction_project_id,
         limit=limit,
+        owner_scope_id=_user_scope_for_context(context),
     )
 
 
@@ -20606,9 +20610,11 @@ def get_regulatory_to_reaction_bridge_route(
     context: AccessContext = Depends(require_access_context),
 ) -> RegulatoryToReactionBridge:
     record = product_store.get_regulatory_to_reaction_bridge(
-        _state(request).session_factory, bridge_id
+        _state(request).session_factory,
+        bridge_id,
+        owner_scope_id=_user_scope_for_context(context),
     )
-    if record is None or not _readable_via_parent_dossier(request, context, record.dossier_id):
+    if record is None:
         raise HTTPException(status_code=404, detail="Regulatory-to-reaction bridge not found.")
     return record
 
@@ -20630,6 +20636,7 @@ def review_regulatory_to_reaction_bridge_route(
             bridge_id,
             payload,
             actor=_product_actor(context),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_product_http_error(exc)
