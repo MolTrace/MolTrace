@@ -236,6 +236,10 @@ jobs:
       # exporter is a PREVIEW feature and emits spec v1.5 (see docs/supply_chain_provenance.md).
       - name: Generate backend SBOM
         run: uv export --format cyclonedx1.5 --no-emit-project -o sbom-backend.cdx.json
+      # Fail-closed if the SBOM isn't well-formed JSON, so a corrupt/empty file can't be attested
+      # then "verified" and shipped as a compliance artifact.
+      - name: Validate backend SBOM
+        run: python3 -c "import json; json.load(open('sbom-backend.cdx.json')); print('backend SBOM is valid JSON')"
       - name: Upload backend SBOM
         uses: actions/upload-artifact@v4
         with:
@@ -263,8 +267,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: moltrace_frontend/pnpm-lock.yaml
       # pnpm's built-in SBOM (pnpm >= 11). --lockfile-only avoids a full install; emits CycloneDX 1.7.
+      # --silent suppresses pnpm log lines that would otherwise leak into the redirected stdout and
+      # corrupt the JSON (pnpm prints some notices to stdout, not stderr).
       - name: Generate frontend SBOM
-        run: pnpm sbom --sbom-format cyclonedx --prod --lockfile-only > sbom-frontend.cdx.json
+        run: pnpm sbom --silent --sbom-format cyclonedx --prod --lockfile-only > sbom-frontend.cdx.json
+      # Fail-closed if the SBOM isn't well-formed JSON (e.g. a stray log line leaked into stdout).
+      - name: Validate frontend SBOM
+        run: node -e "JSON.parse(require('fs').readFileSync('sbom-frontend.cdx.json','utf8')); console.log('frontend SBOM is valid JSON')"
       - name: Upload frontend SBOM
         uses: actions/upload-artifact@v4
         with:
