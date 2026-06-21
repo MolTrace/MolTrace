@@ -3432,6 +3432,7 @@ def create_reaction_project_route(
         _state(request).session_factory,
         payload,
         actor=_reaction_actor(context),
+        owner_scope_id=_user_scope_for_context(context),
     )
 
 

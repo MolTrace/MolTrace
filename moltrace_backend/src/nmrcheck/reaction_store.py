@@ -85,9 +85,19 @@ def create_project(
     payload: ReactionProjectCreate,
     *,
     actor: ReactionActor,
+    owner_scope_id: int | None = None,
 ) -> ReactionProject:
     with session_scope(session_factory) as session:
-        owner_id = payload.owner_id if payload.owner_id is not None else actor.user_id
+        # User-scoped callers cannot plant rows in another tenant: a body ``owner_id`` is
+        # silently overridden with the caller's id, so a non-system caller is structurally
+        # incapable of creating a project owned by anyone else. ``owner_scope_id`` is
+        # threaded through from the route via ``_user_scope_for_context`` — ``None`` for a
+        # system api-key / admin, who keep the prior "trust the body" behavior used for
+        # seeding and restores.
+        if owner_scope_id is not None:
+            owner_id: int | None = owner_scope_id
+        else:
+            owner_id = payload.owner_id if payload.owner_id is not None else actor.user_id
         row = ReactionProjectORM(
             name=payload.name,
             description=payload.description,
