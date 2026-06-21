@@ -17,6 +17,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from . import orchestration_store as orch_store
 from . import reaction_access
+# `_dossier_owned_by` is the canonical session-scoped dossier-ownership predicate used by the
+# cross-module routes the 7a8a52d fix landed; reusing it here keeps the body-id check identical.
+from .product_orchestration_store import _dossier_owned_by
 from .database import session_scope
 from .models import (
     ConnectorCredentialReference,
@@ -70,8 +73,12 @@ from .orm import (
     ManagedFileRecordORM,
     MappingTemplateORM,
     OutboundSyncJobORM,
+    ReactionExperimentORM,
+    ReactionProjectORM,
     RegulatoryDossierORM,
     RegulatorySubmissionPackageORM,
+    SpectraCheckProjectORM,
+    SpectraCheckSessionORM,
     WebhookSubscriptionORM,
     utcnow,
 )
@@ -1347,9 +1354,40 @@ def update_mapping_template(
         return _mapping_template_to_record(row)
 
 
+# Source-resource-type → in-session ownership predicate for outbound sync jobs and any other
+# typed body-id route. A type the table doesn't list is hidden under user scope (the SQL
+# filter excludes unknown types from the user's list, and the create predicate returns False).
+def _outbound_resource_owned_by(
+    session: Session,
+    source_resource_type: str,
+    source_resource_id: int | None,
+    owner_scope_id: int | None,
+) -> bool:
+    if owner_scope_id is None:
+        return True
+    if source_resource_type == "reaction_project":
+        return reaction_access.reaction_project_owned_by(
+            session, source_resource_id, owner_scope_id
+        )
+    if source_resource_type == "reaction_experiment":
+        return reaction_access.reaction_experiment_owned_by(
+            session, source_resource_id, owner_scope_id
+        )
+    if source_resource_type == "regulatory_dossier":
+        return _dossier_owned_by(session, source_resource_id, owner_scope_id)
+    if source_resource_type == "spectracheck_session":
+        return _spectracheck_session_owned_by(session, source_resource_id, owner_scope_id)
+    # Unknown type under user scope: hide. The list filter below uses the same enumeration, so
+    # a user-scoped caller can't create or list a job whose source_resource_type is unknown to
+    # the predicate set — extend both sites in lockstep when adding a new typed source.
+    return False
+
+
 def create_outbound_sync_job(
     session_factory: sessionmaker[Session],
     payload: OutboundSyncJobCreate,
+    *,
+    owner_scope_id: int | None = None,
 ) -> OutboundSyncJob:
     warnings = list(payload.warnings_json)
     status = payload.status
@@ -1359,6 +1397,13 @@ def create_outbound_sync_job(
     notes = list(payload.notes_json)
     notes.append("Outbound sync is reviewable; no external status update is performed by this create action.")
     with session_scope(session_factory) as session:
+        # Owner-scope the body-supplied source resource (the path gate cannot reach it): a
+        # non-owner referencing another tenant's reaction project / dossier / etc. gets a
+        # non-leaking 404. System/admin (owner_scope_id None) stays unrestricted.
+        if not _outbound_resource_owned_by(
+            session, payload.source_resource_type, payload.source_resource_id, owner_scope_id
+        ):
+            raise KeyError("Source resource not found.")
         _ensure_connector(session, payload.connector_id)
         row = OutboundSyncJobORM(
             connector_id=payload.connector_id,
@@ -1382,11 +1427,64 @@ def list_outbound_sync_jobs(
     *,
     status_filter: str | None = None,
     limit: int = 200,
+    owner_scope_id: int | None = None,
 ) -> list[OutboundSyncJob]:
     with session_scope(session_factory) as session:
-        stmt = select(OutboundSyncJobORM).order_by(OutboundSyncJobORM.id.desc()).limit(limit)
+        stmt = select(OutboundSyncJobORM).order_by(OutboundSyncJobORM.id.desc())
         if status_filter:
             stmt = stmt.where(OutboundSyncJobORM.status == status_filter)
+        if owner_scope_id is not None:
+            # Owner-filter IN SQL BEFORE the .limit() — a post-.limit() Python filter would
+            # silently drop owned rows behind another tenant's jobs on a busy table. Build the
+            # union of every typed-resource ownership join the predicate set knows about; an
+            # unknown source_resource_type is excluded (safe default).
+            owned_reaction_projects = select(ReactionProjectORM.id).where(
+                ReactionProjectORM.owner_id == owner_scope_id
+            )
+            owned_reaction_experiments = (
+                select(ReactionExperimentORM.id)
+                .join(
+                    ReactionProjectORM,
+                    ReactionProjectORM.id == ReactionExperimentORM.reaction_project_id,
+                )
+                .where(ReactionProjectORM.owner_id == owner_scope_id)
+            )
+            owned_dossiers = select(RegulatoryDossierORM.id).where(
+                RegulatoryDossierORM.created_by_user_id == owner_scope_id
+            )
+            owned_spectracheck_sessions = (
+                select(SpectraCheckSessionORM.id)
+                .join(
+                    SpectraCheckProjectORM,
+                    SpectraCheckProjectORM.id == SpectraCheckSessionORM.project_id,
+                )
+                .where(SpectraCheckProjectORM.owner_id == owner_scope_id)
+            )
+            # Local import keeps the top-level import minimal — these are the only sites that
+            # need ``and_``/``or_``, all in this filter block.
+            from sqlalchemy import and_, or_
+
+            stmt = stmt.where(
+                or_(
+                    and_(
+                        OutboundSyncJobORM.source_resource_type == "reaction_project",
+                        OutboundSyncJobORM.source_resource_id.in_(owned_reaction_projects),
+                    ),
+                    and_(
+                        OutboundSyncJobORM.source_resource_type == "reaction_experiment",
+                        OutboundSyncJobORM.source_resource_id.in_(owned_reaction_experiments),
+                    ),
+                    and_(
+                        OutboundSyncJobORM.source_resource_type == "regulatory_dossier",
+                        OutboundSyncJobORM.source_resource_id.in_(owned_dossiers),
+                    ),
+                    and_(
+                        OutboundSyncJobORM.source_resource_type == "spectracheck_session",
+                        OutboundSyncJobORM.source_resource_id.in_(owned_spectracheck_sessions),
+                    ),
+                )
+            )
+        stmt = stmt.limit(limit)
         return [_sync_job_to_record(row) for row in session.scalars(stmt).all()]
 
 
@@ -1564,10 +1662,41 @@ def get_submission_package(
         return _submission_package_to_record(row) if row is not None else None
 
 
+def _spectracheck_session_owned_by(
+    session: Session, session_id: int | None, owner_scope_id: int | None
+) -> bool:
+    """In-session ownership predicate for a SpectraCheck session, resolved via its parent
+    project's ``owner_id``. Mirrors :func:`reaction_access.reaction_experiment_owned_by`'s
+    parent-hop pattern. System/admin scope (``owner_scope_id is None``) sees all; otherwise the
+    session must exist, its project must exist, and the project's owner must match — a missing
+    session, a missing project, or a NULL/mismatched owner is False, so the route returns a
+    non-leaking 404."""
+    if owner_scope_id is None:
+        return True
+    if session_id is None:
+        return False
+    sc_session = session.get(SpectraCheckSessionORM, session_id)
+    if sc_session is None:
+        return False
+    project = session.get(SpectraCheckProjectORM, sc_session.project_id)
+    return project is not None and project.owner_id == owner_scope_id
+
+
 def import_spectracheck_file(
     session_factory: sessionmaker[Session],
     payload: SpectraCheckImportFileRequest,
+    *,
+    owner_scope_id: int | None = None,
 ) -> IntegrationImportResponse:
+    # Owner-scope the body-supplied spectracheck_session_id (the path gate cannot reach it):
+    # a non-owner stitching an external link onto another tenant's session gets a non-leaking
+    # 404. System/admin (owner_scope_id None) stays unrestricted.
+    if payload.spectracheck_session_id is not None:
+        with session_scope(session_factory) as session:
+            if not _spectracheck_session_owned_by(
+                session, payload.spectracheck_session_id, owner_scope_id
+            ):
+                raise KeyError("SpectraCheck session not found.")
     with session_scope(session_factory) as session:
         file_row = session.get(ManagedFileRecordORM, payload.file_id)
         if file_row is None:
@@ -1623,7 +1752,16 @@ def import_spectracheck_file(
 def import_regulatory_source(
     session_factory: sessionmaker[Session],
     payload: RegulatoryImportSourceRequest,
+    *,
+    owner_scope_id: int | None = None,
 ) -> IntegrationImportResponse:
+    # Owner-scope the body-supplied dossier_id (the path gate cannot reach it): a non-owner
+    # stitching an external evidence link onto another tenant's dossier gets a non-leaking 404.
+    # System/admin (owner_scope_id None) stays unrestricted.
+    if payload.dossier_id is not None:
+        with session_scope(session_factory) as session:
+            if not _dossier_owned_by(session, payload.dossier_id, owner_scope_id):
+                raise KeyError("Regulatory dossier not found.")
     with session_scope(session_factory) as session:
         file_row = session.get(ManagedFileRecordORM, payload.file_id)
         if file_row is None:

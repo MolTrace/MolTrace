@@ -13413,7 +13413,11 @@ def create_outbound_sync_job_route(
     context: AccessContext = Depends(require_access_context),
 ) -> OutboundSyncJob:
     try:
-        record = interop_store.create_outbound_sync_job(_state(request).session_factory, payload)
+        record = interop_store.create_outbound_sync_job(
+            _state(request).session_factory,
+            payload,
+            owner_scope_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
         _raise_interoperability_http_error(exc)
         raise
@@ -13444,6 +13448,7 @@ def list_outbound_sync_jobs_route(
         _state(request).session_factory,
         status_filter=status_filter,
         limit=limit,
+        owner_scope_id=_user_scope_for_context(context),
     )
 
 
@@ -13620,7 +13625,11 @@ def import_spectracheck_file_route(
     context: AccessContext = Depends(require_access_context),
 ) -> IntegrationImportResponse:
     try:
-        record = interop_store.import_spectracheck_file(_state(request).session_factory, payload)
+        record = interop_store.import_spectracheck_file(
+            _state(request).session_factory,
+            payload,
+            owner_scope_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
         _raise_interoperability_http_error(exc)
         raise
@@ -13648,7 +13657,11 @@ def import_regulatory_source_route(
     context: AccessContext = Depends(require_access_context),
 ) -> IntegrationImportResponse:
     try:
-        record = interop_store.import_regulatory_source(_state(request).session_factory, payload)
+        record = interop_store.import_regulatory_source(
+            _state(request).session_factory,
+            payload,
+            owner_scope_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
         _raise_interoperability_http_error(exc)
         raise
