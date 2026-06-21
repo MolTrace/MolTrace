@@ -209,9 +209,135 @@ jobs:
       - name: Verify regulatory compliance-MLOps gate fails closed
         run: uv run python -m moltrace.regulatory.ops --self-check
 
+  # ---------------------------------------------------------------------------
+  # Security Prompt 15 — SBOM + SLSA provenance + keyless Sigstore attestation,
+  # with a verify-at-deploy gate. Deploy-hook-honest: CI proves and gates the
+  # SOURCE + dependency closure (SBOM) at the gated commit and refuses to fire
+  # the Vercel/Render deploy hooks unless the attestations verify. It does NOT
+  # attest the artifact the platforms rebuild downstream — that build runs
+  # outside CI's signing boundary (documented in docs/supply_chain_provenance.md).
+  # ---------------------------------------------------------------------------
+  sbom-backend:
+    name: SBOM · backend (CycloneDX)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: moltrace_backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13.5"
+          enable-cache: true
+          cache-dependency-glob: moltrace_backend/uv.lock
+      # CycloneDX SBOM straight from uv.lock (no project build needed). NOTE: uv's CycloneDX
+      # exporter is a PREVIEW feature and emits spec v1.5 (see docs/supply_chain_provenance.md).
+      - name: Generate backend SBOM
+        run: uv export --format cyclonedx1.5 --no-emit-project -o sbom-backend.cdx.json
+      - name: Upload backend SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-backend
+          path: moltrace_backend/sbom-backend.cdx.json
+          if-no-files-found: error
+
+  sbom-frontend:
+    name: SBOM · frontend (CycloneDX)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: moltrace_frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 11.0.3
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+          cache-dependency-path: moltrace_frontend/pnpm-lock.yaml
+      # pnpm's built-in SBOM (pnpm >= 11). --lockfile-only avoids a full install; emits CycloneDX 1.7.
+      - name: Generate frontend SBOM
+        run: pnpm sbom --sbom-format cyclonedx --prod --lockfile-only > sbom-frontend.cdx.json
+      - name: Upload frontend SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-frontend
+          path: moltrace_frontend/sbom-frontend.cdx.json
+          if-no-files-found: error
+
+  attest:
+    name: Attest · SLSA provenance (keyless Sigstore)
+    needs: [sbom-backend, sbom-frontend]
+    # Mint attestations only for release commits (push to main). Fully keyless via Sigstore /
+    # Fulcio / Rekor + the Actions OIDC token — no stored key, no external account.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC token -> Fulcio short-lived signing cert (keyless)
+      attestations: write # persist the SLSA provenance to the repo attestation store
+      contents: read
+    steps:
+      - name: Download backend SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-backend
+          path: sbom-artifacts
+      - name: Download frontend SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-frontend
+          path: sbom-artifacts
+      - name: Attest SLSA build provenance for both SBOMs
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: "sbom-artifacts/sbom-backend.cdx.json,sbom-artifacts/sbom-frontend.cdx.json"
+
+  verify-provenance:
+    name: Verify provenance · supply-chain gate
+    needs: [attest]
+    # Separate gating job (NOT an in-deploy step) so a verify failure stops EVERY deploy hook —
+    # the deploy job's hook steps use `if: always()`, which a failed in-job step would not block.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - name: Download backend SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-backend
+          path: sbom-artifacts
+      - name: Download frontend SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-frontend
+          path: sbom-artifacts
+      # Verify the EXACT attested artifacts (same-run download — digests match by construction; no
+      # nondeterministic regeneration). Fail-closed: any verification failure blocks the deploy job.
+      - name: Verify SLSA provenance for both SBOMs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for sbom in sbom-backend.cdx.json sbom-frontend.cdx.json; do
+            echo "::group::gh attestation verify $sbom"
+            gh attestation verify "sbom-artifacts/$sbom" \
+              --repo sirmcdoe/MolTrace \
+              --signer-workflow sirmcdoe/MolTrace/.github/workflows/ci-cd.yml
+            echo "::endgroup::"
+          done
+
   deploy:
     name: Deploy · Vercel + Render (FE + BE)
-    needs: [frontend-tests, backend-tests, deployment-gate]
+    needs: [frontend-tests, backend-tests, deployment-gate, verify-provenance]
     # Only deploy when both gates passed on a direct push to main (not PRs,
     # not manual reruns of feature branches).
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
