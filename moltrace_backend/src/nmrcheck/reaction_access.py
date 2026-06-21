@@ -108,6 +108,36 @@ def reaction_owner_id(
         return _project_owner(session, project_id)
 
 
+def reaction_project_owned_by(
+    session: Session, project_id: int | None, owner_scope_id: int | None
+) -> bool:
+    """Whether a caller scoped to ``owner_scope_id`` may act on a reaction project.
+
+    For **body-supplied** project ids that the path-based ``require_reaction_access`` gate cannot
+    reach (cross-module import/export/bridge routes). ``owner_scope_id is None`` means a system
+    api-key / admin (unrestricted). Otherwise the project must exist and be owned by the caller; a
+    missing project, ``None`` id, or owner mismatch is False, so the route returns a non-leaking
+    404.
+    """
+    if owner_scope_id is None:
+        return True
+    return _project_owner(session, project_id) == owner_scope_id
+
+
+def reaction_experiment_owned_by(
+    session: Session, experiment_id: int | None, owner_scope_id: int | None
+) -> bool:
+    """Whether the caller owns a reaction experiment, resolved via its parent project."""
+    if owner_scope_id is None:
+        return True
+    if experiment_id is None:
+        return False
+    experiment = session.get(ReactionExperimentORM, experiment_id)
+    if experiment is None:
+        return False
+    return _project_owner(session, experiment.reaction_project_id) == owner_scope_id
+
+
 def reaction_route_owner_id(
     session_factory: sessionmaker[Session],
     route_path: str,

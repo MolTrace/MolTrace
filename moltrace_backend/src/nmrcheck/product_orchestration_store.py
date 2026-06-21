@@ -9,6 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import reaction_access
 from .database import session_scope
 from .models import (
     ComplianceDrivenOptimizationObjective,
@@ -440,6 +441,10 @@ def create_regulatory_to_reaction_bridge(
             dossier.reaction_project_id if dossier is not None else None
         )
         project = _required(session, ReactionProjectORM, reaction_project_id, "Reaction project")
+        # Owner-scope the body-supplied reaction project (dossier ownership is already enforced via
+        # _regulatory_action_rows / _resolve_r2r_dossier): a non-owner cannot bridge onto it.
+        if not reaction_access.reaction_project_owned_by(session, project.id, owner_scope_id):
+            raise ProductOrchestrationNotFoundError("Reaction project not found.")
         warnings: list[str] = []
         notes = [_PRODUCT_RULE_NOTE, _REVIEW_NOTE]
         constraints: list[dict[str, Any]] = []
@@ -542,6 +547,7 @@ def list_regulatory_to_reaction_bridges(
     *,
     reaction_project_id: int | None = None,
     limit: int = 500,
+    owner_scope_id: int | None = None,
 ) -> list[RegulatoryToReactionBridge]:
     with session_scope(session_factory) as session:
         stmt = select(RegulatoryToReactionBridgeORM).order_by(
@@ -551,16 +557,36 @@ def list_regulatory_to_reaction_bridges(
             stmt = stmt.where(
                 RegulatoryToReactionBridgeORM.reaction_project_id == reaction_project_id
             )
+        # Owner-scope in SQL (a bridge is visible if its dossier OR its reaction project is owned)
+        # so the filter runs BEFORE the limit — post-filtering after .limit() could silently drop a
+        # user's own bridges. System/admin (owner_scope_id None) sees all.
+        if owner_scope_id is not None:
+            owned_dossiers = select(RegulatoryDossierORM.id).where(
+                RegulatoryDossierORM.created_by_user_id == owner_scope_id
+            )
+            owned_projects = select(ReactionProjectORM.id).where(
+                ReactionProjectORM.owner_id == owner_scope_id
+            )
+            stmt = stmt.where(
+                or_(
+                    RegulatoryToReactionBridgeORM.dossier_id.in_(owned_dossiers),
+                    RegulatoryToReactionBridgeORM.reaction_project_id.in_(owned_projects),
+                )
+            )
         return [_r2r_to_record(row) for row in session.scalars(stmt.limit(limit)).all()]
 
 
 def get_regulatory_to_reaction_bridge(
     session_factory: sessionmaker[Session],
     bridge_id: int,
+    *,
+    owner_scope_id: int | None = None,
 ) -> RegulatoryToReactionBridge | None:
     with session_scope(session_factory) as session:
         row = session.get(RegulatoryToReactionBridgeORM, bridge_id)
-        return _r2r_to_record(row) if row is not None else None
+        if row is None or not _r2r_bridge_owned_by(session, row, owner_scope_id):
+            return None
+        return _r2r_to_record(row)
 
 
 def review_regulatory_to_reaction_bridge(
@@ -569,10 +595,11 @@ def review_regulatory_to_reaction_bridge(
     payload: CrossModuleBridgeReviewRequest,
     *,
     actor: ProductOrchestrationActor,
+    owner_scope_id: int | None = None,
 ) -> RegulatoryToReactionBridge | None:
     with session_scope(session_factory) as session:
         row = session.get(RegulatoryToReactionBridgeORM, bridge_id)
-        if row is None:
+        if row is None or not _r2r_bridge_owned_by(session, row, owner_scope_id):
             return None
         metadata = _json_dict(row.metadata_json)
         metadata["review"] = {
@@ -1057,6 +1084,24 @@ def _dossier_owned_by(session: Session, dossier_id: int | None, owner_scope_id: 
         return False
     row = session.get(RegulatoryDossierORM, dossier_id)
     return row is not None and row.created_by_user_id == owner_scope_id
+
+
+def _r2r_bridge_owned_by(
+    session: Session,
+    row: RegulatoryToReactionBridgeORM,
+    owner_scope_id: int | None,
+) -> bool:
+    """A regulatory-to-reaction bridge is visible to a caller who owns **either** its linked
+    dossier **or** its reaction project (system/admin scope ``None`` sees all). Both roots are
+    nullable; every bridge has a reaction project, so that is the effective fallback. A user owning
+    neither gets a non-leaking 404 at the route."""
+    if owner_scope_id is None:
+        return True
+    if _dossier_owned_by(session, row.dossier_id, owner_scope_id):
+        return True
+    return reaction_access.reaction_project_owned_by(
+        session, row.reaction_project_id, owner_scope_id
+    )
 
 
 def _resolve_dossier(
