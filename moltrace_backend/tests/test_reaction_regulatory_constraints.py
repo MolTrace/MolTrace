@@ -1,6 +1,7 @@
 """Unit tests for the Repho R4 regulatory-constraint enforcement engine (pure, no DB/HTTP)."""
 
 from nmrcheck.reaction_regulatory_constraints import (
+    build_impurity_limit_fields,
     enforce,
     evaluate_candidate,
     parse_limit,
@@ -206,3 +207,40 @@ def test_enforce_with_no_enforceable_constraints_is_a_noop():
     result = enforce([{"impurity_percent": 99.0}], bare)
     assert result.verdicts[0].feasible is True
     assert result.diagnostics()["enforced_constraint_count"] == 0
+
+
+# --- build_impurity_limit_fields (enrichment / write side of the contract) --------------------
+
+
+def test_build_impurity_limit_fields_from_action_metadata_round_trips():
+    fields = build_impurity_limit_fields(
+        "impurity_identification",
+        {"threshold_percent": 0.15, "observed_level_percent": 0.42},
+    )
+    assert fields["limit_value"] == 0.15
+    assert fields["objective_field"] == "impurity_percent"
+    assert fields["comparator"] == "max"
+    assert fields["limit_unit"] == "percent"
+    assert "identification" in fields["limit_basis"]
+    assert fields["observed_level_percent"] == 0.42
+    # the enriched fields parse back as an enforceable limit (write side meets read side)
+    limit = parse_limit(
+        {
+            "id": 1,
+            "constraint_type": "impurity_limit",
+            "severity": "high",
+            "status": "active",
+            "constraint_json": fields,
+        }
+    )
+    assert limit is not None
+    assert limit.limit_value == 0.15
+    assert limit.objective_field == "impurity_percent"
+
+
+def test_build_impurity_limit_fields_empty_without_a_threshold():
+    # no threshold from the regulatory engine -> no invented number (stays advisory)
+    assert build_impurity_limit_fields("impurity_reporting", {}) == {}
+    assert (
+        build_impurity_limit_fields("impurity_reporting", {"observed_level_percent": 0.3}) == {}
+    )

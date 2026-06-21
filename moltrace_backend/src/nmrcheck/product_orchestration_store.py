@@ -62,6 +62,7 @@ from .orm import (
     SpectroscopyToRegulatoryBridgeORM,
     utcnow,
 )
+from .reaction_regulatory_constraints import build_impurity_limit_fields
 
 
 class ProductOrchestrationError(ValueError):
@@ -453,6 +454,15 @@ def create_regulatory_to_reaction_bridge(
                 "compliance_driven_optimization_constraint": True,
                 "requires_review": True,
             }
+            # R4 enrichment: give an impurity_limit constraint the numeric ICH threshold from its
+            # source action item so the compliance engine can enforce it once activated. Other
+            # constraint types stay provenance-only (advisory) until a limit is set.
+            if constraint_type == "impurity_limit":
+                constraint_json.update(
+                    build_impurity_limit_fields(
+                        action.action_type, _json_dict(action.metadata_json)
+                    )
+                )
             row = RegulatoryConstraintSetORM(
                 reaction_project_id=project.id,
                 dossier_id=action.dossier_id or (dossier.id if dossier is not None else None),

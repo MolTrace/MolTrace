@@ -203,6 +203,41 @@ def parse_limits(constraints: Iterable[Mapping[str, Any]]) -> list[RegulatoryLim
     return out
 
 
+_IMPURITY_LIMIT_BASIS = {
+    "impurity_identification": "ICH Q3A/B identification threshold",
+    "impurity_reporting": "ICH Q3A/B reporting threshold",
+    "impurity_qualification": "ICH Q3A/B qualification threshold",
+}
+
+
+def build_impurity_limit_fields(
+    action_type: str, action_metadata: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Derive the numeric ``constraint_json`` fields for an ``impurity_limit`` constraint from the
+    regulatory impurity action item that produced it (the bridge-enrichment slice — the *write*
+    side of the contract that :func:`parse_limit` reads).
+
+    The action carries the ICH threshold it tripped (``threshold_percent``); that threshold is the
+    limit future experiments must stay under. Returns ``{}`` when no numeric threshold is present,
+    leaving the constraint advisory until a limit is set manually — so enrichment never invents a
+    number the regulatory engine did not produce.
+    """
+    threshold = _coerce_float(action_metadata.get("threshold_percent"))
+    if threshold is None:
+        return {}
+    fields: dict[str, Any] = {
+        "limit_value": threshold,
+        "limit_unit": "percent",
+        "objective_field": "impurity_percent",
+        "comparator": "max",
+        "limit_basis": _IMPURITY_LIMIT_BASIS.get(action_type, "ICH Q3A/B impurity threshold"),
+    }
+    observed = _coerce_float(action_metadata.get("observed_level_percent"))
+    if observed is not None:
+        fields["observed_level_percent"] = observed
+    return fields
+
+
 def _violation_fraction(predicted: float, limit: RegulatoryLimit) -> float:
     """Fractional overshoot in [0, 1] for the soft penalty (0 == at/within the limit)."""
     denom = abs(limit.limit_value) if abs(limit.limit_value) > _EPS else 1.0
