@@ -70,10 +70,12 @@ Non-owner → non-leaking **404** (owner/system/admin only).
 ## 5. How a constraint becomes enforceable (important)
 A constraint is only enforced if its `constraint_json` carries a numeric `limit_value` (+ optional
 `objective_field`/`comparator`/`limit_unit`/`limit_basis`; default field per `constraint_type`,
-e.g. `impurity_limit` → `impurity_percent` / `max`). Today those numbers are set via the existing
-**regulatory-constraints structured editor** (Phase 7.4) — so the editor and this compliance panel
-are two halves of one workflow. (Backend follow-up will auto-derive limits from the dossier's
-ICH Q3A/B context at bridge-creation time; until then, advisory when no numeric limit is set.)
+e.g. `impurity_limit` → `impurity_percent` / `max`). These numbers arrive two ways: (1) the
+`/bridges/regulatory-to-reaction` bridge now **auto-derives** the ICH threshold from the dossier's
+impurity action item into the constraint at creation, and (2) the existing **regulatory-constraints
+structured editor** (Phase 7.4) lets a reviewer set/adjust them by hand — so the editor and this
+compliance panel are two halves of one workflow. Bridge-created constraints are `draft` until
+activated (status → `active` via the editor's PATCH), at which point they are enforced.
 
 ## 6. Verify (FE session)
 - `npm run test` (vitest/jsdom) for the panel; mock `apiFetch`.
