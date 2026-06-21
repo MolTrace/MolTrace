@@ -20871,6 +20871,7 @@ def create_cross_module_action_item_route(
             _state(request).session_factory,
             payload,
             actor=_product_actor(context),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_product_http_error(exc)
@@ -20892,6 +20893,7 @@ def list_cross_module_action_items_route(
         _state(request).session_factory,
         status=status_filter,
         limit=limit,
+        owner_scope_id=_user_scope_for_context(context),
     )
 
 
@@ -20912,6 +20914,7 @@ def update_cross_module_action_item_route(
             action_item_id,
             payload,
             actor=_product_actor(context),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_product_http_error(exc)
