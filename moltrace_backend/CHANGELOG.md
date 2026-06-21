@@ -14,6 +14,40 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.54.0 — Security Prompt 15: SBOM, provenance & signing (2026-06-21)
+
+**Headline:** Completes the secure-SDLC / signed-supply-chain pillar (P2). Adds, to `ci-cd.yml`, a
+**CycloneDX SBOM per build**, **SLSA build provenance signed keylessly via Sigstore**, and a
+**verify-at-deploy gate** so nothing reaches the deploy hooks unsigned:
+
+- **SBOM** — `sbom-backend` job: `uv export --format cyclonedx1.5` from `uv.lock` (CycloneDX 1.5,
+  uv's preview exporter). `sbom-frontend` job: `pnpm sbom --sbom-format cyclonedx` (pnpm ≥ 11's
+  built-in generator, CycloneDX 1.7) from `pnpm-lock.yaml`. Both upload as per-run artifacts.
+- **Provenance + signing** — `attest` job (push-to-`main` only) mints SLSA `provenance/v1` over both
+  SBOMs via `actions/attest-build-provenance@v4`, **fully keyless** (Actions OIDC → Sigstore/Fulcio/
+  Rekor; no stored key, no external account); attestations persist to the repo attestation store.
+- **Verify-at-deploy** — a separate `verify-provenance` job downloads the **exact attested SBOM
+  artifacts** (same run) and runs `gh attestation verify … --signer-workflow …`; `deploy` now
+  `needs: verify-provenance`, so a verification failure blocks **every** deploy hook. It is a gating
+  *job* (not an in-`deploy` step) precisely because the hook steps use `if: always()` — only an
+  unmet `needs:` stops them all. Provenance is queryable per release via `gh attestation verify` /
+  the attestations API.
+
+**Deploy-hook-honest:** Vercel/Render rebuild from source *after* the hook, outside CI's signing
+boundary, so the attestation covers the **source + dependency closure at the gated commit**, not the
+platform-served artifact (there is no CI-built image to sign). The gate is only effective with
+platform auto-deploy disabled (already the case). **No application code changed** — CI/repo config +
+docs only.
+
+### Added
+- **`.github/workflows/ci-cd.yml`** jobs `sbom-backend`, `sbom-frontend`, `attest`,
+  `verify-provenance`; `deploy` gated on `verify-provenance`.
+- **`docs/supply_chain_provenance.md`** — SBOM generators + versions, attestation predicate, the
+  verify-at-deploy gate + why it's a separate job, per-release queryability, and the honest
+  deploy-hook / preview-exporter / private-repo-Sigstore limitations.
+
+---
+
 ## v0.53.0 — Security Prompt 14: Secure-SDLC CI gates (2026-06-20)
 
 **Headline:** Opens the secure-SDLC / signed-supply-chain pillar (P2). Adds automated security
