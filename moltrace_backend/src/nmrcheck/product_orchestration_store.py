@@ -49,6 +49,7 @@ from .orm import (
     ModulePriorityMapORM,
     ProductProgramRegistryORM,
     QNMRComplianceProfileORM,
+    ReactionExperimentORM,
     ReactionProjectORM,
     RegulatoryActionItemORM,
     RegulatoryConstraintSetORM,
@@ -58,6 +59,7 @@ from .orm import (
     RegulatoryRuleSetORM,
     RegulatoryToReactionBridgeORM,
     SpectraCheckEvidenceRecordORM,
+    SpectraCheckProjectORM,
     SpectraCheckReportRecordORM,
     SpectraCheckSessionORM,
     SpectroscopyToRegulatoryBridgeORM,
@@ -838,13 +840,54 @@ def get_ctd_module3_bundle(
         return _ctd_to_record(row) if row is not None else None
 
 
+# In-session ownership predicate for a single typed resource (source OR target) on a
+# cross-module action item. Same predicate set as the interop trio's outbound-sync-jobs
+# dispatcher; an unknown type under user scope is hidden (safe default — extend in lockstep
+# when adding a new typed resource).
+def _cross_module_resource_owned_by(
+    session: Session,
+    resource_type: str | None,
+    resource_id: int | None,
+    owner_scope_id: int | None,
+) -> bool:
+    if owner_scope_id is None:
+        return True
+    if resource_type is None or resource_id is None:
+        return False
+    if resource_type == "reaction_project":
+        return reaction_access.reaction_project_owned_by(session, resource_id, owner_scope_id)
+    if resource_type == "reaction_experiment":
+        return reaction_access.reaction_experiment_owned_by(session, resource_id, owner_scope_id)
+    if resource_type == "regulatory_dossier":
+        return _dossier_owned_by(session, resource_id, owner_scope_id)
+    if resource_type == "spectracheck_session":
+        sc_session = session.get(SpectraCheckSessionORM, resource_id)
+        if sc_session is None:
+            return False
+        project = session.get(SpectraCheckProjectORM, sc_session.project_id)
+        return project is not None and project.owner_id == owner_scope_id
+    return False
+
+
 def create_cross_module_action_item(
     session_factory: sessionmaker[Session],
     payload: CrossModuleActionItemCreate,
     *,
     actor: ProductOrchestrationActor,
+    owner_scope_id: int | None = None,
 ) -> CrossModuleActionItem:
     with session_scope(session_factory) as session:
+        # Owner-scope BOTH body ids (path gate cannot reach either). A non-owner referencing
+        # another tenant's resource on either side gets a non-leaking 404. System/admin
+        # (owner_scope_id None) stays unrestricted.
+        if not _cross_module_resource_owned_by(
+            session, payload.source_resource_type, payload.source_resource_id, owner_scope_id
+        ):
+            raise ProductOrchestrationNotFoundError("Source resource not found.")
+        if payload.target_resource_id is not None and not _cross_module_resource_owned_by(
+            session, payload.target_resource_type, payload.target_resource_id, owner_scope_id
+        ):
+            raise ProductOrchestrationNotFoundError("Target resource not found.")
         row = _create_cross_action_row(
             session,
             source_program=payload.source_program,
@@ -871,16 +914,74 @@ def create_cross_module_action_item(
         return _cross_action_to_record(row)
 
 
+def _cross_module_action_visible_to_owner(owner_scope_id: int):
+    """SQL predicate: ``True`` for cross-module action items where the caller owns either the
+    source or the target resource. Caller-supplied subqueries keep the join graph compact and
+    avoid a Python post-filter that would silently drop owned rows behind another tenant's
+    items on a busy table when applied after ``.limit()``."""
+    from sqlalchemy import and_, or_
+
+    owned_reaction_projects = select(ReactionProjectORM.id).where(
+        ReactionProjectORM.owner_id == owner_scope_id
+    )
+    owned_reaction_experiments = (
+        select(ReactionExperimentORM.id)
+        .join(
+            ReactionProjectORM,
+            ReactionProjectORM.id == ReactionExperimentORM.reaction_project_id,
+        )
+        .where(ReactionProjectORM.owner_id == owner_scope_id)
+    )
+    owned_dossiers = select(RegulatoryDossierORM.id).where(
+        RegulatoryDossierORM.created_by_user_id == owner_scope_id
+    )
+    owned_spectracheck_sessions = (
+        select(SpectraCheckSessionORM.id)
+        .join(
+            SpectraCheckProjectORM,
+            SpectraCheckProjectORM.id == SpectraCheckSessionORM.project_id,
+        )
+        .where(SpectraCheckProjectORM.owner_id == owner_scope_id)
+    )
+
+    def _side_owned(type_col, id_col):
+        return or_(
+            and_(type_col == "reaction_project", id_col.in_(owned_reaction_projects)),
+            and_(type_col == "reaction_experiment", id_col.in_(owned_reaction_experiments)),
+            and_(type_col == "regulatory_dossier", id_col.in_(owned_dossiers)),
+            and_(
+                type_col == "spectracheck_session",
+                id_col.in_(owned_spectracheck_sessions),
+            ),
+        )
+
+    return or_(
+        _side_owned(
+            CrossModuleActionItemORM.source_resource_type,
+            CrossModuleActionItemORM.source_resource_id,
+        ),
+        _side_owned(
+            CrossModuleActionItemORM.target_resource_type,
+            CrossModuleActionItemORM.target_resource_id,
+        ),
+    )
+
+
 def list_cross_module_action_items(
     session_factory: sessionmaker[Session],
     *,
     status: str | None = None,
     limit: int = 500,
+    owner_scope_id: int | None = None,
 ) -> list[CrossModuleActionItem]:
     with session_scope(session_factory) as session:
         stmt = select(CrossModuleActionItemORM).order_by(CrossModuleActionItemORM.id.desc())
         if status is not None:
             stmt = stmt.where(CrossModuleActionItemORM.status == status)
+        if owner_scope_id is not None:
+            # Owner-filter IN SQL BEFORE the .limit() — a post-.limit() Python filter would
+            # silently drop owned rows behind another tenant's items on a busy table.
+            stmt = stmt.where(_cross_module_action_visible_to_owner(owner_scope_id))
         return [_cross_action_to_record(row) for row in session.scalars(stmt.limit(limit)).all()]
 
 
@@ -890,11 +991,24 @@ def update_cross_module_action_item(
     payload: CrossModuleActionItemUpdate,
     *,
     actor: ProductOrchestrationActor,
+    owner_scope_id: int | None = None,
 ) -> CrossModuleActionItem | None:
     with session_scope(session_factory) as session:
         row = session.get(CrossModuleActionItemORM, action_item_id)
         if row is None:
             return None
+        # A user-scoped caller may mutate the action item only if they own either side.
+        # System/admin (owner_scope_id None) stays unrestricted. Returning None here surfaces
+        # as a non-leaking 404 in the route, matching the read-scoping rule.
+        if owner_scope_id is not None:
+            owns_source = _cross_module_resource_owned_by(
+                session, row.source_resource_type, row.source_resource_id, owner_scope_id
+            )
+            owns_target = _cross_module_resource_owned_by(
+                session, row.target_resource_type, row.target_resource_id, owner_scope_id
+            )
+            if not (owns_source or owns_target):
+                return None
         update = payload.model_dump(exclude_unset=True)
         for field in (
             "target_resource_type",

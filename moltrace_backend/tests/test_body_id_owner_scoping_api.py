@@ -386,3 +386,139 @@ def test_owner_can_import_spectracheck_file_into_their_own_session(client):
             },
         )
         assert res.status_code == 201, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Hole 4: /cross-module/action-items — body source_resource_id + target_resource_id unscoped.
+# A non-owner could spam another tenant's action queue by creating items targeting their
+# dossiers. Fix: validate BOTH body ids on create (a user-scoped caller must own each); the
+# list owner-filters in SQL by either-side ownership; update is gated by either-side ownership.
+# --------------------------------------------------------------------------- #
+def _cross_action_payload(source_resource_id: int, target_resource_id: int) -> dict:
+    return {
+        "source_program": "reaction_optimization",
+        "target_program": "regulatory_hub",
+        "source_resource_type": "reaction_project",
+        "source_resource_id": source_resource_id,
+        "target_resource_type": "regulatory_dossier",
+        "target_resource_id": target_resource_id,
+        "action_type": "review_required",
+        "title": "Followup",
+        "description": "fixture",
+        "severity": "info",
+        "status": "open",
+    }
+
+
+def test_non_owner_cannot_create_cross_module_action_item_for_another_tenants_target(client):
+    """A non-owner who doesn't own the target dossier can't plant an action item against it."""
+    with client:
+        owner = _sign_up(client, "xm-target-owner@example.com")
+        intruder = _sign_up(client, "xm-target-intruder@example.com")
+        dossier_id = _dossier(client, owner)
+        # The intruder owns a reaction project (legitimate source), but the target dossier is
+        # another tenant's — the create must 404 because the target isn't theirs.
+        intruder_project_id = _reaction_project(client, intruder)
+        res = client.post(
+            "/cross-module/action-items",
+            headers=intruder,
+            json=_cross_action_payload(intruder_project_id, dossier_id),
+        )
+        assert res.status_code == 404, res.text
+
+
+def test_non_owner_cannot_create_cross_module_action_item_for_another_tenants_source(client):
+    """And similarly for the source: a user can't reference another tenant's reaction project."""
+    with client:
+        owner = _sign_up(client, "xm-source-owner@example.com")
+        intruder = _sign_up(client, "xm-source-intruder@example.com")
+        project_id = _reaction_project(client, owner)
+        intruder_dossier_id = _dossier(client, intruder)
+        res = client.post(
+            "/cross-module/action-items",
+            headers=intruder,
+            json=_cross_action_payload(project_id, intruder_dossier_id),
+        )
+        assert res.status_code == 404, res.text
+
+
+def test_owner_can_create_cross_module_action_item_when_both_sides_are_theirs(client):
+    with client:
+        owner = _sign_up(client, "xm-self@example.com")
+        project_id = _reaction_project(client, owner)
+        dossier_id = _dossier(client, owner)
+        res = client.post(
+            "/cross-module/action-items",
+            headers=owner,
+            json=_cross_action_payload(project_id, dossier_id),
+        )
+        assert res.status_code == 201, res.text
+
+
+def test_cross_module_action_items_list_is_owner_filtered(client):
+    """A user's list view shows only items where they own either side; another tenant's
+    items must not leak. Filter must apply in SQL before the .limit()."""
+    with client:
+        owner = _sign_up(client, "xm-list-owner@example.com")
+        other = _sign_up(client, "xm-list-other@example.com")
+        own_proj = _reaction_project(client, owner)
+        own_doss = _dossier(client, owner)
+        other_proj = _reaction_project(client, other)
+        other_doss = _dossier(client, other)
+        own_item = client.post(
+            "/cross-module/action-items",
+            headers=owner,
+            json=_cross_action_payload(own_proj, own_doss),
+        ).json()
+        other_item = client.post(
+            "/cross-module/action-items",
+            headers=other,
+            json=_cross_action_payload(other_proj, other_doss),
+        ).json()
+
+        owner_list = client.get("/cross-module/action-items", headers=owner).json()
+        ids = {item["id"] for item in owner_list}
+        assert own_item["id"] in ids
+        assert other_item["id"] not in ids, (
+            "another tenant's cross-module action item leaked into the user's list — owner "
+            "filter missing or applied post-.limit() (silently drops owned rows on a busy table)"
+        )
+
+
+def test_non_owner_cannot_update_cross_module_action_item(client):
+    with client:
+        owner = _sign_up(client, "xm-upd-owner@example.com")
+        intruder = _sign_up(client, "xm-upd-intruder@example.com")
+        own_proj = _reaction_project(client, owner)
+        own_doss = _dossier(client, owner)
+        created = client.post(
+            "/cross-module/action-items",
+            headers=owner,
+            json=_cross_action_payload(own_proj, own_doss),
+        ).json()
+        # The intruder tries to mutate the owner's action item.
+        res = client.patch(
+            f"/cross-module/action-items/{created['id']}",
+            headers=intruder,
+            json={"status": "resolved"},
+        )
+        assert res.status_code == 404, res.text
+
+
+def test_owner_can_update_their_own_cross_module_action_item(client):
+    with client:
+        owner = _sign_up(client, "xm-upd-self@example.com")
+        own_proj = _reaction_project(client, owner)
+        own_doss = _dossier(client, owner)
+        created = client.post(
+            "/cross-module/action-items",
+            headers=owner,
+            json=_cross_action_payload(own_proj, own_doss),
+        ).json()
+        res = client.patch(
+            f"/cross-module/action-items/{created['id']}",
+            headers=owner,
+            json={"status": "resolved"},
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["status"] == "resolved"
