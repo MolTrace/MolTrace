@@ -30,6 +30,56 @@ const nextConfig = {
       { key: "Expires", value: "0" },
     ]
 
+    // ── Security response headers (Security Prompt 9 FE follow-up) ───────────
+    // The backend API origin already emits HSTS + the X-* headers; the Next app
+    // HTML origin emitted none. These apply to every app route (separate keys
+    // from the Cache-Control rules above, so they never collide with the
+    // MARKETING_PATHS cache logic — Next merges headers across matching rules).
+    const isDev = process.env.NODE_ENV !== "production"
+
+    // Direct (non-proxied) backend origin some flows may hit; same-origin
+    // `/api/backend` calls are already covered by 'self'.
+    const backendOrigin = "https://moltrace-backend.onrender.com"
+
+    // Pragmatic Next.js-compatible CSP. Next injects inline bootstrap/hydration
+    // <script>/<style>, so 'unsafe-inline' is required without a nonce pipeline;
+    // dev additionally needs 'unsafe-eval' + ws: for React Refresh / HMR.
+    // @vercel/analytics loads from same-origin (/_vercel/insights/*) → 'self'.
+    const csp = [
+      "default-src 'self'",
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      `connect-src 'self' ${backendOrigin}${isDev ? " ws: http://localhost:*" : ""}`,
+      "worker-src 'self' blob:",
+      "manifest-src 'self'",
+      "frame-ancestors 'none'",
+      "frame-src 'self'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "object-src 'none'",
+    ].join("; ")
+
+    const securityHeaders = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      // The app is never meant to be framed; enforced now (belt for the CSP's
+      // frame-ancestors, which rides Report-Only until validated).
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      // Belt-and-suspenders with the edge/CDN. Browsers honor a single HSTS
+      // policy, so a duplicate from Vercel/Render (if any) is harmless.
+      {
+        key: "Strict-Transport-Security",
+        value: "max-age=63072000; includeSubDomains; preload",
+      },
+      // SHIP REPORT-ONLY FIRST: browsers report violations to the console but do
+      // NOT block, so this can't break Next's inline scripts/styles, Plotly,
+      // charts, or embeds. Once the console is clean across authed pages, flip
+      // this key to "Content-Security-Policy" to enforce.
+      { key: "Content-Security-Policy-Report-Only", value: csp },
+    ]
+
     // Public, statically-prerendered marketing pages. These carry no authed or
     // tenant-specific data — the same HTML is served to everyone — so they are
     // safe to cache at a shared CDN and (crucially) safe to keep bfcache-
@@ -79,6 +129,13 @@ const nextConfig = {
     ).join("|")
 
     return [
+      // Security headers on every route. Distinct keys from the cache rules, so
+      // both sets are emitted; safe on static assets (CSP/X-Frame are ignored on
+      // non-document responses).
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
       {
         source: "/sw.js",
         headers: [
