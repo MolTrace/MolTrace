@@ -236,10 +236,11 @@ export function ReactionOptimizationLanding() {
             Review next-best-experiment recommendations, constraints, and optimization history.
           </p>
         </div>
+        {/* Action row: kept as a flex container in case future actions land here.
+            The "Open Reaction Studio (program-level)" button was removed because the
+            enclosing workspace already has a top-level tab switcher to Reaction Studio,
+            so the button was a duplicate entry point that pointed to the same URL. */}
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/reactions?tab=reaction-studio">Open Reaction Studio (program-level)</Link>
-          </Button>
           <BackendStatusIndicator />
         </div>
       </div>
