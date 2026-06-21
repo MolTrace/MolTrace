@@ -4,7 +4,7 @@
  * component, captured at all 5 routes that mount it.
  *
  * Mount points:
- *   1. /spectracheck                  → ProgramsInterfaceWorkspace (multiple augmentations)
+ *   1. /spectracheck                  → ProgramsInterfaceWorkspace (SpectraCheck augmentation only; cross-module tabs moved to sidebar)
  *   2. /regulatory/dossiers/[id]      → Regulatory variant
  *   3. /reactions/[id]                → Reaction Optimization variant
  *   4. /knowledge                     → Knowledge variant

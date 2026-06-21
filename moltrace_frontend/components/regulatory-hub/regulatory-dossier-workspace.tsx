@@ -2294,7 +2294,7 @@ export function RegulatoryDossierWorkspace() {
     return (
       <div className="mx-auto max-w-[1200px] space-y-6 pb-12">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/spectracheck?program=regulatory_hub">
+          <Link href="/regulatory">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Link>
@@ -2312,7 +2312,7 @@ export function RegulatoryDossierWorkspace() {
     <div className="mx-auto max-w-[1200px] space-y-6 pb-12">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/spectracheck?program=regulatory_hub">
+          <Link href="/regulatory">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Regentry
           </Link>

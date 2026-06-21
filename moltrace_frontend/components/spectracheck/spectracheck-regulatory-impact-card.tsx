@@ -136,7 +136,7 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
         </span>
       }
       description="Bridge handoff to Regentry for review-required action items. Decision support only — not legal advice."
-      href="/spectracheck?program=regulatory_hub"
+      href="/regulatory"
       ctaLabel="Open Regentry"
     >
         <div className="grid gap-3 md:grid-cols-2">

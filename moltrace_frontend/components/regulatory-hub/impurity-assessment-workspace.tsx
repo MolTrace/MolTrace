@@ -299,7 +299,7 @@ export function ImpurityAssessmentWorkspace() {
           SpectraCheck and Repho, matching where the user came from. */}
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/spectracheck?program=regulatory_hub">
+          <Link href="/regulatory">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Regentry
           </Link>

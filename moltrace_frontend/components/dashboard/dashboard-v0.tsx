@@ -1455,7 +1455,7 @@ export function DashboardV0() {
           title="Regentry"
           icon={FolderOpen}
           description="Active dossiers and review workload across your tenant — not a legal or compliance certification."
-          href="/spectracheck?program=regulatory_hub"
+          href="/regulatory"
           ctaLabel="Open Regentry"
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1488,7 +1488,7 @@ export function DashboardV0() {
           title="Regulatory compliance"
           icon={AlertTriangle}
           description="Open compliance action items, blocked dossiers, and triage by category — workflow signals, not legal conclusions."
-          href="/spectracheck?program=regulatory_hub"
+          href="/regulatory"
           ctaLabel="Open regulatory workspace"
         >
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">

@@ -303,7 +303,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
           </Link>
         </Button>
         <Button variant="outline" size="sm" asChild>
-          <Link href="/spectracheck?program=regulatory_hub">Regulatory home</Link>
+          <Link href="/regulatory">Regulatory home</Link>
         </Button>
       </div>
 

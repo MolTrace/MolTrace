@@ -1,5 +1,4 @@
-import userEvent from "@testing-library/user-event"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ProgramsInterfaceWorkspace } from "@/components/programs/programs-interface-workspace"
 import { clearSpectraCheckTabStatePersistence } from "@/components/spectracheck/spectracheck-tab-state-context"
@@ -8,7 +7,7 @@ import { invalidateSpectraCheckSessionReadCache } from "@/src/lib/spectracheck/s
 import { clearSpectraCheckRuntimeState } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/programs",
+  usePathname: () => "/spectracheck",
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -19,14 +18,6 @@ vi.mock("@/hooks/use-mobile", () => ({
 
 vi.mock("@/components/ai/ai-module-prediction-augmentation", () => ({
   AiModulePredictionAugmentation: () => <div data-testid="ai-module-prediction-augmentation" />,
-}))
-
-vi.mock("@/components/regulatory-hub/regulatory-intelligence-landing", () => ({
-  RegulatoryIntelligenceLanding: () => <section>Regentry workspace placeholder</section>,
-}))
-
-vi.mock("@/components/reaction-optimization/reaction-program-interface-workspace", () => ({
-  ReactionProgramInterfaceWorkspace: () => <section>Repho workspace placeholder</section>,
 }))
 
 vi.mock("@/src/components/mobile/MobileSpectraCheckReview", () => ({
@@ -59,7 +50,7 @@ function analyticsPayloads() {
     })
 }
 
-describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
+describe("ProgramsInterfaceWorkspace (post-reorg: SpectraCheck only)", () => {
   beforeEach(() => {
     window.localStorage.clear()
     window.sessionStorage.clear()
@@ -78,67 +69,29 @@ describe("ProgramsInterfaceWorkspace SpectraCheck persistence", () => {
     invalidateSpectraCheckSessionReadCache()
   })
 
-  it("logs privacy-safe core module openings for SpectraCheck, Regentry, and Repho", async () => {
-    const user = userEvent.setup()
+  it("renders the SpectraCheck workspace without the cross-module tab switcher", () => {
     render(<ProgramsInterfaceWorkspace />)
+    // The cross-module switcher (SpectraCheck / Regentry / Repho) lives on the sidebar
+    // now, not in-page. So /spectracheck must NOT render any of those as page tabs.
+    expect(screen.queryByRole("tab", { name: /^Regentry$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("tab", { name: /^Repho$/i })).not.toBeInTheDocument()
+    // SpectraCheck's own content + AI augmentation are still mounted.
+    expect(screen.getByTestId("ai-module-prediction-augmentation")).toBeInTheDocument()
+  })
 
+  it("logs a privacy-safe core_module_opened event for SpectraCheck on mount", async () => {
+    render(<ProgramsInterfaceWorkspace />)
     await waitFor(() => {
+      const openings = analyticsPayloads().filter(
+        (payload) => payload.event_type === "core_module_opened",
+      )
       expect(
-        analyticsPayloads().some(
+        openings.some(
           (payload) =>
-            payload.event_type === "core_module_opened" &&
             payload.metadata?.module === "spectracheck" &&
             payload.metadata?.surface === "programs_workspace",
         ),
       ).toBe(true)
-    })
-
-    await user.click(screen.getByRole("tab", { name: /^Regentry$/i }))
-    await user.click(screen.getByRole("tab", { name: /^Repho$/i }))
-
-    await waitFor(() => {
-      const openedModules = analyticsPayloads()
-        .filter((payload) => payload.event_type === "core_module_opened")
-        .map((payload) => payload.metadata?.module)
-      expect(openedModules).toEqual(expect.arrayContaining(["spectracheck", "regulatory_hub", "reactioniq"]))
-    })
-  })
-
-  it("keeps raw and processed SpectraCheck uploads while switching between Programs modules", async () => {
-    const user = userEvent.setup()
-    render(<ProgramsInterfaceWorkspace />)
-
-    const rawFile = new File(["pretend-fid"], "program-raw.zip", { type: "application/zip" })
-    await user.click(screen.getByRole("tab", { name: /Raw FID upload/i }))
-    fireEvent.drop(screen.getByRole("button", { name: /Drop raw FID archive/i }), {
-      dataTransfer: { files: [rawFile], types: ["Files"] },
-    })
-    expect(screen.getAllByText("program-raw.zip").length).toBeGreaterThan(0)
-
-    const processedFile = new File(["##TITLE=processed"], "program-processed.jdx", {
-      type: "text/plain",
-    })
-    await user.click(screen.getByRole("tab", { name: /Processed 1H \/ 13C upload/i }))
-    fireEvent.drop(screen.getByRole("button", { name: /Drop processed spectrum file/i }), {
-      dataTransfer: { files: [processedFile], types: ["Files"] },
-    })
-    expect(screen.getAllByText("program-processed.jdx").length).toBeGreaterThan(0)
-
-    await user.click(screen.getByRole("tab", { name: /^Regentry$/i }))
-    expect(screen.getByText("Regentry workspace placeholder")).toBeInTheDocument()
-
-    await user.click(screen.getByRole("tab", { name: /^Repho$/i }))
-    expect(screen.getByText("Repho workspace placeholder")).toBeInTheDocument()
-
-    await user.click(screen.getByRole("tab", { name: /^SpectraCheck$/i }))
-    await user.click(screen.getByRole("tab", { name: /Raw FID upload/i }))
-    await waitFor(() => {
-      expect(screen.getAllByText("program-raw.zip").length).toBeGreaterThan(0)
-    })
-
-    await user.click(screen.getByRole("tab", { name: /Processed 1H \/ 13C upload/i }))
-    await waitFor(() => {
-      expect(screen.getAllByText("program-processed.jdx").length).toBeGreaterThan(0)
     })
   })
 })
