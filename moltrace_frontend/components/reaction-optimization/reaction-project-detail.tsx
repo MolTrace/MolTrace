@@ -66,6 +66,7 @@ import {
 } from "@/lib/reaction/pareto"
 import { ReactionResponseOverview } from "@/components/reaction-optimization/reaction-response-overview"
 import { ReactionRegulatoryConstraintsPanel } from "@/components/reaction-optimization/reaction-regulatory-constraints-panel"
+import { ReactionRegulatoryCompliancePanel } from "@/components/reaction-optimization/reaction-regulatory-compliance-panel"
 import {
   ReactionStudioCompoundLinkingPanel,
   ReactionStudioCompoundLinkSummary,
@@ -4672,6 +4673,7 @@ export function ReactionProjectDetail() {
             onPayloadChange={setRegulatoryPayloadForOptimization}
             onUseInOptimizationChange={setUseRegulatoryAnchorInOptimization}
           />
+          <ReactionRegulatoryCompliancePanel reactionProjectId={reactionProjectId} />
         </TabsContent>
 
         <TabsContent value="cost-safety" className="mt-4 space-y-6">
