@@ -26,9 +26,13 @@ verify-provenance]`. The `verify-provenance` job downloads the **exact** atteste
 (same run — digests match by construction, no nondeterministic regeneration) and runs:
 
 ```
+# In CI the workflow templates ``--repo "$REPO"`` off ``${{ github.repository }}`` so it self-
+# adjusts on any future transfer/rename. The shape from the operator's shell, where
+# ``<owner>`` is whichever account holds MolTrace at the time you check (originally
+# ``sirmcdoe``; on transfer to a GitHub org for the attestations API, that org's slug):
 gh attestation verify sbom-artifacts/<sbom> \
-  --repo sirmcdoe/MolTrace \
-  --signer-workflow sirmcdoe/MolTrace/.github/workflows/ci-cd.yml
+  --repo <owner>/MolTrace \
+  --signer-workflow <owner>/MolTrace/.github/workflows/ci-cd.yml
 ```
 
 for each SBOM. Any verification failure fails the job, and because `deploy` *needs* it, **none** of
@@ -45,8 +49,8 @@ failed in-job step would not stop — only an unmet `needs:` stops them all.
 Every push-to-`main` mints an attestation keyed to the SBOM digests, queryable on demand:
 
 ```
-gh attestation verify <sbom-file> --repo sirmcdoe/MolTrace
-gh api /repos/sirmcdoe/MolTrace/attestations/sha256:<digest>
+gh attestation verify <sbom-file> --repo <owner>/MolTrace
+gh api /repos/<owner>/MolTrace/attestations/sha256:<digest>
 ```
 
 The `verify-provenance` run log prints the verified subject digests, so each release's provenance is
@@ -70,6 +74,15 @@ auditable from the deploy run and re-checkable later.
 - **Private-repo Sigstore:** keyless attestations on a private/internal repo use GitHub's own
   Sigstore instance (no public Rekor) and require GitHub Enterprise Cloud for that path; on a public
   repo the Public-Good Rekor transparency log is used.
+- **The attestations API is gated by GitHub's repo-ownership policy.** ``actions/attest-build-
+  provenance`` calls ``POST /repos/{owner}/{repo}/attestations`` to persist the SLSA bundle, and
+  GitHub blocks that endpoint on **user-owned private repositories** ("Feature not available for
+  user-owned private repositories"). The endpoint is available on public repos and on repos owned
+  by a **GitHub Organization** (any visibility). The fix is one of: transfer MolTrace to a GitHub
+  org (free; the workflow templates ``${{ github.repository }}`` so no edit is needed) or make the
+  repo public. Until either lands, the ``attest`` job will fail, ``verify-provenance`` will be
+  skipped via its ``needs:`` link, and ``deploy`` will be skipped too — the deploy gate is
+  honestly fail-closed under this constraint.
 
 These controls **support** a customer's secure-SDLC / SLSA posture; they do not by themselves certify
 the deployed artifact end-to-end.

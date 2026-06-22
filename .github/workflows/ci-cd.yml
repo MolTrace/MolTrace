@@ -334,13 +334,17 @@ jobs:
       - name: Verify SLSA provenance for both SBOMs
         env:
           GH_TOKEN: ${{ github.token }}
+          # Template the repo path off the runtime context so this step survives any future
+          # transfer or rename (and so the original sirmcdoe -> org transfer that unblocks the
+          # GitHub attestations API on private repos doesn't need a workflow edit).
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           for sbom in sbom-backend.cdx.json sbom-frontend.cdx.json; do
             echo "::group::gh attestation verify $sbom"
             gh attestation verify "sbom-artifacts/$sbom" \
-              --repo sirmcdoe/MolTrace \
-              --signer-workflow sirmcdoe/MolTrace/.github/workflows/ci-cd.yml
+              --repo "$REPO" \
+              --signer-workflow "$REPO/.github/workflows/ci-cd.yml"
             echo "::endgroup::"
           done
 
