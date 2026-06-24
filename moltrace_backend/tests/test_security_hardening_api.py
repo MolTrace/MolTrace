@@ -22,7 +22,7 @@ def _client(tmp_path) -> TestClient:
             detail={
                 "message": (
                     'Traceback (most recent call last):\n'
-                    '  File "/Users/ci/private/service.py", line 1'
+                    '  File "/Users/ci/app/service.py", line 1'
                 ),
                 "database_url": "postgresql://user:password@example.test/moltrace",
                 "signed_url": "https://storage.example.test/object?X-Amz-Signature=abc123",
@@ -35,7 +35,7 @@ def _client(tmp_path) -> TestClient:
     def leaky_server_error() -> None:
         raise RuntimeError(
             "password=super-secret-value\n"
-            'Traceback (most recent call last):\n  File "/Users/ci/private/service.py"'
+            'Traceback (most recent call last):\n  File "/Users/ci/app/service.py"'
         )
 
     @app.get("/_test/leaky-auth-error")

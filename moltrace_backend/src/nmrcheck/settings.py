@@ -69,7 +69,9 @@ class Settings:
 
     api_key: str | None = None
     disable_auth: bool = False
-    admin_emails: tuple[str, ...] = ("admin@example.com",)
+    # No admin is granted by default. Set ADMIN_EMAILS (comma-separated) in the
+    # environment to designate admin accounts; see get_settings() below.
+    admin_emails: tuple[str, ...] = ()
 
     host: str = "127.0.0.1"
     port: int = 8000
@@ -158,7 +160,7 @@ class Settings:
 def get_settings() -> Settings:
     env_admins = tuple(
         email.strip().lower()
-        for email in _parse_csv(os.getenv("ADMIN_EMAILS"), ("admin@example.com",))
+        for email in _parse_csv(os.getenv("ADMIN_EMAILS"), ())
         if email.strip()
     )
     raw_vault_dir = os.getenv("RAW_VAULT_DIR", os.getenv("RAW_DATA_VAULT_DIR", "raw_data_vault"))
