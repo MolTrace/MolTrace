@@ -3,6 +3,18 @@
 Small representative raw FID fixtures downloaded from NMRShiftDB2 for
 `read_fid` regression tests.
 
+## Attribution & license (third-party data)
+
+These fixtures are derived from **NMRShiftDB2** (<https://nmrshiftdb.nmr.uni-koeln.de/>),
+an open NMR database. NMRShiftDB2 content is distributed under the
+**Creative Commons Attribution-ShareAlike (CC BY-SA)** license. The raw Bruker
+archives and the NMReDATA source index below are reproduced here unmodified for
+regression-test purposes, with attribution to the NMRShiftDB2 project and its
+contributors. This third-party data is **not** covered by the MolTrace source
+license (see the repository-root `LICENSE` / `NOTICE`); it retains its upstream
+CC BY-SA terms. If you redistribute these fixtures, preserve this attribution and
+the ShareAlike obligation.
+
 Source index:
 
 - `source/nmrshiftdb2rawdata.nmredata.sd`
