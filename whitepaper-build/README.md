@@ -51,7 +51,7 @@ Both engines emit identical typography targets:
 - Section headings in MolTrace teal (`#00B884`)
 - Eyebrow labels uppercase, tracking-wide, ~10 pt
 - Citations as endnote footnotes with linked back-references
-- Compliance badges (SOC 2 Type II / ICH / GDPR / GxP) at the foot of the title page
+- "Designed to support" posture badges (SOC 2 Type II / ICH Q2(R2) / GDPR / GxP) at the foot of the title page
 - Cover page with brand mark, title, subtitle, version, and audience line
 
 The Typst template (`typst/template.typ`) is the canonical source for the typography; the Pandoc workflow consumes a custom `.tex` header (`pandoc/header.tex`) tuned to match.

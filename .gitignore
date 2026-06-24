@@ -83,3 +83,8 @@ week10/
 
 # Internal Repho build spec — local only; never commit/push to GitHub (user directive 2026-06)
 /MolTrace_Repho_Build_Spec_v3.md
+
+# Internal-only business/strategy docs — untracked before the repo went public (2026-06).
+# Kept on disk for local use; relocate to a private repo. Do NOT re-commit to the public repo.
+/MolTrace_Testing_AI_ML_Playbook.docx
+/MolTrace_WhitePaper_Maintenance.md

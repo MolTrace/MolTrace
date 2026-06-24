@@ -124,7 +124,7 @@ MolTrace's regulatory posture is anchored in three external frameworks and reinf
 
 **Monitored in production, gated on release.** MolTrace does not stop at promotion — it watches the live model and controls what reaches it. Continuous drift monitors flag when the incoming chemistry, the model's confidence, or the reviewer override rate moves away from what the model was validated on, emit to the observability stack, and page on a breach; a lineage dashboard shows, per production model, its version, training data, gold-set scores, and current drift status. Every model or pipeline change must clear a **fail-closed deployment gate** — reaching production only if it dominates on the gold set with no safety regression, the audit chain verifies, the test suite is green, and a leakage check proves it never trained on the gold set — wired into CI so a deploy is blocked on any failure. Most early-stage tools add monitoring and release gates years later; MolTrace ships them from day one, which is what makes it deployable in a regulated environment now.
 
-**Operational compliance posture.** SOC 2 Type II · ICH Compliant · GDPR Ready · GxP Validated.
+**Operational compliance posture.** Designed to support SOC 2 Type II, ICH Q2(R2), GDPR, and GxP / GAMP 5 validation. These controls *support* — they do not by themselves certify — each regime; formal attestation status is available under NDA, and the overall compliance determination remains the regulated user's responsibility.
 
 ---
 
