@@ -210,14 +210,16 @@ describe("Marketing Footer", () => {
     }
   })
 
-  it("renders the four compliance trust seals in teal-tinted pill style", () => {
+  it("renders the four designed-to-support posture badges in teal-tinted pill style", () => {
     render(<Footer />)
     const badges = screen.getByTestId("footer-compliance-badges")
+    // The badges are framed as design intent, not held certifications.
+    expect(within(badges).getByText(/^Designed to support$/i)).toBeInTheDocument()
     const labels = within(badges)
-      .getAllByText(/^(SOC 2 Type II|ICH Compliant|GDPR Ready|GxP Validated)$/i)
+      .getAllByText(/^(SOC 2 Type II|ICH Q2\(R2\)|GDPR|GxP \/ GAMP 5)$/i)
       .map((node) => node.textContent)
     expect(new Set(labels)).toEqual(
-      new Set(["SOC 2 Type II", "ICH Compliant", "GDPR Ready", "GxP Validated"]),
+      new Set(["SOC 2 Type II", "ICH Q2(R2)", "GDPR", "GxP / GAMP 5"]),
     )
     // Each pill must carry the teal-tinted treatment via inline styles.
     const pills = within(badges).getAllByText(/^(SOC|ICH|GDPR|GxP)/i)

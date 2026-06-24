@@ -35,7 +35,7 @@ describe("landing page auth forms", () => {
         expires_at: "2026-05-02T18:00:00Z",
         user: {
           id: 1,
-          email: "admin@example.com",
+          email: "user@example.com",
           is_admin: true,
           is_verified: true,
         },
@@ -48,7 +48,7 @@ describe("landing page auth forms", () => {
     render(<SignInForm />)
 
     fireEvent.change(screen.getByLabelText("Email"), {
-      target: { value: "admin@example.com" },
+      target: { value: "user@example.com" },
     })
     fireEvent.change(screen.getByLabelText("Password"), {
       target: { value: "StrongPassword123!" },
@@ -60,12 +60,12 @@ describe("landing page auth forms", () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe("/api/backend/auth/sign-in")
     expect(JSON.parse(String(init.body))).toEqual({
-      email: "admin@example.com",
+      email: "user@example.com",
       password: "StrongPassword123!",
     })
     expect(window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)).toBe("admin-token")
     expect(JSON.parse(window.localStorage.getItem(AUTH_USER_STORAGE_KEY) || "{}")).toMatchObject({
-      email: "admin@example.com",
+      email: "user@example.com",
       is_admin: true,
     })
     expect(screen.getByRole("status")).toHaveTextContent("Signed in with admin access.")
