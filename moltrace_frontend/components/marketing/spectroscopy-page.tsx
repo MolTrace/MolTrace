@@ -908,7 +908,7 @@ export function SpectroscopyPage() {
                   {
                     icon: Lock,
                     title: "Tenant isolation by default",
-                    body: "SOC 2 Type II controls, GDPR-compliant data residency, role-scoped audit-event ledger.",
+                    body: "Controls designed to support SOC 2 Type II, GDPR-aligned data residency, role-scoped audit-event ledger.",
                   },
                 ].map((item) => {
                   const Icon = item.icon

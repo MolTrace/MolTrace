@@ -361,7 +361,7 @@ export function BlogPage() {
                 </Button>
               </div>
               <p className="mt-8 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                No tracking pixels · Unsubscribe in one click · GDPR-compliant intake
+                No tracking pixels · Unsubscribe in one click · GDPR-aligned intake
               </p>
             </div>
           </div>

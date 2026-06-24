@@ -411,7 +411,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: Database,
     title: "Tenant isolation extends to integrations",
-    body: "Every connector_event is tenant-scoped. Cross-tenant data exchange requires explicit per-event provisioning. SOC 2 Type II controls apply end-to-end.",
+    body: "Every connector_event is tenant-scoped. Cross-tenant data exchange requires explicit per-event provisioning. Controls designed to support SOC 2 Type II apply end-to-end.",
   },
 ]
 

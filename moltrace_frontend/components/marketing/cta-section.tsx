@@ -40,7 +40,7 @@ export function CTASection() {
               </Button>
             </div>
             <p className="mt-6 text-xs uppercase tracking-widest text-background/50">
-              No credit card required &middot; 14-day free trial &middot; SOC 2 Type II
+              No credit card required &middot; 14-day free trial &middot; SOC 2-aligned
             </p>
           </div>
         </div>

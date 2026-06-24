@@ -338,7 +338,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: Lock,
     title: "Tenant isolation by default",
-    body: "SOC 2 Type II controls, GDPR-compliant data residency, and a role-scoped audit-event ledger isolate each organization's data.",
+    body: "Controls designed to support SOC 2 Type II, GDPR-aligned data residency, and a role-scoped audit-event ledger isolate each organization's data.",
   },
 ]
 

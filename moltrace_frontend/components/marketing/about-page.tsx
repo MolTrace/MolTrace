@@ -211,8 +211,8 @@ type Compliance = {
 
 const COMPLIANCE: Compliance[] = [
   {
-    badge: "SOC 2 Type II",
-    meaning: "Independent attestation of security, availability, and confidentiality controls.",
+    badge: "SOC 2-aligned",
+    meaning: "Controls designed to support a SOC 2 Type II audit (security, availability, and confidentiality).",
   },
   {
     badge: "GDPR-ready",

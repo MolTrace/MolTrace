@@ -338,7 +338,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: Lock,
     title: "Tenant isolation & residency",
-    body: "Per-tenant isolation, GDPR-compliant data residency, and SOC 2 Type II controls underpin the whole submission record.",
+    body: "Per-tenant isolation, GDPR-aligned data residency, and controls designed to support SOC 2 Type II underpin the whole submission record.",
   },
 ]
 

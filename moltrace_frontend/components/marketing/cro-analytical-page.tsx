@@ -333,8 +333,8 @@ const TRUST: TrustPillar[] = [
   },
   {
     icon: ShieldCheck,
-    title: "SOC 2 Type II controls",
-    body: "GDPR-compliant data residency and SOC 2 Type II controls underpin the platform every sponsor's procurement team will ask about.",
+    title: "Controls designed to support SOC 2 Type II",
+    body: "GDPR-aligned data residency and controls designed to support SOC 2 Type II underpin the platform every sponsor's procurement team will ask about.",
   },
 ]
 
@@ -913,7 +913,7 @@ export function CroAnalyticalPage() {
                 <p className="mt-4 text-base text-muted-foreground">
                   Your sponsors carry their own regulatory burden, and your deliverables become part
                   of it. Every control below is implemented in production code — designed against
-                  ALCOA+, 21 CFR Part 11, and SOC 2 from day one.
+                  ALCOA+, 21 CFR Part 11, and the SOC 2 criteria from day one.
                 </p>
               </div>
               <ul className="space-y-3">
