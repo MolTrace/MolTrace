@@ -47,7 +47,7 @@ describe("apiFetch", () => {
 
   it("adds the stored auth token to API requests", async () => {
     const fetchMock = vi.fn(async () => {
-      return new Response(JSON.stringify({ email: "admin@example.com" }), {
+      return new Response(JSON.stringify({ email: "user@example.com" }), {
         status: 200,
         headers: { "content-type": "application/json" },
       })

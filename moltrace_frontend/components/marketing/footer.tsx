@@ -266,7 +266,10 @@ const socialLinks: SocialLink[] = [
   { label: "Slack",     href: "#", Glyph: SlackGlyph     },
 ]
 
-const COMPLIANCE_BADGES = ["SOC 2 Type II", "ICH Compliant", "GDPR Ready", "GxP Validated"]
+// Framed as design intent ("designed to support"), NOT held certifications — see the
+// label rendered alongside these badges. The regime names alone are accurate; the claim
+// that would be a misrepresentation ("Compliant"/"Validated") is removed.
+const COMPLIANCE_BADGES = ["SOC 2 Type II", "ICH Q2(R2)", "GDPR", "GxP / GAMP 5"]
 
 export function Footer() {
   return (
@@ -400,6 +403,9 @@ export function Footer() {
             data-testid="footer-compliance-badges"
             className="flex flex-wrap items-center gap-1.5"
           >
+            <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Designed to support
+            </span>
             {COMPLIANCE_BADGES.map((badge) => (
               <span
                 key={badge}

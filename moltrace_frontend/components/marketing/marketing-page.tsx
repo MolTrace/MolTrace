@@ -7,7 +7,6 @@ import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
 import { Hero } from "@/components/marketing/hero"
 import { ModuleCards } from "@/components/marketing/module-cards"
-import { Testimonials } from "@/components/marketing/testimonials"
 import { TrustBar } from "@/components/marketing/trust-bar"
 import { WorkflowStrip } from "@/components/marketing/workflow-strip"
 
@@ -24,7 +23,6 @@ export function MarketingPage() {
         <EvidenceSection />
         <EnterpriseSection />
         <DashboardPreview />
-        <Testimonials />
         <CTASection />
       </main>
       <Footer />

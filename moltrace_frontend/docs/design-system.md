@@ -458,23 +458,6 @@ When reskinning many leaf surfaces at once, dispatch 3-4 general-purpose agents 
    - The lean wrap pattern with both OLD and NEW JSX
    - The verification step (`npx tsc --noEmit | grep error`)
 
-### Worktree → main checkout cp-mirror
-
-The harness sandbox blocks general-purpose agent writes to the main checkout under `/Users/ci/MolTrace/moltrace_frontend/`. Agents can only write to the worktree at `/Users/ci/MolTrace/.claude/worktrees/<worktree-name>/moltrace_frontend/`.
-
-This breaks live HMR on `localhost:3000` (which reads from the main checkout per the user's saved memory note).
-
-**Workflow:** After each agent reports complete, mirror its files from the worktree to the main checkout via `cp`:
-
-```bash
-for f in components/path/file-1.tsx components/path/file-2.tsx; do
-  cp "/Users/ci/MolTrace/.claude/worktrees/<worktree-name>/moltrace_frontend/$f" \
-     "/Users/ci/MolTrace/moltrace_frontend/$f"
-done
-```
-
-After all agents have reported, run `tsc --noEmit` from the main checkout to catch any import regressions across files (occasionally an agent removes too much from a Card import while still using inner sub-cards — fix by re-adding the missing identifiers to the import line).
-
 ### Common agent regressions to watch for
 
 When verifying after a parallel batch, check:
