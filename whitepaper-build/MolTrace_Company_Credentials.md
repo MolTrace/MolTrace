@@ -59,7 +59,7 @@ Replace `assets/logo-bar.svg` with the production asset before publication. The 
 | Stage | [Pre-seed / Seed / Series A / …] |
 | Lead investor(s) | [Investor Name(s)] |
 | Customer count | [n] tenants across pharma, biotech, CRO, academic |
-| Compliance posture | SOC 2 Type II · ICH Compliant · GDPR Ready · GxP Validated |
+| Compliance posture | Designed to support SOC 2 Type II, ICH Q2(R2), GDPR, GxP |
 | Open-source contributions | RDKit · nmrglue · mzML community |
 | Press contact | press@moltrace.tech (placeholder — replace) |
 | Pilot inquiries | pilots@moltrace.tech (placeholder — replace) |
@@ -136,12 +136,12 @@ MolTrace's posture is *build on open science where it exists, contribute back wh
 
 ### Compliance & audit posture
 
-- **SOC 2 Type II** — independent audit on a 12-month cycle (auditor: [Auditor Name])
+- **SOC 2 Type II (target — not yet held)** — controls designed to support a SOC 2 Type II audit; a formal independent audit is planned on a 12-month cycle (auditor: [Auditor Name]) but is not yet held
 - **ICH Q2(R2)** — analytical-procedures validation aligned, including the audit-event ledger, immutable raw vault, and ALCOA+ data-integrity primitives; the platform also generates a deterministic, content-hash-keyed ICH Q2(R2) report stub per analysis
 - **Tamper-evident audit ledger** — the `audit_events` log is a SHA-256 hash chain (per-row prev-hash over a canonical serialization) periodically sealed with organisation-keyed HMAC-signed anchors and a signed high-water mark, so any insert, edit, deletion, reordering, or truncation is detectable; an admin verification endpoint and a reconciliation job confirm integrity and alert on any break
 - **GAMP 5 (Appendix D11)** — the platform generates a versioned, byte-reproducible Computerised System Validation document skeleton (intended use, GxP-risk class, requirements-traceability matrix, IQ/OQ/PQ evidence slots) to accelerate customer CSV; the overall compliance determination remains the regulated user's responsibility
 - **GDPR** — tenant-private data segregation, right-to-erasure tooling, EU-region data residency
-- **GxP Validated** — Computer System Validation (CSV) documentation available under NDA
+- **GxP validation support** — generates Computer System Validation (CSV) evidence to accelerate the customer's validation (CSV documentation available under NDA); the platform *supports*, and does not itself perform, GxP validation — the determination remains the regulated user's responsibility
 - **HIPAA-aligned (US)** — for tenants handling protected health information
 - **21 CFR Part 11 (US)** — electronic-records / electronic-signatures compliance for FDA-regulated workflows
 
@@ -218,7 +218,7 @@ Short, medium, and long-form About-MolTrace strings for use in different context
 
 **Medium (three sentences, 100 words):**
 
-> MolTrace builds the audit-ready evidence engine for pharmaceutical R&D. Our platform — SpectraCheck, Regentry, and Reaction Optimization — closes the loop between raw analytical data and regulatory-ready decisions across NMR, LC-MS, HRMS, and MS/MS, with every numerical claim along the way reachable from a single click. The company is venture-backed, headquartered in [City], with SOC 2 Type II compliance, ICH Q2(R2) alignment, and an architecture engineered to satisfy the FDA's 2025 AI Credibility Framework and the EMA AI reflection paper.
+> MolTrace builds the audit-ready evidence engine for pharmaceutical R&D. Our platform — SpectraCheck, Regentry, and Reaction Optimization — closes the loop between raw analytical data and regulatory-ready decisions across NMR, LC-MS, HRMS, and MS/MS, with every numerical claim along the way reachable from a single click. The company is venture-backed, headquartered in [City], designed to support SOC 2 Type II, with ICH Q2(R2) alignment and an architecture engineered to support the FDA's 2025 AI Credibility Framework and the EMA AI reflection paper.
 
 **Long (six sentences, 200 words):**
 

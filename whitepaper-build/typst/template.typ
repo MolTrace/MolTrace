@@ -159,14 +159,16 @@
 
   #v(1in)
 
-  // Trust seals row
+  // "Designed to support" posture row — framed as design intent, NOT held certifications
   #align(center)[
+    #text(size: 9pt, tracking: 1.5pt, weight: "bold", fill: teal)[DESIGNED TO SUPPORT]
+    #v(0.45em)
     #grid(columns: 4, column-gutter: 0.6in,
       ..(
         "SOC 2 TYPE II",
-        "ICH COMPLIANT",
-        "GDPR READY",
-        "GxP VALIDATED",
+        "ICH Q2(R2)",
+        "GDPR",
+        "GxP / GAMP 5",
       ).map(s => box(
         stroke: teal + 1pt,
         inset: (x: 8pt, y: 4pt),
@@ -174,6 +176,8 @@
         text(size: 8pt, weight: "bold", tracking: 1.5pt, fill: teal, s),
       ))
     )
+    #v(0.5em)
+    #text(size: 7pt, style: "italic", fill: gray)[Controls designed to support these regimes — not a claim of held certification. The overall compliance determination remains the regulated user's responsibility.]
   ]
 
   #pagebreak()

@@ -1,0 +1,52 @@
+MolTrace
+Copyright (c) 2026 MolTrace. All rights reserved.
+
+This product is source-available under the Business Source License 1.1 (see the
+`LICENSE` file at the repository root). It is NOT open source. Production use
+requires a commercial license; see `LICENSE` and README "License" section.
+
+================================================================================
+Third-party components and data
+================================================================================
+
+The license text in `LICENSE` is the Business Source License 1.1, the text of
+which is copyright (c) 2017 MariaDB Corporation Ab. "Business Source License"
+is a trademark of MariaDB Corporation Ab, used here under the permission granted
+in that License. The MolTrace source code and the choice of License Parameters
+are the work of MolTrace; the BSL trademark/text does not imply endorsement by
+MariaDB.
+
+MolTrace depends on, and is built on top of, open-source software distributed
+under its own license terms (including, among others, RDKit (BSD-3-Clause),
+FastAPI, SQLAlchemy, Pydantic, Next.js, and React). Those dependencies are NOT
+covered by the MolTrace license; each remains governed by its own upstream
+license. Installing the dependency closure (via `uv` / `pnpm`) retrieves each
+under its respective terms.
+
+A detailed, per-component third-party attribution list (NMRNet, Uni-Core/Uni-Mol,
+JTF-Net, NMRShiftDB2, NMR-Solver, AIST SDBS, RDKit, nmrglue, NumPy, SciPy, lmfit,
+ReportLab, and the 21 CFR Part 11 regulatory basis) is maintained in
+`moltrace_backend/NOTICE`.
+
+--------------------------------------------------------------------------------
+Vendored third-party test data
+--------------------------------------------------------------------------------
+
+The repository includes small, unmodified third-party datasets used only for
+regression testing. These retain their upstream licenses and are NOT covered by
+the MolTrace source license:
+
+* NMRShiftDB2 fixtures
+  Path: moltrace_backend/tests/fixtures/nmrshiftdb2/
+  Source: NMRShiftDB2 (https://nmrshiftdb.nmr.uni-koeln.de/)
+  License: Creative Commons Attribution-ShareAlike (CC BY-SA)
+  See the directory README for attribution and the ShareAlike obligation. If
+  you redistribute these fixtures, preserve the attribution and license.
+
+* nmrglue example data
+  Path: moltrace_backend/tests/fixtures/nmrglue/
+  Source: nmrglue (https://github.com/jjhelmus/nmrglue)
+  License: New BSD (3-Clause). See the directory README/LICENSE.
+
+If you redistribute MolTrace in source or modified form, retain this NOTICE file
+and the per-directory attributions above.

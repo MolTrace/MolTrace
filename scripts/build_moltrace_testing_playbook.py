@@ -760,9 +760,9 @@ def add_appendices(doc: Document):
 
     doc.add_heading("Appendix C. Source List", level=1)
     sources = [
-        ("MolTrace Technical White Paper", "local: /Users/ci/MolTrace/moltrace_docs/src/content/docs/moltrace-ecosystem-technical-white-paper.md"),
-        ("MolTrace SpectraCheck backend contract", "local: /Users/ci/MolTrace/moltrace_backend/docs/moltrace_spectracheck_backend_contract.md"),
-        ("NMRCheck/MolTrace backend README", "local: /Users/ci/MolTrace/moltrace_backend/README.md"),
+        ("MolTrace Technical White Paper", "local: moltrace_docs/src/content/docs/moltrace-ecosystem-technical-white-paper.md"),
+        ("MolTrace SpectraCheck backend contract", "local: moltrace_backend/docs/moltrace_spectracheck_backend_contract.md"),
+        ("NMRCheck/MolTrace backend README", "local: moltrace_backend/README.md"),
         ("FDA draft guidance on AI in drug/biological regulatory decision-making", "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/considerations-use-artificial-intelligence-support-regulatory-decision-making-drug-and-biological"),
         ("FDA Guiding Principles for Good AI Practice in Drug Development", "https://www.fda.gov/about-fda/artificial-intelligence-drug-development/guiding-principles-good-ai-practice-drug-development"),
         ("EMA reflection paper on AI in the medicinal product lifecycle", "https://www.ema.europa.eu/en/use-artificial-intelligence-ai-medicinal-product-lifecycle-scientific-guideline"),

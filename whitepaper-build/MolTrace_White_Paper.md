@@ -412,7 +412,7 @@ Recent LLM-driven assistants[^reasoning_llms][^generative_drug_discovery] offer 
 - **Live mzML streaming.** Real-time peak-picking on incoming LC-MS scans for in-experiment QC alerts.
 - **Federated tenant-private shift models.** Allow on-tenant fine-tuning of the predicted-NMR layer against the tenant's historical compounds without exposing the data to a shared model, building on PROSPRE/CSP5 architectures.[^han_prospre][^csp5]
 - **Reaction → spectroscopy closed loop.** Bayesian optimisation in the Reaction Optimization program will read in-flight SpectraCheck evidence as the objective function for the next-experiment proposal.[^bayesian_reactions]
-- **Expanded compliance surface.** SOC 2 Type II, ICH compliant, GDPR ready, GxP validated — currently displayed as trust seals — backed by formal third-party audit and continuous monitoring evidence.
+- **Expanded compliance surface.** Move the SOC 2 Type II, ICH Q2(R2), GDPR, and GxP posture from *designed-to-support* trust seals to formal third-party audit and continuous monitoring evidence.
 
 ### 10.2 Conclusion
 

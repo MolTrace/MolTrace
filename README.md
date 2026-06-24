@@ -8,6 +8,9 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
 ![Frontend: Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?logo=vercel&logoColor=white)
 ![Backend: Render](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render&logoColor=white)
+![License: BUSL 1.1](https://img.shields.io/badge/License-BUSL_1.1-4B5563)
+
+> **License.** MolTrace is **source-available, not open source.** The code is published under the [Business Source License 1.1](LICENSE) so you can read, audit, evaluate, and test it — but **production use requires a commercial license** (contact [licensing@moltrace.co](mailto:licensing@moltrace.co)). Each version converts to Apache 2.0 four years after release. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), [`SECURITY.md`](SECURITY.md), and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 MolTrace is an AI-native scientific intelligence platform that confirms structures, profiles impurities, and optimizes reaction routes — without ever losing the trail back to the raw data. It is built for pharmaceutical R&D teams, regulatory affairs professionals, CRO/analytical labs, and academic researchers who need evidence they can defend.
 
@@ -277,7 +280,7 @@ Correctness is enforced, not assumed:
 
 - **Product docs:** [docs.moltrace.co](https://docs.moltrace.co) (a separate Astro/Starlight site; the in-repo `moltrace_docs/` is an empty build mirror).
 - **Engineering docs:** `moltrace_backend/docs/` (48 design/handoff documents) and `moltrace_backend/CHANGELOG.md` — the authoritative per-release record of what shipped.
-- **White papers:** six markdown sources in `whitepaper-build/` (White Paper, Sales, Technical, Executive One-Pager, ROI Methodology, Company Credentials) with a Pandoc + XeLaTeX / Typst PDF build (`make -C whitepaper-build all`). `MolTrace_WhitePaper_Maintenance.md` (repo root) is the per-trigger update matrix.
+- **White papers:** six markdown sources in `whitepaper-build/` (White Paper, Sales, Technical, Executive One-Pager, ROI Methodology, Company Credentials) with a Pandoc + XeLaTeX / Typst PDF build (`make -C whitepaper-build all`).
 
 ## Compliance & disclaimers
 
@@ -294,9 +297,16 @@ Marketing metrics (e.g. accuracy and throughput figures) are positioning copy an
 ## Access, contributing & security
 
 - **Hosted product.** MolTrace runs as a multi-tenant hosted application at [moltrace.co](https://moltrace.co), with authentication (password or per-organization OpenID Connect SSO, with optional enforce-SSO and SCIM 2.0 auto-provisioning/deprovisioning), MFA (TOTP + WebAuthn/passkeys) with per-tenant enforcement and step-up re-auth for signing/admin, rotating refresh tokens with reuse detection and immediate revocation, centralized policy-as-code authorization (a deny-by-default policy engine deciding every access server-side from the authenticated principal), Argon2id password hashing (memory-hard, with transparent upgrade of legacy hashes), field-level envelope encryption of secrets at rest (per-record AES-256-GCM data keys wrapped by a KMS key-encryption key, with key rotation and a customer-managed-key/BYOK seam), secure-SDLC CI gates (secret-scanning via gitleaks in CI + pre-commit, SAST via Semgrep, dependency+license SCA and IaC scanning via Trivy — criticals block merge/deploy, lower-severity findings are reported as SARIF to the Security tab and tracked to closure under triage SLAs), a signed supply chain (a CycloneDX SBOM emitted per build for backend + frontend, SLSA build provenance signed keylessly via Sigstore, and a verify-at-deploy gate that refuses to fire the deploy hooks unless the provenance verifies — provenance queryable per release), HSTS + security response headers over TLS 1.3, a tamper-evident hash-chained audit ledger (per-row prev-hash + periodic HMAC-signed anchors + a signed high-water mark + an admin verification endpoint), per-tenant scoping, 21 CFR Part 11-supporting electronic signatures (server-authoritative signer identity from the authenticated principal — never client-supplied — a SHA-256 record-content binding so a signature cannot be transferred to a different record or version, a durable §11.50 manifestation, and an integrity-verification endpoint), ALCOA+ data-integrity primitives on regulated records (reason-for-change captured in a queryable field, reversible-by-record soft-deletes attributed to the authenticated principal — no hard deletes — server-sourced timestamps, and a fail-closed write-once raw-data vault), a GAMP 5 / CSA validation lifecycle (a regenerable per-release validation package — requirement→risk→test traceability + IQ/OQ/PQ-from-CI evidence + release signatures — and validated-state change control that requires a reason-for-change once a project is approved/released), and CORS allow-lists. Access is via the hosted product, not a public self-serve install.
-- **Contributions.** This is a proprietary, all-rights-reserved repository (see below); external contributions and issues are not solicited here.
-- **Security.** Report any suspected security issue privately to the MolTrace maintainers rather than opening a public issue.
+- **Contributions.** MolTrace is **source-available, not open source** (see License below). Bug reports and feature requests are welcome via GitHub issues; code contributions require a signed CLA so the work stays relicensable. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- **Security.** Report suspected vulnerabilities **privately** — use GitHub's *Security → Report a vulnerability*, or email [security@moltrace.co](mailto:security@moltrace.co). Do **not** open public issues for security reports. See [`SECURITY.md`](SECURITY.md).
 
-## License / status
+## License
 
-**No license file is present in this repository.** In the absence of an explicit license, all rights are reserved and the code is proprietary by default — it is not licensed for reuse, modification, or redistribution unless and until a `LICENSE` is added. The backend ships a `NOTICE` file with third-party attributions (e.g. NMRNet, MIT), which provides attribution only and is **not** a project license.
+MolTrace is **source-available, not open source.** It is licensed under the **Business Source License 1.1** — see [`LICENSE`](LICENSE).
+
+- **You may** read, copy, modify, and make **non-production** use of the code (evaluation, development, testing, research, security review).
+- **Production use requires a commercial license.** For commercial licensing, contact [licensing@moltrace.co](mailto:licensing@moltrace.co).
+- **Change Date.** Each released version converts to the **Apache License 2.0** on 2030-06-23 (four years after first public release).
+- **Third-party components and vendored test data** retain their own licenses; see [`NOTICE`](NOTICE) and the per-directory fixture READMEs.
+
+For security disclosure see [`SECURITY.md`](SECURITY.md); for contribution terms see [`CONTRIBUTING.md`](CONTRIBUTING.md).
