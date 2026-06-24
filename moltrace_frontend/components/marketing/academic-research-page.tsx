@@ -334,7 +334,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: ShieldCheck,
     title: "Your data stays yours",
-    body: "Per-tenant isolation, GDPR-compliant residency, and a role-scoped event ledger keep each group's unpublished work private by default.",
+    body: "Per-tenant isolation, GDPR-aligned residency, and a role-scoped event ledger keep each group's unpublished work private by default.",
   },
 ]
 

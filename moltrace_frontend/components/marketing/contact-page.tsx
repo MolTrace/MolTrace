@@ -102,8 +102,8 @@ const OFFICES: Office[] = [
 ]
 
 const TRUST_SIGNALS = [
-  { icon: ShieldCheck, label: "SOC 2 Type II" },
-  { icon: Lock, label: "GDPR-compliant intake" },
+  { icon: ShieldCheck, label: "SOC 2-aligned" },
+  { icon: Lock, label: "GDPR-aligned intake" },
   { icon: Globe2, label: "Encrypted in transit (TLS 1.3)" },
 ]
 

@@ -23,8 +23,8 @@ const features = [
   },
   {
     icon: Shield,
-    title: "SOC 2 Type II",
-    desc: "Annual third-party audits verify our security controls meet enterprise requirements.",
+    title: "SOC 2-aligned",
+    desc: "Security controls designed to support a SOC 2 Type II audit and enterprise requirements.",
   },
   {
     icon: Globe,
