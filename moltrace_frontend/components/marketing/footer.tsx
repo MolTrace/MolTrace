@@ -255,7 +255,7 @@ const socialLinks: SocialLink[] = [
   { label: "Instagram", href: "#", Glyph: InstagramGlyph },
   { label: "X",         href: "#", Glyph: XGlyph         },
   { label: "YouTube",   href: "#", Glyph: YouTubeGlyph   },
-  { label: "GitHub",    href: "#", Glyph: GitHubGlyph    },
+  { label: "GitHub",    href: "https://github.com/MolTrace/MolTrace", Glyph: GitHubGlyph },
   { label: "WhatsApp",  href: "#", Glyph: WhatsAppGlyph  },
   { label: "Discord",   href: "#", Glyph: DiscordGlyph   },
   { label: "Slack",     href: "#", Glyph: SlackGlyph     },
@@ -381,16 +381,22 @@ export function Footer() {
               data-testid="footer-social-nav"
               className="flex flex-wrap items-center gap-1.5"
             >
-              {socialLinks.map(({ label, href, Glyph }) => (
-                <Link
-                  key={label}
-                  href={href}
-                  aria-label={label}
-                  className="group flex h-10 w-10 items-center justify-center rounded-xl border border-transparent transition-all hover:-translate-y-px hover:border-[color:var(--mt-teal)]/30 hover:bg-muted/40 active:translate-y-0"
-                >
-                  <Glyph />
-                </Link>
-              ))}
+              {socialLinks.map(({ label, href, Glyph }) => {
+                // External profile links (full URLs, e.g. the now-public GitHub repo) open in
+                // a new tab with a safe ``rel``; unset ("#") placeholders stay in-app.
+                const isExternal = /^https?:\/\//i.test(href)
+                return (
+                  <Link
+                    key={label}
+                    href={href}
+                    aria-label={label}
+                    {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : null)}
+                    className="group flex h-10 w-10 items-center justify-center rounded-xl border border-transparent transition-all hover:-translate-y-px hover:border-[color:var(--mt-teal)]/30 hover:bg-muted/40 active:translate-y-0"
+                  >
+                    <Glyph />
+                  </Link>
+                )
+              })}
             </nav>
           </section>
 
