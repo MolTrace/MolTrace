@@ -267,7 +267,7 @@ const ROSTER_SAMPLE: RosterRow[] = [
     vendor: "Okta SSO",
     category: "AUTH",
     status: "connected",
-    detail: "47 users · SAML + SCIM",
+    detail: "SAML + SCIM",
     lastSync: "Continuous",
   },
   {
@@ -406,7 +406,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: AlertCircle,
     title: "Failure modes are observable, not invisible",
-    body: "Connector health checks run continuously. Errors surface in the live roster with the exact next action. Silent failure is impossible — we don't ship that.",
+    body: "Connector health checks run continuously. Errors surface in the live roster with the exact next action. Failures are designed to surface, not stay silent.",
   },
   {
     icon: Database,
@@ -483,7 +483,7 @@ export function IntegrationsPage() {
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                     style={{ color: "var(--mt-teal-ink)" }}
                   >
-                    Connector roster · live
+                    Connector roster · example
                   </p>
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em]"
@@ -494,15 +494,15 @@ export function IntegrationsPage() {
                     }}
                   >
                     <span
-                      className="h-1.5 w-1.5 animate-pulse rounded-full"
+                      className="h-1.5 w-1.5 rounded-full"
                       style={{ backgroundColor: "var(--mt-teal)" }}
                       aria-hidden
                     />
-                    7 active
+                    Sample view
                   </span>
                 </div>
                 <p className="mt-3 font-mono text-xs text-muted-foreground">
-                  tenant · pharmaco · 47 users · 6 connectors healthy
+                  Illustrative — sample data, not a live tenant
                 </p>
                 <p className="mt-1 text-sm font-medium">All sources in one ledger</p>
 
@@ -610,7 +610,7 @@ export function IntegrationsPage() {
                 Every stage emits a typed record. Every record is queryable. The same{" "}
                 <code className="font-mono text-foreground">connector_event</code> ledger covers
                 instrument ingest, LIMS sync, ELN handoff, and regulatory feed updates — one
-                schema, one inspection-ready surface.
+                schema, one surface designed to support inspection.
               </p>
             </div>
 
@@ -662,14 +662,15 @@ export function IntegrationsPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                Connectors shipped
+                Supported connectors
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Four categories. Every vendor named.
+                Four categories — generic protocols plus vendor-specific paths.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                If a vendor isn't on the list, ask. Generic OAuth / SAML / OIDC + a typed mapping
-                template covers most LIMS and ELN systems with a one-day integration. New
+                If a vendor isn't on the list, ask. Identity providers are compatible via generic
+                OAuth / SAML / OIDC with metadata import; most LIMS and ELN systems can often be
+                integrated quickly with a typed mapping template on top of those protocols. New
                 instrument vendors integrate via{" "}
                 <code className="font-mono text-foreground">nmrglue</code> or vendor-supplied
                 exporters.
@@ -725,15 +726,15 @@ export function IntegrationsPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                Use cases shipped
+                What the connectors enable
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Six integration patterns we ship in production.
+                Six integration patterns the platform supports.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 Each pattern maps to typed entities in the backend{" "}
                 <code className="font-mono text-foreground">interoperability_store</code>. Inputs +
-                outputs are real Pydantic shapes — not roadmap items.
+                outputs map to typed Pydantic shapes modeled in that store.
               </p>
             </div>
             <div className="mt-12 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
@@ -1028,8 +1029,8 @@ export function IntegrationsPage() {
                 </h2>
                 <p className="mt-4 text-base text-muted-foreground">
                   Every connector is zero-trust by default. Credentials are vault-referenced,
-                  webhooks are HMAC-signed, mapping templates are versioned, and silent failures
-                  are impossible.
+                  webhooks are HMAC-signed, mapping templates are versioned, and failures are
+                  designed to surface rather than stay silent.
                 </p>
               </div>
               <ul className="space-y-3">
@@ -1070,7 +1071,7 @@ export function IntegrationsPage() {
               </h2>
               <p className="mt-4 text-base text-muted-foreground sm:text-lg">
                 Bruker + LabWare + Benchling + Okta? Done. Something more exotic? Generic OAuth +
-                a typed mapping template usually gets us to a one-day integration. Send us your
+                a typed mapping template is often a fast integration. Send us your
                 inventory and we'll come back with the plan.
               </p>
               <div className="mt-10 flex flex-wrap items-center justify-center gap-4">

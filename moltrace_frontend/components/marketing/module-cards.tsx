@@ -28,7 +28,7 @@ const modules = [
     tag: "Module 01",
     title: "Spectroscopy Intelligence",
     desc: "Interpret raw FID files, elucidate molecular structures from 1H/13C/2D NMR, and annotate unknown compounds from LC-MS/MS. AI-assisted, human-verified.",
-    badge: "Most Popular",
+    badge: "Start Here",
     color: {
       text: "text-teal-500 dark:text-teal-400",
       borderActive: "border-teal-500 dark:border-teal-400",
@@ -43,13 +43,13 @@ const modules = [
       "Unknown compound structure elucidation",
       "Peak-to-structure mapping with confidence scores",
       "Residual solvent & impurity detection",
-      "qNMR quantification with USP <761> compliance",
+      "qNMR quantification designed to support USP <761>",
     ],
   },
   {
     tag: "Module 02",
     title: "Regulatory Intelligence Hub",
-    desc: "Automated ICH-compliant dossier assembly, impurity threshold monitoring, nitrosamine CPCA assessment, and jurisdiction-specific requirement tracking.",
+    desc: "Dossier assembly designed to support ICH requirements, impurity threshold monitoring, nitrosamine CPCA assessment, and jurisdiction-specific requirement tracking.",
     badge: null,
     color: {
       text: "text-cyan-500 dark:text-cyan-400",

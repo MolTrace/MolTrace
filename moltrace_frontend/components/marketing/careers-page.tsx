@@ -52,14 +52,14 @@ const WHY_JOIN: Reason[] = [
   {
     icon: ShieldCheck,
     number: "01",
-    title: "Regulatory-grade engineering, not compliance theatre",
-    body: "FDA Jan 2025 AI framework, EMA reflection paper, ICH Q2(R2), ALCOA+ — these aren't boxes we tick. They're the design constraint. You'll learn pharma data integrity at depth most engineers never touch.",
+    title: "Engineering designed around regulatory data-integrity constraints",
+    body: "FDA Jan 2025 AI framework, EMA reflection paper, ICH Q2(R2), ALCOA+ — these aren't boxes we tick. They shape the design. You'll learn pharma data integrity at depth most engineers never touch.",
   },
   {
     icon: GitBranch,
     number: "02",
     title: "Promotion-gate culture",
-    body: "We don't ship AI defaults until they clear strict statistical validation. New detection backends launch as opt-in, get measured against an expert-curated corpus, and only become default when they cross a published threshold. If you've watched AI startups ship and patch, this will feel like sanity.",
+    body: "We don't ship AI defaults until they clear strict statistical validation. New detection backends launch as opt-in, get measured against an expert-curated corpus, and only become default when they cross a predefined validation threshold. If you've watched AI startups ship and patch, this is designed to feel like sanity.",
   },
   {
     icon: Layers,
@@ -70,8 +70,8 @@ const WHY_JOIN: Reason[] = [
   {
     icon: CalendarCheck2,
     number: "04",
-    title: "Weekly ship cadence, in public",
-    body: "Every existing endpoint and regression test stays green as new evidence layers land. We publish our recent ships, our validation corpus, our gate thresholds. You'll see your work referenced in changelogs and white papers within weeks.",
+    title: "Weekly ship cadence, documented",
+    body: "Every existing endpoint and regression test is designed to stay green as new evidence layers land. We document our ships and our validation methodology. You'll see your work referenced in changelogs and white papers within weeks.",
   },
 ]
 
@@ -86,12 +86,12 @@ const WORK_EXAMPLES: WorkExample[] = [
   {
     area: "ML systems",
     title: "Close a corpus-vs-detector granularity gap with a clustering layer",
-    body: "Expert NMR references count chemical environments; peak-pickers find multiplet lines. Build the algorithm that bridges them, validate it against a 20-fixture corpus, and clear the strict median-Δ≤2 promotion gate.",
+    body: "Expert NMR references count chemical environments; peak-pickers find multiplet lines. Build the algorithm that bridges them, validate it against a fixed reference corpus, and clear a strict median-error promotion gate.",
   },
   {
     area: "Backend · Python",
-    title: "Cut a 5.5-minute Bruker FT pipeline to 3.6 minutes",
-    body: "Profile a 98,304-point ¹³C dense-spectrum hot path. Find the bottleneck without changing the public response envelope or any audit ledger entry. Re-bench against the regression corpus and ship the gain by fixture_id.",
+    title: "Speed up a Bruker FT pipeline without changing its output",
+    body: "Profile a dense ¹³C-spectrum hot path. Find the bottleneck without changing the public response envelope or any audit ledger entry. Re-bench against the regression corpus and ship the gain by fixture_id.",
   },
   {
     area: "Frontend · TypeScript",
@@ -227,12 +227,12 @@ const BENEFITS: Benefit[] = [
   {
     icon: Headphones,
     name: "On-instrument time",
-    body: "Quarterly site visits to partner labs. The platform feels different after you've watched an analyst use it for a real submission.",
+    body: "Site visits to labs we work with as we onboard them. The platform feels different once you've watched an analyst use it on real instrument data.",
   },
   {
     icon: Globe2,
-    name: "Remote-friendly within hub timezones",
-    body: "Most roles support hybrid or remote within Americas / EMEA / APAC. We anchor synchronous work to your office timezone, not a single HQ.",
+    name: "Remote-friendly within regional timezones",
+    body: "Most roles are designed to support hybrid or remote within Americas / EMEA / APAC. We anchor synchronous work to your timezone, not a single HQ.",
   },
   {
     icon: Scale,
@@ -242,7 +242,7 @@ const BENEFITS: Benefit[] = [
   {
     icon: Mail,
     name: "Health, parental, retirement — covered as the floor",
-    body: "Comprehensive medical / dental / vision in every hub, 16 weeks paid parental leave, retirement match. Standard expectations; not a perk.",
+    body: "Comprehensive medical / dental / vision by region, 16 weeks paid parental leave, retirement match. Standard expectations; not a perk.",
   },
 ]
 
@@ -288,19 +288,19 @@ type Office = {
 
 const HUBS: Office[] = [
   {
-    city: "Boston, MA",
-    framing: "Headquarters · Americas",
-    remoteNote: "Hybrid (2-3 days in-office) within MA, NH, RI · Remote within ET / CT timezones",
+    city: "Americas",
+    framing: "Where we're building presence",
+    remoteNote: "Remote within ET / CT timezones · Hybrid options as we open space",
   },
   {
-    city: "London, UK",
-    framing: "EMEA hub · Regulatory liaison",
-    remoteNote: "Hybrid within Greater London · Remote within GMT / CET timezones",
+    city: "EMEA",
+    framing: "Where we're building presence · Regulatory liaison",
+    remoteNote: "Remote within GMT / CET timezones · Hybrid options as we open space",
   },
   {
-    city: "Singapore",
-    framing: "APAC hub",
-    remoteNote: "Hybrid within Singapore · Remote within SGT / JST timezones",
+    city: "APAC",
+    framing: "Where we're building presence",
+    remoteNote: "Remote within SGT / JST timezones · Hybrid options as we open space",
   },
 ]
 
@@ -421,8 +421,8 @@ export function CareersPage() {
                 Six examples of recent work, written like a teammate would describe them.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                These aren't hypothetical roadmap items — they're capabilities that shipped in the
-                last few release cycles. Open the docs to verify. The work is real.
+                These are illustrative of the kind of work we ship — drawn from capabilities built
+                across recent release cycles, not hypothetical roadmap items.
               </p>
             </div>
             <div className="mt-12 grid gap-6 lg:grid-cols-2">
@@ -735,11 +735,11 @@ export function CareersPage() {
                 Hubs & remote
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Three hubs. Remote within your hub timezone.
+                Three regions. Remote within your timezone.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                We anchor synchronous work to your office timezone — never a single HQ. The hubs
-                are chosen for proximity to pharma R&amp;D and regulatory ecosystems.
+                We anchor synchronous work to your timezone, not a single HQ. We're building
+                presence in regions chosen for proximity to pharma R&amp;D and regulatory ecosystems.
               </p>
             </div>
             <div className="mt-12 grid gap-6 lg:grid-cols-3">
@@ -777,8 +777,8 @@ export function CareersPage() {
                 Don't see your role?
               </h2>
               <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-                Tell us what you'd build. The strongest hires we've made started with a one-line
-                pitch that didn't match any open posting.
+                Tell us what you'd build. We'd rather hear what you'd build than match you to a
+                posting.
               </p>
               <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
                 <Button asChild size="lg" className="gap-2">

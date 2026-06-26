@@ -79,7 +79,7 @@ const PIPELINE: Stage[] = [
     stage: "04",
     title: "Cite",
     detail:
-      "Every numerical claim hyperlinks back to its source: the spectrum file, the picked peak, the literature window, the reviewer who approved it. No confidence number without a trail — ever.",
+      "Every numerical claim hyperlinks back to its source: the spectrum file, the picked peak, the literature window, the reviewer who approved it. Every confidence number is designed to carry its citation trail.",
     artifact: "claim · source_uri · citation_chain",
   },
   {
@@ -100,7 +100,7 @@ const PIPELINE: Stage[] = [
     stage: "07",
     title: "Ledger",
     detail:
-      "ALCOA+ audit-event entry written: attributable, legible, contemporaneous, original, accurate, complete, consistent, enduring, available. Inspection-ready by default.",
+      "ALCOA+ audit-event entry written: attributable, legible, contemporaneous, original, accurate, complete, consistent, enduring, available. Inspection-oriented by default.",
     artifact: "audit_event · alcoa_fields · inspector_view_url",
   },
 ]
@@ -158,7 +158,7 @@ const FRAMEWORKS: Framework[] = [
       "Original · Accurate (core ALCOA)",
       "Complete · Consistent · Enduring · Available (the +)",
       "Mapped onto audit_events table + immutable vault",
-      "Inspection-ready provenance for every claim",
+      "Inspection-oriented provenance for every claim",
     ],
   },
 ]
@@ -231,7 +231,7 @@ type LedgerRow = {
 const LEDGER_SAMPLE: LedgerRow[] = [
   {
     field: "Attributable",
-    value: "dr.chen@pharmaco.com · Senior Reviewer · 2026-05-28T14:32:18Z",
+    value: "a.chen@acme-pharma.example · Senior Reviewer · 2026-05-28T14:32:18Z",
     note: "Reviewer identity + role + signing timestamp",
   },
   {
@@ -306,7 +306,7 @@ const COMPARISON: Comparison[] = [
   {
     dimension: "Reproducibility (replay analysis 6 months later)",
     spreadsheet: "Re-run from scratch · 'looks similar' is usually the verdict",
-    moltrace: "Recipe-hash replay · bit-identical output guaranteed forever",
+    moltrace: "Recipe-hash replay · designed to reproduce bit-identical output",
   },
   {
     dimension: "Regulatory-change handling",
@@ -349,12 +349,12 @@ const TRUST: TrustPillar[] = [
   {
     icon: Database,
     title: "Immutable raw vault",
-    body: "Every FID is SHA-256 hashed. Vault path policy enforced. Never overwritten. Inspection-ready forever.",
+    body: "Every FID is SHA-256 hashed. Vault path policy enforced. Designed not to be overwritten, and built to support inspection.",
   },
   {
     icon: GitBranch,
     title: "Recipe-hash provenance",
-    body: "Every processing run links a recipe hash to the unchanged raw archive. Replay any prior date and get bit-identical output.",
+    body: "Every processing run links a recipe hash to the unchanged raw archive. Designed to let you replay a prior run and reproduce the same output from the unchanged raw archive.",
   },
   {
     icon: FileSignature,
@@ -363,18 +363,18 @@ const TRUST: TrustPillar[] = [
   },
   {
     icon: BadgeCheck,
-    title: "21 CFR Part 11 alignment",
-    body: "Electronic-records + electronic-signatures requirements built into the audit_events table from day one.",
+    title: "Designed to support 21 CFR Part 11",
+    body: "The audit_events table is designed to support the electronic-records and electronic-signatures requirements.",
   },
   {
     icon: AlertTriangle,
     title: "Cross-modal contradiction warnings",
-    body: "HRMS exact mass disagreeing with NMR-implied formula raises a first-class warning before signoff — every time.",
+    body: "HRMS exact mass disagreeing with NMR-implied formula raises a first-class warning before signoff.",
   },
   {
     icon: Lock,
     title: "Tenant isolation by default",
-    body: "Controls designed to support SOC 2 Type II, GDPR-aligned data residency, role-scoped audit-event ledger per tenant.",
+    body: "Controls designed to support SOC 2 Type II, data-residency controls designed to support GDPR, role-scoped audit-event ledger per tenant.",
   },
 ]
 
@@ -457,7 +457,7 @@ export function RegulatoryHubPage() {
                       style={{ backgroundColor: "var(--mt-teal)" }}
                       aria-hidden
                     />
-                    Inspection-ready
+                    Inspection-oriented
                   </span>
                 </div>
                 <p className="mt-3 font-mono text-xs text-muted-foreground">
@@ -467,7 +467,7 @@ export function RegulatoryHubPage() {
 
                 <div className="mt-6 space-y-1.5">
                   {[
-                    { label: "A", title: "dr.chen@pharmaco.com · Sr Reviewer" },
+                    { label: "A", title: "a.chen@acme-pharma.example · Sr Reviewer" },
                     { label: "L", title: "JSON · UTF-8 · schema v3.4.0" },
                     { label: "C", title: "2026-05-28T14:32:18Z · 0.4s post-detect" },
                     { label: "O", title: "FID SHA-256: 4f7a…b29e · vault" },
@@ -556,11 +556,11 @@ export function RegulatoryHubPage() {
                 The regulatory pipeline
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Seven stages from raw finding to inspection-ready ledger entry.
+                Seven stages from raw finding to inspection-oriented ledger entry.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 Every stage emits a typed Pydantic record. Every output keys back to the input. The
-                same recipe-hash replay that works for spectroscopy works here — re-derive any
+                same recipe-hash replay that works for spectroscopy works here — designed to re-derive any
                 ledger entry from any prior date with bit-identical output.
               </p>
             </div>
@@ -673,7 +673,7 @@ export function RegulatoryHubPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                Use cases shipped
+                What Regentry covers
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
                 Six regulatory workflows, with their inputs and outputs.
@@ -965,9 +965,9 @@ export function RegulatoryHubPage() {
                   Designed to be audited — not to look auditable.
                 </h2>
                 <p className="mt-4 text-base text-muted-foreground">
-                  Every commitment below is implemented in production code, not aspirational. The
-                  audit_events table runs every claim through the same six pillars. Inspectors
-                  query directly; no reconstruction needed.
+                  The controls below are implemented in code and designed to support audit, not
+                  just to look auditable. The audit_events table runs every claim through the same
+                  six pillars. Inspectors query directly; no reconstruction needed.
                 </p>
               </div>
               <ul className="space-y-3">
@@ -1007,7 +1007,7 @@ export function RegulatoryHubPage() {
                 Bring your hardest submission.
               </h2>
               <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-                Pick a dossier section that's currently a 40-hour reconciliation. We'll walk
+                Pick a dossier section that's currently a multi-week reconciliation. We'll walk
                 through how the Regentry would handle the same evidence, end-to-end.
               </p>
               <div className="mt-10 flex flex-wrap items-center justify-center gap-4">

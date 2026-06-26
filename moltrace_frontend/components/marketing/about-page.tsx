@@ -49,7 +49,7 @@ const PRINCIPLES: Principle[] = [
   {
     number: "02",
     title: "Human-in-the-loop, never autonomous",
-    body: "No regulatory document is released without an explicit human signoff. AI accelerates evidence assembly; humans make the call. This is consistent with both the FDA AI credibility framework (Stage 4 — human oversight gates) and the EMA reflection paper on AI in the medicinal-product lifecycle.",
+    body: "No regulatory document is released without an explicit human signoff. AI accelerates evidence assembly; humans make the call. This is designed to support both the FDA AI credibility framework (Stage 4 — human oversight gates) and the EMA reflection paper on AI in the medicinal-product lifecycle.",
   },
   {
     number: "03",
@@ -78,9 +78,9 @@ const METRICS: Metric[] = [
   },
   {
     value: "94.4%",
-    label: "Solvent auto-detect",
+    label: "Solvent auto-detect (internal corpus)",
     detail:
-      "NMRShiftDB2 20-fixture validation corpus. Strict promotion gate target is 95%; framework continues to validate the algorithm on HMDB-style references.",
+      "Illustrative — internal NMRShiftDB2 20-fixture validation corpus, not an audited benchmark. The strict promotion gate target is 95%; the framework continues to validate the algorithm on HMDB-style references.",
   },
   {
     value: "20",
@@ -92,7 +92,7 @@ const METRICS: Metric[] = [
     value: "6–48 hrs",
     label: "Today's bottleneck",
     detail:
-      "Routine 1D NMR structure elucidation per non-trivial small molecule. 70%+ of that is cognitive overhead — peak picking, integration, candidate ranking, report-writing.",
+      "Routine 1D NMR structure elucidation per non-trivial small molecule can take this long. In our experience, much of that is cognitive overhead — peak picking, integration, candidate ranking, report-writing.",
   },
 ]
 
@@ -115,7 +115,7 @@ const PILLARS: Pillar[] = [
     icon: ShieldCheck,
     name: "Regentry",
     blurb:
-      "Closes the loop between spectroscopy evidence and regulatory action. Dossiers, traceability, ALCOA+ audit ledger, ICH Q2(R2) alignment.",
+      "Closes the loop between spectroscopy evidence and regulatory action. Dossiers, traceability, ALCOA+ audit ledger, designed to support ICH Q2(R2).",
     href: "https://docs.moltrace.co/guides/modules/regulatory/",
   },
   {
@@ -159,12 +159,13 @@ const RECENT_SHIPS: Ship[] = [
     date: "May 27, 2026",
     capability: "HMDB-style validation framework",
     detail:
-      "Multiplet-line-granularity references that match how peak-pickers actually count. Strict gate cleared on this corpus.",
+      "Multiplet-line-granularity references that match how peak-pickers actually count. Gate criteria met on this specific internal reference corpus.",
   },
   {
     date: "May 27, 2026",
-    capability: "20–35% backend perf wins on dense ¹³C",
-    detail: "98,304-point FIDs that took 5.5 minutes now finish in 3.6.",
+    capability: "Measurable backend speedups on dense ¹³C",
+    detail:
+      "On internal benchmark hardware, processing of large 98,304-point FIDs runs meaningfully faster than the prior implementation.",
   },
   {
     date: "May 27, 2026",
@@ -188,19 +189,19 @@ type Office = {
 
 const OFFICES: Office[] = [
   {
-    city: "Boston, MA",
-    framing: "Headquarters · Americas",
-    why: "Proximate to the Cambridge / Kendall Square pharma corridor and the FDA Boston District office.",
+    city: "Boston / Cambridge, MA",
+    framing: "Americas",
+    why: "A region we focus on for its Kendall Square pharma corridor and proximity to the FDA Boston District office.",
   },
   {
     city: "London, UK",
-    framing: "EMEA · Regulatory liaison",
-    why: "Co-located with the MHRA's UK regulatory ecosystem and the broader EMA reflection-paper community.",
+    framing: "EMEA",
+    why: "A region we focus on for its MHRA regulatory ecosystem and the broader EMA reflection-paper community.",
   },
   {
     city: "Singapore",
     framing: "APAC",
-    why: "Adjacent to the APAC pharma-manufacturing corridor and the regional CRO base.",
+    why: "A region we focus on for its APAC pharma-manufacturing corridor and regional CRO base.",
   },
 ]
 
@@ -211,31 +212,31 @@ type Compliance = {
 
 const COMPLIANCE: Compliance[] = [
   {
-    badge: "SOC 2-aligned",
-    meaning: "Controls designed to support a SOC 2 Type II audit (security, availability, and confidentiality).",
+    badge: "Designed to support SOC 2",
+    meaning: "Controls designed to support a SOC 2 Type II audit (security, availability, and confidentiality). SOC 2 is not yet held.",
   },
   {
-    badge: "GDPR-ready",
-    meaning: "Tenant data residency + processing notices aligned to the EU framework.",
+    badge: "Designed to support GDPR",
+    meaning: "Tenant data residency + processing notices designed to support the EU framework.",
   },
   {
-    badge: "ICH Q2(R2) aligned",
+    badge: "Designed to support ICH Q2(R2)",
     meaning:
-      "Audit ledger + immutable raw vault + recipe-hash provenance map onto the ALCOA+ data-integrity principles.",
+      "Audit ledger + immutable raw vault + recipe-hash provenance built to support the ALCOA+ data-integrity principles.",
   },
   {
-    badge: "GxP-validation ready",
+    badge: "Designed to support GxP validation",
     meaning: "Releases gated by a human signoff queue with reviewer attribution per artefact.",
   },
   {
-    badge: "FDA AI framework (Jan 2025)",
+    badge: "Designed to support FDA AI framework (Jan 2025)",
     meaning:
-      "Risk-based credibility framework with explicit traceability, model documentation, and human oversight.",
+      "Risk-based credibility framework built to support explicit traceability, model documentation, and human oversight.",
   },
   {
-    badge: "EMA reflection paper",
+    badge: "Designed to support EMA reflection paper",
     meaning:
-      "AI-derived evidence in submissions is reproducible, version-controlled, and subordinate to expert review.",
+      "AI-derived evidence in submissions is designed to be reproducible, version-controlled, and subordinate to expert review.",
   },
 ]
 
@@ -268,10 +269,10 @@ export function AboutPage() {
               <span style={{ color: "var(--mt-teal-ink)" }}>peer reviewer</span>.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
-              MolTrace Technologies, Inc. is a venture-backed scientific intelligence company
-              building the audit-ready evidence engine for pharmaceutical R&amp;D. Every numerical
-              claim we surface — peak, score, candidate, compliance verdict — is reachable,
-              reproducible, and human-signed-off.
+              MolTrace is a scientific intelligence company building the audit-ready evidence
+              engine for pharmaceutical R&amp;D. Every numerical claim we surface — peak, score,
+              candidate, compliance verdict — is designed to be reachable, reproducible, and
+              human-signed-off.
             </p>
             <div className="mt-10 flex flex-wrap items-center gap-4">
               <Button asChild size="lg" className="gap-2">
@@ -311,16 +312,16 @@ export function AboutPage() {
               </div>
               <div className="space-y-5 text-base leading-relaxed text-muted-foreground">
                 <p>
-                  Routine structure elucidation in industry still consumes <strong className="text-foreground">6–48 hours per non-trivial small molecule</strong>, even with experienced analysts and modern NMR. <strong className="text-foreground">70%+</strong> of that is peak picking, integration adjustment, candidate ranking, and assembling the result into a reviewable narrative. The acquisition takes minutes; the rest is friction.
+                  In our experience, routine structure elucidation can consume <strong className="text-foreground">many hours per non-trivial small molecule</strong>, even with experienced analysts and modern NMR. Much of that is peak picking, integration adjustment, candidate ranking, and assembling the result into a reviewable narrative. The acquisition takes minutes; the rest is friction.
                 </p>
                 <p>
-                  Independent reproductions of published NMR-derived structures fail at <strong className="text-foreground">10–30%</strong>, largely because the chain of custody from FID to regulatory submission is invisible by default — phase corrections done by eye, integration regions adjusted post-hoc, peak lists re-edited in spreadsheets.
+                  Published NMR-derived structures are not always reproducible, largely because the chain of custody from FID to regulatory submission is invisible by default — phase corrections done by eye, integration regions adjusted post-hoc, peak lists re-edited in spreadsheets.
                 </p>
                 <p>
                   Meanwhile the FDA's January 2025 AI framework and the EMA's reflection paper put new credibility burdens on every AI-derived claim in a regulatory submission. R&amp;D groups are being asked to <em>simultaneously</em>: adopt more AI, prove it's reproducible, document every parameter that drove an assignment, and keep the human chain of decisions visible to inspectors.
                 </p>
                 <p className="font-medium text-foreground">
-                  The status-quo toolchain — spreadsheets, ad-hoc desktop processing, email-attached PDFs — doesn't satisfy any of those four constraints. MolTrace does.
+                  The status-quo toolchain — spreadsheets, ad-hoc desktop processing, email-attached PDFs — doesn't address any of those four constraints. MolTrace is built to address all four.
                 </p>
               </div>
             </div>
@@ -382,8 +383,8 @@ export function AboutPage() {
                 We'd rather show you the work.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Marketing pages everywhere claim 95%+ accuracy. We publish the corpus, the gate, and
-                the regression test that catches us when we drift.
+                Many marketing pages claim 95%+ accuracy without showing their work. We publish the
+                corpus, the gate, and the regression test that catches us when we drift.
               </p>
             </div>
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -473,7 +474,7 @@ export function AboutPage() {
                       <span>
                         <strong className="text-background">No raw-data overwrites.</strong> The
                         immutable FID vault is the first storage layer. Every processing run is
-                        recipe-hash-linked to the unchanged raw archive — forever.
+                        designed to stay recipe-hash-linked to the unchanged raw archive.
                       </span>
                     </li>
                   </ul>
@@ -609,7 +610,7 @@ export function AboutPage() {
                 Recent ships
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                A weekly cadence, in public.
+                A weekly build cadence.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 Every existing endpoint and regression test stays green as new evidence layers
@@ -662,11 +663,11 @@ export function AboutPage() {
                 Where we work
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Co-located with the science.
+                Focused on the science.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Three hubs, each picked for proximity to the pharma R&amp;D + regulatory community
-                in its region.
+                Three regions we focus on, each chosen for its proximity to the pharma R&amp;D +
+                regulatory community.
               </p>
             </div>
             <div className="mt-12 grid gap-6 lg:grid-cols-3">

@@ -90,10 +90,7 @@ describe("Marketing Footer", () => {
       // ── Resources ───────────────────────────────────────────────────
       ["Documentation", "https://docs.moltrace.co/"],
       ["API Reference", "https://docs.moltrace.co/guides/api/"],
-      [
-        "Case Studies",
-        "https://docs.moltrace.co/guides/resources/case-study-pharma/",
-      ],
+      // "Case Studies" removed pre-launch (no consented customer engagement yet).
       [
         "Webinars",
         "https://docs.moltrace.co/guides/resources/webinar-getting-started/",

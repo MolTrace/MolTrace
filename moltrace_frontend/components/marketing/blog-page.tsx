@@ -43,7 +43,7 @@ const POSTS: BlogPost[] = [
     title: "A regression test that fails by fixture_id",
     dek: "How a 20-fixture A/B JSON sidecar replaced our 'looks-good-to-me' detector reviews.",
     claim:
-      "Every detector change runs against a curated NMRShiftDB2 corpus before merge. CI fails by name when any single fixture drifts >50% — so reviewers see 'nmrshiftdb2_60000006_13c regressed' instead of 'tests passed (with notes).' The boring infrastructure that quietly raised our ship velocity.",
+      "Every detector change runs against a curated NMRShiftDB2 corpus before merge. CI fails by name when any single fixture drifts >50% — so reviewers see 'nmrshiftdb2_60000006_13c regressed' instead of 'tests passed (with notes).' The boring infrastructure meant to keep ship velocity high.",
     topic: "engineering",
     topicLabel: "Engineering",
     date: "2026-05-27",
@@ -55,7 +55,7 @@ const POSTS: BlogPost[] = [
     title: "What 'experimental' actually means in our promotion gate",
     dek: "Every new AI backend ships as opt-in. Promotion to default is a published-threshold decision, not a vibes call.",
     claim:
-      "GSD-Prompt-3 shipped as `experimental: true` with a documented gate (95% solvent detect, median compound-count delta ≤2). Until both clear, the default stays legacy. Most AI startups ship and patch; we publish the corpus, the threshold, and the date a feature crosses each one.",
+      "GSD-Prompt-3 shipped as `experimental: true` with a documented promotion gate (target: 95% solvent detection, median compound-count delta ≤2). Until both clear, the default stays legacy. We publish the corpus, the threshold, and the date a feature crosses each one.",
     topic: "methodology",
     topicLabel: "Methodology",
     date: "2026-05-27",
@@ -262,7 +262,7 @@ export function BlogPage() {
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                     style={{ color: "var(--mt-teal-ink)" }}
                   >
-                    Key finding
+                    Illustrative — sample figures
                   </p>
                   <p
                     className="mt-4 font-mono text-5xl font-bold tabular-nums tracking-tight sm:text-6xl"
@@ -271,8 +271,8 @@ export function BlogPage() {
                     Δ=17 → Δ=2
                   </p>
                   <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                    Median absolute peak-count delta against the NMRShiftDB2 corpus before vs. after
-                    the multiplet-clustering layer landed.
+                    Example of the median absolute peak-count delta the multiplet-clustering layer is
+                    designed to reduce against the NMRShiftDB2 corpus.
                   </p>
                   <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                     Strict gate target: ≤2
@@ -361,7 +361,7 @@ export function BlogPage() {
                 </Button>
               </div>
               <p className="mt-8 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                No tracking pixels · Unsubscribe in one click · GDPR-aligned intake
+                No tracking pixels · Unsubscribe in one click · Designed to support GDPR-aligned data handling
               </p>
             </div>
           </div>

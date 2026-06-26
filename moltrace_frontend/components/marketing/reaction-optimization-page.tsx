@@ -122,7 +122,7 @@ const METHODS: Method[] = [
       "Gaussian-process surrogate with Matern / RBF kernels",
       "Expected Improvement (EI) + UCB acquisition",
       "Categorical encoding for solvents, catalysts, additives",
-      "Reproducible by seed — same campaign re-runs bit-identically",
+      "Reproducible by seed — same campaign re-runs deterministically in the same environment",
       "Backend: run_bayesian_optimization() · acquisition_score",
     ],
   },
@@ -157,7 +157,7 @@ const METHODS: Method[] = [
     bullets: [
       "Direct integration with autonomous synthesis platforms",
       "Spectroscopy auto-acquired between rounds",
-      "Hands-off campaigns running 24/7 with audit attribution",
+      "Supports continuous unattended campaigns with audit attribution",
       "Safety abort triggers wired to live sensor streams",
       "Reviewer signs off pivots, not individual rounds",
     ],
@@ -219,7 +219,7 @@ const USE_CASES: UseCase[] = [
     blurb:
       "HPLC method dev, work-up optimisation, crystallisation polymorph search. Same engine, different objectives — purity + recovery + crystal habit.",
     inputs: "Design variables · purity targets",
-    outputs: "Validated method · Q2(R2)-ready parameters",
+    outputs: "Method parameters designed to support Q2(R2) validation",
   },
 ]
 
@@ -317,7 +317,7 @@ const COMPARISON: Comparison[] = [
   {
     dimension: "Replay 6 months later",
     trialAndError: "Lab notebook + memory · 'we tried that, didn't work, can't remember why'",
-    reactioniq: "Recipe-hash replay · same surrogate, same posterior, same proposal — forever",
+    reactioniq: "Recipe-hash replay · reproducible from the pinned recipe-hash",
   },
   {
     dimension: "Stopping decision",
@@ -365,12 +365,12 @@ const TRUST: TrustPillar[] = [
   {
     icon: GitBranch,
     title: "Seed-reproducible campaigns",
-    body: "Same design space + same seed + same observations = same proposals. Forever. Recipe-hash-linked surrogate state pinned per round.",
+    body: "Same design space + same seed + same observations are designed to yield the same proposals. Recipe-hash-linked surrogate state pinned per round.",
   },
   {
     icon: ShieldCheck,
     title: "Constraint-aware by design",
-    body: "Regulatory limits, safety thresholds, and cost ceilings enter the optimiser as hard constraints — not soft hints. No proposal ever violates a known limit.",
+    body: "Regulatory limits, safety thresholds, and cost ceilings enter the optimiser as hard constraints — not soft hints. Proposals are masked against known limits before they reach you.",
   },
   {
     icon: BadgeCheck,
@@ -389,8 +389,8 @@ const TRUST: TrustPillar[] = [
   },
   {
     icon: History,
-    title: "Campaign replay forever",
-    body: "Re-derive any historic Pareto front, any historic proposal, any historic decision from any prior date. Bit-identical, recipe-hash-pinned.",
+    title: "Campaign replay from any prior date",
+    body: "Re-derive any historic Pareto front, any historic proposal, any historic decision from any prior date. Deterministically reproducible from the pinned recipe-hash and seed, same-environment.",
   },
 ]
 
@@ -459,7 +459,7 @@ export function ReactionOptimizationPage() {
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                     style={{ color: "var(--mt-teal-ink)" }}
                   >
-                    Campaign · live
+                    Campaign · example
                   </p>
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em]"
@@ -481,6 +481,9 @@ export function ReactionOptimizationPage() {
                   campaign · camp_2f8d · objective Yield × (1 − impurity)
                 </p>
                 <p className="mt-1 text-sm font-medium">5 rounds · best yield 81% · imp 0.7%</p>
+                <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Illustrative — sample data
+                </p>
 
                 <div className="mt-6 space-y-1.5">
                   {CAMPAIGN_SAMPLE.map((row) => {
@@ -542,9 +545,9 @@ export function ReactionOptimizationPage() {
               </div>
               <div className="space-y-5 text-base leading-relaxed text-muted-foreground">
                 <p>
-                  A typical process-chemistry campaign runs{" "}
-                  <strong className="text-foreground">40–80 reactions</strong> to find a robust
-                  optimum. Most of those reactions are wasted — they sample regions the team
+                  A typical process-chemistry campaign often runs{" "}
+                  <strong className="text-foreground">dozens of reactions</strong> to find a robust
+                  optimum. Many of those reactions are wasted — they sample regions the team
                   already knew were bad, or repeat conditions a previous campaign explored two
                   years ago and forgot.
                 </p>

@@ -663,10 +663,10 @@ export function SpectroscopyExploreInterface({ onClose }: { onClose: () => void 
       icon: Waves,
       figureLabel: "1H NMR",
       bullets: [
-        "Automated deconvolution unwraps overlapping multiplets — a quartet hiding under a residual solvent stops sabotaging your quantification.",
+        "Automated deconvolution is designed to separate overlapping multiplets, including peaks near a residual solvent signal that would otherwise complicate quantification.",
         "FID processed in one pass: apodization, zero-filling, phase correction, and baseline drift handled before integration.",
         "Auto-referenced against a known standard so every chemical shift you publish is grounded in raw signal you can re-derive.",
-        "Five multiplets resolved with USP <761>-ready integrations and confidence per peak.",
+        "Five multiplets resolved with integrations designed to support USP <761> workflows, and a confidence value per peak.",
       ],
       footer: (
         <>
@@ -690,7 +690,7 @@ export function SpectroscopyExploreInterface({ onClose }: { onClose: () => void 
         "Proton-decoupled acquisition — every unique carbon resolves as a single sharp peak at its exact chemical shift.",
         "Signature CDCl₃ triplet at δ 77.0 anchors the spectrum — the visual fingerprint of a real ¹³C{¹H} acquisition.",
         "DEPT-135 paired in the same run confirms CH₃ / CH₂ / CH multiplicity without a second sample.",
-        "Six unique carbons mapped against the predicted skeleton — Δδ ±0.05 ppm vs. computed shifts.",
+        "Six unique carbons mapped against the predicted skeleton, with measured shifts compared against computed shifts for each carbon (illustrative).",
       ],
       footer: (
         <>
@@ -712,14 +712,14 @@ export function SpectroscopyExploreInterface({ onClose }: { onClose: () => void 
       figureLabel: "LC-MS",
       bullets: [
         "Total Ion Chromatogram across a 30-minute gradient — features above the s/n threshold flagged automatically.",
-        "Each retention-time peak is m/z-annotated with ±0.02 min reproducibility versus your method standard.",
+        "Each retention-time peak is m/z-annotated and aligned against your method standard.",
         "MS² fragmentation queued against your in-house spectral library; unknown features surface for de-novo annotation.",
         "Five features auto-tagged — ready to flow straight into the regulatory dossier and impurity tables.",
       ],
       footer: (
         <>
           <span>5 features</span>
-          <span className="text-teal-600 dark:text-teal-400">RT ±0.02 min</span>
+          <span className="text-teal-600 dark:text-teal-400">RT-aligned</span>
         </>
       ),
       figure: <LcmsChromatogramSvg />,
@@ -882,7 +882,7 @@ export function RegulatoryExploreInterface({ onClose }: { onClose: () => void })
             Built-in Compliance and Safety.
           </h3>
           <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            QA-RAG grounds every answer in your regulatory corpus — never a hallucinated rule.
+            QA-RAG is designed to ground every answer in your regulatory corpus, with each claim tied to a retrieved citation.
           </p>
         </div>
         <button
@@ -920,9 +920,8 @@ export function RegulatoryExploreInterface({ onClose }: { onClose: () => void })
             <li className="flex items-start gap-2.5 text-sm leading-snug text-foreground/90">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-500 dark:text-cyan-400" strokeWidth={2.5} />
               <span>
-                Retrieval-augmented generation grounds every claim — the AI cannot cite a
-                regulation that isn't in the index, and every assertion ships with a clickable
-                source.
+                Retrieval-augmented generation is designed so every assertion ships with a
+                clickable source drawn from the indexed corpus.
               </span>
             </li>
             <li className="flex items-start gap-2.5 text-sm leading-snug text-foreground/90">
@@ -941,8 +940,8 @@ export function RegulatoryExploreInterface({ onClose }: { onClose: () => void })
             </li>
           </ul>
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-            <span>4 corpora · 38k clauses</span>
-            <span className="text-cyan-600 dark:text-cyan-400">100% cited</span>
+            <span>Multi-corpus regulatory index</span>
+            <span className="text-cyan-600 dark:text-cyan-400">Every answer carries citations</span>
           </div>
         </div>
         {/* Visual: chat snippet */}
@@ -1325,22 +1324,22 @@ export function ReactionExploreInterface({ onClose }: { onClose: () => void }) {
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500 dark:text-violet-400" strokeWidth={2.5} />
               <span>
                 Multi-objective acquisition optimises yield, selectivity, AND impurity profile
-                jointly — never trade an extra 2% yield for a regulatory flag.
+                jointly, so yield gains aren't pursued at the expense of a regulatory flag.
               </span>
             </li>
             <li className="flex items-start gap-2.5 text-sm leading-snug text-foreground/90">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500 dark:text-violet-400" strokeWidth={2.5} />
               <span>
-                Typical campaign: 8 – 15 well-chosen experiments converge to &gt;90% of the global
-                optimum versus 50+ for grid screening.
+                Designed to reach near-optimal conditions in far fewer well-chosen experiments
+                than exhaustive grid screening.
               </span>
             </li>
           </ul>
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
             <span>
-              <Target className="inline h-3 w-3 -translate-y-px" aria-hidden /> 6 experiments · 94% yield
+              <Target className="inline h-3 w-3 -translate-y-px" aria-hidden /> Example: 6 experiments · 94% yield
             </span>
-            <span className="text-violet-600 dark:text-violet-400">vs. 50+ for grid</span>
+            <span className="text-violet-600 dark:text-violet-400">Far fewer than grid screening</span>
           </div>
         </div>
         {/* Visual: 3D response surface */}
@@ -1358,7 +1357,7 @@ export function ReactionExploreInterface({ onClose }: { onClose: () => void }) {
             <ResponseSurface3D />
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               <span>6 experiments mapped · GP posterior shown</span>
-              <span className="text-violet-600 dark:text-violet-400">σ uncertainty &lt; 1.8%</span>
+              <span className="text-violet-600 dark:text-violet-400">Example GP posterior</span>
             </div>
           </div>
         </div>

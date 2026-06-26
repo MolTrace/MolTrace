@@ -39,7 +39,7 @@ const steps = [
     n: "04",
     icon: Send,
     label: "Report & Submit",
-    desc: "Jurisdiction-ready dossier generated. Human sign-off. Export.",
+    desc: "Dossier formatted to support jurisdiction-specific submission. Human sign-off. Export.",
     color: {
       text: "text-amber-500 dark:text-amber-400",
       border: "border-amber-500 dark:border-amber-400",
