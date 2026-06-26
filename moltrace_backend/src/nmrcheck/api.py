@@ -61,6 +61,7 @@ from . import alcoa as alcoa
 from . import compound_registry_store as compound_store
 from . import esign as esign
 from . import rate_limit as rate_limit
+from . import wellknown as wellknown
 
 # build_proton_inventory exported by peak_categorization — imported alongside
 # the other category builders below.
@@ -2000,6 +2001,8 @@ PUBLIC_ROUTE_PATHS: frozenset[str] = frozenset(
         # misc public reads
         "/fid/presets",
         "/share-links/{token}",  # bearer is the unguessable share token in the path
+        # RFC 9116 vulnerability-disclosure file (Prompt 17) — public by design
+        "/.well-known/security.txt",
     }
 )
 
@@ -2934,6 +2937,22 @@ def system_version_route(request: Request) -> dict[str, Any]:
         "timestamp": datetime.now(UTC).isoformat(),
         "notes": ["Version metadata does not indicate scientific validation status."],
     }
+
+
+@router.get("/.well-known/security.txt", include_in_schema=False)
+def security_txt_route(request: Request) -> Response:
+    """RFC 9116 vulnerability-disclosure file (Prompt 17).
+
+    Public, unauthenticated, ``text/plain``. Body is built from settings with an
+    ``Expires`` computed at request time so it never goes stale (see
+    :mod:`nmrcheck.wellknown`). A deployment can disable it via
+    ``SECURITY_TXT_ENABLED=false`` (then 404).
+    """
+    settings = _state(request).settings
+    if not settings.security_txt_enabled:
+        raise HTTPException(status_code=404)
+    body = wellknown.build_security_txt(settings)
+    return Response(content=body, media_type="text/plain; charset=utf-8")
 
 
 @router.get(
