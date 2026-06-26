@@ -94,29 +94,24 @@ export function DevelopmentBanner() {
           <span className="dev-banner-dot relative inline-flex h-2 w-2 rounded-full" />
         </span>
 
-        {/* Mobile (<md): the full statement, static + wrapped + centered. The single-line
-            typewriter cannot fit the whole line on a narrow screen, so on mobile we show the
-            complete disclaimer as plain wrapped text — it always displays fully and properly. */}
+        {/* Looping typewriter — interactive on every breakpoint. Desktop (>=md): one
+            nowrap line over an invisible width reserve. Mobile (<md): the SAME typewriter,
+            but the line wraps inside a max-width box — the invisible full-text copy reserves
+            the wrapped HEIGHT and the typed overlay (inset-0, left-aligned) wraps identically,
+            so the box never reflows. Either way the full statement types out char-by-char. */}
         <span
           aria-hidden
-          className="block text-center font-mono text-[10px] font-medium uppercase leading-snug tracking-[0.1em] sm:text-[11px] sm:tracking-[0.14em] md:hidden"
+          className="dev-banner-typewrap relative inline-block max-w-[17rem] whitespace-normal text-left font-mono text-[10px] font-medium uppercase leading-snug tracking-[0.07em] sm:text-[11px] md:max-w-none md:whitespace-nowrap md:leading-tight md:tracking-[0.16em]"
         >
-          <span className="dev-banner-shimmer font-semibold">{KEY}</span>
-          {/* fixed light color: the banner surface is always dark, so this must not depend on
-              the theme (text-muted-foreground is dark in light mode -> invisible). */}
-          <span className="text-slate-400">{REST}</span>
-        </span>
-
-        {/* Desktop (>=md): single-line looping typewriter over an invisible width reserve. */}
-        <span
-          aria-hidden
-          className="dev-banner-typewrap relative hidden whitespace-nowrap font-mono text-[11px] font-medium uppercase leading-tight tracking-[0.16em] md:inline-block"
-        >
-          {/* invisible copy: reserves the final single-line width (no jitter) and keeps the text in the HTML */}
+          {/* invisible copy: reserves the final box (wrapped on mobile, single line on desktop)
+              so the row never jitters, and keeps the text in the HTML for SEO. */}
           <span className="invisible">{FULL}</span>
-          {/* typed copy, revealed/erased character-by-character over the reserved width */}
-          <span className="absolute left-0 top-0">
+          {/* typed copy, revealed/erased char-by-char. inset-0 makes it wrap to the reserved
+              box width on mobile; right/bottom auto on desktop -> natural single-line width. */}
+          <span className="absolute inset-0 md:bottom-auto md:right-auto">
             <span className="dev-banner-shimmer font-semibold">{keyShown}</span>
+            {/* fixed light color: the banner surface is always dark, so this must not depend on
+                the theme (text-muted-foreground is dark in light mode -> invisible). */}
             <span className="text-slate-400">{restShown}</span>
             <span className="dev-banner-caret">▌</span>
           </span>
