@@ -33,8 +33,9 @@ export function DevelopmentBanner() {
 
   useEffect(() => {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    // Type the full line on >=md (Tailwind md = 768px); just the key phrase on small screens.
-    const end = window.matchMedia("(min-width: 768px)").matches ? FULL.length : KEY.length
+    // The typewriter is desktop-only (it needs the full single line to fit). Mobile renders
+    // the full statement statically + wrapped below, so always target the full line here.
+    const end = FULL.length
 
     if (reduceMotion) {
       setShown(end)
@@ -93,20 +94,29 @@ export function DevelopmentBanner() {
           <span className="dev-banner-dot relative inline-flex h-2 w-2 rounded-full" />
         </span>
 
+        {/* Mobile (<md): the full statement, static + wrapped + centered. The single-line
+            typewriter cannot fit the whole line on a narrow screen, so on mobile we show the
+            complete disclaimer as plain wrapped text — it always displays fully and properly. */}
         <span
           aria-hidden
-          className="dev-banner-typewrap relative inline-block whitespace-nowrap font-mono text-[10.5px] font-medium uppercase leading-tight tracking-[0.16em] sm:text-[11px]"
+          className="block text-center font-mono text-[10px] font-medium uppercase leading-snug tracking-[0.1em] sm:text-[11px] sm:tracking-[0.14em] md:hidden"
+        >
+          <span className="dev-banner-shimmer font-semibold">{KEY}</span>
+          {/* fixed light color: the banner surface is always dark, so this must not depend on
+              the theme (text-muted-foreground is dark in light mode -> invisible). */}
+          <span className="text-slate-400">{REST}</span>
+        </span>
+
+        {/* Desktop (>=md): single-line looping typewriter over an invisible width reserve. */}
+        <span
+          aria-hidden
+          className="dev-banner-typewrap relative hidden whitespace-nowrap font-mono text-[11px] font-medium uppercase leading-tight tracking-[0.16em] md:inline-block"
         >
           {/* invisible copy: reserves the final single-line width (no jitter) and keeps the text in the HTML */}
-          <span className="invisible">
-            {KEY}
-            <span className="hidden md:inline">{REST}</span>
-          </span>
+          <span className="invisible">{FULL}</span>
           {/* typed copy, revealed/erased character-by-character over the reserved width */}
           <span className="absolute left-0 top-0">
             <span className="dev-banner-shimmer font-semibold">{keyShown}</span>
-            {/* fixed light color: the banner surface is always dark, so this must not depend
-                on the theme (text-muted-foreground is dark in light mode -> invisible). */}
             <span className="text-slate-400">{restShown}</span>
             <span className="dev-banner-caret">▌</span>
           </span>
