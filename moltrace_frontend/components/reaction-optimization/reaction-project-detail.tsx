@@ -8,7 +8,7 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { MlModelProvenanceSummary } from "@/components/ml/ml-model-provenance-summary"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
-import { apiFetch } from "@/lib/api/client"
+import { apiFetch, ApiError } from "@/lib/api/client"
 import { formatStableUtcDateTime } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -249,6 +249,30 @@ function optimizationCycleDecisionRecordFromCycle(cycle: Record<string, unknown>
   if (!isRecord(md)) return null
   const ld = md.latest_decision
   return isRecord(ld) ? ld : null
+}
+
+/** R5 — loop metrics on a cycle (metadata_json.cycle_metrics.metrics): the "how fast / how far". */
+function cycleLoopMetricsFromCycle(cycle: Record<string, unknown>): Record<string, unknown> | null {
+  const md = cycle.metadata_json
+  if (!isRecord(md)) return null
+  const cm = md.cycle_metrics
+  if (!isRecord(cm)) return null
+  return isRecord(cm.metrics) ? cm.metrics : null
+}
+
+/** R5 — half-closed-loop info present on a PROPOSED draft cycle (metadata_json.propose_next + note). */
+function cycleProposeNextInfoFromCycle(
+  cycle: Record<string, unknown>,
+): { flags: Record<string, unknown>; note: string | null; proposedFrom: number | null } | null {
+  const md = cycle.metadata_json
+  if (!isRecord(md)) return null
+  const pn = md.propose_next
+  if (!isRecord(pn)) return null
+  return {
+    flags: pn,
+    note: typeof md.note === "string" ? md.note : null,
+    proposedFrom: readNum(md.proposed_from_cycle_id),
+  }
 }
 
 function mergeOutcomeExtractionNotes(run: Record<string, unknown>): string[] {
@@ -3603,6 +3627,52 @@ export function ReactionProjectDetail() {
         tone: "err",
         text: formatApiError(err, "POST /reaction-optimization-cycles/{cycle_id}/decision failed."),
       })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // R5 — half-closed DMTA loop: propose the next batch as a NEW DRAFT cycle.
+  // Decision-support only — it executes nothing; committing an execution batch
+  // still needs a human (and passes the R6 safety gate). The backend 409s with a
+  // human-readable reason when the latest decision isn't `continue_optimization`.
+  async function proposeNextBatch(cycleId: number) {
+    setMsg(null)
+    setBusy(`opt-cc-propose-${cycleId}`)
+    try {
+      const created = await apiFetch<unknown>(
+        `/reaction-optimization-cycles/${cycleId}/propose-next`,
+        { method: "POST", body: {} },
+      )
+      const row = isRecord(created) ? created : null
+      const newId = row ? readNum(row.id) : null
+      const newCn = row ? readNum(row.cycle_number) : null
+      setMsg({
+        tone: "ok",
+        text:
+          `Proposed the next batch as a new draft cycle${newCn != null ? ` (cycle ${newCn})` : ""}. ` +
+          "Decision-support only — nothing has run; committing the batch still needs human signoff.",
+      })
+      await reload()
+      if (newId != null) {
+        setOccExpandedId(newId)
+        void loadOptimizationCycleDetail(newId)
+      }
+    } catch (err) {
+      // 409 carries the "why you can't propose" reason in `detail`; formatApiError
+      // only unpacks 401/403/404, so surface the 409 detail directly.
+      let text: string
+      if (
+        err instanceof ApiError &&
+        err.status === 409 &&
+        isRecord(err.data) &&
+        typeof err.data.detail === "string"
+      ) {
+        text = err.data.detail
+      } else {
+        text = formatApiError(err, "POST /reaction-optimization-cycles/{cycle_id}/propose-next failed.")
+      }
+      setMsg({ tone: "err", text })
     } finally {
       setBusy(null)
     }
@@ -8591,6 +8661,13 @@ export function ReactionProjectDetail() {
                         const warningsList = mergeDuplicateApiListPair(merged, "warnings_json", "warnings")
                         const notesList = mergeDuplicateApiListPair(merged, "notes_json", "notes")
                         const dec = optimizationCycleDecisionRecordFromCycle(merged)
+                        // R5 — half-closed DMTA loop bits
+                        const loopMetrics = cycleLoopMetricsFromCycle(merged)
+                        const proposeInfo = cycleProposeNextInfoFromCycle(merged)
+                        const latestDecision =
+                          dec != null && typeof dec.decision === "string" ? dec.decision : null
+                        const canProposeNext = latestDecision === "continue_optimization"
+                        const proposeBusy = busy === `opt-cc-propose-${cid}`
 
                         const summaryBlob = jsonPreview(isRecord(merged.summary_json) ? merged.summary_json : {}, 4200)
 
@@ -8657,6 +8734,50 @@ export function ReactionProjectDetail() {
                                       Loading cycle detail…
                                     </p>
                                   ) : null}
+                                  {proposeInfo != null ? (
+                                    <div
+                                      className="space-y-1 rounded-md border bg-muted/30 px-3 py-2 text-xs"
+                                      style={{ borderLeft: "3px solid var(--mt-amber)" }}
+                                    >
+                                      <p className="font-medium text-foreground">
+                                        Half-closed loop · proposed draft
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        {proposeInfo.note ??
+                                          "Proposed next batch (decision-support). Nothing has run — committing an execution batch still requires human signoff."}
+                                      </p>
+                                      <div className="flex flex-wrap gap-x-4 gap-y-1 pt-0.5 text-muted-foreground">
+                                        {proposeInfo.proposedFrom != null ? (
+                                          <span>
+                                            proposed from cycle{" "}
+                                            <span className="font-mono text-foreground">
+                                              {proposeInfo.proposedFrom}
+                                            </span>
+                                          </span>
+                                        ) : null}
+                                        {proposeInfo.flags.requires_human_signoff_before_execution === true ? (
+                                          <span className="font-medium text-foreground">
+                                            Execution requires human signoff
+                                          </span>
+                                        ) : null}
+                                        {typeof proposeInfo.flags.safety_gate_status === "string" ? (
+                                          <span>
+                                            safety gate:{" "}
+                                            <span className="font-mono text-foreground">
+                                              {String(proposeInfo.flags.safety_gate_status).replace(/_/g, " ")}
+                                            </span>
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                      {proposeInfo.flags.execution_blocked_by_safety === true ? (
+                                        <p className="font-medium text-foreground">
+                                          Execution is blocked by the safety gate — resolve the rejected
+                                          structural-safety screening (Cost &amp; Safety tab) before this batch
+                                          can be planned or run.
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
                                   <div className="space-y-2">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                       summary_json
@@ -8720,6 +8841,67 @@ export function ReactionProjectDetail() {
                                         decision record — not present on metadata_json.latest_decision yet.
                                       </p>
                                     )}
+                                  </div>
+                                  {loopMetrics != null ? (
+                                    <div className="space-y-2">
+                                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        loop metrics
+                                      </p>
+                                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                                        {[
+                                          { label: "total experiments", value: readNum(loopMetrics.total_experiments) },
+                                          { label: "new this cycle", value: readNum(loopMetrics.new_experiments) },
+                                          { label: "to target", value: readNum(loopMetrics.experiments_to_target) },
+                                          { label: "best objective", value: readNum(loopMetrics.best_objective) },
+                                          { label: "latency (s)", value: readNum(loopMetrics.latency_seconds) },
+                                        ].map((m) => (
+                                          <div key={m.label} className="rounded-md border px-2 py-1.5">
+                                            <p className="font-mono text-sm tabular-nums">
+                                              {m.value != null ? m.value : "—"}
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground">{m.label}</p>
+                                          </div>
+                                        ))}
+                                        <div className="rounded-md border px-2 py-1.5">
+                                          <p className="font-mono text-sm">
+                                            {loopMetrics.target_met === true
+                                              ? "yes"
+                                              : loopMetrics.target_met === false
+                                                ? "no"
+                                                : "—"}
+                                          </p>
+                                          <p className="text-[10px] text-muted-foreground">target met</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                  <div className="space-y-2">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                      propose next batch
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Decision-support: proposes the next batch as a new{" "}
+                                      <span className="font-medium text-foreground">draft</span> cycle. It executes
+                                      nothing — committing an execution batch still needs human signoff and passes the
+                                      safety gate.
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-3">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={!canProposeNext || proposeBusy}
+                                        onClick={() => void proposeNextBatch(cid)}
+                                      >
+                                        {proposeBusy ? "Proposing…" : "Propose next batch"}
+                                      </Button>
+                                      {!canProposeNext ? (
+                                        <span className="text-xs text-muted-foreground">
+                                          {latestDecision != null
+                                            ? `Unlocks after a "continue optimization" decision — latest is "${latestDecision.replace(/_/g, " ")}".`
+                                            : "Record a “continue optimization” decision on this cycle to unlock."}
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   </div>
                                   <Separator />
                                   <form className="space-y-4" onSubmit={(e) => void submitOptimizationCycleDecision(cid, e)}>
