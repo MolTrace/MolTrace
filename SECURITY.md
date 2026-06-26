@@ -17,6 +17,11 @@ Report privately through either of these channels:
 2. **Email** — <security@moltrace.co>. If you would like to encrypt your report,
    ask in an initial low-detail email and we will provide a key.
 
+These contacts are also published, machine-readable, at
+`/.well-known/security.txt` (RFC 9116). The detailed policy — severity rubric,
+remediation SLAs, coordinated-disclosure terms, and safe harbor — lives in the
+[Vulnerability Disclosure Policy](moltrace_backend/docs/security/vulnerability_disclosure_policy.md).
+
 Please include, where possible:
 
 - A description of the vulnerability and its impact.

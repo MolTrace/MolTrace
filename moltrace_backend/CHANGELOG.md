@@ -14,6 +14,65 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.56.0 — Security Prompt 17: Pen testing & coordinated disclosure (2026-06-25)
+
+**Headline:** Stands up the vulnerability-disclosure surface and the pen-test/threat-model program.
+Adds a public **RFC 9116 `security.txt`** endpoint and four in-repo program artifacts that route every
+finding into a tracked backlog with severity SLAs and remediation evidence.
+
+- **`/.well-known/security.txt`** (`src/nmrcheck/wellknown.py`, NEW; route in `api.py`) — public,
+  unauthenticated, `text/plain` RFC 9116 disclosure file. **`Expires` is computed at request time**
+  (clamped into the one-year window) so a served file is never stale — no hardcoded date to rot.
+  Settings-driven (`SECURITY_TXT_*`): mandatory `Contact` + `Expires` ship by default; optional
+  `Policy`/`Canonical`/`Encryption`/`Acknowledgments` URLs are emitted **only when configured**, so the
+  file never advertises a page that 404s or a paid bounty the program doesn't run. Added to
+  `PUBLIC_ROUTE_PATHS` (and the pinned `test_authz_route_regression_api`), so it's covered by the same
+  default-deny gate + IP-keyed rate limiter as `/health`.
+- **Vulnerability Disclosure Policy** (`docs/security/vulnerability_disclosure_policy.md`) — scope
+  (in/out), **safe harbor**, CVSS v3.1 severity rubric, response + remediation SLAs (reusing the P14
+  gate SLAs — one rubric for reported *and* scanner-found issues), coordinated-disclosure terms.
+  Honestly scoped: **coordinated disclosure with credit, not a paid bounty** (yet).
+- **Pen-test program runbook** (`docs/security/pentest_program.md`) — annual + pre-major-release
+  cadence, rules of engagement, and the findings pipeline (intake → triage → register → remediate →
+  verify → disclose) that defines the program's "done when findings flow into the backlog with
+  severity SLAs and remediation evidence" acceptance criterion.
+- **Threat model** (`docs/security/threat_model.md`) — STRIDE-per-surface over the real backend attack
+  surface (auth/session, SSO/SCIM, MFA/step-up, e-sign, dossier RBAC, rate-limit, raw vault, audit
+  ledger, supply chain, admin) with residual-risk callouts, plus a **new-surface threat-model
+  checklist** authors run before shipping an external surface.
+- **Security findings register** (`docs/security/security_findings_register.md`) — the in-repo
+  cross-source roll-up tying each finding to CVSS severity, SLA dates, status, and remediation
+  evidence; cross-links the GitHub code-scanning tab + the `.trivyignore` VEX register.
+
+Honest boundary stated throughout: **engaging a pen-test firm and launching a bounty platform are
+operational steps outside the repo** — this ships the policy, safe harbor, machine-readable intake,
+threat model, and findings process they feed. `security.txt` is settings-gated (`SECURITY_TXT_ENABLED`,
+default ON → 404 when disabled); 9 new tests; authz-route regression green. An adversarial review pass
+folded in 4 fixes before commit (CR/LF field-injection hardening in the builder + its regression test;
+a corrected admin-step-up claim, an added share-link anonymous-surface row, and a sharpened upload-DoS
+residual in the threat model).
+
+### Added
+- **`src/nmrcheck/wellknown.py`** — pure, testable RFC 9116 `security.txt` builder (computed `Expires`,
+  optional-field omission, CRLF framing, contact fallback, **CR/LF-sanitized values** so an operator
+  env value can't inject a forged field line).
+- **`tests/test_security_txt.py`** — builder (mandatory fields, in-window Expires, optional omission,
+  clamping, multiple contacts, CRLF framing, CR/LF-injection neutralized) + route (200/`text/plain`,
+  anonymous reach, disable→404).
+- **`docs/security/`** — `vulnerability_disclosure_policy.md`, `pentest_program.md`, `threat_model.md`,
+  `security_findings_register.md`.
+- **Settings** `security_txt_enabled`, `security_txt_contacts`, `security_txt_expires_days`,
+  `security_txt_policy_url`, `security_txt_canonical_url`, `security_txt_encryption_url`,
+  `security_txt_acknowledgments_url`, `security_txt_preferred_languages` (all env-wired, safe defaults).
+
+### Changed
+- **`api.py`** — new `security_txt_route` on the gated router; `/.well-known/security.txt` added to
+  `PUBLIC_ROUTE_PATHS`.
+- **`tests/test_authz_route_regression_api.py`** — pinned public allow-list acknowledges the new path.
+- **`SECURITY.md`** (repo root) — cross-references `/.well-known/security.txt` + the detailed VDP.
+
+---
+
 ## v0.55.0 — Security Prompt 16: API abuse & WAF protection (2026-06-21)
 
 **Headline:** Opens the API-abuse-protection pillar. Adds an in-app **per-tenant + per-route rate

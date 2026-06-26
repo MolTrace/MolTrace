@@ -149,6 +149,19 @@ class Settings:
     # Global request-body-size guard (Prompt 16), bytes. 0 = disabled (default, so existing flows are
     # unaffected); production sets a generous cap. Multipart uploads are exempt (own caps apply).
     max_request_body_bytes: int = 0
+    # RFC 9116 security.txt disclosure file (Prompt 17), served at /.well-known/security.txt.
+    # Defaults ship a minimal-but-valid file (mandatory Contact + Expires + Preferred-Languages);
+    # a deployment sets the optional URLs only when the target pages exist (see wellknown.py).
+    # ``security_txt_contacts`` is comma-separated, highest-priority first; ``Expires`` is computed
+    # at request time so it never goes stale.
+    security_txt_enabled: bool = True
+    security_txt_contacts: str = "mailto:security@moltrace.co"
+    security_txt_expires_days: int = 180
+    security_txt_policy_url: str = ""
+    security_txt_canonical_url: str = ""
+    security_txt_encryption_url: str = ""
+    security_txt_acknowledgments_url: str = ""
+    security_txt_preferred_languages: str = "en"
     enable_2d_nmr: bool = True
     enable_2d_contour_preview: bool = True
     enable_raw_2d_fid_beta: bool = False
@@ -290,6 +303,22 @@ def get_settings() -> Settings:
             os.getenv("RATE_LIMIT_TRUST_FORWARDED_FOR"), False
         ),
         max_request_body_bytes=_parse_int(os.getenv("MAX_REQUEST_BODY_BYTES"), 0),
+        security_txt_enabled=_parse_bool(os.getenv("SECURITY_TXT_ENABLED"), True),
+        security_txt_contacts=os.getenv(
+            "SECURITY_TXT_CONTACTS", "mailto:security@moltrace.co"
+        ),
+        security_txt_expires_days=_parse_int(
+            os.getenv("SECURITY_TXT_EXPIRES_DAYS"), 180
+        ),
+        security_txt_policy_url=os.getenv("SECURITY_TXT_POLICY_URL", ""),
+        security_txt_canonical_url=os.getenv("SECURITY_TXT_CANONICAL_URL", ""),
+        security_txt_encryption_url=os.getenv("SECURITY_TXT_ENCRYPTION_URL", ""),
+        security_txt_acknowledgments_url=os.getenv(
+            "SECURITY_TXT_ACKNOWLEDGMENTS_URL", ""
+        ),
+        security_txt_preferred_languages=os.getenv(
+            "SECURITY_TXT_PREFERRED_LANGUAGES", "en"
+        ),
         enable_2d_nmr=_parse_bool(os.getenv("ENABLE_2D_NMR"), True),
         enable_2d_contour_preview=_parse_bool(os.getenv("ENABLE_2D_CONTOUR_PREVIEW"), True),
         enable_raw_2d_fid_beta=_parse_bool(os.getenv("ENABLE_RAW_2D_FID_BETA"), False),

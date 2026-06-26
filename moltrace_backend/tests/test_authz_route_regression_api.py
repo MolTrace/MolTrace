@@ -242,6 +242,7 @@ EXPECTED_PUBLIC_PATHS = frozenset(
         "/auth/reset-password",
         "/fid/presets",
         "/share-links/{token}",
+        "/.well-known/security.txt",
     }
 )
 
