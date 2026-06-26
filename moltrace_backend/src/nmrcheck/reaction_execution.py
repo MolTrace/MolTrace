@@ -8,10 +8,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import reaction_bo, reaction_loop, reaction_safety
 from .database import session_scope
 from .models import (
     ReactionAnalyticalResult,
     ReactionAnalyticalResultCreate,
+    ReactionBayesianOptimizationRunRequest,
     ReactionCycleDecisionCreate,
     ReactionCycleDecisionRecord,
     ReactionExecutionBatch,
@@ -51,9 +53,7 @@ from .orm import (
     SpectraCheckSessionORM,
     utcnow,
 )
-from . import reaction_safety
 from .reaction_store import ReactionActor, ReactionError
-
 
 # Statuses that commit a batch to physical execution — gated by the R6 safety hard-block.
 # 'draft' (planning) and terminal/record-keeping states (completed/failed/canceled/…) are not.
@@ -868,6 +868,71 @@ def create_cycle_decision(
             metadata={"decision": payload.decision},
         )
         return _decision_to_record(row)
+
+
+class ReactionLoopGateError(ReactionError):
+    """The DMTA loop may not propose the next batch in its current state (mapped to HTTP 409).
+
+    Subclass of ``ReactionError`` — checked first in ``_raise_reaction_http_error`` so it maps to
+    409 (conflict with the loop's state), not the plain 400.
+    """
+
+
+def propose_next_cycle(
+    session_factory: sessionmaker[Session],
+    cycle_id: int,
+    payload: ReactionBayesianOptimizationRunRequest,
+    *,
+    actor: ReactionActor,
+) -> ReactionOptimizationCycle | None:
+    """R5 human-gated "propose the next batch" — the half-closed loop's only automated step.
+
+    Only a cycle whose latest decision is ``continue_optimization`` may propose; otherwise raise
+    ``ReactionLoopGateError`` (409). When permitted, run a BO batch (PROPOSE) and record a NEW
+    **draft** cycle metered with loop metrics + provenance. Nothing is executed: the safety gate is
+    consulted (advisory here; the R6 hard-block enforces it at the make/commit boundary) and the
+    proposed cycle stays draft until a human commits an execution batch.
+    """
+    with session_scope(session_factory) as session:
+        cycle = session.get(ReactionOptimizationCycleORM, cycle_id)
+        if cycle is None:
+            return None
+        project_id = cycle.reaction_project_id
+        latest_decision = _json_dict(cycle.metadata_json).get("latest_decision", {}).get("decision")
+
+    gate = reaction_safety.gate_status(session_factory, project_id)
+    verdict = reaction_loop.evaluate_propose_next(latest_decision, gate.status)
+    if not verdict.allowed:
+        raise ReactionLoopGateError(verdict.reason)
+
+    # PROPOSE (own session); decision-support only — produces recommendations, executes nothing.
+    bo_run = reaction_bo.run_bayesian_optimization(session_factory, project_id, payload, actor=actor)
+
+    metrics = reaction_loop.compute_loop_metrics(new_experiment_count=payload.batch_size)
+    cycle_metrics = reaction_loop.build_cycle_metrics_payload(
+        metrics,
+        bo_run_id=bo_run.id,
+        surrogate_model_version=getattr(bo_run, "model_type", None)
+        or getattr(bo_run, "model_version", None),
+    )
+    return create_optimization_cycle(
+        session_factory,
+        project_id,
+        ReactionOptimizationCycleCreate(
+            status="draft",
+            bo_run_id=bo_run.id,
+            metadata_json={
+                "cycle_metrics": cycle_metrics,
+                "proposed_from_cycle_id": cycle_id,
+                "propose_next": verdict.as_dict(),
+                "note": (
+                    "Proposed next batch (decision-support). Execution requires human signoff and a "
+                    "clear safety gate; nothing was executed."
+                ),
+            },
+        ),
+        actor=actor,
+    )
 
 
 def _mark_execution_status(
