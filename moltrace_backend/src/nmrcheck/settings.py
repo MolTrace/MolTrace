@@ -162,6 +162,17 @@ class Settings:
     security_txt_encryption_url: str = ""
     security_txt_acknowledgments_url: str = ""
     security_txt_preferred_languages: str = "en"
+    # SIEM detections (Prompt 19). security_siem_enabled gates both SecurityEvent emission
+    # at the auth/deny seams AND the detection scan. The webhook sink (optional) receives
+    # high-severity alerts; otherwise alerts go to stdout JSON (forwarded by the platform
+    # log drain). Thresholds tune the four detections — see detections.py.
+    security_siem_enabled: bool = True
+    security_alert_webhook_url: str = ""
+    security_detection_window_minutes: int = 1440
+    security_detection_scan_limit: int = 5000
+    impossible_travel_window_seconds: int = 300
+    cross_tenant_denied_threshold: int = 5
+    cross_tenant_window_seconds: int = 600
     enable_2d_nmr: bool = True
     enable_2d_contour_preview: bool = True
     enable_raw_2d_fid_beta: bool = False
@@ -318,6 +329,23 @@ def get_settings() -> Settings:
         ),
         security_txt_preferred_languages=os.getenv(
             "SECURITY_TXT_PREFERRED_LANGUAGES", "en"
+        ),
+        security_siem_enabled=_parse_bool(os.getenv("SECURITY_SIEM_ENABLED"), True),
+        security_alert_webhook_url=os.getenv("SECURITY_ALERT_WEBHOOK_URL", ""),
+        security_detection_window_minutes=_parse_int(
+            os.getenv("SECURITY_DETECTION_WINDOW_MINUTES"), 1440
+        ),
+        security_detection_scan_limit=_parse_int(
+            os.getenv("SECURITY_DETECTION_SCAN_LIMIT"), 5000
+        ),
+        impossible_travel_window_seconds=_parse_int(
+            os.getenv("IMPOSSIBLE_TRAVEL_WINDOW_SECONDS"), 300
+        ),
+        cross_tenant_denied_threshold=_parse_int(
+            os.getenv("CROSS_TENANT_DENIED_THRESHOLD"), 5
+        ),
+        cross_tenant_window_seconds=_parse_int(
+            os.getenv("CROSS_TENANT_WINDOW_SECONDS"), 600
         ),
         enable_2d_nmr=_parse_bool(os.getenv("ENABLE_2D_NMR"), True),
         enable_2d_contour_preview=_parse_bool(os.getenv("ENABLE_2D_CONTOUR_PREVIEW"), True),

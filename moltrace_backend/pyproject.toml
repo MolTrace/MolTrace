@@ -1,6 +1,6 @@
 [project]
 name = "nmrcheck"
-version = "0.57.0"
+version = "0.58.0"
 description = "Rule-based 1H NMR checker with Postgres persistence, account verification, password reset, and queued background jobs"
 readme = "README.md"
 license = { text = "BUSL-1.1" }

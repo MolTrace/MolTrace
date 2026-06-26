@@ -6,6 +6,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -718,6 +719,24 @@ def list_security_events(
             stmt = stmt.where(SecurityEventORM.severity == severity)
         if actor_email is not None:
             stmt = stmt.where(SecurityEventORM.actor_email == actor_email.lower())
+        return [_security_event_to_record(row) for row in session.scalars(stmt).all()]
+
+
+def recent_security_events(
+    session_factory: sessionmaker[Session],
+    *,
+    since: datetime,
+    limit: int = 5000,
+) -> list[SecurityEvent]:
+    """SecurityEvents created at/after ``since`` (newest first, capped) — the input
+    window for the Prompt 19 detection scan (see detections.run_detections)."""
+    with session_scope(session_factory) as session:
+        stmt = (
+            select(SecurityEventORM)
+            .where(SecurityEventORM.created_at >= since)
+            .order_by(SecurityEventORM.id.desc())
+            .limit(limit)
+        )
         return [_security_event_to_record(row) for row in session.scalars(stmt).all()]
 
 

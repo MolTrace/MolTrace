@@ -9901,6 +9901,8 @@ SecurityEventType = Literal[
     "login_success",
     "login_failure",
     "permission_denied",
+    "cross_tenant_denied",
+    "privilege_escalation",
     "token_error",
     "suspicious_request",
     "rate_limit",
@@ -9911,6 +9913,12 @@ SecurityEventType = Literal[
     "other",
 ]
 SecuritySeverity = Literal["info", "warning", "error", "critical"]
+DetectionId = Literal[
+    "impossible_travel",
+    "privilege_escalation",
+    "cross_tenant_access",
+    "audit_chain_break",
+]
 DebugBundleScope = Literal["system", "project", "sample", "session", "job", "report"]
 DebugBundleStatus = Literal["created", "failed"]
 
@@ -10040,6 +10048,38 @@ class SecuritySummary(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SecurityAlert(BaseModel):
+    """A correlated security detection finding (Security Prompt 19).
+
+    Derived from the SecurityEvent stream + the audit-chain verification — not a
+    persisted table; the durable record is the underlying SecurityEvents (immutable,
+    in the audit chain) plus whatever the SIEM sink ingests.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    detection: DetectionId
+    severity: SecuritySeverity
+    actor_email: str | None = None
+    message: str
+    first_seen: datetime | None = None
+    last_seen: datetime | None = None
+    event_count: int = 1
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class DetectionScanResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    generated_at: datetime
+    window_minutes: int
+    events_scanned: int
+    alerts: list[SecurityAlert] = Field(default_factory=list)
+    shipped: int = 0
+    audit_chain_ok: bool = True
+    truncated: bool = False
 
 
 class DebugBundleCreate(BaseModel):

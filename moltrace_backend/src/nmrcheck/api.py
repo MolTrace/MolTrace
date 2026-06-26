@@ -59,6 +59,7 @@ from . import authz as authz
 from . import collaboration_store as collab_store
 from . import alcoa as alcoa
 from . import compound_registry_store as compound_store
+from . import detections as detections
 from . import esign as esign
 from . import rate_limit as rate_limit
 from . import wellknown as wellknown
@@ -344,6 +345,7 @@ from .models import (
     DeploymentCandidateResponse,
     DeptAptAnalyzeResult,
     DeptAptPreviewReport,
+    DetectionScanResult,
     DeviationRecord,
     DeviationRecordCreate,
     DeviationRecordUpdate,
@@ -2761,6 +2763,9 @@ def require_dossier_access(
         authz.Resource("dossier", resource_id=dossier_id, owner_id=owner_id),
     )
     if not decision.allowed:
+        detections.emit_cross_tenant_denied(
+            request, context, resource_type="dossier", resource_id=str(dossier_id)
+        )
         raise HTTPException(status_code=404, detail="Regulatory dossier not found.")
 
 
@@ -2789,6 +2794,9 @@ def require_reaction_access(
         authz.Resource("reaction_project", resource_id=None, owner_id=owner_id),
     )
     if not decision.allowed:
+        detections.emit_cross_tenant_denied(
+            request, context, resource_type="reaction_project", resource_id=route_path
+        )
         raise HTTPException(status_code=404, detail="Not found.")
 
 
@@ -2811,6 +2819,13 @@ def _readable_via_parent_dossier(
         authz.Action("dossier:read"),
         authz.Resource("dossier", resource_id=dossier_id, owner_id=owner_id),
     )
+    if not decision.allowed:
+        detections.emit_cross_tenant_denied(
+            request,
+            context,
+            resource_type="dossier_child",
+            resource_id=str(dossier_id) if dossier_id is not None else None,
+        )
     return decision.allowed
 
 
@@ -3075,6 +3090,38 @@ def security_summary_route(
     context: AccessContext = Depends(require_admin),
 ) -> SecuritySummary:
     return ops_store.security_summary(_state(request).session_factory)
+
+
+@router.get(
+    "/admin/security/alerts",
+    response_model=DetectionScanResult,
+    dependencies=[Depends(require_admin)],
+)
+def security_alerts_route(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> DetectionScanResult:
+    """Security Prompt 19 — run the detections over the recent SecurityEvent window +
+    verify the audit chain, returning the current alerts. Read-only: does NOT ship to
+    the SIEM sink (use POST /admin/security/detections/run for that)."""
+    state = _state(request)
+    return detections.run_detections(state.session_factory, state.settings, ship=False)
+
+
+@router.post(
+    "/admin/security/detections/run",
+    response_model=DetectionScanResult,
+    dependencies=[Depends(require_admin)],
+)
+def security_detections_run_route(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> DetectionScanResult:
+    """Run the detection scan AND ship high-severity (error/critical) alerts to the
+    SIEM sink (stdout JSON + optional webhook). This is the hook a scheduler/cron
+    calls; 24/7 on-call routing of the shipped alerts is operational."""
+    state = _state(request)
+    return detections.run_detections(state.session_factory, state.settings, ship=True)
 
 
 @router.get(
@@ -5630,6 +5677,9 @@ def login_json(payload: UserLogin, request: Request) -> AccessTokenResponse:
         )
     if state.settings.is_admin_email(user.email) and not user.is_admin:
         user = set_user_admin_status(state.session_factory, user_id=user.id, is_admin=True)
+        detections.emit_privilege_escalation(
+            request, email=user.email, granted_via="admin_email_login"
+        )
     decision = mfa_store.begin_or_complete_login(state.session_factory, state.settings, user)
     if decision.needs_mfa:
         return _mfa_challenge_response(decision)
@@ -5648,6 +5698,7 @@ def login_json(payload: UserLogin, request: Request) -> AccessTokenResponse:
         entity_type="user",
         entity_id=user.id,
     )
+    detections.emit_login_success(request, user=user)
     return AccessTokenResponse(
         access_token=minted.access_token,
         expires_at=minted.expires_at,
@@ -5675,6 +5726,9 @@ def sign_in(payload: UserSignIn, request: Request) -> AuthPageResponse:
         )
     if state.settings.is_admin_email(user.email) and not user.is_admin:
         user = set_user_admin_status(state.session_factory, user_id=user.id, is_admin=True)
+        detections.emit_privilege_escalation(
+            request, email=user.email, granted_via="admin_email_login"
+        )
     decision = mfa_store.begin_or_complete_login(state.session_factory, state.settings, user)
     if decision.needs_mfa:
         return _mfa_challenge_response(decision)
@@ -5692,6 +5746,7 @@ def sign_in(payload: UserSignIn, request: Request) -> AuthPageResponse:
         entity_id=user.id,
         metadata={"remember_me": payload.remember_me},
     )
+    detections.emit_login_success(request, user=user)
     return response
 
 
@@ -5715,6 +5770,9 @@ def login_form(
         )
     if state.settings.is_admin_email(user.email) and not user.is_admin:
         user = set_user_admin_status(state.session_factory, user_id=user.id, is_admin=True)
+        detections.emit_privilege_escalation(
+            request, email=user.email, granted_via="admin_email_login"
+        )
     decision = mfa_store.begin_or_complete_login(state.session_factory, state.settings, user)
     if decision.needs_mfa:
         return _mfa_challenge_response(decision)
@@ -5733,6 +5791,7 @@ def login_form(
         entity_type="user",
         entity_id=user.id,
     )
+    detections.emit_login_success(request, user=user)
     return AccessTokenResponse(
         access_token=minted.access_token,
         expires_at=minted.expires_at,
