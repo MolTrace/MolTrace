@@ -14,6 +14,53 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.58.0 — Security Prompt 19: SIEM & security detections (2026-06-26)
+
+**Headline:** Turns the immutable SecurityEvent stream + the tamper-evident audit chain into
+near-real-time **detections**, shipping high-severity alerts to a pluggable **SIEM sink**. Four
+detections — impossible travel, privilege escalation, cross-tenant access, audit-chain break —
+all proven to alert end-to-end in staging tests.
+
+- **Detection engine** (`src/nmrcheck/detections.py`, NEW, zero new deps) — four pure rules over the
+  SecurityEvent stream + the `verify_audit_chain` result: `impossible_travel` (same actor, two
+  `login_success` from different IPs within a window — an IP-velocity heuristic; geo enrichment is a
+  documented seam), `privilege_escalation` (an is_admin flip), `cross_tenant_access` (≥ threshold
+  `cross_tenant_denied` within a window — enumeration probing), `audit_chain_break` (ledger
+  verification fails). `run_detections` orchestrates the scan + optional shipping.
+- **SIEM sink seam** — always a `JsonStdoutSink` (structured `{"siem_alert": …}` to stdout → the
+  platform log drain → any SIEM), plus a `WebhookSink` when `SECURITY_ALERT_WEBHOOK_URL` is set
+  (best-effort POST, never raises). Only error/critical alerts ship.
+- **Emission wiring** (`api.py`, best-effort, gated by `SECURITY_SIEM_ENABLED`, default on, modelled
+  on the rate-limiter's emit): `login_success` + client IP at the three password login routes;
+  `cross_tenant_denied` at the three owner-scoped deny branches (anon/system skipped); `privilege_escalation` at the three
+  login admin-email auto-grant sites. (MFA/SSO login + the explicit admin-grant route are noted seams.)
+- **Admin endpoints** (require_admin, default-deny gated): `GET /admin/security/alerts` (read-only
+  scan view) and `POST /admin/security/detections/run` (scan + ship — the cron hook).
+- **Honest boundary** (`docs/security/siem_detections.md`): shipping to a *hosted* SIEM and the
+  *24/7 on-call rotation* are operational; in-repo are the detection rules, the alert sink seam, the
+  scan endpoints, and the scenario tests.
+
+No behavior change when `SECURITY_SIEM_ENABLED=false`; emission is best-effort (a telemetry failure
+can never break the instrumented request). 21 new tests (15 rule/sink units + 6 end-to-end scenarios);
+auth / dossier-scoping / audit-chain / authz-route regression green.
+
+### Added
+- **`src/nmrcheck/detections.py`** — detection rules, `run_detections`, the SIEM sinks, and the
+  best-effort emission helpers.
+- **`tests/test_security_detections.py`** (rule units + sinks) + **`tests/test_security_detections_api.py`**
+  (the four scenarios end-to-end through the admin endpoints).
+- **Models** `SecurityAlert`, `DetectionScanResult`, `DetectionId`; `SecurityEventType` += `cross_tenant_denied`,
+  `privilege_escalation`. **Settings** `security_siem_enabled`, `security_alert_webhook_url`, detection
+  window/limit + the impossible-travel / cross-tenant thresholds.
+- **`operations_store.recent_security_events`** (time-windowed scan input).
+- **`docs/security/siem_detections.md`** + **`docs/fe_handoff_siem_detections.md`**.
+
+### Changed
+- **`api.py`** — `detections` import; emission calls at the login / privilege / cross-tenant seams;
+  the two admin scan endpoints.
+
+---
+
 ## v0.57.0 — Security Prompt 18: Zero-trust infrastructure (in-repo slice) (2026-06-26)
 
 **Headline:** Hardens the CI/CD supply chain and adds continuous IaC posture scoring with drift
