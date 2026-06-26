@@ -46,6 +46,14 @@ concurrency:
   group: ci-cd-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default (Security Prompt 18 — zero-trust CI). Every job inherits a
+# read-only GITHUB_TOKEN unless it explicitly scopes up; only `attest` (id-token +
+# attestations write, for keyless Sigstore) and `verify-provenance` (attestations
+# read) need more. The deploy job only POSTs to external deploy-hook secrets and
+# needs no GITHUB_TOKEN write at all.
+permissions:
+  contents: read
+
 jobs:
   frontend-tests:
     name: Frontend · vitest
@@ -55,18 +63,18 @@ jobs:
         working-directory: moltrace_frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       # pnpm must be installed BEFORE setup-node so the cache key can resolve
       # the pnpm store. Version is pinned to match moltrace_frontend/package.json
       # (packageManager: pnpm@11.0.3).
       - name: Setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 11.0.3
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           # Matches moltrace_frontend/package.json engines.node (22.14.0).
           node-version: 22.14.0
@@ -104,10 +112,10 @@ jobs:
         working-directory: moltrace_backend
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           # uv manages its own Python install — we pick the version that
           # matches moltrace_backend/render.yaml's PYTHON_VERSION.
@@ -152,10 +160,10 @@ jobs:
         working-directory: moltrace_backend
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: "3.13.5"
           enable-cache: true
@@ -180,10 +188,10 @@ jobs:
         working-directory: moltrace_backend
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: "3.13.5"
           enable-cache: true
@@ -225,9 +233,9 @@ jobs:
         working-directory: moltrace_backend
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           python-version: "3.13.5"
           enable-cache: true
@@ -241,7 +249,7 @@ jobs:
       - name: Validate backend SBOM
         run: python3 -c "import json; json.load(open('sbom-backend.cdx.json')); print('backend SBOM is valid JSON')"
       - name: Upload backend SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sbom-backend
           path: moltrace_backend/sbom-backend.cdx.json
@@ -255,13 +263,13 @@ jobs:
         working-directory: moltrace_frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 11.0.3
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22.14.0
           cache: pnpm
@@ -275,7 +283,7 @@ jobs:
       - name: Validate frontend SBOM
         run: node -e "JSON.parse(require('fs').readFileSync('sbom-frontend.cdx.json','utf8')); console.log('frontend SBOM is valid JSON')"
       - name: Upload frontend SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sbom-frontend
           path: moltrace_frontend/sbom-frontend.cdx.json
@@ -294,17 +302,17 @@ jobs:
       contents: read
     steps:
       - name: Download backend SBOM
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: sbom-backend
           path: sbom-artifacts
       - name: Download frontend SBOM
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: sbom-frontend
           path: sbom-artifacts
       - name: Attest SLSA build provenance for both SBOMs
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
         with:
           subject-path: "sbom-artifacts/sbom-backend.cdx.json,sbom-artifacts/sbom-frontend.cdx.json"
 
@@ -320,12 +328,12 @@ jobs:
       attestations: read
     steps:
       - name: Download backend SBOM
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: sbom-backend
           path: sbom-artifacts
       - name: Download frontend SBOM
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: sbom-frontend
           path: sbom-artifacts

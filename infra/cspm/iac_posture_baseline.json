@@ -1,0 +1,5 @@
+{
+  "_comment": "CSPM IaC posture baseline (Security Prompt 18). Each entry is an explicitly-accepted HIGH/CRITICAL Trivy-config misconfiguration (id::target::severity). An empty list = clean posture. Update only via score_iac_posture.py --update, recording the justification in notes.",
+  "accepted": [],
+  "notes": {}
+}
