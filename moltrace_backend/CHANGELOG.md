@@ -14,6 +14,49 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.57.0 — Security Prompt 18: Zero-trust infrastructure (in-repo slice) (2026-06-26)
+
+**Headline:** Hardens the CI/CD supply chain and adds continuous IaC posture scoring with drift
+detection. Honestly scoped: on a Render/Vercel **PaaS**, private networking, cloud IAM, CIS host
+hardening, and runtime protection are platform/operational — this ships the buildable, testable
+in-repo slice (A + B) plus an honest posture runbook (C).
+
+- **A — CSPM-lite: IaC posture scoring + drift gate** (`infra/cspm/`, NEW). The Prompt 14 `iac`
+  Trivy-config job already hard-blocks CRITICAL; this adds a *continuously-scored, drift-alerting*
+  layer: `score_iac_posture.py` diffs the current HIGH/CRITICAL misconfiguration set against a
+  committed baseline (`iac_posture_baseline.json`, currently **empty = clean posture**) and **fails CI
+  on any new misconfig** not already accepted. Accepting one is a deliberate `--update` with a
+  justification, mirroring the `.trivyignore` VEX register. Wired into the `iac` job (JSON pass +
+  drift check); 11 unit tests (no Trivy needed — synthetic reports).
+- **B — Zero-trust CI hardening.** Pinned **every GitHub Action `uses:` to a 40-char commit SHA**
+  (9 distinct actions across the three workflows; tag kept
+  in a trailing comment for Dependabot) across `ci-cd.yml`, `security-scan.yml`, `secret-scan.yml` —
+  a hijacked upstream tag can no longer flow into CI (closes the P14-deferred pinning item). Added a
+  least-privilege default `permissions: { contents: read }` to `ci-cd.yml` so its jobs (incl.
+  `deploy`) stop inheriting the repo-default token scope; `attest` / `verify-provenance` keep their
+  scoped-up permissions. No `pull_request_target` anywhere; deploy/attest gated to `push`→`main`.
+- **C — Zero-trust posture runbook** (`docs/security/zero_trust_infra.md`). A shared-responsibility
+  map (in-repo vs Render/Vercel/GitHub vs operational), the segmentation reality (single public
+  worker + managed Postgres over an internal connection string), the keyless/no-long-lived-keys IAM
+  posture, why **no Dockerfile ⇒ no image scan** (N/A), and the operational TODOs (cloud-account CSPM
+  + safe auto-remediation, runtime-protection agent, branch-protection required checks).
+
+No application/runtime behavior changes — this is CI/IaC/docs only. Backend test suite unaffected; the
+new CSPM tests + ruff are green.
+
+### Added
+- **`infra/cspm/score_iac_posture.py`** (+ `iac_posture_baseline.json`, `README.md`) — pure-stdlib IaC
+  posture scorer + drift gate.
+- **`tests/test_cspm_drift.py`** — extraction (severity + FAIL filtering), drift computation, CLI exit
+  codes (no-drift→0, drift→1, parse-error→2), `--update` re-baseline, committed-baseline-is-clean.
+- **`docs/security/zero_trust_infra.md`** — honest PaaS zero-trust posture runbook.
+
+### Changed
+- **`.github/workflows/*.yml`** — all actions SHA-pinned; `ci-cd.yml` gains a least-privilege default
+  `permissions: { contents: read }`; the `iac` job gains the CSPM drift gate (JSON pass + drift check).
+
+---
+
 ## v0.56.0 — Security Prompt 17: Pen testing & coordinated disclosure (2026-06-25)
 
 **Headline:** Stands up the vulnerability-disclosure surface and the pen-test/threat-model program.
