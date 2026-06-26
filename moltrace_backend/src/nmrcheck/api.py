@@ -2386,6 +2386,9 @@ def _raise_reaction_http_error(exc: Exception) -> None:
     if isinstance(exc, reaction_safety.ReactionSafetyGateBlockedError):
         # Subclass of ReactionError — must be checked first so it maps to 409, not 400.
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if isinstance(exc, reaction_execution.ReactionLoopGateError):
+        # Subclass of ReactionError — checked first so a gated loop maps to 409, not 400.
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if isinstance(exc, reaction_store.ReactionError):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     raise exc
@@ -5334,6 +5337,36 @@ def create_reaction_optimization_cycle_decision_route(
 ) -> ReactionCycleDecisionRecord:
     try:
         record = reaction_execution.create_cycle_decision(
+            _state(request).session_factory,
+            cycle_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction optimization cycle not found.")
+    return record
+
+
+@router.post(
+    "/reaction-optimization-cycles/{cycle_id}/propose-next",
+    response_model=ReactionOptimizationCycle,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def propose_next_reaction_optimization_cycle_route(
+    cycle_id: int,
+    payload: ReactionBayesianOptimizationRunRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionOptimizationCycle:
+    """R5 human-gated 'propose the next batch': only a ``continue_optimization`` decision may
+    propose. Returns a new DRAFT cycle (decision-support) — execution still requires human signoff
+    and a clear safety gate; nothing auto-executes. A held/stopped loop returns 409."""
+    try:
+        record = reaction_execution.propose_next_cycle(
             _state(request).session_factory,
             cycle_id,
             payload,
