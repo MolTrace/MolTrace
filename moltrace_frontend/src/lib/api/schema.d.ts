@@ -209,6 +209,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/security/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Security Alerts Route
+         * @description Security Prompt 19 — run the detections over the recent SecurityEvent window +
+         *     verify the audit chain, returning the current alerts. Read-only: does NOT ship to
+         *     the SIEM sink (use POST /admin/security/detections/run for that).
+         */
+        get: operations["security_alerts_route_admin_security_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/security/detections/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Security Detections Run Route
+         * @description Run the detection scan AND ship high-severity (error/critical) alerts to the
+         *     SIEM sink (stdout JSON + optional webhook). This is the hook a scheduler/cron
+         *     calls; 24/7 on-call routing of the shipped alerts is operational.
+         */
+        post: operations["security_detections_run_route_admin_security_detections_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/audit/search": {
         parameters: {
             query?: never;
@@ -1482,6 +1526,28 @@ export interface paths {
         put?: never;
         /** Create Reaction Optimization Cycle Decision Route */
         post: operations["create_reaction_optimization_cycle_decision_route_reaction_optimization_cycles__cycle_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-optimization-cycles/{cycle_id}/propose-next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Next Reaction Optimization Cycle Route
+         * @description R5 human-gated 'propose the next batch': only a ``continue_optimization`` decision may
+         *     propose. Returns a new DRAFT cycle (decision-support) — execution still requires human signoff
+         *     and a clear safety gate; nothing auto-executes. A held/stopped loop returns 409.
+         */
+        post: operations["propose_next_reaction_optimization_cycle_route_reaction_optimization_cycles__cycle_id__propose_next_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -18509,6 +18575,35 @@ export interface components {
             metadata?: {
                 [key: string]: unknown;
             };
+        };
+        /** DetectionScanResult */
+        DetectionScanResult: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Window Minutes */
+            window_minutes: number;
+            /** Events Scanned */
+            events_scanned: number;
+            /** Alerts */
+            alerts?: components["schemas"]["SecurityAlert"][];
+            /**
+             * Shipped
+             * @default 0
+             */
+            shipped: number;
+            /**
+             * Audit Chain Ok
+             * @default true
+             */
+            audit_chain_ok: boolean;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
         };
         /** DeviationRecord */
         DeviationRecord: {
@@ -35600,6 +35695,43 @@ export interface components {
             /** Notes */
             notes?: string[];
         };
+        /**
+         * SecurityAlert
+         * @description A correlated security detection finding (Security Prompt 19).
+         *
+         *     Derived from the SecurityEvent stream + the audit-chain verification — not a
+         *     persisted table; the durable record is the underlying SecurityEvents (immutable,
+         *     in the audit chain) plus whatever the SIEM sink ingests.
+         */
+        SecurityAlert: {
+            /**
+             * Detection
+             * @enum {string}
+             */
+            detection: "impossible_travel" | "privilege_escalation" | "cross_tenant_access" | "audit_chain_break";
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "error" | "critical";
+            /** Actor Email */
+            actor_email?: string | null;
+            /** Message */
+            message: string;
+            /** First Seen */
+            first_seen?: string | null;
+            /** Last Seen */
+            last_seen?: string | null;
+            /**
+             * Event Count
+             * @default 1
+             */
+            event_count: number;
+            /** Evidence */
+            evidence?: {
+                [key: string]: unknown;
+            };
+        };
         /** SecurityEvent */
         SecurityEvent: {
             /** Id */
@@ -35608,7 +35740,7 @@ export interface components {
              * Event Type
              * @enum {string}
              */
-            event_type: "login_success" | "login_failure" | "permission_denied" | "token_error" | "suspicious_request" | "rate_limit" | "admin_action" | "share_link_created" | "share_link_revoked" | "report_released" | "other";
+            event_type: "login_success" | "login_failure" | "permission_denied" | "cross_tenant_denied" | "privilege_escalation" | "token_error" | "suspicious_request" | "rate_limit" | "admin_action" | "share_link_created" | "share_link_revoked" | "report_released" | "other";
             /**
              * Severity
              * @enum {string}
@@ -35643,7 +35775,7 @@ export interface components {
              * @default other
              * @enum {string}
              */
-            event_type: "login_success" | "login_failure" | "permission_denied" | "token_error" | "suspicious_request" | "rate_limit" | "admin_action" | "share_link_created" | "share_link_revoked" | "report_released" | "other";
+            event_type: "login_success" | "login_failure" | "permission_denied" | "cross_tenant_denied" | "privilege_escalation" | "token_error" | "suspicious_request" | "rate_limit" | "admin_action" | "share_link_created" | "share_link_revoked" | "report_released" | "other";
             /**
              * Severity
              * @default info
@@ -41481,6 +41613,72 @@ export interface operations {
             };
         };
     };
+    security_alerts_route_admin_security_alerts_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionScanResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    security_detections_run_route_admin_security_detections_run_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectionScanResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     admin_audit_search_route_admin_audit_search_get: {
         parameters: {
             query?: {
@@ -45326,6 +45524,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReactionCycleDecisionRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_next_reaction_optimization_cycle_route_reaction_optimization_cycles__cycle_id__propose_next_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                cycle_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionBayesianOptimizationRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionOptimizationCycle"];
                 };
             };
             /** @description Validation Error */
