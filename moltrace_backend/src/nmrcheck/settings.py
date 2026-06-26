@@ -137,6 +137,18 @@ class Settings:
     # raises instead of warning, so write-once cannot silently degrade to warn-only. Default off to
     # preserve dev/test filesystems where chmod is a no-op; ops enables it on production.
     alcoa_raw_vault_strict_immutable: bool = False
+    # API abuse protection (Prompt 16). Default OFF so existing tests + local dev are unaffected;
+    # production turns it on via RATE_LIMIT_ENABLED. The limiter is an in-process token bucket keyed
+    # by (principal|client-ip):route — see rate_limit.py + docs/security/waf_edge_runbook.md.
+    rate_limit_enabled: bool = False
+    rate_limit_default_per_minute: int = 300
+    rate_limit_burst_multiplier: float = 2.0
+    # Trust the first X-Forwarded-For hop for the client-IP key (only behind a trusted proxy such as
+    # Render's edge — otherwise the header is spoofable). Default off.
+    rate_limit_trust_forwarded_for: bool = False
+    # Global request-body-size guard (Prompt 16), bytes. 0 = disabled (default, so existing flows are
+    # unaffected); production sets a generous cap. Multipart uploads are exempt (own caps apply).
+    max_request_body_bytes: int = 0
     enable_2d_nmr: bool = True
     enable_2d_contour_preview: bool = True
     enable_raw_2d_fid_beta: bool = False
@@ -267,6 +279,17 @@ def get_settings() -> Settings:
         alcoa_raw_vault_strict_immutable=_parse_bool(
             os.getenv("ALCOA_RAW_VAULT_STRICT_IMMUTABLE"), False
         ),
+        rate_limit_enabled=_parse_bool(os.getenv("RATE_LIMIT_ENABLED"), False),
+        rate_limit_default_per_minute=_parse_int(
+            os.getenv("RATE_LIMIT_DEFAULT_PER_MINUTE"), 300
+        ),
+        rate_limit_burst_multiplier=_parse_float(
+            os.getenv("RATE_LIMIT_BURST_MULTIPLIER"), 2.0
+        ),
+        rate_limit_trust_forwarded_for=_parse_bool(
+            os.getenv("RATE_LIMIT_TRUST_FORWARDED_FOR"), False
+        ),
+        max_request_body_bytes=_parse_int(os.getenv("MAX_REQUEST_BODY_BYTES"), 0),
         enable_2d_nmr=_parse_bool(os.getenv("ENABLE_2D_NMR"), True),
         enable_2d_contour_preview=_parse_bool(os.getenv("ENABLE_2D_CONTOUR_PREVIEW"), True),
         enable_raw_2d_fid_beta=_parse_bool(os.getenv("ENABLE_RAW_2D_FID_BETA"), False),

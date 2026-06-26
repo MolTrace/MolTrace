@@ -42,6 +42,17 @@ services:
         value: render-production
       - key: RELEASE_VERSION
         value: 0.61.0
+      # API abuse protection (Prompt 16). On in production; TRUST_FORWARDED_FOR=true because the
+      # backend sits behind Render's edge proxy (so the client-IP key uses the first X-Forwarded-For
+      # hop). Off by default in code, so local/test are unaffected.
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: RATE_LIMIT_TRUST_FORWARDED_FOR
+        value: "true"
+      # Reject non-multipart request bodies over 25 MiB (multipart uploads are exempt — they have
+      # their own raw-archive caps). Generous so normal JSON is unaffected.
+      - key: MAX_REQUEST_BODY_BYTES
+        value: "26214400"
 
   - type: web
     name: moltrace-frontend1

@@ -60,6 +60,7 @@ from . import collaboration_store as collab_store
 from . import alcoa as alcoa
 from . import compound_registry_store as compound_store
 from . import esign as esign
+from . import rate_limit as rate_limit
 
 # build_proton_inventory exported by peak_categorization — imported alongside
 # the other category builders below.
@@ -1014,6 +1015,11 @@ CORS_EXPOSE_HEADERS = (
     REQUEST_ID_HEADER,
     DATA_MODE_HEADER,
     GENERATED_AT_HEADER,
+    # Rate-limit headers on a 429 (Prompt 16) so a browser behind CORS can read them.
+    "Retry-After",
+    "X-RateLimit-Limit",
+    "X-RateLimit-Remaining",
+    "X-RateLimit-Window",
 )
 
 _ERROR_SECRET_KEY_RE = re.compile(
@@ -2014,6 +2020,9 @@ async def _baseline_access_gate(request: Request) -> None:
     """
     route = request.scope.get("route")
     if getattr(route, "path", None) in PUBLIC_ROUTE_PATHS:
+        # Public route: rate-limit by client IP (e.g. credential-stuffing on /auth/login). Settings-
+        # gated + fail-open; raises 429 when the bucket is empty (Prompt 16).
+        rate_limit.enforce(request, None)
         return
     context = await get_optional_access_context(
         request,
@@ -2024,6 +2033,25 @@ async def _baseline_access_gate(request: Request) -> None:
     if context is None:
         raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
     _enforce_mfa_satisfied(request, context)
+    # Authenticated route: rate-limit per principal (= per tenant today) + route (Prompt 16).
+    rate_limit.enforce(request, context)
+
+
+async def _abuse_rate_limit_gate(request: Request) -> None:
+    """Rate-limit-only gate (Prompt 16) for routers that do NOT run ``_baseline_access_gate`` — the
+    SCIM router (its own token scheme) and the nmr2d router (per-route auth). Resolves the principal
+    best-effort for per-user keying and falls back to client IP; a credential error here is swallowed
+    (the route's own auth dependency still validates), so this layer only adds abuse throttling."""
+    try:
+        context = await get_optional_access_context(
+            request,
+            request.headers.get("x-api-key"),
+            await oauth2_scheme(request),
+            request.query_params.get("access_token"),
+        )
+    except HTTPException:
+        context = None
+    rate_limit.enforce(request, context)
 
 
 def gate(
@@ -29442,10 +29470,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # PUBLIC_ROUTE_PATHS. scim_router (SCIM-token auth) and nmr2d_router (per-route auth) keep
     # their own schemes.
     app.include_router(router, dependencies=[Depends(_baseline_access_gate)])
-    app.include_router(scim_router)
+    # scim_router / nmr2d_router keep their own auth schemes but still need abuse throttling
+    # (Prompt 16) — they don't run _baseline_access_gate, so attach the rate-limit-only gate.
+    app.include_router(scim_router, dependencies=[Depends(_abuse_rate_limit_gate)])
     from .nmr2d_routes import router as nmr2d_router
 
-    app.include_router(nmr2d_router)
+    app.include_router(nmr2d_router, dependencies=[Depends(_abuse_rate_limit_gate)])
     app.state.session_factory = session_factory
     app.state.settings = settings
     app.state.api_key = settings.api_key
