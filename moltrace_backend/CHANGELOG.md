@@ -14,6 +14,48 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.55.0 — Security Prompt 16: API abuse & WAF protection (2026-06-21)
+
+**Headline:** Opens the API-abuse-protection pillar. Adds an in-app **per-tenant + per-route rate
+limiter** + a **global request-body-size guard**, with the WAF honestly scoped as an edge runbook:
+
+- **Rate limiter** (`src/nmrcheck/rate_limit.py`, NEW, zero new deps) — token bucket keyed
+  `system-key/admin → unlimited | user:{id}:{route} | ip:{client_ip}:{route}`. The per-user key *is*
+  the per-tenant key today (the product is single-tenant-per-user; `AccessContext` carries no org
+  id). Tight limits on the unauthenticated auth endpoints (login 10/min, sign-up/reset 5/min, …),
+  generous default elsewhere. Returns **429 + `Retry-After` + `X-RateLimit-*`** (CORS-exposed). Wired
+  via the router gates — `_baseline_access_gate` on the main router (reusing the resolved principal,
+  no duplicate token decode) and a rate-limit-only gate on the **SCIM** + **nmr2d** routers so
+  privileged provisioning and the heavy 2D-analysis routes are throttled too. A throttle emits a
+  de-duplicated `SecurityEvent(event_type="rate_limit")`. The in-process bucket map is **bounded**
+  (idle-then-LRU eviction) so key rotation can't exhaust memory.
+- **Body-size guard** — rejects non-multipart bodies over `MAX_REQUEST_BODY_BYTES` with **413**
+  (multipart uploads exempt — they have their own raw-archive caps).
+- **WAF** — Render has no built-in WAF, so it is delivered as a **Cloudflare/Vercel edge runbook**
+  (`docs/security/waf_edge_runbook.md`), not faked in-app; the rate limiter is the testable, in-repo
+  enforcement.
+
+Everything is **settings-gated and default-OFF** (`RATE_LIMIT_ENABLED=false`,
+`MAX_REQUEST_BODY_BYTES=0`) so the existing test suite + local dev are unaffected; production turns it
+on in `render.yaml`. **Fail-open** — a limiter error can never 500 a request. No app behavior changes
+when disabled; 8 new tests; full auth/validation/e-sign regression green.
+
+### Added
+- **`src/nmrcheck/rate_limit.py`** — token-bucket limiter, bounded in-process store (Redis-droppable
+  via the `RateLimitStore` protocol), key resolution, body-size guard.
+- **`tests/test_rate_limit.py`** — bucket math, per-IP/per-user throttle, system-key unlimited,
+  default-off, 413 body guard + multipart exemption.
+- **`docs/security/waf_edge_runbook.md`** + **`docs/security/owasp_api_top10_p16.md`** (the
+  ASVS-aligned OWASP API Top-10 coverage map).
+- **Settings** `rate_limit_enabled`, `rate_limit_default_per_minute`, `rate_limit_burst_multiplier`,
+  `rate_limit_trust_forwarded_for`, `max_request_body_bytes`; `render.yaml` enables them in prod.
+
+### Changed
+- **`api.py`** — `_baseline_access_gate` calls `rate_limit.enforce` (IP-keyed on public routes,
+  principal-keyed on authenticated routes); `CORS_EXPOSE_HEADERS` += the rate-limit headers.
+
+---
+
 ## v0.54.0 — Security Prompt 15: SBOM, provenance & signing (2026-06-21)
 
 **Headline:** Completes the secure-SDLC / signed-supply-chain pillar (P2). Adds, to `ci-cd.yml`, a
