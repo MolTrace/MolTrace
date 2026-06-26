@@ -90,7 +90,7 @@ const CONTEXTS: Context[] = [
     fits: [
       "Consistent processing + per-peak QC across every group you serve",
       "Bruker and Agilent/Varian raw FID parsed the same way, every time",
-      "8.5× faster dense ¹³C keeps the instrument queue moving",
+      "Markedly faster dense ¹³C processing keeps the instrument queue moving",
     ],
   },
   {
@@ -100,7 +100,7 @@ const CONTEXTS: Context[] = [
     fits: [
       "Auto-generated supporting information with every claim cited to source",
       "A methods section detailed enough for a reviewer to actually reproduce",
-      "Recipe-hash replay reproduces a figure bit-for-bit, years later",
+      "Recipe-hash replay re-derives a figure deterministically from the same raw archive",
     ],
   },
   {
@@ -217,22 +217,22 @@ const OUTCOMES: Outcome[] = [
       "Typed, additive evidence layers fuse NMR, HRMS, MS/MS, predicted shifts, fragmentation trees, and J-couplings into one transparent confidence score per candidate.",
   },
   {
-    value: "8.5×",
-    label: "Faster dense ¹³C",
+    value: "Faster",
+    label: "Dense ¹³C processing",
     detail:
-      "Heavy ¹³C raw FIDs that previously took 5+ minutes now process in under a minute (v0.5.0) — real throughput for a busy shared facility.",
+      "In internal benchmarks (v0.5.0), heavy ¹³C FIDs that previously took several minutes now process in well under a minute — designed to keep a busy shared facility moving.",
   },
   {
-    value: "94.4%",
-    label: "Solvent auto-detect",
+    value: "Auto",
+    label: "Solvent detection",
     detail:
-      "Residual-solvent peaks identified automatically on the NMRShiftDB2 corpus and masked from candidate scoring — fewer manual corrections per spectrum.",
+      "Residual-solvent peaks identified automatically and masked from candidate scoring — designed to reduce manual corrections per spectrum.",
   },
   {
-    value: "Bit-identical",
+    value: "Deterministic",
     label: "Recipe-hash replay",
     detail:
-      "Re-derive any processed spectrum or figure from any prior date with byte-for-byte identical output — reproducibility a reviewer can actually verify.",
+      "Re-derive a processed spectrum or figure from a prior recipe deterministically — reproducibility a reviewer can verify.",
   },
 ]
 
@@ -251,7 +251,7 @@ const COMPARISON: Comparison[] = [
   {
     dimension: "Reproducing a result later",
     before: "A new student re-runs from scratch and hopes it looks the same",
-    after: "Recipe-hash replay yields bit-identical output — the same numbers, every time",
+    after: "Recipe-hash replay re-derives the same output deterministically",
   },
   {
     dimension: "Teaching how an assignment was reached",
@@ -283,7 +283,7 @@ type LoopStep = {
 const WORKED_EXAMPLE: LoopStep[] = [
   {
     step: "A student characterizes",
-    body: "A freshly made compound goes in as a raw Bruker FID. SpectraCheck confirms the structure with DP4 96%, and flags a residual CDCl₃ peak at 7.26 ppm so it isn't mistaken for signal.",
+    body: "Illustrative: a freshly made compound goes in as a raw Bruker FID. SpectraCheck confirms the structure with a DP4 confidence score, and flags a residual CDCl₃ peak at 7.26 ppm so it isn't mistaken for signal.",
   },
   {
     step: "Evidence stays visible",
@@ -295,7 +295,7 @@ const WORKED_EXAMPLE: LoopStep[] = [
   },
   {
     step: "A labmate reproduces it",
-    body: "Months later a co-author replays the recipe hash and gets bit-identical output. The reviewer's reproducibility question answers itself.",
+    body: "Months later a co-author replays the recipe hash and gets the same output deterministically. The reviewer's reproducibility question answers itself.",
   },
 ]
 
@@ -314,7 +314,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: GitBranch,
     title: "Recipe-hash reproducibility",
-    body: "Every processing run links a recipe hash to the unchanged raw archive. Replay any prior date and get bit-identical output.",
+    body: "Every processing run links a recipe hash to the unchanged raw archive. Replay a prior recipe and get the same output deterministically.",
   },
   {
     icon: Eye,
@@ -334,7 +334,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: ShieldCheck,
     title: "Your data stays yours",
-    body: "Per-tenant isolation, GDPR-aligned residency, and a role-scoped event ledger keep each group's unpublished work private by default.",
+    body: "Per-tenant isolation, residency controls designed to support GDPR, and a role-scoped event ledger keep each group's unpublished work private by default.",
   },
 ]
 
@@ -608,7 +608,7 @@ export function AcademicResearchPage() {
                 Six academic workflows, with their inputs and outputs.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Each is a typed pipeline that ships today. Inputs come from your instruments or your
+                Each is a typed pipeline shipping today. Inputs come from your instruments or your
                 course materials; outputs land in the evidence stack, the SI composer, and the
                 reproducible-methods record.
               </p>
@@ -661,15 +661,15 @@ export function AcademicResearchPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                Measured, not claimed
+                Built to be checkable
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Numbers you can check yourself.
+                Capabilities you can verify yourself.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Every figure below is reproducible from a publicly-described corpus or a shipped
-                release note. The regression gate runs in CI on every detector change — the kind of
-                rigor you'd expect from a paper, applied to the software.
+                Each capability below is designed to be re-derived from your own raw data and the
+                shipped release notes. A regression gate runs in CI on every detector change — the
+                kind of rigor you'd expect from a paper, applied to the software.
               </p>
             </div>
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -888,9 +888,9 @@ export function AcademicResearchPage() {
                   Transparency and reproducibility, by construction.
                 </h2>
                 <p className="mt-4 text-base text-muted-foreground">
-                  The same provenance machinery that satisfies a pharmaceutical inspector is exactly
-                  what an academic group needs for a defensible paper and an honest classroom — open,
-                  explainable, and reproducible by anyone who has the data.
+                  The same provenance machinery designed to support pharmaceutical-grade inspection
+                  is exactly what an academic group needs for a defensible paper and an honest
+                  classroom — open, explainable, and reproducible by anyone who has the data.
                 </p>
               </div>
               <ul className="space-y-3">

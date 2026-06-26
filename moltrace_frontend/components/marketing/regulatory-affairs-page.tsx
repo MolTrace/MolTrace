@@ -114,7 +114,7 @@ const STAGES: Stage[] = [
     fits: [
       "Answer a health-authority query by retrieving the cited evidence chain",
       "Surveillance watches guidance sources and routes changes to your items",
-      "ALCOA+ ledger keeps the whole submission inspection-ready over its life",
+      "ALCOA+ ledger designed to keep the whole submission inspection-oriented over its life",
     ],
   },
 ]
@@ -218,7 +218,7 @@ const OUTCOMES: Outcome[] = [
     value: "9",
     label: "ALCOA+ fields per event",
     detail:
-      "Attributable · Legible · Contemporaneous · Original · Accurate · Complete · Consistent · Enduring · Available — populated on every audit event, queryable by an inspector.",
+      "Attributable · Legible · Contemporaneous · Original · Accurate · Complete · Consistent · Enduring · Available — populated on every audit event and designed to be queryable at inspection.",
   },
   {
     value: "40",
@@ -230,10 +230,10 @@ const OUTCOMES: Outcome[] = [
     value: "Bit-identical",
     label: "Recipe-hash replay",
     detail:
-      "Re-derive any processed result or report from any prior date with byte-for-byte identical output — the reproducibility ICH Q2(R2) now expects.",
+      "Designed to re-derive any processed result or report from any prior date with bit-identical output — aligned with the reproducibility ICH Q2(R2) emphasizes.",
   },
   {
-    value: "94.4%",
+    value: "Automatic",
     label: "Solvent auto-detect",
     detail:
       "Residual-solvent peaks identified automatically and routed straight into ICH Q3C classification — the impurity argument starts itself.",
@@ -270,7 +270,7 @@ const COMPARISON: Comparison[] = [
   {
     dimension: "Proving data integrity at inspection",
     before: "Reconstruct an audit trail from version history and interviews",
-    after: "One ALCOA+ ledger query — nine fields per event, replayable on demand",
+    after: "One ALCOA+ ledger query — nine fields per event, designed to replay on demand",
   },
   {
     dimension: "Reusing a submission across jurisdictions",
@@ -313,27 +313,27 @@ const TRUST: TrustPillar[] = [
   {
     icon: BadgeCheck,
     title: "ALCOA+ audit ledger",
-    body: "Every event carries all nine ALCOA+ fields. Inspectors query directly — no reconstruction from emails and version history.",
+    body: "Every event carries all nine ALCOA+ fields, designed to be queried directly at inspection rather than reconstructed from emails and version history.",
   },
   {
     icon: FileCheck,
-    title: "21 CFR Part 11 alignment",
-    body: "Electronic-records and electronic-signature requirements are built into the audit-event model, not bolted on for show.",
+    title: "Designed to support 21 CFR Part 11",
+    body: "Designed to support 21 CFR Part 11 electronic-records and electronic-signature requirements within the audit-event model.",
   },
   {
     icon: FileSignature,
     title: "Human signoff gate",
-    body: "No submission artefact is released without explicit qualified-human attribution — the FDA Stage 4 oversight gate, enforced in code.",
+    body: "Submission artefacts move through a human-signoff gate requiring explicit qualified-human attribution — designed to support the FDA Stage 4 oversight expectation.",
   },
   {
     icon: GitBranch,
     title: "Recipe-hash provenance",
-    body: "Every processing run links a recipe hash to the unchanged raw archive, so any claim in the dossier replays bit-identical years later.",
+    body: "Every processing run links a recipe hash to the unchanged raw archive, so any claim in the dossier is designed to replay bit-identical years later.",
   },
   {
     icon: Database,
     title: "Immutable raw vault",
-    body: "The original evidence behind every regulatory claim is SHA-256 hashed and never overwritten — provenance that survives the product lifecycle.",
+    body: "The original evidence behind every regulatory claim is SHA-256 hashed and designed not to be overwritten — provenance intended to survive the product lifecycle.",
   },
   {
     icon: Lock,
@@ -381,7 +381,7 @@ export function RegulatoryAffairsPage() {
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                   MolTrace turns structured scientific evidence into CTD dossier sections,
-                  multi-jurisdiction packages, and inspection-ready ledger entries. The regulatory
+                  multi-jurisdiction packages, and ledger entries designed to be inspection-oriented. The regulatory
                   work becomes the output of the science — not a parallel document reconciled by hand
                   in week eleven.
                 </p>
@@ -408,7 +408,7 @@ export function RegulatoryAffairsPage() {
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                     style={{ color: "var(--mt-teal-ink)" }}
                   >
-                    Submission package · live
+                    Submission package · example
                   </p>
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em]"
@@ -423,7 +423,7 @@ export function RegulatoryAffairsPage() {
                       style={{ backgroundColor: "var(--mt-teal)" }}
                       aria-hidden
                     />
-                    Inspection-ready
+                    Inspection view
                   </span>
                 </div>
                 <p className="mt-3 font-mono text-xs text-muted-foreground">
@@ -564,7 +564,7 @@ export function RegulatoryAffairsPage() {
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 The same evidence object that R&amp;D and your CRO partners produced flows through
-                classification, authoring, and packaging — and stays inspection-ready for the life of
+                classification, authoring, and packaging — and stays inspection-oriented for the life of
                 the product.
               </p>
             </div>
@@ -582,7 +582,7 @@ export function RegulatoryAffairsPage() {
   cited       ICH +      CTD draft   FDA · EMA   query response
   evidence    risk +     per claim   · PMDA      + surveillance
   (from R&D   FDA Stage  (3.2.S/P)   (one base)  + ALCOA+ ledger
-   / CRO)     gates                              (inspection-ready)`}
+   / CRO)     gates                              (inspection-oriented)`}
               </pre>
             </div>
 
@@ -645,7 +645,7 @@ export function RegulatoryAffairsPage() {
                 Six regulatory workflows, with their inputs and outputs.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Each is a typed pipeline that ships today. Inputs arrive as structured evidence from
+                Each is a typed pipeline in the product. Inputs arrive as structured evidence from
                 the science; outputs are dossier-ready artefacts, every one cited and ledger-backed.
               </p>
             </div>
@@ -697,14 +697,15 @@ export function RegulatoryAffairsPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                Measured, not claimed
+                How the provenance works
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
                 The numbers behind a defensible submission.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Every figure below is implemented in production code or reproducible from a
-                publicly-described corpus. Provenance isn't a promise here — it's the data model.
+                The structural figures below — nine ALCOA+ fields, 40 evidence layers, bit-identical
+                replay — are implemented in the data model itself, so provenance is built in rather
+                than bolted on.
               </p>
             </div>
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -918,12 +919,13 @@ export function RegulatoryAffairsPage() {
                   Built for inspection
                 </p>
                 <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                  Data integrity you can hand to an inspector.
+                  Data integrity designed to stand up to inspection.
                 </h2>
                 <p className="mt-4 text-base text-muted-foreground">
                   Every control below is implemented in production code — designed against ICH
                   Q2(R2) ALCOA+, the FDA's January 2025 AI framework, the EMA reflection paper, and
-                  21 CFR Part 11 from day one. Not compliance theater; the data model itself.
+                  21 CFR Part 11 from day one. Designed to support these frameworks, not as an
+                  afterthought — within the data model itself.
                 </p>
               </div>
               <ul className="space-y-3">
@@ -965,7 +967,7 @@ export function RegulatoryAffairsPage() {
               <p className="mt-4 text-base text-muted-foreground sm:text-lg">
                 Pick a CTD section that's currently a 40-hour reconciliation, or a query you're still
                 chasing evidence for. We'll show how MolTrace would carry it — cited and
-                inspection-ready — end to end.
+                inspection-oriented — end to end.
               </p>
               <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
                 <Button asChild size="lg" className="gap-2">

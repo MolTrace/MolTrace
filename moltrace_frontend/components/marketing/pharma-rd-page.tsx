@@ -224,19 +224,19 @@ const OUTCOMES: Outcome[] = [
     value: "8.5×",
     label: "Faster dense ¹³C",
     detail:
-      "Heavy ¹³C raw FIDs that previously took 5+ minutes now process in under a minute (v0.5.0) — so confirmation keeps pace with synthesis.",
+      "In our v0.5.0 benchmark on dense ¹³C FIDs, heavy raw files that previously took 5+ minutes process in under a minute — so confirmation keeps pace with synthesis.",
   },
   {
     value: "94.4%",
     label: "Solvent auto-detect",
     detail:
-      "Residual-solvent peaks identified automatically on the NMRShiftDB2 corpus, masked out of candidate scoring, and routed to ICH Q3C classification.",
+      "On our NMRShiftDB2 benchmark corpus, residual-solvent peaks are identified automatically, masked out of candidate scoring, and routed to ICH Q3C classification.",
   },
   {
     value: "Bit-identical",
     label: "Recipe-hash replay",
     detail:
-      "Re-derive any processed spectrum or report from any prior date and get byte-for-byte identical output. Reproducibility is structural, not aspirational.",
+      "Re-derive a processed spectrum or report and get byte-for-byte identical output for the same recipe and inputs. Reproducibility is structural, not aspirational.",
   },
 ]
 
@@ -265,7 +265,7 @@ const COMPARISON: Comparison[] = [
   {
     dimension: "Reproducing an analysis months later",
     before: "Re-run from scratch; 'looks close enough' is usually the verdict",
-    after: "Recipe-hash replay yields bit-identical output — the same numbers, every time",
+    after: "Recipe-hash replay yields bit-identical output for the same recipe and inputs",
   },
   {
     dimension: "Reaching a submission-ready section",
@@ -275,7 +275,7 @@ const COMPARISON: Comparison[] = [
   {
     dimension: "AI evidence under inspection",
     before: "Hard to show how a model reached a call; documentation assembled retroactively",
-    after: "FDA-aligned model documentation + human signoff gate + ALCOA+ ledger, inspection-ready",
+    after: "Model documentation designed to support FDA expectations + human signoff gate + ALCOA+ ledger, designed to support inspection readiness",
   },
 ]
 
@@ -318,7 +318,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: GitBranch,
     title: "Recipe-hash provenance",
-    body: "Every processing run links a recipe hash to the unchanged raw archive. Bit-identical replay from any prior date, forever.",
+    body: "Every processing run links a recipe hash to the unchanged raw archive. Bit-identical replay from any prior date.",
   },
   {
     icon: ClipboardCheck,
@@ -338,7 +338,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: Lock,
     title: "Tenant isolation by default",
-    body: "Controls designed to support SOC 2 Type II, GDPR-aligned data residency, and a role-scoped audit-event ledger isolate each organization's data.",
+    body: "Controls designed to support SOC 2 Type II, data residency designed to support GDPR, and a role-scoped audit-event ledger isolate each organization's data.",
   },
 ]
 
@@ -376,7 +376,7 @@ export function PharmaRdPage() {
                 </div>
                 <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   Move faster on the molecule.{" "}
-                  <span style={{ color: "var(--mt-teal-ink)" }}>Never</span> on the evidence.
+                  <span style={{ color: "var(--mt-teal-ink)" }}>Not</span> on the evidence.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                   MolTrace gives pharmaceutical R&amp;D teams one audit-grade evidence stack from the
@@ -407,7 +407,7 @@ export function PharmaRdPage() {
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                     style={{ color: "var(--mt-teal-ink)" }}
                   >
-                    Program lifecycle · live
+                    Program lifecycle · example
                   </p>
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em]"
@@ -627,9 +627,9 @@ export function PharmaRdPage() {
                 Six R&amp;D workflows, with their inputs and outputs.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Each of these is a typed pipeline that ships today — not a bespoke build. Inputs come
-                from your instruments or your data lake; outputs land in the evidence stack, the
-                audit ledger, and the dossier composer.
+                Each of these is a typed pipeline available in the platform — not a bespoke build.
+                Inputs come from your instruments or your data lake; outputs land in the evidence
+                stack, the audit ledger, and the dossier composer.
               </p>
             </div>
             <div className="mt-12 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
@@ -680,14 +680,14 @@ export function PharmaRdPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                Measured, not claimed
+                Measured on our test corpus
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                What the platform actually delivers.
+                What the platform is built to do.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Every number below is reproducible from a publicly-described corpus or a shipped
-                release note — not a marketing estimate. The regression gate runs in CI on every
+                Every number below is derived from our internal benchmark corpus and release
+                notes — not a marketing estimate. The regression gate runs in CI on every
                 detector change.
               </p>
             </div>
@@ -901,7 +901,7 @@ export function PharmaRdPage() {
                   Built for inspection
                 </p>
                 <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                  Speed that survives an audit.
+                  Speed designed to survive an audit.
                 </h2>
                 <p className="mt-4 text-base text-muted-foreground">
                   Going faster only helps if the work holds up when an inspector arrives. Every

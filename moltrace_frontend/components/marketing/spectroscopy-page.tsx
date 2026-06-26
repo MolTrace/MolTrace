@@ -41,9 +41,9 @@ import { Header } from "@/components/marketing/header"
  *      outputs / file formats — credible to analysts at a glance.
  *   4. The 39-layer evidence stack rendered as a multi-band visual,
  *      not paragraphs of prose.
- *   5. Two-detector comparison table — the legacy / GSD honesty that no
- *      competitor exposes.
- *   6. Validation numbers up front (94.4% solvent detect, env Δ=2 gate,
+ *   5. Two-detector comparison table — the legacy / GSD honesty laid out
+ *      side by side.
+ *   6. Internal benchmark numbers up front (solvent detect, env Δ=2 gate,
  *      20-fixture regression).
  *   7. The closing-loop diagram showing spectroscopy → regulatory →
  *      reaction optimization.
@@ -68,7 +68,7 @@ const WORKFLOW: WorkflowStage[] = [
     stage: "02",
     title: "Process",
     detail:
-      "Fourier transform + apodization + phasing + baseline correction. Every parameter recipe-hash-linked to the unchanged raw archive. Recipe is reproducible byte-for-byte.",
+      "Fourier transform + apodization + phasing + baseline correction. Every parameter recipe-hash-linked to the unchanged raw archive — designed for byte-for-byte reproducible replay.",
     outputs: "Processed spectrum (ppm + intensity) · processing_metadata",
   },
   {
@@ -96,7 +96,7 @@ const WORKFLOW: WorkflowStage[] = [
     stage: "06",
     title: "Report",
     detail:
-      "Regulatory-ready structure-elucidation report composer. Every numerical claim is hyperlinked to its source. Human signoff required before release.",
+      "Structure-elucidation report composer designed for regulatory submission. Every numerical claim is hyperlinked to its source. Human signoff required before release.",
     outputs: "Audit-grade report · ALCOA+ ledger entry",
   },
 ]
@@ -215,9 +215,9 @@ type Validation = {
 const VALIDATION: Validation[] = [
   {
     value: "94.4%",
-    label: "Solvent auto-detect",
+    label: "Solvent auto-detect (internal benchmark)",
     detail:
-      "NMRShiftDB2 20-fixture corpus. 17 of 18 fixtures with a reference. Strict gate target: 95%.",
+      "On our 18-fixture internal NMRShiftDB2-derived benchmark (17 of 18 fixtures with a reference). Strict gate target: 95%.",
   },
   {
     value: "Δ ≤ 2",
@@ -256,7 +256,7 @@ const DETECTOR_COMPARE: DetectorRow[] = [
   {
     capability: "Solvent auto-detect (structured field)",
     legacy: "Inferred via impurity-match table",
-    gsd: "94.4% on the 20-fixture corpus",
+    gsd: "94.4% on our 18-fixture internal benchmark",
     winner: "gsd",
   },
   {
@@ -384,7 +384,7 @@ export function SpectroscopyPage() {
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                     style={{ color: "var(--mt-teal-ink)" }}
                   >
-                    Evidence stack · live snapshot
+                    Evidence stack · illustrative snapshot
                   </p>
                   <p
                     className="mt-4 font-mono text-5xl font-bold tabular-nums tracking-tight sm:text-6xl"
@@ -425,7 +425,7 @@ export function SpectroscopyPage() {
                     ))}
                   </div>
                   <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                    + 31 more · additive, never destructive
+                    + 31 more · additive, designed to be non-destructive
                   </p>
                 </div>
               </aside>
@@ -448,8 +448,8 @@ export function SpectroscopyPage() {
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 Every stage emits a typed Pydantic model with stable JSON keys. Every emission is
-                pinned to the immutable raw archive by SHA-256 + recipe hash. You can replay any
-                report from any prior date and get bit-identical output.
+                pinned to the immutable raw archive by SHA-256 + recipe hash — designed so you can
+                replay a report from any prior date and reproduce bit-identical output.
               </p>
             </div>
 
@@ -659,7 +659,7 @@ export function SpectroscopyPage() {
               <p className="mt-4 text-base text-muted-foreground">
                 We ship a stable, evidence-pipeline legacy detector as the default. The experimental
                 GSD-Prompt-3 backend (industry-standard peak detection with auto-classification)
-                ships as opt-in until it clears a published validation gate. Both return the same{" "}
+                ships as opt-in until it clears our internal validation gate. Both return the same{" "}
                 <code className="font-mono text-foreground">{`{ peaks, environments, category_counts }`}</code>{" "}
                 envelope so consumer code is detector-agnostic.
               </p>
@@ -700,7 +700,7 @@ export function SpectroscopyPage() {
               </table>
             </div>
             <p className="mt-5 font-mono text-xs text-muted-foreground">
-              Full A/B methodology + per-fixture numbers published in{" "}
+              Full A/B methodology + per-fixture numbers documented in{" "}
               <Link
                 href="/blog"
                 className="text-foreground underline-offset-4 hover:underline"
@@ -720,15 +720,15 @@ export function SpectroscopyPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                Measured, not claimed
+                Internal validation benchmarks
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                The numbers we publish.
+                The numbers we benchmark.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Every claim below is reproducible from the publicly-described corpus. The
-                regression gate runs in CI; any drift larger than 50% on any single fixture fails
-                the build with the fixture_id called out by name.
+                Every figure below comes from our internal benchmark corpora. The regression gate
+                runs in CI; any drift larger than 50% on any single fixture fails the build with
+                the fixture_id called out by name.
               </p>
             </div>
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -872,10 +872,10 @@ export function SpectroscopyPage() {
                   Designed against the regulations you'll be audited on.
                 </h2>
                 <p className="mt-4 text-base text-muted-foreground">
-                  SpectraCheck isn't compliant by accident. The audit ledger, the immutable raw
-                  vault, the recipe-hash provenance, and the human-signoff release gate were
-                  designed against ICH Q2(R2) ALCOA+, the FDA's January 2025 AI framework, and the
-                  EMA reflection paper from day one.
+                  SpectraCheck's controls are designed to support compliance — by design, not by
+                  accident. The audit ledger, the immutable raw vault, the recipe-hash provenance,
+                  and the human-signoff release gate were designed to support ICH Q2(R2) ALCOA+,
+                  the FDA's January 2025 AI framework, and the EMA reflection paper from day one.
                 </p>
               </div>
               <ul className="space-y-3">
@@ -888,7 +888,7 @@ export function SpectroscopyPage() {
                   {
                     icon: GitBranch,
                     title: "Recipe-hash provenance",
-                    body: "Every processing run links a recipe hash to the unchanged raw archive. Bit-identical replay forever.",
+                    body: "Every processing run links a recipe hash to the unchanged raw archive. Designed for bit-identical replay.",
                   },
                   {
                     icon: ClipboardCheck,
@@ -908,7 +908,7 @@ export function SpectroscopyPage() {
                   {
                     icon: Lock,
                     title: "Tenant isolation by default",
-                    body: "Controls designed to support SOC 2 Type II, GDPR-aligned data residency, role-scoped audit-event ledger.",
+                    body: "Controls designed to support SOC 2 Type II, data-residency controls designed to support GDPR, role-scoped audit-event ledger.",
                   },
                 ].map((item) => {
                   const Icon = item.icon

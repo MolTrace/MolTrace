@@ -70,7 +70,7 @@ const STAGES: Stage[] = [
     fits: [
       "Each sample's raw FID is SHA-256 hashed and vaulted on arrival",
       "Per-sponsor isolation enforced from the first byte",
-      "Provenance starts at intake and never breaks downstream",
+      "Provenance starts at intake and is carried through every downstream step",
     ],
   },
   {
@@ -108,8 +108,8 @@ const STAGES: Stage[] = [
     name: "Sponsor handoff & audit support",
     icon: ShieldCheck,
     fits: [
-      "ALCOA+ audit ledger + 21 CFR Part 11 alignment, inspection-ready",
-      "Recipe-hash replay reproduces any deliverable, bit-for-bit, years on",
+      "ALCOA+ audit ledger designed to support 21 CFR Part 11 electronic-records requirements",
+      "Recipe-hash replay reproduces a deliverable's processing, bit-for-bit, from the pinned hash",
       "Hand the sponsor an evidence package their auditor can query directly",
     ],
   },
@@ -134,7 +134,7 @@ const PRESSURES: Pain[] = [
   },
   {
     icon: Lock,
-    title: "Many clients, zero leakage",
+    title: "Many clients, isolated by construction",
     body: "You run competing sponsors in the same building on the same instruments. Confidentiality can't depend on folder discipline — isolation has to be structural and provable.",
   },
   {
@@ -212,9 +212,9 @@ type Outcome = {
 const OUTCOMES: Outcome[] = [
   {
     value: "8.5×",
-    label: "Faster dense ¹³C",
+    label: "Faster dense ¹³C (internal benchmark, v0.5.0)",
     detail:
-      "Heavy ¹³C raw FIDs that previously took 5+ minutes now process in under a minute (v0.5.0) — throughput that shows up directly in turnaround time.",
+      "In internal benchmarking, heavy ¹³C FIDs that previously took 5+ minutes process in under a minute (v0.5.0).",
   },
   {
     value: "40",
@@ -224,15 +224,15 @@ const OUTCOMES: Outcome[] = [
   },
   {
     value: "94.4%",
-    label: "Solvent auto-detect",
+    label: "Solvent auto-detect (NMRShiftDB2, internal eval)",
     detail:
-      "Residual-solvent peaks identified automatically on the NMRShiftDB2 corpus and routed to ICH Q3C — fewer manual touches per sample at volume.",
+      "94.4% on the NMRShiftDB2 residual-solvent corpus (internal eval): residual-solvent peaks identified automatically and routed to ICH Q3C — fewer manual touches per sample at volume.",
   },
   {
     value: "Bit-identical",
     label: "Recipe-hash replay",
     detail:
-      "Reproduce any deliverable from any prior date with byte-for-byte identical output — the answer to a sponsor auditor's hardest question.",
+      "Reproduce a deliverable's processing with byte-for-byte identical output from the pinned recipe hash — the answer to a sponsor auditor's hardest question.",
   },
 ]
 
@@ -319,12 +319,12 @@ const TRUST: TrustPillar[] = [
   {
     icon: GitBranch,
     title: "Recipe-hash provenance",
-    body: "Every processing run links a recipe hash to the unchanged raw archive. Reproduce any deliverable, bit-identical, years later.",
+    body: "Every processing run links a recipe hash to the unchanged raw archive. Reproduce a deliverable's processing, bit-identical, from the pinned hash.",
   },
   {
     icon: BadgeCheck,
     title: "ALCOA+ & 21 CFR Part 11",
-    body: "The audit ledger is built against ALCOA+ and electronic-records requirements, so your deliverables stand up in the sponsor's own inspection.",
+    body: "The audit ledger is built against ALCOA+ and electronic-records requirements, so your deliverables carry a complete, queryable evidence trail for the sponsor's inspection.",
   },
   {
     icon: AlertTriangle,
@@ -402,7 +402,7 @@ export function CroAnalyticalPage() {
                     className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                     style={{ color: "var(--mt-teal-ink)" }}
                   >
-                    Batch queue · live
+                    Batch queue · example
                   </p>
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em]"
@@ -482,7 +482,7 @@ export function CroAnalyticalPage() {
                   ))}
                 </div>
                 <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                  each sponsor isolated · each result traces to its FID
+                  Illustrative — sample data · each sponsor isolated · each result traces to its FID
                 </p>
               </aside>
             </div>
@@ -633,7 +633,7 @@ export function CroAnalyticalPage() {
                 Six contract-lab workflows, with their inputs and outputs.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
-                Each is a typed pipeline that ships today. Inputs arrive from your instruments and
+                Each is a typed pipeline available in the platform today. Inputs arrive from your instruments and
                 your sponsors; outputs land in the evidence stack, the audit ledger, and a
                 consistent, cited deliverable.
               </p>
@@ -686,7 +686,7 @@ export function CroAnalyticalPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                Measured, not claimed
+                Reproducible from a public corpus and release notes
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
                 The numbers that move turnaround and trust.
@@ -912,7 +912,7 @@ export function CroAnalyticalPage() {
                 </h2>
                 <p className="mt-4 text-base text-muted-foreground">
                   Your sponsors carry their own regulatory burden, and your deliverables become part
-                  of it. Every control below is implemented in production code — designed against
+                  of it. Every control below is built into the platform — designed against
                   ALCOA+, 21 CFR Part 11, and the SOC 2 criteria from day one.
                 </p>
               </div>

@@ -20,9 +20,9 @@ import { Header } from "@/components/marketing/header"
  *
  * Layout (modern B2B SaaS standard):
  *   - Hero: eyebrow + H1 + one-line subtitle
- *   - Channel cards: 4 inbox-routed contact options with response-time SLA
- *   - Two-column body: form (2/3) + sidebar (1/3) with offices and trust signals
- *   - Trust band: GDPR + SOC 2 + encryption reassurance
+ *   - Channel cards: 4 inbox-routed contact options with response-time targets
+ *   - Two-column body: form (2/3) + sidebar (1/3) with regions and trust signals
+ *   - Trust band: privacy/security reassurance (designed-to-support framing)
  *
  * The form (client component) hands off to mailto: with prefilled fields
  * routed to the right inbox per the user's "Reason" selection. No backend
@@ -45,31 +45,31 @@ const CHANNELS: Channel[] = [
     title: "See MolTrace in action",
     description: "Walk through SpectraCheck, the Regentry, and Repho with our solutions team.",
     email: "sales@moltrace.com",
-    responseTime: "Within 1 business day",
+    responseTime: "Typically within 1 business day",
   },
   {
     icon: HeadphonesIcon,
     eyebrow: "Customer support",
     title: "Open a support ticket",
-    description: "Existing customers — we'll route your message into your enterprise SLA queue.",
+    description: "Have a question about your account? Send us the details and we'll get back to you.",
     email: "support@moltrace.com",
-    responseTime: "24/5 enterprise SLA",
+    responseTime: "We aim to reply within 1 business day",
   },
   {
     icon: ShieldCheck,
     eyebrow: "Security · Compliance",
     title: "Report a vulnerability",
-    description: "Coordinated disclosure encouraged. PGP key on request. Same-day acknowledgement.",
+    description: "Coordinated disclosure encouraged. PGP key on request. We aim to acknowledge reports promptly.",
     email: "security@moltrace.com",
-    responseTime: "Same business day",
+    responseTime: "We aim to acknowledge promptly",
   },
   {
     icon: Newspaper,
     eyebrow: "Press · Analysts",
     title: "Media inquiries",
-    description: "For analyst briefings, regulatory commentary, and customer-story interviews.",
+    description: "For analyst briefings and regulatory commentary.",
     email: "press@moltrace.com",
-    responseTime: "Within 2 business days",
+    responseTime: "Typically within 2 business days",
   },
 ]
 
@@ -82,28 +82,28 @@ type Office = {
 
 const OFFICES: Office[] = [
   {
-    city: "Boston, MA",
-    region: "Headquarters · Americas",
-    address: "245 Main Street, Cambridge, MA 02142, USA",
-    hours: "Mon–Fri · 09:00–18:00 ET",
+    city: "Americas",
+    region: "Remote-first team",
+    address: "Reach us anytime at hello@moltrace.com",
+    hours: "Mon–Fri · ET business hours",
   },
   {
-    city: "London, UK",
-    region: "EMEA · Regulatory liaison",
-    address: "1 Finsbury Avenue, London EC2M 2PF, United Kingdom",
-    hours: "Mon–Fri · 09:00–18:00 GMT",
+    city: "EMEA",
+    region: "Remote-first team",
+    address: "Reach us anytime at hello@moltrace.com",
+    hours: "Mon–Fri · GMT business hours",
   },
   {
-    city: "Singapore",
-    region: "APAC",
-    address: "8 Marina View, Asia Square Tower 1, Singapore 018960",
-    hours: "Mon–Fri · 09:00–18:00 SGT",
+    city: "APAC",
+    region: "Remote-first team",
+    address: "Reach us anytime at hello@moltrace.com",
+    hours: "Mon–Fri · SGT business hours",
   },
 ]
 
 const TRUST_SIGNALS = [
-  { icon: ShieldCheck, label: "SOC 2-aligned" },
-  { icon: Lock, label: "GDPR-aligned intake" },
+  { icon: ShieldCheck, label: "Controls designed to support SOC 2" },
+  { icon: Lock, label: "Intake designed to support GDPR" },
   { icon: Globe2, label: "Encrypted in transit (TLS 1.3)" },
 ]
 
@@ -220,7 +220,7 @@ export function ContactPage() {
                   className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                   style={{ color: "var(--mt-teal-ink)" }}
                 >
-                  Offices
+                  Where we work
                 </p>
                 <ul className="mt-4 space-y-5">
                   {OFFICES.map((office) => (
@@ -259,7 +259,7 @@ export function ContactPage() {
                   ))}
                 </ul>
                 <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-                  We never share contact-form data with third parties. See our{" "}
+                  We don't sell contact-form data. See our{" "}
                   <Link
                     href="https://docs.moltrace.co/guides/legal/privacy-policy/"
                     target="_blank"
@@ -268,7 +268,7 @@ export function ContactPage() {
                   >
                     privacy policy
                   </Link>{" "}
-                  for the full retention and processing notice.
+                  for how it's processed, including the full retention and processing notice.
                 </p>
               </div>
 

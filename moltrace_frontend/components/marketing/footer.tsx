@@ -38,13 +38,8 @@ const navigation = {
   resources: [
     { name: "Documentation", href: "https://docs.moltrace.co/" },
     { name: "API Reference", href: "https://docs.moltrace.co/guides/api/" },
-    // ``Case Studies`` is a category with multiple pages and no index page;
-    // landing on the pharma case study reflects the primary persona
-    // (pharma R&D scientists). Update when a case-studies index ships.
-    {
-      name: "Case Studies",
-      href: "https://docs.moltrace.co/guides/resources/case-study-pharma/",
-    },
+    // "Case Studies" removed pre-launch — MolTrace has no consented customer
+    // engagement to point at yet; re-add once a real case study ships.
     // Webinars likewise has no index — the "Getting Started" webinar is
     // the canonical entry point for new viewers. Update when an index ships.
     {

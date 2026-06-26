@@ -14,7 +14,7 @@ const features = [
   {
     icon: Lock,
     title: "End-to-End Encryption",
-    desc: "Data encrypted at rest (AES-256) and in transit. Customer-managed keys for enterprise.",
+    desc: "Designed to encrypt data at rest (AES-256) and in transit. Customer-managed keys available for enterprise deployments.",
   },
   {
     icon: Server,
@@ -23,13 +23,13 @@ const features = [
   },
   {
     icon: Shield,
-    title: "SOC 2-aligned",
+    title: "Designed for SOC 2 Type II",
     desc: "Security controls designed to support a SOC 2 Type II audit and enterprise requirements.",
   },
   {
     icon: Globe,
     title: "Data Residency",
-    desc: "Choose storage regions to comply with data sovereignty requirements. EU and US regions.",
+    desc: "Choose storage regions designed to support data residency requirements.",
   },
 ]
 
@@ -44,7 +44,7 @@ export function EnterpriseSection() {
             Enterprise
           </p>
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Enterprise-grade security and compliance.
+            Security and compliance controls designed for regulated industries.
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-muted-foreground">
             Built for regulated industries. Your data stays yours, with the controls
