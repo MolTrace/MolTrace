@@ -906,7 +906,9 @@ def propose_next_cycle(
         raise ReactionLoopGateError(verdict.reason)
 
     # PROPOSE (own session); decision-support only — produces recommendations, executes nothing.
-    bo_run = reaction_bo.run_bayesian_optimization(session_factory, project_id, payload, actor=actor)
+    bo_run = reaction_bo.run_bayesian_optimization(
+        session_factory, project_id, payload, actor=actor
+    )
 
     metrics = reaction_loop.compute_loop_metrics(new_experiment_count=payload.batch_size)
     cycle_metrics = reaction_loop.build_cycle_metrics_payload(
@@ -926,8 +928,8 @@ def propose_next_cycle(
                 "proposed_from_cycle_id": cycle_id,
                 "propose_next": verdict.as_dict(),
                 "note": (
-                    "Proposed next batch (decision-support). Execution requires human signoff and a "
-                    "clear safety gate; nothing was executed."
+                    "Proposed next batch (decision-support). Execution requires human signoff "
+                    "and a clear safety gate; nothing was executed."
                 ),
             },
         ),
