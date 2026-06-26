@@ -32,7 +32,7 @@
 CVE-2025-32434
 
 # --- mlflow (moltrace_backend/pyproject.toml [project.optional-dependencies] infra; uv.lock) ---
-# Status: not_affected for all four. Justification: vulnerable_code_not_in_execute_path.
+# Status: not_affected for all five. Justification: vulnerable_code_not_in_execute_path.
 #   * mlflow is declared ONLY in the optional `infra` extra and present in uv.lock solely
 #     because uv locks all optional groups (marker extra=='infra'). It is intentionally never
 #     installed: prod deploy is `uv sync --no-dev --extra fid`; CI is `--extra fid --extra dev`.
@@ -40,11 +40,16 @@ CVE-2025-32434
 #     tracking.py): set_tracking_uri/start_run/log_params/log_metrics/log_artifact to a local
 #     file store. It never starts a tracking server, never serves models, never sets
 #     enable_mlserver, and never instantiates MlflowClient (verified by grep across src/).
-#   * All four CVEs require running mlflow's SERVER / model-SERVING components, which MolTrace
+#   * CVE-2026-0545 (GHSA-7qhf-v65m-g5f3, CVSS 9.1) is the /ajax-api/3.0/jobs/* job endpoints
+#     bypassing the basic-auth app when MLFLOW_SERVER_ENABLE_JOB_EXECUTION + an allowlisted job
+#     are enabled — same server surface; no patched mlflow version exists yet.
+#   * All five CVEs require running mlflow's SERVER / model-SERVING components, which MolTrace
 #     does not run.
-#   Re-evaluate (and bump infra to mlflow>=3.9.0) only if MolTrace ever ships the `infra`
-#   extra in a deploy target or runs an mlflow server/serving process.
+#   Re-evaluate (and bump to a patched mlflow once upstream ships one — none exists for
+#   CVE-2026-0545 as of 2026-06-25) if MolTrace ever ships the `infra` extra in a deploy
+#   target or runs an mlflow server/serving process.
 CVE-2025-15036
 CVE-2025-15379
 CVE-2026-0596
 CVE-2026-2635
+CVE-2026-0545
