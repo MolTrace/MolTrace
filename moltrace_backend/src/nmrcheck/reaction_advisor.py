@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import reaction_agent
 from .database import session_scope
 from .models import (
     ReactionAdvisorReviewRequest,
@@ -34,6 +36,7 @@ from .orm import (
     ReactionMechanisticHypothesisORM,
     ReactionObjectiveProfileORM,
     ReactionOptimizationAdvisorRunORM,
+    ReactionOptimizationCycleORM,
     ReactionOptimizationDebateORM,
     ReactionProjectORM,
     ReactionRecommendationBatchORM,
@@ -43,7 +46,6 @@ from .orm import (
     utcnow,
 )
 from .reaction_store import ReactionActor
-
 
 _SAFE_NOTE = (
     "Reaction advisor output is explanatory decision support. It critiques and contextualizes "
@@ -167,7 +169,16 @@ def run_advisor(
             entity_id=run_row.id,
             metadata={"project_id": project_id, "recommendation_count": len(recommendations)},
         )
-        return _advisor_run_to_record(run_row)
+        run_id = run_row.id
+        record = _advisor_run_to_record(run_row)
+    # The deterministic rule-based critique above is always the structured math. When an operator
+    # opts in (MOLTRACE_REACTION_AGENT) and an LLM mode is requested, layer the math-frozen Claude
+    # agent on top — it degrades to the rule-based agent without an API key. Runs outside the
+    # persist scope to avoid nesting a second session.
+    if not (payload.advisor_mode != "rule_based_mechanistic" and _agent_enabled()):
+        return record
+    agent_result = _run_agent_layer(session_factory, project_id, payload)
+    return _persist_agent_layer(session_factory, run_id, agent_result, actor=actor)
 
 
 def list_advisor_runs(
@@ -1330,3 +1341,226 @@ def _audit(
             metadata_json=_json_dump(metadata or {}),
         )
     )
+
+
+# --------------------------------------------------------------------------- #
+# R8 — optional, math-frozen Claude agent layer (opt-in; degrades without a key).
+# --------------------------------------------------------------------------- #
+_AGENT_NOTE_FROZEN = (
+    "Claude agent layer produced a math-frozen plan; all quantitative values come from frozen "
+    "tools, not the model. See metadata.agent for the transcript and tool-call provenance."
+)
+_AGENT_NOTE_DEGRADED = (
+    "The Claude agent layer degraded to the deterministic rule-based path (no API key configured)."
+)
+
+
+def _agent_enabled() -> bool:
+    """The optional Claude agent layer is opt-in (default off); an operator must enable it."""
+    return os.environ.get("MOLTRACE_REACTION_AGENT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _agent_goal(session_factory: sessionmaker[Session], project_id: int) -> str:
+    with session_scope(session_factory) as session:
+        project = session.get(ReactionProjectORM, project_id)
+        objective = project.objective if project is not None else "the campaign objective"
+        name = project.name if project is not None else f"project {project_id}"
+    return (
+        f"Plan the next decision for reaction campaign {name!r} (objective: {objective}). Use the "
+        "frozen tools to ground every claim and produce a short, cited plan for human review."
+    )
+
+
+def _build_agent_executors(
+    session_factory: sessionmaker[Session],
+    project_id: int,
+    payload: ReactionOptimizationAdvisorRunRequest,
+) -> dict[str, Any]:
+    """Read-only, side-effect-free executors that wrap the frozen reaction engines.
+
+    Imported lazily to avoid any import-time cycle with the engine modules.
+    """
+
+    from . import reaction_green, reaction_hte, reaction_safety
+
+    def assess_safety(_args: dict[str, Any]) -> dict[str, Any]:
+        gate = reaction_safety.gate_status(session_factory, project_id)
+        return {
+            "status": gate.status,
+            "summary": gate.summary,
+            "blocking_screening_ids": list(gate.blocking_screening_ids),
+            "screenings_total": gate.screenings_total,
+        }
+
+    def recommend_next_batch(args: dict[str, Any]) -> dict[str, Any]:
+        size = max(1, int(args.get("batch_size") or 5))
+        with session_scope(session_factory) as session:
+            bo_run = _resolve_bo_run(session, project_id, payload.bo_run_id)
+            batch = _resolve_batch(session, project_id, payload.recommendation_batch_id)
+            recommendations = _advisor_recommendations(session, project_id, bo_run, batch)
+            bo_run_id = bo_run.id if bo_run is not None else None
+        return {
+            "candidates": recommendations[:size],
+            "count": len(recommendations),
+            "bo_run_id": bo_run_id,
+        }
+
+    def calculate_green_metrics(_args: dict[str, Any]) -> dict[str, Any]:
+        with session_scope(session_factory) as session:
+            completed = [
+                row
+                for row in _project_experiments(session, project_id)
+                if row.status == "completed"
+            ]
+            experiment_id = completed[-1].id if completed else None
+        if experiment_id is None:
+            return {"green_metrics": None, "note": "No completed experiment is available to score."}
+        assessment = reaction_green.get_green_metrics(session_factory, project_id, experiment_id)
+        if assessment is None:
+            return {
+                "green_metrics": None,
+                "experiment_id": experiment_id,
+                "note": "No green assessment is recorded for the latest completed experiment.",
+            }
+        return {"green_metrics": assessment.model_dump(mode="json"), "experiment_id": experiment_id}
+
+    def retrieve_precedents(args: dict[str, Any]) -> dict[str, Any]:
+        query = str(args.get("query") or "").strip().lower()
+        top_k = max(1, int(args.get("top_k") or 5))
+        priors = list_literature_priors(session_factory, project_id)
+        matches: list[dict[str, Any]] = []
+        for prior in priors:
+            haystack = f"{prior.title} {prior.summary} {prior.citation}".lower()
+            if not query or query in haystack:
+                matches.append(
+                    {
+                        "id": prior.id,
+                        "title": prior.title,
+                        "summary": prior.summary,
+                        "citation": prior.citation,
+                        "source_type": prior.source_type,
+                    }
+                )
+        return {"precedents": matches[:top_k], "query": args.get("query"), "count": len(matches)}
+
+    def design_plate(args: dict[str, Any]) -> dict[str, Any]:
+        plate_format = str(args.get("plate_format") or "96")
+        with session_scope(session_factory) as session:
+            design_space = _latest_design_space(session, project_id)
+            numeric_spec = _json_dict(design_space.numeric_variables_json) if design_space else {}
+            categorical_spec = (
+                _json_dict(design_space.categorical_variables_json) if design_space else {}
+            )
+        numeric: dict[str, tuple[float, float]] = {}
+        for name, spec in numeric_spec.items():
+            values = _numeric_values(spec)
+            if len(values) >= 2:
+                numeric[name] = (min(values), max(values))
+        categorical = {
+            name: list(values)
+            for name, values in categorical_spec.items()
+            if isinstance(values, list) and values
+        }
+        design = reaction_hte.generate_plate_design(
+            numeric=numeric or None,
+            categorical=categorical or None,
+            plate_format=plate_format,
+        )
+        wells = design.get("wells", [])
+        design["well_count"] = len(wells)
+        design["well_preview"] = wells[:6]
+        design.pop("wells", None)
+        return design
+
+    def summarize_cycle(args: dict[str, Any]) -> dict[str, Any]:
+        cycle_id = args.get("cycle_id")
+        with session_scope(session_factory) as session:
+            if cycle_id is not None:
+                row = session.get(ReactionOptimizationCycleORM, int(cycle_id))
+            else:
+                row = session.scalar(
+                    select(ReactionOptimizationCycleORM)
+                    .where(ReactionOptimizationCycleORM.reaction_project_id == project_id)
+                    .order_by(ReactionOptimizationCycleORM.id.desc())
+                )
+            if row is None or row.reaction_project_id != project_id:
+                return {"cycle": None, "note": "No optimization cycle is available."}
+            metadata = _json_dict(row.metadata_json)
+            return {
+                "cycle_id": row.id,
+                "status": row.status,
+                "cycle_metrics": metadata.get("cycle_metrics"),
+            }
+
+    return {
+        "assess_safety": assess_safety,
+        "recommend_next_batch": recommend_next_batch,
+        "calculate_green_metrics": calculate_green_metrics,
+        "retrieve_precedents": retrieve_precedents,
+        "design_plate": design_plate,
+        "summarize_cycle": summarize_cycle,
+    }
+
+
+def _run_agent_layer(
+    session_factory: sessionmaker[Session],
+    project_id: int,
+    payload: ReactionOptimizationAdvisorRunRequest,
+) -> reaction_agent.ReactionAgentResult:
+    return reaction_agent.run_reaction_agent(
+        goal=_agent_goal(session_factory, project_id),
+        tool_executors=_build_agent_executors(session_factory, project_id, payload),
+        safety_precheck_arguments={},
+        fallback_tool_plan=[("recommend_next_batch", {})],
+        extra_context="Advisor surface: produce a cited, math-frozen plan for human review.",
+    )
+
+
+def _persist_agent_layer(
+    session_factory: sessionmaker[Session],
+    run_id: int,
+    agent_result: reaction_agent.ReactionAgentResult,
+    *,
+    actor: ReactionActor,
+) -> ReactionOptimizationAdvisorRun:
+    with session_scope(session_factory) as session:
+        row = session.get(ReactionOptimizationAdvisorRunORM, run_id)
+        if row is None:
+            raise KeyError("Reaction advisor run not found.")
+        agent_dict = agent_result.as_dict()
+        metadata = _json_dict(row.metadata_json)
+        metadata["agent"] = agent_dict
+        metadata["agent_human_review_required"] = True
+        notes = [str(note) for note in _json_list(row.notes_json)]
+        warnings = [str(item) for item in _json_list(row.warnings_json)]
+        warnings.extend(str(item) for item in agent_dict.get("warnings", []))
+        if agent_dict.get("mode") == "claude_tool_agent":
+            # A real model produced the plan: drop the not-configured note, add the agent note.
+            notes = [note for note in notes if note != _LLM_NOT_CONFIGURED_NOTE]
+            notes.append(_AGENT_NOTE_FROZEN)
+        else:
+            notes.append(_AGENT_NOTE_DEGRADED)
+        row.metadata_json = _json_dump(metadata)
+        row.notes_json = _json_dump(notes)
+        row.warnings_json = _json_dump(warnings)
+        _audit(
+            session,
+            actor=actor,
+            event_type="reaction.advisor.agent",
+            message="Reaction agent layer produced a math-frozen plan.",
+            entity_type="reaction_optimization_advisor_run",
+            entity_id=row.id,
+            metadata={
+                "project_id": row.reaction_project_id,
+                "mode": agent_dict.get("mode"),
+                "model_version": agent_dict.get("model_version"),
+                "execution_blocked": agent_dict.get("execution_blocked"),
+                "tool_call_count": len(agent_dict.get("tool_calls", [])),
+            },
+        )
+        return _advisor_run_to_record(row)
