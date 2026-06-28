@@ -244,15 +244,21 @@ function mergeDuplicateApiListPair(record: Record<string, unknown>, a: string, b
   return out
 }
 
-function optimizationCycleDecisionRecordFromCycle(cycle: Record<string, unknown>): Record<string, unknown> | null {
+export function optimizationCycleDecisionRecordFromCycle(cycle: Record<string, unknown>): Record<string, unknown> | null {
   const md = cycle.metadata_json
   if (!isRecord(md)) return null
   const ld = md.latest_decision
   return isRecord(ld) ? ld : null
 }
 
+/** R5 — true only when the cycle's latest decision unlocks proposing the next batch. */
+export function cycleCanProposeNext(cycle: Record<string, unknown>): boolean {
+  const dec = optimizationCycleDecisionRecordFromCycle(cycle)
+  return dec != null && dec.decision === "continue_optimization"
+}
+
 /** R5 — loop metrics on a cycle (metadata_json.cycle_metrics.metrics): the "how fast / how far". */
-function cycleLoopMetricsFromCycle(cycle: Record<string, unknown>): Record<string, unknown> | null {
+export function cycleLoopMetricsFromCycle(cycle: Record<string, unknown>): Record<string, unknown> | null {
   const md = cycle.metadata_json
   if (!isRecord(md)) return null
   const cm = md.cycle_metrics
@@ -261,7 +267,7 @@ function cycleLoopMetricsFromCycle(cycle: Record<string, unknown>): Record<strin
 }
 
 /** R5 — half-closed-loop info present on a PROPOSED draft cycle (metadata_json.propose_next + note). */
-function cycleProposeNextInfoFromCycle(
+export function cycleProposeNextInfoFromCycle(
   cycle: Record<string, unknown>,
 ): { flags: Record<string, unknown>; note: string | null; proposedFrom: number | null } | null {
   const md = cycle.metadata_json
@@ -8666,7 +8672,7 @@ export function ReactionProjectDetail() {
                         const proposeInfo = cycleProposeNextInfoFromCycle(merged)
                         const latestDecision =
                           dec != null && typeof dec.decision === "string" ? dec.decision : null
-                        const canProposeNext = latestDecision === "continue_optimization"
+                        const canProposeNext = cycleCanProposeNext(merged)
                         const proposeBusy = busy === `opt-cc-propose-${cid}`
 
                         const summaryBlob = jsonPreview(isRecord(merged.summary_json) ? merged.summary_json : {}, 4200)
