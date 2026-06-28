@@ -321,6 +321,30 @@ export function proposeNextErrorMessage(err: unknown, fallback: string): string 
   return formatApiError(err, fallback)
 }
 
+/** R5 — build the optional BO-param body for propose-next. Every field is
+ *  defaulted server-side, so an untouched/invalid value is simply omitted and
+ *  `{}` stays valid (handoff §4 item 1: "POST {} (or pass BO params …)"). */
+export function proposeNextRequestBody(opts: {
+  algorithm?: string | null
+  batchSize?: string | number | null
+  safetyAware?: boolean | null
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {}
+  if (typeof opts.algorithm === "string" && opts.algorithm.trim()) {
+    body.algorithm = opts.algorithm.trim()
+  }
+  // batch_size is an integer experiment-count server-side; floor both the
+  // numeric and string paths so e.g. 2.9 → 2 (matches runBayesianOptimization).
+  const raw =
+    typeof opts.batchSize === "number"
+      ? opts.batchSize
+      : Number.parseInt(String(opts.batchSize ?? "").trim(), 10)
+  const n = Math.floor(raw)
+  if (Number.isFinite(n) && n >= 1) body.batch_size = n
+  if (typeof opts.safetyAware === "boolean") body.safety_aware = opts.safetyAware
+  return body
+}
+
 function mergeOutcomeExtractionNotes(run: Record<string, unknown>): string[] {
   const out: string[] = []
   const seen = new Set<string>()
@@ -938,6 +962,9 @@ export function ReactionProjectDetail() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  // Controlled tab value so the half-closed-loop banner can deep-link to the
+  // Cost & Safety tab (where the R6 structural-safety screening / gate lives).
+  const [activeTab, setActiveTab] = useState("overview")
   const [project, setProject] = useState<Record<string, unknown> | null>(null)
   const [variables, setVariables] = useState<unknown[]>([])
   const [experiments, setExperiments] = useState<unknown[]>([])
@@ -3682,13 +3709,35 @@ export function ReactionProjectDetail() {
   // Decision-support only — it executes nothing; committing an execution batch
   // still needs a human (and passes the R6 safety gate). The backend 409s with a
   // human-readable reason when the latest decision isn't `continue_optimization`.
+  /** Deep-link from the half-closed-loop banner to the structural-safety gate,
+   *  which lives in the Cost & Safety tab (a different tab from the cycle UI). */
+  function goToSafetyGate() {
+    setActiveTab("cost-safety")
+    if (typeof window === "undefined") return
+    window.requestAnimationFrame(() => {
+      const el = document.getElementById("reaction-safety-gate")
+      el?.scrollIntoView({ block: "start", behavior: "smooth" })
+      el?.focus({ preventScroll: true })
+    })
+  }
+
   async function proposeNextBatch(cycleId: number) {
     setMsg(null)
     setBusy(`opt-cc-propose-${cycleId}`)
     try {
       const created = await apiFetch<unknown>(
         `/reaction-optimization-cycles/${cycleId}/propose-next`,
-        { method: "POST", body: {} },
+        {
+          method: "POST",
+          // Carry the BO params from the Bayesian-Optimization run form on the
+          // Optimization tab (one shared config); every field is server-defaulted
+          // so this stays valid when untouched.
+          body: proposeNextRequestBody({
+            algorithm: boAlgorithm,
+            batchSize: boBatchSize,
+            safetyAware: boSafetyAware,
+          }),
+        },
       )
       const row = isRecord(created) ? created : null
       const newId = row ? readNum(row.id) : null
@@ -3814,7 +3863,7 @@ export function ReactionProjectDetail() {
 
       <ReactionStudioKnowledgeLinksCard reactionProjectId={reactionProjectId} />
 
-      <Tabs defaultValue="overview" className="w-full min-w-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0">
         <div className="min-w-0 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
           <TabsList className="inline-flex h-auto min-h-9 w-max max-w-full flex-nowrap justify-start gap-1">
             <TabsTrigger value="overview" className={reactionProjectTabClass}>
@@ -5114,10 +5163,12 @@ export function ReactionProjectDetail() {
             </div>
           </ModuleCard>
 
-          <SafetyScreeningPanel
-            projectId={reactionProjectId}
-            productSmilesHint={typeof project?.target_product_smiles === "string" ? project.target_product_smiles : null}
-          />
+          <div id="reaction-safety-gate" tabIndex={-1} className="scroll-mt-4 outline-none">
+            <SafetyScreeningPanel
+              projectId={reactionProjectId}
+              productSmilesHint={typeof project?.target_product_smiles === "string" ? project.target_product_smiles : null}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="green" className="mt-4 space-y-6">
@@ -8812,8 +8863,14 @@ export function ReactionProjectDetail() {
                                       {proposeInfo.flags.execution_blocked_by_safety === true ? (
                                         <p className="font-medium text-foreground">
                                           Execution is blocked by the safety gate — resolve the rejected
-                                          structural-safety screening (Cost &amp; Safety tab) before this batch
-                                          can be planned or run.
+                                          structural-safety screening before this batch can be planned or run.{" "}
+                                          <button
+                                            type="button"
+                                            className="inline min-h-0 align-baseline font-medium text-foreground underline underline-offset-2 hover:opacity-80"
+                                            onClick={goToSafetyGate}
+                                          >
+                                            Open the safety gate (Cost &amp; Safety) →
+                                          </button>
                                         </p>
                                       ) : null}
                                     </div>
@@ -8996,6 +9053,34 @@ export function ReactionProjectDetail() {
                                         </span>
                                       ) : null}
                                     </div>
+                                    {canProposeNext ? (
+                                      <p className="text-[11px] text-muted-foreground">
+                                        Sends the Bayesian-Optimization run settings from the{" "}
+                                        <button
+                                          type="button"
+                                          className="inline min-h-0 align-baseline font-medium text-foreground underline underline-offset-2 hover:opacity-80"
+                                          onClick={() => setActiveTab("optimization")}
+                                        >
+                                          Optimization tab
+                                        </button>
+                                        :{" "}
+                                        <span className="font-mono text-foreground">
+                                          {boAlgorithm.replace(/_/g, " ")}
+                                        </span>{" "}
+                                        · batch{" "}
+                                        <span className="font-mono text-foreground">
+                                          {(() => {
+                                            const b = proposeNextRequestBody({ batchSize: boBatchSize })
+                                            return typeof b.batch_size === "number" ? b.batch_size : "default"
+                                          })()}
+                                        </span>{" "}
+                                        · safety-aware{" "}
+                                        <span className="font-mono text-foreground">
+                                          {boSafetyAware ? "on" : "off"}
+                                        </span>
+                                        .
+                                      </p>
+                                    ) : null}
                                   </div>
                                   <Separator />
                                   <form className="space-y-4" onSubmit={(e) => void submitOptimizationCycleDecision(cid, e)}>
