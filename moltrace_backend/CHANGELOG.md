@@ -14,6 +14,46 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.59.0 — Security Prompt 20: Incident-response program (2026-06-26)
+
+**Headline:** Stands up the incident-response program — an IR plan, executable runbooks tied to the
+P19 detections, a GDPR Art. 33/34 breach-notification workflow, and a testable notification-deadline
+engine. Mostly process artifacts (the on-call rotation, hosted SIEM, edge WAF, and *sending* notices
+are operational); the buildable in-repo slice is the deadline engine + the docs.
+
+- **IR notification-deadline engine** (`src/nmrcheck/ir_timeline.py`, NEW, zero new deps, **library-only —
+  no api.py**). Given an incident's awareness timestamp + a breach classification, computes the
+  notification obligations and evaluates met/missed/overdue/pending — making "notifications meet
+  deadlines" concrete and testable. Gets the **processor-vs-controller** distinction right: for
+  *customer* data MolTrace is a **processor** (Art. 33(2)) whose binding deadline is to notify the
+  *customer* within the DPA SLA (default 24h); the customer owns the 72h supervisory-authority clock.
+  For MolTrace's *own* data it wears the controller hat (72h SA + Art. 34 data-subject). Decision-support
+  only — it computes timing, not legal conclusions, and sends nothing.
+- **IR plan** (`docs/security/incident_response_plan.md`) — SEV1–4 tiers, roles (IC/comms/scribe/DPO),
+  the detect→triage→contain→eradicate→recover→notify→post-incident lifecycle, a **containment-levers
+  table** mapped to real endpoints/store fns (revoke session family, `revoke_all_user_tokens`, SCIM
+  deprovision, `POST /admin/users/{id}/demote`, rotate API/audit-signing keys, …), forensic **evidence
+  sources** (audit-chain verify/search, SecurityEvent stream, debug bundles, soft-delete retention,
+  e-sign verify), Part 11 e-signature sign-off, and tabletop + post-incident-review templates.
+- **Runbooks** (`docs/security/incident_runbooks.md`) — R1 audit-chain break, R2 account takeover
+  (impossible travel), R3 privilege escalation, R4 cross-tenant probing, R5 credential/key compromise,
+  R6 DoS, R7 external VDP report — each keyed to a P19 detection signal + the containment levers.
+- **Breach-notification workflow** (`docs/security/breach_notification.md`) — the processor/controller
+  table + the trap to avoid, the GDPR "awareness" clock, a decision tree, the `ir_timeline` usage,
+  the Art. 33(3) notice content, and the Art. 34(3) exemptions. Framed "designed to support", never a
+  held attestation.
+
+Honest boundaries stated throughout: sending notices + the 24/7 on-call rotation are operational; the
+notifiable-breach / high-risk calls are human judgments (DPO), not automated. 11 new engine tests.
+
+### Added
+- **`src/nmrcheck/ir_timeline.py`** + **`tests/test_ir_timeline.py`** — the deadline engine + tests
+  (processor/controller obligations, the 72h vs DPA-SLA clocks, met/missed/overdue/manual evaluation,
+  regime overlays).
+- **`docs/security/`** — `incident_response_plan.md`, `incident_runbooks.md`, `breach_notification.md`.
+
+---
+
 ## v0.58.0 — Security Prompt 19: SIEM & security detections (2026-06-26)
 
 **Headline:** Turns the immutable SecurityEvent stream + the tamper-evident audit chain into
