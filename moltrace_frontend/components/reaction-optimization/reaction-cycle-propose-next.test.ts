@@ -8,19 +8,19 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({ reactionId: "10" }),
 }))
-vi.mock("@/lib/api/client", () => ({
-  apiFetch: vi.fn(async () => []),
-  ApiError: class ApiError extends Error {},
-}))
+// Use the REAL @/lib/api/client — the test makes no network calls, and the error
+// helper relies on the real ApiError + sanitizePublicApiErrorMessage.
 vi.mock("framer-motion", () => ({
   motion: new Proxy({}, { get: () => (p: { children?: unknown }) => p.children }),
   AnimatePresence: (p: { children?: unknown }) => p.children,
 }))
 
+import { ApiError } from "@/lib/api/client"
 import {
   cycleCanProposeNext,
   cycleLoopMetricsFromCycle,
   cycleProposeNextInfoFromCycle,
+  proposeNextErrorMessage,
 } from "@/components/reaction-optimization/reaction-project-detail"
 
 const cycleWithDecision = (decision: string) => ({
@@ -82,5 +82,31 @@ describe("R5 propose-next cycle helpers", () => {
     // a normal (non-proposed) cycle has no banner
     expect(cycleProposeNextInfoFromCycle({ metadata_json: {} })).toBeNull()
     expect(cycleProposeNextInfoFromCycle({})).toBeNull()
+  })
+})
+
+const FALLBACK = "POST …/propose-next failed."
+
+describe("R5 propose-next error message", () => {
+  it("surfaces the 409 'why you can't propose' reason directly from detail", () => {
+    const reason = "Latest decision is 'pause'; record a 'continue_optimization' decision first."
+    expect(proposeNextErrorMessage(new ApiError(409, { detail: reason }), FALLBACK)).toBe(reason)
+  })
+
+  it("a 409 with no string detail is NOT surfaced raw — it falls through", () => {
+    const out = proposeNextErrorMessage(new ApiError(409, {}), FALLBACK)
+    expect(typeof out).toBe("string")
+    expect(out).not.toBe("")
+  })
+
+  it("routes the non-owner / generic 404 through formatApiError (non-leaking), not the 409 path", () => {
+    // a non-leaking 404 ("Not Found") becomes the generic endpoint message, never the raw detail
+    expect(proposeNextErrorMessage(new ApiError(404, { detail: "Not Found" }), FALLBACK)).toContain(
+      "not available",
+    )
+    // a 404 carrying a real resource detail surfaces that detail
+    expect(
+      proposeNextErrorMessage(new ApiError(404, { detail: "Reaction project not found." }), FALLBACK),
+    ).toContain("project not found")
   })
 })
