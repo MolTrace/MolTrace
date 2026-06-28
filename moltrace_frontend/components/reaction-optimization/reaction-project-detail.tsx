@@ -21,6 +21,11 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/
 
 const reactionProjectTabClass =
   "font-mono text-xs sm:text-sm data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#EBF4F8] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+/** Shared style for inline, baseline-aligned link-buttons rendered inside prose
+ *  (e.g. the safety-gate deep-link). `inline min-h-0 align-baseline` neutralizes
+ *  the global button min-height; the focus-visible ring matches house style. */
+const INLINE_LINK_BUTTON_CLASS =
+  "inline min-h-0 align-baseline font-medium text-foreground underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:rounded-sm"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -343,6 +348,57 @@ export function proposeNextRequestBody(opts: {
   if (Number.isFinite(n) && n >= 1) body.batch_size = n
   if (typeof opts.safetyAware === "boolean") body.safety_aware = opts.safetyAware
   return body
+}
+
+/** R8 — the math-frozen Claude advisor-agent block that rides in an advisor run's
+ *  untyped `metadata_json.agent`. Absent unless the MOLTRACE_REACTION_AGENT flag +
+ *  an LLM advisor_mode are in play, so read defensively. The model plans/narrates/
+ *  re-ranks but NEVER computes a number — every quantitative value lives in
+ *  `tool_calls[].output` (the grounded source of truth); narrative/plan are prose. */
+export function advisorAgentFromRun(run: unknown): {
+  engine: string | null
+  mode: string | null
+  llmUsed: boolean
+  modelVersion: string | null
+  narrative: string | null
+  plan: string[]
+  toolCalls: Record<string, unknown>[]
+  safetyStatus: string | null
+  safetyPrecheck: Record<string, unknown> | null
+  executionBlocked: boolean
+  warnings: string[]
+  stopReason: string | null
+  disclaimer: string | null
+  humanReviewRequired: boolean
+  isFallback: boolean
+} | null {
+  if (!isRecord(run)) return null
+  const md = run.metadata_json
+  if (!isRecord(md)) return null
+  const a = md.agent
+  if (!isRecord(a)) return null
+  const mode = typeof a.mode === "string" ? a.mode : null
+  const modelVersion = typeof a.model_version === "string" ? a.model_version : null
+  const precheck = isRecord(a.safety_precheck) ? a.safety_precheck : null
+  return {
+    engine: typeof a.engine === "string" ? a.engine : null,
+    mode,
+    llmUsed: a.llm_used === true,
+    modelVersion,
+    narrative: typeof a.narrative === "string" ? a.narrative : null,
+    plan: Array.isArray(a.plan) ? a.plan.filter((s): s is string => typeof s === "string") : [],
+    toolCalls: Array.isArray(a.tool_calls) ? a.tool_calls.filter(isRecord) : [],
+    safetyStatus: precheck && typeof precheck.status === "string" ? precheck.status : null,
+    safetyPrecheck: precheck,
+    executionBlocked: a.execution_blocked === true,
+    warnings: Array.isArray(a.warnings) ? a.warnings.filter((s): s is string => typeof s === "string") : [],
+    stopReason: typeof a.stop_reason === "string" ? a.stop_reason : null,
+    disclaimer: typeof a.disclaimer === "string" ? a.disclaimer : null,
+    // Always-review: defaults true even if the field is absent (the agent schedules nothing).
+    humanReviewRequired: a.human_review_required !== false,
+    // Degraded path: deterministic / no-LLM when explicitly fallback or no model version.
+    isFallback: mode === "rule_based_fallback" || modelVersion == null,
+  }
 }
 
 function mergeOutcomeExtractionNotes(run: Record<string, unknown>): string[] {
@@ -6096,6 +6152,193 @@ export function ReactionProjectDetail() {
                   />
 
                   {(() => {
+                    const agent = advisorAgentFromRun(lastAdvisorRun)
+                    if (agent == null) return null
+                    return (
+                      <section
+                        className="space-y-3 rounded-md border bg-muted/20 p-3"
+                        style={{ borderLeft: "3px solid var(--mt-violet)" }}
+                        aria-label="Reaction agent"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium text-foreground">Reaction agent</p>
+                          {agent.engine ? (
+                            <Badge variant="outline" className="font-mono text-[11px]">
+                              {agent.engine}
+                            </Badge>
+                          ) : null}
+                          {agent.isFallback ? (
+                            <Badge variant="secondary" className="text-[11px]">
+                              deterministic · no LLM
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="font-mono text-[11px]">
+                              model: {agent.modelVersion}
+                            </Badge>
+                          )}
+                          {agent.stopReason ? (
+                            <Badge variant="outline" className="text-[11px]">
+                              stop: {agent.stopReason.replace(/_/g, " ")}
+                            </Badge>
+                          ) : null}
+                        </div>
+
+                        {agent.isFallback ? (
+                          <Alert>
+                            <AlertTitle className="text-sm">Deterministic plan (no LLM)</AlertTitle>
+                            <AlertDescription className="text-xs">
+                              No Anthropic key / agent flag in play — this plan is the rule-based fallback,
+                              not a model-guided one. Treat it as the baseline deterministic critique.
+                            </AlertDescription>
+                          </Alert>
+                        ) : null}
+
+                        {/* §4.3 safety pre-check banner */}
+                        {agent.safetyStatus || agent.executionBlocked ? (
+                          <div
+                            className="space-y-1 rounded-md border px-3 py-2 text-xs"
+                            style={{
+                              borderLeft: `3px solid ${
+                                agent.executionBlocked || agent.safetyStatus === "blocked"
+                                  ? "var(--mt-amber)"
+                                  : "var(--mt-teal)"
+                              }`,
+                            }}
+                          >
+                            <p className="font-medium text-foreground">
+                              Safety pre-check:{" "}
+                              <span className="font-mono">
+                                {(agent.safetyStatus ?? "unknown").replace(/_/g, " ")}
+                              </span>
+                            </p>
+                            {agent.safetyPrecheck != null &&
+                            typeof agent.safetyPrecheck.summary === "string" ? (
+                              <p className="text-muted-foreground">{agent.safetyPrecheck.summary}</p>
+                            ) : null}
+                            {agent.executionBlocked ? (
+                              <p className="font-medium text-foreground">
+                                The agent refused the action tools — resolve the blocking structural-safety
+                                screening before any proposed batch can proceed.{" "}
+                                <button
+                                  type="button"
+                                  className={INLINE_LINK_BUTTON_CLASS}
+                                  onClick={goToSafetyGate}
+                                >
+                                  Open the safety gate (Cost &amp; Safety) →
+                                </button>
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        {/* §4.1 plan panel — model prose, explicitly NOT the source of numbers */}
+                        {agent.narrative || agent.plan.length > 0 ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                agent plan
+                              </p>
+                              <Badge variant="outline" className="text-[10px]">
+                                model prose — not a source of numbers
+                              </Badge>
+                            </div>
+                            {agent.narrative ? (
+                              <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                                {agent.narrative}
+                              </p>
+                            ) : null}
+                            {agent.plan.length > 0 ? (
+                              <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
+                                {agent.plan.map((step, i) => (
+                                  <li key={`agent-plan-${i}`}>{step}</li>
+                                ))}
+                              </ol>
+                            ) : null}
+                            <p className="text-[11px] text-muted-foreground">
+                              Decision support only — the agent re-ranks and explains; the chemist decides.
+                              It schedules nothing.{" "}
+                              {agent.toolCalls.length > 0
+                                ? "Any figure in the prose is a citation to a tool call below, not a computed value."
+                                : "No grounded tool outputs were recorded for this run — treat any figure in the prose as uncited."}
+                            </p>
+                          </div>
+                        ) : null}
+
+                        {/* §4.2 tool-call provenance — the ONLY source of quantitative truth */}
+                        {agent.toolCalls.length > 0 ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                tool-call provenance
+                              </p>
+                              <Badge variant="secondary" className="text-[10px]">
+                                grounded — every number comes from here
+                              </Badge>
+                            </div>
+                            <div className="space-y-2">
+                              {agent.toolCalls.map((tc, i) => {
+                                const name = typeof tc.name === "string" ? tc.name : "tool"
+                                const isErr = tc.is_error === true
+                                return (
+                                  <div
+                                    key={`agent-tc-${i}-${name}`}
+                                    className="space-y-1 rounded-md border px-3 py-2"
+                                  >
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Badge
+                                        variant={isErr ? "destructive" : "outline"}
+                                        className="font-mono text-[11px]"
+                                      >
+                                        {name}
+                                      </Badge>
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {isErr ? "tool error" : "source: tool"}
+                                      </span>
+                                    </div>
+                                    {isRecord(tc.arguments) && Object.keys(tc.arguments).length > 0 ? (
+                                      <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-[10px] leading-snug">
+                                        args: {jsonPreview(tc.arguments, 2000)}
+                                      </pre>
+                                    ) : null}
+                                    {tc.output != null ? (
+                                      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-[10px] leading-snug">
+                                        {jsonPreview(tc.output, 6000)}
+                                      </pre>
+                                    ) : null}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {agent.warnings.length > 0 ? (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-muted-foreground">agent warnings</p>
+                            <ul className="list-inside list-disc text-xs text-muted-foreground">
+                              {agent.warnings.map((w, i) => (
+                                <li key={`agent-w-${i}-${w.slice(0, 24)}`}>{w}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+
+                        {agent.disclaimer ? (
+                          <p className="rounded-md bg-muted/40 px-3 py-2 text-[11px] italic text-muted-foreground">
+                            {agent.disclaimer}
+                          </p>
+                        ) : null}
+
+                        {/* §4.5 always-review */}
+                        <p className="text-[11px] font-medium text-foreground">
+                          Human review required — the agent schedules nothing; a chemist signs off on any
+                          next step.
+                        </p>
+                      </section>
+                    )
+                  })()}
+
+                  {(() => {
                     const ws = mergeRunStringLists(lastAdvisorRun.warnings, lastAdvisorRun.warnings_json)
                     return (
                       <div className="space-y-2">
@@ -8866,7 +9109,7 @@ export function ReactionProjectDetail() {
                                           structural-safety screening before this batch can be planned or run.{" "}
                                           <button
                                             type="button"
-                                            className="inline min-h-0 align-baseline font-medium text-foreground underline underline-offset-2 hover:opacity-80"
+                                            className={INLINE_LINK_BUTTON_CLASS}
                                             onClick={goToSafetyGate}
                                           >
                                             Open the safety gate (Cost &amp; Safety) →
@@ -9060,7 +9303,7 @@ export function ReactionProjectDetail() {
                                         Sends the Bayesian-Optimization run settings from the{" "}
                                         <button
                                           type="button"
-                                          className="inline min-h-0 align-baseline font-medium text-foreground underline underline-offset-2 hover:opacity-80"
+                                          className={INLINE_LINK_BUTTON_CLASS}
                                           onClick={() => setActiveTab("optimization")}
                                         >
                                           Optimization tab
