@@ -14,6 +14,39 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.60.0 — Security Prompt 21: Backup & DR resilience (2026-06-26)
+
+**Headline:** Adds the in-repo half of disaster-recovery resilience — a restore-integrity verifier
+that proves a restored database is intact and un-tampered by reusing the tamper-evident audit chain
+as the integrity oracle — plus the RTO/RPO + restore-drill + game-day runbook. The cross-region /
+immutable backup storage and *running* a restore are operational (Render console / secondary region).
+
+- **Restore-integrity verifier** (`src/nmrcheck/dr_verify.py`, NEW, zero new deps, library + CLI, **no
+  api.py**). After a restore, `verify_restore` / `assess` re-run the audit-chain verification
+  (Prompt 10 — per-row SHA-256 chain + HMAC anchors + signed high-water mark) and add restore-sanity
+  checks: audit history present (catches an empty/wrong DB), the **production signing key** is in use
+  (not the dev fallback — else the chain's tamper-evidence can't be trusted), and core-table row counts
+  meet a pre-loss baseline (data-loss guard). A restored DB whose chain still verifies is provable
+  evidence nothing was lost or altered — the "verified for integrity" half of the DR criterion.
+  `python -m nmrcheck.dr_verify --min-rows audit_events=1,users=1` → exit 0 verified / 1 failed / 2
+  can't-connect. The `assess` decision is pure + unit-tested; `verify_restore` is tested against a
+  seeded (clean) and a tampered DB.
+- **Backup & DR runbook** (`docs/security/backup_dr.md`) — what's backed up (honest Render scope),
+  RTO/RPO targets (DB ≤4h RTO / ≤24h-or-PITR RPO; app ≤1h), the restore-drill procedure (with the
+  `dr_verify` integrity step), a DR game-day template, and the operational TODOs (cross-region +
+  immutable/object-lock backups, scheduled drills, independent secrets recovery).
+
+Honest boundary throughout: backup storage / replication / immutability and executing a region-loss
+restore are operational; in-repo we ship the integrity verifier + the targets + the drill runbooks.
+10 new tests.
+
+### Added
+- **`src/nmrcheck/dr_verify.py`** + **`tests/test_dr_verify.py`** — the restore-integrity verifier
+  (pure `assess` + DB-driven `verify_restore` + CLI) and its tests.
+- **`docs/security/backup_dr.md`** — the backup/RTO-RPO/restore-drill/game-day runbook.
+
+---
+
 ## v0.59.0 — Security Prompt 20: Incident-response program (2026-06-26)
 
 **Headline:** Stands up the incident-response program — an IR plan, executable runbooks tied to the
