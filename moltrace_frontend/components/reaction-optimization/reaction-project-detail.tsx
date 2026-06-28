@@ -281,6 +281,30 @@ export function cycleProposeNextInfoFromCycle(
   }
 }
 
+/** R5 — DMTA loop sequence + per-phase latencies + provenance from a cycle's
+ *  cycle_metrics (drives the optional DMTA stepper). */
+export function cycleDmtaInfoFromCycle(cycle: Record<string, unknown>): {
+  sequence: string[]
+  phaseLatencies: Record<string, unknown>
+  provenance: Record<string, unknown> | null
+  engine: string | null
+} | null {
+  const md = cycle.metadata_json
+  if (!isRecord(md)) return null
+  const cm = md.cycle_metrics
+  if (!isRecord(cm)) return null
+  const sequence = Array.isArray(cm.dmta_sequence)
+    ? cm.dmta_sequence.filter((s): s is string => typeof s === "string")
+    : []
+  const metrics = isRecord(cm.metrics) ? cm.metrics : {}
+  return {
+    sequence,
+    phaseLatencies: isRecord(metrics.phase_latencies_seconds) ? metrics.phase_latencies_seconds : {},
+    provenance: isRecord(cm.provenance) ? cm.provenance : null,
+    engine: typeof cm.engine === "string" ? cm.engine : null,
+  }
+}
+
 /** R5 — user-facing message for a failed propose-next. The 409 "why you can't
  *  propose" reason rides in `detail`, but formatApiError only unpacks 401/403/404
  *  — so the 409 detail is surfaced directly; everything else (incl. the
@@ -8679,6 +8703,7 @@ export function ReactionProjectDetail() {
                         // R5 — half-closed DMTA loop bits
                         const loopMetrics = cycleLoopMetricsFromCycle(merged)
                         const proposeInfo = cycleProposeNextInfoFromCycle(merged)
+                        const dmtaInfo = cycleDmtaInfoFromCycle(merged)
                         const latestDecision =
                           dec != null && typeof dec.decision === "string" ? dec.decision : null
                         const canProposeNext = cycleCanProposeNext(merged)
@@ -8888,6 +8913,60 @@ export function ReactionProjectDetail() {
                                           <p className="text-[10px] text-muted-foreground">target met</p>
                                         </div>
                                       </div>
+                                    </div>
+                                  ) : null}
+                                  {dmtaInfo != null && dmtaInfo.sequence.length > 0 ? (
+                                    <div className="space-y-2">
+                                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        DMTA loop{dmtaInfo.engine ? ` · ${dmtaInfo.engine}` : ""}
+                                      </p>
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {dmtaInfo.sequence.map((phase, i) => {
+                                          const lat = readNum(dmtaInfo.phaseLatencies[phase])
+                                          return (
+                                            <div key={`${phase}-${i}`} className="flex items-center gap-1.5">
+                                              {i > 0 ? (
+                                                <span aria-hidden className="text-muted-foreground/50">
+                                                  →
+                                                </span>
+                                              ) : null}
+                                              <div className="rounded-md border px-2 py-1 text-center">
+                                                <p className="text-xs font-medium capitalize">
+                                                  {phase.replace(/_/g, " ")}
+                                                </p>
+                                                <p className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                                                  {lat != null ? `${lat}s` : "—"}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                      <p className="text-[11px] text-muted-foreground">
+                                        Only propose &amp; safety-gate are automated; make / test / learn / decision are
+                                        human steps (no latency until performed).
+                                      </p>
+                                      {dmtaInfo.provenance != null ? (
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                                          {typeof dmtaInfo.provenance.surrogate_model_version === "string" ? (
+                                            <span>
+                                              surrogate{" "}
+                                              <span className="font-mono text-foreground">
+                                                {dmtaInfo.provenance.surrogate_model_version}
+                                              </span>
+                                            </span>
+                                          ) : null}
+                                          {Array.isArray(dmtaInfo.provenance.spectracheck_session_ids) &&
+                                          dmtaInfo.provenance.spectracheck_session_ids.length > 0 ? (
+                                            <span>
+                                              SpectraCheck sessions{" "}
+                                              <span className="font-mono text-foreground">
+                                                {dmtaInfo.provenance.spectracheck_session_ids.join(", ")}
+                                              </span>
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      ) : null}
                                     </div>
                                   ) : null}
                                   <div className="space-y-2">

@@ -18,6 +18,7 @@ vi.mock("framer-motion", () => ({
 import { ApiError } from "@/lib/api/client"
 import {
   cycleCanProposeNext,
+  cycleDmtaInfoFromCycle,
   cycleLoopMetricsFromCycle,
   cycleProposeNextInfoFromCycle,
   proposeNextErrorMessage,
@@ -82,6 +83,26 @@ describe("R5 propose-next cycle helpers", () => {
     // a normal (non-proposed) cycle has no banner
     expect(cycleProposeNextInfoFromCycle({ metadata_json: {} })).toBeNull()
     expect(cycleProposeNextInfoFromCycle({})).toBeNull()
+  })
+
+  it("reads the DMTA sequence + per-phase latencies + provenance for the stepper", () => {
+    const info = cycleDmtaInfoFromCycle({
+      metadata_json: {
+        cycle_metrics: {
+          dmta_sequence: ["propose", "safety_gate", "make", "test", "learn", "decision"],
+          engine: "reaction_loop.v1",
+          metrics: { phase_latencies_seconds: { propose: 1.2, safety_gate: 0.3 } },
+          provenance: { surrogate_model_version: "gp-1", spectracheck_session_ids: [7, 9] },
+        },
+      },
+    })
+    expect(info?.sequence).toEqual(["propose", "safety_gate", "make", "test", "learn", "decision"])
+    expect(info?.engine).toBe("reaction_loop.v1")
+    expect(info?.phaseLatencies).toEqual({ propose: 1.2, safety_gate: 0.3 })
+    expect(info?.provenance?.surrogate_model_version).toBe("gp-1")
+    // missing cycle_metrics → null; missing dmta_sequence → empty sequence (stepper hides)
+    expect(cycleDmtaInfoFromCycle({ metadata_json: {} })).toBeNull()
+    expect(cycleDmtaInfoFromCycle({ metadata_json: { cycle_metrics: {} } })?.sequence).toEqual([])
   })
 })
 
