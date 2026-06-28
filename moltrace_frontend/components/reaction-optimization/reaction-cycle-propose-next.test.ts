@@ -22,6 +22,7 @@ import {
   cycleLoopMetricsFromCycle,
   cycleProposeNextInfoFromCycle,
   proposeNextErrorMessage,
+  proposeNextRequestBody,
 } from "@/components/reaction-optimization/reaction-project-detail"
 
 const cycleWithDecision = (decision: string) => ({
@@ -129,5 +130,34 @@ describe("R5 propose-next error message", () => {
     expect(
       proposeNextErrorMessage(new ApiError(404, { detail: "Reaction project not found." }), FALLBACK),
     ).toContain("project not found")
+  })
+})
+
+describe("R5 propose-next request body (optional BO params)", () => {
+  it("stays {}-valid when nothing usable is supplied (server defaults all fields)", () => {
+    expect(proposeNextRequestBody({})).toEqual({})
+    expect(proposeNextRequestBody({ algorithm: "", batchSize: "", safetyAware: null })).toEqual({})
+    // a blank/zero/negative/non-numeric batch is omitted, not sent as 0/NaN
+    expect(proposeNextRequestBody({ batchSize: "0" })).toEqual({})
+    expect(proposeNextRequestBody({ batchSize: "-3" })).toEqual({})
+    expect(proposeNextRequestBody({ batchSize: "abc" })).toEqual({})
+  })
+
+  it("carries the configured algorithm / batch_size / safety_aware when set", () => {
+    expect(
+      proposeNextRequestBody({ algorithm: "gaussian_process_ucb", batchSize: "8", safetyAware: true }),
+    ).toEqual({ algorithm: "gaussian_process_ucb", batch_size: 8, safety_aware: true })
+    // safety_aware:false is a real value (not omitted); numeric batch passes through
+    expect(proposeNextRequestBody({ batchSize: 3, safetyAware: false })).toEqual({
+      batch_size: 3,
+      safety_aware: false,
+    })
+  })
+
+  it("floors a fractional batch_size on BOTH the numeric and string paths (server wants an int)", () => {
+    expect(proposeNextRequestBody({ batchSize: 2.9 })).toEqual({ batch_size: 2 })
+    expect(proposeNextRequestBody({ batchSize: "4.7" })).toEqual({ batch_size: 4 })
+    // floors to 0 → below the >= 1 floor → omitted
+    expect(proposeNextRequestBody({ batchSize: 0.6 })).toEqual({})
   })
 })
