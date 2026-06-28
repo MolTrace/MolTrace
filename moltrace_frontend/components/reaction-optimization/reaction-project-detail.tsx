@@ -8950,6 +8950,8 @@ export function ReactionProjectDetail() {
                                           { label: "new this cycle", value: readNum(loopMetrics.new_experiments) },
                                           { label: "to target", value: readNum(loopMetrics.experiments_to_target) },
                                           { label: "best objective", value: readNum(loopMetrics.best_objective) },
+                                          { label: "objective target", value: readNum(loopMetrics.objective_target) },
+                                          { label: "gap to target", value: readNum(loopMetrics.objective_gap) },
                                           { label: "latency (s)", value: readNum(loopMetrics.latency_seconds) },
                                         ].map((m) => (
                                           <div key={m.label} className="rounded-md border px-2 py-1.5">
