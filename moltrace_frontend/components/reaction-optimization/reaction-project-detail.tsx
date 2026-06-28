@@ -281,6 +281,22 @@ export function cycleProposeNextInfoFromCycle(
   }
 }
 
+/** R5 — user-facing message for a failed propose-next. The 409 "why you can't
+ *  propose" reason rides in `detail`, but formatApiError only unpacks 401/403/404
+ *  — so the 409 detail is surfaced directly; everything else (incl. the
+ *  non-owner 404 and any 5xx) falls through formatApiError. */
+export function proposeNextErrorMessage(err: unknown, fallback: string): string {
+  if (
+    err instanceof ApiError &&
+    err.status === 409 &&
+    isRecord(err.data) &&
+    typeof err.data.detail === "string"
+  ) {
+    return err.data.detail
+  }
+  return formatApiError(err, fallback)
+}
+
 function mergeOutcomeExtractionNotes(run: Record<string, unknown>): string[] {
   const out: string[] = []
   const seen = new Set<string>()
@@ -3665,20 +3681,13 @@ export function ReactionProjectDetail() {
         void loadOptimizationCycleDetail(newId)
       }
     } catch (err) {
-      // 409 carries the "why you can't propose" reason in `detail`; formatApiError
-      // only unpacks 401/403/404, so surface the 409 detail directly.
-      let text: string
-      if (
-        err instanceof ApiError &&
-        err.status === 409 &&
-        isRecord(err.data) &&
-        typeof err.data.detail === "string"
-      ) {
-        text = err.data.detail
-      } else {
-        text = formatApiError(err, "POST /reaction-optimization-cycles/{cycle_id}/propose-next failed.")
-      }
-      setMsg({ tone: "err", text })
+      setMsg({
+        tone: "err",
+        text: proposeNextErrorMessage(
+          err,
+          "POST /reaction-optimization-cycles/{cycle_id}/propose-next failed.",
+        ),
+      })
     } finally {
       setBusy(null)
     }
