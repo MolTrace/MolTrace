@@ -1,0 +1,324 @@
+{
+  "_comment": "MolTrace control->evidence register (Security Prompt 22). Maps the in-repo security controls (built across Security Prompts 5-21) to the SOC 2 Trust Services Criteria + ISO/IEC 27001:2022 Annex A themes, with repo-relative evidence paths. This is a self-assessment of control COVERAGE / readiness, NOT an attestation: SOC 2 and ISO 27001 are AUDITED certifications issued by an independent auditor/body. MolTrace does NOT currently hold a SOC 2 report or an ISO 27001 certificate; controls are 'designed to support' those frameworks. Validate every evidence path with compliance/validate_controls.py.",
+  "framework_status": {
+    "soc2_type_ii": "not held — designed to support; pursuing",
+    "iso27001_2022": "not held — controls mapped to / aligned with Annex A",
+    "iso27017_27018": "not held — cloud/PII extensions, would be certified alongside an ISO 27001 ISMS",
+    "note": "This register shows control coverage only. Only an auditor's report (SOC 2) or certificate (ISO 27001) provides assurance."
+  },
+  "controls": [
+    {
+      "id": "rbac-pdp",
+      "control": "RBAC deny-by-default policy-decision point",
+      "summary": "Embedded policy-as-code PDP: deny-by-default, forbid-overrides-permit, owner-scoped with non-leaking 404; new endpoints inherit the gate.",
+      "soc2_tsc": ["CC6"],
+      "iso27001_annex_a": ["A.5", "A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/authz.py",
+        "moltrace_backend/src/nmrcheck/reaction_access.py",
+        "moltrace_backend/docs/fe_handoff_policy_as_code_authz.md"
+      ]
+    },
+    {
+      "id": "argon2id",
+      "control": "Argon2id password hashing",
+      "summary": "Memory-hard KDF (64 MiB, t=3) with unique salt + optional KMS pepper; legacy PBKDF2 verify + rehash-on-login.",
+      "soc2_tsc": ["CC6"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/security.py",
+        "moltrace_backend/docs/fe_handoff_argon2_password_hashing.md"
+      ]
+    },
+    {
+      "id": "field-encryption",
+      "control": "Field-level envelope encryption + pluggable KMS/BYOK seam",
+      "summary": "Per-record AES-256-GCM data keys wrapped by a KMS KEK; key rotation + customer-managed-key seam.",
+      "soc2_tsc": ["CC6", "C1"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/field_crypto.py",
+        "moltrace_backend/src/nmrcheck/kms.py",
+        "moltrace_backend/docs/fe_handoff_field_level_encryption.md"
+      ]
+    },
+    {
+      "id": "secret-scanning",
+      "control": "Committed-secret scanning gate + secrets-management seam",
+      "summary": "gitleaks over full history (CI + pre-commit); secrets resolved from a provider seam, not committed.",
+      "soc2_tsc": ["CC6", "CC8"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        ".github/workflows/secret-scan.yml",
+        "moltrace_backend/docs/ops_secrets_management.md",
+        "moltrace_backend/docs/fe_handoff_secrets_management.md"
+      ]
+    },
+    {
+      "id": "tls-posture",
+      "control": "TLS / transport security headers posture",
+      "summary": "HSTS + security response headers over TLS 1.3 (settings-gated); TLS/mTLS posture documented.",
+      "soc2_tsc": ["CC6"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/docs/ops_tls_posture.md",
+        "moltrace_backend/docs/fe_handoff_tls_security_headers.md"
+      ]
+    },
+    {
+      "id": "audit-chain",
+      "control": "Tamper-evident audit hash chain",
+      "summary": "Per-row SHA-256 chain + periodic HMAC-signed anchors + signed high-water mark; admin verify endpoint + reconciliation.",
+      "soc2_tsc": ["CC7", "PI1"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/audit_chain.py",
+        "moltrace_backend/docs/fe_handoff_audit_chain.md"
+      ]
+    },
+    {
+      "id": "esignature-part11",
+      "control": "21 CFR Part 11 e-signature binding & manifestation",
+      "summary": "Server-authoritative signer, SHA-256 record-content binding (non-transferable), durable §11.50 manifestation, verify endpoint.",
+      "soc2_tsc": ["CC6", "PI1"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/esign.py",
+        "moltrace_backend/docs/fe_handoff_esignature_part11.md"
+      ]
+    },
+    {
+      "id": "alcoa",
+      "control": "ALCOA+ controlled-records primitives",
+      "summary": "Reason-for-change capture, reversible-by-record soft-deletes (no hard delete), server-sourced timestamps, write-once raw vault.",
+      "soc2_tsc": ["PI1", "C1"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/alcoa.py",
+        "moltrace_backend/docs/fe_handoff_alcoa_hardening.md"
+      ]
+    },
+    {
+      "id": "validation-lifecycle",
+      "control": "GAMP 5 / CSA validation lifecycle package + change control",
+      "summary": "Regenerable per-release validation package (requirement->risk->test + IQ/OQ/PQ-from-CI) + validated-state change control.",
+      "soc2_tsc": ["CC8", "PI1"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/validation_package.py",
+        "moltrace_backend/docs/fe_handoff_validation_lifecycle.md"
+      ]
+    },
+    {
+      "id": "secure-sdlc-ci",
+      "control": "Secure-SDLC CI gates (SAST / SCA / IaC)",
+      "summary": "Semgrep SAST + Trivy dependency/license SCA + IaC config scanning; criticals block, findings tracked to SLAs.",
+      "soc2_tsc": ["CC8"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        ".github/workflows/security-scan.yml",
+        "moltrace_backend/docs/security_sdlc_gates.md",
+        ".trivyignore"
+      ]
+    },
+    {
+      "id": "signed-supply-chain",
+      "control": "Signed supply chain (SBOM + SLSA provenance + verify-at-deploy)",
+      "summary": "CycloneDX SBOM per build + keyless Sigstore SLSA provenance + a verify-provenance gate the deploy needs.",
+      "soc2_tsc": ["CC8"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        ".github/workflows/ci-cd.yml",
+        "moltrace_backend/docs/supply_chain_provenance.md"
+      ]
+    },
+    {
+      "id": "rate-limiting",
+      "control": "Per-tenant + per-route rate limiting and request-size guard",
+      "summary": "In-app token-bucket limiter (429 + Retry-After), body-size guard; edge-WAF documented as a runbook.",
+      "soc2_tsc": ["CC6", "CC7", "A1"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/rate_limit.py",
+        "moltrace_backend/docs/security/owasp_api_top10_p16.md",
+        "moltrace_backend/docs/security/waf_edge_runbook.md"
+      ]
+    },
+    {
+      "id": "vuln-disclosure",
+      "control": "Coordinated vulnerability disclosure (RFC 9116 security.txt + VDP + pen-test program)",
+      "summary": "Public security.txt + a VDP (safe harbor, CVSS SLAs), a pen-test program + threat model + findings register.",
+      "soc2_tsc": ["CC4", "CC7"],
+      "iso27001_annex_a": ["A.5", "A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/wellknown.py",
+        "SECURITY.md",
+        "moltrace_backend/docs/security/vulnerability_disclosure_policy.md",
+        "moltrace_backend/docs/security/pentest_program.md",
+        "moltrace_backend/docs/security/threat_model.md",
+        "moltrace_backend/docs/security/security_findings_register.md"
+      ]
+    },
+    {
+      "id": "zero-trust-infra",
+      "control": "Zero-trust infrastructure: CSPM-lite IaC drift gate + least-privilege CI",
+      "summary": "Continuously-scored IaC posture (fail-on-drift) + SHA-pinned least-privilege GitHub Actions; honest PaaS shared-responsibility map.",
+      "soc2_tsc": ["CC7", "CC8"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "infra/cspm/score_iac_posture.py",
+        "infra/cspm/iac_posture_baseline.json",
+        "infra/cspm/README.md",
+        "moltrace_backend/docs/security/zero_trust_infra.md"
+      ]
+    },
+    {
+      "id": "detections-siem",
+      "control": "Security detections engine + SIEM alert sink",
+      "summary": "Impossible-travel / privilege-escalation / cross-tenant / audit-chain-break detections shipped to a pluggable SIEM sink.",
+      "soc2_tsc": ["CC7"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/detections.py",
+        "moltrace_backend/docs/security/siem_detections.md",
+        "moltrace_backend/docs/fe_handoff_siem_detections.md"
+      ]
+    },
+    {
+      "id": "incident-response",
+      "control": "Incident-response program + GDPR breach-notification deadline engine",
+      "summary": "IR plan + detection-keyed runbooks + a processor-aware GDPR Art. 33/34 notification-deadline engine.",
+      "soc2_tsc": ["CC7", "P1"],
+      "iso27001_annex_a": ["A.5"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/ir_timeline.py",
+        "moltrace_backend/docs/security/incident_response_plan.md",
+        "moltrace_backend/docs/security/incident_runbooks.md",
+        "moltrace_backend/docs/security/breach_notification.md"
+      ]
+    },
+    {
+      "id": "backup-dr",
+      "control": "Backup / disaster-recovery restore-integrity verifier",
+      "summary": "Restore-integrity verifier reusing the audit chain as the oracle + documented RTO/RPO + restore-drill/game-day runbook.",
+      "soc2_tsc": ["A1", "CC7"],
+      "iso27001_annex_a": ["A.5", "A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/dr_verify.py",
+        "moltrace_backend/docs/security/backup_dr.md"
+      ]
+    },
+    {
+      "id": "sso-oidc",
+      "control": "Enterprise SSO (OIDC) with server-side redirect URIs + encrypted secrets",
+      "summary": "Per-org OpenID Connect (Auth Code + PKCE, JWKS validation, JIT provisioning, optional enforce-SSO); IdP secrets envelope-encrypted.",
+      "soc2_tsc": ["CC6"],
+      "iso27001_annex_a": ["A.5", "A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/sso_store.py",
+        "moltrace_backend/src/nmrcheck/oidc_client.py",
+        "moltrace_backend/docs/fe_handoff_sso_oidc.md"
+      ]
+    },
+    {
+      "id": "scim-provisioning",
+      "control": "SCIM 2.0 provisioning with tenant-isolated resource ids",
+      "summary": "Auto-provision + soft auto-deprovision (disable + immediate session revocation), org-scoped per-connection bearer.",
+      "soc2_tsc": ["CC6"],
+      "iso27001_annex_a": ["A.5"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/scim_store.py",
+        "moltrace_backend/docs/fe_handoff_scim_provisioning.md"
+      ]
+    },
+    {
+      "id": "mfa-stepup",
+      "control": "MFA / passkeys / step-up authentication",
+      "summary": "TOTP + phishing-resistant WebAuthn/passkeys, per-tenant enforced, step-up re-auth before signing/admin.",
+      "soc2_tsc": ["CC6"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/mfa_store.py",
+        "moltrace_backend/src/nmrcheck/mfa_totp.py",
+        "moltrace_backend/src/nmrcheck/mfa_webauthn.py",
+        "moltrace_backend/docs/fe_handoff_mfa_passkeys.md"
+      ]
+    },
+    {
+      "id": "session-hardening",
+      "control": "Session hardening: rotating single-use refresh tokens + reuse detection",
+      "summary": "Short-lived access bearer + rotating single-use refresh with reuse-detection family revocation + immediate DB-checked revocation.",
+      "soc2_tsc": ["CC6"],
+      "iso27001_annex_a": ["A.8"],
+      "type": "in-repo",
+      "evidence": [
+        "moltrace_backend/src/nmrcheck/session_store.py",
+        "moltrace_backend/docs/fe_handoff_session_hardening.md"
+      ]
+    }
+  ],
+  "inherited_or_operational": [
+    {
+      "control": "Physical & data-center security",
+      "type": "inherited",
+      "via": "Render + Vercel (the IaaS/PaaS providers' own SOC 2 / ISO 27001 attestations under the shared-responsibility model)",
+      "soc2_tsc": ["CC6"],
+      "iso27001_annex_a": ["A.7"]
+    },
+    {
+      "control": "HR security: background screening, security-awareness training, onboarding/offboarding",
+      "type": "operational",
+      "via": "internal HR process (not a product control)",
+      "soc2_tsc": ["CC1"],
+      "iso27001_annex_a": ["A.6"]
+    },
+    {
+      "control": "Governance, risk register & risk-assessment methodology",
+      "type": "operational",
+      "via": "management process",
+      "soc2_tsc": ["CC1", "CC3"],
+      "iso27001_annex_a": ["A.5"]
+    },
+    {
+      "control": "Vendor / sub-processor risk management & DPAs",
+      "type": "operational",
+      "via": "vendor-risk register + DPAs (sub-processor list: see docs/security/trust_center.md)",
+      "soc2_tsc": ["CC9"],
+      "iso27001_annex_a": ["A.5"]
+    },
+    {
+      "control": "Continuous-compliance monitoring tooling (Vanta / Drata) + the SOC 2 Type II / ISO 27001 audits",
+      "type": "operational",
+      "via": "third-party compliance platform + an independent auditor/certification body",
+      "soc2_tsc": ["CC4"],
+      "iso27001_annex_a": ["A.5"]
+    },
+    {
+      "control": "24/7 on-call paging + hosted SIEM ingest",
+      "type": "operational",
+      "via": "PagerDuty/Opsgenie + Datadog/Splunk/Elastic (the in-repo detections feed these; routing is operational)",
+      "soc2_tsc": ["CC7"],
+      "iso27001_annex_a": ["A.8"]
+    }
+  ]
+}
