@@ -154,7 +154,9 @@ def _count_rows(session_factory: sessionmaker[Session], tables: tuple[str, ...])
                 counts[table] = -1
                 continue
             try:
-                # nosemgrep: python.sqlalchemy.security.sqlalchemy-text-sql-expression
+                # SAFE: table is identifier-validated by _IDENT (lowercase SQL identifier) above and is
+                # sourced only from _DEFAULT_TABLES / the --tables config arg, never from request data.
+                # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text, python.sqlalchemy.security.sqlalchemy-text-sql-expression
                 value = session.execute(text(f"SELECT count(*) FROM {table}")).scalar()  # noqa: S608
                 counts[table] = int(value or 0)
             except Exception:
