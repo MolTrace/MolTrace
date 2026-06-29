@@ -691,7 +691,7 @@ The §3.10 audit-trail layer hardens this posture cryptographically. **Original 
 
 **Reaction → spectroscopy closed loop.** Bayesian optimisation in the Reaction Optimization program reads in-flight SpectraCheck evidence as the objective function for the next-experiment proposal.[^bayesian_reactions]
 
-**Expanded compliance surface.** Move the SOC 2 Type II, ICH Q2(R2), GDPR, and GxP posture from *designed-to-support* trust seals to formal third-party audit and continuous monitoring evidence on a 12-month cycle.
+**Expanded compliance surface.** A machine-checked control-evidence register (`compliance/controls.json` + validator) already maps every in-repo control to the SOC 2 Trust Services Criteria + ISO 27001 Annex A as the audit-readiness foundation; the next step is to move the SOC 2 Type II, ICH Q2(R2), GDPR, and GxP posture from *designed-to-support* to formal third-party audit + continuous-monitoring evidence (Vanta/Drata) on a 12-month cycle.
 
 **Open Question 1 — Predictor versioning.** As external predictors (CSP5, PROSPRE) ship updates, MolTrace must record the predictor model hash alongside the analyze response so re-running an analysis with a newer predictor doesn't silently change the result. Planned for Q3 2026.
 

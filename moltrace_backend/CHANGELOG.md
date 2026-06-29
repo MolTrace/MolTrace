@@ -14,6 +14,39 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.61.0 — Security Prompt 22: SOC 2 + ISO 27001 + Trust Center (2026-06-29)
+
+**Headline:** Opens the governance/trust pillar with a **machine-checkable control→evidence register**
+mapping the 21 in-repo security controls (Prompts 5–21) to the SOC 2 Trust Services Criteria + ISO/IEC
+27001:2022 Annex A, plus the compliance-map + Trust-Center + sub-processor content. Honestly scoped:
+SOC 2 / ISO are **audited certifications MolTrace does not hold** — everything is framed "designed to
+support / pursuing", never "compliant/certified". Vanta/Drata, the audits, and the published web Trust
+Center are operational/external.
+
+- **Control register + validator** (`compliance/`, NEW, repo-root, mirrors `infra/cspm/`). `controls.json`
+  maps each in-repo control → SOC 2 TSC + ISO Annex A + **evidence file paths**; `validate_controls.py`
+  (pure stdlib, CLI + importable) enforces that every in-repo control cites a **resolvable** evidence
+  path with a framework mapping — **fail-on-drift**, so a deleted/moved control file breaks the check and
+  the map can't silently rot. Inherited (platform) / operational controls are marked as such, not claimed
+  as in-repo evidence. 7 tests (the shipped register validates + the validator catches missing-path /
+  unmapped / duplicate / missing-`via` / no-claim-of-certification).
+- **Compliance controls map** (`docs/security/compliance_controls_map.md`) — the human-readable TSC /
+  Annex-A → control → "built in P-N" table + the inherited/operational set, with the not-held framing.
+- **Trust Center content** (`docs/security/trust_center.md`) — customer-facing posture summary, framework
+  status (all not-held), and the **sub-processor register** (Render, Vercel, customer IdP, GitHub, +
+  operational SIEM/paging) with the data each handles.
+
+No application/runtime code — register + validator + docs only. The validator's `--help`/exit codes work;
+register validates clean (21 controls, all evidence paths resolve).
+
+### Added
+- **`compliance/controls.json`** + **`compliance/validate_controls.py`** + **`compliance/README.md`** —
+  the machine-checkable control→evidence register + fail-on-drift validator.
+- **`moltrace_backend/tests/test_compliance_register.py`** — shipped-register-validates + validator units.
+- **`docs/security/compliance_controls_map.md`** + **`docs/security/trust_center.md`**.
+
+---
+
 ## v0.60.0 — Security Prompt 21: Backup & DR resilience (2026-06-26)
 
 **Headline:** Adds the in-repo half of disaster-recovery resilience — a restore-integrity verifier
