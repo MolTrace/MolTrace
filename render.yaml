@@ -3,6 +3,10 @@
 services:
   - type: web
     name: moltrace-backend
+    # Deploy ONLY via the CI deploy hook, AFTER the fail-closed gate passes — never on a raw git
+    # push. Render defaults autoDeploy to true; leaving it on both bypasses the release gate and
+    # makes the post-gate hook return 409 ("a deploy is already in progress").
+    autoDeploy: false
     runtime: python
     plan: starter
     rootDir: moltrace_backend
@@ -56,6 +60,7 @@ services:
 
   - type: web
     name: moltrace-frontend1
+    autoDeploy: false  # deploy only via the post-gate CI hook (see the moltrace-backend note above)
     runtime: node
     plan: starter
     rootDir: moltrace_frontend

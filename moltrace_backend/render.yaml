@@ -3,6 +3,7 @@
 services:
   - type: web
     name: moltrace-backend
+    autoDeploy: false  # deploy only via the post-gate CI hook — never on raw git push (see repo-root render.yaml)
     runtime: python
     plan: starter
     rootDir: moltrace_backend
