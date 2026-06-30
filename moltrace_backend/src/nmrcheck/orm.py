@@ -3860,6 +3860,41 @@ class ReactionSafetyScreeningORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class ReactionFeedbackORM(Base):
+    """A chemist's accept/edit/reject feedback on a reaction proposal (R9).
+
+    Persisted with the model version that produced the proposal so the preference re-ranker and
+    the A/B gate can be reproduced. A safety (``unsafe``) signal is recorded but flagged out of
+    preference learning — it routes to strengthen the deterministic R6 safety screen instead.
+    """
+
+    __tablename__ = "reaction_feedback"
+    __table_args__ = (
+        Index(
+            "ix_reaction_feedback_project_created",
+            "reaction_project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    proposal_ref: Mapped[str] = mapped_column(String(200), default="")
+    decision: Mapped[str] = mapped_column(String(16), default="")
+    reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    free_text: Mapped[str] = mapped_column(Text, default="")
+    model_version: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    features_json: Mapped[str] = mapped_column(Text, default="{}")
+    is_safety_signal: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_preference_learnable: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class ReactionBayesianOptimizationRunORM(Base):
     __tablename__ = "reaction_bayesian_optimization_runs"
     __table_args__ = (
