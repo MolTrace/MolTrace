@@ -83,6 +83,7 @@ from . import reaction_access as reaction_access
 from . import reaction_advisor as reaction_advisor
 from . import reaction_bo as reaction_bo
 from . import reaction_execution as reaction_execution
+from . import reaction_feedback_store as reaction_feedback_store
 from . import reaction_green as reaction_green
 from . import reaction_hte as reaction_hte
 from . import reaction_regulatory_compliance as reaction_regulatory_compliance
@@ -4214,6 +4215,84 @@ def review_reaction_safety_screening_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Reaction safety screening not found.")
     return record
+
+
+# --- R9: chemist feedback -> advisory preference re-ranker -> A/B promotion gate ---
+@router.post(
+    "/reaction-projects/{reaction_project_id}/feedback",
+    response_model=reaction_feedback_store.ReactionFeedbackRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def create_reaction_feedback_route(
+    reaction_project_id: int,
+    payload: reaction_feedback_store.ReactionFeedbackCreateRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_feedback_store.ReactionFeedbackRecord:
+    try:
+        return reaction_feedback_store.create_feedback(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/feedback",
+    response_model=list[reaction_feedback_store.ReactionFeedbackRecord],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def list_reaction_feedback_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[reaction_feedback_store.ReactionFeedbackRecord]:
+    try:
+        return reaction_feedback_store.list_feedback(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/preference-ranking",
+    response_model=reaction_feedback_store.ReactionPreferenceRanking,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def reaction_preference_ranking_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_feedback_store.ReactionPreferenceRanking:
+    try:
+        return reaction_feedback_store.preference_ranking(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/ab-promotion/evaluate",
+    response_model=reaction_feedback_store.ReactionABPromotionVerdict,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def reaction_ab_promotion_evaluate_route(
+    reaction_project_id: int,
+    payload: reaction_feedback_store.ReactionABEvaluateRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_feedback_store.ReactionABPromotionVerdict:
+    # Pure decision-support: gate a challenger against the champion. Owner-scoped, executes nothing.
+    return reaction_feedback_store.evaluate_ab_promotion(payload)
 
 
 @router.post(
