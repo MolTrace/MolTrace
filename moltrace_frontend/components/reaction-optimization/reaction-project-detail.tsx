@@ -401,6 +401,288 @@ export function advisorAgentFromRun(run: unknown): {
   }
 }
 
+// ── R9: chemist feedback → preference re-ranker → A/B promotion gate ──────────
+
+/** R9 — feedback decisions. */
+export const REACTION_FEEDBACK_DECISIONS = ["accept", "edit", "reject"] as const
+/** R9 — reject reason taxonomy (a reason is required on a reject; backend 422s otherwise). */
+export const REACTION_FEEDBACK_REASONS = [
+  "unsafe",
+  "infeasible_on_our_kit",
+  "reagent_unavailable",
+  "cost",
+  "lower_confidence_than_stated",
+  "wrong_precedent",
+  "other",
+] as const
+
+/** R9 — a reject needs a reason; accept/edit do not. */
+export function reactionFeedbackReasonRequired(decision: string): boolean {
+  return decision === "reject"
+}
+
+/** R9 — best-effort model_version that produced a proposal (optional on the feedback request):
+ *  the recommendation's own field, else a run-level hint, else null (omitted). */
+export function reactionProposalModelVersion(rec: unknown, hint: string | null): string | null {
+  if (isRecord(rec)) {
+    if (typeof rec.model_version === "string" && rec.model_version) return rec.model_version
+    const md = rec.metadata_json
+    if (isRecord(md) && typeof md.model_version === "string" && md.model_version) return md.model_version
+  }
+  return hint && hint.trim() ? hint.trim() : null
+}
+
+/** R9 — typed view over a ReactionFeedbackRecord (POST/GET …/feedback response). The three
+ *  routing flags are the point: an unsafe rejection is a high-signal safety event that hardens R6
+ *  and is excluded from preference learning. */
+export function reactionFeedbackRecordView(rec: unknown): {
+  id: number | null
+  proposalRef: string | null
+  decision: string | null
+  reason: string | null
+  isSafetySignal: boolean
+  routesToSafetyHardening: boolean
+  isPreferenceLearnable: boolean
+  modelVersion: string | null
+  createdAt: string | null
+  disclaimer: string | null
+} | null {
+  if (!isRecord(rec)) return null
+  return {
+    id: readNum(rec.id),
+    proposalRef: typeof rec.proposal_ref === "string" ? rec.proposal_ref : null,
+    decision: typeof rec.decision === "string" ? rec.decision : null,
+    reason: typeof rec.reason === "string" ? rec.reason : null,
+    isSafetySignal: rec.is_safety_signal === true,
+    routesToSafetyHardening: rec.routes_to_safety_hardening === true,
+    isPreferenceLearnable: rec.is_preference_learnable === true,
+    modelVersion: typeof rec.model_version === "string" ? rec.model_version : null,
+    createdAt: typeof rec.created_at === "string" ? rec.created_at : null,
+    disclaimer: typeof rec.disclaimer === "string" ? rec.disclaimer : null,
+  }
+}
+
+/** R9 — typed view over a ReactionPreferenceRanking (advisory re-rank; never the optimiser's call). */
+export function reactionPreferenceRankingView(resp: unknown): {
+  advisory: boolean
+  boRunId: number | null
+  disclaimer: string | null
+  ranked: {
+    proposalRef: string
+    acceptanceScore: number | null
+    originalRank: number | null
+    conditionsJson: Record<string, unknown>
+  }[]
+} | null {
+  if (!isRecord(resp)) return null
+  const rawRanked = Array.isArray(resp.ranked) ? resp.ranked : []
+  return {
+    advisory: resp.advisory !== false,
+    boRunId: readNum(resp.bo_run_id),
+    disclaimer: typeof resp.disclaimer === "string" ? resp.disclaimer : null,
+    ranked: rawRanked.filter(isRecord).map((it) => ({
+      proposalRef: typeof it.proposal_ref === "string" ? it.proposal_ref : String(it.proposal_ref ?? ""),
+      acceptanceScore: readNum(it.acceptance_score),
+      originalRank: readNum(it.original_rank),
+      conditionsJson: isRecord(it.conditions_json) ? it.conditions_json : {},
+    })),
+  }
+}
+
+/** R9 — index a preference ranking by proposal_ref so the "likely-accept" re-rank can merge onto
+ *  the recommendation cards (keeps the optimiser's original_rank visible). `rerank` is 1-based. */
+export function reactionPreferenceRankByRef(
+  ranking: ReturnType<typeof reactionPreferenceRankingView>,
+): Map<string, { acceptanceScore: number | null; originalRank: number | null; rerank: number }> {
+  const m = new Map<string, { acceptanceScore: number | null; originalRank: number | null; rerank: number }>()
+  if (!ranking) return m
+  ranking.ranked.forEach((it, i) => {
+    m.set(it.proposalRef, { acceptanceScore: it.acceptanceScore, originalRank: it.originalRank, rerank: i + 1 })
+  })
+  return m
+}
+
+/** R9 — a stable content key for a proposal's conditions. The preference-ranking `proposal_ref` is an
+ *  acquisition-candidate id, a DIFFERENT id space from the recommendation-row id the cards render, so
+ *  keying the re-rank merge by id is unreliable across projects. Both carry the same conditions_json,
+ *  so we join on content instead (keys sorted; numbers normalized so 20 === 20.0). */
+export function canonicalConditionsKey(conditions: unknown): string {
+  if (!isRecord(conditions)) return ""
+  const entries = Object.keys(conditions)
+    .sort()
+    .map((k) => {
+      const v = conditions[k]
+      const norm =
+        typeof v === "number" || typeof v === "string" || typeof v === "boolean" ? v : JSON.stringify(v)
+      return [k, norm]
+    })
+  return JSON.stringify(entries)
+}
+
+/** R9 — index the preference ranking by canonical conditions key (robust to the proposal_ref vs
+ *  recommendation-id id-space mismatch). First entry wins on a conditions collision. */
+export function reactionPreferenceRankByConditions(
+  ranking: ReturnType<typeof reactionPreferenceRankingView>,
+): Map<string, { acceptanceScore: number | null; originalRank: number | null; rerank: number }> {
+  const m = new Map<string, { acceptanceScore: number | null; originalRank: number | null; rerank: number }>()
+  if (!ranking) return m
+  ranking.ranked.forEach((it, i) => {
+    const key = canonicalConditionsKey(it.conditionsJson)
+    if (key && !m.has(key)) {
+      m.set(key, { acceptanceScore: it.acceptanceScore, originalRank: it.originalRank, rerank: i + 1 })
+    }
+  })
+  return m
+}
+
+/** R9 — validate a safety_flag_recall input: a finite number in [0, 1], else null (blocked, never
+ *  silently coerced to 0 — recall is the hard, blocking safety dimension of the A/B gate). */
+export function parseReactionRecall(v: string | number): number | null {
+  if (typeof v !== "number") {
+    const s = String(v ?? "").trim()
+    if (s === "") return null // blank must NOT coerce to 0 (Number("") === 0)
+    const n = Number(s)
+    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null
+  }
+  return Number.isFinite(v) && v >= 0 && v <= 1 ? v : null
+}
+
+/** R9 — typed view over a ReactionABPromotionVerdict. Pure decision-support: deploys nothing.
+ *  `promotable` is true only when there is no safety regression AND the challenger dominates;
+ *  human sign-off + rollback are always required. */
+export function reactionAbVerdictView(resp: unknown): {
+  championVersion: string | null
+  challengerVersion: string | null
+  promotable: boolean
+  safetyRegression: boolean
+  dominates: boolean
+  requiresHumanSignoff: boolean
+  rollbackAvailable: boolean
+  reasons: string[]
+  excludedMetrics: string[]
+  disclaimer: string | null
+} | null {
+  if (!isRecord(resp)) return null
+  const strList = (v: unknown) =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
+  return {
+    championVersion: typeof resp.champion_version === "string" ? resp.champion_version : null,
+    challengerVersion: typeof resp.challenger_version === "string" ? resp.challenger_version : null,
+    promotable: resp.promotable === true,
+    safetyRegression: resp.safety_regression === true,
+    dominates: resp.dominates === true,
+    requiresHumanSignoff: resp.requires_human_signoff !== false,
+    rollbackAvailable: resp.rollback_available !== false,
+    reasons: strList(resp.reasons),
+    excludedMetrics: strList(resp.excluded_metrics),
+    disclaimer: typeof resp.disclaimer === "string" ? resp.disclaimer : null,
+  }
+}
+
+/** R9 — parse a "name=value, name2=value2" (or newline / JSON) string into a numeric metric map.
+ *  Non-numeric entries are dropped, so a malformed field never poisons the request. */
+export function parseReactionMetricsText(text: string): Record<string, number> {
+  const out: Record<string, number> = {}
+  const t = (text ?? "").trim()
+  if (!t) return out
+  if (t.startsWith("{")) {
+    try {
+      const obj: unknown = JSON.parse(t)
+      if (isRecord(obj)) {
+        for (const [k, v] of Object.entries(obj)) {
+          const n = typeof v === "number" ? v : Number(v)
+          if (k.trim() && Number.isFinite(n)) out[k.trim()] = n
+        }
+        return out
+      }
+    } catch {
+      // fall through to key=value parsing
+    }
+  }
+  for (const pair of t.split(/[,\n]/)) {
+    const idx = pair.search(/[=:]/)
+    if (idx < 0) continue
+    const k = pair.slice(0, idx).trim()
+    const n = Number(pair.slice(idx + 1).trim())
+    if (k && Number.isFinite(n)) out[k] = n
+  }
+  return out
+}
+
+/** R9 — parse a "name=higher, name2=lower" string into a per-metric direction map. The backend's
+ *  A/B engine only honours the tokens "higher" / "lower" (anything else excludes the metric), so we
+ *  normalize the friendly synonyms (maximize/max, minimize/min) to those. */
+export function parseReactionDirectionsText(text: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const pair of (text ?? "").split(/[,\n]/)) {
+    const idx = pair.search(/[=:]/)
+    if (idx < 0) continue
+    const k = pair.slice(0, idx).trim()
+    const raw = pair.slice(idx + 1).trim().toLowerCase()
+    const v =
+      raw === "higher" || raw === "maximize" || raw === "max" || raw === "up"
+        ? "higher"
+        : raw === "lower" || raw === "minimize" || raw === "min" || raw === "down"
+          ? "lower"
+          : null
+    if (k && v) out[k] = v
+  }
+  return out
+}
+
+/** R9 — build the ReactionABEvaluateRequest body from the compare-panel form inputs. */
+export function reactionAbEvaluateBody(form: {
+  championVersion: string
+  championMetrics: string
+  championRecall: string | number
+  challengerVersion: string
+  challengerMetrics: string
+  challengerRecall: string | number
+  directions?: string
+  tolerance?: string | number
+}): {
+  champion: { model_version: string; metrics: Record<string, number>; safety_flag_recall: number }
+  challenger: { model_version: string; metrics: Record<string, number>; safety_flag_recall: number }
+  directions?: Record<string, string>
+  tolerance: number
+} {
+  const num = (v: string | number | undefined): number => {
+    const n = typeof v === "number" ? v : Number(String(v ?? "").trim())
+    return Number.isFinite(n) ? n : 0
+  }
+  const body: {
+    champion: { model_version: string; metrics: Record<string, number>; safety_flag_recall: number }
+    challenger: { model_version: string; metrics: Record<string, number>; safety_flag_recall: number }
+    directions?: Record<string, string>
+    tolerance: number
+  } = {
+    champion: {
+      model_version: form.championVersion.trim() || "champion",
+      metrics: parseReactionMetricsText(form.championMetrics),
+      safety_flag_recall: num(form.championRecall),
+    },
+    challenger: {
+      model_version: form.challengerVersion.trim() || "challenger",
+      metrics: parseReactionMetricsText(form.challengerMetrics),
+      safety_flag_recall: num(form.challengerRecall),
+    },
+    tolerance: num(form.tolerance),
+  }
+  const dirs = parseReactionDirectionsText(form.directions ?? "")
+  if (Object.keys(dirs).length > 0) body.directions = dirs
+  return body
+}
+
+/** R9 — user-facing message for a failed feedback POST. A 422 (e.g. reject without a valid reason)
+ *  carries its reason in `detail`; formatApiError only unpacks 401/403/404, so surface 422 here. */
+export function reactionFeedbackErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.status === 422) {
+    if (isRecord(err.data) && typeof err.data.detail === "string") return err.data.detail
+    return "A valid reason is required to reject a proposal."
+  }
+  return formatApiError(err, "POST /reaction-projects/{id}/feedback failed.")
+}
+
 function mergeOutcomeExtractionNotes(run: Record<string, unknown>): string[] {
   const out: string[] = []
   const seen = new Set<string>()
@@ -1078,6 +1360,24 @@ export function ReactionProjectDetail() {
   const [lastOptimizationRun, setLastOptimizationRun] = useState<unknown>(null)
   /** Latest POST /optimization/bo/run response */
   const [lastBoRun, setLastBoRun] = useState<unknown>(null)
+  // R9 — chemist feedback (per recommendation), advisory preference re-rank, A/B promotion gate.
+  const [feedbackDraft, setFeedbackDraft] = useState<
+    Record<number, { decision: string; reason: string; freeText: string }>
+  >({})
+  const [feedbackResult, setFeedbackResult] = useState<Record<number, Record<string, unknown>>>({})
+  const [showLikelyAccept, setShowLikelyAccept] = useState(false)
+  const [preferenceRanking, setPreferenceRanking] = useState<Record<string, unknown> | null>(null)
+  const [abForm, setAbForm] = useState({
+    championVersion: "",
+    championMetrics: "",
+    championRecall: "",
+    challengerVersion: "",
+    challengerMetrics: "",
+    challengerRecall: "",
+    directions: "",
+    tolerance: "0",
+  })
+  const [abVerdict, setAbVerdict] = useState<Record<string, unknown> | null>(null)
   const [boAlgorithm, setBoAlgorithm] = useState<string>(BO_ALGORITHM_OPTIONS[0])
   const [boBatchSize, setBoBatchSize] = useState("1")
   const [boExplorationWeight, setBoExplorationWeight] = useState("0.1")
@@ -1605,6 +1905,50 @@ export function ReactionProjectDetail() {
       return ub - ua
     })
   }, [recommendations])
+
+  // R9 — best-effort model version that produced the current proposals (feedback provenance).
+  const reactionRunModelHint = useMemo<string | null>(() => {
+    const tryKeys = (o: unknown, keys: string[]): string | null => {
+      if (!isRecord(o)) return null
+      for (const k of keys) {
+        const v = o[k]
+        if (typeof v === "string" && v) return v
+      }
+      return null
+    }
+    return (
+      tryKeys(lastBoRun, ["surrogate_model_version", "model_version", "algorithm"]) ??
+      tryKeys(lastOptimizationRun, ["model_version", "model_type"]) ??
+      null
+    )
+  }, [lastBoRun, lastOptimizationRun])
+
+  // R9 — advisory preference ranking joined to cards by conditions content (id-space-agnostic).
+  const preferenceRankByConditions = useMemo(
+    () => reactionPreferenceRankByConditions(reactionPreferenceRankingView(preferenceRanking)),
+    [preferenceRanking],
+  )
+
+  // R9 — how many of the displayed proposals the latest ranking actually covers (transparency: the
+  // re-rank is a no-op for anything it can't match, so we surface "ranked M of N").
+  const likelyAcceptMatchCount = useMemo(() => {
+    if (preferenceRankByConditions.size === 0) return 0
+    return sortedRecs.filter((r) => preferenceRankByConditions.has(canonicalConditionsKey(r.conditions_json)))
+      .length
+  }, [preferenceRankByConditions, sortedRecs])
+
+  // R9 — recommendation cards, optionally re-ordered by acceptance_score (advisory) while keeping
+  // the optimiser's own order recoverable via each card's original_rank badge.
+  const displayRecs = useMemo(() => {
+    if (!showLikelyAccept || preferenceRankByConditions.size === 0) return sortedRecs
+    return [...sortedRecs].sort((a, b) => {
+      const sa =
+        preferenceRankByConditions.get(canonicalConditionsKey(a.conditions_json))?.acceptanceScore ?? -Infinity
+      const sb =
+        preferenceRankByConditions.get(canonicalConditionsKey(b.conditions_json))?.acceptanceScore ?? -Infinity
+      return sb - sa
+    })
+  }, [showLikelyAccept, preferenceRankByConditions, sortedRecs])
 
   const latestBatchRows = useMemo(
     () => parseRecommendationBatchItems(latestRecommendationBatch),
@@ -3775,6 +4119,98 @@ export function ReactionProjectDetail() {
       el?.scrollIntoView({ block: "start", behavior: "smooth" })
       el?.focus({ preventScroll: true })
     })
+  }
+
+  /** R9 — POST structured chemist feedback on a proposal. A reject needs a reason (guarded here +
+   *  backed by the 422). The response's routing flags tell us whether it was an unsafe rejection
+   *  (routed to the safety gate, excluded from preference learning). */
+  async function submitReactionFeedback(rec: Record<string, unknown>) {
+    const id = readNum(rec.id)
+    if (id == null) return
+    const draft = feedbackDraft[id] ?? { decision: "accept", reason: "", freeText: "" }
+    if (reactionFeedbackReasonRequired(draft.decision) && !draft.reason) {
+      setMsg({ tone: "err", text: "A reason is required to reject a proposal." })
+      return
+    }
+    setMsg(null)
+    setBusy(`feedback-${id}`)
+    try {
+      const body: Record<string, unknown> = {
+        proposal_ref: String(id),
+        decision: draft.decision,
+        free_text: draft.freeText.trim(),
+      }
+      if (draft.reason) body.reason = draft.reason
+      if (isRecord(rec.conditions_json)) body.features = rec.conditions_json
+      const mv = reactionProposalModelVersion(rec, reactionRunModelHint)
+      if (mv) body.model_version = mv
+      const created = await apiFetch<unknown>(`/reaction-projects/${reactionProjectId}/feedback`, {
+        method: "POST",
+        body,
+      })
+      if (isRecord(created)) setFeedbackResult((prev) => ({ ...prev, [id]: created }))
+      const view = reactionFeedbackRecordView(created)
+      setMsg({
+        tone: "ok",
+        text: view?.isSafetySignal
+          ? "Feedback recorded. Unsafe rejection routed to the safety gate (R6) — excluded from preference learning."
+          : "Feedback recorded — advisory; it never overrides the optimiser.",
+      })
+    } catch (err) {
+      setMsg({ tone: "err", text: reactionFeedbackErrorMessage(err) })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** R9 — GET the advisory preference ranking and turn on the likely-accept re-rank. */
+  async function loadPreferenceRanking() {
+    setMsg(null)
+    setBusy("pref-rank")
+    try {
+      const data = await apiFetch<unknown>(
+        `/reaction-projects/${reactionProjectId}/preference-ranking`,
+        { method: "GET" },
+      )
+      setPreferenceRanking(isRecord(data) ? data : null)
+      setShowLikelyAccept(true)
+    } catch (err) {
+      setMsg({
+        tone: "err",
+        text: formatApiError(err, "GET /reaction-projects/{id}/preference-ranking failed."),
+      })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** R9 — POST an A/B promotion evaluation (pure decision-support; deploys nothing). */
+  async function evaluateAbPromotion(e: React.FormEvent) {
+    e.preventDefault()
+    // Recall is the hard, blocking safety dimension — never fabricate a 0 for a blank/garbage field.
+    if (parseReactionRecall(abForm.championRecall) == null || parseReactionRecall(abForm.challengerRecall) == null) {
+      setMsg({
+        tone: "err",
+        text: "safety_flag_recall must be a number between 0 and 1 for both the champion and the challenger.",
+      })
+      return
+    }
+    setMsg(null)
+    setBusy("ab-eval")
+    try {
+      const data = await apiFetch<unknown>(
+        `/reaction-projects/${reactionProjectId}/ab-promotion/evaluate`,
+        { method: "POST", body: reactionAbEvaluateBody(abForm) },
+      )
+      setAbVerdict(isRecord(data) ? data : null)
+    } catch (err) {
+      setMsg({
+        tone: "err",
+        text: formatApiError(err, "POST /reaction-projects/{id}/ab-promotion/evaluate failed."),
+      })
+    } finally {
+      setBusy(null)
+    }
   }
 
   async function proposeNextBatch(cycleId: number) {
@@ -7292,11 +7728,42 @@ export function ReactionProjectDetail() {
             description="Proposed next-experiment recommendations from the optimization engine — ranked by predicted improvement. Approve or reject each with a reviewer name and comment."
           >
             <div className="space-y-6">
-              {sortedRecs.map((r) => {
+              {/* R9 — advisory "likely acceptance" re-rank; the optimiser's own rank stays visible. */}
+              <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/20 px-3 py-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showLikelyAccept ? "default" : "outline"}
+                  disabled={busy != null}
+                  onClick={() => {
+                    if (showLikelyAccept) setShowLikelyAccept(false)
+                    else void loadPreferenceRanking()
+                  }}
+                >
+                  {busy === "pref-rank"
+                    ? "Ranking…"
+                    : showLikelyAccept
+                      ? "Likely-acceptance re-rank: on"
+                      : "Re-rank by likely acceptance"}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Advisory — re-orders by predicted chemist acceptance learned from past feedback. The
+                  optimiser&apos;s own rank stays visible (badge) and is never overridden.
+                </span>
+                {showLikelyAccept ? (
+                  <span className="w-full text-[11px] text-muted-foreground">
+                    {likelyAcceptMatchCount > 0
+                      ? `Ranked ${likelyAcceptMatchCount} of ${sortedRecs.length} proposal${sortedRecs.length === 1 ? "" : "s"} against the latest preference model; unmatched proposals keep the optimiser's order.`
+                      : "No current proposals matched the latest ranking — showing the optimiser's original order."}
+                  </span>
+                ) : null}
+              </div>
+              {displayRecs.map((r) => {
                 const id = readNum(r.id)
                 if (id == null) return null
                 const st = String(r.status ?? "")
                 const canReview = st === "proposed"
+                const likely = preferenceRankByConditions.get(canonicalConditionsKey(r.conditions_json))
                 return (
                   <Card key={id} className="border-muted">
                     <CardHeader className="pb-2">
@@ -7310,6 +7777,19 @@ export function ReactionProjectDetail() {
                         {r.human_review_required === true ? (
                           <Badge variant="secondary" className="text-xs">
                             requires human review
+                          </Badge>
+                        ) : null}
+                        {showLikelyAccept && likely && likely.acceptanceScore != null ? (
+                          <Badge
+                            variant="outline"
+                            className="font-mono text-xs"
+                            style={{ borderColor: "var(--mt-teal)", color: "var(--mt-teal-ink)" }}
+                          >
+                            BO #{likely.originalRank ?? "—"} · likely-accept {likely.acceptanceScore.toFixed(2)}
+                          </Badge>
+                        ) : showLikelyAccept ? (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            unranked
                           </Badge>
                         ) : null}
                       </div>
@@ -7393,14 +7873,241 @@ export function ReactionProjectDetail() {
                           {busy === `reject-${id}` ? "…" : "Reject"}
                         </Button>
                       </div>
+                      <Separator />
+                      {/* R9 — structured chemist feedback that trains the advisory preference re-ranker. */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-medium uppercase text-muted-foreground">proposal feedback</p>
+                          <Badge variant="outline" className="text-[10px]">advisory · trains the re-ranker</Badge>
+                        </div>
+                        {(() => {
+                          const draft = feedbackDraft[id] ?? { decision: "accept", reason: "", freeText: "" }
+                          const needReason = reactionFeedbackReasonRequired(draft.decision)
+                          const setDraft = (
+                            patch: Partial<{ decision: string; reason: string; freeText: string }>,
+                          ) => setFeedbackDraft((prev) => ({ ...prev, [id]: { ...draft, ...patch } }))
+                          const fbView = reactionFeedbackRecordView(feedbackResult[id])
+                          return (
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-end gap-2">
+                                <div className="space-y-1">
+                                  <Label htmlFor={`fb-dec-${id}`} className="text-xs">decision</Label>
+                                  <Select
+                                    value={draft.decision}
+                                    onValueChange={(v) => setDraft(v === "reject" ? { decision: v } : { decision: v, reason: "" })}
+                                  >
+                                    <SelectTrigger id={`fb-dec-${id}`} className="h-8 w-[130px] text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {REACTION_FEEDBACK_DECISIONS.map((d) => (
+                                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                {needReason ? (
+                                  <div className="space-y-1">
+                                    <Label htmlFor={`fb-reason-${id}`} className="text-xs">
+                                      reason <span className="text-destructive">(required)</span>
+                                    </Label>
+                                    <Select value={draft.reason} onValueChange={(v) => setDraft({ reason: v })}>
+                                      <SelectTrigger id={`fb-reason-${id}`} className="h-8 w-[210px] text-xs">
+                                        <SelectValue placeholder="select a reason" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {REACTION_FEEDBACK_REASONS.map((rs) => (
+                                          <SelectItem key={rs} value={rs}>{rs.replace(/_/g, " ")}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                ) : null}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-8 text-xs"
+                                  disabled={busy != null || (needReason && !draft.reason)}
+                                  onClick={() => void submitReactionFeedback(r)}
+                                >
+                                  {busy === `feedback-${id}` ? "…" : "Submit feedback"}
+                                </Button>
+                              </div>
+                              <Textarea
+                                rows={2}
+                                className="text-xs"
+                                value={draft.freeText}
+                                onChange={(e) => setDraft({ freeText: e.target.value })}
+                                placeholder="Optional free-text (e.g. why this is infeasible on our kit)."
+                              />
+                              {needReason && draft.reason === "unsafe" ? (
+                                <p className="text-[11px] font-medium text-foreground">
+                                  An “unsafe” rejection is high-signal: it routes to strengthen the R6 safety
+                                  screen and is excluded from preference learning.
+                                </p>
+                              ) : null}
+                              {fbView ? (
+                                <div
+                                  className="rounded-md border px-3 py-2 text-[11px]"
+                                  style={{ borderLeft: `3px solid ${fbView.isSafetySignal ? "var(--mt-amber)" : "var(--mt-teal)"}` }}
+                                >
+                                  <p className="text-muted-foreground">
+                                    Recorded: <span className="font-mono text-foreground">{fbView.decision}</span>
+                                    {fbView.reason ? (
+                                      <> · <span className="font-mono text-foreground">{fbView.reason.replace(/_/g, " ")}</span></>
+                                    ) : null}
+                                  </p>
+                                  {fbView.isSafetySignal ? (
+                                    <p className="font-medium text-foreground">
+                                      Routed to the safety gate (R6){fbView.routesToSafetyHardening ? " for hardening" : ""} —
+                                      excluded from preference learning.{" "}
+                                      <button type="button" className={INLINE_LINK_BUTTON_CLASS} onClick={goToSafetyGate}>
+                                        Open the safety gate →
+                                      </button>
+                                    </p>
+                                  ) : (
+                                    <p className="text-muted-foreground">
+                                      {fbView.isPreferenceLearnable
+                                        ? "Feeds the advisory preference re-ranker."
+                                        : "Not used for preference learning."}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          )
+                        })()}
+                      </div>
                     </CardContent>
                   </Card>
                 )
               })}
-              {!loading && sortedRecs.length === 0 ? (
+              {!loading && displayRecs.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No recommendations.</p>
               ) : null}
             </div>
+          </ModuleCard>
+
+          <ModuleCard
+            accent="violet"
+            eyebrow="Models · A/B promotion gate"
+            title="A/B model promotion (advisory)"
+            description="Compare a challenger model against the champion on held-out metrics + safety-flag recall. Decision-support only — it deploys nothing. A challenger is promotable only when it has no safety regression AND dominates the champion; a human still signs off and rollback stays available."
+          >
+            <form className="space-y-4" onSubmit={(e) => void evaluateAbPromotion(e)}>
+              <div className="grid gap-4 md:grid-cols-2">
+                {(
+                  [
+                    { key: "champion", verLabel: "championVersion", metLabel: "championMetrics", recLabel: "championRecall", ph: "champion-v1" },
+                    { key: "challenger", verLabel: "challengerVersion", metLabel: "challengerMetrics", recLabel: "challengerRecall", ph: "challenger-v2" },
+                  ] as const
+                ).map((side) => (
+                  <div key={side.key} className="space-y-2 rounded-md border p-3">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">{side.key}</p>
+                    <div className="space-y-1">
+                      <Label htmlFor={`ab-${side.key}-ver`} className="text-xs">model_version</Label>
+                      <Input
+                        id={`ab-${side.key}-ver`}
+                        className="h-8 text-xs"
+                        value={abForm[side.verLabel]}
+                        onChange={(e) => setAbForm((p) => ({ ...p, [side.verLabel]: e.target.value }))}
+                        placeholder={side.ph}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor={`ab-${side.key}-met`} className="text-xs">metrics (name=value, …)</Label>
+                      <Textarea
+                        id={`ab-${side.key}-met`}
+                        rows={2}
+                        className="text-xs"
+                        value={abForm[side.metLabel]}
+                        onChange={(e) => setAbForm((p) => ({ ...p, [side.metLabel]: e.target.value }))}
+                        placeholder="r2=0.88, rmse=0.21"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor={`ab-${side.key}-rec`} className="text-xs">safety_flag_recall</Label>
+                      <Input
+                        id={`ab-${side.key}-rec`}
+                        className="h-8 text-xs"
+                        value={abForm[side.recLabel]}
+                        onChange={(e) => setAbForm((p) => ({ ...p, [side.recLabel]: e.target.value }))}
+                        placeholder="0.95"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="ab-dirs" className="text-xs">directions (name=higher|lower, …)</Label>
+                  <Input
+                    id="ab-dirs"
+                    className="h-8 text-xs"
+                    value={abForm.directions}
+                    onChange={(e) => setAbForm((p) => ({ ...p, directions: e.target.value }))}
+                    placeholder="r2=higher, rmse=lower"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ab-tol" className="text-xs">tolerance</Label>
+                  <Input
+                    id="ab-tol"
+                    className="h-8 text-xs"
+                    value={abForm.tolerance}
+                    onChange={(e) => setAbForm((p) => ({ ...p, tolerance: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <Button type="submit" size="sm" disabled={busy != null}>
+                {busy === "ab-eval" ? "Evaluating…" : "Evaluate promotion"}
+              </Button>
+            </form>
+            {(() => {
+              const v = reactionAbVerdictView(abVerdict)
+              if (v == null) return null
+              return (
+                <div
+                  className="mt-4 space-y-3 rounded-md border p-3"
+                  style={{ borderLeft: `3px solid ${v.promotable ? "var(--mt-teal)" : "var(--mt-amber)"}` }}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={v.promotable ? "default" : "secondary"} className="text-xs">
+                      {v.promotable ? "promotable (pending sign-off)" : "not promotable"}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">safety_regression: {String(v.safetyRegression)}</Badge>
+                    <Badge variant="outline" className="text-xs">dominates: {String(v.dominates)}</Badge>
+                    <Badge variant="outline" className="font-mono text-[11px]">
+                      {v.challengerVersion ?? "challenger"} vs {v.championVersion ?? "champion"}
+                    </Badge>
+                  </div>
+                  <p className="rounded-md bg-muted/40 px-3 py-2 text-xs font-medium text-foreground">
+                    Requires human sign-off — this evaluation does not deploy or roll back any model;
+                    rollback remains available.
+                  </p>
+                  {v.reasons.length > 0 ? (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">reasons</p>
+                      <ul className="list-inside list-disc text-xs text-muted-foreground">
+                        {v.reasons.map((rr, i) => (
+                          <li key={`ab-reason-${i}`}>{rr}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {v.excludedMetrics.length > 0 ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      excluded metrics (unknown direction / not comparable):{" "}
+                      <span className="font-mono">{v.excludedMetrics.join(", ")}</span>
+                    </p>
+                  ) : null}
+                  {v.disclaimer ? (
+                    <p className="text-[11px] italic text-muted-foreground">{v.disclaimer}</p>
+                  ) : null}
+                </div>
+              )
+            })()}
           </ModuleCard>
         </TabsContent>
 
