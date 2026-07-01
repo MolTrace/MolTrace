@@ -86,6 +86,7 @@ from . import reaction_execution as reaction_execution
 from . import reaction_feedback_store as reaction_feedback_store
 from . import reaction_green as reaction_green
 from . import reaction_hte as reaction_hte
+from . import reaction_priors_store as reaction_priors_store
 from . import reaction_regulatory_compliance as reaction_regulatory_compliance
 from . import reaction_safety as reaction_safety
 from . import reaction_store as reaction_store
@@ -4293,6 +4294,74 @@ def reaction_ab_promotion_evaluate_route(
 ) -> reaction_feedback_store.ReactionABPromotionVerdict:
     # Pure decision-support: gate a challenger against the champion. Owner-scoped, executes nothing.
     return reaction_feedback_store.evaluate_ab_promotion(payload)
+
+
+# --- R10: warm-start transfer-learning priors (verified data; gold-excluded; advisory) ---
+@router.post(
+    "/reaction-projects/{reaction_project_id}/warm-start/prior",
+    response_model=reaction_priors_store.ReactionWarmStartPriorRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def build_reaction_warm_start_prior_route(
+    reaction_project_id: int,
+    payload: reaction_priors_store.ReactionWarmStartBuildRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_priors_store.ReactionWarmStartPriorRecord:
+    try:
+        # owner_scope_id gates the body-supplied source campaigns (cross-tenant leak guard).
+        return reaction_priors_store.build_prior(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+            owner_scope_id=_user_scope_for_context(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/warm-start/prior",
+    response_model=reaction_priors_store.ReactionWarmStartPriorRecord,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_warm_start_prior_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_priors_store.ReactionWarmStartPriorRecord:
+    try:
+        record = reaction_priors_store.get_latest_prior(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="No warm-start prior found for this project.")
+    return record
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/warm-start/ranking",
+    response_model=reaction_priors_store.ReactionWarmStartRanking,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def reaction_warm_start_ranking_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_priors_store.ReactionWarmStartRanking:
+    try:
+        return reaction_priors_store.warm_start_ranking(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
 
 
 @router.post(
