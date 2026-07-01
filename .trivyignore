@@ -32,7 +32,7 @@
 CVE-2025-32434
 
 # --- mlflow (moltrace_backend/pyproject.toml [project.optional-dependencies] infra; uv.lock) ---
-# Status: not_affected for all five. Justification: vulnerable_code_not_in_execute_path.
+# Status: not_affected for all six. Justification: vulnerable_code_not_in_execute_path.
 #   * mlflow is declared ONLY in the optional `infra` extra and present in uv.lock solely
 #     because uv locks all optional groups (marker extra=='infra'). It is intentionally never
 #     installed: prod deploy is `uv sync --no-dev --extra fid`; CI is `--extra fid --extra dev`.
@@ -43,13 +43,20 @@ CVE-2025-32434
 #   * CVE-2026-0545 (GHSA-7qhf-v65m-g5f3, CVSS 9.1) is the /ajax-api/3.0/jobs/* job endpoints
 #     bypassing the basic-auth app when MLFLOW_SERVER_ENABLE_JOB_EXECUTION + an allowlisted job
 #     are enabled — same server surface; no patched mlflow version exists yet.
-#   * All five CVEs require running mlflow's SERVER / model-SERVING components, which MolTrace
+#   * CVE-2026-2651 (fixed in mlflow 3.11.0rc1) is arbitrary code execution via the tracking
+#     server's unauthorized multipart artifact-upload endpoint — again a SERVER surface. MolTrace's
+#     client `log_artifact` writes to the local file:// store; it never uploads to, nor runs, a
+#     tracking server. A fix exists, but a bump is not warranted while infra stays un-deployed: the
+#     only fix is a major-version jump (2.x -> 3.x) to a currently pre-release line, for a package
+#     that is never installed.
+#   * All six CVEs require running mlflow's SERVER / model-SERVING components, which MolTrace
 #     does not run.
-#   Re-evaluate (and bump to a patched mlflow once upstream ships one — none exists for
-#   CVE-2026-0545 as of 2026-06-25) if MolTrace ever ships the `infra` extra in a deploy
-#   target or runs an mlflow server/serving process.
+#   Re-evaluate if MolTrace ever ships the `infra` extra in a deploy target or runs an mlflow
+#   server/serving process — then bump to a patched mlflow (3.11.x covers CVE-2026-2651; some
+#   others, e.g. CVE-2026-0545, still had no fix as of 2026-06-25).
 CVE-2025-15036
 CVE-2025-15379
 CVE-2026-0596
 CVE-2026-2635
 CVE-2026-0545
+CVE-2026-2651
