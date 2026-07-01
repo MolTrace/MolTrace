@@ -839,6 +839,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reaction-projects/{reaction_project_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reaction Feedback Route */
+        get: operations["list_reaction_feedback_route_reaction_projects__reaction_project_id__feedback_get"];
+        put?: never;
+        /** Create Reaction Feedback Route */
+        post: operations["create_reaction_feedback_route_reaction_projects__reaction_project_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/preference-ranking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reaction Preference Ranking Route */
+        get: operations["reaction_preference_ranking_route_reaction_projects__reaction_project_id__preference_ranking_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/ab-promotion/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reaction Ab Promotion Evaluate Route */
+        post: operations["reaction_ab_promotion_evaluate_route_reaction_projects__reaction_project_id__ab_promotion_evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reaction-projects/{reaction_project_id}/variables": {
         parameters: {
             query?: never;
@@ -29676,6 +29728,46 @@ export interface components {
             /** Raw Archive Id */
             raw_archive_id?: string | null;
         };
+        /** ReactionABEvaluateRequest */
+        ReactionABEvaluateRequest: {
+            champion: components["schemas"]["ReactionModelMetricsInput"];
+            challenger: components["schemas"]["ReactionModelMetricsInput"];
+            /** Directions */
+            directions?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Tolerance
+             * @default 0
+             */
+            tolerance: number;
+        };
+        /** ReactionABPromotionVerdict */
+        ReactionABPromotionVerdict: {
+            /** Champion Version */
+            champion_version: string;
+            /** Challenger Version */
+            challenger_version: string;
+            /** Promotable */
+            promotable: boolean;
+            /** Safety Regression */
+            safety_regression: boolean;
+            /** Dominates */
+            dominates: boolean;
+            /** Requires Human Signoff */
+            requires_human_signoff: boolean;
+            /** Rollback Available */
+            rollback_available: boolean;
+            /** Reasons */
+            reasons: string[];
+            /** Excluded Metrics */
+            excluded_metrics: string[];
+            /**
+             * Disclaimer
+             * @default Reaction feedback feeds an advisory preference re-ranker and an A/B promotion gate; it never auto-deploys a model and never overrides the optimiser. A safety (unsafe) rejection routes to the R6 safety screen for hardening and is excluded from preference learning.
+             */
+            disclaimer: string;
+        };
         /** ReactionAcquisitionCandidate */
         ReactionAcquisitionCandidate: {
             /** Id */
@@ -30708,6 +30800,74 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ReactionFeedbackCreateRequest */
+        ReactionFeedbackCreateRequest: {
+            /** Proposal Ref */
+            proposal_ref: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "accept" | "edit" | "reject";
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Free Text
+             * @default
+             */
+            free_text: string;
+            /** Model Version */
+            model_version?: string | null;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ReactionFeedbackRecord */
+        ReactionFeedbackRecord: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Proposal Ref */
+            proposal_ref: string;
+            /** Decision */
+            decision: string;
+            /** Reason */
+            reason: string | null;
+            /** Free Text */
+            free_text: string;
+            /** Model Version */
+            model_version: string | null;
+            /** Features */
+            features: {
+                [key: string]: unknown;
+            };
+            /** Is Safety Signal */
+            is_safety_signal: boolean;
+            /** Routes To Safety Hardening */
+            routes_to_safety_hardening: boolean;
+            /** Is Preference Learnable */
+            is_preference_learnable: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Metadata Json */
+            metadata_json: {
+                [key: string]: unknown;
+            };
+            /**
+             * Disclaimer
+             * @default Reaction feedback feeds an advisory preference re-ranker and an A/B promotion gate; it never auto-deploys a model and never overrides the optimiser. A safety (unsafe) rejection routes to the R6 safety screen for hardening and is excluded from preference learning.
+             */
+            disclaimer: string;
+        };
         /** ReactionGreenAssessment */
         ReactionGreenAssessment: {
             /** Id */
@@ -31083,6 +31243,17 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** ReactionModelMetricsInput */
+        ReactionModelMetricsInput: {
+            /** Model Version */
+            model_version: string;
+            /** Metrics */
+            metrics: {
+                [key: string]: number;
+            };
+            /** Safety Flag Recall */
+            safety_flag_recall: number;
         };
         /** ReactionObjectiveProfile */
         ReactionObjectiveProfile: {
@@ -31770,6 +31941,42 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+        };
+        /** ReactionPreferenceRankedItem */
+        ReactionPreferenceRankedItem: {
+            /** Proposal Ref */
+            proposal_ref: string;
+            /** Acceptance Score */
+            acceptance_score: number;
+            /** Original Rank */
+            original_rank: number | null;
+            /** Conditions Json */
+            conditions_json: {
+                [key: string]: unknown;
+            };
+        };
+        /** ReactionPreferenceRanking */
+        ReactionPreferenceRanking: {
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Bo Run Id */
+            bo_run_id: number | null;
+            /** Model Summary */
+            model_summary: {
+                [key: string]: unknown;
+            };
+            /** Ranked */
+            ranked: components["schemas"]["ReactionPreferenceRankedItem"][];
+            /**
+             * Advisory
+             * @default true
+             */
+            advisory: boolean;
+            /**
+             * Disclaimer
+             * @default Reaction feedback feeds an advisory preference re-ranker and an A/B promotion gate; it never auto-deploys a model and never overrides the optimiser. A safety (unsafe) rejection routes to the R6 safety screen for hardening and is excluded from preference learning.
+             */
+            disclaimer: string;
         };
         /** ReactionProject */
         ReactionProject: {
@@ -43547,6 +43754,154 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReactionSafetyScreening"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reaction_feedback_route_reaction_projects__reaction_project_id__feedback_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionFeedbackRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_reaction_feedback_route_reaction_projects__reaction_project_id__feedback_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionFeedbackCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionFeedbackRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reaction_preference_ranking_route_reaction_projects__reaction_project_id__preference_ranking_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionPreferenceRanking"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reaction_ab_promotion_evaluate_route_reaction_projects__reaction_project_id__ab_promotion_evaluate_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionABEvaluateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionABPromotionVerdict"];
                 };
             };
             /** @description Validation Error */
