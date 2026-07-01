@@ -3895,6 +3895,42 @@ class ReactionFeedbackORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class ReactionWarmStartPriorORM(Base):
+    """A fitted warm-start transfer-learning prior (R10) for a target reaction project.
+
+    The immutable, content-hashed snapshot it was fit from (verified, gold-excluded campaign data)
+    plus the fitted prior (global mean, per-feature offsets, augmentation) and full lineage. Frozen
+    weights live in the DB, not git. Source campaigns are owner-checked at the store layer.
+    """
+
+    __tablename__ = "reaction_warm_start_priors"
+    __table_args__ = (
+        Index(
+            "ix_reaction_warm_start_priors_project_created",
+            "reaction_project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    snapshot_hash: Mapped[str] = mapped_column(String(80), default="")
+    objective_target: Mapped[float | None] = mapped_column(Float, nullable=True)
+    global_mean: Mapped[float] = mapped_column(Float, default=0.0)
+    trained_n: Mapped[int] = mapped_column(Integer, default=0)
+    excluded_gold_count: Mapped[int] = mapped_column(Integer, default=0)
+    excluded_unverified_count: Mapped[int] = mapped_column(Integer, default=0)
+    source_project_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    lineage_json: Mapped[str] = mapped_column(Text, default="{}")
+    prior_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class ReactionBayesianOptimizationRunORM(Base):
     __tablename__ = "reaction_bayesian_optimization_runs"
     __table_args__ = (
