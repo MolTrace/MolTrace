@@ -1,0 +1,50 @@
+# Keep the build context small. NOTE: README.md is intentionally NOT ignored —
+# hatchling reads it (pyproject `readme = "README.md"`) when building the project.
+
+.git/
+.github/
+.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Large test fixtures (NMRShiftDB2/nmrglue binaries) — not needed at runtime.
+tests/
+docs/
+deploy/
+
+# Local runtime state, data vaults, and generated output.
+*.sqlite3
+*.db
+*.log
+raw_data_vault/
+.nmrcheck/
+artifacts/
+reports/
+uploads/
+exports/
+tmp/
+*.zip
+
+# Model weights / knowledge bases (downloaded at runtime, never baked in).
+*.pt
+*.ss
+*.ckpt
+hose_kb*.json
+
+# Secrets / local env.
+.env
+.env.*
+!.env.example
+!.env.render.example
+
+# Container + compose files themselves.
+Dockerfile
+.dockerignore
+.gcloudignore
+cloudbuild.yaml

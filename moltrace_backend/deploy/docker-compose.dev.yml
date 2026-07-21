@@ -1,0 +1,76 @@
+# Local / eval stack: Postgres + Redis + API + RQ worker, all from the one image.
+#
+#   docker compose -f deploy/docker-compose.dev.yml up --build
+#   API -> http://localhost:8080/health
+#
+# GCP free-tier "$0" path: run the db + redis + worker services on an Always-Free
+# e2-micro VM and keep the API on Cloud Run (scale-to-zero). Caveat: e2-micro is
+# 1 GB RAM — tight for this ML-heavy image; an e2-small (~$13/mo) is far safer, or
+# point DATABASE_URL/REDIS_URL at a free managed Postgres/Redis (Neon / Upstash).
+
+name: moltrace-dev
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://moltrace:moltrace@db:5432/moltrace
+  REDIS_URL: redis://redis:6379/0
+  APP_ENV: development
+  LOG_LEVEL: info
+  ADMIN_EMAILS: admin@example.com   # code default is empty; set an admin explicitly
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: moltrace
+      POSTGRES_PASSWORD: moltrace
+      POSTGRES_DB: moltrace
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moltrace -d moltrace"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  # One-shot: apply Alembic migrations, then exit. env.py reads DATABASE_URL.
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment: *backend-env
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: ["python", "-m", "nmrcheck.worker"]
+    environment: *backend-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
+volumes:
+  pgdata:
