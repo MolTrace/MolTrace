@@ -1,0 +1,38 @@
+# Controls what `gcloud builds submit` uploads as the build context (falls back to
+# .gitignore when absent). Mirror .dockerignore's heavy excludes so uploads stay small.
+# README.md stays (hatchling needs it); src/, pyproject.toml, uv.lock, alembic/ stay.
+
+.git/
+.github/
+.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+tests/
+docs/
+deploy/
+
+*.sqlite3
+*.db
+*.log
+raw_data_vault/
+.nmrcheck/
+artifacts/
+reports/
+uploads/
+exports/
+tmp/
+*.zip
+*.pt
+*.ss
+*.ckpt
+hose_kb*.json
+
+.env
+.env.*
+!.env.example
+!.env.render.example
