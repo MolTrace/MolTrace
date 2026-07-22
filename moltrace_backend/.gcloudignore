@@ -6,6 +6,10 @@
 .github/
 .venv/
 venv/
+# Local scratch virtualenvs (torch_env alone is ~626 MB). A .gcloudignore REPLACES
+# the .gitignore-derived defaults, so these must be listed explicitly.
+torch_env/
+*_env/
 **/__pycache__/
 *.py[cod]
 .pytest_cache/
