@@ -1,25 +1,26 @@
 # MolTrace CI/CD
 #
 # This is a monorepo: pnpm/Next.js FE under moltrace_frontend/ and uv/Python
-# BE under moltrace_backend/. Both are gated by tests before any of the
-# three production targets gets a deploy.
+# BE under moltrace_backend/. Both are gated by tests before any production
+# target gets a deploy.
 #
-# Production targets (all three are real production):
-#   - Vercel             — primary FE (moltrace.co, www.moltrace.co)
-#   - Render web (FE)    — second-region FE mirror (moltrace-frontend1)
-#   - Render web (BE)    — backend API (moltrace-backend)
-# The Render-managed Postgres (moltrace-db) is NOT a deploy target — it has
-# no Auto-Deploy toggle and no deploy hook; schema migrations land via the
-# backend's startCommand chain (`alembic upgrade head && uvicorn …`).
+# Production targets (since the 2026-07 Render → GCP migration):
+#   - Vercel              — FE (moltrace.co, www.moltrace.co); deployed by the
+#                           `deploy` job's hook below.
+#   - GCP Cloud Run (BE)  — backend API (service moltrace-backend, project
+#                           moltrace-prod). Deployed via gcloud for now (see
+#                           moltrace_backend/deploy/README.md); wiring it into
+#                           this workflow via Workload Identity Federation +
+#                           deploy-cloudrun is the planned follow-up.
+# Cloud SQL (moltrace-db) is NOT a deploy target — on a NEW database the app
+# bootstraps its schema at startup (init_db → create_all) and Alembic is then
+# stamped; on an existing database migrations run as the one-off Cloud Run job
+# `moltrace-migrate` (alembic upgrade head), never in the start command.
 #
 # Required GitHub Secrets (set under Settings → Secrets and variables →
 # Actions → New repository secret):
 #   VERCEL_DEPLOY_HOOK       — Vercel "Deploy Hooks" URL for the FE project
 #                              (Project Settings → Git → Deploy Hooks)
-#   RENDER_FE_DEPLOY_HOOK    — Render Deploy Hook URL for moltrace-frontend1
-#                              (Service Settings → Deploy Hook)
-#   RENDER_BE_DEPLOY_HOOK    — Render Deploy Hook URL for moltrace-backend
-#                              (Service Settings → Deploy Hook)
 #
 # Required platform toggles (one-time, manual):
 #   - Vercel: disable auto-deploy on the connected Git repo (file-based via
@@ -357,19 +358,23 @@ jobs:
           done
 
   deploy:
-    name: Deploy · Vercel + Render (FE + BE)
+    name: Deploy · Vercel (FE)
     needs: [frontend-tests, backend-tests, deployment-gate, verify-provenance]
     # Only deploy when both gates passed on a direct push to main (not PRs,
     # not manual reruns of feature branches).
+    #
+    # 2026-07 migration: the backend moved from Render to GCP Cloud Run
+    # (project moltrace-prod, service moltrace-backend). The Render deploy
+    # hooks are retired — the Render service is suspended and no longer a
+    # production target. Backend deploys currently run via gcloud
+    # (`gcloud builds submit` + `gcloud run deploy`, see
+    # moltrace_backend/deploy/README.md); automating that here via Workload
+    # Identity Federation + deploy-cloudrun is the planned follow-up so the
+    # backend regains a fully gated CI deploy path.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # `if: always()` on each step lets every target fire independently — a
-    # Vercel hiccup must NOT block Render production, since both are real
-    # production targets. The final `report` step then fails the job if
-    # any individual hook returned non-2xx, so the run still goes red.
     steps:
-      - name: Trigger Vercel deploy hook (FE · primary)
-        id: vercel
+      - name: Trigger Vercel deploy hook (FE)
         env:
           HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
         # `--fail` so a 4xx/5xx fails the step (deploy hooks return 201 on
@@ -381,41 +386,3 @@ jobs:
             echo "::error::VERCEL_DEPLOY_HOOK secret is not set"; exit 1
           fi
           curl -sS --fail -X POST "$HOOK"
-
-      - name: Trigger Render deploy hook (FE · second region)
-        id: render_fe
-        if: always()
-        env:
-          HOOK: ${{ secrets.RENDER_FE_DEPLOY_HOOK }}
-        run: |
-          if [ -z "$HOOK" ]; then
-            echo "::error::RENDER_FE_DEPLOY_HOOK secret is not set"; exit 1
-          fi
-          curl -sS --fail -X POST "$HOOK"
-
-      - name: Trigger Render deploy hook (BE · API)
-        id: render_be
-        if: always()
-        env:
-          HOOK: ${{ secrets.RENDER_BE_DEPLOY_HOOK }}
-        run: |
-          if [ -z "$HOOK" ]; then
-            echo "::error::RENDER_BE_DEPLOY_HOOK secret is not set"; exit 1
-          fi
-          curl -sS --fail -X POST "$HOOK"
-
-      - name: Fail if any hook failed
-        if: always()
-        # Each step above sets its own outcome; this step fails the job
-        # when any one of them was not 'success' (skipped also counts —
-        # skipped means a prior step's failure short-circuited the run,
-        # which `if: always()` should prevent, but we keep the check
-        # strict so silent skips never look green).
-        run: |
-          v="${{ steps.vercel.outcome }}"
-          rf="${{ steps.render_fe.outcome }}"
-          rb="${{ steps.render_be.outcome }}"
-          echo "Vercel=$v · Render-FE=$rf · Render-BE=$rb"
-          if [ "$v" != "success" ] || [ "$rf" != "success" ] || [ "$rb" != "success" ]; then
-            echo "::error::one or more deploy hooks did not succeed"; exit 1
-          fi
