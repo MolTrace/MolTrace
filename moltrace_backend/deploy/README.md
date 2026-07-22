@@ -178,7 +178,28 @@ The `deploy-backend` job in `.github/workflows/ci-cd.yml` deploys every gated pu
 for `moltrace-deployer@` — no stored service-account key anywhere. Sequence per release:
 Cloud Build builds/pushes `backend:<sha>` → the `moltrace-migrate` job runs
 `alembic upgrade head` (correct post-bootstrap; the DB is stamped) → `gcloud run deploy`
-rolls the new revision (image only; env/secrets/VPC config are preserved). The deployer
-SA holds `run.developer`, `cloudbuild.builds.editor`, `logging.viewer`,
-`storage.objectAdmin`, `serviceusage.serviceUsageConsumer`, plus `iam.serviceAccountUser`
-on the runtime SA.
+rolls the new revision (image only; env/secrets/VPC config are preserved).
+
+The deployer SA (`moltrace-deployer@`) needs, and this is the full verified set:
+
+- `roles/run.developer` — deploy Cloud Run services + run jobs
+- `roles/cloudbuild.builds.editor` — submit Cloud Build builds
+- `roles/logging.viewer`, `roles/serviceusage.serviceUsageConsumer`
+- **`roles/storage.admin` at PROJECT level** — NOT just `objectAdmin`. `gcloud builds
+  submit` resolves/checks the `{project}_cloudbuild` staging bucket at the project
+  level; a bucket-scoped grant is not enough and you get
+  *"forbidden from accessing the bucket … serviceusage.services.use"*.
+- `roles/iam.serviceAccountUser` on **two** service accounts:
+  - the runtime SA `moltrace-run@` (deploys/jobs run as it), and
+  - the **Cloud Build build-runtime SA** `<PROJECT_NUMBER>-compute@developer.gserviceaccount.com`
+    — without it the build fails with *"caller does not have permission to act as
+    service account …"*.
+
+WIF binding: the repo principal
+`principalSet://…/workloadIdentityPools/github/attribute.repository/MolTrace/MolTrace`
+holds `roles/iam.workloadIdentityUser` on the deployer SA.
+
+> Tip: verify the whole chain locally before the first CI run by impersonating the
+> deployer SA — `gcloud builds submit … --impersonate-service-account=moltrace-deployer@…`
+> reproduces the exact permission errors CI would hit (grant yourself
+> `iam.serviceAccountTokenCreator` on it temporarily).
