@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft, ChevronDown, ExternalLink, FlaskConical, Info, Lightbulb } from "lucide-react"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { DeveloperOnly } from "@/components/developer-mode-provider"
@@ -545,6 +545,141 @@ export function parseReactionRecall(v: string | number): number | null {
     return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null
   }
   return Number.isFinite(v) && v >= 0 && v <= 1 ? v : null
+}
+
+// ── R10: warm-start transfer-learning priors ─────────────────────────────────
+
+/** R10 — typed view over a ReactionWarmStartPriorRecord (POST/GET …/warm-start/prior). The lineage
+ *  fields let a reviewer see exactly what the prior was fit from: owned + verified data only, never
+ *  the frozen evaluation gold set. */
+export function reactionWarmStartPriorView(rec: unknown): {
+  id: number | null
+  snapshotHash: string | null
+  objectiveTarget: number | null
+  globalMean: number | null
+  trainedN: number | null
+  excludedGoldCount: number | null
+  excludedUnverifiedCount: number | null
+  sourceProjectIds: number[]
+  augmentationCount: number | null
+  lineage: Record<string, unknown> | null
+  /** false ⇒ a PREVIEW fit (require_verified was off — unverified data admitted). The verbatim
+   *  disclaimer's "verified-only" sentence is NOT true for such a record; render it as a preview. */
+  verifiedOnly: boolean
+  createdAt: string | null
+  disclaimer: string | null
+} | null {
+  if (!isRecord(rec)) return null
+  const lineage = isRecord(rec.lineage) ? rec.lineage : null
+  return {
+    id: readNum(rec.id),
+    snapshotHash: typeof rec.snapshot_hash === "string" ? rec.snapshot_hash : null,
+    objectiveTarget: readNum(rec.objective_target),
+    globalMean: readNum(rec.global_mean),
+    trainedN: readNum(rec.trained_n),
+    excludedGoldCount: readNum(rec.excluded_gold_count),
+    excludedUnverifiedCount: readNum(rec.excluded_unverified_count),
+    sourceProjectIds: Array.isArray(rec.source_project_ids)
+      ? rec.source_project_ids.filter((n): n is number => typeof n === "number")
+      : [],
+    augmentationCount: readNum(rec.augmentation_count),
+    lineage,
+    // Only an explicit false marks a preview; absent/true reads as verified-only.
+    verifiedOnly: lineage?.verified_only !== false,
+    createdAt: typeof rec.created_at === "string" ? rec.created_at : null,
+    disclaimer: typeof rec.disclaimer === "string" ? rec.disclaimer : null,
+  }
+}
+
+/** R10 — typed view over a ReactionWarmStartRanking (advisory; never the optimiser's decision). */
+export function reactionWarmStartRankingView(resp: unknown): {
+  advisory: boolean
+  priorId: number | null
+  boRunId: number | null
+  globalMean: number | null
+  disclaimer: string | null
+  ranked: {
+    proposalRef: string
+    priorMean: number | null
+    originalRank: number | null
+    conditionsJson: Record<string, unknown>
+  }[]
+} | null {
+  if (!isRecord(resp)) return null
+  const rawRanked = Array.isArray(resp.ranked) ? resp.ranked : []
+  return {
+    advisory: resp.advisory !== false,
+    priorId: readNum(resp.prior_id),
+    boRunId: readNum(resp.bo_run_id),
+    globalMean: readNum(resp.global_mean),
+    disclaimer: typeof resp.disclaimer === "string" ? resp.disclaimer : null,
+    ranked: rawRanked.filter(isRecord).map((it) => ({
+      proposalRef: typeof it.proposal_ref === "string" ? it.proposal_ref : String(it.proposal_ref ?? ""),
+      priorMean: readNum(it.prior_mean),
+      originalRank: readNum(it.original_rank),
+      conditionsJson: isRecord(it.conditions_json) ? it.conditions_json : {},
+    })),
+  }
+}
+
+/** R10 — index the warm-start ranking by canonical conditions key (same id-space-agnostic join as
+ *  R9: proposal_ref is an acquisition-candidate id, not the recommendation-row id the cards use). */
+export function reactionWarmStartRankByConditions(
+  ranking: ReturnType<typeof reactionWarmStartRankingView>,
+): Map<string, { priorMean: number | null; originalRank: number | null; rerank: number }> {
+  const m = new Map<string, { priorMean: number | null; originalRank: number | null; rerank: number }>()
+  if (!ranking) return m
+  ranking.ranked.forEach((it, i) => {
+    const key = canonicalConditionsKey(it.conditionsJson)
+    if (key && !m.has(key)) {
+      m.set(key, { priorMean: it.priorMean, originalRank: it.originalRank, rerank: i + 1 })
+    }
+  })
+  return m
+}
+
+/** R10 — build the warm-start prior request body. An empty source list is omitted so the backend
+ *  defaults to intra-campaign (this project only); a blank target is omitted (→ null server-side). */
+export function reactionWarmStartBuildBody(opts: {
+  sourceProjectIds: number[]
+  objectiveTarget?: string | number | null
+  requireVerified: boolean
+  goldSetObservationIds?: string[]
+}): {
+  source_project_ids?: number[]
+  objective_target?: number
+  require_verified: boolean
+  gold_set_observation_ids?: string[]
+} {
+  const body: {
+    source_project_ids?: number[]
+    objective_target?: number
+    require_verified: boolean
+    gold_set_observation_ids?: string[]
+  } = { require_verified: opts.requireVerified }
+  const ids = opts.sourceProjectIds.filter((n) => Number.isFinite(n))
+  if (ids.length > 0) body.source_project_ids = Array.from(new Set(ids))
+  const raw = String(opts.objectiveTarget ?? "").trim()
+  if (raw !== "") {
+    const t = typeof opts.objectiveTarget === "number" ? opts.objectiveTarget : Number(raw)
+    if (Number.isFinite(t)) body.objective_target = t
+  }
+  const gold = (opts.goldSetObservationIds ?? []).filter((s) => typeof s === "string" && s.trim() !== "")
+  if (gold.length > 0) body.gold_set_observation_ids = gold
+  return body
+}
+
+/** R10 — user-facing message for a failed warm-start build. 400 carries the admissible-data reason
+ *  (no verified experiments / duplicate observation ids / non-native value) in `detail`; a 404 is the
+ *  non-leaking owner/source guard (don't echo which id). */
+export function reactionWarmStartErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 400 && isRecord(err.data) && typeof err.data.detail === "string") return err.data.detail
+    if (err.status === 404) {
+      return "No warm-start prior could be built — check that you own every source campaign you selected."
+    }
+  }
+  return formatApiError(err, "POST /reaction-projects/{id}/warm-start/prior failed.")
 }
 
 /** R9 — typed view over a ReactionABPromotionVerdict. Pure decision-support: deploys nothing.
@@ -1297,6 +1432,9 @@ export function ReactionProjectDetail() {
       : Array.isArray(raw) && raw[0]
         ? Number.parseInt(raw[0], 10)
         : NaN
+  /** Latest project id, for dropping stale async responses after a client-side project switch. */
+  const reactionProjectIdRef = useRef(reactionProjectId)
+  reactionProjectIdRef.current = reactionProjectId
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -1378,6 +1516,18 @@ export function ReactionProjectDetail() {
     tolerance: "0",
   })
   const [abVerdict, setAbVerdict] = useState<Record<string, unknown> | null>(null)
+  // R10 — warm-start transfer-learning priors.
+  const [warmStartPrior, setWarmStartPrior] = useState<Record<string, unknown> | null>(null)
+  /** true ⇒ the prior GET failed for a NON-404 reason — render "couldn't load", never "none yet". */
+  const [wsPriorLoadFailed, setWsPriorLoadFailed] = useState(false)
+  const [warmStartRanking, setWarmStartRanking] = useState<Record<string, unknown> | null>(null)
+  const [showWarmStartRank, setShowWarmStartRank] = useState(false)
+  /** "loading" | "loaded" | "error" for the owned-campaign picker (distinct empty vs failed). */
+  const [wsProjectsStatus, setWsProjectsStatus] = useState<"loading" | "loaded" | "error">("loading")
+  const [ownedReactionProjects, setOwnedReactionProjects] = useState<Record<string, unknown>[]>([])
+  const [wsSourceIds, setWsSourceIds] = useState<number[]>([])
+  const [wsObjectiveTarget, setWsObjectiveTarget] = useState("")
+  const [wsRequireVerified, setWsRequireVerified] = useState(true)
   const [boAlgorithm, setBoAlgorithm] = useState<string>(BO_ALGORITHM_OPTIONS[0])
   const [boBatchSize, setBoBatchSize] = useState("1")
   const [boExplorationWeight, setBoExplorationWeight] = useState("0.1")
@@ -1797,6 +1947,22 @@ export function ReactionProjectDetail() {
     void reload()
   }, [reload])
 
+  // R10 — load any existing warm-start prior + the owned-campaign picker options on mount / project
+  // switch, and seed the source picker with this campaign (intra-campaign warm-start is the default).
+  // A project change RESETS every R9/R10 rank surface first, so project B's cards can never render
+  // re-ranked/badged by project A's prior or preference model.
+  useEffect(() => {
+    setWarmStartPrior(null)
+    setWsPriorLoadFailed(false)
+    setWarmStartRanking(null)
+    setShowWarmStartRank(false)
+    setPreferenceRanking(null)
+    setShowLikelyAccept(false)
+    setWsSourceIds([reactionProjectId])
+    void loadWarmStartPrior()
+    void loadOwnedReactionProjects()
+  }, [reactionProjectId])
+
   const objective = typeof project?.objective === "string" ? project.objective : undefined
   const status = typeof project?.status === "string" ? project.status : undefined
   const projectName = typeof project?.name === "string" ? project.name : "Reaction project"
@@ -1929,26 +2095,39 @@ export function ReactionProjectDetail() {
     [preferenceRanking],
   )
 
-  // R9 — how many of the displayed proposals the latest ranking actually covers (transparency: the
-  // re-rank is a no-op for anything it can't match, so we surface "ranked M of N").
-  const likelyAcceptMatchCount = useMemo(() => {
-    if (preferenceRankByConditions.size === 0) return 0
-    return sortedRecs.filter((r) => preferenceRankByConditions.has(canonicalConditionsKey(r.conditions_json)))
-      .length
-  }, [preferenceRankByConditions, sortedRecs])
+  // R10 — warm-start ranking joined to cards by conditions content (same id-space-agnostic join).
+  const warmStartRankByConditions = useMemo(
+    () => reactionWarmStartRankByConditions(reactionWarmStartRankingView(warmStartRanking)),
+    [warmStartRanking],
+  )
 
-  // R9 — recommendation cards, optionally re-ordered by acceptance_score (advisory) while keeping
-  // the optimiser's own order recoverable via each card's original_rank badge.
+  // R9/R10 — how many of the displayed proposals the ACTIVE re-rank actually covers (transparency:
+  // the re-rank is a no-op for anything it can't match, so we surface "ranked M of N").
+  const rerankMatchCount = useMemo(() => {
+    const active = showLikelyAccept
+      ? preferenceRankByConditions
+      : showWarmStartRank
+        ? warmStartRankByConditions
+        : null
+    if (!active || active.size === 0) return 0
+    return sortedRecs.filter((r) => active.has(canonicalConditionsKey(r.conditions_json))).length
+  }, [showLikelyAccept, showWarmStartRank, preferenceRankByConditions, warmStartRankByConditions, sortedRecs])
+
+  // R9/R10 — recommendation cards, optionally re-ordered by the ACTIVE advisory re-rank (likely
+  // acceptance OR warm-start prior_mean; mutually exclusive) while keeping the optimiser's own order
+  // recoverable via each card's original_rank badge.
   const displayRecs = useMemo(() => {
-    if (!showLikelyAccept || preferenceRankByConditions.size === 0) return sortedRecs
-    return [...sortedRecs].sort((a, b) => {
-      const sa =
-        preferenceRankByConditions.get(canonicalConditionsKey(a.conditions_json))?.acceptanceScore ?? -Infinity
-      const sb =
-        preferenceRankByConditions.get(canonicalConditionsKey(b.conditions_json))?.acceptanceScore ?? -Infinity
-      return sb - sa
-    })
-  }, [showLikelyAccept, preferenceRankByConditions, sortedRecs])
+    const scoreOf = showLikelyAccept
+      ? (r: Record<string, unknown>) =>
+          preferenceRankByConditions.get(canonicalConditionsKey(r.conditions_json))?.acceptanceScore ?? -Infinity
+      : showWarmStartRank
+        ? (r: Record<string, unknown>) =>
+            warmStartRankByConditions.get(canonicalConditionsKey(r.conditions_json))?.priorMean ?? -Infinity
+        : null
+    if (!scoreOf) return sortedRecs
+    const score = scoreOf
+    return [...sortedRecs].sort((a, b) => score(b) - score(a))
+  }, [showLikelyAccept, showWarmStartRank, preferenceRankByConditions, warmStartRankByConditions, sortedRecs])
 
   const latestBatchRows = useMemo(
     () => parseRecommendationBatchItems(latestRecommendationBatch),
@@ -4213,6 +4392,104 @@ export function ReactionProjectDetail() {
     }
   }
 
+  /** R10 — fetch the chemist's owned reaction campaigns for the warm-start source picker. */
+  async function loadOwnedReactionProjects() {
+    setWsProjectsStatus("loading")
+    try {
+      const data = await apiFetch<unknown>("/reaction-projects", { method: "GET" })
+      setOwnedReactionProjects(Array.isArray(data) ? (data.filter(isRecord) as Record<string, unknown>[]) : [])
+      setWsProjectsStatus("loaded")
+    } catch {
+      setOwnedReactionProjects([])
+      setWsProjectsStatus("error")
+    }
+  }
+
+  /** R10 — GET the existing warm-start prior. ONLY a 404 means "none yet"; any other failure is a
+   *  load error and must not masquerade as confirmed non-existence. Responses for a project the user
+   *  has since navigated away from are dropped (stale-response guard). */
+  async function loadWarmStartPrior() {
+    const pid = reactionProjectId
+    try {
+      const data = await apiFetch<unknown>(`/reaction-projects/${pid}/warm-start/prior`, {
+        method: "GET",
+      })
+      if (pid !== reactionProjectIdRef.current) return
+      setWarmStartPrior(isRecord(data) ? data : null)
+      setWsPriorLoadFailed(false)
+    } catch (err) {
+      if (pid !== reactionProjectIdRef.current) return
+      setWarmStartPrior(null)
+      setWsPriorLoadFailed(!(err instanceof ApiError && err.status === 404))
+    }
+  }
+
+  /** R10 — build (freeze + fit) a warm-start prior from the selected owned campaigns. */
+  async function buildWarmStartPrior(e: React.FormEvent) {
+    e.preventDefault()
+    // A non-numeric target must be refused, not silently dropped from the request.
+    const rawTarget = wsObjectiveTarget.trim()
+    if (rawTarget !== "" && !Number.isFinite(Number(rawTarget))) {
+      setMsg({ tone: "err", text: "objective_target must be a number (or leave it blank)." })
+      return
+    }
+    setMsg(null)
+    setBusy("ws-build")
+    try {
+      const body = reactionWarmStartBuildBody({
+        sourceProjectIds: wsSourceIds,
+        objectiveTarget: wsObjectiveTarget,
+        requireVerified: wsRequireVerified,
+      })
+      const created = await apiFetch<unknown>(
+        `/reaction-projects/${reactionProjectId}/warm-start/prior`,
+        { method: "POST", body },
+      )
+      setWarmStartPrior(isRecord(created) ? created : null)
+      setWsPriorLoadFailed(false)
+      // The new prior supersedes whatever an active ranking was computed from — force a refetch.
+      setWarmStartRanking(null)
+      setShowWarmStartRank(false)
+      const view = reactionWarmStartPriorView(created)
+      const n = view?.trainedN
+      setMsg({
+        tone: "ok",
+        text:
+          n != null
+            ? wsRequireVerified
+              ? `Warm-start prior fit from ${n} verified observation${n === 1 ? "" : "s"} — advisory; it never overrides the optimiser.`
+              : `Warm-start prior fit from ${n} observation${n === 1 ? "" : "s"} (PREVIEW — includes unconfirmed data; rebuild with verified-only before real use).`
+            : "Warm-start prior built (advisory).",
+      })
+    } catch (err) {
+      setMsg({ tone: "err", text: reactionWarmStartErrorMessage(err) })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** R10 — GET the warm-start ranking and turn on the (mutually exclusive with R9) warm-start re-rank. */
+  async function loadWarmStartRanking() {
+    setMsg(null)
+    setBusy("ws-rank")
+    try {
+      const data = await apiFetch<unknown>(
+        `/reaction-projects/${reactionProjectId}/warm-start/ranking`,
+        { method: "GET" },
+      )
+      setWarmStartRanking(isRecord(data) ? data : null)
+      setShowWarmStartRank(true)
+      setShowLikelyAccept(false) // only one advisory re-rank active at a time
+    } catch (err) {
+      setMsg({
+        tone: "err",
+        text: formatApiError(err, "GET /reaction-projects/{id}/warm-start/ranking failed."),
+      })
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function proposeNextBatch(cycleId: number) {
     setMsg(null)
     setBusy(`opt-cc-propose-${cycleId}`)
@@ -5684,6 +5961,181 @@ export function ReactionProjectDetail() {
               Launch optimization cycles with regulatory constraints, compare BO vs LLM advisors, and inspect benchmark history.
             </p>
           </div>
+
+          <ModuleCard
+            accent="violet"
+            eyebrow="Optimization · Warm-start"
+            title="Warm-start from related campaigns"
+            description="Fit an advisory prior from your accumulated, verified data on related campaigns you own, so a new campaign reaches the target in fewer experiments. Fit only from owned, SpectraCheck-verified data — never the frozen evaluation gold set — and it never overrides the optimiser."
+          >
+            <form className="space-y-4" onSubmit={(e) => void buildWarmStartPrior(e)}>
+              <div className="space-y-2">
+                <span id="ws-sources-label" className="text-xs font-medium">
+                  source campaigns (owned)
+                </span>
+                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="ws-sources-label">
+                  {wsProjectsStatus === "loading" ? (
+                    <span className="text-xs text-muted-foreground">Loading your campaigns…</span>
+                  ) : wsProjectsStatus === "error" ? (
+                    <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                      Couldn&apos;t load your campaigns.
+                      <button
+                        type="button"
+                        className={INLINE_LINK_BUTTON_CLASS}
+                        onClick={() => void loadOwnedReactionProjects()}
+                      >
+                        Retry
+                      </button>
+                    </span>
+                  ) : ownedReactionProjects.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      No campaigns found — this campaign is still used as the default source.
+                    </span>
+                  ) : (
+                    ownedReactionProjects.map((p) => {
+                      const pid = readNum(p.id)
+                      if (pid == null) return null
+                      const isSelf = pid === reactionProjectId
+                      const selected = wsSourceIds.includes(pid)
+                      return (
+                        <Button
+                          key={pid}
+                          type="button"
+                          size="sm"
+                          aria-pressed={selected}
+                          variant={selected ? "default" : "outline"}
+                          className="h-8 text-xs"
+                          onClick={() =>
+                            setWsSourceIds((prev) =>
+                              prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid],
+                            )
+                          }
+                        >
+                          {String(p.name ?? `project ${pid}`)}
+                          {isSelf ? " (this campaign)" : ""}
+                        </Button>
+                      )
+                    })
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Defaults to this campaign (intra-campaign warm-start). Add related campaigns you own
+                  for transfer learning; a campaign you don&apos;t own is rejected (404).
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="ws-target" className="text-xs">objective_target (optional)</Label>
+                  <Input
+                    id="ws-target"
+                    className="h-8 text-xs"
+                    inputMode="decimal"
+                    value={wsObjectiveTarget}
+                    onChange={(e) => setWsObjectiveTarget(e.target.value)}
+                    placeholder="e.g. 95"
+                  />
+                  {wsObjectiveTarget.trim() !== "" && !Number.isFinite(Number(wsObjectiveTarget)) ? (
+                    <p className="text-[11px] text-destructive">Enter a number (or leave it blank).</p>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 pt-5">
+                  <Switch id="ws-verified" checked={wsRequireVerified} onCheckedChange={setWsRequireVerified} />
+                  <Label htmlFor="ws-verified" className="text-xs">require verified data only</Label>
+                </div>
+              </div>
+              {!wsRequireVerified ? (
+                <div
+                  role="status"
+                  className="rounded-md border bg-muted/30 px-3 py-2 text-xs"
+                  style={{ borderLeft: "3px solid var(--mt-amber)" }}
+                >
+                  <p className="font-medium text-foreground">Preview mode — fitting on unconfirmed data.</p>
+                  <p className="text-muted-foreground">
+                    A prior for real use should admit only SpectraCheck-verified / reviewer-confirmed
+                    outcomes.
+                  </p>
+                </div>
+              ) : null}
+              <Button type="submit" size="sm" disabled={busy != null || wsSourceIds.length === 0}>
+                {busy === "ws-build" ? "Building…" : "Build warm-start prior"}
+              </Button>
+            </form>
+            {(() => {
+              const p = reactionWarmStartPriorView(warmStartPrior)
+              if (p == null) {
+                return wsPriorLoadFailed ? (
+                  <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                    Couldn&apos;t load the warm-start prior — this is a load failure, not proof none
+                    exists.
+                    <button
+                      type="button"
+                      className={INLINE_LINK_BUTTON_CLASS}
+                      onClick={() => void loadWarmStartPrior()}
+                    >
+                      Retry
+                    </button>
+                  </p>
+                ) : (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    No warm-start prior yet — build one from your verified campaigns above.
+                  </p>
+                )
+              }
+              return (
+                <div className="mt-4 space-y-3 rounded-md border p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium text-foreground">Fitted prior · lineage</p>
+                    <Badge variant="secondary" className="text-xs">advisory</Badge>
+                    {!p.verifiedOnly ? (
+                      <Badge variant="destructive" className="text-xs">
+                        preview — unverified data admitted
+                      </Badge>
+                    ) : null}
+                    {p.snapshotHash ? (
+                      <Badge variant="outline" className="font-mono text-[11px]">
+                        snapshot {p.snapshotHash.slice(0, 12)}…
+                      </Badge>
+                    ) : null}
+                  </div>
+                  {!p.verifiedOnly ? (
+                    <p
+                      className="rounded-md border bg-muted/30 px-3 py-2 text-xs font-medium text-foreground"
+                      style={{ borderLeft: "3px solid var(--mt-amber)" }}
+                    >
+                      This prior was fit in preview mode with unconfirmed data admitted — rebuild with
+                      “require verified data only” before using it to guide real experiments.
+                    </p>
+                  ) : null}
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                    {[
+                      { label: "trained_n", value: p.trainedN },
+                      { label: "excluded · gold", value: p.excludedGoldCount },
+                      { label: "excluded · unverified", value: p.excludedUnverifiedCount },
+                      { label: "augmentation", value: p.augmentationCount },
+                      { label: "objective_target", value: p.objectiveTarget },
+                    ].map((m) => (
+                      <div key={m.label} className="rounded-md border px-2 py-1.5">
+                        <p className="font-mono text-sm tabular-nums">{m.value != null ? m.value : "—"}</p>
+                        <p className="text-[10px] text-muted-foreground">{m.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {p.sourceProjectIds.length > 0 ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      source campaigns:{" "}
+                      <span className="font-mono text-foreground">{p.sourceProjectIds.join(", ")}</span>
+                    </p>
+                  ) : null}
+                  {/* The verbatim disclaimer asserts a verified-only fit — true only for a
+                      non-preview prior; for a preview fit the amber note above states the truth. */}
+                  {p.disclaimer && p.verifiedOnly ? (
+                    <p className="text-[11px] italic text-muted-foreground">{p.disclaimer}</p>
+                  ) : null}
+                </div>
+              )
+            })()}
+          </ModuleCard>
+
           <ReactionRegulatoryConstraintsPanel
             reactionProjectId={reactionProjectId}
             onPayloadChange={setRegulatoryPayloadForOptimization}
@@ -7728,7 +8180,7 @@ export function ReactionProjectDetail() {
             description="Proposed next-experiment recommendations from the optimization engine — ranked by predicted improvement. Approve or reject each with a reviewer name and comment."
           >
             <div className="space-y-6">
-              {/* R9 — advisory "likely acceptance" re-rank; the optimiser's own rank stays visible. */}
+              {/* R9/R10 — advisory re-ranks (mutually exclusive); the optimiser's own rank stays visible. */}
               <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/20 px-3 py-2">
                 <Button
                   type="button"
@@ -7737,7 +8189,10 @@ export function ReactionProjectDetail() {
                   disabled={busy != null}
                   onClick={() => {
                     if (showLikelyAccept) setShowLikelyAccept(false)
-                    else void loadPreferenceRanking()
+                    else {
+                      setShowWarmStartRank(false)
+                      void loadPreferenceRanking()
+                    }
                   }}
                 >
                   {busy === "pref-rank"
@@ -7746,15 +8201,40 @@ export function ReactionProjectDetail() {
                       ? "Likely-acceptance re-rank: on"
                       : "Re-rank by likely acceptance"}
                 </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showWarmStartRank ? "default" : "outline"}
+                  disabled={busy != null}
+                  onClick={() => {
+                    if (showWarmStartRank) setShowWarmStartRank(false)
+                    else {
+                      setShowLikelyAccept(false)
+                      void loadWarmStartRanking()
+                    }
+                  }}
+                >
+                  {busy === "ws-rank"
+                    ? "Ranking…"
+                    : showWarmStartRank
+                      ? "Warm-start re-rank: on"
+                      : "Re-rank by warm-start prior"}
+                </Button>
                 <span className="text-xs text-muted-foreground">
-                  Advisory — re-orders by predicted chemist acceptance learned from past feedback. The
+                  Advisory —{" "}
+                  {showWarmStartRank
+                    ? reactionWarmStartPriorView(warmStartPrior)?.verifiedOnly === false
+                      ? "warm-start biases toward conditions from related campaigns (PREVIEW prior — fit including unconfirmed data)"
+                      : "warm-start biases toward conditions that worked on related, verified campaigns"
+                    : "likely-acceptance re-orders by predicted chemist acceptance from past feedback"}
+                  . The
                   optimiser&apos;s own rank stays visible (badge) and is never overridden.
                 </span>
-                {showLikelyAccept ? (
+                {showLikelyAccept || showWarmStartRank ? (
                   <span className="w-full text-[11px] text-muted-foreground">
-                    {likelyAcceptMatchCount > 0
-                      ? `Ranked ${likelyAcceptMatchCount} of ${sortedRecs.length} proposal${sortedRecs.length === 1 ? "" : "s"} against the latest preference model; unmatched proposals keep the optimiser's order.`
-                      : "No current proposals matched the latest ranking — showing the optimiser's original order."}
+                    {rerankMatchCount > 0
+                      ? `Ranked ${rerankMatchCount} of ${sortedRecs.length} proposal${sortedRecs.length === 1 ? "" : "s"} against the ${showWarmStartRank ? "warm-start prior" : "preference model"}; unmatched proposals keep the optimiser's order.`
+                      : `No current proposals matched the ${showWarmStartRank ? "warm-start ranking" : "preference ranking"} — showing the optimiser's original order${showWarmStartRank ? " (run a BO batch, or build a prior first)" : ""}.`}
                   </span>
                 ) : null}
               </div>
@@ -7763,7 +8243,9 @@ export function ReactionProjectDetail() {
                 if (id == null) return null
                 const st = String(r.status ?? "")
                 const canReview = st === "proposed"
-                const likely = preferenceRankByConditions.get(canonicalConditionsKey(r.conditions_json))
+                const condKey = canonicalConditionsKey(r.conditions_json)
+                const likely = preferenceRankByConditions.get(condKey)
+                const warm = warmStartRankByConditions.get(condKey)
                 return (
                   <Card key={id} className="border-muted">
                     <CardHeader className="pb-2">
@@ -7787,7 +8269,15 @@ export function ReactionProjectDetail() {
                           >
                             BO #{likely.originalRank ?? "—"} · likely-accept {likely.acceptanceScore.toFixed(2)}
                           </Badge>
-                        ) : showLikelyAccept ? (
+                        ) : showWarmStartRank && warm && warm.priorMean != null ? (
+                          <Badge
+                            variant="outline"
+                            className="font-mono text-xs"
+                            style={{ borderColor: "var(--mt-violet)", color: "var(--mt-violet-ink)" }}
+                          >
+                            BO #{warm.originalRank ?? "—"} · prior {warm.priorMean.toFixed(2)}
+                          </Badge>
+                        ) : showLikelyAccept || showWarmStartRank ? (
                           <Badge variant="outline" className="text-[10px] text-muted-foreground">
                             unranked
                           </Badge>
