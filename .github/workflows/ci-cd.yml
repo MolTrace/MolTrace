@@ -8,10 +8,10 @@
 #   - Vercel              — FE (moltrace.co, www.moltrace.co); deployed by the
 #                           `deploy` job's hook below.
 #   - GCP Cloud Run (BE)  — backend API (service moltrace-backend, project
-#                           moltrace-prod). Deployed via gcloud for now (see
-#                           moltrace_backend/deploy/README.md); wiring it into
-#                           this workflow via Workload Identity Federation +
-#                           deploy-cloudrun is the planned follow-up.
+#                           moltrace-prod). Deployed by the `deploy-backend`
+#                           job: keyless Workload Identity Federation (no
+#                           stored SA key) as moltrace-deployer@, then Cloud
+#                           Build → migrate job → new Cloud Run revision.
 # Cloud SQL (moltrace-db) is NOT a deploy target — on a NEW database the app
 # bootstraps its schema at startup (init_db → create_all) and Alembic is then
 # stamped; on an existing database migrations run as the one-off Cloud Run job
@@ -357,20 +357,56 @@ jobs:
             echo "::endgroup::"
           done
 
+  deploy-backend:
+    name: Deploy · Cloud Run (BE)
+    needs: [frontend-tests, backend-tests, deployment-gate, verify-provenance]
+    # Fully gated backend deploy (2026-07 Render → GCP migration): keyless auth
+    # via Workload Identity Federation — the GitHub OIDC token is exchanged for
+    # moltrace-deployer@ credentials, no stored service-account key anywhere
+    # (same principle as the Sigstore/SLSA supply chain above). Sequence:
+    # Cloud Build builds+pushes the image, the moltrace-migrate job applies
+    # Alembic deltas (the DB is stamped, so `upgrade head` is correct for every
+    # release after the bootstrap), then the service gets the new revision.
+    # `gcloud run deploy --image` preserves the service's env/secrets/VPC
+    # config — only the image changes here; config changes stay in the
+    # deploy runbook (moltrace_backend/deploy/README.md).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token -> WIF exchange (keyless)
+    env:
+      IMAGE: us-central1-docker.pkg.dev/moltrace-prod/moltrace/backend:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Authenticate to GCP (WIF, keyless)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/304031104668/locations/global/workloadIdentityPools/github/providers/github-oidc
+          service_account: moltrace-deployer@moltrace-prod.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build + push image (Cloud Build)
+        working-directory: moltrace_backend
+        run: |
+          gcloud builds submit --config cloudbuild.yaml \
+            --substitutions=_TAG="${{ github.sha }}" --project moltrace-prod
+      - name: Apply DB migrations (Cloud Run job)
+        run: |
+          gcloud run jobs update moltrace-migrate --image "$IMAGE" \
+            --command alembic --args upgrade,head \
+            --region us-central1 --project moltrace-prod
+          gcloud run jobs execute moltrace-migrate \
+            --region us-central1 --project moltrace-prod --wait
+      - name: Deploy new revision
+        run: |
+          gcloud run deploy moltrace-backend --image "$IMAGE" \
+            --region us-central1 --project moltrace-prod
+
   deploy:
     name: Deploy · Vercel (FE)
     needs: [frontend-tests, backend-tests, deployment-gate, verify-provenance]
     # Only deploy when both gates passed on a direct push to main (not PRs,
     # not manual reruns of feature branches).
-    #
-    # 2026-07 migration: the backend moved from Render to GCP Cloud Run
-    # (project moltrace-prod, service moltrace-backend). The Render deploy
-    # hooks are retired — the Render service is suspended and no longer a
-    # production target. Backend deploys currently run via gcloud
-    # (`gcloud builds submit` + `gcloud run deploy`, see
-    # moltrace_backend/deploy/README.md); automating that here via Workload
-    # Identity Federation + deploy-cloudrun is the planned follow-up so the
-    # backend regains a fully gated CI deploy path.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

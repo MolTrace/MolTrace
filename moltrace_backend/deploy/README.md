@@ -167,5 +167,18 @@ Verify: `curl https://<service-url>/health` → `{"status":"ok","checks":{"app":
   `local_raw_vault`). Same for the DVC remote in `versioning.py`.
 - **RQ worker + Memorystore.** Deferred (~$35/mo). The worker doesn't serve HTTP, so on
   Cloud Run it needs a worker pool, a health-server wrapper, or a small VM.
-- **Domain + CI/CD.** Map `api.moltrace.co`; deploy from GitHub Actions via Workload
-  Identity Federation (keyless), keeping the existing fail-closed release gate.
+- **Custom domain.** Map `api.moltrace.co` (cosmetic — the frontend's `/api/backend`
+  proxy hides the run.app URL from users).
+
+## CI/CD (done — keyless)
+
+The `deploy-backend` job in `.github/workflows/ci-cd.yml` deploys every gated push to
+`main`: GitHub's OIDC token is exchanged via **Workload Identity Federation** (pool
+`github`, provider `github-oidc`, locked to `assertion.repository=='MolTrace/MolTrace'`)
+for `moltrace-deployer@` — no stored service-account key anywhere. Sequence per release:
+Cloud Build builds/pushes `backend:<sha>` → the `moltrace-migrate` job runs
+`alembic upgrade head` (correct post-bootstrap; the DB is stamped) → `gcloud run deploy`
+rolls the new revision (image only; env/secrets/VPC config are preserved). The deployer
+SA holds `run.developer`, `cloudbuild.builds.editor`, `logging.viewer`,
+`storage.objectAdmin`, `serviceusage.serviceUsageConsumer`, plus `iam.serviceAccountUser`
+on the runtime SA.
