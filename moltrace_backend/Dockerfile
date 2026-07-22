@@ -27,11 +27,11 @@ WORKDIR /app
 
 # 1) Resolve dependencies first so this layer caches until the lockfile changes.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --extra fid --no-install-project
+RUN uv sync --frozen --no-dev --extra fid --extra gcs --no-install-project
 
 # 2) Add the source and install the project itself.
 COPY . .
-RUN uv sync --frozen --no-dev --extra fid
+RUN uv sync --frozen --no-dev --extra fid --extra gcs
 
 # ---------- runtime stage ----------
 FROM python:3.13-slim

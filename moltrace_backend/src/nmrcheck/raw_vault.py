@@ -277,6 +277,34 @@ class S3RawStorageBackend(RawStorageBackend):
 
     # TODO: implement with S3 object lock/versioning, server-side encryption,
     # conditional writes, and checksum validation before enabling in production.
+    # (The GCS equivalent IS implemented -- see raw_vault_gcs.GCSRawStorageBackend.)
+
+
+def default_raw_storage_backend(
+    vault_dir: str | Path = DEFAULT_RAW_DATA_VAULT_DIR,
+) -> RawStorageBackend:
+    """Select the vault backend from settings (``RAW_VAULT_BACKEND`` / ``RAW_VAULT_BUCKET``).
+
+    Defaults to the local filesystem backend, so dev, tests, and existing deployments are
+    unchanged. Serverless hosts (Cloud Run) set ``RAW_VAULT_BACKEND=gcs`` because their
+    filesystem is ephemeral. Every public entry point still accepts an explicit ``backend``
+    argument, which takes precedence over this.
+    """
+    # Imported lazily: settings imports this module for DEFAULT_RAW_DATA_VAULT_DIR.
+    from .settings import get_settings
+
+    settings = get_settings()
+    choice = (getattr(settings, "raw_vault_backend", None) or "local").strip().lower()
+    if choice in {"gcs", "gs", "google"}:
+        bucket = getattr(settings, "raw_vault_bucket", None)
+        if not bucket:
+            raise RawVaultError(
+                "RAW_VAULT_BACKEND=gcs requires RAW_VAULT_BUCKET to name the vault bucket."
+            )
+        from .raw_vault_gcs import GCSRawStorageBackend
+
+        return GCSRawStorageBackend(bucket)
+    return LocalRawStorageBackend(vault_dir)
 
 
 @dataclass(frozen=True)
@@ -820,7 +848,7 @@ def ingest_raw_archive(
         allowed_extensions=allowed_extensions,
     )
     warnings = list(inspection.get("warnings") or [])
-    storage = (backend or LocalRawStorageBackend(vault_dir)).save(
+    storage = (backend or default_raw_storage_backend(vault_dir)).save(
         content=content,
         sha256=digest,
         filename=safe_name,
@@ -956,7 +984,7 @@ def verify_raw_archive_integrity(
             expected_size = int(size_value) if size_value is not None else None
         except (TypeError, ValueError):
             expected_size = None
-    return (backend or LocalRawStorageBackend()).verify(
+    return (backend or default_raw_storage_backend()).verify(
         storage_path=resolved_storage_path,
         expected_sha256=str(expected) if expected else None,
         expected_byte_size=expected_size,
@@ -982,7 +1010,7 @@ def load_raw_archive_bytes(
 
     if not provenance.get("storage_path") or not provenance.get("sha256"):
         raise RawVaultError("Raw archive provenance does not include a vault storage path and SHA-256.")
-    return (backend or LocalRawStorageBackend()).read(
+    return (backend or default_raw_storage_backend()).read(
         storage_path=provenance.get("storage_path"),
         expected_sha256=str(provenance.get("sha256")),
         expected_byte_size=int(provenance["byte_size"]) if provenance.get("byte_size") is not None else None,
