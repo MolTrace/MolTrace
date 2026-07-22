@@ -128,6 +128,12 @@ class Settings:
     raw_fid_storage_dir: str = ".nmrcheck/raw_fid_store"
     raw_vault_dir: str = "raw_data_vault"
     raw_data_vault_dir: str = "raw_data_vault"
+    # Which storage backend holds the immutable raw-archive vault: "local" (filesystem,
+    # the default and what dev/tests use) or "gcs" (Cloud Storage). Serverless hosts such
+    # as Cloud Run have an ephemeral filesystem, so they MUST set RAW_VAULT_BACKEND=gcs
+    # plus RAW_VAULT_BUCKET or uploaded archives are lost on instance recycle.
+    raw_vault_backend: str = "local"
+    raw_vault_bucket: str | None = None
     raw_archive_max_bytes: int = 2 * 1024 * 1024 * 1024
     raw_archive_max_files: int = 5000
     raw_archive_allowed_extensions: tuple[str, ...] = (".zip", ".tar.gz", ".tgz")
@@ -285,6 +291,8 @@ def get_settings() -> Settings:
         raw_fid_storage_dir=os.getenv("RAW_FID_STORAGE_DIR", ".nmrcheck/raw_fid_store"),
         raw_vault_dir=raw_vault_dir,
         raw_data_vault_dir=raw_vault_dir,
+        raw_vault_backend=(os.getenv("RAW_VAULT_BACKEND") or "local").strip().lower(),
+        raw_vault_bucket=(os.getenv("RAW_VAULT_BUCKET") or None),
         raw_archive_max_bytes=_parse_int(
             os.getenv("RAW_ARCHIVE_MAX_BYTES"), 2 * 1024 * 1024 * 1024
         ),
