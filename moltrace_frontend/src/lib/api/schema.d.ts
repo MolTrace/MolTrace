@@ -891,6 +891,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reaction-projects/{reaction_project_id}/warm-start/prior": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Warm Start Prior Route */
+        get: operations["get_reaction_warm_start_prior_route_reaction_projects__reaction_project_id__warm_start_prior_get"];
+        put?: never;
+        /** Build Reaction Warm Start Prior Route */
+        post: operations["build_reaction_warm_start_prior_route_reaction_projects__reaction_project_id__warm_start_prior_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/warm-start/ranking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reaction Warm Start Ranking Route */
+        get: operations["reaction_warm_start_ranking_route_reaction_projects__reaction_project_id__warm_start_ranking_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reaction-projects/{reaction_project_id}/variables": {
         parameters: {
             query?: never;
@@ -32650,6 +32685,105 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ReactionWarmStartBuildRequest */
+        ReactionWarmStartBuildRequest: {
+            /** Source Project Ids */
+            source_project_ids?: number[];
+            /** Gold Set Observation Ids */
+            gold_set_observation_ids?: string[];
+            /** Objective Target */
+            objective_target?: number | null;
+            /**
+             * Require Verified
+             * @default true
+             */
+            require_verified: boolean;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ReactionWarmStartPriorRecord */
+        ReactionWarmStartPriorRecord: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Snapshot Hash */
+            snapshot_hash: string;
+            /** Objective Target */
+            objective_target: number | null;
+            /** Global Mean */
+            global_mean: number;
+            /** Trained N */
+            trained_n: number;
+            /** Excluded Gold Count */
+            excluded_gold_count: number;
+            /** Excluded Unverified Count */
+            excluded_unverified_count: number;
+            /** Source Project Ids */
+            source_project_ids: number[];
+            /** Lineage */
+            lineage: {
+                [key: string]: unknown;
+            };
+            /** Feature Offsets */
+            feature_offsets: {
+                [key: string]: unknown;
+            };
+            /** Augmentation Count */
+            augmentation_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Metadata Json */
+            metadata_json: {
+                [key: string]: unknown;
+            };
+            /**
+             * Disclaimer
+             * @default Warm-start priors are advisory: they bias a new campaign toward conditions that worked on related, verified campaigns to reach the target in fewer experiments. The prior is fit only from owned, SpectraCheck-verified data, never the frozen evaluation gold set, and it never overrides the optimiser or a human decision.
+             */
+            disclaimer: string;
+        };
+        /** ReactionWarmStartRankedItem */
+        ReactionWarmStartRankedItem: {
+            /** Proposal Ref */
+            proposal_ref: string;
+            /** Prior Mean */
+            prior_mean: number;
+            /** Original Rank */
+            original_rank: number | null;
+            /** Conditions Json */
+            conditions_json: {
+                [key: string]: unknown;
+            };
+        };
+        /** ReactionWarmStartRanking */
+        ReactionWarmStartRanking: {
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Prior Id */
+            prior_id: number | null;
+            /** Bo Run Id */
+            bo_run_id: number | null;
+            /** Global Mean */
+            global_mean: number | null;
+            /** Ranked */
+            ranked: components["schemas"]["ReactionWarmStartRankedItem"][];
+            /**
+             * Advisory
+             * @default true
+             */
+            advisory: boolean;
+            /**
+             * Disclaimer
+             * @default Warm-start priors are advisory: they bias a new campaign toward conditions that worked on related, verified campaigns to reach the target in fewer experiments. The prior is fit only from owned, SpectraCheck-verified data, never the frozen evaluation gold set, and it never overrides the optimiser or a human decision.
+             */
+            disclaimer: string;
+        };
         /** RecordRetentionPolicy */
         RecordRetentionPolicy: {
             /** Id */
@@ -43902,6 +44036,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReactionABPromotionVerdict"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_warm_start_prior_route_reaction_projects__reaction_project_id__warm_start_prior_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionWarmStartPriorRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    build_reaction_warm_start_prior_route_reaction_projects__reaction_project_id__warm_start_prior_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionWarmStartBuildRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionWarmStartPriorRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reaction_warm_start_ranking_route_reaction_projects__reaction_project_id__warm_start_ranking_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionWarmStartRanking"];
                 };
             };
             /** @description Validation Error */
