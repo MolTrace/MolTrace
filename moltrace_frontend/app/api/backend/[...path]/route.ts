@@ -45,7 +45,9 @@ function backendBaseUrl() {
   const raw =
     process.env.API_BASE_URL ||
     (process.env.NODE_ENV === "production"
-      ? "https://moltrace-backend.onrender.com"
+      ? // Production backend on GCP Cloud Run (moltrace-prod project). API_BASE_URL,
+        // set in the Vercel dashboard, always wins — this is only the fallback.
+        "https://moltrace-backend-304031104668.us-central1.run.app"
       : "http://127.0.0.1:8000")
   return raw.replace(/^http:\/\/localhost(:|\/|$)/i, "http://127.0.0.1$1")
 }

@@ -38,8 +38,9 @@ const nextConfig = {
     const isDev = process.env.NODE_ENV !== "production"
 
     // Direct (non-proxied) backend origin some flows may hit; same-origin
-    // `/api/backend` calls are already covered by 'self'.
-    const backendOrigin = "https://moltrace-backend.onrender.com"
+    // `/api/backend` calls are already covered by 'self'. GCP Cloud Run since the
+    // 2026-07 migration off Render.
+    const backendOrigin = "https://moltrace-backend-304031104668.us-central1.run.app"
 
     // Pragmatic Next.js-compatible CSP. Next injects inline bootstrap/hydration
     // <script>/<style>, so 'unsafe-inline' is required without a nonce pipeline;
