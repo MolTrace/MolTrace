@@ -1,0 +1,75 @@
+name: reaction-benchmark-gate
+
+# Repho R11 — the promotion gate for reaction optimiser/predictor versions.
+#
+# POLICY (see nmrcheck/reaction_eval.py): a candidate ships only if its metric vector DOMINATES the
+# incumbent on the frozen, checksummed benchmark AND safety-flag recall does NOT regress. The gate
+# is fail-closed: a drifted gold set, a result that was not evaluated against it, or a malformed
+# results file all refuse to judge (exit 2) rather than judge on a broken benchmark.
+#
+#   exit 0 → promotable (still requires HUMAN SIGN-OFF; this is not auto-deploy)
+#   exit 1 → blocked (safety-recall regression and/or no dominance)
+#   exit 2 → drift / integrity failure
+#
+# This job is INERT until measured benchmark results are committed: with no candidate+incumbent
+# under moltrace_backend/benchmarks/reaction/ there is nothing to promote, so it reports "no
+# benchmark results" and passes. It only gates when someone actually proposes a new version.
+#
+# To make this BLOCK merge: add "Repho · benchmark promotion gate" as a REQUIRED status check under
+# Settings → Branches → branch protection for `main` (same one-time step as the other gates).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: reaction-benchmark-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark-gate:
+    name: Repho · benchmark promotion gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: moltrace_backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13.5"
+
+      - name: Detect committed benchmark results
+        id: detect
+        run: |
+          if [ -f benchmarks/reaction/candidate.json ] && [ -f benchmarks/reaction/incumbent.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No candidate/incumbent under benchmarks/reaction/ — nothing to promote."
+          fi
+
+      # The gate itself. Non-zero exit fails the job (and therefore the required check).
+      - name: Gate candidate against incumbent on the frozen benchmark
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          uv run python -m nmrcheck.reaction_eval_cli \
+            --gold tests/fixtures/reaction_eval/gold_set_v1.json \
+            --candidate benchmarks/reaction/candidate.json \
+            --incumbent benchmarks/reaction/incumbent.json
+
+      # The gold set is the benchmark's integrity anchor: if it drifts, the harness refuses to run.
+      # Keeping the engine's own tests on this workflow means a change that breaks the gate's
+      # fail-closed behaviour cannot land quietly alongside a benchmark update.
+      - name: Verify the harness + frozen gold set
+        run: uv run pytest tests/test_reaction_eval.py tests/test_reaction_eval_cli.py -q
