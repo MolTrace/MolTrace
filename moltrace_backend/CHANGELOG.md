@@ -14,6 +14,49 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.62.0 — Security Prompt 23: Privacy & data residency (2026-06-26)
+
+**Headline:** Closes the Security & Data-Integrity Standard (P1–P23). Adds a DSAR /
+right-to-erasure **planner** with a machine-readable personal-data map, and states the
+residency posture honestly. The headline design point is the **erasure-vs-immutable-ledger**
+reconciliation — and the honest admission of where it currently lands.
+
+- **DSAR + erasure planner** (`src/nmrcheck/privacy.py`, NEW, library-only, no api.py):
+  `access_report` (Art. 15 discovery — enumerates every store *including those that cannot be
+  exported or erased*, plus the facts only the processor knows: sub-processor recipients,
+  retention windows, source, and the automated-decision position), `erasure_plan` (Art. 17
+  per-store disposition), and `response_deadline` (Art. 12(3) — one month, with the
+  two-month extension only if notified **with reasons inside month one**).
+- **`DATA_MAP`** — the machine-readable personal-data classification map (14 store groups,
+  unit-tested) with four honest dispositions: **erase** · **pseudonymise + restrict** ·
+  **retain (legal obligation, Art. 17(3))** · **immutable ledger**.
+- **The honesty invariant, enforced in tests:** pseudonymisation is **never** reported as
+  erasure. Under Recital 26 a tokenised/hashed record is still personal data, so it is
+  reported as *retained and restricted* — as is the existing ALCOA+ soft-delete. A legal
+  hold suspends destruction everywhere (and never downgrades the immutable ledger).
+- **The immutable-ledger limit, stated plainly** (`docs/security/privacy_data_map.md`): the
+  audit chain's canonical payload covers the identity fields, so an erasure-by-rewrite is
+  indistinguishable from tampering and would violate Part 11 §11.10(e) retention —
+  **identity cannot be erased from the ledger today**. The enabling change
+  (crypto-shredding: hash ciphertext, destroy the per-subject key) is documented as a seam
+  with its four preconditions, not claimed as a capability. Notably `security_events` has
+  **no** hash chain over it, so those identity columns *are* safely pseudonymisable.
+- **Residency** (`docs/security/data_residency.md`): MolTrace is **single-region** with **no
+  tenant region pinning**; the four things pinning would require are enumerated with an
+  honest per-item status, so a customer gets a straight answer instead of an implied
+  capability.
+
+Processor framing throughout (Art. 28(3)(e)): MolTrace **assists**, the controller verifies
+identity, decides scope, applies Art. 15(4) balancing, and responds. Execution of deletions
+is deliberately not automated — it happens on documented controller instruction. 14 new tests.
+
+### Added
+- **`src/nmrcheck/privacy.py`** + **`tests/test_privacy.py`** — the planner, the data map,
+  and the honesty invariants.
+- **`docs/security/privacy_data_map.md`** + **`docs/security/data_residency.md`**.
+
+---
+
 ## v0.61.0 — Security Prompt 22: SOC 2 + ISO 27001 + Trust Center (2026-06-29)
 
 **Headline:** Opens the governance/trust pillar with a **machine-checkable control→evidence register**

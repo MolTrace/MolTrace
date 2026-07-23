@@ -54,11 +54,14 @@ provenance.
 ## Sub-processor register
 
 MolTrace uses the following sub-processors. (Customers are notified of material changes
-per their DPA; this list is the in-repo source for the published register.)
+per their DPA; this list is the in-repo source for the published register.) Hosting is
+**single-region in `us-central1`, United States** — see
+[`data_residency.md`](data_residency.md) for the residency and cross-border-transfer
+position.
 
 | Sub-processor | Purpose | Data handled | Region/notes |
 |---|---|---|---|
-| **Render** | Backend API hosting + managed Postgres + second-region FE mirror | All tenant data at rest, the audit ledger, security events, encrypted IdP/MFA secrets, the raw-data vault | DB reached over an internal connection string; provider holds its own SOC 2/ISO attestations |
+| **Google Cloud** (project `moltrace-prod`, `us-central1`) | Backend API (Cloud Run) + Cloud SQL for PostgreSQL 16 + Cloud Storage raw-data vault + Secret Manager + Cloud KMS | All tenant data at rest, the audit ledger, security events, encrypted IdP/MFA secrets, the raw-data vault | **United States** region; Cloud SQL on a private IP via Direct VPC egress; provider holds its own SOC 2 / ISO attestations |
 | **Vercel** | Primary frontend hosting (moltrace.co) | Browser session traffic / proxied API requests; no first-party database | — |
 | **Customer-configured IdP** (e.g. Okta, Microsoft Entra) | Enterprise SSO (OIDC) + SCIM provisioning | Authentication assertions + provisioning lifecycle | Customer-owned federation, not MolTrace-operated |
 | **GitHub** | Source hosting + CI/CD (Actions) | Source code + build artifacts; CI secrets (deploy hooks); keyless Sigstore provenance — **no production tenant data** | — |
