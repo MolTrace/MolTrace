@@ -8,7 +8,10 @@ evidence sources](incident_response_plan.md#containment). Follow the
 personal data may be involved.
 
 > All `/admin/*` and `/security/*` endpoints below require an admin or the system key.
-> "Operational" steps (paging, console actions, sending notices) happen outside the repo.
+> "Operational" steps (paging, console actions, sending notices) happen outside the repo —
+> for the hosted backend the console is the **Google Cloud console** (project `moltrace-prod`,
+> `us-central1`): app secrets live in **Secret Manager**, the field-encryption KEK in
+> **Cloud KMS**, and the service/config in **Cloud Run**.
 
 ---
 
@@ -21,8 +24,11 @@ question.
 1. **Triage.** `GET /admin/audit/verify` → note `detail`, `first_break_seq`, `anchors_ok`,
    `key_id`. A `key_id` showing the dev-fallback key in prod is itself the finding.
 2. **Contain.** Treat the DB + the `AUDIT_SIGNING_KEY` as suspect. If key compromise is
-   plausible, **rotate `AUDIT_SIGNING_KEY`** and restrict DB write access. Do **not** delete
-   or "fix" any row — the break IS the evidence.
+   plausible, **rotate `AUDIT_SIGNING_KEY`** (new version in **Secret Manager**, then roll a
+   new Cloud Run revision so it is loaded) and restrict DB write access — Cloud SQL is on a
+   **private IP** reached over Direct VPC egress, so the write path is the Cloud Run service
+   account, not the public internet. Do **not** delete or "fix" any row — the break IS the
+   evidence.
 3. **Collect evidence.** Snapshot via `POST /admin/debug-bundles`; `GET /admin/audit/search`
    around `first_break_seq`; export the `GET /security/events` window. Preserve (soft-delete
    only).
@@ -56,7 +62,8 @@ short window. Escalate to SEV1 if the account is an admin or touched regulated d
    email auto-grants on login — the threat-model crown jewel).
 2. **Contain.** **`POST /admin/users/{id}/demote`**; revoke the user's tokens
    (`revoke_all_user_tokens`); if the allowlist was poisoned, correct the
-   `IS_ADMIN_EMAIL`/`ADMIN_EMAILS` config (operational).
+   `IS_ADMIN_EMAIL`/`ADMIN_EMAILS` config — a new secret version in **Secret Manager** plus a
+   new Cloud Run revision (operational).
 3. **Eradicate.** Audit everything the elevated account did; reverse unauthorized changes.
 4. **Notify.** Per data touched.
 
@@ -81,11 +88,17 @@ default it is a *probing* signal, not a confirmed breach.
 **Trigger:** a leaked secret (gitleaks, a VDP report, anomalous use of the system key or a
 SCIM bearer).
 
-1. **Contain by rotating the specific secret:** system API key (Render console) · SCIM bearer
-   (`DELETE …/scim-token`) · IdP client secret (`PATCH …/connections/{id}`) · `AUDIT_SIGNING_KEY`
-   · `API_KEY`. Revoke affected sessions.
+1. **Contain by rotating the specific secret:** system API key `API_KEY` and
+   `AUDIT_SIGNING_KEY` (new version in **Secret Manager**, then roll a new Cloud Run revision —
+   the service binds them at `:latest` per revision, so a new version alone does not take
+   effect) · the field-encryption KEK (**Cloud KMS**, then re-wrap with
+   `field_crypto.rewrap`) · SCIM bearer (`DELETE …/scim-token`) · IdP client secret
+   (`PATCH …/connections/{id}`). Revoke affected sessions.
 2. **Eradicate.** Purge the secret from history if committed (gitleaks scans full history);
-   find what the secret could access and audit it.
+   find what the secret could access and audit it. Note the CI deploy path holds **no
+   long-lived cloud key** to rotate — GitHub Actions authenticates to Google Cloud keylessly
+   via OIDC → Workload Identity Federation; if CI itself is suspect, disable the WIF
+   pool/provider binding in the Google Cloud console rather than hunting a stored credential.
 3. **Notify.** Per data the secret could reach.
 
 ## R6 — Denial of service / abuse · SEV2–SEV3
@@ -94,7 +107,12 @@ SCIM bearer).
 
 1. **Contain.** The in-app rate limiter (`RATE_LIMIT_*`) throttles per-principal/route; for
    volumetric/cross-instance attacks invoke the **[edge WAF runbook](waf_edge_runbook.md)**
-   (Cloudflare/Vercel — operational). `MAX_REQUEST_BODY_BYTES` bounds oversized bodies.
+   (**Cloud Armor** in front of Cloud Run is the GCP-native option — available, *not* enabled
+   by default; Cloudflare/Vercel still apply at the frontend edge — all operational).
+   `MAX_REQUEST_BODY_BYTES` bounds oversized bodies. **Caveat:** Cloud Run runs the backend at
+   `--max-instances 2`, so the limiter's in-process bucket store is **per-instance** — under
+   load the effective limit can be up to 2× the configured value until a shared (Redis) store
+   is wired in. Size the edge rule accordingly.
 2. **Eradicate.** Block the source at the edge; tune limits.
 3. **Notify.** DoS alone is usually not a personal-data breach (no confidentiality loss) —
    but document it (Art. 33(5)) and watch for it masking a parallel intrusion.

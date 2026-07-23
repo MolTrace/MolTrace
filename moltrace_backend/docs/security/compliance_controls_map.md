@@ -67,7 +67,7 @@ by management process, not by code:
 
 | Control | Type | Provided by | SOC 2 / ISO |
 |---|---|---|---|
-| Physical & data-center security | inherited | Render + Vercel (their SOC 2 / ISO attestations) | CC6 / A.7 |
+| Physical & data-center security | inherited | Google Cloud + Vercel (their SOC 2 / ISO attestations) | CC6 / A.7 |
 | HR screening, security-awareness training | operational | internal HR process | CC1 / A.6 |
 | Governance, risk register & risk assessment | operational | management process | CC1, CC3 / A.5 |
 | Vendor / sub-processor risk management + DPAs | operational | vendor-risk register + DPAs | CC9 / A.5 |

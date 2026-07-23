@@ -14,6 +14,49 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.62.1 — Security-doc accuracy sweep: Render → GCP (2026-06-26)
+
+**Docs + register only; no code change.** The P16–P23 security documentation had been written
+against the **retired Render** deployment because the design passes trusted the stale
+`render.yaml`. Production runs on **Google Cloud** (project `moltrace-prod`, `us-central1`):
+Cloud Run + Cloud SQL 16 on a private IP via Direct VPC egress + Cloud Storage raw vault +
+Secret Manager + Cloud KMS, deployed keylessly via Workload Identity Federation. Every
+security doc was swept and corrected.
+
+**This was not cosmetic — the migration invalidated three control claims, now registered as
+open findings** (the first entries in the [findings register](docs/security/security_findings_register.md),
+which had been empty):
+
+- **`MT-VULN-2026-001` (Medium)** — the in-app rate limiter is **per-instance**. Cloud Run runs
+  `--max-instances 2`, so the effective limit can be **2× the configured value** and bucket
+  state is lost on scale-to-zero. The old docs asserted single-worker consistency (true on
+  Render, false now). Closing it needs the existing `RateLimitStore` (Redis) seam.
+- **`MT-VULN-2026-002` (Medium)** — **container-image vulnerability scanning is missing**. The
+  docs recorded it as "N/A — no Dockerfile", which was true on Render's buildpacks and became
+  false at the migration: an image is now built via Cloud Build → Artifact Registry → Cloud Run.
+  CI scans dependencies and Dockerfile *misconfiguration*, never the built image.
+- **`MT-VULN-2026-003` (Medium)** — the documented **≤5 min RPO is not met**: Cloud SQL PITR is a
+  per-instance toggle the deploy runbook does not enable and the instance is `zonal`, so real DB
+  RPO is the ≤24 h daily-backup window. The GCS vault has versioning but no retention/bucket-lock.
+
+Corrections also went the *other* way — the migration **improved** two postures the docs
+understated: private networking is now genuinely implemented (Cloud SQL private IP, no public
+IP), and backend deploy authority is keyless WIF rather than stored deploy-hook secrets.
+
+### Changed
+- **`docs/security/`** — `zero_trust_infra.md` (shared-responsibility map, the withdrawn image-scan
+  N/A, private networking, WIF), `backup_dr.md`, `waf_edge_runbook.md` (Cloud Armor + the
+  per-instance limiter), `threat_model.md`, `siem_detections.md` (stdout → Cloud Logging),
+  `incident_response_plan.md` + `incident_runbooks.md` (Secret Manager / Cloud KMS rotation),
+  `pentest_program.md`, `vulnerability_disclosure_policy.md`, `compliance_controls_map.md`,
+  and `security_findings_register.md` (the three findings above).
+- **`compliance/controls.json`** — inherited physical/data-center control now credits Google Cloud.
+- Earlier in this sweep (shipped with v0.62.0): the Trust Center **sub-processor register**,
+  `data_residency.md`, and `MolTrace_Company_Credentials.md` (which had claimed "EU-region data
+  residency" — false; hosting is single-region **US**).
+
+---
+
 ## v0.62.0 — Security Prompt 23: Privacy & data residency (2026-06-26)
 
 **Headline:** Closes the Security & Data-Integrity Standard (P1–P23). Adds a DSAR /

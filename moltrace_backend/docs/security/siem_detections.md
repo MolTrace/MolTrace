@@ -20,9 +20,10 @@ each of which also writes a paired entry into the **tamper-evident audit chain**
 (`operations_store.create_security_event` → a hash-chained `audit_events` row), so
 the security log is itself integrity-protected (Prompt 10). The export path to a SIEM
 is the platform log drain: every shipped alert is written as a single structured JSON
-line to **stdout** (`{"siem_alert": {...}}`), which Render / Vercel forward to their
-log drains and on to any SIEM. A configured webhook additionally pushes high-severity
-alerts (below).
+line to **stdout** (`{"siem_alert": {...}}`), which **Cloud Run captures into Cloud
+Logging** (and Vercel into its own log drain for the frontend); a Cloud Logging sink can
+then export to any SIEM. A configured webhook additionally pushes high-severity alerts
+(below).
 
 ## The four detections
 

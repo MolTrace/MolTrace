@@ -17,7 +17,7 @@ not guarantees, when reviewing.
 ## System context & trust boundaries
 
 ```
- Internet ──▶ platform edge (Render / Vercel reverse proxy) ──▶ single uvicorn FastAPI worker
+ Internet ──▶ Cloud Run edge (Vercel for the FE) ──▶ FastAPI on Cloud Run (0–2 instances)
                                                                   │
    ┌──────────────────────────────────────────────────────────────┼───────────────────────────┐
    │ default-deny router gate (_baseline_access_gate)              │                           │
@@ -144,9 +144,13 @@ pen test / review should probe.
 - **D — resource exhaustion.** In-app token bucket keyed `principal|ip × route`,
   429 + `Retry-After`; tight policies on `/auth/*`; body-size guard (413). Bucket map
   bounded (100k, idle/LRU eviction) so the limiter isn't itself a memory sink.
-  *Residual:* limiter is in-process + fail-open and single-worker-consistent only; a
-  distributed flood across many keys is the edge WAF's job, which **does not exist**
-  on the hosted platform — a documented residual DoS exposure. The body-size guard
+  *Residual:* the limiter is in-process + fail-open, and on Cloud Run it runs at
+  `--max-instances 2`, so the bucket store is **per-instance** — the effective limit can
+  be up to **2× the configured value**, and per-instance state is lost on scale-to-zero.
+  Closing that needs the existing `RateLimitStore` (shared Redis) seam — tracked as
+  `MT-VULN-2026-001` in the [findings register](security_findings_register.md). A
+  distributed flood across many keys is the edge WAF's job; **Cloud Armor is available
+  but not enabled today** — a documented residual DoS exposure. The body-size guard
   **exempts multipart**, so a large upload is bounded by `raw_archive_max_bytes` (a
   2 GB default, validated `>= 1`) — but that cap is enforced **after** the full body
   is buffered, not as a pre-stream edge limit, so a flood of large uploads can still

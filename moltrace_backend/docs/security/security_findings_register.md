@@ -45,17 +45,38 @@ remediation evidence.*
 
 ## Register
 
-> No findings are recorded yet. The program (cadence, intake, pipeline) is
-> established; the first annual third-party pen test and any researcher disclosures
-> will populate the table below. Pre-existing **scanner** findings are tracked in
-> the GitHub **Security → Code scanning** tab and the
-> [`.trivyignore` VEX register](../../../.trivyignore) (torch / mlflow CRITICALs,
-> both `not_affected` — vulnerable code not in the execute path) and are summarized
-> in [secure-SDLC gates](../security_sdlc_gates.md).
+> Pre-existing **scanner** findings are tracked in the GitHub **Security → Code
+> scanning** tab and the [`.trivyignore` VEX register](../../../.trivyignore)
+> (torch / mlflow CRITICALs, both `not_affected` — vulnerable code not in the
+> execute path) and are summarized in
+> [secure-SDLC gates](../security_sdlc_gates.md).
+
+The two rows below were raised by an internal **documentation-accuracy review** that
+compared the security docs against the live GCP deployment (the docs had been written
+against the retired Render setup). Both are platform-migration regressions: controls
+that were adequate on the old single-worker PaaS became weaker or newly-applicable on
+Cloud Run.
 
 | ID | Source | Title | CVSS | Reported | Triaged-by | Remediate-by | Status | Evidence |
 |---|---|---|---|---|---|---|---|---|
-| _none yet_ | | | | | | | | |
+| `MT-VULN-2026-001` | internal review | In-process rate limiter is per-instance under Cloud Run autoscaling — effective limit up to **2× configured** (`--max-instances 2`), and bucket state is lost on scale-to-zero | 5.3 (Medium) | 2026-06-26 | 2026-07-10 | 2026-09-24 | open | — |
+| `MT-VULN-2026-002` | internal review | **No container-image vulnerability scanning.** A Dockerfile is built and deployed to Cloud Run via Artifact Registry, but CI scans only dependencies (`trivy fs`) and Dockerfile *misconfiguration* (`trivy config`) — never the built image | 5.3 (Medium) | 2026-06-26 | 2026-07-10 | 2026-09-24 | open | — |
+| `MT-VULN-2026-003` | internal review | **Stated RPO is not met by the current instance config.** Cloud SQL point-in-time recovery is a per-instance toggle that the deploy runbook does not enable, and `moltrace-db` is `--availability-type=zonal` with in-region backups — so real DB RPO is the ≤24 h daily-backup window, not the ≤5 min documented objective. The GCS raw vault has object versioning but **no retention/bucket-lock** policy | 4.0 (Medium) | 2026-06-26 | 2026-07-10 | 2026-09-24 | open | — |
+
+**MT-VULN-2026-001 — remediation options.** (a) Back the limiter with the existing
+`RateLimitStore` protocol seam (a shared Redis/Memorystore store — note Memorystore is
+currently deliberately deferred for cost); (b) pin `--max-instances 1` (loses burst
+headroom); or (c) halve the configured limits so the aggregate matches intent. The
+limiter remains fail-open and is defence-in-depth, not the only control — but it no
+longer enforces the number it advertises. See
+[`waf_edge_runbook.md`](waf_edge_runbook.md).
+
+**MT-VULN-2026-002 — remediation options.** Add a Trivy **image** scan of the
+Artifact Registry image to the deploy pipeline (mirroring the existing `fs`/`config`
+gates), or enable **GCP Artifact Analysis** on the registry. Note this control was
+previously recorded as "N/A — no container image", which was true on the buildpack-based
+Render deploy and became false at the GCP migration; see
+[`zero_trust_infra.md`](zero_trust_infra.md).
 
 ### Example row (format reference — not a real finding)
 

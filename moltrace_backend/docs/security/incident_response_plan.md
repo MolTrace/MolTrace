@@ -108,9 +108,10 @@ record with a [Part 11 e-signature](#sign-off) for a verifiable, immutable closu
 | Revoke a SCIM bearer | `DELETE /auth/sso/connections/{id}/scim-token` | leaked org provisioning token |
 | Kill an SSO connection | `DELETE /auth/sso/connections/{id}` | compromised IdP federation |
 | Force enforce-SSO / lock local password | `PATCH /auth/sso/connections/{id}` (`enforce_sso`) | compromised local credential |
-| Rotate the system API key | re-generate `API_KEY` in the Render console | suspected break-glass key compromise |
-| Rotate the audit signing key | rotate `AUDIT_SIGNING_KEY`, then re-anchor | suspected audit-chain tamper |
-| Throttle / WAF | rate limiter (`RATE_LIMIT_*`) + the [edge-WAF runbook](waf_edge_runbook.md) | DoS / volumetric abuse |
+| Rotate the system API key | add a new `API_KEY` version in **Secret Manager**, then roll a new Cloud Run revision so it is picked up | suspected break-glass key compromise |
+| Rotate the audit signing key | add a new `AUDIT_SIGNING_KEY` version in **Secret Manager**, roll the revision, then re-anchor | suspected audit-chain tamper |
+| Rotate the field-encryption key | the KEK material is held in **Cloud KMS**; rotate it there, then re-wrap in-app (`field_crypto.needs_rewrap` / `rewrap` — each `mtenc.v2` envelope carries its KEK `key_id`, so only the small DEK is re-wrapped and old values stay readable) | suspected exposure of the envelope-encrypted IdP/MFA secrets |
+| Throttle / WAF | rate limiter (`RATE_LIMIT_*`) + the [edge-WAF runbook](waf_edge_runbook.md) (**Cloud Armor** is the GCP-native edge WAF — available, not enabled by default) | DoS / volumetric abuse |
 
 ## <a id="evidence-collection"></a>Evidence collection (in-repo, forensic-grade)
 
