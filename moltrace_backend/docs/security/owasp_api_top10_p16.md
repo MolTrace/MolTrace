@@ -27,9 +27,13 @@ value. No other endpoint reflects unescaped user input into HTML.
 
 ## Deliberately deferred / edge
 
-- **WAF (OWASP CRS, IP reputation, L7 DDoS, bot rules)** — network-edge control (Render has no
-  built-in WAF); delivered as the Cloudflare/Vercel runbook, not faked in-app.
-- **Cross-instance rate limiting** — the in-process store is per-worker; a Redis-backed
-  `RateLimitStore` is the documented drop-in if the backend scales beyond one worker.
+- **WAF (OWASP CRS, IP reputation, L7 DDoS, bot rules)** — network-edge control, not faked in-app.
+  The backend runs on Google Cloud Run, where **Google Cloud Armor** is the native edge-WAF option;
+  it is **available but not enabled today**. Until it is turned on, this remains an operator
+  follow-up delivered as the edge runbook (`waf_edge_runbook.md`).
+- **Cross-instance rate limiting** — the rate-limit store is in-process, i.e. **per instance**.
+  Cloud Run is deployed with `--max-instances 2`, so up to two instances can serve traffic
+  concurrently and the **effective ceiling can be up to 2× the configured per-route/per-tenant
+  limit**. A Redis-backed `RateLimitStore` is the documented drop-in for a single shared counter.
 - **Formal ASVS audit + DAST** — operator follow-ups (DAST also deferred in `security_sdlc_gates.md`
   pending a preview environment).
