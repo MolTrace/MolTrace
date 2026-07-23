@@ -7,7 +7,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
 ![Frontend: Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?logo=vercel&logoColor=white)
-![Backend: Render](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render&logoColor=white)
+![Backend: Google Cloud Run](https://img.shields.io/badge/Backend-Cloud_Run-4285F4?logo=googlecloud&logoColor=white)
 ![License: BUSL 1.1](https://img.shields.io/badge/License-BUSL_1.1-4B5563)
 
 > **License.** MolTrace is **source-available, not open source.** The code is published under the [Business Source License 1.1](LICENSE) so you can read, audit, evaluate, and test it — but **production use requires a commercial license** (contact [licensing@moltrace.co](mailto:licensing@moltrace.co)). Each version converts to Apache 2.0 four years after release. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), [`SECURITY.md`](SECURITY.md), and [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -16,7 +16,7 @@ MolTrace is an AI-native scientific intelligence platform that confirms structur
 
 The platform is architected **deterministic-first**: regulated math and classifications are computed by a version-pinned rule engine, an auditable verifier is the sole arbiter of correctness, and AI is strictly advisory — it proposes, the science decides.
 
-> **Status.** MolTrace runs as a hosted product at [moltrace.co](https://moltrace.co) (frontend on Vercel, backend on Render). `moltrace_backend/CHANGELOG.md` is the authoritative per-release record of what shipped; the repo's in-code version numbers are not yet unified across the two apps, so treat the CHANGELOG as the source of truth for "what's in production."
+> **Status.** MolTrace runs as a hosted product at [moltrace.co](https://moltrace.co) — frontend on **Vercel**, backend on **Google Cloud Run** with **Cloud SQL** (migrated off Render in July 2026). `moltrace_backend/CHANGELOG.md` is the authoritative per-release record of what shipped; the repo's in-code version numbers are not yet unified across the two apps, so treat the CHANGELOG as the source of truth for "what's in production."
 
 ## The platform
 
@@ -96,7 +96,7 @@ All browser→backend traffic is proxied same-origin; the binding FE↔BE contra
                                                   │  forwards /api/backend/*
                                                   ▼
                           ┌─────────────────────────────────────────────┐
-                          │  FastAPI  (Render — moltrace-backend)        │
+                          │  FastAPI (Cloud Run — moltrace-backend)      │
                           │  nmrcheck.main:app   /health                 │
                           ├──────────────┬───────────────┬──────────────┤
                           │ spectroscopy │  AI model     │  regulatory  │
@@ -108,7 +108,8 @@ All browser→backend traffic is proxied same-origin; the binding FE↔BE contra
                                  ▼               ▼              ▼
                           ┌─────────────┐   ┌──────────────────────────────┐
                           │  Postgres   │   │  HMAC-chained audit log       │
-                          │ (Render db) │   │  + e-sigs (Part 11-supporting)│
+                          │ (Cloud SQL, │   │  + e-sigs (Part 11-supporting)│
+                          │ private IP) │   │                               │
                           └─────────────┘   └──────────────────────────────┘
 ```
 
@@ -127,7 +128,7 @@ The FE↔BE contract pipeline: FastAPI `/openapi.json` → `pnpm generate:openap
 
 **Backend**
 - Python ≥3.11 (deployed on 3.13.5); FastAPI ≥0.115,<1.0, Pydantic v2
-- SQLAlchemy 2.x + Alembic (PostgreSQL via psycopg v3 in prod, SQLite in tests; 20 migrations)
+- SQLAlchemy 2.x + Alembic (PostgreSQL via psycopg v3 in prod, SQLite in tests; 30 migrations)
 - uv package manager + hatchling build backend; ruff + mypy (strict)
 - RQ ≥2.0 + Redis for queued background jobs
 - `pyjwt[crypto]` (RS256/ES256 OIDC id_token verification) + `cryptography` (AES-256-GCM secret encryption) for enterprise SSO; `pyotp` (RFC 6238 TOTP) + `webauthn` (py_webauthn, FIDO2 passkeys) for MFA
@@ -140,8 +141,10 @@ The FE↔BE contract pipeline: FastAPI `/openapi.json` → `pnpm generate:openap
 - Optional RAG (regulatory): a declared `rag` extra (`anthropic`, `openai`) powers the guidance-corpus search in `moltrace.regulatory.intelligence` (Claude `claude-sonnet-4-6` synthesis + `text-embedding-3-small` vectors). It is fully optional — the engine and its tests run offline on a zero-dependency lexical retriever + deterministic extractive synthesis — and regulated numbers always defer to the deterministic engines.
 
 **Infra**
-- Render — FastAPI web service (plan `starter`) + a second-region FE mirror (plan `starter`) + managed Postgres `moltrace-db` (plan `basic-256mb`); Vercel (primary frontend); GitHub Actions (CI/CD)
+- **Google Cloud** (project `moltrace-prod`, us-central1) — Cloud Run (FastAPI, scale-to-zero) · Cloud SQL for PostgreSQL 16 on a **private IP** reached via Direct VPC egress · Cloud Storage (immutable raw-FID vault, model weights, DVC remote) · Secret Manager · Cloud KMS (field-encryption key) · Artifact Registry + Cloud Build
+- **Vercel** — frontend at `moltrace.co`; **GitHub Actions** — CI/CD, deploying the backend keylessly via Workload Identity Federation
 - `infra` extra (optional, not installed in CI/prod): MLflow, DVC, Great Expectations, pandas, boto3
+- `gcs` extra (optional): `google-cloud-storage` for the GCS raw-vault backend
 - Pandoc + XeLaTeX / Typst for white-paper PDF builds
 
 ## Repository layout
@@ -168,12 +171,12 @@ MolTrace/
 │   ├── components/            #   marketing/, programs/, spectracheck/, regulatory-hub/,
 │   │                          #   reaction-optimization/, science/, dashboard/, ui/
 │   ├── src/lib/api/           #   client.ts + generated schema.d.ts (FE↔BE contract)
-│   ├── next.config.mjs · vercel.json · render.yaml
+│   ├── next.config.mjs · vercel.json
 ├── whitepaper-build/          # six white-paper .md sources + Pandoc/Typst PDF build (Makefile)
 ├── moltrace_docs/             # empty Astro/Starlight build mirror (real site: docs.moltrace.co)
 ├── scripts/                   # CI watch, release guardrails, playbook generator
 ├── tests/contracts/           # cross-cutting release-health contract fixtures
-├── render.yaml                # Render blueprint: backend + FE mirror + Postgres
+├── moltrace_backend/deploy/   # GCP runbook + docker-compose dev stack (Dockerfile, cloudbuild.yaml one level up)
 ├── .github/workflows/ci-cd.yml
 ├── RELEASE_GUARDRAILS.md · MolTrace_WhitePaper_Maintenance.md
 ```
@@ -240,7 +243,7 @@ For local development, run both apps: the backend on `:8000` and the frontend on
 
 ## Configuration
 
-Key environment variables (see `render.yaml` for the full set):
+Key environment variables (in production these are injected from **Secret Manager**; see `moltrace_backend/deploy/README.md` for the deployed set):
 
 | Variable | Scope | Purpose |
 |---|---|---|
@@ -255,21 +258,23 @@ Key environment variables (see `render.yaml` for the full set):
 | `BASE_URL` / `FRONTEND_BASE_URL` | backend | API origin (used to compute the OIDC callback redirect URI) and SPA origin (where the SSO callback lands). |
 | `ANTHROPIC_API_KEY` | backend | Enables the optional RAG `/spectrum/reason` path (with the undeclared `anthropic` package). |
 | `API_BASE_URL` | frontend | Backend target for the same-origin proxy (local + root deploy). |
-| `NEXT_PUBLIC_API_BASE_URL` | frontend | Public API base. **Divergence to note:** `moltrace_frontend/render.yaml` sets it to `/api/backend`, while the root `render.yaml` points it at the full backend URL. |
+| `NEXT_PUBLIC_API_BASE_URL` | frontend | Public API base. Note: the browser always calls the same-origin `/api/backend` proxy — an absolute URL here is deliberately ignored by `lib/api/client.ts`. |
+| `RAW_VAULT_BACKEND` / `RAW_VAULT_BUCKET` | backend | Storage backend for the immutable raw-FID vault: `local` (default, filesystem) or `gcs` + a bucket. **Serverless deploys must use `gcs`** — Cloud Run's filesystem is ephemeral. |
+| `RATE_LIMIT_ENABLED` / `RATE_LIMIT_TRUST_FORWARDED_FOR` | backend | API abuse protection; trust `X-Forwarded-For` when behind the Cloud Run edge. |
+| `ADMIN_EMAILS` | backend | Comma-separated admin allow-list. **No admin exists unless this is set** — the code default is empty. |
 
 ## Deployment
 
-Deployment is split across real production targets, defined in `render.yaml` (root) and `.github/workflows/ci-cd.yml`:
+Deployment targets are defined in `.github/workflows/ci-cd.yml`; the backend runbook lives in [`moltrace_backend/deploy/README.md`](moltrace_backend/deploy/README.md).
 
-- **Frontend → Vercel** at `moltrace.co` / `www.moltrace.co`. A second-region frontend mirror (`moltrace-frontend1`, Render plan `starter`) also runs on Render with health-check path `/api/app-version`.
-- **Backend → Render** (`moltrace-backend.onrender.com`, plan `starter`), built with `uv sync --frozen --no-dev --extra fid` and started with the chained command:
-  ```bash
-  uv run alembic upgrade head && uv run python -m uvicorn nmrcheck.main:app --host 0.0.0.0 --port $PORT
-  ```
-  DB migrations apply automatically through this start command — there is no separate migration step. Health-checks hit `/health`.
-- **Database → Render-managed Postgres** (`moltrace-db`, plan `basic-256mb`), injected into the backend as `DATABASE_URL`.
+- **Frontend → Vercel** at `moltrace.co` / `www.moltrace.co`, reaching the API through the same-origin `/api/backend` proxy.
+- **Backend → Google Cloud Run** (service `moltrace-backend`, project `moltrace-prod`, us-central1), from a multi-stage container built by **Cloud Build** and stored in **Artifact Registry**. Scale-to-zero; health-checks hit `/health`.
+- **Database → Cloud SQL for PostgreSQL 16** on a **private IP with no public interface**, reached over **Direct VPC egress** (no billable VPC connector). Credentials come from **Secret Manager**.
+- **Object storage → Cloud Storage** — the write-once raw-FID vault (versioned), model weights, and the DVC remote.
 
-CI runs frontend (vitest) and backend (pytest) tests independently, then a fail-closed deployment gate (`uv run moltrace-deployment-gate --self-check`), and only then fires the Vercel and Render deploy hooks — **only on push to `main`**. Platform auto-deploy is disabled (Vercel `git.deploymentEnabled: false`; Render Auto-Deploy off) so only green CI reaches production.
+**Migrations are a separate, gated step — never chained into the start command** (on Cloud Run that would race across every autoscaled instance). They run as the one-off Cloud Run job `moltrace-migrate` (`alembic upgrade head`). Note that on a *brand-new* database `upgrade head` cannot bootstrap the schema: the migrations are deltas over an ORM-created schema, so the app builds it at startup (`init_db()` → `create_all()`, 260 tables) and Alembic is then `stamp`ed.
+
+CI runs frontend (vitest) and backend (pytest) tests independently, then SBOM + SLSA attestation + provenance verification and a fail-closed deployment gate (`uv run moltrace-deployment-gate --self-check`) — and only then deploys, **only on push to `main`**. The backend deploy authenticates via **Workload Identity Federation** (keyless — no stored service-account key) and runs build → migrate → new revision. Vercel auto-deploy is disabled (`git.deploymentEnabled: false`) so only green CI reaches production.
 
 ## Testing & quality gates
 
