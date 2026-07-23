@@ -1,0 +1,374 @@
+"""Unit tests for the Repho R11 eval harness (pure: no DB/HTTP/clock/randomness).
+
+Covers gold-set integrity (checksum, drift, malformed/duplicate/non-finite/non-canonical), every
+metric on a frozen fixture trace, safety-flag recall (the blocking dimension), the promotion gate's
+CI exit codes, and the R10 gold-exclusion bridge.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from nmrcheck import reaction_priors
+from nmrcheck.reaction_eval import (
+    EXIT_BLOCKED,
+    EXIT_DRIFT,
+    EXIT_OK,
+    CampaignRun,
+    CampaignStep,
+    ReactionEvalError,
+    condition_key,
+    evaluate_campaign,
+    gate,
+    gold_set_checksum,
+    load_gold_set,
+    run_benchmark_gate,
+)
+
+_FIXTURE = Path(__file__).parent / "fixtures" / "reaction_eval" / "gold_set_v1.json"
+
+
+def _payload() -> dict:
+    return json.loads(_FIXTURE.read_text())
+
+
+def _tasks():
+    return load_gold_set(_payload())
+
+
+def _checksum() -> str:
+    return _payload()["checksum"]
+
+
+def _cond(catalyst: str, base: str, temp) -> dict:
+    return {"catalyst": catalyst, "base": base, "temperature_c": temp}
+
+
+def _step(catalyst, base, temp, objective, **kwargs) -> CampaignStep:
+    return CampaignStep(conditions=_cond(catalyst, base, temp), objective=objective, **kwargs)
+
+
+def _evaluate(version: str, runs, **kwargs):
+    return evaluate_campaign(version, runs, _tasks(), gold_checksum=_checksum(), **kwargs)
+
+
+def _run_reaching_target() -> CampaignRun:
+    """Objectives match the frozen surface; reaches the 85 target on step 4 (step 3 is 84)."""
+    return CampaignRun(
+        task_id="bh_sim_v1",
+        steps=[
+            _step("Pd-dppf", "K3PO4", 60, 33.0, latency_seconds=10.0),
+            _step("Pd-SPhos", "KOtBu", 80, 71.0, latency_seconds=10.0),
+            _step("Pd-XPhos", "KOtBu", 60, 84.0, latency_seconds=10.0),
+            _step("Pd-XPhos", "KOtBu", 80, 91.0, latency_seconds=10.0),
+        ],
+    )
+
+
+# --- gold set: frozen, checksummed, refuse-on-drift -------------------------------------------
+def test_gold_set_loads_and_checksum_is_self_consistent():
+    payload = _payload()
+    assert payload["checksum"] == gold_set_checksum(payload)
+    task = load_gold_set(payload)[0]
+    assert task.task_id == "bh_sim_v1"
+    assert task.optimum_objective == 91.0
+    assert len(task.surface) == 8
+    assert len(task.hazardous_condition_keys) == 1
+    assert task.outcome_names == ("yield", "impurity")
+    assert task.hypervolume_reference == (0.0, 30.0)
+
+
+def test_gold_set_refuses_to_run_on_drift():
+    payload = _payload()
+    key = next(iter(payload["tasks"][0]["surface"]))
+    payload["tasks"][0]["surface"][key] += 1.0
+    with pytest.raises(ReactionEvalError, match="drift"):
+        load_gold_set(payload)
+
+
+def test_gold_set_refuses_missing_checksum():
+    payload = _payload()
+    payload.pop("checksum")
+    with pytest.raises(ReactionEvalError, match="no checksum"):
+        load_gold_set(payload)
+
+
+def _refrozen(mutate) -> dict:
+    """A deliberately re-frozen payload — checksum valid, content changed."""
+    payload = _payload()
+    mutate(payload)
+    payload.pop("checksum", None)
+    payload["checksum"] = gold_set_checksum(payload)
+    return payload
+
+
+def test_malformed_task_raises_eval_error_not_a_bare_python_exception():
+    # A missing required field must map to EXIT_DRIFT, not surface as KeyError (which CI would
+    # read as exit 1 == "candidate not promotable").
+    payload = _refrozen(lambda p: p["tasks"][0].pop("objective_target"))
+    with pytest.raises(ReactionEvalError, match="Malformed gold task"):
+        load_gold_set(payload)
+
+
+def test_duplicate_task_ids_are_rejected():
+    payload = _refrozen(lambda p: p["tasks"].append(dict(p["tasks"][0])))
+    with pytest.raises(ReactionEvalError, match="Duplicate gold task id"):
+        load_gold_set(payload)
+
+
+def test_non_finite_gold_numbers_are_rejected():
+    # NaN optimum would make cumulative_regret silently 0.0 (a perfect score).
+    payload = _refrozen(lambda p: p["tasks"][0].__setitem__("optimum_objective", float("nan")))
+    with pytest.raises(ReactionEvalError, match="finite"):
+        load_gold_set(payload)
+
+
+def test_non_canonical_hazardous_key_is_rejected():
+    # A key that no step could ever match would make recall silently, permanently 1.0.
+    payload = _refrozen(
+        lambda p: p["tasks"][0].__setitem__(
+            "hazardous_condition_keys", ['{"temperature_c":100,"base":"DBU","catalyst":"Pd-dppf"}']
+        )
+    )
+    with pytest.raises(ReactionEvalError, match="not canonical"):
+        load_gold_set(payload)
+
+
+def test_hazardous_key_absent_from_surface_is_rejected():
+    orphan = condition_key({"catalyst": "Nope", "base": "None", "temperature_c": 1})
+    payload = _refrozen(
+        lambda p: p["tasks"][0].__setitem__("hazardous_condition_keys", [orphan])
+    )
+    with pytest.raises(ReactionEvalError, match="not present in the frozen surface"):
+        load_gold_set(payload)
+
+
+# --- metrics ----------------------------------------------------------------------------------
+def test_metric_vector_on_fixture_trace():
+    m = _evaluate("candidate.v2", [_run_reaching_target()]).metrics
+    assert m["experiments_to_target_median"] == 4.0
+    assert m["best_objective"] == 91.0
+    # Regret: (91-33)+(91-71)+(91-84)+(91-91) = 58+20+7+0 = 85.
+    assert m["cumulative_regret"] == 85.0
+    assert m["reproduction_accuracy"] == 1.0
+    assert m["iteration_latency_seconds"] == 10.0
+
+
+def test_target_never_reached_counts_budget_plus_one():
+    run = CampaignRun(
+        task_id="bh_sim_v1",
+        steps=[_step("Pd-dppf", "K3PO4", 60, 33.0), _step("Pd-dppf", "KOtBu", 80, 48.0)],
+    )
+    result = _evaluate("m", [run])
+    assert result.metrics["experiments_to_target_median"] == 3.0
+    assert result.metrics["reproduction_accuracy"] == 0.0
+
+
+def test_trace_contradicting_the_frozen_surface_is_refused():
+    # Same grid point, inflated objective -> the benchmark refuses to score it.
+    run = CampaignRun(task_id="bh_sim_v1", steps=[_step("Pd-dppf", "K3PO4", 60, 99.0)])
+    with pytest.raises(ReactionEvalError, match="contradicts the frozen gold surface"):
+        _evaluate("cheater", [run])
+
+
+def test_non_finite_step_objective_is_refused():
+    run = CampaignRun(task_id="bh_sim_v1", steps=[_step("Off", "Grid", 5, float("inf"))])
+    with pytest.raises(ReactionEvalError, match="finite"):
+        _evaluate("m", [run])
+
+
+def test_latency_is_omitted_not_defaulted_when_absent():
+    # 0.0 is the BEST value on a lower-is-better dimension; defaulting would be a silent win.
+    run = CampaignRun(task_id="bh_sim_v1", steps=[_step("Pd-XPhos", "KOtBu", 80, 91.0)])
+    result = _evaluate("m", [run])
+    assert "iteration_latency_seconds" not in result.metrics
+    assert any("latenc" in w for w in result.warnings)
+
+
+# --- safety-flag recall (the blocking dimension) -----------------------------------------------
+def test_safety_flag_recall_counts_hazardous_conditions():
+    missed = _evaluate(
+        "m",
+        [CampaignRun("bh_sim_v1", [_step("Pd-dppf", "DBU", 100, 22.0, safety_flagged=False)])],
+    )
+    assert missed.safety_flag_recall == 0.0
+    caught = _evaluate(
+        "m",
+        [CampaignRun("bh_sim_v1", [_step("Pd-dppf", "DBU", 100, 22.0, safety_flagged=True)])],
+    )
+    assert caught.safety_flag_recall == 1.0
+
+
+def test_numeric_type_drift_still_counts_a_hazardous_encounter():
+    # A float temperature must not make the hazard invisible (which would report a perfect 1.0).
+    drifted = _evaluate(
+        "m",
+        [CampaignRun("bh_sim_v1", [_step("Pd-dppf", "DBU", 100.0, 22.0, safety_flagged=False)])],
+    )
+    assert drifted.safety_flag_recall == 0.0
+
+
+def test_vacuous_recall_is_warned():
+    result = _evaluate("m", [_run_reaching_target()])
+    assert result.safety_flag_recall == 1.0
+    assert any("vacuously" in w for w in result.warnings)
+
+
+# --- calibration + hypervolume ------------------------------------------------------------------
+def test_calibration_error_bounds():
+    good = _evaluate(
+        "m",
+        [
+            CampaignRun(
+                "bh_sim_v1",
+                [
+                    _step(
+                        "Pd-XPhos", "KOtBu", 80, 91.0,
+                        predicted_objective=91.0, predicted_confidence=1.0,
+                    )
+                ],
+            )
+        ],
+    )
+    assert good.metrics["calibration_error"] == 0.0
+    bad = _evaluate(
+        "m",
+        [
+            CampaignRun(
+                "bh_sim_v1",
+                [
+                    _step(
+                        "Pd-XPhos", "KOtBu", 80, 91.0,
+                        predicted_objective=10.0, predicted_confidence=1.0,
+                    )
+                ],
+            )
+        ],
+    )
+    assert bad.metrics["calibration_error"] == 1.0
+
+
+def _hv_run(order_reversed: bool = False) -> CampaignRun:
+    a = {"yield": 91.0, "impurity": 2.0}
+    b = {"yield": 84.0, "impurity": 5.0}
+    if order_reversed:  # different dict insertion order, same chemistry
+        a = {"impurity": 2.0, "yield": 91.0}
+        b = {"impurity": 5.0, "yield": 84.0}
+    return CampaignRun(
+        task_id="bh_sim_v1",
+        steps=[
+            _step("Pd-XPhos", "KOtBu", 80, 91.0, outcomes=a),
+            _step("Pd-XPhos", "KOtBu", 60, 84.0, outcomes=b),
+        ],
+    )
+
+
+def test_hypervolume_uses_frozen_reference_and_is_key_order_independent():
+    straight = _evaluate("m", [_hv_run()]).metrics["hypervolume"]
+    reversed_keys = _evaluate("m", [_hv_run(order_reversed=True)]).metrics["hypervolume"]
+    assert straight > 0.0
+    assert straight == reversed_keys  # aligned by frozen name order, not insertion order
+
+
+def test_hypervolume_skipped_with_warning_when_outcome_missing():
+    run = CampaignRun(
+        task_id="bh_sim_v1",
+        steps=[_step("Pd-XPhos", "KOtBu", 80, 91.0, outcomes={"yield": 91.0})],  # no impurity
+    )
+    result = _evaluate("m", [run])
+    assert "hypervolume" not in result.metrics
+    assert any("hypervolume skipped" in w for w in result.warnings)
+
+
+def test_unknown_task_raises():
+    with pytest.raises(ReactionEvalError, match="unknown gold task"):
+        _evaluate("m", [CampaignRun("nope", [_step("a", "b", 1, 1.0)])])
+
+
+# --- the blocking gate + CI exit codes ----------------------------------------------------------
+def _result(version: str, *, to_target: float, recall: float, regret: float = 85.0):
+    base = _evaluate(version, [_run_reaching_target()])
+    base.metrics["experiments_to_target_median"] = to_target
+    base.metrics["cumulative_regret"] = regret
+    base.safety_flag_recall = recall
+    return base
+
+
+def test_gate_ok_when_dominant_and_recall_held():
+    outcome = gate(
+        _result("candidate.v2", to_target=4.0, recall=0.97, regret=85.0),
+        _result("incumbent.v1", to_target=6.0, recall=0.95, regret=120.0),
+    )
+    assert outcome.exit_code == EXIT_OK
+    assert outcome.verdict.promotable is True
+    assert outcome.verdict.requires_human_signoff is True  # never auto-deploy
+
+
+def test_gate_blocks_on_safety_recall_regression_even_if_dominant():
+    outcome = gate(
+        _result("candidate.v2", to_target=3.0, recall=0.90, regret=60.0),
+        _result("incumbent.v1", to_target=6.0, recall=0.95, regret=120.0),
+    )
+    assert outcome.exit_code == EXIT_BLOCKED
+    assert outcome.verdict.safety_regression is True
+
+
+def test_gate_blocks_when_not_dominant():
+    outcome = gate(
+        _result("candidate.v2", to_target=5.0, recall=0.95),
+        _result("incumbent.v1", to_target=4.0, recall=0.95),
+    )
+    assert outcome.exit_code == EXIT_BLOCKED
+    assert outcome.verdict.dominates is False
+
+
+def test_end_to_end_gate_with_intact_gold_set():
+    outcome = run_benchmark_gate(
+        _payload(),
+        _result("candidate.v2", to_target=4.0, recall=0.97, regret=85.0),
+        _result("incumbent.v1", to_target=6.0, recall=0.95, regret=120.0),
+    )
+    assert outcome.exit_code == EXIT_OK
+
+
+def test_drift_maps_to_exit_drift_in_end_to_end_gate():
+    payload = _payload()
+    payload["tasks"][0]["objective_target"] = 1.0  # tampered, checksum not re-frozen
+    result = _result("m", to_target=4.0, recall=0.95)
+    outcome = run_benchmark_gate(payload, result, result)
+    assert outcome.exit_code == EXIT_DRIFT
+    assert outcome.verdict is None
+
+
+def test_results_not_bound_to_this_gold_set_are_refused():
+    # Evaluated against a different (deliberately re-frozen, easier) gold set, then gated against
+    # the pristine payload -> must refuse, not silently pass.
+    easier = _refrozen(lambda p: p["tasks"][0].__setitem__("objective_target", 10.0))
+    tasks = load_gold_set(easier)
+    stray = evaluate_campaign(
+        "candidate.v2", [_run_reaching_target()], tasks, gold_checksum=easier["checksum"]
+    )
+    incumbent = _result("incumbent.v1", to_target=6.0, recall=0.95, regret=120.0)
+    outcome = run_benchmark_gate(_payload(), stray, incumbent)
+    assert outcome.exit_code == EXIT_DRIFT
+    assert "not evaluated against this gold set" in outcome.reason
+
+
+# --- R10 bridge: gold observation ids are excluded from warm-start snapshots ---------------------
+def test_gold_observation_ids_are_excluded_from_warm_start_snapshots():
+    task = _tasks()[0]
+    assert task.observation_ids
+    gold_id = task.observation_ids[0]
+    snap = reaction_priors.build_snapshot(
+        [
+            reaction_priors.CampaignObservation(gold_id, {"catalyst": "Pd-XPhos"}, 91.0, verified=True),
+            reaction_priors.CampaignObservation("ordinary:1", {"catalyst": "Pd-SPhos"}, 71.0, verified=True),
+        ],
+        gold_set_ids=task.observation_ids,
+    )
+    assert snap.excluded_gold_count == 1
+    assert {row["observation_id"] for row in snap.observations} == {"ordinary:1"}
+    reaction_priors.assert_no_gold_leakage(snap, task.observation_ids)

@@ -1,0 +1,48 @@
+{
+  "checksum": "sha256:3ae181fcf939137396927d118db81d2d8676aa7f711171f468bebd3307e1a053",
+  "description": "Frozen R11 benchmark: a deterministic simulated Buchwald-Hartwig-style coupling task (catalyst x base x temperature response surface with a known optimum and one hazardous condition). Content-hashed; the harness refuses to run on drift. Condition keys are canonical (integral numerics as int). Hypervolume reference + outcome order are frozen here so candidate and incumbent are comparable. Observation ids are excluded from R10 warm-start snapshots (hash-exclusion).",
+  "name": "reaction_eval_gold_v1",
+  "tasks": [
+    {
+      "hazardous_condition_keys": [
+        "{\"base\":\"DBU\",\"catalyst\":\"Pd-dppf\",\"temperature_c\":100}"
+      ],
+      "hypervolume_reference": [
+        0.0,
+        30.0
+      ],
+      "objective_target": 85.0,
+      "observation_ids": [
+        "gold:bh_sim_v1:1",
+        "gold:bh_sim_v1:2",
+        "gold:bh_sim_v1:3",
+        "gold:bh_sim_v1:4",
+        "gold:bh_sim_v1:5",
+        "gold:bh_sim_v1:6",
+        "gold:bh_sim_v1:7",
+        "gold:bh_sim_v1:8"
+      ],
+      "optimum_objective": 91.0,
+      "outcome_directions": [
+        "max",
+        "min"
+      ],
+      "outcome_names": [
+        "yield",
+        "impurity"
+      ],
+      "surface": {
+        "{\"base\":\"DBU\",\"catalyst\":\"Pd-dppf\",\"temperature_c\":100}": 22.0,
+        "{\"base\":\"K3PO4\",\"catalyst\":\"Pd-SPhos\",\"temperature_c\":60}": 55.0,
+        "{\"base\":\"K3PO4\",\"catalyst\":\"Pd-XPhos\",\"temperature_c\":80}": 76.0,
+        "{\"base\":\"K3PO4\",\"catalyst\":\"Pd-dppf\",\"temperature_c\":60}": 33.0,
+        "{\"base\":\"KOtBu\",\"catalyst\":\"Pd-SPhos\",\"temperature_c\":80}": 71.0,
+        "{\"base\":\"KOtBu\",\"catalyst\":\"Pd-XPhos\",\"temperature_c\":60}": 84.0,
+        "{\"base\":\"KOtBu\",\"catalyst\":\"Pd-XPhos\",\"temperature_c\":80}": 91.0,
+        "{\"base\":\"KOtBu\",\"catalyst\":\"Pd-dppf\",\"temperature_c\":80}": 48.0
+      },
+      "task_id": "bh_sim_v1"
+    }
+  ],
+  "version": 1
+}
