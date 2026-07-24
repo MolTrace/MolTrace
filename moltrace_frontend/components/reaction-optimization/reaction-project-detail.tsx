@@ -5954,7 +5954,7 @@ export function ReactionProjectDetail() {
             />
           </div>
 
-          <ForwardCheckPanel projectId={reactionProjectId} />
+          <ForwardCheckPanel key={reactionProjectId} projectId={reactionProjectId} />
         </TabsContent>
 
         <TabsContent value="green" className="mt-4 space-y-6">
@@ -5976,11 +5976,11 @@ export function ReactionProjectDetail() {
             <h2 className="font-mono text-xl font-bold tracking-tight">Synthesis route scoring</h2>
             <p className="text-sm text-muted-foreground">
               Score pasted or hand-built route trees with the frozen safety and green-chemistry
-              engines. Route generation is not available on this deployment — see the ML capability
-              readout in the Developer tab.
+              engines. Route generation is not available on this deployment; routes are entered manually by
+              design.
             </p>
           </div>
-          <RouteScoresPanel projectId={reactionProjectId} />
+          <RouteScoresPanel key={reactionProjectId} projectId={reactionProjectId} />
         </TabsContent>
 
         <TabsContent value="optimization" className="mt-4 space-y-6">
@@ -6171,7 +6171,7 @@ export function ReactionProjectDetail() {
             })()}
           </ModuleCard>
 
-          <YieldPredictionPanel projectId={reactionProjectId} variables={variableRecords} />
+          <YieldPredictionPanel key={reactionProjectId} projectId={reactionProjectId} variables={variableRecords} />
 
           <ReactionRegulatoryConstraintsPanel
             reactionProjectId={reactionProjectId}
