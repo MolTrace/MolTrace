@@ -926,6 +926,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reaction-projects/{reaction_project_id}/yield-predictions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reaction Yield Predictions Route */
+        get: operations["list_reaction_yield_predictions_route_reaction_projects__reaction_project_id__yield_predictions_get"];
+        put?: never;
+        /** Create Reaction Yield Prediction Route */
+        post: operations["create_reaction_yield_prediction_route_reaction_projects__reaction_project_id__yield_predictions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/yield-predictions/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Yield Prediction Route */
+        get: operations["get_reaction_yield_prediction_route_reaction_projects__reaction_project_id__yield_predictions__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/route-scores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reaction Route Scores Route */
+        get: operations["list_reaction_route_scores_route_reaction_projects__reaction_project_id__route_scores_get"];
+        put?: never;
+        /** Create Reaction Route Score Route */
+        post: operations["create_reaction_route_score_route_reaction_projects__reaction_project_id__route_scores_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/route-scores/{score_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Route Score Route */
+        get: operations["get_reaction_route_score_route_reaction_projects__reaction_project_id__route_scores__score_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/forward-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reaction Forward Checks Route */
+        get: operations["list_reaction_forward_checks_route_reaction_projects__reaction_project_id__forward_checks_get"];
+        put?: never;
+        /** Create Reaction Forward Check Route */
+        post: operations["create_reaction_forward_check_route_reaction_projects__reaction_project_id__forward_checks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/forward-checks/{check_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Forward Check Route */
+        get: operations["get_reaction_forward_check_route_reaction_projects__reaction_project_id__forward_checks__check_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reaction Capabilities Route */
+        get: operations["reaction_capabilities_route_reaction_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-sdl/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reaction Sdl Status Route */
+        get: operations["reaction_sdl_status_route_reaction_sdl_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reaction-projects/{reaction_project_id}/variables": {
         parameters: {
             query?: never;
@@ -30067,6 +30206,37 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** ReactionCapabilityReadout */
+        ReactionCapabilityReadout: {
+            /** Capabilities */
+            capabilities: components["schemas"]["ReactionCapabilityStatus"][];
+            /**
+             * Disclaimer
+             * @default Heavy-ML reaction capabilities are optional, default-off extras governed by per-deployment flags, dependency probes, and (where frozen math is replaced) a recorded benchmark-gate pass. This readout reports what this deployment has actually enabled; nothing heavy activates implicitly.
+             */
+            disclaimer: string;
+        };
+        /** ReactionCapabilityStatus */
+        ReactionCapabilityStatus: {
+            /** Name */
+            name: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Available */
+            available: boolean;
+            /** Active */
+            active: boolean;
+            /** Missing Modules */
+            missing_modules?: string[];
+            /** Reason */
+            reason: string;
+            /** Provenance */
+            provenance?: {
+                [key: string]: unknown;
+            };
+            /** Engine */
+            engine: string;
+        };
         /** ReactionConditionCritique */
         ReactionConditionCritique: {
             /** Id */
@@ -30902,6 +31072,71 @@ export interface components {
              * @default Reaction feedback feeds an advisory preference re-ranker and an A/B promotion gate; it never auto-deploys a model and never overrides the optimiser. A safety (unsafe) rejection routes to the R6 safety screen for hardening and is excluded from preference learning.
              */
             disclaimer: string;
+        };
+        /** ReactionForwardCheckRecord */
+        ReactionForwardCheckRecord: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Label */
+            label: string;
+            /** Reactants Smiles */
+            reactants_smiles: string[];
+            /** Reagents Smiles */
+            reagents_smiles: string[];
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            };
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Metadata Json */
+            metadata_json: {
+                [key: string]: unknown;
+            };
+            /**
+             * Disclaimer
+             * @default Forward predictions and condition suggestions are machine proposals annotated by the frozen safety and green-chemistry engines. They are advisory decision support, never a synthesis instruction; a qualified chemist must review every prediction, and flagged chemistry is surfaced rather than hidden.
+             */
+            disclaimer: string;
+        };
+        /** ReactionForwardCheckRequest */
+        ReactionForwardCheckRequest: {
+            /** Reactants Smiles */
+            reactants_smiles: string[];
+            /** Products Smiles */
+            products_smiles: string[];
+            /** Reagents Smiles */
+            reagents_smiles?: string[];
+            /** Confidence */
+            confidence?: number | null;
+            /** Conditions */
+            conditions?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Source
+             * @default external
+             */
+            source: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
         };
         /** ReactionGreenAssessment */
         ReactionGreenAssessment: {
@@ -32373,6 +32608,65 @@ export interface components {
             /** Notes */
             notes?: string[];
         };
+        /** ReactionRouteScoreRecord */
+        ReactionRouteScoreRecord: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Label */
+            label: string;
+            /** Route */
+            route: {
+                [key: string]: unknown;
+            };
+            /** Score */
+            score: {
+                [key: string]: unknown;
+            };
+            /** Mermaid */
+            mermaid: string;
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Metadata Json */
+            metadata_json: {
+                [key: string]: unknown;
+            };
+            /**
+             * Disclaimer
+             * @default Retrosynthesis routes are machine proposals scored by the frozen safety and green-chemistry engines. Scores are advisory decision support: they rank options for review and are never a safety determination or a synthesis instruction. A qualified chemist must review every route.
+             */
+            disclaimer: string;
+        };
+        /** ReactionRouteScoreRequest */
+        ReactionRouteScoreRequest: {
+            /** Route */
+            route: {
+                [key: string]: unknown;
+            };
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /**
+             * Route Format
+             * @default native
+             */
+            route_format: string;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
         /** ReactionSafetyConstraintProfile */
         ReactionSafetyConstraintProfile: {
             /** Id */
@@ -32588,6 +32882,24 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** ReactionSdlSiteStatus */
+        ReactionSdlSiteStatus: {
+            /** Enabled */
+            enabled: boolean;
+            capability: components["schemas"]["ReactionCapabilityStatus"];
+            /**
+             * Execution Surface Wired
+             * @default false
+             */
+            execution_surface_wired: boolean;
+            /** Detail */
+            detail: string;
+            /**
+             * Disclaimer
+             * @default SDL execution is a hardware-automation layer under the same safety, regulatory, and human-approval gates as manual execution. Manual mode is the default; autonomy automates make/test inside a human-approved envelope and never bypasses a gate.
+             */
+            disclaimer: string;
+        };
         /** ReactionVariable */
         ReactionVariable: {
             /** Id */
@@ -32781,6 +33093,72 @@ export interface components {
             /**
              * Disclaimer
              * @default Warm-start priors are advisory: they bias a new campaign toward conditions that worked on related, verified campaigns to reach the target in fewer experiments. The prior is fit only from owned, SpectraCheck-verified data, never the frozen evaluation gold set, and it never overrides the optimiser or a human decision.
+             */
+            disclaimer: string;
+        };
+        /** ReactionYieldPredictionItem */
+        ReactionYieldPredictionItem: {
+            /** Conditions */
+            conditions: {
+                [key: string]: unknown;
+            };
+            /** Mean */
+            mean: number;
+            /** Std */
+            std: number;
+            /** Backend */
+            backend: string;
+            /** N Samples */
+            n_samples: number;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /** ReactionYieldPredictionRequest */
+        ReactionYieldPredictionRequest: {
+            /** Conditions */
+            conditions: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Require Verified
+             * @default false
+             */
+            require_verified: boolean;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ReactionYieldPredictionRun */
+        ReactionYieldPredictionRun: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Backend */
+            backend: string;
+            /** Trained N */
+            trained_n: number;
+            /** Require Verified */
+            require_verified: boolean;
+            /** Predictions */
+            predictions: components["schemas"]["ReactionYieldPredictionItem"][];
+            /** Capability Provenance */
+            capability_provenance: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Metadata Json */
+            metadata_json: {
+                [key: string]: unknown;
+            };
+            /**
+             * Disclaimer
+             * @default Yield predictions are advisory decision support from a surrogate fit on this project's own recorded experiments. They rank candidate conditions for review and are never a synthesis instruction or a guarantee; a qualified chemist reviews every prediction. The backend that produced each number is recorded in capability_provenance.
              */
             disclaimer: string;
         };
@@ -44145,6 +44523,402 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReactionWarmStartRanking"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reaction_yield_predictions_route_reaction_projects__reaction_project_id__yield_predictions_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionYieldPredictionRun"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_reaction_yield_prediction_route_reaction_projects__reaction_project_id__yield_predictions_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionYieldPredictionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionYieldPredictionRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_yield_prediction_route_reaction_projects__reaction_project_id__yield_predictions__run_id__get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionYieldPredictionRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reaction_route_scores_route_reaction_projects__reaction_project_id__route_scores_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionRouteScoreRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_reaction_route_score_route_reaction_projects__reaction_project_id__route_scores_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionRouteScoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionRouteScoreRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_route_score_route_reaction_projects__reaction_project_id__route_scores__score_id__get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                score_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionRouteScoreRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reaction_forward_checks_route_reaction_projects__reaction_project_id__forward_checks_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionForwardCheckRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_reaction_forward_check_route_reaction_projects__reaction_project_id__forward_checks_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionForwardCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionForwardCheckRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_forward_check_route_reaction_projects__reaction_project_id__forward_checks__check_id__get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                check_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionForwardCheckRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reaction_capabilities_route_reaction_capabilities_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionCapabilityReadout"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reaction_sdl_status_route_reaction_sdl_status_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionSdlSiteStatus"];
                 };
             };
             /** @description Validation Error */
