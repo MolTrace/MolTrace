@@ -33,6 +33,7 @@ from .reaction_eval import (
     EXIT_DRIFT,
     EXIT_OK,
     EvalResult,
+    promotion_evidence,
     run_benchmark_gate,
 )
 
@@ -83,6 +84,14 @@ def main(argv: list[str] | None = None) -> int:
         default=0.0,
         help="metric tolerance for dominance (never widens the safety gate)",
     )
+    parser.add_argument(
+        "--evidence-out",
+        default=None,
+        help=(
+            "write the machine-readable gate record here — the artifact "
+            "nmrcheck.reaction_ml requires before any heavy backend may activate"
+        ),
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -95,6 +104,22 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_DRIFT
 
     outcome = run_benchmark_gate(gold_payload, candidate, incumbent, tolerance=args.tolerance)
+    if args.evidence_out:
+        # Written for EVERY outcome, not just a pass: a blocked run's evidence carries its
+        # non-zero exit code, which reaction_ml then correctly refuses. Emitting only on success
+        # would leave a stale passing artifact from an earlier run as the newest thing on disk.
+        evidence = promotion_evidence(outcome, candidate)
+        try:
+            Path(args.evidence_out).write_text(
+                json.dumps(evidence, indent=2, sort_keys=True)
+            )
+        except OSError as exc:
+            print(
+                f"reaction-benchmark-gate: DRIFT — could not write evidence to "
+                f"{args.evidence_out}: {exc}",
+                file=sys.stderr,
+            )
+            return EXIT_DRIFT
     label = {EXIT_OK: "PROMOTABLE", EXIT_BLOCKED: "BLOCKED", EXIT_DRIFT: "DRIFT"}.get(
         outcome.exit_code, "UNKNOWN"
     )

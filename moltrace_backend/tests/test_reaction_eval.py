@@ -372,3 +372,85 @@ def test_gold_observation_ids_are_excluded_from_warm_start_snapshots():
     assert snap.excluded_gold_count == 1
     assert {row["observation_id"] for row in snap.observations} == {"ordinary:1"}
     reaction_priors.assert_no_gold_leakage(snap, task.observation_ids)
+
+
+# --- the gate must be able to PRODUCE the evidence the Phase-C seam consumes ---------------------
+def test_a_real_gate_pass_produces_evidence_the_capability_seam_accepts():
+    """Closes the loop between R11 and Phase C.
+
+    The gate outcome carries the exit code; the evaluated result carries the gold checksum and
+    model version. Without a producer of that union the only thing that could ever unlock a heavy
+    backend was a hand-typed dict, and the "R11 gate pass" in provenance was a self-attestation.
+    """
+
+    from nmrcheck import reaction_ml
+    from nmrcheck.reaction_eval import promotion_evidence
+
+    payload = _payload()
+    candidate = _result("candidate.v2", to_target=4.0, recall=0.97, regret=85.0)
+    incumbent = _result("incumbent.v1", to_target=6.0, recall=0.95, regret=120.0)
+    outcome = run_benchmark_gate(payload, candidate, incumbent)
+    assert outcome.exit_code == EXIT_OK
+
+    evidence = promotion_evidence(outcome, candidate)
+    status = reaction_ml.capability_status(
+        "yield_gnn",
+        probe=lambda _module: True,
+        env={"MOLTRACE_REACTION_YIELD_GNN": "1"},
+        promotion_evidence=evidence,
+        expected_gold_checksum=gold_set_checksum(payload),
+        expected_model_version="candidate.v2",
+    )
+    assert status.active is True, status.reason
+
+
+def test_a_blocked_gate_produces_evidence_that_is_refused():
+    from nmrcheck import reaction_ml
+    from nmrcheck.reaction_eval import promotion_evidence
+
+    payload = _payload()
+    candidate = _result("candidate.v2", to_target=3.0, recall=0.90, regret=60.0)
+    incumbent = _result("incumbent.v1", to_target=6.0, recall=0.95, regret=120.0)
+    outcome = run_benchmark_gate(payload, candidate, incumbent)
+    assert outcome.exit_code == EXIT_BLOCKED
+
+    evidence = promotion_evidence(outcome, candidate)
+    status = reaction_ml.capability_status(
+        "yield_gnn",
+        probe=lambda _module: True,
+        env={"MOLTRACE_REACTION_YIELD_GNN": "1"},
+        promotion_evidence=evidence,
+    )
+    assert status.active is False
+    assert "exit_code" in status.reason
+
+
+def test_cli_writes_the_evidence_artifact(tmp_path):
+    import json as _json
+
+    from nmrcheck.reaction_eval_cli import main
+
+    payload = _payload()
+    candidate = _result("candidate.v2", to_target=4.0, recall=0.97, regret=85.0)
+    incumbent = _result("incumbent.v1", to_target=6.0, recall=0.95, regret=120.0)
+    gold = tmp_path / "gold.json"
+    gold.write_text(_json.dumps(payload))
+    cand = tmp_path / "candidate.json"
+    cand.write_text(_json.dumps(candidate.as_dict()))
+    inc = tmp_path / "incumbent.json"
+    inc.write_text(_json.dumps(incumbent.as_dict()))
+    out = tmp_path / "evidence.json"
+
+    code = main(
+        [
+            "--gold", str(gold),
+            "--candidate", str(cand),
+            "--incumbent", str(inc),
+            "--evidence-out", str(out),
+        ]
+    )
+    assert code == EXIT_OK
+    evidence = _json.loads(out.read_text())
+    assert evidence["exit_code"] == EXIT_OK
+    assert evidence["gold_checksum"] == gold_set_checksum(payload)
+    assert evidence["model_version"] == "candidate.v2"
