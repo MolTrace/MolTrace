@@ -19,8 +19,16 @@ import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 
+/** Reaction Studio tab styling. Uses arbitrary *values* (`bg-[…]`/`text-[…]`), never arbitrary
+ *  *properties* (`[background-color:…]`): tailwind-merge cannot dedupe an arbitrary property
+ *  against the TabsTrigger base's `data-[state=active]:bg-background`, so both survived and CSS
+ *  source order decided the winner — the active tab kept the near-white `#EBF4F8` text but lost the
+ *  violet pill, rendering invisible on the light background. The dark-mode variants are spelled out
+ *  because variant sets only dedupe against themselves (`dark:…:bg-input/30` and
+ *  `dark:…:text-foreground` would otherwise survive and wash the pill out). #EBF4F8 on
+ *  var(--mt-violet) (#6B3FE0) is 5.52:1 — WCAG AA for normal text, in both modes. */
 const reactionProjectTabClass =
-  "font-mono text-xs sm:text-sm data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#EBF4F8] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
+  "font-mono text-xs sm:text-sm data-[state=active]:bg-[var(--mt-violet)] dark:data-[state=active]:bg-[var(--mt-violet)] data-[state=active]:text-[#EBF4F8] dark:data-[state=active]:text-[#EBF4F8] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
 /** Shared style for inline, baseline-aligned link-buttons rendered inside prose
  *  (e.g. the safety-gate deep-link). `inline min-h-0 align-baseline` neutralizes
  *  the global button min-height; the focus-visible ring matches house style. */
@@ -63,6 +71,10 @@ import { GreenMetricsPanel } from "@/components/reaction-optimization/green-metr
 import { ParetoFrontPanel } from "@/components/reaction-optimization/pareto-front-panel"
 import { PlateDesignPanel } from "@/components/reaction-optimization/plate-design-panel"
 import { SafetyScreeningPanel } from "@/components/reaction-optimization/safety-screening-panel"
+import { MlCapabilitiesPanel } from "@/components/reaction-optimization/ml-capabilities-panel"
+import { YieldPredictionPanel } from "@/components/reaction-optimization/yield-prediction-panel"
+import { RouteScoresPanel } from "@/components/reaction-optimization/route-scores-panel"
+import { ForwardCheckPanel } from "@/components/reaction-optimization/forward-check-panel"
 import {
   hypervolumeTrend,
   nonDominatedExperimentIds,
@@ -4656,6 +4668,9 @@ export function ReactionProjectDetail() {
             <TabsTrigger value="plates" className={reactionProjectTabClass}>
               Plates
             </TabsTrigger>
+            <TabsTrigger value="routes" className={reactionProjectTabClass}>
+              Routes
+            </TabsTrigger>
             <TabsTrigger value="optimization" className={reactionProjectTabClass}>
               Optimization
             </TabsTrigger>
@@ -5938,6 +5953,8 @@ export function ReactionProjectDetail() {
               productSmilesHint={typeof project?.target_product_smiles === "string" ? project.target_product_smiles : null}
             />
           </div>
+
+          <ForwardCheckPanel projectId={reactionProjectId} />
         </TabsContent>
 
         <TabsContent value="green" className="mt-4 space-y-6">
@@ -5946,6 +5963,24 @@ export function ReactionProjectDetail() {
 
         <TabsContent value="plates" className="mt-4 space-y-6">
           <PlateDesignPanel projectId={reactionProjectId} variables={variableRecords} />
+        </TabsContent>
+
+        <TabsContent value="routes" className="mt-4 space-y-6">
+          <div className="space-y-1">
+            <p
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: "var(--mt-violet-ink)" }}
+            >
+              Project · Routes
+            </p>
+            <h2 className="font-mono text-xl font-bold tracking-tight">Synthesis route scoring</h2>
+            <p className="text-sm text-muted-foreground">
+              Score pasted or hand-built route trees with the frozen safety and green-chemistry
+              engines. Route generation is not available on this deployment — see the ML capability
+              readout in the Developer tab.
+            </p>
+          </div>
+          <RouteScoresPanel projectId={reactionProjectId} />
         </TabsContent>
 
         <TabsContent value="optimization" className="mt-4 space-y-6">
@@ -6135,6 +6170,8 @@ export function ReactionProjectDetail() {
               )
             })()}
           </ModuleCard>
+
+          <YieldPredictionPanel projectId={reactionProjectId} variables={variableRecords} />
 
           <ReactionRegulatoryConstraintsPanel
             reactionProjectId={reactionProjectId}
@@ -10735,6 +10772,7 @@ export function ReactionProjectDetail() {
 
         <TabsContent value="developer" className="mt-4 space-y-6">
           <DeveloperOnly>
+            <MlCapabilitiesPanel />
             <div className="space-y-1">
               <p
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
