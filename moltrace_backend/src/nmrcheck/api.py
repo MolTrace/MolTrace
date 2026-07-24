@@ -82,14 +82,19 @@ from . import quality_control_store as qc_store
 from . import reaction_access as reaction_access
 from . import reaction_advisor as reaction_advisor
 from . import reaction_bo as reaction_bo
+from . import reaction_capabilities_store as reaction_capabilities_store
 from . import reaction_execution as reaction_execution
 from . import reaction_feedback_store as reaction_feedback_store
+from . import reaction_forward_store as reaction_forward_store
 from . import reaction_green as reaction_green
 from . import reaction_hte as reaction_hte
+from . import reaction_ml as reaction_ml
 from . import reaction_priors_store as reaction_priors_store
+from . import reaction_retro_store as reaction_retro_store
 from . import reaction_regulatory_compliance as reaction_regulatory_compliance
 from . import reaction_safety as reaction_safety
 from . import reaction_store as reaction_store
+from . import reaction_yield_store as reaction_yield_store
 from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
 from . import regulatory_surveillance_store as surveillance_store
@@ -2395,6 +2400,12 @@ def _raise_reaction_http_error(exc: Exception) -> None:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if isinstance(exc, reaction_store.ReactionError):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if isinstance(exc, reaction_ml.CapabilityUnavailableError):
+        # A heavy capability that is disabled/absent/unevidenced in THIS deployment — an honest
+        # "not available here", not a client error and not a crash.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
     raise exc
 
 
@@ -4362,6 +4373,239 @@ def reaction_warm_start_ranking_route(
     except Exception as exc:
         _raise_reaction_http_error(exc)
         raise
+
+
+# --- Phase C: yield predictions (R12) · route scores (R13) · forward checks (R14).
+# Only the surfaces usable with NO heavy dependency are wired; the generative heavy paths
+# (AiZynth route proposal, RXN/transformers forward prediction, torch GNN training) stay
+# deliberately unwired until a background worker + the site extras exist. The capability
+# readout below is their honest face.
+@router.post(
+    "/reaction-projects/{reaction_project_id}/yield-predictions",
+    response_model=reaction_yield_store.ReactionYieldPredictionRun,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def create_reaction_yield_prediction_route(
+    reaction_project_id: int,
+    payload: reaction_yield_store.ReactionYieldPredictionRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_yield_store.ReactionYieldPredictionRun:
+    try:
+        return reaction_yield_store.create_prediction_run(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/yield-predictions",
+    response_model=list[reaction_yield_store.ReactionYieldPredictionRun],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def list_reaction_yield_predictions_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[reaction_yield_store.ReactionYieldPredictionRun]:
+    try:
+        return reaction_yield_store.list_prediction_runs(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/yield-predictions/{run_id}",
+    response_model=reaction_yield_store.ReactionYieldPredictionRun,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_yield_prediction_route(
+    reaction_project_id: int,
+    run_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_yield_store.ReactionYieldPredictionRun:
+    try:
+        record = reaction_yield_store.get_prediction_run(
+            _state(request).session_factory, reaction_project_id, run_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction yield-prediction run not found.")
+    return record
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/route-scores",
+    response_model=reaction_retro_store.ReactionRouteScoreRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def create_reaction_route_score_route(
+    reaction_project_id: int,
+    payload: reaction_retro_store.ReactionRouteScoreRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_retro_store.ReactionRouteScoreRecord:
+    try:
+        return reaction_retro_store.create_route_score(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/route-scores",
+    response_model=list[reaction_retro_store.ReactionRouteScoreRecord],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def list_reaction_route_scores_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[reaction_retro_store.ReactionRouteScoreRecord]:
+    try:
+        return reaction_retro_store.list_route_scores(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/route-scores/{score_id}",
+    response_model=reaction_retro_store.ReactionRouteScoreRecord,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_route_score_route(
+    reaction_project_id: int,
+    score_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_retro_store.ReactionRouteScoreRecord:
+    try:
+        record = reaction_retro_store.get_route_score(
+            _state(request).session_factory, reaction_project_id, score_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction route score not found.")
+    return record
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/forward-checks",
+    response_model=reaction_forward_store.ReactionForwardCheckRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def create_reaction_forward_check_route(
+    reaction_project_id: int,
+    payload: reaction_forward_store.ReactionForwardCheckRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_forward_store.ReactionForwardCheckRecord:
+    try:
+        return reaction_forward_store.create_forward_check(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/forward-checks",
+    response_model=list[reaction_forward_store.ReactionForwardCheckRecord],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def list_reaction_forward_checks_route(
+    reaction_project_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[reaction_forward_store.ReactionForwardCheckRecord]:
+    try:
+        return reaction_forward_store.list_forward_checks(
+            _state(request).session_factory, reaction_project_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/forward-checks/{check_id}",
+    response_model=reaction_forward_store.ReactionForwardCheckRecord,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_forward_check_route(
+    reaction_project_id: int,
+    check_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_forward_store.ReactionForwardCheckRecord:
+    try:
+        record = reaction_forward_store.get_forward_check(
+            _state(request).session_factory, reaction_project_id, check_id
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction forward check not found.")
+    return record
+
+
+@router.get(
+    "/reaction-capabilities",
+    response_model=reaction_capabilities_store.ReactionCapabilityReadout,
+    dependencies=[Depends(require_access_context)],
+)
+def reaction_capabilities_route(
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_capabilities_store.ReactionCapabilityReadout:
+    # Global (not project-scoped) honest readout of the governed heavy-ML capability table —
+    # what THIS deployment has enabled, what is absent, and why. Stateless; no reaction gate
+    # (no {reaction_project_id} in the path, and adding the gate would trip the completeness
+    # test's leak check).
+    return reaction_capabilities_store.capability_readout()
+
+
+@router.get(
+    "/reaction-sdl/status",
+    response_model=reaction_capabilities_store.ReactionSdlSiteStatus,
+    dependencies=[Depends(require_access_context)],
+)
+def reaction_sdl_status_route(
+    context: AccessContext = Depends(require_access_context),
+) -> reaction_capabilities_store.ReactionSdlSiteStatus:
+    # Read-only SDL site status. There is deliberately NO HTTP execution surface (no arm /
+    # run-step / abort routes): execution needs a bound site driver, persisted journal
+    # anchoring, and the human-approval/safety-gate linkage. Manual mode is the default
+    # everywhere; this endpoint only reports the site opt-in honestly.
+    return reaction_capabilities_store.sdl_site_status()
 
 
 @router.post(

@@ -301,5 +301,13 @@ cd moltrace_backend
   are cross-checked against frozen safety, and SDL execution requires an armed controller, a live
   heartbeat, and a human-approved envelope.
 - **Not a compliance claim.** Nothing here changes MolTrace's "designed to support" framing.
-- **Not wired to HTTP yet.** These are engines. The API surface and the FE handoff follow the
-  house engine-first pattern, in a separate commit.
+- **Not a full HTTP surface.** The lightweight halves ARE wired (owner-scoped, per project):
+  `POST/GET …/yield-predictions` (surrogate fit on the project's own experiments),
+  `POST/GET …/route-scores` (frozen-engine overlay on a supplied route),
+  `POST/GET …/forward-checks` (frozen-engine cross-check of a supplied prediction), plus the
+  global `GET /reaction-capabilities` readout and the read-only `GET /reaction-sdl/status`.
+  The **generative heavy paths stay unwired** — AiZynth route proposal, RXN/transformers forward
+  prediction, torch GNN training, and every SDL execution route — because the extras are absent
+  in all current deployments and there is no background worker to host them; wiring them now
+  would ship endpoints that 503 for every customer. The capability readout is their honest face
+  until that changes. See `docs/fe_handoff_reaction_phase_c.md`.

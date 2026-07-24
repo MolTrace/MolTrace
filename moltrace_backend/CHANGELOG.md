@@ -14,6 +14,49 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.63.0 — Repho Phase C: heavy-ML engines + governed HTTP wiring (2026-07-23)
+
+Phase C (R12–R15) of the Repho build spec, delivered as **default-off governed
+guests**: no heavy dependency enters `pyproject.toml` — torch / aizynthfinder /
+transformers / rxn4chemistry stay site-installed extras probed with
+`importlib.util.find_spec` at decision time.
+
+**Engines** (six new pure modules, 129 tests, all green with no heavy dep
+installed): `reaction_ml` (the one capability seam — per-capability env flag,
+probe, R11 promotion evidence bound to gold-checksum + model version, auditable
+`BackendDecision`, honest named fallback), `reaction_yield_models` (MPNN with
+MC-Dropout + SHA-sealed checkpoints, degrading GP → zero-dep k-NN),
+`reaction_retro` (route model + frozen safety/green overlay, reagents screened,
+unweighable atom economy refused), `reaction_forward` (predictions cross-checked
+against the frozen engines; unrecognised risk ranks worse than critical),
+`reaction_sdl` (arm/heartbeat/disarm on one monotonic timeline, bounds-checked
+envelope refusing non-finite caps and params, hash-chained journal verified by
+head hash AND entry count), `reaction_data_pipeline` (license registry —
+unregistered datasets un-ingestable, HTE corpora benchmark-only,
+Reaxys/Pistachio/Bretherick's prohibited; content-addressed splits keep the R11
+gold set out of training). Two adversarial review passes; 34 confirmed findings
+fixed (the second pass reviewed the remediation itself). The R11 gate gained
+`promotion_evidence()` + `reaction_eval_cli --evidence-out` — the previously
+missing machine-readable producer of the activation artifact.
+
+**HTTP wiring** (Alembic `0031`, three tables; 28 API tests): only the surfaces
+usable with **no** heavy dependency are exposed — owner-scoped per project:
+`POST/GET …/yield-predictions` (lightweight surrogate fit on the project's own
+completed experiments; backend + `BackendDecision` recorded verbatim, degraded
+conditions disclosed in per-prediction warnings), `POST/GET …/route-scores`
+(chemist-supplied route scored by the frozen engines; Mermaid render persisted),
+`POST/GET …/forward-checks` (supplied prediction cross-checked before anyone
+acts on it) — plus the global `GET /reaction-capabilities` honesty readout and
+the read-only `GET /reaction-sdl/status` (a registered-routes test pins that no
+SDL execution surface exists). `CapabilityUnavailableError` now maps to 503 in
+`_raise_reaction_http_error`; engine `ValueError`/`ReactionRetroError`/
+`ReactionForwardError` are wrapped to 400 at the store layer. The generative
+heavy endpoints (AiZynth proposal, RXN/transformers prediction, torch GNN
+training, SDL execution) stay deliberately unwired until the extras and an
+off-request worker exist. FE handoff: `docs/fe_handoff_reaction_phase_c.md`.
+
+---
+
 ## v0.62.1 — Security-doc accuracy sweep: Render → GCP (2026-06-26)
 
 **Docs + register only; no code change.** The P16–P23 security documentation had been written
