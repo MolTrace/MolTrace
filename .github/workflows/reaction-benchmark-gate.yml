@@ -72,4 +72,6 @@ jobs:
       # Keeping the engine's own tests on this workflow means a change that breaks the gate's
       # fail-closed behaviour cannot land quietly alongside a benchmark update.
       - name: Verify the harness + frozen gold set
-        run: uv run pytest tests/test_reaction_eval.py tests/test_reaction_eval_cli.py -q
+        # `--extra dev` because pytest lives in that extra; a bare `uv run` syncs only the default
+        # dependencies and then fails with "Failed to spawn: pytest".
+        run: uv run --extra dev pytest tests/test_reaction_eval.py tests/test_reaction_eval_cli.py -q
