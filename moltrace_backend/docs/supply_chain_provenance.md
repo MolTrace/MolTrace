@@ -35,10 +35,10 @@ gh attestation verify sbom-artifacts/<sbom> \
   --signer-workflow <owner>/MolTrace/.github/workflows/ci-cd.yml
 ```
 
-for each SBOM. Any verification failure fails the job, and because `deploy` *needs* it, **none** of
-the Vercel / Render deploy hooks fire. It is a **separate gating job** (not an in-`deploy` step) on
-purpose: the deploy hook steps use `if: always()` (so a Vercel hiccup can't block Render), which a
-failed in-job step would not stop — only an unmet `needs:` stops them all.
+for each SBOM. Any verification failure fails the job, and because the deploy jobs *need* it,
+**neither** the Cloud Run backend deploy nor the Vercel frontend hook fires. It is a **separate
+gating job** (not an in-`deploy` step) on purpose: a failed in-job step would not reliably stop
+sibling steps — only an unmet `needs:` stops them all.
 
 > A `serialNumber`/`timestamp` makes each CycloneDX document non-byte-stable across runs, so the
 > gate verifies the *same-run attested file*, never a regenerated one (regenerate-then-verify-by-
@@ -64,10 +64,11 @@ auditable from the deploy run and re-checkable later.
   This is a real, defensible supply-chain control for a hook-based deploy; it is not container-image
   signing (there is no CI-built image to sign).
 - **The gate is only effective with platform auto-deploy disabled.** Vercel auto-deploy is
-  file-disabled (`moltrace_frontend/vercel.json` `git.deploymentEnabled: false`) and both Render
-  services have Auto-Deploy = No, so the gated CI `deploy` job is the only trigger path. Anyone with
-  a deploy-hook URL or dashboard access could still deploy out-of-band — operational access control,
-  not a CI control.
+  file-disabled (`moltrace_frontend/vercel.json` `git.deploymentEnabled: false`), and the backend has
+  no platform-side auto-deploy at all: Cloud Run only takes a new revision when the gated
+  `deploy-backend` job runs `gcloud run deploy` (keyless, via Workload Identity Federation). So the
+  gated CI jobs are the only trigger path. Anyone with the Vercel deploy-hook URL, or with GCP
+  deploy IAM, could still deploy out-of-band — operational access control, not a CI control.
 - **uv's CycloneDX exporter is PREVIEW** (v1.5 only; "may change in any future release"). The two
   SBOMs differ in spec version (BE 1.5 / FE 1.7) and tool — acceptable, each is lockfile-native and
   accurate for its ecosystem. Revisit when uv's exporter stabilises.

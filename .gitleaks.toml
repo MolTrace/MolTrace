@@ -2,7 +2,7 @@
 # Extends gitleaks' default rule set. The allowlist is intentionally MINIMAL — it suppresses
 # only the exact false positives an unallowlisted full-history scan produces (verified: 62
 # generic-api-key hits, all benign), so the scanner still covers real source, tests, CI
-# workflows, render.yaml, and .env*.example. Never broaden an entry to mask a live secret —
+# workflows, deploy config, and .env*.example. Never broaden an entry to mask a live secret —
 # rotate the credential instead, then add a precise allowlist entry for a confirmed false hit.
 title = "MolTrace gitleaks config"
 

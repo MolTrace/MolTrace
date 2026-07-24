@@ -2,8 +2,8 @@
 """CSPM-lite: score the repo's IaC posture against a committed baseline; fail on drift.
 
 Security Prompt 18 (zero-trust infrastructure). The Prompt 14 ``iac`` CI gate already
-runs Trivy ``config`` over the declarative infrastructure (the ``render.yaml``
-blueprints + the GitHub Actions workflows) and hard-blocks on CRITICAL
+runs Trivy ``config`` over the declarative infrastructure (repo-wide; in practice the
+parsed target is ``moltrace_backend/Dockerfile``) and hard-blocks on CRITICAL
 misconfigurations. This adds a *continuously-scored, drift-alerting* layer on top:
 it records the accepted set of HIGH/CRITICAL misconfigurations in a committed
 baseline and FAILS on any NEW misconfiguration not already accepted — so posture

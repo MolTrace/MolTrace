@@ -24,8 +24,8 @@ Production runs on **Google Cloud, project `moltrace-prod`, region `us-central1`
 | Primary frontend | **Vercel** (`moltrace.co`) | Edge-distributed static/SSR; stores no first-party database |
 | Source, CI, build artifacts | **GitHub Actions** (+ Artifact Registry / Cloud Build) | No production tenant data |
 
-> ⚠️ `render.yaml` remains in the repo as **legacy** configuration and no longer describes
-> production. Treat the README deployment section + this page as authoritative.
+> ℹ️ The legacy `render.yaml` blueprints have been **deleted** from the repo (they described the
+> retired Render setup). Treat the README deployment section + this page as authoritative.
 
 Sub-processors and what each handles are enumerated in the
 [Trust Center register](trust_center.md#sub-processor-register). Cross-border transfer

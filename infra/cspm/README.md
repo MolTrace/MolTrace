@@ -18,8 +18,9 @@ auto-remediation) are platform/operational and are documented honestly in
   report, extracts the FAILing HIGH/CRITICAL misconfigurations (`id::target::severity`), diffs
   against the baseline, and exits non-zero on drift. `--update` re-baselines.
 - **`iac_posture_baseline.json`** — the accepted-posture baseline (the "score").
-  `accepted` is currently empty: the gated IaC tree (`render.yaml` blueprints + the
-  GitHub Actions workflows) has **zero** HIGH/CRITICAL misconfigurations.
+  `accepted` is currently empty: the gated IaC tree (`moltrace_backend/Dockerfile`, the
+  backend container image Cloud Build ships to Cloud Run) has **zero** HIGH/CRITICAL
+  misconfigurations.
 
 ## What scans, what's scored
 
