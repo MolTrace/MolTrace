@@ -11,7 +11,7 @@ security gate and the workflow files never contend.
 | **Secret scanning** | `secret-scan.yml` · `gitleaks` | gitleaks (pinned + checksum) | P8 |
 | **SAST** | `security-scan.yml` · `sast` | Semgrep (`p/python`, `p/javascript`, `p/typescript`, `p/owasp-top-ten`, `p/react`) | P14 |
 | **SCA** (deps + license) | `security-scan.yml` · `sca` | Trivy `fs` (vuln + license) over `uv.lock` + `pnpm-lock.yaml` | P14 |
-| **IaC** | `security-scan.yml` · `iac` | Trivy `config` over `render.yaml` blueprints + workflows | P14 |
+| **IaC** | `security-scan.yml` · `iac` | Trivy `config` repo-wide (parsed target: `moltrace_backend/Dockerfile`) | P14 |
 
 All four run on `push` to `main`, on `pull_request` to `main`, and on `workflow_dispatch`.
 

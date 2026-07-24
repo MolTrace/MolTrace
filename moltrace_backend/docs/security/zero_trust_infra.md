@@ -10,7 +10,7 @@ platform**, and the rest — the VPC, cloud IAM, ingress policy — is **configu
 operationally against the cloud APIs**, not declared in this repository.
 
 > **Platform of record:** Google Cloud, since the July 2026 Render → GCP migration.
-> The root `render.yaml` is **stale legacy** and no longer describes production; the
+> The legacy `render.yaml` blueprints have been **deleted** from the repo; the
 > authoritative topology is the verified
 > [GCP deploy runbook](../../deploy/README.md).
 
@@ -43,8 +43,8 @@ open gap. It is the infrastructure companion to the [threat model](threat_model.
 ### 1. IaC posture scoring + drift detection (CSPM-lite)
 
 The `iac` job in `.github/workflows/security-scan.yml` runs Trivy `config` over the
-repository's declarative infrastructure — the GitHub Actions workflows, the backend
-[`Dockerfile`](../../Dockerfile), and the legacy `render.yaml` still sitting at the root.
+repository's declarative infrastructure; the parsed target is the backend
+[`Dockerfile`](../../Dockerfile) — the image Cloud Build ships to Cloud Run.
 Beyond Trivy's own CRITICAL hard-block, the
 [`infra/cspm/score_iac_posture.py`](../../../infra/cspm/score_iac_posture.py) gate
 scores the result against a **committed baseline** and **fails CI on any new
@@ -214,8 +214,10 @@ platform-owned. The line has simply moved: everything **inside** the image is ou
 - **Branch protection.** The scanning gates (gitleaks, SAST, SCA, IaC + CSPM drift) only
   *block merge* once added as **required status checks** on `main` — a one-time GitHub
   setting (noted in each workflow header).
-- **Retire `render.yaml`.** It is stale legacy that no longer describes production, yet it
-  is still scanned by the `iac` job. Leaving it invites reading it as current.
+- ~~**Retire `render.yaml`.**~~ **Done** — the three legacy Render blueprints (root,
+  `moltrace_backend/`, `moltrace_frontend/`) were deleted. Verified no IaC coverage was lost:
+  Trivy has no parser for Render blueprints, so it never scanned them; the `iac` target is
+  unchanged (`moltrace_backend/Dockerfile`) and the CSPM drift gate still reports zero drift.
 
 **Operational / platform (outside this repo):**
 

@@ -7,10 +7,14 @@ api.py), so it reuses the already-resolved ``AccessContext`` (no duplicate token
 both public and authenticated routes.
 
 Design choices (grounded in the deployment):
-* **In-process store.** Render runs a single uvicorn worker (no ``--workers`` in render.yaml), so a
-  per-process dict of buckets is consistent for all traffic today. The store sits behind a small
-  ``RateLimitStore`` protocol so a Redis-backed store can drop in unchanged IF the deploy ever goes
-  multi-worker — see ``docs/security/waf_edge_runbook.md``. No new dependency is added.
+* **In-process store — per-instance, NOT global.** A per-process dict of buckets. On Cloud Run this
+  is scoped to a single container instance, so with autoscaling the *effective* limit is
+  ``limit × instance_count`` and a client rotating across instances sees a looser bound than the
+  configured one. Treat this as abuse-dampening + a security-event signal, not a hard global quota.
+  The store sits behind a small ``RateLimitStore`` protocol so a shared (Redis) store can drop in
+  unchanged to make the limit global — see ``docs/security/waf_edge_runbook.md``. Note the
+  Memorystore/RQ deployment is currently deferred, so no shared store exists yet. No new dependency
+  is added.
 * **Tenant == user today.** ``AccessContext`` carries no org/tenant id (the product runs
   single-tenant-per-user), so the per-user key *is* the per-tenant key; the key builder is the one
   place to widen to ``org:{id}`` when an org id lands on the request.

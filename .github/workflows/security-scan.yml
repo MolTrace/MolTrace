@@ -119,8 +119,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
-      # Scans declarative infra (render.yaml blueprints + the GitHub Actions workflows themselves)
-      # for misconfigurations. Report pass → SARIF; gate pass → blocks on CRITICAL.
+      # Scans declarative infra for misconfigurations (no scan-ref → whole repo). In practice the
+      # parsed target is the backend container build, `moltrace_backend/Dockerfile` — the artifact
+      # Cloud Build ships to Cloud Run. Report pass → SARIF; gate pass → blocks on CRITICAL.
       - name: Trivy — IaC report (→ SARIF)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
