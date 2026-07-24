@@ -3931,6 +3931,104 @@ class ReactionWarmStartPriorORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class ReactionYieldPredictionRunORM(Base):
+    """A yield-prediction run (Phase C / R12 wiring) over the project's own experiments.
+
+    Always the governed *lightweight* surrogate (sklearn GP or the zero-dependency k-NN) fit
+    inline on the project's completed experiments — the heavy torch MPNN is never trained in a
+    request and requires a benchmark-gate artifact to activate. Which backend actually ran, and
+    why, is recorded verbatim in ``capability_provenance_json`` (the ``BackendDecision``).
+    """
+
+    __tablename__ = "reaction_yield_prediction_runs"
+    __table_args__ = (
+        Index(
+            "ix_reaction_yield_prediction_runs_project_created",
+            "reaction_project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    backend: Mapped[str] = mapped_column(String(80), default="")
+    trained_n: Mapped[int] = mapped_column(Integer, default=0)
+    require_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    request_json: Mapped[str] = mapped_column(Text, default="{}")
+    predictions_json: Mapped[str] = mapped_column(Text, default="[]")
+    capability_provenance_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ReactionProposedRouteScoreORM(Base):
+    """A chemist-supplied synthesis route scored by the frozen engines (Phase C / R13 wiring).
+
+    The route tree arrives from the client (native or AiZynthFinder shape); scoring is the pure
+    overlay — R6 structural safety on every molecule AND reagent, atom economy, solvent
+    greenness, brevity — persisted whole in ``score_json`` with the Mermaid render for the UI.
+    Route *generation* (AiZynthFinder MCTS) is deliberately not wired; scores are advisory and
+    always human-reviewed.
+    """
+
+    __tablename__ = "reaction_proposed_route_scores"
+    __table_args__ = (
+        Index(
+            "ix_reaction_proposed_route_scores_project_created",
+            "reaction_project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    label: Mapped[str] = mapped_column(String(200), default="")
+    route_json: Mapped[str] = mapped_column(Text, default="{}")
+    score_json: Mapped[str] = mapped_column(Text, default="{}")
+    mermaid_text: Mapped[str] = mapped_column(Text, default="")
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class ReactionForwardCheckORM(Base):
+    """A forward prediction cross-checked against the frozen engines (Phase C / R14 wiring).
+
+    The prediction arrives from the client (an external model or a chemist's hypothesis); the
+    frozen R6 safety screen and solvent-greenness overlay annotate it before anyone acts on it —
+    a model's confidence is not a safety opinion. Prediction *generation* (IBM RXN /
+    transformers) is deliberately not wired; checks are advisory and always human-reviewed.
+    """
+
+    __tablename__ = "reaction_forward_checks"
+    __table_args__ = (
+        Index(
+            "ix_reaction_forward_checks_project_created",
+            "reaction_project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    label: Mapped[str] = mapped_column(String(200), default="")
+    request_json: Mapped[str] = mapped_column(Text, default="{}")
+    result_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class ReactionBayesianOptimizationRunORM(Base):
     __tablename__ = "reaction_bayesian_optimization_runs"
     __table_args__ = (
