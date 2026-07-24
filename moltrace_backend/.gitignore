@@ -58,6 +58,15 @@ moltrace_jtfnet_cache/
 # (Prompt 13) tracks only their SHA-256 + lineage -- NEVER the weight blobs.
 *.safetensors
 adapter_model.bin
+
+# Repho Phase C (R12) yield-GNN checkpoints. `TorchMPNNPredictor.save()` writes an
+# `mpnn.pt` weight blob NEXT TO a `meta.json` sidecar (featurizer vocabularies, feature
+# order, model_version, sealing digest). `*.pt` above stops the blob; the sidecar is just
+# as much trained-model artifact, and a committed meta.json without its weights is a
+# broken half-checkpoint. The directory is caller-chosen, so `save()` also writes a
+# self-ignoring .gitignore inside it -- these are the conventional locations.
+moltrace_reaction_yield_checkpoints/
+**/reaction_yield_gnn/
 adapter_config.json
 moltrace_lora_cache/
 # FAISS spectrum-similarity indices + embeddings DERIVED from NMRShiftDB2 are
