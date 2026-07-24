@@ -156,7 +156,9 @@ export function ProjectAccessSection({ projectId }: Props) {
       await apiFetch(`/projects/${encodeURIComponent(pid)}/permissions`, {
         method: "POST",
         body: {
-          email,
+          // Contract field is `user_email` (ProjectPermissionCreate); the model forbids extras,
+          // so sending `email` 422s with "user_email: Field required; email: Extra inputs…".
+          user_email: email,
           role: addRole,
         },
       })
