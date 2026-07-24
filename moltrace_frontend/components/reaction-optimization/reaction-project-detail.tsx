@@ -36,6 +36,9 @@ const INLINE_LINK_BUTTON_CLASS =
   "inline min-h-0 align-baseline font-medium text-foreground underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:rounded-sm"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { KeyNumberTableField } from "@/components/ui/key-number-table-field"
+import { StringListField } from "@/components/ui/string-list-field"
+import { PairListField } from "@/components/ui/pair-list-field"
 import {
   Select,
   SelectContent,
@@ -1120,15 +1123,82 @@ function constraintsTextFromField(raw: unknown): string {
   }
 }
 
-/** Serialize textarea for JSON/object API fields — empty → null. */
-function jsonFieldFromText(text: string): unknown {
-  const t = text.trim()
-  if (!t) return null
-  try {
-    return JSON.parse(t) as unknown
-  } catch {
-    return t
+/** Read a free-text "notes" field stored as the backend's list|dict json shape. */
+function notesFromField(raw: unknown): string {
+  if (typeof raw === "string") return raw
+  if (Array.isArray(raw)) return raw.filter((v) => v != null).map((v) => String(v)).join("\n")
+  if (raw && typeof raw === "object") {
+    const notes = (raw as Record<string, unknown>).notes
+    if (typeof notes === "string") return notes
+    if (Array.isArray(notes)) return notes.map((v) => String(v)).join("\n")
   }
+  return ""
+}
+
+/** Free text → the backend's `{notes: ...}` json object (empty text → {}). */
+function notesToField(text: string): Record<string, unknown> {
+  const t = text.trim()
+  return t ? { notes: t } : {}
+}
+
+/**
+ * Serialize a notes-style field non-destructively. These wire fields
+ * (availability_json, safety_notes_json) can hold arbitrary structured data
+ * that this free-text UI can't fully render; if the user hasn't changed the
+ * visible text away from what we loaded, resend the original value verbatim
+ * rather than clobbering it with a `{notes}`/`{}` reduction.
+ */
+function notesFieldForSave(text: string, loadedRaw: unknown): unknown {
+  if (text.trim() === notesFromField(loadedRaw).trim()) {
+    return loadedRaw ?? {}
+  }
+  return notesToField(text)
+}
+
+/** Read a wire cost/weight field into a flat name→number map for KeyNumberTableField. */
+function numberMapFromField(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {}
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = typeof v === "number" ? v : Number(v)
+    if (Number.isFinite(n)) out[k] = n
+  }
+  return out
+}
+
+/** Read a blocked-values wire field (array, or the legacy {name: true|[...]}) into a string list. */
+function stringListFromField(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((v) => v != null).map((v) => String(v))
+  if (raw && typeof raw === "object") {
+    const out: string[] = []
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (v === true) out.push(k)
+      else if (Array.isArray(v)) out.push(...v.map((e) => String(e)))
+    }
+    return out
+  }
+  return []
+}
+
+/** Read an incompatible-pairs wire field (array-of-pairs, or {pairs:[...]}) into [a,b] rows. */
+function pairListFromField(raw: unknown): [string, string][] {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>).pairs)
+      ? ((raw as Record<string, unknown>).pairs as unknown[])
+      : []
+  const out: [string, string][] = []
+  for (const item of list) {
+    if (Array.isArray(item) && item.length >= 2) {
+      out.push([String(item[0] ?? ""), String(item[1] ?? "")])
+    } else if (item && typeof item === "object") {
+      const rec = item as Record<string, unknown>
+      const left = rec.left ?? rec.a
+      const right = rec.right ?? rec.b
+      if (left != null && right != null) out.push([String(left), String(right)])
+    }
+  }
+  return out
 }
 
 function readBoRunId(r: Record<string, unknown>): string {
@@ -1573,20 +1643,32 @@ export function ReactionProjectDetail() {
 
   const [costProfileRaw, setCostProfileRaw] = useState<unknown>(null)
   const [safetyProfileRaw, setSafetyProfileRaw] = useState<unknown>(null)
-  const [reagentCostsText, setReagentCostsText] = useState("")
-  const [solventCostsText, setSolventCostsText] = useState("")
-  const [catalystCostsText, setCatalystCostsText] = useState("")
-  const [ligandCostsText, setLigandCostsText] = useState("")
+  // Cost/safety profiles: structured object state (was raw-JSON text). A `key`
+  // bump (costFormKey) remounts the field editors after a reload/save so they
+  // reseed from the freshly-loaded values.
+  const [reagentCosts, setReagentCosts] = useState<Record<string, number>>({})
+  const [solventCosts, setSolventCosts] = useState<Record<string, number>>({})
+  const [catalystCosts, setCatalystCosts] = useState<Record<string, number>>({})
+  const [ligandCosts, setLigandCosts] = useState<Record<string, number>>({})
   const [availabilityNotes, setAvailabilityNotes] = useState("")
+  // The loaded availability_json verbatim. It is a functional map the optimizer reads
+  // (unavailable reagents are penalized), not just prose — preserve it byte-for-byte
+  // unless the user edits the visible notes text, so a PATCH never wipes structured data.
+  const [availabilityRaw, setAvailabilityRaw] = useState<unknown>(null)
   const [maxCostPerExperiment, setMaxCostPerExperiment] = useState("")
   const [costProfilePenaltyWeight, setCostProfilePenaltyWeight] = useState("")
-  const [blockedReagentsText, setBlockedReagentsText] = useState("")
-  const [blockedSolventsText, setBlockedSolventsText] = useState("")
+  const [costFormKey, setCostFormKey] = useState(0)
+  const [blockedReagents, setBlockedReagents] = useState<string[]>([])
+  const [blockedSolvents, setBlockedSolvents] = useState<string[]>([])
   const [maxTemperatureC, setMaxTemperatureC] = useState("")
   const [maxPressureBar, setMaxPressureBar] = useState("")
-  const [incompatiblePairsText, setIncompatiblePairsText] = useState("")
-  const [requiredControlsText, setRequiredControlsText] = useState("")
+  const [incompatiblePairs, setIncompatiblePairs] = useState<[string, string][]>([])
+  const [requiredControls, setRequiredControls] = useState<string[]>([])
   const [safetyNotes, setSafetyNotes] = useState("")
+  // As with availabilityRaw: preserve the loaded safety_notes_json unless the visible
+  // text is edited, so we never overwrite a structured value we couldn't fully display.
+  const [safetyNotesRaw, setSafetyNotesRaw] = useState<unknown>(null)
+  const [safetyFormKey, setSafetyFormKey] = useState(0)
 
   const [recommendationBatchesList, setRecommendationBatchesList] = useState<unknown[]>([])
   const [latestRecommendationBatch, setLatestRecommendationBatch] = useState<unknown>(null)
@@ -1826,47 +1908,51 @@ export function ReactionProjectDetail() {
 
       setCostProfileRaw(costRaw)
       if (isRecord(costRaw)) {
-        setReagentCostsText(constraintsTextFromField(costRaw.reagent_costs_json))
-        setSolventCostsText(constraintsTextFromField(costRaw.solvent_costs_json))
-        setCatalystCostsText(constraintsTextFromField(costRaw.catalyst_costs_json))
-        setLigandCostsText(constraintsTextFromField(costRaw.ligand_costs_json))
-        const av = costRaw.availability_notes
-        setAvailabilityNotes(typeof av === "string" ? av : "")
+        setReagentCosts(numberMapFromField(costRaw.reagent_costs_json))
+        setSolventCosts(numberMapFromField(costRaw.solvent_costs_json))
+        setCatalystCosts(numberMapFromField(costRaw.catalyst_costs_json))
+        setLigandCosts(numberMapFromField(costRaw.ligand_costs_json))
+        setAvailabilityRaw(costRaw.availability_json ?? null)
+        setAvailabilityNotes(notesFromField(costRaw.availability_json))
         const mce = readNum(costRaw.max_cost_per_experiment)
         setMaxCostPerExperiment(mce != null ? String(mce) : "")
         const cpw = readNum(costRaw.cost_penalty_weight)
         setCostProfilePenaltyWeight(cpw != null ? String(cpw) : "")
       } else {
-        setReagentCostsText("")
-        setSolventCostsText("")
-        setCatalystCostsText("")
-        setLigandCostsText("")
+        setReagentCosts({})
+        setSolventCosts({})
+        setCatalystCosts({})
+        setLigandCosts({})
+        setAvailabilityRaw(null)
         setAvailabilityNotes("")
         setMaxCostPerExperiment("")
         setCostProfilePenaltyWeight("")
       }
+      setCostFormKey((k) => k + 1)
 
       setSafetyProfileRaw(safetyRaw)
       if (isRecord(safetyRaw)) {
-        setBlockedReagentsText(constraintsTextFromField(safetyRaw.blocked_reagents))
-        setBlockedSolventsText(constraintsTextFromField(safetyRaw.blocked_solvents))
+        setBlockedReagents(stringListFromField(safetyRaw.blocked_reagents_json))
+        setBlockedSolvents(stringListFromField(safetyRaw.blocked_solvents_json))
         const tc = readNum(safetyRaw.max_temperature_c)
         setMaxTemperatureC(tc != null ? String(tc) : "")
         const pb = readNum(safetyRaw.max_pressure_bar)
         setMaxPressureBar(pb != null ? String(pb) : "")
-        setIncompatiblePairsText(constraintsTextFromField(safetyRaw.incompatible_pairs))
-        setRequiredControlsText(constraintsTextFromField(safetyRaw.required_controls))
-        const sn = safetyRaw.safety_notes
-        setSafetyNotes(typeof sn === "string" ? sn : "")
+        setIncompatiblePairs(pairListFromField(safetyRaw.incompatible_pairs_json))
+        setRequiredControls(stringListFromField(safetyRaw.required_controls_json))
+        setSafetyNotesRaw(safetyRaw.safety_notes_json ?? null)
+        setSafetyNotes(notesFromField(safetyRaw.safety_notes_json))
       } else {
-        setBlockedReagentsText("")
-        setBlockedSolventsText("")
+        setBlockedReagents([])
+        setBlockedSolvents([])
         setMaxTemperatureC("")
         setMaxPressureBar("")
-        setIncompatiblePairsText("")
-        setRequiredControlsText("")
+        setIncompatiblePairs([])
+        setRequiredControls([])
+        setSafetyNotesRaw(null)
         setSafetyNotes("")
       }
+      setSafetyFormKey((k) => k + 1)
 
       const exArr = Array.isArray(ex) ? ex : []
       const counts: Record<number, number> = {}
@@ -2469,6 +2555,23 @@ export function ReactionProjectDetail() {
     return names
   }, [variableRecords])
 
+  // Autocomplete pool for the cost/safety name fields: the design space's own
+  // categorical choices (catalyst/solvent/ligand/base names) so a chemist picks
+  // a value that already exists in the campaign instead of retyping it.
+  const categoricalSuggestions = useMemo(() => {
+    const seen = new Set<string>()
+    for (const v of variableRecords) {
+      const allowed = v.allowed_values_json
+      if (Array.isArray(allowed)) {
+        for (const a of allowed) {
+          const s = a == null ? "" : String(a).trim()
+          if (s) seen.add(s)
+        }
+      }
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b))
+  }, [variableRecords])
+
   const conditionKeysFromExperiments = useMemo(() => {
     const keys = new Set<string>()
     for (const e of experimentsRec) {
@@ -2641,12 +2744,16 @@ export function ReactionProjectDetail() {
     const cpwRaw = costProfilePenaltyWeight.trim()
     const cost_penalty_weight =
       cpwRaw && Number.isFinite(Number.parseFloat(cpwRaw)) ? Number.parseFloat(cpwRaw) : null
+    // The Create model (ReactionCostProfileCreate, extra=forbid) types the cost
+    // maps as `dict` with no `None`, and has no `availability_notes` field — it's
+    // `availability_json: dict`. Send the objects directly (empty → {}) under the
+    // schema keys; the previous payload (unsuffixed key + null empties) 422'd.
     return {
-      reagent_costs_json: jsonFieldFromText(reagentCostsText),
-      solvent_costs_json: jsonFieldFromText(solventCostsText),
-      catalyst_costs_json: jsonFieldFromText(catalystCostsText),
-      ligand_costs_json: jsonFieldFromText(ligandCostsText),
-      availability_notes: availabilityNotes.trim() || null,
+      reagent_costs_json: reagentCosts,
+      solvent_costs_json: solventCosts,
+      catalyst_costs_json: catalystCosts,
+      ligand_costs_json: ligandCosts,
+      availability_json: notesFieldForSave(availabilityNotes, availabilityRaw),
       max_cost_per_experiment,
       cost_penalty_weight,
     }
@@ -2686,14 +2793,19 @@ export function ReactionProjectDetail() {
     const pRaw = maxPressureBar.trim()
     const max_pressure_bar =
       pRaw && Number.isFinite(Number.parseFloat(pRaw)) ? Number.parseFloat(pRaw) : null
+    // The Create model (ReactionSafetyConstraintProfileCreate, extra=forbid) uses
+    // `_json`-suffixed keys typed `list|dict` (no `None`), and `safety_notes_json`
+    // is a list|dict — not a string. The previous payload (unsuffixed keys, a
+    // bare notes string, null empties) 422'd on every save. Send schema-correct
+    // arrays (empty → []) and wrap the note text.
     return {
-      blocked_reagents: jsonFieldFromText(blockedReagentsText),
-      blocked_solvents: jsonFieldFromText(blockedSolventsText),
+      blocked_reagents_json: blockedReagents,
+      blocked_solvents_json: blockedSolvents,
       max_temperature_c,
       max_pressure_bar,
-      incompatible_pairs: jsonFieldFromText(incompatiblePairsText),
-      required_controls: jsonFieldFromText(requiredControlsText),
-      safety_notes: safetyNotes.trim() || null,
+      incompatible_pairs_json: incompatiblePairs,
+      required_controls_json: requiredControls,
+      safety_notes_json: notesFieldForSave(safetyNotes, safetyNotesRaw),
     }
   }
 
@@ -5643,50 +5755,58 @@ export function ReactionProjectDetail() {
             description="Reagent, solvent, and process cost parameters applied during optimization to penalize expensive condition combinations."
           >
               <form className="space-y-6" onSubmit={(e) => void saveCostProfile(e)}>
-                <div className="space-y-2">
-                  <Label htmlFor="cp-reagent-costs">Reagent costs</Label>
-                  <p className="text-xs text-muted-foreground">JSON or table (advanced).</p>
-                  <Textarea
-                    id="cp-reagent-costs"
-                    rows={4}
-                    value={reagentCostsText}
-                    onChange={(e) => setReagentCostsText(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cp-solvent-costs">Solvent costs</Label>
-                  <p className="text-xs text-muted-foreground">JSON or table (advanced).</p>
-                  <Textarea
-                    id="cp-solvent-costs"
-                    rows={4}
-                    value={solventCostsText}
-                    onChange={(e) => setSolventCostsText(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cp-catalyst-costs">Catalyst costs</Label>
-                  <p className="text-xs text-muted-foreground">JSON or table (advanced).</p>
-                  <Textarea
-                    id="cp-catalyst-costs"
-                    rows={4}
-                    value={catalystCostsText}
-                    onChange={(e) => setCatalystCostsText(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cp-ligand-costs">Ligand costs</Label>
-                  <p className="text-xs text-muted-foreground">JSON or table (advanced).</p>
-                  <Textarea
-                    id="cp-ligand-costs"
-                    rows={4}
-                    value={ligandCostsText}
-                    onChange={(e) => setLigandCostsText(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                </div>
+                <KeyNumberTableField
+                  key={`reagent-costs-${costFormKey}`}
+                  label="Reagent costs"
+                  keyLabel="Reagent"
+                  valueLabel="Cost"
+                  unit="cost/unit"
+                  addLabel="Add reagent"
+                  initialValue={reagentCosts}
+                  onChange={setReagentCosts}
+                  suggestions={categoricalSuggestions}
+                  suggestionsHint="Suggestions come from this project's design-space choices."
+                  idPrefix="cp-reagent-costs"
+                />
+                <KeyNumberTableField
+                  key={`solvent-costs-${costFormKey}`}
+                  label="Solvent costs"
+                  keyLabel="Solvent"
+                  valueLabel="Cost"
+                  unit="cost/unit"
+                  addLabel="Add solvent"
+                  initialValue={solventCosts}
+                  onChange={setSolventCosts}
+                  suggestions={categoricalSuggestions}
+                  suggestionsHint="Suggestions come from this project's design-space choices."
+                  idPrefix="cp-solvent-costs"
+                />
+                <KeyNumberTableField
+                  key={`catalyst-costs-${costFormKey}`}
+                  label="Catalyst costs"
+                  keyLabel="Catalyst"
+                  valueLabel="Cost"
+                  unit="cost/unit"
+                  addLabel="Add catalyst"
+                  initialValue={catalystCosts}
+                  onChange={setCatalystCosts}
+                  suggestions={categoricalSuggestions}
+                  suggestionsHint="Suggestions come from this project's design-space choices."
+                  idPrefix="cp-catalyst-costs"
+                />
+                <KeyNumberTableField
+                  key={`ligand-costs-${costFormKey}`}
+                  label="Ligand costs"
+                  keyLabel="Ligand"
+                  valueLabel="Cost"
+                  unit="cost/unit"
+                  addLabel="Add ligand"
+                  initialValue={ligandCosts}
+                  onChange={setLigandCosts}
+                  suggestions={categoricalSuggestions}
+                  suggestionsHint="Suggestions come from this project's design-space choices."
+                  idPrefix="cp-ligand-costs"
+                />
                 <div className="space-y-2">
                   <Label htmlFor="cp-availability">Availability notes</Label>
                   <Textarea
@@ -5734,42 +5854,30 @@ export function ReactionProjectDetail() {
             description="Blocked reagents, hazard flags, and safety-constraint parameters applied to filter candidate conditions before scoring."
           >
               <form className="space-y-6" onSubmit={(e) => void saveSafetyProfile(e)}>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Label htmlFor="sp-blocked-reagents">Blocked reagents</Label>
-                    {blockedReagentsText.trim() ? (
-                      <Badge variant="destructive" className="text-[10px] font-normal">
-                        blocked list active
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="text-xs text-muted-foreground">JSON or list (advanced).</p>
-                  <Textarea
-                    id="sp-blocked-reagents"
-                    rows={4}
-                    value={blockedReagentsText}
-                    onChange={(e) => setBlockedReagentsText(e.target.value)}
-                    className="border-destructive/25 font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Label htmlFor="sp-blocked-solvents">Blocked solvents</Label>
-                    {blockedSolventsText.trim() ? (
-                      <Badge variant="destructive" className="text-[10px] font-normal">
-                        blocked list active
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="text-xs text-muted-foreground">JSON or list (advanced).</p>
-                  <Textarea
-                    id="sp-blocked-solvents"
-                    rows={4}
-                    value={blockedSolventsText}
-                    onChange={(e) => setBlockedSolventsText(e.target.value)}
-                    className="border-destructive/25 font-mono text-xs"
-                  />
-                </div>
+                <StringListField
+                  key={`blocked-reagents-${safetyFormKey}`}
+                  label="Blocked reagents"
+                  itemLabel="Reagent"
+                  addLabel="Add blocked reagent"
+                  initialValue={blockedReagents}
+                  onChange={setBlockedReagents}
+                  suggestions={categoricalSuggestions}
+                  suggestionsHint="Suggestions come from this project's design-space choices."
+                  description="Candidate conditions using any blocked reagent are filtered out before scoring."
+                  idPrefix="sp-blocked-reagents"
+                />
+                <StringListField
+                  key={`blocked-solvents-${safetyFormKey}`}
+                  label="Blocked solvents"
+                  itemLabel="Solvent"
+                  addLabel="Add blocked solvent"
+                  initialValue={blockedSolvents}
+                  onChange={setBlockedSolvents}
+                  suggestions={categoricalSuggestions}
+                  suggestionsHint="Suggestions come from this project's design-space choices."
+                  description="Candidate conditions using any blocked solvent are filtered out before scoring."
+                  idPrefix="sp-blocked-solvents"
+                />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="sp-max-temp">Max temperature (°C)</Label>
@@ -5792,28 +5900,30 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sp-incompatible">Incompatible pairs</Label>
-                  <p className="text-xs text-muted-foreground">JSON (advanced).</p>
-                  <Textarea
-                    id="sp-incompatible"
-                    rows={4}
-                    value={incompatiblePairsText}
-                    onChange={(e) => setIncompatiblePairsText(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sp-controls">Required controls</Label>
-                  <p className="text-xs text-muted-foreground">JSON (advanced).</p>
-                  <Textarea
-                    id="sp-controls"
-                    rows={4}
-                    value={requiredControlsText}
-                    onChange={(e) => setRequiredControlsText(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                </div>
+                <PairListField
+                  key={`incompatible-pairs-${safetyFormKey}`}
+                  label="Incompatible pairs"
+                  leftLabel="Component A"
+                  rightLabel="Component B"
+                  addLabel="Add incompatible pair"
+                  initialValue={incompatiblePairs}
+                  onChange={setIncompatiblePairs}
+                  suggestions={categoricalSuggestions}
+                  suggestionsHint="Suggestions come from this project's design-space choices."
+                  description="Conditions containing both components of a pair are filtered out before scoring."
+                  idPrefix="sp-incompatible"
+                />
+                <StringListField
+                  key={`required-controls-${safetyFormKey}`}
+                  label="Required controls"
+                  itemLabel="Control"
+                  itemPlaceholder="e.g. blast shield, slow addition"
+                  addLabel="Add required control"
+                  initialValue={requiredControls}
+                  onChange={setRequiredControls}
+                  description="Operational controls a chemist must confirm before running flagged chemistry."
+                  idPrefix="sp-controls"
+                />
                 <div className="space-y-2">
                   <Label htmlFor="sp-notes">Safety notes</Label>
                   <Textarea
