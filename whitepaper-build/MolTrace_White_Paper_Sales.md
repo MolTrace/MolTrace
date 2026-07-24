@@ -96,6 +96,8 @@ Dossier scaffolding, FDA / EMA / ICH-aligned audit packs, human-in-the-loop rele
 
 Bayesian optimisation, multi-objective response surface modelling, and mechanistic-insight-guided design-of-experiments — sharing the same SMILES candidates and the same audit-provenance manifest as SpectraCheck, so a "this reaction was optimised toward yield + selectivity" claim is reproducible end-to-end. Per-experiment green-chemistry metrics (E-factor, atom economy, PMI, reaction mass efficiency, and a CHEM21-based solvent green-score) are computed and can be optimised alongside yield and selectivity.
 
+Heavier machine learning — GNN yield prediction, retrosynthesis, forward prediction, and self-driving-lab execution — is available as **optional, default-off capabilities**. They are enabled one at a time, deliberately; their dependencies are not installed unless you want them, so the standard deployment stays lightweight and CPU-only. A model that would replace the platform's deterministic arithmetic must first pass a frozen benchmark **that includes a blocking safety check** — an improvement in accuracy cannot buy its way past a hazard the previous model caught. Predicted routes and products are re-screened by the same frozen safety engine that governs manual work, robotic execution sits behind explicit interlocks with manual mode as the default, and reaction training data is licence-governed: unregistered datasets cannot be ingested and licence-restricted commercial corpora are never bundled.
+
 ---
 
 ## 5. Compliance & Regulatory Posture
