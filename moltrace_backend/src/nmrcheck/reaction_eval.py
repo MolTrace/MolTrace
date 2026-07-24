@@ -531,6 +531,33 @@ def run_benchmark_gate(
     return gate(candidate, incumbent, tolerance=tolerance)
 
 
+def promotion_evidence(outcome: GateOutcome, candidate: EvalResult) -> dict[str, Any]:
+    """Emit the machine-readable gate record that :mod:`nmrcheck.reaction_ml` consumes.
+
+    The gate outcome carries the *exit code*; the evaluated result carries the *gold checksum* and
+    the *model version*. Neither alone is the record the Phase-C capability seam requires, so this
+    is the one producer of that union — without it the only thing that could ever unlock a heavy
+    backend was a dict an operator typed by hand, and the "R11 gate pass" recorded in provenance
+    would have been a self-attestation.
+
+    It reports the outcome faithfully rather than only on success: a blocked or drifted run yields
+    evidence carrying that non-zero exit code, which ``reaction_ml`` then correctly refuses. This
+    ties the record to a gate run that actually happened; it is not a signature, and it does not
+    defend against an operator who edits the artifact afterwards. Treat it as the audit trail of
+    the promotion decision, and protect it the way the rest of the release evidence is protected.
+    """
+
+    return {
+        "exit_code": int(outcome.exit_code),
+        "gold_checksum": candidate.gold_checksum,
+        "model_version": candidate.model_version,
+        "safety_flag_recall": candidate.safety_flag_recall,
+        "reason": outcome.reason,
+        "verdict": outcome.verdict.as_dict() if outcome.verdict is not None else None,
+        "engine": ENGINE,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Helpers.
 # --------------------------------------------------------------------------- #
