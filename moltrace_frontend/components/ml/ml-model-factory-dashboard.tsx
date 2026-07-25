@@ -188,7 +188,7 @@ export function MlModelFactoryDashboard() {
         const data = await apiFetch<unknown>(path, { method: "GET" })
         setRows(extractRows(data, keys))
       } catch (e) {
-        setErr(formatErr(e, `Could not load ${path}.`))
+        setErr(formatErr(e, `Could not load this list.`))
         setRows([])
       }
     }
@@ -203,7 +203,7 @@ export function MlModelFactoryDashboard() {
           const data = await apiFetch<unknown>("/ml/model-health", { method: "GET" })
           setModelHealth(data)
         } catch (e) {
-          setErrHealth(formatErr(e, "Could not load /ml/model-health."))
+          setErrHealth(formatErr(e, "Could not load model health."))
           setModelHealth(null)
         }
       })(),
@@ -235,7 +235,7 @@ export function MlModelFactoryDashboard() {
 
   function statSub(opts: { errored: boolean; empty: boolean; label: string }) {
     if (loading) return <p className="text-xs text-muted-foreground">Loading…</p>
-    if (opts.errored) return <p className="text-xs text-muted-foreground">Unable to load from backend.</p>
+    if (opts.errored) return <p className="text-xs text-muted-foreground">Unable to load.</p>
     if (opts.empty) return <p className="text-xs text-muted-foreground">No data returned.</p>
     return <p className="text-xs text-muted-foreground">{opts.label}</p>
   }
@@ -245,11 +245,11 @@ export function MlModelFactoryDashboard() {
     errTasks || errTraining || errEval || errDeploy || errHealth ? (
       <AlertCard variant="error" title="Partial load">
         <div className="space-y-1 text-xs">
-          {errTasks ? <p>GET /ml/tasks: {errTasks}</p> : null}
-          {errTraining ? <p>GET /ml/training-runs: {errTraining}</p> : null}
-          {errEval ? <p>GET /ml/evaluation-runs: {errEval}</p> : null}
-          {errDeploy ? <p>GET /ml/deployment-candidates: {errDeploy}</p> : null}
-          {errHealth ? <p>GET /ml/model-health: {errHealth}</p> : null}
+          {errTasks ? <p>Tasks: {errTasks}</p> : null}
+          {errTraining ? <p>Training runs: {errTraining}</p> : null}
+          {errEval ? <p>Evaluation runs: {errEval}</p> : null}
+          {errDeploy ? <p>Deployment candidates: {errDeploy}</p> : null}
+          {errHealth ? <p>Model health: {errHealth}</p> : null}
         </div>
       </AlertCard>
     ) : null
@@ -338,7 +338,7 @@ export function MlModelFactoryDashboard() {
               {statSub({
                 errored: Boolean(errTasks),
                 empty: !errTasks && tasks.length === 0,
-                label: "GET /ml/tasks",
+                label: "Registered tasks",
               })}
             </CardContent>
           </Card>
@@ -358,7 +358,7 @@ export function MlModelFactoryDashboard() {
               {statSub({
                 errored: Boolean(errTraining),
                 empty: !errTraining && trainingRuns.length === 0,
-                label: "GET /ml/training-runs",
+                label: "Training runs",
               })}
             </CardContent>
           </Card>
@@ -378,7 +378,7 @@ export function MlModelFactoryDashboard() {
               {statSub({
                 errored: Boolean(errEval),
                 empty: !errEval && evaluationRuns.length === 0,
-                label: "GET /ml/evaluation-runs",
+                label: "Evaluation runs",
               })}
             </CardContent>
           </Card>
@@ -398,7 +398,7 @@ export function MlModelFactoryDashboard() {
               {statSub({
                 errored: Boolean(errHealth),
                 empty: !errHealth && artifactCount == null && healthScalars.length === 0,
-                label: "GET /ml/model-health",
+                label: "Model artifacts",
               })}
             </CardContent>
           </Card>
@@ -418,7 +418,7 @@ export function MlModelFactoryDashboard() {
               {statSub({
                 errored: Boolean(errDeploy),
                 empty: !errDeploy && deploymentCandidates.length === 0,
-                label: "GET /ml/deployment-candidates",
+                label: "Deployment candidates",
               })}
             </CardContent>
           </Card>
@@ -445,7 +445,7 @@ export function MlModelFactoryDashboard() {
                   Boolean(errDeploy) === false &&
                   reviewPendingCount === null &&
                   deploymentCandidates.length === 0,
-                label: "From model-health or deployment-candidate status fields",
+                label: "From model health or candidate status",
               })}
             </CardContent>
           </Card>
@@ -472,7 +472,7 @@ export function MlModelFactoryDashboard() {
                   Boolean(errTasks) === false &&
                   errorAnalysisOpen === null &&
                   tasks.length === 0,
-                label: "From model-health or task rows",
+                label: "From model health or task records",
               })}
             </CardContent>
           </Card>
@@ -496,11 +496,11 @@ export function MlModelFactoryDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>name</TableHead>
-                  <TableHead>task_type</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Task type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -547,11 +547,11 @@ export function MlModelFactoryDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>dataset_version_id</TableHead>
-                  <TableHead>started_at</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Dataset version ID</TableHead>
+                  <TableHead>Started</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -598,10 +598,10 @@ export function MlModelFactoryDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>metric_summary</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Metric summary</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -645,11 +645,11 @@ export function MlModelFactoryDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>approval_status</TableHead>
-                  <TableHead>model_version_id</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Approval status</TableHead>
+                  <TableHead>Model version ID</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -683,7 +683,7 @@ export function MlModelFactoryDashboard() {
         accent="teal"
         eyebrow="ML · Model Health"
         title="Model health preview"
-        description="Model health summary — scalar performance and drift indicators. Nested payloads are not expanded; approval and validation states always come from backend fields."
+        description="Model health summary — scalar performance and drift indicators. Nested details are not expanded; approval and validation states always come from stored record fields."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -692,15 +692,15 @@ export function MlModelFactoryDashboard() {
             <p className="text-sm text-muted-foreground">{errHealth}</p>
           ) : healthScalars.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No scalar summary fields returned (or response is array-only). Approval and validation states always come
-              from backend fields — not inferred here.
+              No summary fields available. Approval and validation states always come
+              from stored record fields — not inferred here.
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>field</TableHead>
-                  <TableHead>value</TableHead>
+                  <TableHead>Field</TableHead>
+                  <TableHead>Value</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -717,8 +717,8 @@ export function MlModelFactoryDashboard() {
       </ModuleCard>
 
       <p className="text-xs text-muted-foreground">
-        Factory lists reflect operational signals from your tenant API. Release decisions follow your governance process;
-        surface <span className="font-medium text-foreground">approval_status</span> and related backend fields rather
+        Factory lists reflect operational signals from your workspace. Release decisions follow your governance process;
+        surface <span className="font-medium text-foreground">approval status</span> and related recorded fields rather
         than UI assumptions.
       </p>
     </div>

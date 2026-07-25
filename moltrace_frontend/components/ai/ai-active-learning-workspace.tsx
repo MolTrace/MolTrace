@@ -72,7 +72,7 @@ function formatErr(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
     const data = err.data
     if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return `HTTP ${err.status}: ${err.message || fallback}`
+    return err.message || fallback
   }
   if (err instanceof Error) return err.message
   return fallback
@@ -137,7 +137,7 @@ export function AiActiveLearningWorkspace() {
       const data = await apiFetch<unknown>("/ai/active-learning/candidates", { method: "GET" })
       setQueueRows(extractRows(data, QUEUE_KEYS))
     } catch (err) {
-      setQueueErr(formatErr(err, "Could not load /ai/active-learning/candidates."))
+      setQueueErr(formatErr(err, "Could not load active-learning candidates."))
       setQueueRows([])
     } finally {
       setLoading(false)
@@ -153,7 +153,7 @@ export function AiActiveLearningWorkspace() {
     setFeedbackOk("")
     const id = Number.parseInt(predictionId, 10)
     if (!Number.isFinite(id) || id < 1) {
-      setFeedbackErr("prediction_id is required.")
+      setFeedbackErr("Prediction ID is required.")
       return
     }
     if (sensitiveWarning && !sensitiveConfirmed) {
@@ -211,7 +211,7 @@ export function AiActiveLearningWorkspace() {
     setCandidateErr("")
     setCandidateOk("")
     if (!candidateReason.trim()) {
-      setCandidateErr("reason is required.")
+      setCandidateErr("Reason is required.")
       return
     }
     const predId = Number.parseInt(candidatePredictionId, 10)
@@ -254,7 +254,7 @@ export function AiActiveLearningWorkspace() {
       })
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setCandidateErr(formatErr(err, `Could not update /ai/active-learning/candidates/${candidateId}.`))
+      setCandidateErr(formatErr(err, `Could not update candidate ${candidateId}.`))
     } finally {
       setRowBusyId(null)
     }
@@ -293,11 +293,11 @@ export function AiActiveLearningWorkspace() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="feedback-prediction-id">prediction ID</Label>
-              <Input id="feedback-prediction-id" value={predictionId} onChange={(e) => setPredictionId(e.target.value)} inputMode="numeric" placeholder="prediction_id" />
+              <Label htmlFor="feedback-prediction-id">Prediction ID</Label>
+              <Input id="feedback-prediction-id" value={predictionId} onChange={(e) => setPredictionId(e.target.value)} inputMode="numeric" placeholder="Prediction ID" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="feedback-type">feedback type</Label>
+              <Label htmlFor="feedback-type">Feedback type</Label>
               <Select value={feedbackType} onValueChange={setFeedbackType}>
                 <SelectTrigger id="feedback-type">
                   <SelectValue placeholder="Select feedback type" />
@@ -312,12 +312,12 @@ export function AiActiveLearningWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="reviewer-name">reviewer name optional</Label>
-              <Input id="reviewer-name" value={reviewerName} onChange={(e) => setReviewerName(e.target.value)} placeholder="reviewer_name" />
+              <Label htmlFor="reviewer-name">Reviewer name (optional)</Label>
+              <Input id="reviewer-name" value={reviewerName} onChange={(e) => setReviewerName(e.target.value)} placeholder="Reviewer name" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="reviewer-comment">reviewer comment optional</Label>
-              <Input id="reviewer-comment" value={reviewerComment} onChange={(e) => setReviewerComment(e.target.value)} placeholder="reviewer_comment" />
+              <Label htmlFor="reviewer-comment">Reviewer comment (optional)</Label>
+              <Input id="reviewer-comment" value={reviewerComment} onChange={(e) => setReviewerComment(e.target.value)} placeholder="Reviewer comment" />
             </div>
             {/* reason_code (v0.19.1) — surfaces only on a negative verdict
                 (rejected / corrected / error_case / uncertain). Orthogonal
@@ -325,7 +325,7 @@ export function AiActiveLearningWorkspace() {
             {isNegativeFeedbackType(feedbackType) ? (
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="feedback-reason-code">
-                  reason_code optional
+                  Reason code (optional)
                   <span className="ml-2 font-normal text-muted-foreground">
                     · structured "why?" tag for the negative verdict
                   </span>
@@ -350,7 +350,7 @@ export function AiActiveLearningWorkspace() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="corrected-output-json">corrected output JSON optional</Label>
+            <Label htmlFor="corrected-output-json">Corrected output (optional)</Label>
             <JsonObjectField idPrefix="corrected-output-json" label="Corrected output (optional)" initialValue={correctedOutput} onChange={setCorrectedOutput} description="A structured correction, if any. Leave empty for none." />
           </div>
 
@@ -390,7 +390,7 @@ export function AiActiveLearningWorkspace() {
           {candidateOk ? <p className="text-sm text-emerald-700">{candidateOk}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="candidate-source-module">source module</Label>
+              <Label htmlFor="candidate-source-module">Source module</Label>
               <Select value={candidateSourceModule} onValueChange={setCandidateSourceModule}>
                 <SelectTrigger id="candidate-source-module">
                   <SelectValue placeholder="Select source module" />
@@ -405,7 +405,7 @@ export function AiActiveLearningWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="candidate-priority">priority</Label>
+              <Label htmlFor="candidate-priority">Priority</Label>
               <Select value={candidatePriority} onValueChange={setCandidatePriority}>
                 <SelectTrigger id="candidate-priority">
                   <SelectValue placeholder="Select priority" />
@@ -420,7 +420,7 @@ export function AiActiveLearningWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="candidate-status">status</Label>
+              <Label htmlFor="candidate-status">Status</Label>
               <Select value={candidateStatus} onValueChange={setCandidateStatus}>
                 <SelectTrigger id="candidate-status">
                   <SelectValue placeholder="Select status" />
@@ -435,27 +435,27 @@ export function AiActiveLearningWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="candidate-linked-prediction">linked prediction</Label>
+              <Label htmlFor="candidate-linked-prediction">Linked prediction</Label>
               <Input
                 id="candidate-linked-prediction"
                 value={candidatePredictionId}
                 onChange={(e) => setCandidatePredictionId(e.target.value)}
                 inputMode="numeric"
-                placeholder="prediction_id"
+                placeholder="Prediction ID"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="candidate-linked-model-improvement">linked model improvement item</Label>
+              <Label htmlFor="candidate-linked-model-improvement">Linked model improvement item</Label>
               <Input
                 id="candidate-linked-model-improvement"
                 value={candidateModelImprovementId}
                 onChange={(e) => setCandidateModelImprovementId(e.target.value)}
                 inputMode="numeric"
-                placeholder="model_improvement_item_id"
+                placeholder="Model improvement item ID"
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="candidate-reason">reason</Label>
+              <Label htmlFor="candidate-reason">Reason</Label>
               <Textarea
                 id="candidate-reason"
                 value={candidateReason}
@@ -484,14 +484,14 @@ export function AiActiveLearningWorkspace() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>source module</TableHead>
-                <TableHead>reason</TableHead>
-                <TableHead>priority</TableHead>
-                <TableHead>status</TableHead>
-                <TableHead>linked prediction</TableHead>
-                <TableHead>linked model improvement item</TableHead>
-                <TableHead>created date</TableHead>
-                <TableHead>actions</TableHead>
+                <TableHead>Source module</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Linked prediction</TableHead>
+                <TableHead>Linked model improvement item</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -516,10 +516,10 @@ export function AiActiveLearningWorkspace() {
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         <Button size="sm" variant="outline" disabled={busy || candidateId == null} onClick={() => candidateId != null && void patchCandidateStatus(candidateId, "accepted")}>
-                          accept
+                          Accept
                         </Button>
                         <Button size="sm" variant="outline" disabled={busy || candidateId == null} onClick={() => candidateId != null && void patchCandidateStatus(candidateId, "rejected")}>
-                          reject
+                          Reject
                         </Button>
                         <Button
                           size="sm"
@@ -527,10 +527,10 @@ export function AiActiveLearningWorkspace() {
                           disabled={busy || candidateId == null}
                           onClick={() => candidateId != null && void patchCandidateStatus(candidateId, "queued_for_dataset")}
                         >
-                          queue for dataset
+                          Queue for dataset
                         </Button>
                         <Button size="sm" variant="outline" disabled={busy || candidateId == null} onClick={() => candidateId != null && void patchCandidateStatus(candidateId, "resolved")}>
-                          resolve
+                          Resolve
                         </Button>
                       </div>
                     </TableCell>

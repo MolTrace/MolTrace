@@ -201,16 +201,16 @@ export function SystemReleasesWorkspace() {
 
   async function createRelease() {
     if (!releaseVersion.trim()) {
-      setError("release version is required.")
+      setError("Release version is required.")
       return
     }
     if (!changeSummary.trim()) {
-      setError("change summary is required.")
+      setError("Change summary is required.")
       return
     }
     const parsedValidationProjectId = validationProjectId.trim() ? readInt(validationProjectId) : null
     if (validationProjectId.trim() && parsedValidationProjectId == null) {
-      setError("validation project ID must be a positive integer.")
+      setError("Validation project ID must be a positive integer.")
       return
     }
 
@@ -254,15 +254,15 @@ export function SystemReleasesWorkspace() {
     const id = rowId(detailRelease)
     if (!id) return
     if (!reviewerName.trim()) {
-      setError("reviewer name is required.")
+      setError("Reviewer name is required.")
       return
     }
     if (!approvalRationale.trim()) {
-      setError("approval rationale is required.")
+      setError("Approval rationale is required.")
       return
     }
     if (!signatureReason.trim()) {
-      setError("e-signature reason is required.")
+      setError("E-signature reason is required.")
       return
     }
 
@@ -326,7 +326,7 @@ export function SystemReleasesWorkspace() {
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label htmlFor="system-release-version">release version</Label>
+                <Label htmlFor="system-release-version">Release version</Label>
                 <Input
                   id="system-release-version"
                   value={releaseVersion}
@@ -334,7 +334,7 @@ export function SystemReleasesWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="system-release-type">release type</Label>
+                <Label htmlFor="system-release-type">Release type</Label>
                 <Select value={releaseType} onValueChange={setReleaseType}>
                   <SelectTrigger id="system-release-type">
                     <SelectValue />
@@ -349,7 +349,7 @@ export function SystemReleasesWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="system-release-validation-project-id">validation project ID</Label>
+                <Label htmlFor="system-release-validation-project-id">Validation project ID</Label>
                 <Input
                   id="system-release-validation-project-id"
                   inputMode="numeric"
@@ -358,7 +358,7 @@ export function SystemReleasesWorkspace() {
                 />
               </div>
               <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="system-release-change-summary">change summary</Label>
+                <Label htmlFor="system-release-change-summary">Change summary</Label>
                 <Textarea
                   id="system-release-change-summary"
                   value={changeSummary}
@@ -367,7 +367,7 @@ export function SystemReleasesWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>test summary</Label>
+                <Label>Test summary</Label>
                 <StructuredJsonObjectEditor
                   key={`test-summary-${summaryFormNonce}`}
                   idPrefix="system-release-test-summary"
@@ -378,7 +378,7 @@ export function SystemReleasesWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>risk summary</Label>
+                <Label>Risk summary</Label>
                 <StructuredJsonObjectEditor
                   key={`risk-summary-${summaryFormNonce}`}
                   idPrefix="system-release-risk-summary"
@@ -407,25 +407,25 @@ export function SystemReleasesWorkspace() {
               <>
                 <div className="grid gap-3 sm:grid-cols-4">
                   <div>
-                    <p className="text-xs text-muted-foreground">release version</p>
+                    <p className="text-xs text-muted-foreground">Release version</p>
                     <p className="font-medium">{readStr(detailRelease.release_version) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">release type</p>
+                    <p className="text-xs text-muted-foreground">Release type</p>
                     <p className="font-medium">{readStr(detailRelease.release_type) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">approval status</p>
+                    <p className="text-xs text-muted-foreground">Approval status</p>
                     <StatusBadge status={detailRelease.approval_status} />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">validation project ID</p>
+                    <p className="text-xs text-muted-foreground">Validation project ID</p>
                     <p className="font-medium">{validationProjectRef(detailRelease.validation_project_id)}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium">change summary</h3>
+                  <h3 className="text-sm font-medium">Change summary</h3>
                   <p className="whitespace-pre-wrap rounded-lg border p-3 text-sm">
                     {readStr(detailRelease.change_summary) || "-"}
                   </p>
@@ -433,13 +433,13 @@ export function SystemReleasesWorkspace() {
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <details className="rounded-lg border p-3">
-                    <summary className="cursor-pointer text-sm font-medium">test summary</summary>
+                    <summary className="cursor-pointer text-sm font-medium">Test summary</summary>
                     <pre className="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
                       {JSON.stringify(sanitizedTestSummary, null, 2)}
                     </pre>
                   </details>
                   <details className="rounded-lg border p-3">
-                    <summary className="cursor-pointer text-sm font-medium">risk summary</summary>
+                    <summary className="cursor-pointer text-sm font-medium">Risk summary</summary>
                     <pre className="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
                       {JSON.stringify(sanitizedRiskSummary, null, 2)}
                     </pre>
@@ -453,7 +453,7 @@ export function SystemReleasesWorkspace() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1">
-                      <Label htmlFor="system-release-reviewer-name">reviewer name</Label>
+                      <Label htmlFor="system-release-reviewer-name">Reviewer name</Label>
                       <Input
                         id="system-release-reviewer-name"
                         value={reviewerName}
@@ -461,7 +461,7 @@ export function SystemReleasesWorkspace() {
                       />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
-                      <Label htmlFor="system-release-approval-rationale">approval rationale</Label>
+                      <Label htmlFor="system-release-approval-rationale">Approval rationale</Label>
                       <Textarea
                         id="system-release-approval-rationale"
                         value={approvalRationale}
@@ -470,7 +470,7 @@ export function SystemReleasesWorkspace() {
                       />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
-                      <Label htmlFor="system-release-signature-reason">e-signature reason</Label>
+                      <Label htmlFor="system-release-signature-reason">E-signature reason</Label>
                       <Textarea
                         id="system-release-signature-reason"
                         value={signatureReason}
@@ -514,13 +514,13 @@ export function SystemReleasesWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>release version</TableHead>
-                  <TableHead>release type</TableHead>
-                  <TableHead>approval status</TableHead>
-                  <TableHead>validation project ID</TableHead>
-                  <TableHead>created date</TableHead>
-                  <TableHead>released date</TableHead>
-                  <TableHead className="text-right">open</TableHead>
+                  <TableHead>Release version</TableHead>
+                  <TableHead>Release type</TableHead>
+                  <TableHead>Approval status</TableHead>
+                  <TableHead>Validation project ID</TableHead>
+                  <TableHead>Created date</TableHead>
+                  <TableHead>Released date</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

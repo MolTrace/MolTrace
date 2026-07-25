@@ -373,7 +373,7 @@ export function FileIngestionNormalizationWorkspace() {
           {ingestionError ? <p className="text-xs text-destructive">{ingestionError}</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="ingestion-source-system">source system/path: source system</Label>
+              <Label htmlFor="ingestion-source-system">Source system</Label>
               <Input
                 id="ingestion-source-system"
                 value={sourceSystem}
@@ -382,7 +382,7 @@ export function FileIngestionNormalizationWorkspace() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="ingestion-source-path">source system/path: source path</Label>
+              <Label htmlFor="ingestion-source-path">Source path</Label>
               <Input
                 id="ingestion-source-path"
                 value={sourcePath}
@@ -391,7 +391,7 @@ export function FileIngestionNormalizationWorkspace() {
               />
             </div>
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="ingestion-notes">notes</Label>
+              <Label htmlFor="ingestion-notes">Notes</Label>
               <Textarea
                 id="ingestion-notes"
                 rows={3}
@@ -421,23 +421,23 @@ export function FileIngestionNormalizationWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ingestion run ID</TableHead>
-                    <TableHead>status badges</TableHead>
-                    <TableHead>source system/path</TableHead>
-                    <TableHead>discovered count</TableHead>
-                    <TableHead>ingested count</TableHead>
-                    <TableHead>skipped count</TableHead>
-                    <TableHead>failed count</TableHead>
-                    <TableHead>warnings</TableHead>
-                    <TableHead>notes</TableHead>
-                    <TableHead>open</TableHead>
+                    <TableHead>Ingestion run ID</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Source system / path</TableHead>
+                    <TableHead>Discovered</TableHead>
+                    <TableHead>Ingested</TableHead>
+                    <TableHead>Skipped</TableHead>
+                    <TableHead>Failed</TableHead>
+                    <TableHead>Warnings</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead>Open</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {ingestionRuns.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} className="text-xs text-muted-foreground">
-                        No ingestion runs returned.
+                        No ingestion runs yet.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -490,7 +490,7 @@ export function FileIngestionNormalizationWorkspace() {
           {normalizationError ? <p className="text-xs text-destructive">{normalizationError}</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="normalization-file-id">select file ID</Label>
+              <Label htmlFor="normalization-file-id">File ID</Label>
               <Input
                 id="normalization-file-id"
                 value={fileId}
@@ -499,7 +499,7 @@ export function FileIngestionNormalizationWorkspace() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="normalization-target-route">choose target route</Label>
+              <Label htmlFor="normalization-target-route">Target format</Label>
               <select
                 id="normalization-target-route"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -542,22 +542,22 @@ export function FileIngestionNormalizationWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>normalization run ID</TableHead>
-                  <TableHead>status badges</TableHead>
-                  <TableHead>file ID</TableHead>
-                  <TableHead>source format</TableHead>
-                  <TableHead>target format</TableHead>
-                  <TableHead>output artifact ID</TableHead>
-                  <TableHead>warnings</TableHead>
-                  <TableHead>notes</TableHead>
-                  <TableHead>open</TableHead>
+                  <TableHead>Normalization run ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>File ID</TableHead>
+                  <TableHead>Source format</TableHead>
+                  <TableHead>Target format</TableHead>
+                  <TableHead>Output artifact ID</TableHead>
+                  <TableHead>Warnings</TableHead>
+                  <TableHead>Notes</TableHead>
+                  <TableHead>Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {normalizationRuns.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-xs text-muted-foreground">
-                      No normalization runs returned.
+                      No normalization runs yet.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -605,21 +605,21 @@ export function FileIngestionNormalizationWorkspace() {
         <div className="space-y-3 text-xs">
           <div className="rounded-md border p-3">
             <p>
-              <span className="font-semibold">ingestion run:</span> {selectedIngestionRun?.ingestion_run_id ?? "—"}
+              <span className="font-semibold">Ingestion run:</span> {selectedIngestionRun?.ingestion_run_id ?? "—"}
             </p>
             <p>
-              <span className="font-semibold">normalization run:</span>{" "}
+              <span className="font-semibold">Normalization run:</span>{" "}
               {selectedNormalizationRun?.normalization_run_id ?? "—"}
             </p>
             <p>
-              <span className="font-semibold">normalized artifact:</span>{" "}
+              <span className="font-semibold">Normalized artifact:</span>{" "}
               {selectedNormalizationRun?.output_artifact_id ?? "—"}
             </p>
             <p>
-              <span className="font-semibold">derived output:</span> {selectedNormalizationRun?.target_format ?? "—"}
+              <span className="font-semibold">Derived output:</span> {selectedNormalizationRun?.target_format ?? "—"}
             </p>
             <p>
-              <span className="font-semibold">requires review:</span> yes
+              <span className="font-semibold">Requires review:</span> yes
             </p>
           </div>
           <DeveloperOnly>

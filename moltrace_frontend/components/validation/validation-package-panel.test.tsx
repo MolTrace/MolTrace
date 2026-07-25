@@ -36,7 +36,7 @@ describe("ValidationPackagePanel", () => {
     await waitFor(() => expect(m.get).toHaveBeenCalledWith(1))
     expect(await screen.findByText(/142 passed · 0 failed/)).toBeInTheDocument()
     expect(screen.getByText("Gaps identified")).toBeInTheDocument()
-    expect(screen.getByText("not validated")).toBeInTheDocument()
+    expect(screen.getByText("Not validated")).toBeInTheDocument()
     expect(
       screen.getByText(/SUPPORTS a customer's GAMP 5 \/ CSA effort; it does not replace the customer's CSV/),
     ).toBeInTheDocument()

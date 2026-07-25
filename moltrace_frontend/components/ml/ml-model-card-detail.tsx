@@ -157,7 +157,7 @@ export function MlModelCardDetail() {
   if (!Number.isFinite(cardIdNum) || cardIdNum < 1) {
     return (
       <div className="p-6">
-        <p className="text-sm text-destructive">Invalid model card id.</p>
+        <p className="text-sm text-destructive">Invalid model card ID.</p>
       </div>
     )
   }
@@ -186,7 +186,7 @@ export function MlModelCardDetail() {
             <h1 className="font-mono text-2xl font-bold tracking-tight">Model card</h1>
             <InfoTooltip content={CARD_TOOLTIP} label="About model cards" />
           </div>
-          <p className="font-mono text-sm text-muted-foreground">id {cardIdNum}</p>
+          <p className="font-mono text-sm text-muted-foreground">ID {cardIdNum}</p>
         </div>
         <BackendStatusIndicator />
       </div>
@@ -206,7 +206,7 @@ export function MlModelCardDetail() {
       {err ? (
         <AlertCard
           variant="error"
-          title={`GET /ml/model-cards/{model_card_id}`}
+          title="Could not load model card"
           description={err}
         />
       ) : null}
@@ -216,9 +216,9 @@ export function MlModelCardDetail() {
           <ModuleCard
             accent="teal"
             eyebrow="Validation"
-            title="approval_status"
+            title="Approval status"
             icon={ShieldCheck}
-            description="Shown from the API only — do not treat models as cleared for production outside this workflow."
+            description="Shown for reference only — do not treat models as cleared for production outside this workflow."
           >
             <Badge variant="outline" className="text-sm">
               {readRecordString(card, "approval_status") ?? "—"}
@@ -228,7 +228,7 @@ export function MlModelCardDetail() {
           <ModuleCard
             accent="teal"
             eyebrow="Intended Use"
-            title="intended_use"
+            title="Intended use"
             icon={Target}
           >
             <div className="whitespace-pre-wrap text-sm">{readRecordString(card, "intended_use") ?? "—"}</div>
@@ -237,18 +237,18 @@ export function MlModelCardDetail() {
           <ModuleCard
             accent="teal"
             eyebrow="Limitations"
-            title="limitations"
+            title="Limitations"
             icon={AlertTriangle}
           >
             <div className="whitespace-pre-wrap text-sm">{readRecordString(card, "limitations") ?? "—"}</div>
           </ModuleCard>
 
-          <SummaryTable title="training_data_summary_json" rows={objectRows(card["training_data_summary_json"])} />
-          <SummaryTable title="evaluation_summary_json" rows={objectRows(card["evaluation_summary_json"])} />
-          <SummaryTable title="bias_risk_summary_json" rows={objectRows(card["bias_risk_summary_json"])} />
-          <SummaryTable title="out_of_domain_summary_json" rows={objectRows(card["out_of_domain_summary_json"])} />
-          <SummaryTable title="calibration_summary_json" rows={objectRows(card["calibration_summary_json"])} />
-          <SummaryTable title="human_review_summary_json" rows={objectRows(card["human_review_summary_json"])} />
+          <SummaryTable title="Training data summary" rows={objectRows(card["training_data_summary_json"])} />
+          <SummaryTable title="Evaluation summary" rows={objectRows(card["evaluation_summary_json"])} />
+          <SummaryTable title="Bias & risk summary" rows={objectRows(card["bias_risk_summary_json"])} />
+          <SummaryTable title="Out-of-domain summary" rows={objectRows(card["out_of_domain_summary_json"])} />
+          <SummaryTable title="Calibration summary" rows={objectRows(card["calibration_summary_json"])} />
+          <SummaryTable title="Human review summary" rows={objectRows(card["human_review_summary_json"])} />
 
           <DeveloperJsonPanel data={card} />
 
@@ -266,11 +266,11 @@ export function MlModelCardDetail() {
           >
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="iu2">intended_use</Label>
+                <Label htmlFor="iu2">Intended use</Label>
                 <Textarea id="iu2" value={intendedUse} onChange={(e) => setIntendedUse(e.target.value)} rows={5} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lm2">limitations</Label>
+                <Label htmlFor="lm2">Limitations</Label>
                 <Textarea id="lm2" value={limitations} onChange={(e) => setLimitations(e.target.value)} rows={5} />
               </div>
               <JsonObjectField key={`training-${summaryFormKey}`} idPrefix="mc-training" label="Training data summary" initialValue={trainingSummary} onChange={setTrainingSummary} />
@@ -280,7 +280,7 @@ export function MlModelCardDetail() {
               <JsonObjectField key={`calibration-${summaryFormKey}`} idPrefix="mc-calibration" label="Calibration summary" initialValue={calibration} onChange={setCalibration} />
               <JsonObjectField key={`humanreview-${summaryFormKey}`} idPrefix="mc-humanreview" label="Human review summary" initialValue={humanReview} onChange={setHumanReview} />
               <div className="space-y-2">
-                <Label>approval_status</Label>
+                <Label>Approval status</Label>
                 <Select value={approvalDraft} onValueChange={setApprovalDraft}>
                   <SelectTrigger>
                     <SelectValue />
@@ -320,8 +320,8 @@ function SummaryTable({ title, rows }: { title: string; rows: { key: string; val
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>key</TableHead>
-                <TableHead>value (summary)</TableHead>
+                <TableHead>Key</TableHead>
+                <TableHead>Value (summary)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

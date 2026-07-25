@@ -28,7 +28,7 @@ function formatErr(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
     const data = err.data
     if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return `HTTP ${err.status}: ${err.message || fallback}`
+    return err.message || fallback
   }
   if (err instanceof Error) return err.message
   return fallback
@@ -81,7 +81,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
       } catch (err) {
         if (!cancelled) {
           setPrediction(null)
-          setError(formatErr(err, `Could not load /ai/predictions/${predictionId}.`))
+          setError(formatErr(err, `Could not load this prediction.`))
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -132,7 +132,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
               eyebrow="Overview"
               title={readRecordString(prediction, "service_key") ?? "-"}
               icon={Activity}
-              description="service key"
+              description="Service key"
             />
             <ModuleCard
               accent="teal"
@@ -154,14 +154,14 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
                 })()
               }
               icon={ArrowRight}
-              description="model artifact"
+              description="Model artifact"
             />
             <ModuleCard
               accent="teal"
               eyebrow="Inputs"
               title={readRecordString(prediction, "deployment_candidate_id") ?? "-"}
               icon={ArrowRight}
-              description="deployment candidate ID"
+              description="Deployment candidate ID"
             />
             <ModuleCard
               accent="teal"
@@ -172,14 +172,14 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
                 </span>
               }
               icon={Sparkles}
-              description="status"
+              description="Status"
             />
           </div>
 
           {confidence != null && confidence < 0.5 ? (
             <AlertCard
               variant="warning"
-              title="low confidence"
+              title="Low confidence"
               description="This prediction has low confidence and requires review."
             />
           ) : null}
@@ -187,7 +187,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
           {isOod === true ? (
             <AlertCard
               variant="warning"
-              title="out-of-domain warning"
+              title="Out-of-domain warning"
               description="This prediction indicates out-of-domain warning and requires review."
             />
           ) : null}
@@ -201,29 +201,29 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
           >
             <div className="space-y-2 text-sm">
               <p>
-                <span className="font-medium">prediction result:</span> {summarizeValue(prediction.prediction_result ?? prediction.result)}
+                <span className="font-medium">Prediction result:</span> {summarizeValue(prediction.prediction_result ?? prediction.result)}
               </p>
               <p>
-                <span className="font-medium">confidence:</span> {confidence == null ? "-" : confidence}
+                <span className="font-medium">Confidence:</span> {confidence == null ? "-" : confidence}
               </p>
               <p>
-                <span className="font-medium">uncertainty:</span> {uncertainty == null ? "-" : uncertainty}
+                <span className="font-medium">Uncertainty:</span> {uncertainty == null ? "-" : uncertainty}
               </p>
               <p>
-                <span className="font-medium">OOD status:</span>{" "}
+                <span className="font-medium">Out-of-domain status:</span>{" "}
                 {summarizeValue(prediction.ood_status ?? prediction.is_ood ?? prediction.out_of_domain)}
               </p>
               <p>
-                <span className="font-medium">explanation:</span> {summarizeValue(prediction.explanation)}
+                <span className="font-medium">Explanation:</span> {summarizeValue(prediction.explanation)}
               </p>
               <p>
-                <span className="font-medium">warnings:</span> {warnings.length ? warnings.join("; ") : "-"}
+                <span className="font-medium">Warnings:</span> {warnings.length ? warnings.join("; ") : "-"}
               </p>
               <p>
-                <span className="font-medium">notes:</span> {summarizeValue(prediction.notes)}
+                <span className="font-medium">Notes:</span> {summarizeValue(prediction.notes)}
               </p>
               <p>
-                <span className="font-medium">human review required:</span>{" "}
+                <span className="font-medium">Human review required:</span>{" "}
                 {humanReviewRequired == null ? "requires review" : humanReviewRequired ? "requires review" : "not flagged"}
               </p>
             </div>
@@ -234,7 +234,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
             eyebrow="Feedback"
             title="Feedback form"
             icon={MessageSquare}
-            description="Submit workflow feedback without scientific payloads."
+            description="Submit workflow feedback without scientific data."
           >
             <FeedbackButton
               module="ai-predictions-detail"

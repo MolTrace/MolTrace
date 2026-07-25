@@ -172,7 +172,7 @@ export function MlModelArtifactDetail() {
     if (!artifact) return
     const tk = readRecordString(artifact, "task_key") ?? ""
     if (!intendedUse.trim() || !limitations.trim()) {
-      setCreateErr("intended_use and limitations are required.")
+      setCreateErr("Intended use and limitations are required.")
       return
     }
     const training_data_summary_json = trainingSummary
@@ -230,7 +230,7 @@ export function MlModelArtifactDetail() {
   if (!Number.isFinite(artifactIdNum) || artifactIdNum < 1) {
     return (
       <div className="p-6">
-        <p className="text-sm text-destructive">Invalid model artifact id.</p>
+        <p className="text-sm text-destructive">Invalid model artifact ID.</p>
       </div>
     )
   }
@@ -254,7 +254,7 @@ export function MlModelArtifactDetail() {
             MolTrace · ML Model Factory · Artifact
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Model artifact</h1>
-          <p className="font-mono text-sm text-muted-foreground">id {artifactIdNum}</p>
+          <p className="font-mono text-sm text-muted-foreground">ID {artifactIdNum}</p>
         </div>
         <BackendStatusIndicator />
       </div>
@@ -269,7 +269,7 @@ export function MlModelArtifactDetail() {
       {errArtifact ? (
         <AlertCard
           variant="error"
-          title={`GET /ml/model-artifacts/{model_artifact_id}`}
+          title={`Could not load model artifact`}
           description={errArtifact}
         />
       ) : null}
@@ -285,37 +285,37 @@ export function MlModelArtifactDetail() {
             eyebrow="Overview"
             title="Summary"
             icon={Cpu}
-            description="Operational fields from the API — release claims follow approval_status on model cards."
+            description="Operational fields for this model — release claims follow the approval status on model cards."
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">model_name / model_version</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Model name / model version</p>
                 <p className="text-sm font-medium">
                   {readRecordString(artifact, "model_name") ?? "—"} · {readRecordString(artifact, "model_version") ?? "—"}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">task_key</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Task key</p>
                 <p className="font-mono text-sm">{readRecordString(artifact, "task_key") ?? "—"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">model_family</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Model family</p>
                 <p className="font-mono text-sm">{readRecordString(artifact, "model_family") ?? "—"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">training_run_id</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Training run ID</p>
                 <p className="font-mono text-sm">{readRecordNumber(artifact, "training_run_id") ?? "—"}</p>
               </div>
               <div className="sm:col-span-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">artifact_sha256</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Artifact SHA-256</p>
                 <p className="break-all font-mono text-xs">{readRecordString(artifact, "artifact_sha256") ?? "—"}</p>
               </div>
               <div className="sm:col-span-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">model_hash</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Model hash</p>
                 <p className="break-all font-mono text-xs">{readRecordString(artifact, "model_hash") ?? "—"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">status</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
                 <Badge variant="secondary">{readRecordString(artifact, "status") ?? "—"}</Badge>
               </div>
             </div>
@@ -337,9 +337,9 @@ export function MlModelArtifactDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[72px]">id</TableHead>
-                      <TableHead>status</TableHead>
-                      <TableHead>dataset_version_id</TableHead>
+                      <TableHead className="w-[72px]">ID</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Dataset version ID</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -393,7 +393,7 @@ export function MlModelArtifactDetail() {
                         )}
                         {st ? (
                           <span className="ml-2 text-muted-foreground">
-                            approval_status: <span className="font-mono text-xs">{st}</span>
+                            Approval status: <span className="font-mono text-xs">{st}</span>
                           </span>
                         ) : null}
                       </li>
@@ -424,7 +424,7 @@ export function MlModelArtifactDetail() {
                     const st = readRecordString(d, "status")
                     return (
                       <li key={cid ?? i} className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs">candidate_id {cid ?? "—"}</span>
+                        <span className="font-mono text-xs">Candidate ID {cid ?? "—"}</span>
                         <Badge variant="outline">{st ?? "—"}</Badge>
                         <Link className="text-xs text-primary underline-offset-4 hover:underline" href="/ml">
                           ML factory dashboard
@@ -442,7 +442,7 @@ export function MlModelArtifactDetail() {
             eyebrow="Audit"
             title="Warnings"
             icon={AlertTriangle}
-            description="From artifact metadata_json when present."
+            description="From artifact metadata when present."
           >
             {metaWarnings.length ? (
               <ul className="list-inside list-disc text-sm text-muted-foreground">
@@ -472,11 +472,11 @@ export function MlModelArtifactDetail() {
             >
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="iu">intended_use</Label>
+                  <Label htmlFor="iu">Intended use</Label>
                   <Textarea id="iu" value={intendedUse} onChange={(e) => setIntendedUse(e.target.value)} rows={4} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lim">limitations</Label>
+                  <Label htmlFor="lim">Limitations</Label>
                   <Textarea id="lim" value={limitations} onChange={(e) => setLimitations(e.target.value)} rows={4} />
                 </div>
                 <JsonObjectField idPrefix="ma-training" label="Training data summary" initialValue={trainingSummary} onChange={setTrainingSummary} />
@@ -486,7 +486,7 @@ export function MlModelArtifactDetail() {
                 <JsonObjectField idPrefix="ma-calibration" label="Calibration summary" initialValue={calibration} onChange={setCalibration} />
                 <JsonObjectField idPrefix="ma-humanreview" label="Human review summary" initialValue={humanReview} onChange={setHumanReview} />
                 <div className="space-y-2">
-                  <Label>approval_status</Label>
+                  <Label>Approval status</Label>
                   <Select value={approvalDraft} onValueChange={setApprovalDraft}>
                     <SelectTrigger>
                       <SelectValue />

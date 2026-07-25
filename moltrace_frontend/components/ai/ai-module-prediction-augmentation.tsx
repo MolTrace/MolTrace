@@ -320,7 +320,7 @@ export function AiModulePredictionAugmentation({
         eyebrow={`${moduleLabel} AI · Step 1 · Setup`}
         title="Configure prediction inputs"
         icon={Settings2}
-        description="Pick a service, attach optional ID anchors (artifact / evidence / compound / session), then provide an input summary JSON. IDs and summaries only — never raw data."
+        description="Pick a service, attach optional ID anchors (artifact / evidence / compound / session), then provide an input summary. IDs and summaries only — never raw data."
         className="min-w-0"
       >
         <div className="space-y-5">
@@ -349,38 +349,38 @@ export function AiModulePredictionAugmentation({
               <Input value={selected.taskKey} readOnly className="font-mono text-xs" />
             </div>
             <div className="space-y-2">
-              <Label>artifact ID optional</Label>
+              <Label>Artifact ID (optional)</Label>
               <Input inputMode="numeric" value={artifactId} onChange={(e) => setArtifactId(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>evidence item ID optional</Label>
+              <Label>Evidence item ID (optional)</Label>
               <Input inputMode="numeric" value={evidenceItemId} onChange={(e) => setEvidenceItemId(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>compound ID optional</Label>
+              <Label>Compound ID (optional)</Label>
               <Input inputMode="numeric" value={compoundId} onChange={(e) => setCompoundId(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>session ID optional</Label>
+              <Label>Session ID (optional)</Label>
               <Input inputMode="numeric" value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>experimental mode</Label>
+              <Label>Experimental mode</Label>
               <Select value={experimentalMode ? "true" : "false"} onValueChange={(v) => setExperimentalMode(v === "true")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="false">false</SelectItem>
-                  <SelectItem value="true">true</SelectItem>
+                  <SelectItem value="false">Off</SelectItem>
+                  <SelectItem value="true">On</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="space-y-2">
-            <Label>input summary JSON</Label>
+            <Label>Input summary</Label>
             <JsonObjectField idPrefix="augmentation-input-summary" label="Input summary" initialValue={inputSummary} onChange={setInputSummary} description="IDs and summaries only — no raw spectra or source text." />
           </div>
           <div className="space-y-2">
-            <Label>notes</Label>
+            <Label>Notes</Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes (no raw data)." />
           </div>
         </div>
@@ -437,7 +437,7 @@ export function AiModulePredictionAugmentation({
               )}
             </span>
             <span className="text-xs text-muted-foreground">
-              POST /ai/predictions — submits a draft prediction request through the controlled AI service.
+              Submits a draft prediction request through the controlled AI service.
             </span>
           </button>
           {err ? <p className="text-sm text-destructive">{err}</p> : null}
@@ -452,7 +452,7 @@ export function AiModulePredictionAugmentation({
           eyebrow={`${moduleLabel} AI · Step 3 · Result`}
           title="Prediction result &amp; reviewer feedback"
           icon={BarChart3}
-          description="Draft prediction with confidence and OOD flags — review, then submit feedback or escalate low-confidence cases to the Active Learning queue."
+          description="Draft prediction with confidence and out-of-distribution flags — review, then submit feedback or escalate low-confidence cases to the Active Learning queue."
           className="min-w-0"
         >
           <div className="space-y-4">
@@ -492,14 +492,14 @@ export function AiModulePredictionAugmentation({
                 <Select value={feedbackType} onValueChange={setFeedbackType}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="accepted">accepted</SelectItem>
-                    <SelectItem value="rejected">rejected</SelectItem>
-                    <SelectItem value="corrected">corrected</SelectItem>
-                    <SelectItem value="uncertain">uncertain</SelectItem>
-                    <SelectItem value="useful">useful</SelectItem>
-                    <SelectItem value="not_useful">not_useful</SelectItem>
-                    <SelectItem value="error_case">error_case</SelectItem>
-                    <SelectItem value="other">other</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="corrected">Corrected</SelectItem>
+                    <SelectItem value="uncertain">Uncertain</SelectItem>
+                    <SelectItem value="useful">Useful</SelectItem>
+                    <SelectItem value="not_useful">Not useful</SelectItem>
+                    <SelectItem value="error_case">Error case</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
                 <Input value={feedbackComment} onChange={(e) => setFeedbackComment(e.target.value)} placeholder="Feedback comment" />
@@ -545,9 +545,7 @@ export function AiModulePredictionAugmentation({
                     </Select>
                   </div>
                   <p className="mt-6 text-xs text-muted-foreground md:col-span-2">
-                    Pick the closest match; reasons fan into the active-learning
-                    candidate metadata and prediction-audit analytics on the
-                    backend.
+                    Pick the closest match; reasons feed active-learning candidate details and prediction-audit analytics automatically.
                   </p>
                 </div>
               ) : null}

@@ -104,7 +104,7 @@ export function MlOodAssessmentWorkspace() {
       )
       setAssessments(Array.isArray(o) ? (o.filter(isRecord) as Record<string, unknown>[]) : [])
     } catch (er) {
-      setErrLoad(formatApiError(er, "Could not load OOD assessment data."))
+      setErrLoad(formatApiError(er, "Could not load out-of-domain assessment data."))
     }
     setLoading(false)
   }, [])
@@ -118,7 +118,7 @@ export function MlOodAssessmentWorkspace() {
     setFormOk("")
     const aid = Number.parseInt(artifactId, 10)
     if (!Number.isFinite(aid) || aid < 1) {
-      setFormErr("model_artifact_id is required.")
+      setFormErr("Model artifact ID is required.")
       return
     }
     const ood_summary_json = summary
@@ -146,7 +146,7 @@ export function MlOodAssessmentWorkspace() {
       setFormOk("Out-of-domain assessment recorded.")
       setReload((x) => x + 1)
     } catch (er) {
-      setFormErr(formatApiError(er, "Could not create OOD assessment."))
+      setFormErr(formatApiError(er, "Could not create out-of-domain assessment."))
     } finally {
       setSubmitBusy(false)
     }
@@ -201,14 +201,14 @@ export function MlOodAssessmentWorkspace() {
       <ModuleCard
         accent="teal"
         eyebrow="Create"
-        title="Create OOD assessment"
+        title="Create out-of-domain assessment"
         icon={Plus}
         description="Run an out-of-distribution applicability assessment on a model artifact — flags high-risk structural regions where predictions are less reliable."
       >
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>model_artifact_id</Label>
+              <Label>Model artifact ID</Label>
               <Select value={artifactId || undefined} onValueChange={setArtifactId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select artifact" />
@@ -227,7 +227,7 @@ export function MlOodAssessmentWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>dataset_version_id (optional)</Label>
+              <Label>Dataset version ID (optional)</Label>
               <Select value={datasetVersionId || "__none__"} onValueChange={(v) => setDatasetVersionId(v === "__none__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="None" />
@@ -249,7 +249,7 @@ export function MlOodAssessmentWorkspace() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>method</Label>
+              <Label>Method</Label>
               <Select value={method} onValueChange={setMethod}>
                 <SelectTrigger>
                   <SelectValue />
@@ -264,7 +264,7 @@ export function MlOodAssessmentWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>status</Label>
+              <Label>Status</Label>
               <Select value={statusDraft} onValueChange={setStatusDraft}>
                 <SelectTrigger>
                   <SelectValue />
@@ -280,18 +280,18 @@ export function MlOodAssessmentWorkspace() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ood-summary-json">ood_summary_json</Label>
-            <JsonObjectField idPrefix="ood-summary-json" label="OOD summary" initialValue={summary} onChange={setSummary} />
+            <Label htmlFor="ood-summary-json">Out-of-domain summary</Label>
+            <JsonObjectField idPrefix="ood-summary-json" label="Out-of-domain summary" initialValue={summary} onChange={setSummary} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ood-high-risk-regions-json">high_risk_regions_json</Label>
+            <Label htmlFor="ood-high-risk-regions-json">High-risk regions</Label>
             <ObjectArrayField idPrefix="ood-high-risk-regions-json" label="High-risk regions" itemLabel="Region" addLabel="Add region" initialValue={regions} onChange={setRegions} />
           </div>
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-muted-foreground">{formOk}</p> : null}
           <Button type="button" disabled={submitBusy || loading} onClick={() => void submitOod()}>
             {submitBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-            Submit OOD assessment
+            Submit out-of-domain assessment
           </Button>
         </div>
       </ModuleCard>
@@ -313,13 +313,13 @@ export function MlOodAssessmentWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[72px]">id</TableHead>
-                    <TableHead>model_artifact_id</TableHead>
-                    <TableHead>dataset_version_id</TableHead>
-                    <TableHead>method</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>ood_summary (summary)</TableHead>
-                    <TableHead>high_risk_regions</TableHead>
+                    <TableHead className="w-[72px]">ID</TableHead>
+                    <TableHead>Model artifact ID</TableHead>
+                    <TableHead>Dataset version ID</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Out-of-domain summary</TableHead>
+                    <TableHead>High-risk regions</TableHead>
                     <TableHead className="w-[90px]" />
                   </TableRow>
                 </TableHeader>
@@ -359,19 +359,19 @@ export function MlOodAssessmentWorkspace() {
           {detailId != null ? (
             <div className="space-y-3 rounded-lg border p-3">
               <p className="text-sm font-medium">
-                GET /ml/ood-assessments/{detailId}
+                Out-of-domain assessment #{detailId}
                 {detailLoading ? <Loader2 className="ml-2 inline h-4 w-4 animate-spin" aria-hidden /> : null}
               </p>
               {detail ? (
                 <>
                   <div>
-                    <h4 className="mb-2 text-sm font-medium">ood_summary_json</h4>
+                    <h4 className="mb-2 text-sm font-medium">Out-of-domain summary</h4>
                     <div className="table-scroll min-w-0">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>field</TableHead>
-                            <TableHead>value (summary)</TableHead>
+                            <TableHead>Field</TableHead>
+                            <TableHead>Value</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -386,13 +386,13 @@ export function MlOodAssessmentWorkspace() {
                     </div>
                   </div>
                   <div>
-                    <h4 className="mb-2 text-sm font-medium">high_risk_regions_json (summary)</h4>
+                    <h4 className="mb-2 text-sm font-medium">High-risk regions</h4>
                     <div className="table-scroll min-w-0">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>region</TableHead>
-                            <TableHead>summary</TableHead>
+                            <TableHead>Region</TableHead>
+                            <TableHead>Summary</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

@@ -321,20 +321,20 @@ export function ConnectorsCenterWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>display name</TableHead>
-                    <TableHead>connector type</TableHead>
-                    <TableHead>target program</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>last health check</TableHead>
-                    <TableHead>updated date</TableHead>
-                    <TableHead>open</TableHead>
+                    <TableHead>Display name</TableHead>
+                    <TableHead>Connector type</TableHead>
+                    <TableHead>Target program</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last health check</TableHead>
+                    <TableHead>Updated date</TableHead>
+                    <TableHead>Open</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {connectors.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-xs text-muted-foreground">
-                        No connectors returned.
+                        No connectors found.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -376,15 +376,15 @@ export function ConnectorsCenterWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="connector-key">connector key</Label>
+              <Label htmlFor="connector-key">Connector key</Label>
               <Input id="connector-key" value={connectorKey} onChange={(e) => setConnectorKey(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="display-name">display name</Label>
+              <Label htmlFor="display-name">Display name</Label>
               <Input id="display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="connector-type">connector type</Label>
+              <Label htmlFor="connector-type">Connector type</Label>
               <select
                 id="connector-type"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -399,7 +399,7 @@ export function ConnectorsCenterWorkspace() {
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="target-program">target program</Label>
+              <Label htmlFor="target-program">Target program</Label>
               <select
                 id="target-program"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -414,7 +414,7 @@ export function ConnectorsCenterWorkspace() {
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="status">status</Label>
+              <Label htmlFor="status">Status</Label>
               <select
                 id="status"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -465,16 +465,16 @@ export function ConnectorsCenterWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>status</TableHead>
-                    <TableHead>checked at</TableHead>
-                    <TableHead>message</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Checked at</TableHead>
+                    <TableHead>Message</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {healthChecks.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={3} className="text-xs text-muted-foreground">
-                        No health checks returned.
+                        No health checks found.
                       </TableCell>
                     </TableRow>
                   ) : (

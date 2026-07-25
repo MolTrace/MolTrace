@@ -141,7 +141,7 @@ export function AiCanaryDeploymentsWorkspace() {
       setSelectedDetail(isRecord(data) ? data : null)
     } catch (err) {
       setSelectedDetail(null)
-      setDetailErr(formatErr(err, `Could not load /ai/canary-deployments/${canaryId}.`))
+      setDetailErr(formatErr(err, `Could not load canary deployment ${canaryId}.`))
     }
   }
 
@@ -151,7 +151,7 @@ export function AiCanaryDeploymentsWorkspace() {
     const artifactId = Number.parseInt(candidateModelArtifact, 10)
     const traffic = Number.parseFloat(trafficPercent)
     if (!serviceKey.trim() || !targetModule.trim() || !Number.isFinite(artifactId) || artifactId < 1 || !Number.isFinite(traffic)) {
-      setFormErr("service key, candidate model artifact, target module, and traffic percent are required.")
+      setFormErr("Service key, candidate model artifact, target module, and traffic percent are required.")
       return
     }
     setSubmitBusy(true)
@@ -182,7 +182,7 @@ export function AiCanaryDeploymentsWorkspace() {
   async function reviewCanary(canaryId: number, action: "approve" | "reject") {
     setActionErr("")
     if (!reviewerComment.trim()) {
-      setActionErr("reviewer comment required.")
+      setActionErr("Reviewer comment required.")
       return
     }
     setActionBusyId(canaryId)
@@ -225,7 +225,7 @@ export function AiCanaryDeploymentsWorkspace() {
       <Alert className="border-amber-500/30 bg-amber-500/10">
         <AlertTriangle className="h-4 w-4 text-amber-600" />
         <AlertTitle>Human review required</AlertTitle>
-        <AlertDescription>Canary approval does not automatically activate a model unless backend policy explicitly performs activation.</AlertDescription>
+        <AlertDescription>Canary approval does not automatically activate a model unless system policy explicitly performs activation.</AlertDescription>
       </Alert>
 
       {!hasModelCard || !hasEvaluation ? (
@@ -257,9 +257,9 @@ export function AiCanaryDeploymentsWorkspace() {
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-emerald-700">{formOk}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor="cd-service-key">service key</Label><Input id="cd-service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="cd-service-key">Service key</Label><Input id="cd-service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} /></div>
             <div className="space-y-2">
-              <Label htmlFor="cd-candidate-artifact">candidate model artifact</Label>
+              <Label htmlFor="cd-candidate-artifact">Candidate model artifact</Label>
               <select
                 id="cd-candidate-artifact"
                 value={candidateModelArtifact}
@@ -274,12 +274,12 @@ export function AiCanaryDeploymentsWorkspace() {
                 })}
               </select>
             </div>
-            <div className="space-y-2"><Label htmlFor="cd-target-module">target module</Label><Input id="cd-target-module" value={targetModule} onChange={(e) => setTargetModule(e.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="cd-traffic">traffic percent</Label><Input id="cd-traffic" value={trafficPercent} onChange={(e) => setTrafficPercent(e.target.value)} inputMode="decimal" /></div>
+            <div className="space-y-2"><Label htmlFor="cd-target-module">Target module</Label><Input id="cd-target-module" value={targetModule} onChange={(e) => setTargetModule(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="cd-traffic">Traffic percent</Label><Input id="cd-traffic" value={trafficPercent} onChange={(e) => setTrafficPercent(e.target.value)} inputMode="decimal" /></div>
           </div>
           <Button type="button" onClick={() => void proposeCanary()} disabled={submitBusy}>
             {submitBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-            Start/propose
+            Propose
           </Button>
         </div>
       </ModuleCard>
@@ -293,7 +293,7 @@ export function AiCanaryDeploymentsWorkspace() {
       >
         <div className="space-y-4 overflow-x-auto">
           <Table>
-            <TableHeader><TableRow><TableHead>canary</TableHead><TableHead>service key</TableHead><TableHead>candidate artifact</TableHead><TableHead>status</TableHead><TableHead>created</TableHead><TableHead>actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Canary</TableHead><TableHead>Service key</TableHead><TableHead>Candidate artifact</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {rows.map((row, idx) => {
                 const canaryId = readRecordNumber(row, "canary_id") ?? readRecordNumber(row, "id")
@@ -315,21 +315,21 @@ export function AiCanaryDeploymentsWorkspace() {
                   </TableRow>
                 )
               })}
-              {rows.length === 0 ? <TableRow><TableCell colSpan={6} className="text-muted-foreground">No canary deployments returned.</TableCell></TableRow> : null}
+              {rows.length === 0 ? <TableRow><TableCell colSpan={6} className="text-muted-foreground">No canary deployments yet.</TableCell></TableRow> : null}
             </TableBody>
           </Table>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor="cd-reviewer-name">reviewer name</Label><Input id="cd-reviewer-name" value={reviewerName} onChange={(e) => setReviewerName(e.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="cd-reviewer-comment">reviewer comment required</Label><Input id="cd-reviewer-comment" value={reviewerComment} onChange={(e) => setReviewerComment(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="cd-reviewer-name">Reviewer name</Label><Input id="cd-reviewer-name" value={reviewerName} onChange={(e) => setReviewerName(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="cd-reviewer-comment">Reviewer comment (required)</Label><Input id="cd-reviewer-comment" value={reviewerComment} onChange={(e) => setReviewerComment(e.target.value)} /></div>
           </div>
           {actionErr ? <p className="text-sm text-destructive">{actionErr}</p> : null}
           {detailErr ? <p className="text-sm text-destructive">{detailErr}</p> : null}
           {selectedDetail ? (
             <div className="rounded-md border bg-muted/20 p-3 text-sm">
-              <p><span className="font-medium">canary:</span> {readRecordString(selectedDetail, "canary_id") ?? readRecordString(selectedDetail, "id") ?? "-"}</p>
-              <p><span className="font-medium">status:</span> {readRecordString(selectedDetail, "status") ?? "-"}</p>
-              <p><span className="font-medium">summary:</span> {readRecordString(selectedDetail, "summary") ?? "-"}</p>
+              <p><span className="font-medium">Canary:</span> {readRecordString(selectedDetail, "canary_id") ?? readRecordString(selectedDetail, "id") ?? "-"}</p>
+              <p><span className="font-medium">Status:</span> {readRecordString(selectedDetail, "status") ?? "-"}</p>
+              <p><span className="font-medium">Summary:</span> {readRecordString(selectedDetail, "summary") ?? "-"}</p>
             </div>
           ) : null}
         </div>

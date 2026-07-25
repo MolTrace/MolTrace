@@ -350,20 +350,20 @@ export function FeatureFlagsWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">flag key</TableHead>
-                  <TableHead className="text-xs">display name</TableHead>
-                  <TableHead className="text-xs">program</TableHead>
-                  <TableHead className="text-xs">default enabled</TableHead>
-                  <TableHead className="text-xs">rollout rules JSON</TableHead>
-                  <TableHead className="text-xs">status</TableHead>
-                  <TableHead className="text-xs">actions</TableHead>
+                  <TableHead className="text-xs">Flag key</TableHead>
+                  <TableHead className="text-xs">Display name</TableHead>
+                  <TableHead className="text-xs">Program</TableHead>
+                  <TableHead className="text-xs">Default enabled</TableHead>
+                  <TableHead className="text-xs">Rollout rules</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedFeatureFlags.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-xs text-muted-foreground">
-                      No feature flags returned.
+                      No feature flags yet.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -441,27 +441,27 @@ export function FeatureFlagsWorkspace() {
           {selectedFlagDetail ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">flag key</p>
+                <p className="text-xs font-medium text-muted-foreground">Flag key</p>
                 <p className="mt-1 break-words text-sm">{readFirst(selectedFlagDetail, ["flag_key"]) || "-"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground">display name</p>
+                <p className="text-xs font-medium text-muted-foreground">Display name</p>
                 <p className="mt-1 break-words text-sm">{readFirst(selectedFlagDetail, ["display_name"]) || "-"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground">program</p>
+                <p className="text-xs font-medium text-muted-foreground">Program</p>
                 <p className="mt-1 break-words text-sm">{readFirst(selectedFlagDetail, ["program"]) || "-"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground">default enabled</p>
+                <p className="text-xs font-medium text-muted-foreground">Default enabled</p>
                 <p className="mt-1 break-words text-sm">{formatValue(selectedFlagDetail.default_enabled)}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground">status</p>
+                <p className="text-xs font-medium text-muted-foreground">Status</p>
                 <p className="mt-1 break-words text-sm">{readFirst(selectedFlagDetail, ["status"]) || "-"}</p>
               </div>
               <div className="sm:col-span-2 lg:col-span-3">
-                <p className="text-xs font-medium text-muted-foreground">rollout rules JSON</p>
+                <p className="text-xs font-medium text-muted-foreground">Rollout rules</p>
                 <p className="mt-1 break-words text-sm">{formatValue(selectedFlagDetail.rollout_rules_json)}</p>
               </div>
             </div>
@@ -481,11 +481,11 @@ export function FeatureFlagsWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="feature-flag-key">flag key</Label>
+              <Label htmlFor="feature-flag-key">Flag key</Label>
               <Input id="feature-flag-key" value={flagKey} onChange={(event) => setFlagKey(event.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="feature-flag-display-name">display name</Label>
+              <Label htmlFor="feature-flag-display-name">Display name</Label>
               <Input
                 id="feature-flag-display-name"
                 value={flagDisplayName}
@@ -493,7 +493,7 @@ export function FeatureFlagsWorkspace() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="feature-flag-program">program</Label>
+              <Label htmlFor="feature-flag-program">Program</Label>
               <Select value={flagProgram} onValueChange={(value) => setFlagProgram(value as typeof flagProgram)}>
                 <SelectTrigger id="feature-flag-program">
                   <SelectValue />
@@ -508,7 +508,7 @@ export function FeatureFlagsWorkspace() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="feature-flag-default-enabled">default enabled</Label>
+              <Label htmlFor="feature-flag-default-enabled">Default enabled</Label>
               <Select value={flagDefaultEnabled} onValueChange={setFlagDefaultEnabled}>
                 <SelectTrigger id="feature-flag-default-enabled">
                   <SelectValue />
@@ -520,7 +520,7 @@ export function FeatureFlagsWorkspace() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="feature-flag-status">status</Label>
+              <Label htmlFor="feature-flag-status">Status</Label>
               <Select value={flagStatus} onValueChange={(value) => setFlagStatus(value as typeof flagStatus)}>
                 <SelectTrigger id="feature-flag-status">
                   <SelectValue />
@@ -568,18 +568,18 @@ export function FeatureFlagsWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">plan key</TableHead>
-                  <TableHead className="text-xs">display name</TableHead>
-                  <TableHead className="text-xs">description</TableHead>
-                  <TableHead className="text-xs">default entitlements JSON</TableHead>
-                  <TableHead className="text-xs">status</TableHead>
+                  <TableHead className="text-xs">Plan key</TableHead>
+                  <TableHead className="text-xs">Display name</TableHead>
+                  <TableHead className="text-xs">Description</TableHead>
+                  <TableHead className="text-xs">Default entitlements</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {subscriptionPlans.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-xs text-muted-foreground">
-                      No subscription plans returned.
+                      No subscription plans yet.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -621,11 +621,11 @@ export function FeatureFlagsWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="subscription-plan-key">plan key</Label>
+              <Label htmlFor="subscription-plan-key">Plan key</Label>
               <Input id="subscription-plan-key" value={planKey} onChange={(event) => setPlanKey(event.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="subscription-plan-display-name">display name</Label>
+              <Label htmlFor="subscription-plan-display-name">Display name</Label>
               <Input
                 id="subscription-plan-display-name"
                 value={planDisplayName}
@@ -633,7 +633,7 @@ export function FeatureFlagsWorkspace() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="subscription-plan-status">status</Label>
+              <Label htmlFor="subscription-plan-status">Status</Label>
               <Select value={planStatus} onValueChange={(value) => setPlanStatus(value as typeof planStatus)}>
                 <SelectTrigger id="subscription-plan-status">
                   <SelectValue />
@@ -648,7 +648,7 @@ export function FeatureFlagsWorkspace() {
               </Select>
             </div>
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="subscription-plan-description">description</Label>
+              <Label htmlFor="subscription-plan-description">Description</Label>
               <Textarea
                 id="subscription-plan-description"
                 value={planDescription}
@@ -663,7 +663,7 @@ export function FeatureFlagsWorkspace() {
                 label="Default entitlements"
                 initialValue={planDefaultEntitlements}
                 onChange={setPlanDefaultEntitlements}
-                description="Feature entitlements granted by this plan (feature_key → value)."
+                description="Feature entitlements granted by this plan (feature → value)."
               />
             </div>
           </div>

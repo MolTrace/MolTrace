@@ -67,7 +67,7 @@ function formatErr(err: unknown, fallback: string): string {
     if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) {
       return data.detail
     }
-    return `HTTP ${err.status}: ${err.message || fallback}`
+    return err.message || fallback
   }
   if (err instanceof Error) return err.message
   return fallback
@@ -165,7 +165,7 @@ export function AiServiceRegistryWorkspace() {
       } catch (err) {
         if (!cancelled) {
           setServiceDetail(null)
-          setDetailErr(formatErr(err, `Could not load /ai/services/${selectedServiceId}.`))
+          setDetailErr(formatErr(err, `Could not load service ${selectedServiceId}.`))
         }
       }
     })()
@@ -202,15 +202,15 @@ export function AiServiceRegistryWorkspace() {
     setFormErr("")
     setFormOk("")
     if (!serviceKey.trim() || !name.trim() || !targetModule.trim() || !taskKey.trim()) {
-      setFormErr("service_key, name, target_module, and task_key are required.")
+      setFormErr("Service key, name, target module, and task key are required.")
       return
     }
     if (!Number.isFinite(activeArtifactIdNum) || activeArtifactIdNum < 1) {
-      setFormErr("active_model_artifact_id is required.")
+      setFormErr("Active model artifact is required.")
       return
     }
     if (blockingActiveStatus) {
-      setFormErr("Selected active model is not approved; backend experimental mode allowance is required.")
+      setFormErr("Selected active model is not approved; experimental mode must be enabled first.")
       return
     }
     const body: Record<string, unknown> = {
@@ -243,15 +243,15 @@ export function AiServiceRegistryWorkspace() {
       return
     }
     if (!serviceKey.trim() || !name.trim() || !targetModule.trim() || !taskKey.trim()) {
-      setFormErr("service_key, name, target_module, and task_key are required.")
+      setFormErr("Service key, name, target module, and task key are required.")
       return
     }
     if (!Number.isFinite(activeArtifactIdNum) || activeArtifactIdNum < 1) {
-      setFormErr("active_model_artifact_id is required.")
+      setFormErr("Active model artifact is required.")
       return
     }
     if (blockingActiveStatus) {
-      setFormErr("Selected active model is not approved; backend experimental mode allowance is required.")
+      setFormErr("Selected active model is not approved; experimental mode must be enabled first.")
       return
     }
     const body: Record<string, unknown> = {
@@ -270,7 +270,7 @@ export function AiServiceRegistryWorkspace() {
       setFormOk("Service updated.")
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setFormErr(formatErr(err, `Could not update /ai/services/${selectedServiceId}.`))
+      setFormErr(formatErr(err, `Could not update service ${selectedServiceId}.`))
     } finally {
       setSubmitBusy(false)
     }
@@ -293,7 +293,7 @@ export function AiServiceRegistryWorkspace() {
         <AlertTriangle className="h-4 w-4 text-amber-600" />
         <AlertTitle>Review and approval safeguards</AlertTitle>
         <AlertDescription>
-          Service status changes remain decision support. Backend approval signals and review controls determine serving eligibility.
+          Service status changes remain decision support. Approval signals and review controls determine serving eligibility.
         </AlertDescription>
       </Alert>
 
@@ -302,7 +302,7 @@ export function AiServiceRegistryWorkspace() {
           {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
           Refresh
         </Button>
-        <Badge variant="outline">GET /ai/services</Badge>
+        <Badge variant="outline">Service list</Badge>
       </div>
 
       {loadErr ? (
@@ -323,14 +323,14 @@ export function AiServiceRegistryWorkspace() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>service key</TableHead>
-                <TableHead>name</TableHead>
-                <TableHead>target module</TableHead>
-                <TableHead>task key</TableHead>
-                <TableHead>active model artifact</TableHead>
-                <TableHead>fallback model artifact</TableHead>
-                <TableHead>status</TableHead>
-                <TableHead>updated date</TableHead>
+                <TableHead>Service key</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Target module</TableHead>
+                <TableHead>Task key</TableHead>
+                <TableHead>Active model artifact</TableHead>
+                <TableHead>Fallback model artifact</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Updated</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -394,7 +394,7 @@ export function AiServiceRegistryWorkspace() {
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               <AlertTitle>Selected model is not approved</AlertTitle>
               <AlertDescription>
-                The selected active model artifact does not have an explicit approved deployment signal. Activation is blocked unless backend explicitly allows experimental mode.
+                The selected active model artifact does not have an explicit approved deployment signal. Activation is blocked unless experimental mode is explicitly enabled.
               </AlertDescription>
             </Alert>
           ) : null}
@@ -413,15 +413,15 @@ export function AiServiceRegistryWorkspace() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="service-key">service key</Label>
-              <Input id="service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} placeholder="service_key" />
+              <Label htmlFor="service-key">Service key</Label>
+              <Input id="service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} placeholder="Service key" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="service-name">name</Label>
+              <Label htmlFor="service-name">Name</Label>
               <Input id="service-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Service name" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="target-module">target module</Label>
+              <Label htmlFor="target-module">Target module</Label>
               <Select value={targetModule} onValueChange={setTargetModule}>
                 <SelectTrigger id="target-module">
                   <SelectValue placeholder="Select target module" />
@@ -436,11 +436,11 @@ export function AiServiceRegistryWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="task-key">task key</Label>
-              <Input id="task-key" value={taskKey} onChange={(e) => setTaskKey(e.target.value)} placeholder="task_key" />
+              <Label htmlFor="task-key">Task key</Label>
+              <Input id="task-key" value={taskKey} onChange={(e) => setTaskKey(e.target.value)} placeholder="Task key" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="active-model-artifact">active model artifact</Label>
+              <Label htmlFor="active-model-artifact">Active model artifact</Label>
               <Select value={activeModelArtifactId || "none"} onValueChange={(v) => setActiveModelArtifactId(v === "none" ? "" : v)}>
                 <SelectTrigger id="active-model-artifact">
                   <SelectValue placeholder="Select active model artifact" />
@@ -460,7 +460,7 @@ export function AiServiceRegistryWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="fallback-model-artifact">fallback model artifact</Label>
+              <Label htmlFor="fallback-model-artifact">Fallback model artifact</Label>
               <Select value={fallbackModelArtifactId || "none"} onValueChange={(v) => setFallbackModelArtifactId(v === "none" ? "" : v)}>
                 <SelectTrigger id="fallback-model-artifact">
                   <SelectValue placeholder="Select fallback model artifact" />
@@ -480,7 +480,7 @@ export function AiServiceRegistryWorkspace() {
               </Select>
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="service-status">status</Label>
+              <Label htmlFor="service-status">Status</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger id="service-status">
                   <SelectValue placeholder="Select status" />

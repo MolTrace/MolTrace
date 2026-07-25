@@ -61,7 +61,7 @@ function formatErr(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
     const data = err.data
     if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return `HTTP ${err.status}: ${err.message || fallback}`
+    return err.message || fallback
   }
   if (err instanceof Error) return err.message
   return fallback
@@ -117,7 +117,7 @@ export function AiPredictionsWorkspace() {
           const data = await apiFetch<unknown>("/ai/predictions", { method: "GET" })
           setPredictions(extractRows(data, PREDICTION_KEYS))
         } catch (err) {
-          setLoadErrPredictions(formatErr(err, "Could not load /ai/predictions."))
+          setLoadErrPredictions(formatErr(err, "Could not load predictions."))
           setPredictions([])
         }
       })(),
@@ -126,7 +126,7 @@ export function AiPredictionsWorkspace() {
           const data = await apiFetch<unknown>("/ai/prediction-audit", { method: "GET" })
           setAuditRows(extractRows(data, AUDIT_KEYS))
         } catch (err) {
-          setLoadErrAudit(formatErr(err, "Could not load /ai/prediction-audit."))
+          setLoadErrAudit(formatErr(err, "Could not load prediction audit."))
           setAuditRows([])
         }
       })(),
@@ -142,7 +142,7 @@ export function AiPredictionsWorkspace() {
     setFormErr("")
     setFormOk("")
     if (!serviceKey.trim() || !targetModule.trim() || !taskKey.trim()) {
-      setFormErr("service_key, target_module, and task_key are required.")
+      setFormErr("Service key, target module, and task key are required.")
       return
     }
 
@@ -224,9 +224,9 @@ export function AiPredictionsWorkspace() {
           {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
           Refresh
         </Button>
-        <Badge variant="outline">POST /ai/predictions</Badge>
-        <Badge variant="outline">GET /ai/predictions</Badge>
-        <Badge variant="outline">GET /ai/prediction-audit</Badge>
+        <Badge variant="outline">Submit prediction</Badge>
+        <Badge variant="outline">List predictions</Badge>
+        <Badge variant="outline">Prediction audit</Badge>
       </div>
 
       <ModuleCard
@@ -234,7 +234,7 @@ export function AiPredictionsWorkspace() {
         eyebrow="Run"
         title="Run prediction"
         icon={Play}
-        description="Use IDs and summaries only. Do not include raw scientific payloads."
+        description="Use IDs and summaries only. Do not include raw scientific data."
       >
         <div className="space-y-4">
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
@@ -242,11 +242,11 @@ export function AiPredictionsWorkspace() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="prediction-service-key">service key</Label>
-              <Input id="prediction-service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} placeholder="service_key" />
+              <Label htmlFor="prediction-service-key">Service key</Label>
+              <Input id="prediction-service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} placeholder="Service key" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prediction-target-module">target module</Label>
+              <Label htmlFor="prediction-target-module">Target module</Label>
               <Select value={targetModule} onValueChange={setTargetModule}>
                 <SelectTrigger id="prediction-target-module">
                   <SelectValue placeholder="Select target module" />
@@ -261,35 +261,35 @@ export function AiPredictionsWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prediction-task-key">task key</Label>
-              <Input id="prediction-task-key" value={taskKey} onChange={(e) => setTaskKey(e.target.value)} placeholder="task_key" />
+              <Label htmlFor="prediction-task-key">Task key</Label>
+              <Input id="prediction-task-key" value={taskKey} onChange={(e) => setTaskKey(e.target.value)} placeholder="Task key" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prediction-artifact-id">artifact ID optional</Label>
-              <Input id="prediction-artifact-id" value={artifactId} onChange={(e) => setArtifactId(e.target.value)} inputMode="numeric" placeholder="artifact_id" />
+              <Label htmlFor="prediction-artifact-id">Artifact ID (optional)</Label>
+              <Input id="prediction-artifact-id" value={artifactId} onChange={(e) => setArtifactId(e.target.value)} inputMode="numeric" placeholder="Artifact ID" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prediction-evidence-item-id">evidence item ID optional</Label>
+              <Label htmlFor="prediction-evidence-item-id">Evidence item ID (optional)</Label>
               <Input
                 id="prediction-evidence-item-id"
                 value={evidenceItemId}
                 onChange={(e) => setEvidenceItemId(e.target.value)}
                 inputMode="numeric"
-                placeholder="evidence_item_id"
+                placeholder="Evidence item ID"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prediction-compound-id">compound ID optional</Label>
-              <Input id="prediction-compound-id" value={compoundId} onChange={(e) => setCompoundId(e.target.value)} inputMode="numeric" placeholder="compound_id" />
+              <Label htmlFor="prediction-compound-id">Compound ID (optional)</Label>
+              <Input id="prediction-compound-id" value={compoundId} onChange={(e) => setCompoundId(e.target.value)} inputMode="numeric" placeholder="Compound ID" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prediction-session-id">session ID optional</Label>
-              <Input id="prediction-session-id" value={sessionId} onChange={(e) => setSessionId(e.target.value)} inputMode="numeric" placeholder="session_id" />
+              <Label htmlFor="prediction-session-id">Session ID (optional)</Label>
+              <Input id="prediction-session-id" value={sessionId} onChange={(e) => setSessionId(e.target.value)} inputMode="numeric" placeholder="Session ID" />
             </div>
             <div className="flex items-center justify-between rounded-md border p-3">
               <div className="space-y-1">
-                <Label htmlFor="prediction-experimental-mode">experimental mode toggle</Label>
-                <p className="text-xs text-muted-foreground">Use only when backend policy allows this request path.</p>
+                <Label htmlFor="prediction-experimental-mode">Experimental mode</Label>
+                <p className="text-xs text-muted-foreground">Use only when your organization's policy allows it.</p>
               </div>
               <Switch id="prediction-experimental-mode" checked={experimentalMode} onCheckedChange={setExperimentalMode} />
             </div>
@@ -315,13 +315,13 @@ export function AiPredictionsWorkspace() {
           ) : null}
 
           <div className="space-y-2">
-            <Label htmlFor="prediction-notes">notes</Label>
+            <Label htmlFor="prediction-notes">Notes</Label>
             <Textarea
               id="prediction-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              placeholder="Prediction request notes (no private scientific payloads)."
+              placeholder="Prediction request notes (no private scientific data)."
             />
           </div>
 
@@ -344,13 +344,13 @@ export function AiPredictionsWorkspace() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>prediction</TableHead>
-                <TableHead>service key</TableHead>
-                <TableHead>status</TableHead>
-                <TableHead>confidence</TableHead>
+                <TableHead>Prediction</TableHead>
+                <TableHead>Service key</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Confidence</TableHead>
                 <TableHead>OOD</TableHead>
-                <TableHead>created</TableHead>
-                <TableHead>detail</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Detail</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -412,11 +412,11 @@ export function AiPredictionsWorkspace() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>event</TableHead>
-                <TableHead>prediction</TableHead>
-                <TableHead>status</TableHead>
-                <TableHead>actor</TableHead>
-                <TableHead>timestamp</TableHead>
+                <TableHead>Event</TableHead>
+                <TableHead>Prediction</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actor</TableHead>
+                <TableHead>Timestamp</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -439,7 +439,7 @@ export function AiPredictionsWorkspace() {
               {auditRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-muted-foreground">
-                    No audit events returned.
+                    No audit events found.
                   </TableCell>
                 </TableRow>
               ) : null}

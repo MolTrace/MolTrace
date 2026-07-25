@@ -244,7 +244,7 @@ export function MlDeploymentCandidatesWorkspace() {
   const missingGateWarnings = useMemo(() => {
     const w: string[] = []
     if (!gateChecks.hasSucceededEval) {
-      w.push("No succeeded evaluation run is associated with this model_artifact_id; the approve endpoint is expected to reject approval until one exists.")
+      w.push("No succeeded evaluation run is associated with this model artifact; approval cannot proceed until one exists.")
     }
     if (!gateChecks.hasCalibration) {
       w.push("No calibration assessment found for this artifact.")
@@ -261,11 +261,11 @@ export function MlDeploymentCandidatesWorkspace() {
     const aid = Number.parseInt(createArtifactId, 10)
     const cid = Number.parseInt(createCardId, 10)
     if (!Number.isFinite(aid) || aid < 1) {
-      setCreateErr("model_artifact_id is required.")
+      setCreateErr("Model artifact is required.")
       return
     }
     if (!Number.isFinite(cid) || cid < 1) {
-      setCreateErr("model_card_id is required (backend rejects null).")
+      setCreateErr("Model card is required.")
       return
     }
     const endpoint = createEndpoint.trim() || null
@@ -302,7 +302,7 @@ export function MlDeploymentCandidatesWorkspace() {
     if (!selected || selectedId == null) return
     setApproveErr("")
     if (!canSubmitApprove) {
-      setApproveErr("Approval requires model_card_id and a non-empty reviewer_comment.")
+      setApproveErr("Approval requires a model card and a reviewer comment.")
       return
     }
     setApproveBusy(true)
@@ -336,7 +336,7 @@ export function MlDeploymentCandidatesWorkspace() {
     setRejectErr("")
     const rc = rejectReason.trim()
     if (!rc) {
-      setRejectErr("rejection reason is required (sent as reviewer_comment).")
+      setRejectErr("Rejection reason is required.")
       return
     }
     if (!REVIEWABLE_STATUSES.includes(readRecordString(selected, "status") as (typeof REVIEWABLE_STATUSES)[number])) {
@@ -386,7 +386,7 @@ export function MlDeploymentCandidatesWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Deployment candidate review</h1>
           <p className="text-sm text-muted-foreground">
-            Create deployment candidates, then record human approval or rejection. Registry status updates only through the approve and reject endpoints—nothing here activates production routing.
+            Create deployment candidates, then record human approval or rejection. Registry status updates only through the approve and reject actions—nothing here activates production routing.
           </p>
         </div>
         <BackendStatusIndicator />
@@ -424,7 +424,7 @@ export function MlDeploymentCandidatesWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>model_artifact_id</Label>
+              <Label>Model artifact</Label>
               <Select
                 value={createArtifactId || undefined}
                 onValueChange={(v) => {
@@ -449,7 +449,7 @@ export function MlDeploymentCandidatesWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>model_card_id</Label>
+              <Label>Model card</Label>
               <Select value={createCardId || undefined} onValueChange={setCreateCardId} disabled={!createArtifactId}>
                 <SelectTrigger>
                   <SelectValue placeholder={createArtifactId ? "Select model card" : "Choose artifact first"} />
@@ -470,7 +470,7 @@ export function MlDeploymentCandidatesWorkspace() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>target_module</Label>
+              <Label>Target module</Label>
               <Select value={createTargetModule} onValueChange={setCreateTargetModule}>
                 <SelectTrigger>
                   <SelectValue />
@@ -485,7 +485,7 @@ export function MlDeploymentCandidatesWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="te">target_endpoint (optional)</Label>
+              <Label htmlFor="te">Target endpoint (optional)</Label>
               <Input id="te" value={createEndpoint} onChange={(e) => setCreateEndpoint(e.target.value)} autoComplete="off" />
             </div>
           </div>
@@ -515,12 +515,12 @@ export function MlDeploymentCandidatesWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[72px]">id</TableHead>
-                    <TableHead>model_artifact_id</TableHead>
-                    <TableHead>model_card_id</TableHead>
-                    <TableHead>target_module</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>artifact status</TableHead>
+                    <TableHead className="w-[72px]">ID</TableHead>
+                    <TableHead>Model artifact ID</TableHead>
+                    <TableHead>Model card ID</TableHead>
+                    <TableHead>Target module</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Artifact status</TableHead>
                     <TableHead className="w-[90px]" />
                   </TableRow>
                 </TableHeader>
@@ -561,7 +561,7 @@ export function MlDeploymentCandidatesWorkspace() {
 
           {selected ? (
             <div className="space-y-4 rounded-lg border p-4">
-              <h3 className="text-sm font-medium">Selected candidate id {readRecordNumber(selected, "id") ?? "—"}</h3>
+              <h3 className="text-sm font-medium">Selected candidate ID {readRecordNumber(selected, "id") ?? "—"}</h3>
 
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">Deployment candidate {selectedId}</span>
@@ -569,7 +569,7 @@ export function MlDeploymentCandidatesWorkspace() {
                   <Loader2 className="ml-2 inline h-3 w-3 animate-spin" aria-hidden />
                 ) : getSnapshot ? (
                   <span className="ml-2">
-                    registry_status {readRecordString(getSnapshot, "status") ?? "—"}; candidate_id{" "}
+                    Registry status {readRecordString(getSnapshot, "status") ?? "—"}; candidate ID{" "}
                     {readRecordNumber(getSnapshot, "candidate_id") ?? "—"}
                   </span>
                 ) : (
@@ -583,15 +583,15 @@ export function MlDeploymentCandidatesWorkspace() {
                   <p className="text-sm">{selectedArtifact ? artifactLabel(selectedArtifact) : "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Model card (approval_status)</p>
+                  <p className="text-xs font-medium text-muted-foreground">Model card (approval status)</p>
                   <p className="text-sm">
                     {selectedCard ? (
                       <>
-                        model_card_id {readRecordNumber(selectedCard, "id") ?? "—"} —{" "}
+                        Model card {readRecordNumber(selectedCard, "id") ?? "—"} —{" "}
                         <Badge variant="outline">{readRecordString(selectedCard, "approval_status") ?? "—"}</Badge>
                       </>
                     ) : (
-                      <span className="text-destructive">model_card_id missing — approval cannot proceed.</span>
+                      <span className="text-destructive">Model card missing — approval cannot proceed.</span>
                     )}
                   </p>
                 </div>
@@ -604,7 +604,7 @@ export function MlDeploymentCandidatesWorkspace() {
                   <p className="text-xs text-muted-foreground">{gateChecks.calibrationLine}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">OOD (latest assessment)</p>
+                  <p className="text-xs font-medium text-muted-foreground">Out-of-domain (latest assessment)</p>
                   <p className="text-xs text-muted-foreground">{gateChecks.oodLine}</p>
                 </div>
                 <div>
@@ -612,7 +612,7 @@ export function MlDeploymentCandidatesWorkspace() {
                   <Badge variant="outline">{readRecordString(selected, "status") ?? "—"}</Badge>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">target_endpoint</p>
+                  <p className="text-xs font-medium text-muted-foreground">Target endpoint</p>
                   <p className="font-mono text-xs">{readRecordString(selected, "target_endpoint") ?? "—"}</p>
                 </div>
               </div>
@@ -628,7 +628,7 @@ export function MlDeploymentCandidatesWorkspace() {
                 if (merged.length === 0) return null
                 return (
                   <div>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">warnings</p>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">Warnings</p>
                     <ul className="list-inside list-disc text-sm text-muted-foreground">
                       {merged.map((w, i) => (
                         <li key={`w-${i}`}>{typeof w === "string" ? w : summarizeJson(w)}</li>
@@ -655,10 +655,10 @@ export function MlDeploymentCandidatesWorkspace() {
               <div>
                 <p className="mb-1 text-xs font-medium text-muted-foreground">Reviewer fields on record</p>
                 <p className="text-sm">
-                  reviewer_name: {readRecordString(selected, "reviewer_name") ?? "—"}
+                  Reviewer name: {readRecordString(selected, "reviewer_name") ?? "—"}
                 </p>
                 <p className="mt-1 text-sm">
-                  reviewer_comment: {readRecordString(selected, "reviewer_comment") ?? "—"}
+                  Reviewer comment: {readRecordString(selected, "reviewer_comment") ?? "—"}
                 </p>
               </div>
 
@@ -667,22 +667,22 @@ export function MlDeploymentCandidatesWorkspace() {
                   <div className="space-y-3">
                     <p className="text-sm font-medium">Approve candidate</p>
                     <div className="space-y-2">
-                      <Label htmlFor="an">reviewer_name</Label>
+                      <Label htmlFor="an">Reviewer name</Label>
                       <Input id="an" value={approveName} onChange={(e) => setApproveName(e.target.value)} autoComplete="name" />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ac">reviewer_comment (required)</Label>
+                      <Label htmlFor="ac">Reviewer comment (required)</Label>
                       <Input id="ac" value={approveComment} onChange={(e) => setApproveComment(e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <Label>status (approval level)</Label>
+                      <Label>Status (approval level)</Label>
                       <Select value={approveLevel} onValueChange={setApproveLevel}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="approved_for_internal_use">approved_for_internal_use</SelectItem>
-                          <SelectItem value="approved_for_production">approved_for_production</SelectItem>
+                          <SelectItem value="approved_for_internal_use">Approved for internal use</SelectItem>
+                          <SelectItem value="approved_for_production">Approved for production</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -700,21 +700,21 @@ export function MlDeploymentCandidatesWorkspace() {
                       Submit approval record
                     </Button>
                     {!readRecordNumber(selected, "model_card_id") ? (
-                      <p className="text-xs text-destructive">Approve action disabled until model_card_id is present.</p>
+                      <p className="text-xs text-destructive">Approve action disabled until a model card is present.</p>
                     ) : null}
                     {!approveComment.trim() ? (
-                      <p className="text-xs text-muted-foreground">Enter reviewer_comment to enable approval.</p>
+                      <p className="text-xs text-muted-foreground">Enter a reviewer comment to enable approval.</p>
                     ) : null}
                   </div>
 
                   <div className="space-y-3">
                     <p className="text-sm font-medium">Reject candidate</p>
                     <div className="space-y-2">
-                      <Label htmlFor="rn">reviewer_name</Label>
+                      <Label htmlFor="rn">Reviewer name</Label>
                       <Input id="rn" value={rejectName} onChange={(e) => setRejectName(e.target.value)} autoComplete="name" />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="rr">rejection reason → reviewer_comment (required)</Label>
+                      <Label htmlFor="rr">Rejection reason (required)</Label>
                       <Input id="rr" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
                     </div>
                     {rejectErr ? <p className="text-sm text-destructive">{rejectErr}</p> : null}

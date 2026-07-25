@@ -125,9 +125,9 @@ function formatCount(snapshot: Snapshot, count: number): string {
 }
 
 function formatErr(err: unknown): string {
-  if (err instanceof ApiError) return err.message || "Validation readiness endpoint unavailable."
+  if (err instanceof ApiError) return err.message || "Validation readiness is unavailable."
   if (err instanceof Error) return err.message
-  return "Validation readiness endpoint unavailable."
+  return "Validation readiness is unavailable."
 }
 
 function latestByDate(rows: Row[], dateKey = "updated_at"): Row | null {
@@ -361,12 +361,12 @@ export function ValidationReadinessDashboardCards() {
               )
             })}
           </div>
-          {snapshot.partial ? <p className="text-xs text-muted-foreground">Some readiness endpoints unavailable.</p> : null}
+          {snapshot.partial ? <p className="text-xs text-muted-foreground">Some readiness data is unavailable.</p> : null}
         </CardContent>
       </Card>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">open deviations</CardTitle>
+          <CardTitle className="text-sm font-medium">Open deviations</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tabular-nums">{formatCount(snapshot, openDeviations(snapshot.deviations).length)}</div>
@@ -375,7 +375,7 @@ export function ValidationReadinessDashboardCards() {
       </Card>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">open CAPA</CardTitle>
+          <CardTitle className="text-sm font-medium">Open CAPA</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tabular-nums">{formatCount(snapshot, openCapa(snapshot.capa).length)}</div>
@@ -384,7 +384,7 @@ export function ValidationReadinessDashboardCards() {
       </Card>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">failed validation tests</CardTitle>
+          <CardTitle className="text-sm font-medium">Failed validation tests</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tabular-nums">
@@ -395,7 +395,7 @@ export function ValidationReadinessDashboardCards() {
       </Card>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">pending signatures</CardTitle>
+          <CardTitle className="text-sm font-medium">Pending signatures</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tabular-nums">{formatCount(snapshot, pendingSignatureTargets(snapshot))}</div>
@@ -422,23 +422,23 @@ export function SpectraCheckValidationReadinessCard({ sessionId }: { sessionId?:
       <CardContent className="space-y-3">
         <div className="grid gap-3 md:grid-cols-3">
           <StatusBadgeLine
-            label="validation coverage badge"
+            label="Validation coverage"
             badge={coverage}
             detail={`${projects.length} SpectraCheck validation project record(s).`}
           />
           <StatusBadgeLine
-            label="controlled record status for reports"
+            label="Controlled record status for reports"
             badge={{ label: reportStatus.label, variant: reportStatus.variant }}
             detail={`Latest controlled record version: ${reportStatus.version}.`}
           />
           <StatusBadgeLine
-            label="data integrity status for session"
+            label="Data integrity status for session"
             badge={dataIntegrity}
-            detail={sessionId ? `scope_id ${sessionId}` : "No session ID selected."}
+            detail={sessionId ? `Session ID ${sessionId}` : "No session ID selected."}
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Readiness summaries do not mark a session validated unless an approved backend status exists.
+          Readiness summaries do not mark a session validated unless an approved status exists.
         </p>
       </CardContent>
     </Card>
@@ -460,17 +460,17 @@ export function RegulatoryHubValidationReadinessCard() {
       <CardContent className="space-y-3">
         <div className="grid gap-3 md:grid-cols-3">
           <StatusBadgeLine
-            label="controlled dossier status"
+            label="Controlled dossier status"
             badge={{ label: dossierStatus.label, variant: dossierStatus.variant }}
             detail={`Latest controlled record version: ${dossierStatus.version}.`}
           />
           <StatusBadgeLine
-            label="e-signature status"
+            label="E-signature status"
             badge={signatureStatus}
             detail={`${snapshot.signatures.length} e-signature record(s) returned.`}
           />
           <StatusBadgeLine
-            label="inspection package readiness"
+            label="Inspection package readiness"
             badge={packageReadiness}
             detail="Based on controlled records, signatures, deviations, and CAPA state."
           />
@@ -499,23 +499,23 @@ export function ReactionValidationReadinessCard() {
       <CardContent className="space-y-3">
         <div className="grid gap-3 md:grid-cols-3">
           <StatusBadgeLine
-            label="controlled experiment record status"
+            label="Controlled experiment record status"
             badge={{ label: experimentStatus.label, variant: experimentStatus.variant }}
             detail={`Latest controlled record version: ${experimentStatus.version}.`}
           />
           <StatusBadgeLine
-            label="validated optimization workflow status"
+            label="Validated optimization workflow status"
             badge={workflowCoverage}
             detail={`${reactionProjects.length} Reaction Optimization validation project record(s).`}
           />
           <Metric
-            label="deviation links"
+            label="Deviation links"
             value={formatCount(snapshot, reactionDeviations.length)}
             detail="Open deviations mentioning reaction, optimization, or execution."
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          The workflow status mirrors backend validation project status and does not imply an optimum.
+          The workflow status mirrors the validation project status and does not imply an optimum.
         </p>
       </CardContent>
     </Card>
@@ -537,23 +537,23 @@ export function ReportsValidationReadinessCard() {
       <CardContent className="space-y-3">
         <div className="grid gap-3 md:grid-cols-4">
           <StatusLine
-            label="controlled record version"
+            label="Controlled record version"
             status={reportStatus.version}
             detail={`Controlled record status: ${reportStatus.label}.`}
           />
           <StatusBadgeLine
-            label="signatures"
+            label="Signatures"
             badge={signatureStatus}
             detail={`${snapshot.signatures.length} e-signature record(s) returned.`}
           />
           <div className="rounded-md border bg-muted/20 p-3">
-            <p className="text-xs text-muted-foreground">inspection package link</p>
+            <p className="text-xs text-muted-foreground">Inspection package link</p>
             <Button variant="outline" size="sm" className="mt-2" asChild>
               <Link href="/validation-center/inspection-package">Open package</Link>
             </Button>
           </div>
           <StatusLine
-            label="release status"
+            label="Release status"
             status={releaseStatus}
             detail="Shows approved only when controlled record status is approved."
           />

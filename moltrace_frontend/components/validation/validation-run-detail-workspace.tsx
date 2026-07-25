@@ -136,7 +136,7 @@ export function ValidationRunDetailWorkspace() {
     const id = validationRunId?.trim()
     if (!id) {
       setLoading(false)
-      setError("Missing validation run id.")
+      setError("Missing validation run ID.")
       setRun(null)
       setRawPayload(null)
       return
@@ -215,7 +215,7 @@ export function ValidationRunDetailWorkspace() {
           <h1 className="font-mono text-2xl font-bold tracking-tight">Validation run</h1>
           <p className="font-mono text-xs text-muted-foreground break-all">{validationRunId || "—"}</p>
           <p className="text-sm text-muted-foreground">
-            Read-only details from the validation run response. Terminology reflects API labels only.
+            Read-only details for this validation run.
           </p>
         </div>
         <BackendStatusIndicator />
@@ -227,7 +227,7 @@ export function ValidationRunDetailWorkspace() {
         <AlertCard
           variant="error"
           icon={ServerOff}
-          title="Backend unavailable or run not found"
+          title="Run unavailable or not found"
           description={error}
         />
       ) : run ? (
@@ -237,7 +237,7 @@ export function ValidationRunDetailWorkspace() {
             eyebrow="Result"
             title="Validation result"
             icon={Activity}
-            description="Status and identifiers as returned by the API."
+            description="Status and identifiers for this run."
           >
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -247,7 +247,7 @@ export function ValidationRunDetailWorkspace() {
                 </Badge>
               </div>
               {showReviewNote ? (
-                <p className="text-sm text-muted-foreground">Requires review (per run status label).</p>
+                <p className="text-sm text-muted-foreground">Requires review (based on the run status).</p>
               ) : null}
             </div>
           </ModuleCard>
@@ -257,7 +257,7 @@ export function ValidationRunDetailWorkspace() {
             eyebrow="Benchmark"
             title="Benchmark result"
             icon={Database}
-            description="Benchmark dataset reference from the run payload."
+            description="Benchmark dataset reference for this run."
           >
             <dl className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -288,11 +288,11 @@ export function ValidationRunDetailWorkspace() {
             eyebrow="Metrics"
             title="Metrics"
             icon={BarChart3}
-            description="Per-metric rows from the run payload."
+            description="Per-metric rows for this run."
           >
             <div>
               {metrics.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No metrics rows in this response.</p>
+                <p className="text-sm text-muted-foreground">No metrics rows for this run.</p>
               ) : (
                 <div className="overflow-x-auto rounded-md border">
                   <Table>
@@ -351,7 +351,7 @@ export function ValidationRunDetailWorkspace() {
           >
             <div>
               {warningsList.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No warnings in this response.</p>
+                <p className="text-sm text-muted-foreground">No warnings for this run.</p>
               ) : (
                 <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
                   {warningsList.map((w, idx) => (
@@ -369,7 +369,7 @@ export function ValidationRunDetailWorkspace() {
           <ModuleCard accent="cyan" eyebrow="Metadata" title="Metadata" icon={Info}>
             <div>
               {metadataRaw == null || (isRecord(metadataRaw) && Object.keys(metadataRaw).length === 0) ? (
-                <p className="text-sm text-muted-foreground">No metadata object in this response.</p>
+                <p className="text-sm text-muted-foreground">No metadata for this run.</p>
               ) : (
                 <pre className="max-h-[320px] overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-[10px] leading-relaxed">
                   {JSON.stringify(metadataRaw, null, 2)}
@@ -406,7 +406,7 @@ export function ValidationRunDetailWorkspace() {
           </Card>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">No run payload.</p>
+        <p className="text-sm text-muted-foreground">No run details.</p>
       )}
     </div>
   )

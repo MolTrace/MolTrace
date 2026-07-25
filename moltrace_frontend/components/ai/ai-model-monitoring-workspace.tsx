@@ -94,7 +94,7 @@ export function AiModelMonitoringWorkspace() {
           const data = await apiFetch<unknown>("/ai/model-monitoring", { method: "GET" })
           setMonitoring(data)
         } catch (err) {
-          setLoadErr(formatErr(err, "Could not load /ai/model-monitoring."))
+          setLoadErr(formatErr(err, "Could not load monitoring data."))
           setMonitoring(null)
         }
       })(),
@@ -103,7 +103,7 @@ export function AiModelMonitoringWorkspace() {
           const data = await apiFetch<unknown>("/ai/model-monitoring/events", { method: "GET" })
           setEvents(extractRows(data, EVENT_KEYS))
         } catch (err) {
-          setEventsErr(formatErr(err, "Could not load /ai/model-monitoring/events."))
+          setEventsErr(formatErr(err, "Could not load monitoring events."))
           setEvents([])
         }
       })(),
@@ -164,7 +164,7 @@ export function AiModelMonitoringWorkspace() {
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="font-mono text-2xl font-bold tracking-tight">Model Monitoring</h1>
-        <p className="text-sm text-muted-foreground">Read monitoring rollups and log monitoring events.</p>
+        <p className="text-sm text-muted-foreground">Read monitoring summaries and log monitoring events.</p>
       </div>
 
       <Alert className="border-amber-500/30 bg-amber-500/10">
@@ -178,20 +178,20 @@ export function AiModelMonitoringWorkspace() {
           {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
           Refresh
         </Button>
-        <Badge variant="outline">GET /ai/model-monitoring</Badge>
-        <Badge variant="outline">GET /ai/model-monitoring/events</Badge>
+        <Badge variant="outline">Monitoring summary</Badge>
+        <Badge variant="outline">Event log</Badge>
       </div>
 
       {loadErr ? <p className="text-sm text-destructive">{loadErr}</p> : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {[
-          { label: "prediction volume", value: predictionVolume, color: "var(--mt-teal-ink)" },
-          { label: "low-confidence count", value: lowConfidenceCount, color: "var(--mt-amber)" },
-          { label: "OOD count", value: oodCount, color: "var(--mt-amber)" },
-          { label: "fallback used count", value: fallbackUsedCount, color: "var(--mt-violet-ink)" },
-          { label: "human rejection count", value: humanRejectionCount, color: "var(--mt-amber)" },
-          { label: "service failure count", value: serviceFailureCount, color: "var(--mt-red)" },
+          { label: "Prediction volume", value: predictionVolume, color: "var(--mt-teal-ink)" },
+          { label: "Low-confidence count", value: lowConfidenceCount, color: "var(--mt-amber)" },
+          { label: "Out-of-distribution count", value: oodCount, color: "var(--mt-amber)" },
+          { label: "Fallback used count", value: fallbackUsedCount, color: "var(--mt-violet-ink)" },
+          { label: "Human rejection count", value: humanRejectionCount, color: "var(--mt-amber)" },
+          { label: "Service failure count", value: serviceFailureCount, color: "var(--mt-red)" },
         ].map((kpi) => (
           <Card
             key={kpi.label}
@@ -226,10 +226,10 @@ export function AiModelMonitoringWorkspace() {
           {postErr ? <p className="text-sm text-destructive">{postErr}</p> : null}
           {postOk ? <p className="text-sm text-emerald-700">{postOk}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor="mm-event-type">event type</Label><Input id="mm-event-type" value={eventType} onChange={(e) => setEventType(e.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="mm-service-key">service key</Label><Input id="mm-service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="mm-status">status</Label><Input id="mm-status" value={status} onChange={(e) => setStatus(e.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="mm-notes">notes</Label><Input id="mm-notes" value={eventNotes} onChange={(e) => setEventNotes(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="mm-event-type">Event type</Label><Input id="mm-event-type" value={eventType} onChange={(e) => setEventType(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="mm-service-key">Service key</Label><Input id="mm-service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="mm-status">Status</Label><Input id="mm-status" value={status} onChange={(e) => setStatus(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="mm-notes">Notes</Label><Input id="mm-notes" value={eventNotes} onChange={(e) => setEventNotes(e.target.value)} /></div>
           </div>
           <Button type="button" onClick={() => void postEvent()} disabled={postBusy}>
             {postBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
@@ -248,7 +248,7 @@ export function AiModelMonitoringWorkspace() {
         <div className="overflow-x-auto">
           {eventsErr ? <p className="mb-3 text-sm text-destructive">{eventsErr}</p> : null}
           <Table>
-            <TableHeader><TableRow><TableHead>event</TableHead><TableHead>service key</TableHead><TableHead>status</TableHead><TableHead>timestamp</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Event</TableHead><TableHead>Service key</TableHead><TableHead>Status</TableHead><TableHead>Timestamp</TableHead></TableRow></TableHeader>
             <TableBody>
               {events.slice(0, 40).map((row, idx) => (
                 <TableRow key={`${readStr(row, ["id", "event_id"])}-${idx}`}>

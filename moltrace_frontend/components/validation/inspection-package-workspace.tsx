@@ -208,11 +208,11 @@ export function InspectionPackageWorkspace() {
   async function createPackage() {
     const parsedScopeId = scopeId.trim() ? readInt(scopeId) : null
     if (!title.trim()) {
-      setError("title is required.")
+      setError("Title is required.")
       return
     }
     if (scopeId.trim() && parsedScopeId == null) {
-      setError("scope ID must be a positive integer.")
+      setError("Scope ID must be a positive integer.")
       return
     }
     const parsedValidationProjects = parseIdList(validationProjectIds)
@@ -220,7 +220,7 @@ export function InspectionPackageWorkspace() {
     const parsedAuditEvents = parseIdList(auditEventIds)
     const parsedControlledRecords = parseIdList(controlledRecordIds)
     if (!parsedValidationProjects || !parsedSignatures || !parsedAuditEvents || !parsedControlledRecords) {
-      setError("included IDs must be positive integers separated by commas or spaces.")
+      setError("Included IDs must be positive integers separated by commas or spaces.")
       return
     }
 
@@ -279,7 +279,7 @@ export function InspectionPackageWorkspace() {
         headers,
         cache: "no-store",
       })
-      if (!response.ok) throw new Error(`Download failed with status ${response.status}`)
+      if (!response.ok) throw new Error("Download failed. Please try again.")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const anchor = document.createElement("a")
@@ -329,11 +329,11 @@ export function InspectionPackageWorkspace() {
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="inspection-package-title">title</Label>
+                <Label htmlFor="inspection-package-title">Title</Label>
                 <Input id="inspection-package-title" value={title} onChange={(event) => setTitle(event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="inspection-package-scope">scope</Label>
+                <Label htmlFor="inspection-package-scope">Scope</Label>
                 <Select value={scope} onValueChange={setScope}>
                   <SelectTrigger id="inspection-package-scope">
                     <SelectValue />
@@ -348,7 +348,7 @@ export function InspectionPackageWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="inspection-package-scope-id">scope ID optional</Label>
+                <Label htmlFor="inspection-package-scope-id">Scope ID (optional)</Label>
                 <Input
                   id="inspection-package-scope-id"
                   inputMode="numeric"
@@ -357,7 +357,7 @@ export function InspectionPackageWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="inspection-package-validation-projects">include validation projects</Label>
+                <Label htmlFor="inspection-package-validation-projects">Include validation projects</Label>
                 <Input
                   id="inspection-package-validation-projects"
                   placeholder="1, 2, 3"
@@ -366,7 +366,7 @@ export function InspectionPackageWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="inspection-package-signatures">include signatures</Label>
+                <Label htmlFor="inspection-package-signatures">Include signatures</Label>
                 <Input
                   id="inspection-package-signatures"
                   placeholder="1, 2, 3"
@@ -375,7 +375,7 @@ export function InspectionPackageWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="inspection-package-audit-events">include audit events</Label>
+                <Label htmlFor="inspection-package-audit-events">Include audit events</Label>
                 <Input
                   id="inspection-package-audit-events"
                   placeholder="1, 2, 3"
@@ -384,7 +384,7 @@ export function InspectionPackageWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="inspection-package-controlled-records">include controlled records</Label>
+                <Label htmlFor="inspection-package-controlled-records">Include controlled records</Label>
                 <Input
                   id="inspection-package-controlled-records"
                   placeholder="1, 2, 3"
@@ -399,11 +399,11 @@ export function InspectionPackageWorkspace() {
                   checked={includeReleaseRecords}
                   onCheckedChange={(checked) => setIncludeReleaseRecords(Boolean(checked))}
                 />
-                include release records
+                Include release records
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox checked={includeHashes} onCheckedChange={(checked) => setIncludeHashes(Boolean(checked))} />
-                include hashes
+                Include hashes
               </label>
             </div>
             <Button type="button" onClick={createPackage} disabled={createBusy}>
@@ -424,23 +424,23 @@ export function InspectionPackageWorkspace() {
               <>
                 <div className="grid gap-3 sm:grid-cols-4">
                   <div>
-                    <p className="text-xs text-muted-foreground">package status</p>
+                    <p className="text-xs text-muted-foreground">Package status</p>
                     <Badge variant="secondary">{readStr(detailPackage.package_status) || "-"}</Badge>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">scope</p>
+                    <p className="text-xs text-muted-foreground">Scope</p>
                     <p className="font-medium">{readStr(detailPackage.scope) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">scope ID</p>
+                    <p className="text-xs text-muted-foreground">Scope ID</p>
                     <p className="font-medium">{readStr(detailPackage.scope_id) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">created date</p>
+                    <p className="text-xs text-muted-foreground">Created date</p>
                     <p className="font-medium">{formatDate(detailPackage.created_at)}</p>
                   </div>
                   <div className="sm:col-span-4">
-                    <p className="text-xs text-muted-foreground">package SHA-256</p>
+                    <p className="text-xs text-muted-foreground">Package SHA-256</p>
                     <p className="break-all font-mono text-xs">{readStr(detailPackage.package_sha256) || "-"}</p>
                   </div>
                 </div>
@@ -458,17 +458,17 @@ export function InspectionPackageWorkspace() {
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="space-y-2">
-                    <h3 className="text-sm font-medium">included records</h3>
+                    <h3 className="text-sm font-medium">Included records</h3>
                     <div className="space-y-2">
                       {includedRecordIds.map((recordId, index) => (
                         <div key={`${recordId}-${index}`} className="rounded-lg border p-3 text-sm">
-                          record ID: {readStr(recordId)}
+                          Record ID: {readStr(recordId)}
                         </div>
                       ))}
                       {manifestRecords.map((record, index) => (
                         <div key={`${rowId(record)}-${index}`} className="rounded-lg border p-3 text-sm">
-                          <p>record ID: {readStr(record.record_id) || "-"}</p>
-                          <p className="text-muted-foreground">content hash: {shortHash(record.content_hash)}</p>
+                          <p>Record ID: {readStr(record.record_id) || "-"}</p>
+                          <p className="text-muted-foreground">Content hash: {shortHash(record.content_hash)}</p>
                         </div>
                       ))}
                       {!includedRecordIds.length && !manifestRecords.length ? (
@@ -477,7 +477,7 @@ export function InspectionPackageWorkspace() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-sm font-medium">warnings</h3>
+                    <h3 className="text-sm font-medium">Warnings</h3>
                     <div className="space-y-2">
                       {warnings.map((warning, index) => (
                         <div key={index} className="rounded-lg border p-3 text-sm">
@@ -490,7 +490,7 @@ export function InspectionPackageWorkspace() {
                 </div>
 
                 <details open className="rounded-lg border p-3">
-                  <summary className="cursor-pointer text-sm font-medium">manifest</summary>
+                  <summary className="cursor-pointer text-sm font-medium">Manifest</summary>
                   <pre className="mt-3 max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs">
                     {JSON.stringify(developerManifest, null, 2)}
                   </pre>
@@ -522,12 +522,12 @@ export function InspectionPackageWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>title</TableHead>
-                  <TableHead>scope</TableHead>
-                  <TableHead>package status</TableHead>
-                  <TableHead>package SHA-256</TableHead>
-                  <TableHead>created date</TableHead>
-                  <TableHead className="text-right">actions</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Package status</TableHead>
+                  <TableHead>Package SHA-256</TableHead>
+                  <TableHead>Created date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

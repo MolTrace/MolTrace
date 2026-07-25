@@ -30,7 +30,7 @@ describe("SystemStatusWorkspace connector health fallback", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("Connector health").length).toBeGreaterThan(0)
-      expect(screen.getByText("Connector health unavailable — current admin system content continues.")).toBeInTheDocument()
+      expect(screen.getByText("Connector health unavailable — the rest of System Status is still shown.")).toBeInTheDocument()
     })
   })
 })

@@ -185,16 +185,16 @@ export function DeviationsWorkspace() {
 
   async function createDeviation() {
     if (!title.trim()) {
-      setError("title is required.")
+      setError("Title is required.")
       return
     }
     if (!description.trim()) {
-      setError("description is required.")
+      setError("Description is required.")
       return
     }
     const parsedSourceId = sourceId.trim() ? readInt(sourceId) : null
     if (sourceId.trim() && parsedSourceId == null) {
-      setError("source ID must be a positive integer.")
+      setError("Source ID must be a positive integer.")
       return
     }
 
@@ -243,11 +243,11 @@ export function DeviationsWorkspace() {
     const id = rowId(detailDeviation)
     if (!id) return
     if (!editTitle.trim()) {
-      setError("title is required.")
+      setError("Title is required.")
       return
     }
     if (!editDescription.trim()) {
-      setError("description is required.")
+      setError("Description is required.")
       return
     }
 
@@ -299,7 +299,7 @@ export function DeviationsWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Deviations</h1>
           <p className="text-sm text-muted-foreground">
-            Create, update, and review deviation records with linked validation test/source context.
+            Create, update, and review deviation records with linked test and source context.
           </p>
         </div>
         <BackendStatusIndicator />
@@ -320,7 +320,7 @@ export function DeviationsWorkspace() {
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label htmlFor="deviation-code">deviation code</Label>
+                <Label htmlFor="deviation-code">Deviation code</Label>
                 <Input
                   id="deviation-code"
                   value={deviationCode}
@@ -328,11 +328,11 @@ export function DeviationsWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="deviation-title">title</Label>
+                <Label htmlFor="deviation-title">Title</Label>
                 <Input id="deviation-title" value={title} onChange={(event) => setTitle(event.target.value)} />
               </div>
               <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="deviation-description">description</Label>
+                <Label htmlFor="deviation-description">Description</Label>
                 <Textarea
                   id="deviation-description"
                   value={description}
@@ -341,7 +341,7 @@ export function DeviationsWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="deviation-severity">severity</Label>
+                <Label htmlFor="deviation-severity">Severity</Label>
                 <Select value={severity} onValueChange={setSeverity}>
                   <SelectTrigger id="deviation-severity">
                     <SelectValue />
@@ -356,7 +356,7 @@ export function DeviationsWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="deviation-status">status</Label>
+                <Label htmlFor="deviation-status">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger id="deviation-status">
                     <SelectValue />
@@ -371,7 +371,7 @@ export function DeviationsWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="deviation-source-type">source type</Label>
+                <Label htmlFor="deviation-source-type">Source type</Label>
                 <Select value={sourceType} onValueChange={setSourceType}>
                   <SelectTrigger id="deviation-source-type">
                     <SelectValue />
@@ -386,7 +386,7 @@ export function DeviationsWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="deviation-source-id">source ID</Label>
+                <Label htmlFor="deviation-source-id">Source ID</Label>
                 <Input
                   id="deviation-source-id"
                   inputMode="numeric"
@@ -395,7 +395,7 @@ export function DeviationsWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="deviation-root-cause">root cause</Label>
+                <Label htmlFor="deviation-root-cause">Root cause</Label>
                 <Textarea
                   id="deviation-root-cause"
                   value={rootCause}
@@ -404,7 +404,7 @@ export function DeviationsWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="deviation-resolution">resolution</Label>
+                <Label htmlFor="deviation-resolution">Resolution</Label>
                 <Textarea
                   id="deviation-resolution"
                   value={resolution}
@@ -431,25 +431,25 @@ export function DeviationsWorkspace() {
               <>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div>
-                    <p className="text-xs text-muted-foreground">deviation code</p>
+                    <p className="text-xs text-muted-foreground">Deviation code</p>
                     <p className="font-medium">{readStr(detailDeviation.deviation_code) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">severity</p>
+                    <p className="text-xs text-muted-foreground">Severity</p>
                     <Badge variant={severityVariant(detailDeviation.severity)}>
                       {readStr(detailDeviation.severity) || "-"}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">status</p>
+                    <p className="text-xs text-muted-foreground">Status</p>
                     <Badge variant={statusVariant(detailDeviation.status)}>{readStr(detailDeviation.status) || "-"}</Badge>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">linked validation test/source</p>
+                    <p className="text-xs text-muted-foreground">Linked validation test / source</p>
                     <p className="font-medium">{sourceLabel(detailDeviation)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">created date</p>
+                    <p className="text-xs text-muted-foreground">Created</p>
                     <p className="font-medium">{formatDate(detailDeviation.created_at)}</p>
                   </div>
                   <div>
@@ -460,7 +460,7 @@ export function DeviationsWorkspace() {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1 sm:col-span-2">
-                    <Label htmlFor="edit-deviation-title">title</Label>
+                    <Label htmlFor="edit-deviation-title">Title</Label>
                     <Input
                       id="edit-deviation-title"
                       value={editTitle}
@@ -468,7 +468,7 @@ export function DeviationsWorkspace() {
                     />
                   </div>
                   <div className="space-y-1 sm:col-span-2">
-                    <Label htmlFor="edit-deviation-description">description</Label>
+                    <Label htmlFor="edit-deviation-description">Description</Label>
                     <Textarea
                       id="edit-deviation-description"
                       value={editDescription}
@@ -477,7 +477,7 @@ export function DeviationsWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-deviation-severity">severity</Label>
+                    <Label htmlFor="edit-deviation-severity">Severity</Label>
                     <Select value={editSeverity} onValueChange={setEditSeverity}>
                       <SelectTrigger id="edit-deviation-severity">
                         <SelectValue />
@@ -492,7 +492,7 @@ export function DeviationsWorkspace() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-deviation-status">status</Label>
+                    <Label htmlFor="edit-deviation-status">Status</Label>
                     <Select value={editStatus} onValueChange={setEditStatus}>
                       <SelectTrigger id="edit-deviation-status">
                         <SelectValue />
@@ -507,7 +507,7 @@ export function DeviationsWorkspace() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-deviation-root-cause">root cause</Label>
+                    <Label htmlFor="edit-deviation-root-cause">Root cause</Label>
                     <Textarea
                       id="edit-deviation-root-cause"
                       value={editRootCause}
@@ -516,7 +516,7 @@ export function DeviationsWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-deviation-resolution">resolution</Label>
+                    <Label htmlFor="edit-deviation-resolution">Resolution</Label>
                     <Textarea
                       id="edit-deviation-resolution"
                       value={editResolution}
@@ -555,14 +555,14 @@ export function DeviationsWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>deviation code</TableHead>
-                  <TableHead>title</TableHead>
-                  <TableHead>severity</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>linked validation test/source</TableHead>
-                  <TableHead>root cause</TableHead>
-                  <TableHead>updated date</TableHead>
-                  <TableHead className="text-right">open</TableHead>
+                  <TableHead>Deviation code</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Linked validation test / source</TableHead>
+                  <TableHead>Root cause</TableHead>
+                  <TableHead>Updated</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

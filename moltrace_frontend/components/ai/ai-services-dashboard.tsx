@@ -139,7 +139,7 @@ export function AiServicesDashboard() {
           const data = await apiFetch<unknown>("/ai/services", { method: "GET" })
           setServices(extractRows(data, SERVICE_KEYS))
         } catch (err) {
-          setErrServices(formatErr(err, "Could not load /ai/services."))
+          setErrServices(formatErr(err, "Could not load AI services."))
           setServices([])
         }
       })(),
@@ -148,7 +148,7 @@ export function AiServicesDashboard() {
           const data = await apiFetch<unknown>("/ai/predictions", { method: "GET" })
           setPredictions(extractRows(data, PREDICTION_KEYS))
         } catch (err) {
-          setErrPredictions(formatErr(err, "Could not load /ai/predictions."))
+          setErrPredictions(formatErr(err, "Could not load predictions."))
           setPredictions([])
         }
       })(),
@@ -157,7 +157,7 @@ export function AiServicesDashboard() {
           const data = await apiFetch<unknown>("/ai/active-learning/candidates", { method: "GET" })
           setActiveLearningCandidates(extractRows(data, ACTIVE_LEARNING_KEYS))
         } catch (err) {
-          setErrActiveLearning(formatErr(err, "Could not load /ai/active-learning/candidates."))
+          setErrActiveLearning(formatErr(err, "Could not load active-learning candidates."))
           setActiveLearningCandidates([])
         }
       })(),
@@ -166,7 +166,7 @@ export function AiServicesDashboard() {
           const data = await apiFetch<unknown>("/ai/model-monitoring", { method: "GET" })
           setModelMonitoring(data)
         } catch (err) {
-          setErrMonitoring(formatErr(err, "Could not load /ai/model-monitoring."))
+          setErrMonitoring(formatErr(err, "Could not load model monitoring."))
           setModelMonitoring(null)
         }
       })(),
@@ -389,7 +389,7 @@ export function AiServicesDashboard() {
                   {!services.length ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-muted-foreground">
-                        No services returned.
+                        No services found.
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -433,7 +433,7 @@ export function AiServicesDashboard() {
                   {!predictions.length ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-muted-foreground">
-                        No predictions returned.
+                        No predictions found.
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -475,7 +475,7 @@ export function AiServicesDashboard() {
                   {!activeLearningCandidates.length ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-muted-foreground">
-                        No active-learning candidates returned.
+                        No active-learning candidates found.
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -511,7 +511,7 @@ export function AiServicesDashboard() {
                   {!monitoringRows.length ? (
                     <TableRow>
                       <TableCell colSpan={2} className="text-muted-foreground">
-                        No scalar monitoring metrics returned.
+                        No monitoring metrics found.
                       </TableCell>
                     </TableRow>
                   ) : null}

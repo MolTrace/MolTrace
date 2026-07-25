@@ -395,15 +395,15 @@ export function MappingTemplatesWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="mapping-connector">connector</Label>
+              <Label htmlFor="mapping-connector">Connector</Label>
               <Input id="mapping-connector" value={connector} onChange={(e) => setConnector(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="mapping-name">name</Label>
+              <Label htmlFor="mapping-name">Name</Label>
               <Input id="mapping-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="mapping-source-type">source type</Label>
+              <Label htmlFor="mapping-source-type">Source type</Label>
               <select
                 id="mapping-source-type"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -418,7 +418,7 @@ export function MappingTemplatesWorkspace() {
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="mapping-target-type">target type</Label>
+              <Label htmlFor="mapping-target-type">Target type</Label>
               <select
                 id="mapping-target-type"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -472,20 +472,20 @@ export function MappingTemplatesWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>template ID</TableHead>
-                    <TableHead>connector</TableHead>
-                    <TableHead>name</TableHead>
-                    <TableHead>source type</TableHead>
-                    <TableHead>target type</TableHead>
-                    <TableHead>field map JSON</TableHead>
-                    <TableHead>open</TableHead>
+                    <TableHead>Template ID</TableHead>
+                    <TableHead>Connector</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Source type</TableHead>
+                    <TableHead>Target type</TableHead>
+                    <TableHead>Field map</TableHead>
+                    <TableHead>Open</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {mappingTemplates.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-xs text-muted-foreground">
-                        No mapping templates returned.
+                        No mapping templates found.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -527,7 +527,7 @@ export function MappingTemplatesWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1">
-              <Label htmlFor="external-record-connector">connector</Label>
+              <Label htmlFor="external-record-connector">Connector</Label>
               <Input
                 id="external-record-connector"
                 value={externalRecordConnector}
@@ -535,7 +535,7 @@ export function MappingTemplatesWorkspace() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="external-record-source-type">source type</Label>
+              <Label htmlFor="external-record-source-type">Source type</Label>
               <select
                 id="external-record-source-type"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -550,7 +550,7 @@ export function MappingTemplatesWorkspace() {
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="external-record-key">external key</Label>
+              <Label htmlFor="external-record-key">External key</Label>
               <Input
                 id="external-record-key"
                 value={externalRecordExternalKey}
@@ -577,19 +577,19 @@ export function MappingTemplatesWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>external record ID</TableHead>
-                    <TableHead>connector</TableHead>
-                    <TableHead>source type</TableHead>
-                    <TableHead>external key</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>open</TableHead>
+                    <TableHead>External record ID</TableHead>
+                    <TableHead>Connector</TableHead>
+                    <TableHead>Source type</TableHead>
+                    <TableHead>External key</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Open</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {externalRecords.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-xs text-muted-foreground">
-                        No external records returned.
+                        No external records found.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -633,7 +633,7 @@ export function MappingTemplatesWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1">
-              <Label htmlFor="external-link-record-id">external record ID</Label>
+              <Label htmlFor="external-link-record-id">External record ID</Label>
               <Input
                 id="external-link-record-id"
                 value={externalLinkExternalRecordId}
@@ -641,7 +641,7 @@ export function MappingTemplatesWorkspace() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="external-link-target-type">target type</Label>
+              <Label htmlFor="external-link-target-type">Target type</Label>
               <select
                 id="external-link-target-type"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -656,7 +656,7 @@ export function MappingTemplatesWorkspace() {
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="external-link-target-id">target ID</Label>
+              <Label htmlFor="external-link-target-id">Target ID</Label>
               <Input
                 id="external-link-target-id"
                 value={externalLinkTargetId}
@@ -683,18 +683,18 @@ export function MappingTemplatesWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>external object link ID</TableHead>
-                    <TableHead>external record ID</TableHead>
-                    <TableHead>target type</TableHead>
-                    <TableHead>target ID</TableHead>
-                    <TableHead>status</TableHead>
+                    <TableHead>External object link ID</TableHead>
+                    <TableHead>External record ID</TableHead>
+                    <TableHead>Target type</TableHead>
+                    <TableHead>Target ID</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {externalObjectLinks.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-xs text-muted-foreground">
-                        No external object links returned.
+                        No external object links found.
                       </TableCell>
                     </TableRow>
                   ) : (
