@@ -109,7 +109,7 @@ function RouteScoreResult({ view }: { view: RouteScoreView }) {
         {view.label ? <p className="text-sm font-medium text-foreground">{view.label}</p> : null}
         <Badge variant="secondary" className="text-xs">advisory</Badge>
         <Badge variant="outline" className="font-mono tabular-nums text-xs">
-          route_score {view.routeScore != null ? view.routeScore.toFixed(3) : "—"}
+          Route score {view.routeScore != null ? view.routeScore.toFixed(3) : "—"}
         </Badge>
         {/* unknown renders as the WORST tier (unreviewable), never neutral */}
         <Badge className={`text-xs ${routeRiskBadgeClass(view.worstRisk)}`}>
@@ -256,13 +256,13 @@ export function RouteScoresPanel({ projectId }: { projectId: number }) {
       } else {
         // Never leave a stale score on screen pretending to be this submission's result.
         setLatest(null)
-        setMsg("The score response was malformed — retry, or check previous scores below.")
+        setMsg("The score could not be read — retry, or check previous scores below.")
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 400 && isRecord(err.data) && typeof err.data.detail === "string") {
         setInputError(err.data.detail) // malformed route tree → inline validation message
       } else {
-        setMsg(formatApiError(err, "POST …/route-scores failed."))
+        setMsg(formatApiError(err, "Could not score the route."))
       }
     } finally {
       setBusy(false)
@@ -277,7 +277,7 @@ export function RouteScoresPanel({ projectId }: { projectId: number }) {
       eyebrow="Routes · Scoring"
       title="Score a synthesis route"
       icon={GitBranch}
-      description="Paste or build a route tree and score it with the frozen safety and green-chemistry engines. Advisory decision support — never a safety determination or synthesis instruction. Route GENERATION is not available on this deployment; input is manual by design."
+      description="Paste or build a route tree and score it with the frozen safety and green-chemistry engines. Advisory decision support — never a safety determination or synthesis instruction. Route GENERATION is not available in this app; input is manual by design."
     >
       <form className="space-y-3" onSubmit={(e) => void score(e)}>
         <div className="space-y-1">

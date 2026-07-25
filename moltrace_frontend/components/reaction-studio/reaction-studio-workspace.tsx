@@ -57,14 +57,14 @@ const DEMO_PREDICTION = {
   predicted_yield_pct: 76,
   predicted_selectivity_pct: 90,
   disclaimer:
-    "Figures below are placeholders for a future surrogate model. No inference has been run in this build.",
+    "Figures below are placeholders for a future surrogate model. No prediction has been run yet.",
 }
 
 const DEMO_UNCERTAINTY = {
   yield_ci_pct: [68, 83] as const,
   selectivity_ci_pct: [84, 94] as const,
   epistemic_note:
-    "Uncertainty bands are demo annotations only; connect calibration data when the prediction API is available.",
+    "Uncertainty bands are demo annotations only; connect calibration data when predictions are available.",
 }
 
 const DEMO_NEXT_EXPERIMENT = {
@@ -73,7 +73,7 @@ const DEMO_NEXT_EXPERIMENT = {
   catalyst: "Pd(PPh₃)₄",
   base: "Cs₂CO₃",
   rationale:
-    "Placeholder suggestion — replace with acquisition policy once experiments are logged and scored server-side.",
+    "Placeholder suggestion — replace with a real acquisition policy once experiments are logged and scored.",
 }
 
 export function ReactionStudioWorkspace() {
@@ -157,7 +157,7 @@ export function ReactionStudioWorkspace() {
 
   async function exportApprovedExperiments() {
     if (!exportApprovedItems.trim()) {
-      setExportError("approved recommendations / experiments is required.")
+      setExportError("Approved recommendations or experiments are required.")
       return
     }
     setExportBusy(true)
@@ -217,8 +217,8 @@ export function ReactionStudioWorkspace() {
             </p>
             <h1 className="font-mono text-2xl font-bold tracking-tight">Optimization workspace</h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Shell UI for reaction schemes, condition matrices, outcomes, and decision-support cards. Backend wiring is
-              intentionally omitted until endpoints are available.
+              Workspace for reaction schemes, condition matrices, outcomes, and decision-support cards. Live analysis is
+              intentionally turned off in this build until it becomes available.
             </p>
           </div>
           <Button variant="outline" size="sm" disabled className="gap-2">
@@ -244,7 +244,7 @@ export function ReactionStudioWorkspace() {
           </p>
           <h2 className="font-mono text-xl font-bold tracking-tight">Structure drawing &amp; SMARTS canvas</h2>
           <p className="text-sm text-muted-foreground">
-            Placeholder canvas for the route&apos;s structural representation — wire to a structure editor or ELN link when chemistry services are available.
+            Placeholder canvas for the route&apos;s structural representation — connect a structure editor or ELN link when chemistry services are available.
           </p>
         </div>
         <ModuleCard
@@ -258,7 +258,7 @@ export function ReactionStudioWorkspace() {
             <Beaker className="mb-3 h-10 w-10 text-muted-foreground/70" aria-hidden />
             <p className="text-sm font-medium text-foreground">Scheme preview area</p>
             <p className="mt-2 max-w-md text-xs text-muted-foreground">
-              Demo layout only. Import molfile / CXSMILES or render from route params when chemistry services exist.
+              Demo layout only. Import a molfile / CXSMILES or render from the route when chemistry services exist.
             </p>
           </div>
         </ModuleCard>
@@ -326,7 +326,7 @@ export function ReactionStudioWorkspace() {
             eyebrow="Studio · Outcomes"
             title={<span id="outcomes-heading">Yield, selectivity & impurities</span>}
             icon={Target}
-            description="Measured outcomes table — values are fictional for UI staging."
+            description="Measured outcomes table — values are fictional and shown for layout only."
             className="h-full"
           >
             <div className="overflow-x-auto">
@@ -372,7 +372,7 @@ export function ReactionStudioWorkspace() {
             ELN import &amp; export bridges
           </h2>
           <p className="text-sm text-muted-foreground">
-            Round-trip a route&apos;s conditions and outcomes between the studio and your ELN — both directions are demo placeholders until the connector services land.
+            Round-trip a route&apos;s conditions and outcomes between the studio and your ELN — both directions are demo placeholders until connectors are available.
           </p>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -492,11 +492,11 @@ export function ReactionStudioWorkspace() {
                     id="rxn-export-approved-items"
                     value={exportApprovedItems}
                     onChange={(e) => setExportApprovedItems(e.target.value)}
-                    placeholder="ids or payload from approved recommendations / experiments"
+                    placeholder="IDs from approved recommendations or experiments"
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="rxn-export-target-external-record">target external record optional</Label>
+                  <Label htmlFor="rxn-export-target-external-record">Target external record (optional)</Label>
                   <Input
                     id="rxn-export-target-external-record"
                     value={exportTargetExternalRecord}
@@ -544,7 +544,7 @@ export function ReactionStudioWorkspace() {
           evidence_items={[
             `${DEMO_PREDICTION.label}: predicted yield placeholder ${DEMO_PREDICTION.predicted_yield_pct}%`,
             `${DEMO_PREDICTION.label}: predicted selectivity placeholder ${DEMO_PREDICTION.predicted_selectivity_pct}%`,
-            "Predictor execution is disabled until backend model evidence is connected.",
+            "Predictions are turned off until model evidence is connected.",
           ]}
           citations={[]}
           model_name="reaction surrogate placeholder"
@@ -574,7 +574,7 @@ export function ReactionStudioWorkspace() {
               </p>
             </div>
             <div className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Calibration curves and posterior stacks will render here after model API integration.
+              Calibration curves and posterior stacks will render here once predictions are connected.
             </div>
           </div>
         </ModuleCard>
@@ -601,7 +601,7 @@ export function ReactionStudioWorkspace() {
             </dl>
             <Separator />
             <Button variant="outline" size="sm" className="w-full" disabled>
-              Queue in ELN (requires backend)
+              Queue in ELN (not yet available)
             </Button>
           </div>
         </ModuleCard>
@@ -627,7 +627,7 @@ export function ReactionStudioWorkspace() {
           eyebrow="Studio · Response Surface"
           title={<span id="surface-heading">Response surface</span>}
           icon={LineChart}
-          description="Contour / surface visualization placeholder — wire to DOE engine or plotting library when data pipelines exist."
+          description="Contour / surface visualization placeholder — connect a DOE engine or plotting library when data is available."
         >
             <div className="scientific-grid relative flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg border bg-muted/20">
               <div className="absolute inset-0 bg-gradient-to-br from-chart-2/10 via-transparent to-chart-4/10" aria-hidden />
@@ -656,7 +656,7 @@ export function ReactionStudioWorkspace() {
           </p>
           <h2 className="font-mono text-xl font-bold tracking-tight">Human approval &amp; audit trail</h2>
           <p className="text-sm text-muted-foreground">
-            Experimental decisions require qualified review. Signatures and audit trails attach here once the workflow API is connected.
+            Experimental decisions require qualified review. Signatures and audit trails attach here once the approval workflow is connected.
           </p>
         </div>
         <ModuleCard
@@ -664,7 +664,7 @@ export function ReactionStudioWorkspace() {
           eyebrow="Studio · Approval Gate"
           title={<span id="approval-heading">Human approval gate</span>}
           icon={Shield}
-          description="Experimental decisions require qualified review. This gate will attach signatures and audit trails when the workflow API is connected."
+          description="Experimental decisions require qualified review. This gate will attach signatures and audit trails when the approval workflow is connected."
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-4 rounded-md border bg-background/80 px-4 py-3">
@@ -676,7 +676,7 @@ export function ReactionStudioWorkspace() {
             <div className="flex flex-wrap gap-3">
               <Button disabled className="gap-2">
                 <CheckCircle2 className="h-4 w-4" />
-                Submit for approval (requires backend)
+                Submit for approval (not yet available)
               </Button>
               <Button variant="outline" disabled className="gap-2">
                 Request revision
@@ -691,8 +691,8 @@ export function ReactionStudioWorkspace() {
                 style={{ color: "var(--mt-amber)" }}
                 aria-hidden
               />
-              Buttons stay disabled until approval endpoints and identity checks exist — avoids implying signed-off
-              experiments from static UI.
+              Buttons stay disabled until approvals and identity checks are available — this avoids implying signed-off
+              experiments from a demo screen.
             </p>
           </div>
         </ModuleCard>
@@ -701,9 +701,9 @@ export function ReactionStudioWorkspace() {
       {/* Footer strip */}
       <Card className="border-dashed bg-muted/30">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4 text-xs text-muted-foreground">
-          <span>MolTrace Reaction Studio (program-level) · shell build · no inference executed</span>
+          <span>MolTrace Reaction Studio (program-level) · demo build · no analysis executed</span>
           <Badge variant="outline" className="font-normal">
-            Progress: UI scaffold
+            Progress: early preview
           </Badge>
         </CardContent>
       </Card>

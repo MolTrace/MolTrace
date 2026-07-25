@@ -119,7 +119,7 @@ function ScreeningRow({
                   {sp.role}
                 </Badge>
                 <code className="truncate text-xs text-muted-foreground">{sp.smiles}</code>
-                {!sp.parsed ? <span className="text-[11px] text-red-600 dark:text-red-400">unparsed</span> : null}
+                {!sp.parsed ? <span className="text-[11px] text-red-600 dark:text-red-400">unreadable</span> : null}
                 <RiskBadge risk={sp.overallRisk} className="ml-auto" />
               </div>
               {sp.flaggedGroups.length > 0 ? (

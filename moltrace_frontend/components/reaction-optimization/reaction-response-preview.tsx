@@ -26,8 +26,8 @@ const EMPTY_COPY =
   "Add completed experiments with numeric outcomes to visualize reaction response."
 
 const OUTCOME_FIELDS = [
-  { value: "yield_percent", label: "yield_percent" },
-  { value: "selectivity_percent", label: "selectivity_percent" },
+  { value: "yield_percent", label: "Yield (%)" },
+  { value: "selectivity_percent", label: "Selectivity (%)" },
 ] as const
 
 const CHART_FILLS = [

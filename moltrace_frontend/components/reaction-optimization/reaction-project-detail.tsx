@@ -697,7 +697,7 @@ export function reactionWarmStartErrorMessage(err: unknown): string {
       return "No warm-start prior could be built — check that you own every source campaign you selected."
     }
   }
-  return formatApiError(err, "POST /reaction-projects/{id}/warm-start/prior failed.")
+  return formatApiError(err, "Could not build the warm-start prior.")
 }
 
 /** R9 — typed view over a ReactionABPromotionVerdict. Pure decision-support: deploys nothing.
@@ -833,7 +833,7 @@ export function reactionFeedbackErrorMessage(err: unknown): string {
     if (isRecord(err.data) && typeof err.data.detail === "string") return err.data.detail
     return "A valid reason is required to reject a proposal."
   }
-  return formatApiError(err, "POST /reaction-projects/{id}/feedback failed.")
+  return formatApiError(err, "Could not save your feedback.")
 }
 
 function mergeOutcomeExtractionNotes(run: Record<string, unknown>): string[] {
@@ -1356,7 +1356,7 @@ function RecommendationAdvisorCritiqueCard({ payload }: { payload: Record<string
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Condition critique (Advisor)</CardTitle>
         <CardDescription className="text-xs">
-          POST /reaction-recommendations/{"{recommendation_id}"}/advisor/critique — GET same path. Interpretations are
+          Interpretations are
           plausible and provisional; potential concerns require review before experimental decisions.
         </CardDescription>
       </CardHeader>
@@ -1377,39 +1377,39 @@ function RecommendationAdvisorCritiqueCard({ payload }: { payload: Record<string
             variant={payload.human_review_required === true ? "secondary" : "outline"}
             className="text-xs"
           >
-            human_review_required: {String(payload.human_review_required)}
+            Human review required: {String(payload.human_review_required)}
           </Badge>
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase text-muted-foreground">condition_summary_json</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Condition summary</p>
           <pre className="max-h-40 overflow-auto rounded-md bg-muted/40 p-3 text-xs leading-relaxed">
             {jsonPreview(isRecord(payload.condition_summary_json) ? payload.condition_summary_json : {}, 6000)}
           </pre>
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs font-medium uppercase text-muted-foreground">mechanistic_rationale</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Mechanistic rationale</p>
           <p className="text-muted-foreground">{String(payload.mechanistic_rationale ?? "")}</p>
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs font-medium uppercase text-muted-foreground">practicality_assessment</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Practicality assessment</p>
           <p className="text-muted-foreground">{String(payload.practicality_assessment ?? "")}</p>
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs font-medium uppercase text-muted-foreground">cost_assessment</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Cost assessment</p>
           <p className="text-muted-foreground">{String(payload.cost_assessment ?? "")}</p>
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs font-medium uppercase text-muted-foreground">safety_assessment</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Safety assessment</p>
           <p className="text-muted-foreground">{String(payload.safety_assessment ?? "")}</p>
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase text-muted-foreground">risk_flags</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Risk flags</p>
           {riskFlags.length > 0 ? (
             <ul className="space-y-2">
               {riskFlags.map((f, i) => (
@@ -1437,29 +1437,29 @@ function RecommendationAdvisorCritiqueCard({ payload }: { payload: Record<string
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-muted-foreground">risk_flags: none</p>
+            <p className="text-xs text-muted-foreground">Risk flags: none</p>
           )}
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase text-muted-foreground">suggested_controls</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Suggested controls</p>
           {suggestedControls.length > 0 ? (
             <pre className="max-h-40 overflow-auto rounded-md bg-muted/40 p-3 text-[10px] leading-snug">
               {jsonPreview(suggestedControls, 6000)}
             </pre>
           ) : (
-            <p className="text-xs text-muted-foreground">suggested_controls: none</p>
+            <p className="text-xs text-muted-foreground">Suggested controls: none</p>
           )}
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase text-muted-foreground">suggested_alternatives</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Suggested alternatives</p>
           {suggestedAlternatives.length > 0 ? (
             <pre className="max-h-40 overflow-auto rounded-md bg-muted/40 p-3 text-[10px] leading-snug">
               {jsonPreview(suggestedAlternatives, 6000)}
             </pre>
           ) : (
-            <p className="text-xs text-muted-foreground">suggested_alternatives: none</p>
+            <p className="text-xs text-muted-foreground">Suggested alternatives: none</p>
           )}
         </div>
 
@@ -2972,7 +2972,7 @@ export function ReactionProjectDetail() {
     setMsg(null)
     const code = expCode.trim()
     if (!code) {
-      setMsg({ tone: "err", text: "experiment_code is required." })
+      setMsg({ tone: "err", text: "Experiment code is required." })
       return
     }
     const conditions_json = buildConditionsJsonFromForm()
@@ -3542,7 +3542,7 @@ export function ReactionProjectDetail() {
     const rid = ridRaw ? Number.parseInt(ridRaw, 10) : Number.NaN
     const rationale = advisorReviewRationale.trim()
     if (!Number.isFinite(rid)) {
-      setMsg({ tone: "err", text: "advisor_run_id is required." })
+      setMsg({ tone: "err", text: "Advisor run ID is required." })
       return
     }
     if (!rationale) {
@@ -3665,7 +3665,7 @@ export function ReactionProjectDetail() {
     setMsg(null)
     const rationale = convertRecRationale.trim()
     if (!rationale) {
-      setMsg({ tone: "err", text: "rationale is required before conversion (POST body field)." })
+      setMsg({ tone: "err", text: "A rationale is required before conversion." })
       setBusy(null)
       return
     }
@@ -3674,7 +3674,7 @@ export function ReactionProjectDetail() {
     if (rid && rid !== "__none__") {
       const n = Number.parseInt(rid, 10)
       if (!Number.isFinite(n) || n < 1) {
-        setMsg({ tone: "err", text: "execution_batch_id must be a positive integer when provided." })
+        setMsg({ tone: "err", text: "Execution batch ID must be a positive integer when provided." })
         setBusy(null)
         return
       }
@@ -3716,7 +3716,7 @@ export function ReactionProjectDetail() {
         text:
           experiment_id != null
             ? `Planned experiment recorded (experiment id ${experiment_id}; status ${experiment_status}). Saving a conversion does not mean the experiment was performed in the lab.`
-            : "Conversion response received — check experiment list if the backend returned an experiment.",
+            : "Conversion completed — check the experiment list to confirm an experiment was created.",
       })
       trackReactionRecommendationConvertedToExperiment({
         reaction_project_id: reactionProjectId,
@@ -3728,7 +3728,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "POST /reaction-recommendations/{recommendation_id}/convert-to-experiment failed."),
+        text: formatApiError(err, "Could not convert the recommendation to a planned experiment."),
       })
     } finally {
       setBusy(null)
@@ -3740,7 +3740,7 @@ export function ReactionProjectDetail() {
     setMsg(null)
     const batch_code = plEbBatchCode.trim()
     if (!batch_code) {
-      setMsg({ tone: "err", text: "batch_code is required (POST body field)." })
+      setMsg({ tone: "err", text: "Batch code is required." })
       return
     }
     setBusy("exec-batch-create")
@@ -3783,7 +3783,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "POST /reaction-projects/{reaction_project_id}/execution-batches failed."),
+        text: formatApiError(err, "Could not create the execution batch."),
       })
     } finally {
       setBusy(null)
@@ -3794,30 +3794,30 @@ export function ReactionProjectDetail() {
     e.preventDefault()
     setMsg(null)
     if (plannerSelectedBatchId == null || !Number.isFinite(plannerSelectedBatchId)) {
-      setMsg({ tone: "err", text: "Open an execution batch first (batch_id from GET list)." })
+      setMsg({ tone: "err", text: "Open an execution batch first." })
       return
     }
     const item_code = execPlannerItemCode.trim()
     if (!item_code) {
-      setMsg({ tone: "err", text: "item_code is required (POST body field)." })
+      setMsg({ tone: "err", text: "Item code is required." })
       return
     }
     const exRaw = execPlannerExperimentId.trim()
     if (!exRaw || exRaw === "__none__") {
       setMsg({
         tone: "err",
-        text: "Select a planned experiment — experiment_id links the item to stored conditions.",
+        text: "Select a planned experiment to link the item to its stored conditions.",
       })
       return
     }
     const experiment_id = Number.parseInt(exRaw, 10)
     if (!Number.isFinite(experiment_id) || experiment_id < 1) {
-      setMsg({ tone: "err", text: "experiment_id must be a positive integer." })
+      setMsg({ tone: "err", text: "Experiment ID must be a positive integer." })
       return
     }
     const chosen = plannedExperimentsForPlanner.some((row) => readNum(row.id) === experiment_id)
     if (!chosen) {
-      setMsg({ tone: "err", text: "Selected experiment must have status planned in the current GET experiments list." })
+      setMsg({ tone: "err", text: "Selected experiment must have status planned." })
       return
     }
     setBusy("exec-item-add")
@@ -3844,7 +3844,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "POST /reaction-execution-batches/{batch_id}/items failed."),
+        text: formatApiError(err, "Could not add the execution item."),
       })
     } finally {
       setBusy(null)
@@ -3919,7 +3919,7 @@ export function ReactionProjectDetail() {
       } else if (kind === "fail") {
         const failure_reason = boardDialogFailureReason.trim()
         if (!failure_reason) {
-          setMsg({ tone: "err", text: "failure_reason is required for POST …/mark-failed." })
+          setMsg({ tone: "err", text: "A failure reason is required to mark the item failed." })
           setBusy(null)
           return
         }
@@ -3957,7 +3957,7 @@ export function ReactionProjectDetail() {
           method: "PATCH",
           body: { metadata_json: { ...prevMd, execution_board_notes: notes } },
         })
-        setMsg({ tone: "ok", text: "Note appended via PATCH metadata_json." })
+        setMsg({ tone: "ok", text: "Note saved." })
       }
       closeExecutionBoardDialog()
       await reload()
@@ -4004,7 +4004,7 @@ export function ReactionProjectDetail() {
     const file_id = parseOptionalPositiveInt(arFileId)
     const artifact_id = parseOptionalPositiveInt(arArtifactId)
     if (spectracheck_session_id === "invalid" || file_id === "invalid" || artifact_id === "invalid") {
-      setMsg({ tone: "err", text: "session_id, file_id, and artifact_id must be positive integers when provided." })
+      setMsg({ tone: "err", text: "Session ID, file ID, and artifact ID must be positive integers when provided." })
       return
     }
     setBusy("exec-analytical-add")
@@ -4044,7 +4044,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "POST /reaction-execution-items/{item_id}/analytical-results failed."),
+        text: formatApiError(err, "Couldn't link the analytical result."),
       })
     } finally {
       setBusy(null)
@@ -4095,7 +4095,7 @@ export function ReactionProjectDetail() {
     setMsg(null)
     const executionItemId = selectedOutcomeExecutionItemId
     if (executionItemId == null || executionItemId < 1) {
-      setMsg({ tone: "err", text: "execution_item_id is required." })
+      setMsg({ tone: "err", text: "An execution item is required." })
       return
     }
 
@@ -4104,7 +4104,7 @@ export function ReactionProjectDetail() {
     if (arChoice !== "" && arChoice !== "__all__") {
       const nar = Number.parseInt(arChoice, 10)
       if (!Number.isFinite(nar) || nar < 1) {
-        setMsg({ tone: "err", text: "analytical_result_id must be a positive integer when provided." })
+        setMsg({ tone: "err", text: "The analytical result ID must be a positive integer when provided." })
         return
       }
       analytical_result_id = nar
@@ -4148,7 +4148,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "POST /reaction-execution-items/{item_id}/extract-outcome failed."),
+        text: formatApiError(err, "Couldn't extract the proposed outcome."),
       })
     } finally {
       setBusy(null)
@@ -4161,7 +4161,7 @@ export function ReactionProjectDetail() {
 
     const executionItemId = selectedOutcomeExecutionItemId
     if (executionItemId == null || executionItemId < 1) {
-      setMsg({ tone: "err", text: "execution_item_id is required." })
+      setMsg({ tone: "err", text: "An execution item is required." })
       return
     }
 
@@ -4169,7 +4169,7 @@ export function ReactionProjectDetail() {
     if (!rationale) {
       setMsg({
         tone: "err",
-        text: "Provide a confirmation rationale (reviewer comment). Reviewer_name is recommended when available.",
+        text: "Provide a confirmation rationale (reviewer comment). A reviewer name is recommended when available.",
       })
       return
     }
@@ -4186,7 +4186,7 @@ export function ReactionProjectDetail() {
     if (Object.keys(built.json).length === 0 && extraction_run_id == null) {
       setMsg({
         tone: "err",
-        text: "Run extract-outcome first, or fill at least one confirmed outcome field before confirming.",
+        text: "Extract the proposed outcome first, or fill at least one confirmed outcome field before confirming.",
       })
       return
     }
@@ -4219,7 +4219,7 @@ export function ReactionProjectDetail() {
         outcome_fields_count: countClosedLoopOutcomeFieldKeys(outcomeCountEnvelope),
         status: extraction_run_id != null ? "with_extraction_run" : "without_extraction_run",
       })
-      setMsg({ tone: "ok", text: "Confirmed outcome applied to official experiment outcome_json." })
+      setMsg({ tone: "ok", text: "Confirmed outcome applied to the official experiment outcome." })
       setOeExtractionRun(null)
       setOeConfirmedYieldPercent("")
       setOeConfirmedConversionPercent("")
@@ -4234,7 +4234,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "POST /reaction-execution-items/{item_id}/confirm-outcome failed."),
+        text: formatApiError(err, "Couldn't confirm the outcome."),
       })
     } finally {
       setBusy(null)
@@ -4269,7 +4269,7 @@ export function ReactionProjectDetail() {
     if (cn) {
       const n = Number.parseInt(cn, 10)
       if (!Number.isFinite(n) || n < 1) {
-        setMsg({ tone: "err", text: "cycle_number must be a positive integer when provided." })
+        setMsg({ tone: "err", text: "Cycle number must be a positive integer when provided." })
         return
       }
       body.cycle_number = n
@@ -4279,7 +4279,7 @@ export function ReactionProjectDetail() {
     if (eb !== "" && eb !== "__none__") {
       const bid = Number.parseInt(eb, 10)
       if (!Number.isFinite(bid) || bid < 1) {
-        setMsg({ tone: "err", text: "execution_batch_id must be a positive integer when selected." })
+        setMsg({ tone: "err", text: "The execution batch ID must be a positive integer when selected." })
         return
       }
       body.execution_batch_id = bid
@@ -4329,7 +4329,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "POST /reaction-projects/{reaction_project_id}/optimization-cycles failed."),
+        text: formatApiError(err, "Couldn't create the optimization cycle."),
       })
     } finally {
       setBusy(null)
@@ -4382,7 +4382,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "POST /reaction-optimization-cycles/{cycle_id}/decision failed."),
+        text: formatApiError(err, "Couldn't record the cycle decision."),
       })
     } finally {
       setBusy(null)
@@ -4437,7 +4437,7 @@ export function ReactionProjectDetail() {
       setMsg({
         tone: "ok",
         text: view?.isSafetySignal
-          ? "Feedback recorded. Unsafe rejection routed to the safety gate (R6) — excluded from preference learning."
+          ? "Feedback recorded. Unsafe rejection routed to the safety gate — excluded from preference learning."
           : "Feedback recorded — advisory; it never overrides the optimiser.",
       })
     } catch (err) {
@@ -4461,7 +4461,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "GET /reaction-projects/{id}/preference-ranking failed."),
+        text: formatApiError(err, "Couldn't load the preference ranking."),
       })
     } finally {
       setBusy(null)
@@ -4475,7 +4475,7 @@ export function ReactionProjectDetail() {
     if (parseReactionRecall(abForm.championRecall) == null || parseReactionRecall(abForm.challengerRecall) == null) {
       setMsg({
         tone: "err",
-        text: "safety_flag_recall must be a number between 0 and 1 for both the champion and the challenger.",
+        text: "Safety-flag recall must be a number between 0 and 1 for both the champion and the challenger.",
       })
       return
     }
@@ -4510,7 +4510,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "POST /reaction-projects/{id}/ab-promotion/evaluate failed."),
+        text: formatApiError(err, "Couldn't evaluate the A/B promotion."),
       })
     } finally {
       setBusy(null)
@@ -4555,7 +4555,7 @@ export function ReactionProjectDetail() {
     // A non-numeric target must be refused, not silently dropped from the request.
     const rawTarget = wsObjectiveTarget.trim()
     if (rawTarget !== "" && !Number.isFinite(Number(rawTarget))) {
-      setMsg({ tone: "err", text: "objective_target must be a number (or leave it blank)." })
+      setMsg({ tone: "err", text: "Objective target must be a number (or leave it blank)." })
       return
     }
     setMsg(null)
@@ -4608,7 +4608,7 @@ export function ReactionProjectDetail() {
     } catch (err) {
       setMsg({
         tone: "err",
-        text: formatApiError(err, "GET /reaction-projects/{id}/warm-start/ranking failed."),
+        text: formatApiError(err, "Couldn't load the warm-start ranking."),
       })
     } finally {
       setBusy(null)
@@ -4652,7 +4652,7 @@ export function ReactionProjectDetail() {
         tone: "err",
         text: proposeNextErrorMessage(
           err,
-          "POST /reaction-optimization-cycles/{cycle_id}/propose-next failed.",
+          "Couldn't propose the next batch.",
         ),
       })
     } finally {
@@ -4675,7 +4675,7 @@ export function ReactionProjectDetail() {
     const raw = linkSessionInput.trim()
     const sid = Number.parseInt(raw, 10)
     if (!Number.isFinite(sid) || sid < 1) {
-      setMsg({ tone: "err", text: "session_id must be a positive integer." })
+      setMsg({ tone: "err", text: "Session ID must be a positive integer." })
       return
     }
     const eid = linkDialogExperimentId
@@ -4709,7 +4709,7 @@ export function ReactionProjectDetail() {
     return (
       <Alert variant="destructive">
         <AlertTitle className="text-sm">Invalid route</AlertTitle>
-        <AlertDescription className="text-xs">Missing or invalid reaction_project_id.</AlertDescription>
+        <AlertDescription className="text-xs">Missing or invalid reaction project ID.</AlertDescription>
       </Alert>
     )
   }
@@ -4726,7 +4726,7 @@ export function ReactionProjectDetail() {
               </Link>
             </Button>
             <Badge variant="outline" className="font-mono text-xs">
-              reaction_project_id={reactionProjectId}
+              Project ID {reactionProjectId}
             </Badge>
           </div>
           <p
@@ -4918,7 +4918,7 @@ export function ReactionProjectDetail() {
                 >
                   {loading ? "…" : experimentCount}
                 </p>
-                <p className="mt-2 text-xs text-muted-foreground">From GET …/experiments</p>
+                <p className="mt-2 text-xs text-muted-foreground">From recorded experiments</p>
               </CardContent>
             </Card>
           </div>
@@ -5150,7 +5150,7 @@ export function ReactionProjectDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>experiment_code</TableHead>
+                    <TableHead>Experiment code</TableHead>
                     <TableHead>status</TableHead>
                     {conditionColumnKeys.map((k) => (
                       <TableHead key={k} className="max-w-[100px] whitespace-nowrap text-xs">
@@ -5161,10 +5161,10 @@ export function ReactionProjectDetail() {
                     <TableHead className="text-right text-xs">conversion</TableHead>
                     <TableHead className="text-right text-xs">selectivity</TableHead>
                     <TableHead className="text-right text-xs">impurity</TableHead>
-                    <TableHead className="text-right text-xs">green_score</TableHead>
+                    <TableHead className="text-right text-xs">Green score</TableHead>
                     <TableHead className="text-xs">pareto</TableHead>
-                    <TableHead className="font-mono text-xs">linked_spectracheck_session_id</TableHead>
-                    <TableHead className="whitespace-nowrap text-xs">updated_at</TableHead>
+                    <TableHead className="font-mono text-xs">Linked SpectraCheck session</TableHead>
+                    <TableHead className="whitespace-nowrap text-xs">Updated</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">SpectraCheck</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -5273,13 +5273,13 @@ export function ReactionProjectDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>experiment_code</TableHead>
+                    <TableHead>Experiment code</TableHead>
                     <TableHead className="font-mono text-xs">linked_spectracheck_session_id</TableHead>
                     <TableHead className="text-xs">sample_id</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">unified status</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">report status</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">QC status</TableHead>
-                    <TableHead className="text-right text-xs">evidence_records</TableHead>
+                    <TableHead className="text-right text-xs">Evidence records</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">open</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -5370,13 +5370,13 @@ export function ReactionProjectDetail() {
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-sm font-medium">conditions_json</p>
+                  <p className="text-sm font-medium">Conditions</p>
                   <p className="text-xs text-muted-foreground">
-                    Fields follow GET …/variables. Leave blank to omit a key.
+                    Fields come from the project variables. Leave blank to omit a key.
                   </p>
                   {variableRecords.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      No reaction variables yet — add variables first, or POST with empty conditions_json.
+                      No reaction variables yet — add variables first, or save with no conditions set.
                     </p>
                   ) : (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -5448,7 +5448,7 @@ export function ReactionProjectDetail() {
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-sm font-medium">outcome_json</p>
+                  <p className="text-sm font-medium">Outcome</p>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="space-y-2">
                       <Label htmlFor="ex-yield">Yield (%)</Label>
@@ -5585,7 +5585,7 @@ export function ReactionProjectDetail() {
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-sm font-medium">weights_json</p>
+                  <p className="text-sm font-medium">Weights</p>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="space-y-2">
                       <Label htmlFor="w-yield">yield</Label>
@@ -6160,12 +6160,12 @@ export function ReactionProjectDetail() {
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Defaults to this campaign (intra-campaign warm-start). Add related campaigns you own
-                  for transfer learning; a campaign you don&apos;t own is rejected (404).
+                  for transfer learning; a campaign you don&apos;t own is rejected.
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label htmlFor="ws-target" className="text-xs">objective_target (optional)</Label>
+                  <Label htmlFor="ws-target" className="text-xs">Objective target (optional)</Label>
                   <Input
                     id="ws-target"
                     className="h-8 text-xs"
@@ -6248,11 +6248,11 @@ export function ReactionProjectDetail() {
                   ) : null}
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                     {[
-                      { label: "trained_n", value: p.trainedN },
+                      { label: "Training observations", value: p.trainedN },
                       { label: "excluded · gold", value: p.excludedGoldCount },
                       { label: "excluded · unverified", value: p.excludedUnverifiedCount },
                       { label: "augmentation", value: p.augmentationCount },
-                      { label: "objective_target", value: p.objectiveTarget },
+                      { label: "Objective target", value: p.objectiveTarget },
                     ].map((m) => (
                       <div key={m.label} className="rounded-md border px-2 py-1.5">
                         <p className="font-mono text-sm tabular-nums">{m.value != null ? m.value : "—"}</p>
@@ -6309,7 +6309,7 @@ export function ReactionProjectDetail() {
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 text-sm">
                 <Badge variant="outline" className="font-mono text-xs">
-                  model_type: rule_based
+                  Model type: rule-based
                 </Badge>
                 {status ? (
                   <Badge variant="outline" className="text-xs">
@@ -6391,7 +6391,7 @@ export function ReactionProjectDetail() {
               <div className="space-y-3 rounded-lg border border-border p-3">
                 <div className="flex items-center justify-between gap-4">
                   <Label htmlFor="bo-cost-aware" className="font-mono text-xs">
-                    cost_aware
+                    Cost-aware
                   </Label>
                   <Switch
                     id="bo-cost-aware"
@@ -6401,7 +6401,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <Label htmlFor="bo-safety-aware" className="font-mono text-xs">
-                    safety_aware
+                    Safety-aware
                   </Label>
                   <Switch
                     id="bo-safety-aware"
@@ -6411,7 +6411,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <Label htmlFor="bo-failed-neg" className="text-xs leading-snug">
-                    include_failed_experiments_as_negative
+                    Include failed experiments as negatives
                   </Label>
                   <Switch
                     id="bo-failed-neg"
@@ -6453,7 +6453,7 @@ export function ReactionProjectDetail() {
                   <>
                     {String(lastBoRun.status ?? "").toLowerCase() === "insufficient_data" ? (
                       <Alert>
-                        <AlertTitle className="text-sm">insufficient_data</AlertTitle>
+                        <AlertTitle className="text-sm">Insufficient data</AlertTitle>
                         <AlertDescription className="text-xs">
                           More completed experiments are needed for reliable model-based optimization. Exploratory
                           recommendations are shown.
@@ -6468,10 +6468,10 @@ export function ReactionProjectDetail() {
                         algorithm: {String(lastBoRun.algorithm ?? "—")}
                       </Badge>
                       <Badge variant="outline" className="font-mono text-xs">
-                        model_type: {String(lastBoRun.model_type ?? "—")}
+                        Model type: {String(lastBoRun.model_type ?? "—")}
                       </Badge>
                       <Badge variant="outline" className="tabular-nums text-xs">
-                        input_experiment_count: {String(lastBoRun.input_experiment_count ?? "—")}
+                        Input experiment count: {String(lastBoRun.input_experiment_count ?? "—")}
                       </Badge>
                       <Badge variant="outline">status: {String(lastBoRun.status ?? "—")}</Badge>
                     </div>
@@ -6551,8 +6551,8 @@ export function ReactionProjectDetail() {
             </ModuleCard>
           ) : (
             <p className="text-sm text-muted-foreground">
-              After you run Bayesian optimization, this panel shows BO run ID, algorithm, model_type, status, warnings,
-              notes, and diagnostics from the POST response.
+              After you run Bayesian optimization, this panel shows the run ID, algorithm, model, status, warnings,
+              notes, and diagnostics from the latest run.
             </p>
           )}
 
@@ -6563,7 +6563,7 @@ export function ReactionProjectDetail() {
               accent="violet"
               eyebrow="Optimization · Latest Run"
               title="latest optimization run"
-              description="Fields from the POST response: status, model, experiment count, metrics_json, recommendations_json, warnings, and notes."
+              description="Status, model, experiment count, metrics, recommendations, warnings, and notes from the latest run."
             >
               <div className="space-y-4">
                 {isRecord(lastOptimizationRun) ? (
@@ -6571,10 +6571,10 @@ export function ReactionProjectDetail() {
                     <div className="flex flex-wrap gap-2 text-sm">
                       <Badge variant="outline">status: {String(lastOptimizationRun.status ?? "—")}</Badge>
                       <Badge variant="outline" className="font-mono">
-                        model_type: {String(lastOptimizationRun.model_type ?? "—")}
+                        Model type: {String(lastOptimizationRun.model_type ?? "—")}
                       </Badge>
                       <Badge variant="outline" className="tabular-nums">
-                        input_experiment_count: {String(lastOptimizationRun.input_experiment_count ?? "—")}
+                        Input experiment count: {String(lastOptimizationRun.input_experiment_count ?? "—")}
                       </Badge>
                     </div>
                     <MlModelProvenanceSummary
@@ -6586,7 +6586,7 @@ export function ReactionProjectDetail() {
                       const populated = isRecord(m) && Object.keys(m).length > 0
                       return populated ? (
                         <div className="space-y-2">
-                          <p className="text-sm font-medium">metrics_json</p>
+                          <p className="text-sm font-medium">Metrics</p>
                           <pre className="max-h-48 overflow-auto rounded-md bg-muted/40 p-3 text-xs leading-relaxed">
                             {jsonPreview(m, 4000)}
                           </pre>
@@ -6598,7 +6598,7 @@ export function ReactionProjectDetail() {
                       const n = Array.isArray(recs) ? recs.length : 0
                       return (
                         <p className="text-sm text-muted-foreground">
-                          recommendations_json returned {n} row{n === 1 ? "" : "s"} — see the Recommendations tab to review
+                          Recommendations returned {n} row{n === 1 ? "" : "s"} — see the Recommendations tab to review
                           each promising condition.
                         </p>
                       )
@@ -6645,8 +6645,8 @@ export function ReactionProjectDetail() {
             </ModuleCard>
           ) : (
             <p className="text-sm text-muted-foreground">
-              After you run optimization, this panel shows run status, metrics_json, and recommendations_json counts from
-              the POST response.
+              After you run optimization, this panel shows run status, metrics, and recommendation counts from
+              the latest run.
             </p>
           )}
 
@@ -6714,7 +6714,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bench-seed">
-                    random_seed <span className="font-normal text-muted-foreground">(optional)</span>
+                    Random seed <span className="font-normal text-muted-foreground">(optional)</span>
                   </Label>
                   <Input
                     id="bench-seed"
@@ -6726,7 +6726,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3 md:col-span-2">
                   <Label htmlFor="bench-use-completed" className="font-mono text-xs">
-                    use_completed_project_data
+                    Use completed project data
                   </Label>
                   <Switch
                     id="bench-use-completed"
@@ -6847,7 +6847,7 @@ export function ReactionProjectDetail() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  After a benchmark POST succeeds, this section shows best observed objective, regret if returned,
+                  After a benchmark run finishes, this section shows best observed objective, regret if returned,
                   experiment count, trajectory, warnings, and notes.
                 </p>
               )}
@@ -6866,9 +6866,9 @@ export function ReactionProjectDetail() {
                   <TableRow>
                     <TableHead>id</TableHead>
                     <TableHead>status</TableHead>
-                    <TableHead className="font-mono text-xs">benchmark_name</TableHead>
+                    <TableHead className="font-mono text-xs">Benchmark name</TableHead>
                     <TableHead className="font-mono text-xs">algorithm</TableHead>
-                    <TableHead>created_at</TableHead>
+                    <TableHead>Created</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -6905,9 +6905,9 @@ export function ReactionProjectDetail() {
                   <TableRow>
                     <TableHead>id</TableHead>
                     <TableHead>status</TableHead>
-                    <TableHead>model_type</TableHead>
-                    <TableHead className="text-right">input_experiment_count</TableHead>
-                    <TableHead>created_at</TableHead>
+                    <TableHead>Model type</TableHead>
+                    <TableHead className="text-right">Input experiment count</TableHead>
+                    <TableHead>Created</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -7032,7 +7032,7 @@ export function ReactionProjectDetail() {
 
                 <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3 md:col-span-2">
                   <Label htmlFor="adv-cost-safety" className="font-mono text-xs">
-                    include_cost_safety_context
+                    Include cost &amp; safety context
                   </Label>
                   <Switch
                     id="adv-cost-safety"
@@ -7042,7 +7042,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3 md:col-span-2">
                   <Label htmlFor="adv-completed" className="font-mono text-xs">
-                    include_completed_experiments
+                    Include completed experiments
                   </Label>
                   <Switch
                     id="adv-completed"
@@ -7052,7 +7052,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3 md:col-span-2">
                   <Label htmlFor="adv-lit" className="font-mono text-xs">
-                    include_literature_priors
+                    Include literature priors
                   </Label>
                   <Switch
                     id="adv-lit"
@@ -7070,7 +7070,7 @@ export function ReactionProjectDetail() {
                     onChange={(e) => setAdvNotes(e.target.value)}
                     className="text-sm"
                   />
-                  <p className="text-xs text-muted-foreground">Optional — stored in metadata_json when provided.</p>
+                  <p className="text-xs text-muted-foreground">Optional — saved with the run when provided.</p>
                 </div>
               </div>
 
@@ -7096,10 +7096,10 @@ export function ReactionProjectDetail() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">advisor_run_id</TableHead>
+                        <TableHead className="text-xs">Advisor run ID</TableHead>
                         <TableHead className="text-xs">status</TableHead>
-                        <TableHead className="text-xs">advisor_mode</TableHead>
-                        <TableHead className="text-xs">created_at</TableHead>
+                        <TableHead className="text-xs">Advisor mode</TableHead>
+                        <TableHead className="text-xs">Created</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -7139,13 +7139,13 @@ export function ReactionProjectDetail() {
 
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline" className="font-mono text-xs">
-                      advisor_mode: {String(lastAdvisorRun.advisor_mode ?? "—")}
+                      Advisor mode: {String(lastAdvisorRun.advisor_mode ?? "—")}
                     </Badge>
                     <Badge variant="outline" className="text-xs">
                       status: {String(lastAdvisorRun.status ?? "—")}
                     </Badge>
                     <Badge variant="outline" className="tabular-nums text-xs">
-                      recommendation_count:{" "}
+                      Recommendation count:{" "}
                       {String(readNum(lastAdvisorRun.recommendation_count) ?? "—")}
                     </Badge>
                     <Badge variant="outline" className="tabular-nums text-xs">
@@ -7172,7 +7172,7 @@ export function ReactionProjectDetail() {
                       variant={lastAdvisorRun.human_review_required === true ? "secondary" : "outline"}
                       className="text-xs"
                     >
-                      human_review_required: {String(lastAdvisorRun.human_review_required)}
+                      Human review required: {String(lastAdvisorRun.human_review_required)}
                     </Badge>
                   </div>
 
@@ -7551,14 +7551,14 @@ export function ReactionProjectDetail() {
                           <CardTitle className="text-sm font-medium leading-snug">{String(row.title ?? "")}</CardTitle>
                           <div className="flex flex-wrap gap-2">
                             <Badge variant="outline" className="font-mono text-xs">
-                              confidence_label: {conf || "—"}
+                              Confidence: {conf || "—"}
                             </Badge>
                             <Badge variant="secondary" className="font-mono text-xs">
                               status: {st || "—"}
                             </Badge>
                             {row.human_review_required === true ? (
                               <Badge variant="outline" className="text-xs">
-                                human_review_required
+                                Human review required
                               </Badge>
                             ) : null}
                           </div>
@@ -7596,7 +7596,7 @@ export function ReactionProjectDetail() {
                           </div>
                           <div className="space-y-2">
                             <Label className="text-xs" htmlFor={`mh-conf-${hid}`}>
-                              confidence_label
+                              Confidence label
                             </Label>
                             <Select
                               value={conf || "speculative"}
@@ -7618,7 +7618,7 @@ export function ReactionProjectDetail() {
                         </div>
                         <div className="space-y-2">
                           <p className="text-xs font-medium uppercase text-muted-foreground">
-                            supporting_observations_json
+                            Supporting observations
                           </p>
                           <pre className="max-h-40 overflow-auto rounded-md bg-muted/40 p-3 text-[10px] leading-snug">
                             {jsonPreview(sup ?? [], 8000)}
@@ -7626,7 +7626,7 @@ export function ReactionProjectDetail() {
                         </div>
                         <div className="space-y-2">
                           <p className="text-xs font-medium uppercase text-muted-foreground">
-                            contradicting_observations_json
+                            Contradicting observations
                           </p>
                           <pre className="max-h-40 overflow-auto rounded-md bg-muted/40 p-3 text-[10px] leading-snug">
                             {jsonPreview(con ?? [], 8000)}
@@ -7681,7 +7681,7 @@ export function ReactionProjectDetail() {
                     </Select>
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="lp-title">title</Label>
+                    <Label htmlFor="lp-title">Title</Label>
                     <Input
                       id="lp-title"
                       value={lpTitle}
@@ -7691,7 +7691,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="lp-summary">summary</Label>
+                    <Label htmlFor="lp-summary">Summary</Label>
                     <Textarea
                       id="lp-summary"
                       rows={4}
@@ -7701,7 +7701,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="lp-citation">citation</Label>
+                    <Label htmlFor="lp-citation">Citation</Label>
                     <p className="text-xs text-muted-foreground">Optional — paste or type a real reference only.</p>
                     <Textarea
                       id="lp-citation"
@@ -7738,12 +7738,12 @@ export function ReactionProjectDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-xs">source_type</TableHead>
-                      <TableHead className="text-xs">title</TableHead>
-                      <TableHead className="min-w-[200px] text-xs">summary</TableHead>
-                      <TableHead className="min-w-[140px] text-xs">citation</TableHead>
-                      <TableHead className="text-xs">relevance_tags_json</TableHead>
-                      <TableHead className="text-xs">created_at</TableHead>
+                      <TableHead className="text-xs">Source type</TableHead>
+                      <TableHead className="text-xs">Title</TableHead>
+                      <TableHead className="min-w-[200px] text-xs">Summary</TableHead>
+                      <TableHead className="min-w-[140px] text-xs">Citation</TableHead>
+                      <TableHead className="text-xs">Relevance tags</TableHead>
+                      <TableHead className="text-xs">Created</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -7760,7 +7760,7 @@ export function ReactionProjectDetail() {
                               </Badge>
                               {row.human_review_required === true ? (
                                 <Badge variant="secondary" className="text-[10px] w-fit">
-                                  human_review_required
+                                  Needs human review
                                 </Badge>
                               ) : null}
                             </div>
@@ -7869,17 +7869,17 @@ export function ReactionProjectDetail() {
                 <div className="space-y-4 border-t border-border pt-4">
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="font-mono text-xs">
-                      bo_run_id: {String(lastComparison.bo_run_id ?? "—")}
+                      BO run: {String(lastComparison.bo_run_id ?? "—")}
                     </Badge>
                     <Badge variant="outline" className="font-mono text-xs">
-                      advisor_run_id: {String(lastComparison.advisor_run_id ?? "—")}
+                      Advisor run: {String(lastComparison.advisor_run_id ?? "—")}
                     </Badge>
                     <Badge variant="secondary" className="text-xs">
                       requires review
                     </Badge>
                     {lastComparison.human_review_required === true ? (
                       <Badge variant="outline" className="text-xs">
-                        human_review_required
+                        Needs human review
                       </Badge>
                     ) : null}
                   </div>
@@ -7963,11 +7963,11 @@ export function ReactionProjectDetail() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">id</TableHead>
-                        <TableHead className="text-xs">bo_run_id</TableHead>
-                        <TableHead className="text-xs">advisor_run_id</TableHead>
-                        <TableHead className="text-xs">final_review_recommendation</TableHead>
-                        <TableHead className="text-xs">created_at</TableHead>
+                        <TableHead className="text-xs">ID</TableHead>
+                        <TableHead className="text-xs">BO run</TableHead>
+                        <TableHead className="text-xs">Advisor run</TableHead>
+                        <TableHead className="text-xs">Final review recommendation</TableHead>
+                        <TableHead className="text-xs">Created</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -8051,7 +8051,7 @@ export function ReactionProjectDetail() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="advisor-review-decision">decision</Label>
+                  <Label htmlFor="advisor-review-decision">Decision</Label>
                   <Select value={advisorReviewDecision} onValueChange={setAdvisorReviewDecision}>
                     <SelectTrigger id="advisor-review-decision">
                       <SelectValue />
@@ -8067,7 +8067,7 @@ export function ReactionProjectDetail() {
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="advisor-review-rationale">
-                    rationale <span className="text-destructive">(required)</span>
+                    Rationale <span className="text-destructive">(required)</span>
                   </Label>
                   <Textarea
                     id="advisor-review-rationale"
@@ -8139,8 +8139,7 @@ export function ReactionProjectDetail() {
             title="Reviewer"
             description={
               <>
-                POST …/reaction-recommendations/{"{recommendation_id}"}/approve and …/reject require reviewer_name and
-                reviewer_comment (human approval). Outputs are decision-support; each recommended next experiment
+                Approving or rejecting a recommendation requires a reviewer name and comment (human approval). Outputs are decision-support; each recommended next experiment
                 requires human review.
               </>
             }
@@ -8155,7 +8154,7 @@ export function ReactionProjectDetail() {
                 placeholder="Your name"
               />
               <p className="text-xs text-muted-foreground">
-                Shared across approve/reject on this tab. Each row needs a reviewer_comment before approval or rejection.
+                Shared across approve/reject on this tab. Each row needs a review comment before approval or rejection.
               </p>
             </div>
           </ModuleCard>
@@ -8187,7 +8186,7 @@ export function ReactionProjectDetail() {
                         <TableHead className="text-xs">acquisition score</TableHead>
                         <TableHead className="min-w-[120px] text-xs">rationale</TableHead>
                         <TableHead className="text-xs">status</TableHead>
-                        <TableHead className="min-w-[160px] text-xs">reviewer_comment</TableHead>
+                        <TableHead className="min-w-[160px] text-xs">Review comment</TableHead>
                         <TableHead className="text-xs"> </TableHead>
                       </TableRow>
                     </TableHeader>
@@ -8326,7 +8325,7 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Recommendations · List"
-            title="recommendations"
+            title="Recommendations"
             description="Proposed next-experiment recommendations from the optimization engine — ranked by predicted improvement. Approve or reject each with a reviewer name and comment."
           >
             <div className="space-y-6">
@@ -8400,7 +8399,7 @@ export function ReactionProjectDetail() {
                   <Card key={id} className="border-muted">
                     <CardHeader className="pb-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <CardTitle className="text-sm font-medium">recommendation_id {id}</CardTitle>
+                        <CardTitle className="text-sm font-medium">Recommendation {id}</CardTitle>
                         <Badge variant="secondary" className="font-mono text-xs">
                           rank {String(r.rank ?? "")}
                         </Badge>
@@ -8437,19 +8436,19 @@ export function ReactionProjectDetail() {
                     </CardHeader>
                     <CardContent className="space-y-4 text-sm">
                       <div className="space-y-2">
-                        <p className="text-xs font-medium uppercase text-muted-foreground">conditions_json</p>
+                        <p className="text-xs font-medium uppercase text-muted-foreground">Conditions</p>
                         <pre className="max-h-36 overflow-auto rounded-md bg-muted/40 p-3 text-xs leading-relaxed">
                           {jsonPreview(r.conditions_json ?? {}, 4000)}
                         </pre>
                       </div>
                       <div className="space-y-2">
-                        <p className="text-xs font-medium uppercase text-muted-foreground">predicted_outcome_json</p>
+                        <p className="text-xs font-medium uppercase text-muted-foreground">Predicted outcome</p>
                         <pre className="max-h-36 overflow-auto rounded-md bg-muted/40 p-3 text-xs leading-relaxed">
                           {jsonPreview(r.predicted_outcome_json ?? {}, 4000)}
                         </pre>
                       </div>
                       <div className="space-y-2">
-                        <p className="text-xs font-medium uppercase text-muted-foreground">uncertainty_json</p>
+                        <p className="text-xs font-medium uppercase text-muted-foreground">Uncertainty</p>
                         <pre className="max-h-36 overflow-auto rounded-md bg-muted/40 p-3 text-xs leading-relaxed">
                           {jsonPreview(r.uncertainty_json ?? {}, 4000)}
                         </pre>
@@ -8485,7 +8484,7 @@ export function ReactionProjectDetail() {
                       ) : null}
                       <Separator />
                       <div className="space-y-2">
-                        <Label htmlFor={`rev-${id}`}>reviewer_comment <span className="text-destructive">(required)</span></Label>
+                        <Label htmlFor={`rev-${id}`}>Review comment <span className="text-destructive">(required)</span></Label>
                         <Textarea
                           id={`rev-${id}`}
                           rows={3}
@@ -8531,7 +8530,7 @@ export function ReactionProjectDetail() {
                             <div className="space-y-2">
                               <div className="flex flex-wrap items-end gap-2">
                                 <div className="space-y-1">
-                                  <Label htmlFor={`fb-dec-${id}`} className="text-xs">decision</Label>
+                                  <Label htmlFor={`fb-dec-${id}`} className="text-xs">Decision</Label>
                                   <Select
                                     value={draft.decision}
                                     onValueChange={(v) => setDraft(v === "reject" ? { decision: v } : { decision: v, reason: "" })}
@@ -8549,7 +8548,7 @@ export function ReactionProjectDetail() {
                                 {needReason ? (
                                   <div className="space-y-1">
                                     <Label htmlFor={`fb-reason-${id}`} className="text-xs">
-                                      reason <span className="text-destructive">(required)</span>
+                                      Reason <span className="text-destructive">(required)</span>
                                     </Label>
                                     <Select value={draft.reason} onValueChange={(v) => setDraft({ reason: v })}>
                                       <SelectTrigger id={`fb-reason-${id}`} className="h-8 w-[210px] text-xs">
@@ -8645,7 +8644,7 @@ export function ReactionProjectDetail() {
                   <div key={side.key} className="space-y-2 rounded-md border p-3">
                     <p className="text-xs font-medium uppercase text-muted-foreground">{side.key}</p>
                     <div className="space-y-1">
-                      <Label htmlFor={`ab-${side.key}-ver`} className="text-xs">model_version</Label>
+                      <Label htmlFor={`ab-${side.key}-ver`} className="text-xs">Model version</Label>
                       <Input
                         id={`ab-${side.key}-ver`}
                         className="h-8 text-xs"
@@ -8664,7 +8663,7 @@ export function ReactionProjectDetail() {
                       idPrefix={`ab-${side.key}-met`}
                     />
                     <div className="space-y-1">
-                      <Label htmlFor={`ab-${side.key}-rec`} className="text-xs">safety_flag_recall</Label>
+                      <Label htmlFor={`ab-${side.key}-rec`} className="text-xs">Safety-flag recall</Label>
                       <Input
                         id={`ab-${side.key}-rec`}
                         className="h-8 text-xs"
@@ -8692,7 +8691,7 @@ export function ReactionProjectDetail() {
                   idPrefix="ab-dirs"
                 />
                 <div className="space-y-1">
-                  <Label htmlFor="ab-tol" className="text-xs">tolerance</Label>
+                  <Label htmlFor="ab-tol" className="text-xs">Tolerance</Label>
                   <Input
                     id="ab-tol"
                     className="h-8 text-xs"
@@ -8718,7 +8717,7 @@ export function ReactionProjectDetail() {
                     <Badge variant={v.promotable ? "default" : "secondary"} className="text-xs">
                       {v.promotable ? "promotable (pending sign-off)" : "not promotable"}
                     </Badge>
-                    <Badge variant="outline" className="text-xs">safety_regression: {String(v.safetyRegression)}</Badge>
+                    <Badge variant="outline" className="text-xs">Safety regression: {String(v.safetyRegression)}</Badge>
                     <Badge variant="outline" className="text-xs">dominates: {String(v.dominates)}</Badge>
                     <Badge variant="outline" className="font-mono text-[11px]">
                       {v.challengerVersion ?? "challenger"} vs {v.championVersion ?? "champion"}
@@ -8730,7 +8729,7 @@ export function ReactionProjectDetail() {
                   </p>
                   {v.reasons.length > 0 ? (
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground">reasons</p>
+                      <p className="text-xs font-medium text-muted-foreground">Reasons</p>
                       <ul className="list-inside list-disc text-xs text-muted-foreground">
                         {v.reasons.map((rr, i) => (
                           <li key={`ab-reason-${i}`}>{rr}</li>
@@ -8862,17 +8861,17 @@ export function ReactionProjectDetail() {
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="conv-rec-rationale">rationale</Label>
+                  <Label htmlFor="conv-rec-rationale">Rationale</Label>
                   <Textarea
                     id="conv-rec-rationale"
                     rows={3}
                     className="text-sm"
                     value={convertRecRationale}
                     onChange={(e) => setConvertRecRationale(e.target.value)}
-                    placeholder="Required POST body rationale for conversion."
+                    placeholder="Reason for conversion (required)."
                   />
                   <p className="text-xs text-muted-foreground">
-                    Optional reviewer_name uses the Recommendations tab reviewer_name field when set.
+                    Optional reviewer name uses the Recommendations tab reviewer name field when set.
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -8895,8 +8894,7 @@ export function ReactionProjectDetail() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Omit (—) to leave execution_batch_id out of the POST body when the backend allows conversion without an
-                    execution batch link.
+                    Omit (—) to record the conversion without an execution batch link when that is allowed.
                   </p>
                 </div>
               </div>
@@ -8905,7 +8903,7 @@ export function ReactionProjectDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="font-mono text-xs tabular-nums">recommendation_id</TableHead>
+                      <TableHead className="font-mono text-xs tabular-nums">Recommendation</TableHead>
                       <TableHead className="text-xs">rank</TableHead>
                       <TableHead className="text-xs">label</TableHead>
                       <TableHead className="min-w-[140px] text-xs">proposed conditions</TableHead>
@@ -8967,7 +8965,7 @@ export function ReactionProjectDetail() {
                                 </Badge>
                                 {planned.execution_item_id != null ? (
                                   <span className="text-[10px] text-muted-foreground">
-                                    execution_item id {planned.execution_item_id}
+                                    Execution item {planned.execution_item_id}
                                   </span>
                                 ) : null}
                               </div>
@@ -9012,9 +9010,9 @@ export function ReactionProjectDetail() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="font-mono text-xs">recommendation_id</TableHead>
-                        <TableHead className="font-mono text-xs">experiment id</TableHead>
-                        <TableHead className="font-mono text-xs">execution_item id</TableHead>
+                        <TableHead className="font-mono text-xs">Recommendation</TableHead>
+                        <TableHead className="font-mono text-xs">Experiment ID</TableHead>
+                        <TableHead className="font-mono text-xs">Execution item</TableHead>
                         <TableHead className="text-xs">experiment status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -9067,7 +9065,7 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="eb-pl-title">title</Label>
+                    <Label htmlFor="eb-pl-title">Title</Label>
                     <Input
                       id="eb-pl-title"
                       value={plEbTitle}
@@ -9096,14 +9094,14 @@ export function ReactionProjectDetail() {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="eb-pl-notes">notes</Label>
+                    <Label htmlFor="eb-pl-notes">Notes</Label>
                     <Textarea
                       id="eb-pl-notes"
                       rows={2}
                       className="text-sm"
                       value={plEbNotes}
                       onChange={(e) => setPlEbNotes(e.target.value)}
-                      placeholder="Optional — stored under metadata_json when present."
+                      placeholder="Optional — kept with the batch details when present."
                     />
                   </div>
                 </div>
@@ -9120,13 +9118,13 @@ export function ReactionProjectDetail() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="font-mono text-xs">batch_id</TableHead>
-                        <TableHead className="text-xs">batch code</TableHead>
-                        <TableHead className="text-xs">title</TableHead>
-                        <TableHead className="text-xs">status</TableHead>
-                        <TableHead className="text-right text-xs tabular-nums">item count</TableHead>
-                        <TableHead className="whitespace-nowrap text-xs">planned_start</TableHead>
-                        <TableHead className="whitespace-nowrap text-xs">planned_end</TableHead>
+                        <TableHead className="font-mono text-xs">Batch ID</TableHead>
+                        <TableHead className="text-xs">Batch code</TableHead>
+                        <TableHead className="text-xs">Title</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-right text-xs tabular-nums">Item count</TableHead>
+                        <TableHead className="whitespace-nowrap text-xs">Planned start</TableHead>
+                        <TableHead className="whitespace-nowrap text-xs">Planned end</TableHead>
                         <TableHead className="text-xs"> </TableHead>
                       </TableRow>
                     </TableHeader>
@@ -9186,7 +9184,7 @@ export function ReactionProjectDetail() {
                 {plannerSelectedBatchId != null ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="secondary" className="font-mono text-xs">
-                      selected_batch_id={plannerSelectedBatchId}
+                      Selected batch {plannerSelectedBatchId}
                     </Badge>
                     <Button
                       type="button"
@@ -9226,13 +9224,13 @@ export function ReactionProjectDetail() {
                     <p className="text-sm font-medium">Add execution item</p>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="eb-pl-exp">experiment id (planned experiment)</Label>
+                        <Label htmlFor="eb-pl-exp">Experiment (planned experiment)</Label>
                         <Select
                           value={execPlannerExperimentId || "__none__"}
                           onValueChange={setExecPlannerExperimentId}
                         >
                           <SelectTrigger id="eb-pl-exp">
-                            <SelectValue placeholder="Choose experiment id" />
+                            <SelectValue placeholder="Choose an experiment" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">—</SelectItem>
@@ -9269,7 +9267,7 @@ export function ReactionProjectDetail() {
                           value={execPlannerOperatorName}
                           onChange={(e) => setExecPlannerOperatorName(e.target.value)}
                           maxLength={200}
-                          placeholder="Optional POST body."
+                          placeholder="Optional."
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -9306,8 +9304,8 @@ export function ReactionProjectDetail() {
                             <TableHead className="text-xs">experiment code</TableHead>
                             <TableHead className="text-xs">status</TableHead>
                             <TableHead className="text-xs">operator</TableHead>
-                            <TableHead className="whitespace-nowrap text-xs">started_at</TableHead>
-                            <TableHead className="whitespace-nowrap text-xs">completed_at</TableHead>
+                            <TableHead className="whitespace-nowrap text-xs">Started</TableHead>
+                            <TableHead className="whitespace-nowrap text-xs">Completed</TableHead>
                             <TableHead className="text-xs">conditions summary</TableHead>
                             <TableHead className="text-xs">actions</TableHead>
                           </TableRow>
@@ -9362,7 +9360,7 @@ export function ReactionProjectDetail() {
                           {!plannerPanelLoading && plannerBatchItemRecords.length === 0 ? (
                             <TableRow>
                               <TableCell colSpan={8} className="text-muted-foreground">
-                                No items — POST items using the form above when an experiment row is planned.
+                                No items — add items using the form above when an experiment row is planned.
                               </TableCell>
                             </TableRow>
                           ) : null}
@@ -9385,9 +9383,9 @@ export function ReactionProjectDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="font-mono text-xs">batch_id</TableHead>
-                    <TableHead className="whitespace-nowrap text-xs">updated_at</TableHead>
-                    <TableHead className="text-xs">summary</TableHead>
+                    <TableHead className="font-mono text-xs">Batch ID</TableHead>
+                    <TableHead className="whitespace-nowrap text-xs">Updated</TableHead>
+                    <TableHead className="text-xs">Summary</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -9474,7 +9472,7 @@ export function ReactionProjectDetail() {
                                 {String(item.item_code ?? "")}
                               </CardTitle>
                               <CardDescription className="font-mono text-[10px]">
-                                item_id {itemId != null ? itemId : "—"}
+                                Item {itemId != null ? itemId : "—"}
                               </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-2 p-3 pt-0 text-xs">
@@ -9583,11 +9581,11 @@ export function ReactionProjectDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>experiment_code</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead className="text-right text-xs">yield %</TableHead>
-                    <TableHead className="font-mono text-xs">linked_spectracheck_session_id</TableHead>
-                    <TableHead className="whitespace-nowrap text-xs">spectracheck</TableHead>
+                    <TableHead>Experiment code</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right text-xs">Yield %</TableHead>
+                    <TableHead className="font-mono text-xs">Linked SpectraCheck session</TableHead>
+                    <TableHead className="whitespace-nowrap text-xs">SpectraCheck</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -9628,8 +9626,7 @@ export function ReactionProjectDetail() {
                   {!loading && experimentsRec.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-muted-foreground">
-                        No experiments — use the Experiments tab to POST
-                        /reaction-projects/{"{reaction_project_id}"}/experiments.
+                        No experiments — use the Experiments tab to record one.
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -9851,7 +9848,7 @@ export function ReactionProjectDetail() {
             accent="violet"
             eyebrow="Execution · Outcome Extraction"
             title="Outcome extraction"
-            description="Yield, conversion, and related fields are recorded on POST/PATCH experiments as outcome_json (see Experiments tab). The UI does not autonomously import numerical outcomes from spectral files."
+            description="Yield, conversion, and related fields are recorded on experiments as the outcome (see Experiments tab). The UI does not autonomously import numerical outcomes from spectral files."
           >
             <div className="space-y-4">
               <p className="text-xs text-muted-foreground">
@@ -9962,7 +9959,7 @@ export function ReactionProjectDetail() {
 
                     <div className="space-y-1">
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        extracted raw (proposed_outcome_json)
+                        Extracted raw (proposed outcome)
                       </p>
                       <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-2 text-[10px] leading-snug">
                         {jsonPreview(
@@ -9976,7 +9973,7 @@ export function ReactionProjectDetail() {
 
                     <div className="space-y-2 text-xs">
                       <p>
-                        <span className="font-medium text-foreground">confidence_label</span>{" "}
+                        <span className="font-medium text-foreground">Confidence</span>{" "}
                         <span className="font-mono text-muted-foreground">
                           {typeof oeExtractionRun.confidence_label === "string"
                             ? oeExtractionRun.confidence_label
@@ -9985,7 +9982,7 @@ export function ReactionProjectDetail() {
                       </p>
                       {mergeOutcomeExtractionWarnings(oeExtractionRun).length > 0 ? (
                         <div className="space-y-1">
-                          <p className="font-medium text-foreground">warnings</p>
+                          <p className="font-medium text-foreground">Warnings</p>
                           <ul className="list-inside list-disc text-muted-foreground">
                             {mergeOutcomeExtractionWarnings(oeExtractionRun).map((w) => (
                               <li key={w}>{w}</li>
@@ -9995,7 +9992,7 @@ export function ReactionProjectDetail() {
                       ) : null}
                       {mergeOutcomeExtractionNotes(oeExtractionRun).length > 0 ? (
                         <div className="space-y-1">
-                          <p className="font-medium text-foreground">notes</p>
+                          <p className="font-medium text-foreground">Notes</p>
                           <ul className="list-inside list-disc text-muted-foreground">
                             {mergeOutcomeExtractionNotes(oeExtractionRun).map((n) => (
                               <li key={n}>{n}</li>
@@ -10018,10 +10015,9 @@ export function ReactionProjectDetail() {
                     <form className="space-y-4" onSubmit={(e) => void confirmRecordedOutcome(e)}>
                       <p className="text-base font-medium">Confirmed outcome</p>
                       <p className="text-sm text-muted-foreground">
-                        Edit the confirmed outcome fields you want to persist. Percent fields you leave blank are omitted
-                        from confirmed_outcome_json; the server merges only the keys you send with the existing
-                        outcome_json row. Omitting confirmed_outcome_json entirely still applies the proposed outcome when an
-                        extraction_run_id is supplied.
+                        Edit the confirmed outcome fields you want to keep. Percent fields you leave blank are left
+                        unchanged; only the values you enter are saved over the existing outcome. Leaving every field
+                        blank still applies the proposed outcome.
                       </p>
 
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -10103,14 +10099,14 @@ export function ReactionProjectDetail() {
                           />
                         </div>
                         <div className="space-y-2 sm:col-span-2 lg:col-span-3">
-                          <Label htmlFor="oe-notes">notes</Label>
+                          <Label htmlFor="oe-notes">Notes</Label>
                           <Textarea
                             id="oe-notes"
                             rows={3}
                             className="text-sm"
                             value={oeConfirmedNotes}
                             onChange={(e) => setOeConfirmedNotes(e.target.value)}
-                            placeholder="Optional free text stored on confirmed_outcome_json.notes"
+                            placeholder="Optional free text saved with the confirmed outcome."
                           />
                         </div>
                       </div>
@@ -10126,7 +10122,7 @@ export function ReactionProjectDetail() {
                           />
                         </div>
                         <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="oe-rationale">rationale</Label>
+                          <Label htmlFor="oe-rationale">Rationale</Label>
                           <Textarea
                             id="oe-rationale"
                             rows={3}
@@ -10164,11 +10160,11 @@ export function ReactionProjectDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>experiment_code</TableHead>
-                      <TableHead>status</TableHead>
-                      <TableHead className="text-right text-xs">yield %</TableHead>
-                      <TableHead className="text-right text-xs">conversion %</TableHead>
-                      <TableHead className="text-xs">outcome_json preview</TableHead>
+                      <TableHead>Experiment code</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right text-xs">Yield %</TableHead>
+                      <TableHead className="text-right text-xs">Conversion %</TableHead>
+                      <TableHead className="text-xs">Outcome preview</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -10236,7 +10232,7 @@ export function ReactionProjectDetail() {
                         <SelectValue placeholder="Optional linkage" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">No explicit execution_batch_id</SelectItem>
+                        <SelectItem value="__none__">No execution batch link</SelectItem>
                         {reactionExecutionBatchRecords.flatMap((brow) => {
                           const bid = readNum(brow.id)
                           if (bid == null) return []
@@ -10254,7 +10250,7 @@ export function ReactionProjectDetail() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="opt-cc-st">status</Label>
+                    <Label htmlFor="opt-cc-st">Status</Label>
                     <Select value={optCcStatus} onValueChange={setOptCcStatus}>
                       <SelectTrigger id="opt-cc-st">
                         <SelectValue />
@@ -10325,14 +10321,14 @@ export function ReactionProjectDetail() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-px" aria-hidden />
-                      <TableHead className="text-right text-xs">cycle_number</TableHead>
-                      <TableHead>status</TableHead>
-                      <TableHead className="text-right text-xs tabular-nums">input experiments</TableHead>
-                      <TableHead className="text-right text-xs tabular-nums">new experiments</TableHead>
-                      <TableHead className="font-mono text-xs">bo_run_id</TableHead>
-                      <TableHead className="font-mono text-xs">advisor_run_id</TableHead>
-                      <TableHead className="font-mono text-xs">recommendation_batch_id</TableHead>
-                      <TableHead className="font-mono text-xs">execution_batch_id</TableHead>
+                      <TableHead className="text-right text-xs">Cycle number</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right text-xs tabular-nums">Input experiments</TableHead>
+                      <TableHead className="text-right text-xs tabular-nums">New experiments</TableHead>
+                      <TableHead className="font-mono text-xs">BO run</TableHead>
+                      <TableHead className="font-mono text-xs">Advisor run</TableHead>
+                      <TableHead className="font-mono text-xs">Recommendation batch</TableHead>
+                      <TableHead className="font-mono text-xs">Execution batch</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -10475,7 +10471,7 @@ export function ReactionProjectDetail() {
                                   ) : null}
                                   <div className="space-y-2">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                      summary_json
+                                      Summary
                                     </p>
                                     <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-3 text-[10px] leading-snug">
                                       {summaryBlob}
@@ -10483,7 +10479,7 @@ export function ReactionProjectDetail() {
                                   </div>
                                   {warningsList.length > 0 ? (
                                     <div className="space-y-1">
-                                      <p className="text-xs font-medium text-muted-foreground">warnings</p>
+                                      <p className="text-xs font-medium text-muted-foreground">Warnings</p>
                                       <ul className="list-inside list-disc text-xs text-muted-foreground">
                                         {warningsList.map((w) => (
                                           <li key={`${cid}-w-${w}`}>{w}</li>
@@ -10491,11 +10487,11 @@ export function ReactionProjectDetail() {
                                       </ul>
                                     </div>
                                   ) : (
-                                    <p className="text-xs text-muted-foreground">warnings — none listed.</p>
+                                    <p className="text-xs text-muted-foreground">Warnings — none listed.</p>
                                   )}
                                   {notesList.length > 0 ? (
                                     <div className="space-y-1">
-                                      <p className="text-xs font-medium text-muted-foreground">notes</p>
+                                      <p className="text-xs font-medium text-muted-foreground">Notes</p>
                                       <ul className="list-inside list-disc text-xs text-muted-foreground">
                                         {notesList.map((n) => (
                                           <li key={`${cid}-n-${n}`}>{n}</li>
@@ -10503,7 +10499,7 @@ export function ReactionProjectDetail() {
                                       </ul>
                                     </div>
                                   ) : (
-                                    <p className="text-xs text-muted-foreground">notes — none listed.</p>
+                                    <p className="text-xs text-muted-foreground">Notes — none listed.</p>
                                   )}
                                   <div className="space-y-2">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -10512,28 +10508,28 @@ export function ReactionProjectDetail() {
                                     {dec != null ? (
                                       <div className="space-y-1 rounded-md border border-border px-3 py-2 text-xs">
                                         <p>
-                                          <span className="text-muted-foreground">decision</span>{" "}
+                                          <span className="text-muted-foreground">Decision</span>{" "}
                                           <span className="font-mono capitalize">
                                             {String(dec.decision ?? "").replace(/_/g, " ")}
                                           </span>
                                         </p>
                                         <p className="whitespace-pre-wrap text-muted-foreground">
-                                          rationale:{" "}
+                                          Rationale:{" "}
                                           <span className="text-foreground">{String(dec.rationale ?? "")}</span>
                                         </p>
                                         {dec.reviewer_name != null ? (
                                           <p className="text-muted-foreground">
-                                            reviewer_name:{" "}
+                                            Reviewer name:{" "}
                                             <span className="font-mono text-foreground">{String(dec.reviewer_name)}</span>
                                           </p>
                                         ) : null}
                                         {typeof dec.created_at === "string" ? (
-                                          <p className="text-muted-foreground">created_at {fmtIso(dec.created_at)}</p>
+                                          <p className="text-muted-foreground">Created {fmtIso(dec.created_at)}</p>
                                         ) : null}
                                       </div>
                                     ) : (
                                       <p className="text-xs text-muted-foreground">
-                                        decision record — not present on metadata_json.latest_decision yet.
+                                        No decision recorded yet.
                                       </p>
                                     )}
                                   </div>
@@ -10687,7 +10683,7 @@ export function ReactionProjectDetail() {
                                     <p className="text-xs font-medium text-muted-foreground">Record decision</p>
                                     <div className="grid gap-4 md:grid-cols-2">
                                       <div className="space-y-2 md:col-span-2">
-                                        <Label htmlFor={`opt-dec-${cid}`}>decision</Label>
+                                        <Label htmlFor={`opt-dec-${cid}`}>Decision</Label>
                                         <Select value={occDecision} onValueChange={setOccDecision}>
                                           <SelectTrigger id={`opt-dec-${cid}`}>
                                             <SelectValue />
@@ -10702,7 +10698,7 @@ export function ReactionProjectDetail() {
                                         </Select>
                                       </div>
                                       <div className="space-y-2 md:col-span-2">
-                                        <Label htmlFor={`opt-rat-${cid}`}>rationale</Label>
+                                        <Label htmlFor={`opt-rat-${cid}`}>Rationale</Label>
                                         <Textarea
                                           id={`opt-rat-${cid}`}
                                           className="text-sm"
@@ -10816,14 +10812,14 @@ export function ReactionProjectDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>experiment_id</TableHead>
-                    <TableHead>experiment_code</TableHead>
-                    <TableHead className="font-mono text-xs">linked_spectracheck_session_id</TableHead>
-                    <TableHead className="text-xs">sample_id</TableHead>
-                    <TableHead className="whitespace-nowrap text-xs">unified status</TableHead>
-                    <TableHead className="whitespace-nowrap text-xs">report status</TableHead>
+                    <TableHead>Experiment ID</TableHead>
+                    <TableHead>Experiment code</TableHead>
+                    <TableHead className="font-mono text-xs">Linked SpectraCheck session</TableHead>
+                    <TableHead className="text-xs">Sample ID</TableHead>
+                    <TableHead className="whitespace-nowrap text-xs">Unified status</TableHead>
+                    <TableHead className="whitespace-nowrap text-xs">Report status</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">QC status</TableHead>
-                    <TableHead className="text-right">evidence_records</TableHead>
+                    <TableHead className="text-right">Evidence records</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">open</TableHead>
                     <TableHead className="hidden lg:table-cell">conditions preview</TableHead>
                   </TableRow>
@@ -10881,7 +10877,7 @@ export function ReactionProjectDetail() {
                   experimentsRec.filter((e) => readNum(e.linked_spectracheck_session_id) != null).length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} className="text-muted-foreground">
-                        No experiments with linked_spectracheck_session_id.
+                        No experiments are linked to a SpectraCheck session.
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -10931,7 +10927,7 @@ export function ReactionProjectDetail() {
               Link a SpectraCheck analysis session to this experiment to enable evidence tracking and cross-module analytical review.
               {linkDialogExperimentId != null ? (
                 <span className="mt-1 block font-mono text-xs">
-                  experiment_id={linkDialogExperimentId}
+                  Experiment {linkDialogExperimentId}
                 </span>
               ) : null}
             </DialogDescription>
@@ -10954,14 +10950,14 @@ export function ReactionProjectDetail() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="link-sc-note">
-                note <span className="font-normal text-muted-foreground">(optional)</span>
+                Note <span className="font-normal text-muted-foreground">(optional)</span>
               </Label>
               <Textarea
                 id="link-sc-note"
                 rows={3}
                 value={linkNoteInput}
                 onChange={(e) => setLinkNoteInput(e.target.value)}
-                placeholder="Stored in metadata_json when provided."
+                placeholder="Saved with the link's notes when provided."
               />
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
@@ -11016,7 +11012,7 @@ export function ReactionProjectDetail() {
                       : boardDialog.kind === "fail"
                         ? "Mark failed"
                         : boardDialog.kind === "checklist"
-                          ? "Edit checklist_json"
+                          ? "Edit checklist"
                           : "Add note"}
                 </DialogTitle>
                 <DialogDescription className="text-xs">
@@ -11045,7 +11041,7 @@ export function ReactionProjectDetail() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ebd-message">message</Label>
+                      <Label htmlFor="ebd-message">Message</Label>
                       <Textarea
                         id="ebd-message"
                         rows={3}
@@ -11054,8 +11050,8 @@ export function ReactionProjectDetail() {
                         onChange={(e) => setBoardDialogMessage(e.target.value)}
                         placeholder={
                           boardDialog.kind === "done"
-                            ? "Optional completion note (POST message field)."
-                            : "Optional (POST message field)."
+                            ? "Optional completion note."
+                            : "Optional."
                         }
                       />
                     </div>
@@ -11104,14 +11100,14 @@ export function ReactionProjectDetail() {
                 )}
                 {boardDialog.kind === "note" && (
                   <div className="space-y-2">
-                    <Label htmlFor="ebd-note">note</Label>
+                    <Label htmlFor="ebd-note">Note</Label>
                     <Textarea
                       id="ebd-note"
                       rows={4}
                       className="text-sm"
                       value={boardDialogNote}
                       onChange={(e) => setBoardDialogNote(e.target.value)}
-                      placeholder="Appended via PATCH metadata_json (execution_board_notes array)."
+                      placeholder="Added to this item's notes."
                     />
                   </div>
                 )}

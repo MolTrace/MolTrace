@@ -40,7 +40,7 @@ export function ModelDiagnosticsCard({
   const trainingNote =
     trainingExperimentCount != null ? null : (
       <p className="text-[10px] text-muted-foreground">
-        No training count in run response — showing total experiment count as fallback.
+        No training count was reported for this run — showing the total experiment count instead.
       </p>
     )
 
@@ -55,7 +55,7 @@ export function ModelDiagnosticsCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Model diagnostics</CardTitle>
         <CardDescription>
-          Summary from the latest Bayesian optimization run or heuristic optimization run response when fields are
+          Summary from the latest Bayesian optimization run or heuristic optimization run when those values are
           present — indicative only, not proof of predictive accuracy.
         </CardDescription>
       </CardHeader>
