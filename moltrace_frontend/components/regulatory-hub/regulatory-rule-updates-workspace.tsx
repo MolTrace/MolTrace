@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
+import { NumberListField } from "@/components/ui/number-list-field"
 import { AlertTriangle, ArrowLeft, ClipboardCheck, ListChecks, Loader2, Plus } from "lucide-react"
 
 const PROPOSAL_TYPES = [
@@ -58,28 +60,6 @@ function formatWhen(iso: string | undefined): string {
   return formatStableUtcDateTime(iso)
 }
 
-function parseOptionalJsonObject(input: string, fieldName: string): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {
-  const t = input.trim()
-  if (!t) return { ok: true, value: {} }
-  try {
-    const parsed = JSON.parse(t)
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return { ok: false, error: `${fieldName} must be a JSON object.` }
-    }
-    return { ok: true, value: parsed as Record<string, unknown> }
-  } catch {
-    return { ok: false, error: `${fieldName} must be valid JSON.` }
-  }
-}
-
-function parseOptionalCsvInts(input: string): number[] {
-  if (!input.trim()) return []
-  return input
-    .split(",")
-    .map((p) => Number.parseInt(p.trim(), 10))
-    .filter((n) => Number.isFinite(n) && n >= 1)
-}
-
 export function RegulatoryRuleUpdatesWorkspace() {
   const searchParams = useSearchParams()
 
@@ -94,8 +74,9 @@ export function RegulatoryRuleUpdatesWorkspace() {
   const [createTitle, setCreateTitle] = useState("")
   const [createRationale, setCreateRationale] = useState("")
   const [createRuleSetId, setCreateRuleSetId] = useState("")
-  const [createProposedChangesJson, setCreateProposedChangesJson] = useState("{}")
-  const [createCitationIds, setCreateCitationIds] = useState("")
+  const [createProposedChanges, setCreateProposedChanges] = useState<Record<string, unknown>>({})
+  const [createCitationIds, setCreateCitationIds] = useState<number[]>([])
+  const [createFormKey, setCreateFormKey] = useState(0)
   const [createBusy, setCreateBusy] = useState(false)
   const [createErr, setCreateErr] = useState("")
   const [createOk, setCreateOk] = useState("")
@@ -209,19 +190,14 @@ export function RegulatoryRuleUpdatesWorkspace() {
       setCreateErr("rationale is required.")
       return
     }
-    const parsedJson = parseOptionalJsonObject(createProposedChangesJson, "proposed changes JSON")
-    if (!parsedJson.ok) {
-      setCreateErr(parsedJson.error)
-      return
-    }
     setCreateBusy(true)
     try {
       const body: Record<string, unknown> = {
         proposal_type: createProposalType,
         title,
         rationale,
-        proposed_changes_json: parsedJson.value,
-        citation_ids_json: parseOptionalCsvInts(createCitationIds),
+        proposed_changes_json: createProposedChanges,
+        citation_ids_json: createCitationIds,
         metadata_json: {},
       }
       const rsid = Number.parseInt(createRuleSetId.trim(), 10)
@@ -235,8 +211,9 @@ export function RegulatoryRuleUpdatesWorkspace() {
       setCreateTitle("")
       setCreateRationale("")
       setCreateRuleSetId("")
-      setCreateCitationIds("")
-      setCreateProposedChangesJson("{}")
+      setCreateCitationIds([])
+      setCreateProposedChanges({})
+      setCreateFormKey((k) => k + 1)
       await load()
     } catch (e) {
       setCreateErr(formatApiError(e, "Create rule update proposal failed."))
@@ -413,22 +390,25 @@ export function RegulatoryRuleUpdatesWorkspace() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rup-citations">citation IDs optional</Label>
-              <Input
-                id="rup-citations"
-                value={createCitationIds}
-                onChange={(e) => setCreateCitationIds(e.target.value)}
-                placeholder="1,2,3"
-                autoComplete="off"
+              <NumberListField
+                key={`rup-citations-${createFormKey}`}
+                label="Citation IDs (optional)"
+                itemLabel="Citation ID"
+                addLabel="Add citation"
+                initialValue={createCitationIds}
+                onChange={setCreateCitationIds}
+                description="IDs of source citations backing this proposal."
+                idPrefix="rup-citations"
               />
             </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="rup-json">proposed changes JSON</Label>
-              <Textarea
-                id="rup-json"
-                rows={6}
-                value={createProposedChangesJson}
-                onChange={(e) => setCreateProposedChangesJson(e.target.value)}
+            <div className="md:col-span-2">
+              <JsonObjectField
+                key={`rup-json-${createFormKey}`}
+                idPrefix="rup-json"
+                label="Proposed changes"
+                initialValue={createProposedChanges}
+                onChange={setCreateProposedChanges}
+                description="The proposed rule changes as name/value pairs (or raw JSON for nested detail). Advisory — never machine-applied."
               />
             </div>
           </div>

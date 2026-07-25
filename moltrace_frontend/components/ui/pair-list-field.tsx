@@ -100,7 +100,11 @@ export function PairListField({
 
   function enterTable() {
     const trimmed = rawDraft.trim()
-    if (trimmed && !rawError) {
+    if (!trimmed) {
+      // The raw box was cleared (onRawChange already emitted []). Clear the rows to match.
+      setRows([])
+      onChange([])
+    } else if (!rawError) {
       try {
         const parsed = JSON.parse(trimmed) as unknown[]
         let id = nextId
