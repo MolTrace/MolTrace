@@ -17,7 +17,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
+import { ObjectArrayField } from "@/components/ui/object-array-field"
+import type { StructuredJsonField } from "@/components/ui/structured-json-editor"
 import {
   parseYieldPredictionRun,
   postYieldPredictions,
@@ -87,6 +88,26 @@ export function conditionsTemplateFromVariables(variables: unknown[]): string {
   return Object.keys(obj).length > 0 ? JSON.stringify(obj) : ""
 }
 
+/** Labeled fields for each design-space variable, so a condition row shows named inputs. */
+export function conditionFieldsFromVariables(variables: unknown[]): StructuredJsonField[] {
+  const fields: StructuredJsonField[] = []
+  for (const v of variables) {
+    if (!isRecord(v)) continue
+    const name = typeof v.name === "string" ? v.name.trim() : ""
+    if (!name) continue
+    const vt = typeof v.variable_type === "string" ? v.variable_type : ""
+    fields.push({
+      key: name,
+      label: name,
+      type: vt === "numeric" ? "number" : "text",
+      help: vt === "categorical" && Array.isArray(v.allowed_values_json) && v.allowed_values_json.length
+        ? `e.g. ${v.allowed_values_json.slice(0, 3).map((x) => String(x)).join(", ")}`
+        : undefined,
+    })
+  }
+  return fields
+}
+
 export function YieldPredictionPanel({
   projectId,
   variables,
@@ -94,7 +115,7 @@ export function YieldPredictionPanel({
   projectId: number
   variables: unknown[]
 }) {
-  const [conditionsText, setConditionsText] = useState("")
+  const [conditions, setConditions] = useState<Record<string, unknown>[]>([])
   const [requireVerified, setRequireVerified] = useState(false)
   const [run, setRun] = useState<YieldPredictionRun | null>(null)
   const [busy, setBusy] = useState(false)
@@ -107,16 +128,20 @@ export function YieldPredictionPanel({
     e.preventDefault()
     setGuidance("")
     setMsg("")
-    const parsed = parseConditionsInput(conditionsText)
-    if (parsed.error) {
-      setInputError(parsed.error)
+    const rows = conditions.filter((c) => Object.keys(c).length > 0)
+    if (rows.length === 0) {
+      setInputError("Enter at least one condition set.")
+      return
+    }
+    if (rows.length > 200) {
+      setInputError("At most 200 condition sets per run.")
       return
     }
     setInputError("")
     setBusy(true)
     try {
       const created = await postYieldPredictions(projectId, {
-        conditions: parsed.conditions,
+        conditions: rows,
         require_verified: requireVerified,
       })
       setRun(parseYieldPredictionRun(created))
@@ -141,7 +166,7 @@ export function YieldPredictionPanel({
     }
   }
 
-  const template = conditionsTemplateFromVariables(variables)
+  const conditionFields = conditionFieldsFromVariables(variables)
 
   return (
     <ModuleCard
@@ -153,28 +178,16 @@ export function YieldPredictionPanel({
     >
       <form className="space-y-3" onSubmit={(e) => void predict(e)}>
         <div className="space-y-1">
-          <Label htmlFor="yp-conditions" className="text-xs">
-            condition sets — one JSON object per line (or one JSON array), max 200
-          </Label>
-          <Textarea
-            id="yp-conditions"
-            rows={4}
-            className="font-mono text-xs"
-            value={conditionsText}
-            onChange={(e) => setConditionsText(e.target.value)}
-            placeholder={template || '{"temperature": 80}'}
+          <ObjectArrayField
+            label="Condition sets (max 200)"
+            itemLabel="Condition set"
+            addLabel="Add condition set"
+            fields={conditionFields}
+            initialValue={conditions}
+            onChange={setConditions}
+            description="Each set predicts one yield. Fields come from the design-space variables; add your own with the raw-JSON toggle."
+            idPrefix="yp-conditions"
           />
-          {template ? (
-            <button
-              type="button"
-              className="inline min-h-0 align-baseline text-[11px] font-medium text-foreground underline underline-offset-2 hover:opacity-80 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() =>
-                setConditionsText((prev) => (prev.trim() ? `${prev.trimEnd()}\n${template}` : template))
-              }
-            >
-              Add a template row from the design-space variables
-            </button>
-          ) : null}
           {inputError ? (
             <p role="alert" className="text-[11px] text-destructive">
               {inputError}

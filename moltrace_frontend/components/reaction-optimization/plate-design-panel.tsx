@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
+import { ObjectArrayField } from "@/components/ui/object-array-field"
 import {
   Select,
   SelectContent,
@@ -44,8 +45,8 @@ function buildRequestBody(args: {
   numeric: NumericRow[]
   categorical: CategoricalRow[]
   booleanNames: string
-  fixedText: string
-  excludedText: string
+  fixed: Record<string, unknown>
+  excluded: Record<string, unknown>[]
   seed: string
 }): { body: PlateDesignRequest; error: string | null } {
   const numeric_json: Record<string, [number, number]> = {}
@@ -71,26 +72,8 @@ function buildRequestBody(args: {
     .map((s) => s.trim())
     .filter(Boolean)
 
-  let fixed_json: Record<string, unknown> | undefined
-  if (args.fixedText.trim()) {
-    try {
-      const parsed = JSON.parse(args.fixedText)
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) fixed_json = parsed
-      else return { body: {} as PlateDesignRequest, error: "Fixed conditions must be a JSON object." }
-    } catch {
-      return { body: {} as PlateDesignRequest, error: "Fixed conditions is not valid JSON." }
-    }
-  }
-  let excluded_json: Record<string, unknown>[] | undefined
-  if (args.excludedText.trim()) {
-    try {
-      const parsed = JSON.parse(args.excludedText)
-      if (Array.isArray(parsed)) excluded_json = parsed
-      else return { body: {} as PlateDesignRequest, error: "Excluded combinations must be a JSON array." }
-    } catch {
-      return { body: {} as PlateDesignRequest, error: "Excluded combinations is not valid JSON." }
-    }
-  }
+  const fixed_json = Object.keys(args.fixed).length ? args.fixed : undefined
+  const excluded_json = args.excluded.length ? args.excluded : undefined
 
   const seedNum = Number(args.seed)
   const body: PlateDesignRequest = {
@@ -208,8 +191,8 @@ export function PlateDesignPanel({
   })
   const [categorical, setCategorical] = useState<CategoricalRow[]>(() => prefillFromVariables(variables).categorical)
   const [booleanNames, setBooleanNames] = useState(() => prefillFromVariables(variables).boolean.join(", "))
-  const [fixedText, setFixedText] = useState("")
-  const [excludedText, setExcludedText] = useState("")
+  const [fixed, setFixed] = useState<Record<string, unknown>>({})
+  const [excluded, setExcluded] = useState<Record<string, unknown>[]>([])
   const [colorBy, setColorBy] = useState<string | null>(null)
   const [exporting, setExporting] = useState<"csv" | "json" | null>(null)
 
@@ -249,8 +232,8 @@ export function PlateDesignPanel({
       numeric,
       categorical,
       booleanNames,
-      fixedText,
-      excludedText,
+      fixed,
+      excluded,
       seed,
     })
     if (bodyErr) {
@@ -457,31 +440,23 @@ export function PlateDesignPanel({
                 onChange={(e) => setBooleanNames(e.target.value)}
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs" htmlFor="plate-fixed">
-                Fixed conditions — JSON object
-              </Label>
-              <Textarea
-                id="plate-fixed"
-                className="min-h-[36px] font-mono text-xs"
-                placeholder='{ "base": "K2CO3" }'
-                value={fixedText}
-                onChange={(e) => setFixedText(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs" htmlFor="plate-excluded">
-              Excluded combinations — JSON array of objects
-            </Label>
-            <Textarea
-              id="plate-excluded"
-              className="min-h-[36px] font-mono text-xs"
-              placeholder='[ { "solvent": "DMF" } ]'
-              value={excludedText}
-              onChange={(e) => setExcludedText(e.target.value)}
+            <JsonObjectField
+              label="Fixed conditions"
+              initialValue={fixed}
+              onChange={setFixed}
+              description="Constants applied to every well (e.g. base = K2CO3)."
+              idPrefix="plate-fixed"
             />
           </div>
+          <ObjectArrayField
+            label="Excluded combinations"
+            itemLabel="Combination"
+            addLabel="Add exclusion"
+            initialValue={excluded}
+            onChange={setExcluded}
+            description="Condition subsets to drop from the plate (e.g. solvent = DMF)."
+            idPrefix="plate-excluded"
+          />
 
           <Button type="button" className="gap-2" onClick={handleGenerate} disabled={generating}>
             {generating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Grid3x3 className="h-4 w-4" aria-hidden />}

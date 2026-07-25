@@ -39,6 +39,9 @@ import { Label } from "@/components/ui/label"
 import { KeyNumberTableField } from "@/components/ui/key-number-table-field"
 import { StringListField } from "@/components/ui/string-list-field"
 import { PairListField } from "@/components/ui/pair-list-field"
+import { KeyChoiceTableField } from "@/components/ui/key-choice-table-field"
+import { JsonObjectField } from "@/components/ui/json-object-field"
+import { ObjectArrayField } from "@/components/ui/object-array-field"
 import {
   Select,
   SelectContent,
@@ -1113,16 +1116,6 @@ function buildExplorationMap(
   return map
 }
 
-function constraintsTextFromField(raw: unknown): string {
-  if (raw == null) return ""
-  if (typeof raw === "string") return raw
-  try {
-    return JSON.stringify(raw, null, 2)
-  } catch {
-    return String(raw)
-  }
-}
-
 /** Read a free-text "notes" field stored as the backend's list|dict json shape. */
 function notesFromField(raw: unknown): string {
   if (typeof raw === "string") return raw
@@ -1153,6 +1146,37 @@ function notesFieldForSave(text: string, loadedRaw: unknown): unknown {
     return loadedRaw ?? {}
   }
   return notesToField(text)
+}
+
+/** Coerce a checklist row's done-like flags from the "true"/"false" TEXT the structured
+ *  editor emits into real booleans — the progress reader counts `x.done === true` strictly. */
+export function checklistForWire(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  const toBool = (v: unknown): unknown => {
+    if (typeof v !== "string") return v
+    const s = v.trim().toLowerCase()
+    if (s === "true" || s === "yes" || s === "done" || s === "1") return true
+    if (s === "false" || s === "no" || s === "0" || s === "") return false
+    return v
+  }
+  return rows.map((row) => {
+    const out = { ...row }
+    for (const k of ["done", "completed", "checked"]) {
+      if (k in out) out[k] = toBool(out[k])
+    }
+    return out
+  })
+}
+
+/** Read a wire object field into a plain object (non-objects → {}), for JsonObjectField. */
+function objectFromField(raw: unknown): Record<string, unknown> {
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+}
+
+/** Read a wire array-of-objects field for ObjectArrayField (a bare object → [object]). */
+function objectArrayFromField(raw: unknown): Record<string, unknown>[] {
+  if (Array.isArray(raw)) return raw.filter((v): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v))
+  if (raw && typeof raw === "object") return [raw as Record<string, unknown>]
+  return []
 }
 
 /** Read a wire cost/weight field into a flat name→number map for KeyNumberTableField. */
@@ -1566,15 +1590,17 @@ export function ReactionProjectDetail() {
   const [mhTitle, setMhTitle] = useState("")
   const [mhHypothesis, setMhHypothesis] = useState("")
   const [mhConfidence, setMhConfidence] = useState<string>("speculative")
-  const [mhSupportingJson, setMhSupportingJson] = useState("")
-  const [mhContradictingJson, setMhContradictingJson] = useState("")
+  const [mhSupporting, setMhSupporting] = useState<Record<string, unknown>[]>([])
+  const [mhContradicting, setMhContradicting] = useState<Record<string, unknown>[]>([])
+  const [mhFormKey, setMhFormKey] = useState(0)
 
   const [literaturePriors, setLiteraturePriors] = useState<unknown[]>([])
   const [lpSourceType, setLpSourceType] = useState<string>("user_note")
   const [lpTitle, setLpTitle] = useState("")
   const [lpSummary, setLpSummary] = useState("")
   const [lpCitation, setLpCitation] = useState("")
-  const [lpTagsJson, setLpTagsJson] = useState("")
+  const [lpTags, setLpTags] = useState<string[]>([])
+  const [lpFormKey, setLpFormKey] = useState(0)
 
   /** Latest POST /optimization/run response for this session */
   const [lastOptimizationRun, setLastOptimizationRun] = useState<unknown>(null)
@@ -1597,6 +1623,10 @@ export function ReactionProjectDetail() {
     directions: "",
     tolerance: "0",
   })
+  // Structured A/B inputs (the metrics maps + direction map replace the parsed text fields).
+  const [abChampionMetrics, setAbChampionMetrics] = useState<Record<string, number>>({})
+  const [abChallengerMetrics, setAbChallengerMetrics] = useState<Record<string, number>>({})
+  const [abDirections, setAbDirections] = useState<Record<string, string>>({})
   const [abVerdict, setAbVerdict] = useState<Record<string, unknown> | null>(null)
   // R10 — warm-start transfer-learning priors.
   const [warmStartPrior, setWarmStartPrior] = useState<Record<string, unknown> | null>(null)
@@ -1637,8 +1667,9 @@ export function ReactionProjectDetail() {
   const [minimumYield, setMinimumYield] = useState("")
   const [minimumSelectivity, setMinimumSelectivity] = useState("")
   const [maximumImpurity, setMaximumImpurity] = useState("")
-  const [hardConstraintsText, setHardConstraintsText] = useState("")
-  const [softConstraintsText, setSoftConstraintsText] = useState("")
+  const [hardConstraints, setHardConstraints] = useState<Record<string, unknown>>({})
+  const [softConstraints, setSoftConstraints] = useState<Record<string, unknown>>({})
+  const [objectiveFormKey, setObjectiveFormKey] = useState(0)
   const [explorationByVariableId, setExplorationByVariableId] = useState<Record<number, ExplorationState>>({})
 
   const [costProfileRaw, setCostProfileRaw] = useState<unknown>(null)
@@ -1717,14 +1748,15 @@ export function ReactionProjectDetail() {
   const [boardDialogMessage, setBoardDialogMessage] = useState("")
   const [boardDialogFailureReason, setBoardDialogFailureReason] = useState("")
   const [boardDialogNote, setBoardDialogNote] = useState("")
-  const [boardDialogChecklistJson, setBoardDialogChecklistJson] = useState("")
+  const [boardDialogChecklist, setBoardDialogChecklist] = useState<Record<string, unknown>[]>([])
   const [arExecutionItemId, setArExecutionItemId] = useState("")
   const [arResultType, setArResultType] = useState<string>(ANALYTICAL_RESULT_TYPE_OPTIONS[0])
   const [arSpectraCheckSessionId, setArSpectraCheckSessionId] = useState("")
   const [arFileId, setArFileId] = useState("")
   const [arArtifactId, setArArtifactId] = useState("")
   const [arSourceHash, setArSourceHash] = useState("")
-  const [arSummaryText, setArSummaryText] = useState("")
+  const [arSummary, setArSummary] = useState<Record<string, unknown>>({})
+  const [arFormKey, setArFormKey] = useState(0)
   const [analyticalResultsByExecutionItemId, setAnalyticalResultsByExecutionItemId] = useState<Record<number, unknown[]>>({})
   const [analyticalResultsLoadingItemId, setAnalyticalResultsLoadingItemId] = useState<number | null>(null)
   const [oeExecutionItemId, setOeExecutionItemId] = useState("")
@@ -1768,7 +1800,8 @@ export function ReactionProjectDetail() {
   const [execPlannerExperimentId, setExecPlannerExperimentId] = useState("")
   const [execPlannerItemCode, setExecPlannerItemCode] = useState("")
   const [execPlannerOperatorName, setExecPlannerOperatorName] = useState("")
-  const [execPlannerChecklistJsonText, setExecPlannerChecklistJsonText] = useState("")
+  const [execPlannerChecklist, setExecPlannerChecklist] = useState<Record<string, unknown>[]>([])
+  const [execPlannerFormKey, setExecPlannerFormKey] = useState(0)
   const [plannerItemInspectPayload, setPlannerItemInspectPayload] = useState<unknown>(null)
   const [regulatoryPayloadForOptimization, setRegulatoryPayloadForOptimization] = useState<{
     regulatory_constraints: Record<string, unknown>[]
@@ -1880,15 +1913,21 @@ export function ReactionProjectDetail() {
         setWeightEFactor(wNum("e_factor_weight"))
         setWeightAtomEconomy(wNum("atom_economy_weight"))
         setWeightGreenScore(wNum("green_score_weight"))
-        const tt = isRecord(opRaw.target_thresholds) ? opRaw.target_thresholds : null
-        const rMinY = readNum(opRaw.minimum_yield) ?? readNum(tt?.minimum_yield)
-        const rMinS = readNum(opRaw.minimum_selectivity) ?? readNum(tt?.minimum_selectivity)
-        const rMaxI = readNum(opRaw.maximum_impurity) ?? readNum(tt?.maximum_impurity)
+        // Thresholds come back ONLY under target_thresholds_json (the write-side nests them
+        // there); keep the legacy top-level / target_thresholds reads as fallbacks for old rows.
+        const tt = isRecord(opRaw.target_thresholds_json)
+          ? opRaw.target_thresholds_json
+          : isRecord(opRaw.target_thresholds)
+            ? opRaw.target_thresholds
+            : null
+        const rMinY = readNum(tt?.minimum_yield) ?? readNum(opRaw.minimum_yield)
+        const rMinS = readNum(tt?.minimum_selectivity) ?? readNum(opRaw.minimum_selectivity)
+        const rMaxI = readNum(tt?.maximum_impurity) ?? readNum(opRaw.maximum_impurity)
         setMinimumYield(rMinY != null ? String(rMinY) : "")
         setMinimumSelectivity(rMinS != null ? String(rMinS) : "")
         setMaximumImpurity(rMaxI != null ? String(rMaxI) : "")
-        setHardConstraintsText(constraintsTextFromField(opRaw.hard_constraints_json ?? opRaw.hard_constraints))
-        setSoftConstraintsText(constraintsTextFromField(opRaw.soft_constraints_json ?? opRaw.soft_constraints))
+        setHardConstraints(objectFromField(opRaw.hard_constraints_json ?? opRaw.hard_constraints))
+        setSoftConstraints(objectFromField(opRaw.soft_constraints_json ?? opRaw.soft_constraints))
       } else {
         setObjectiveType("maximize_yield")
         setWeightYield("")
@@ -1899,9 +1938,10 @@ export function ReactionProjectDetail() {
         setMinimumYield("")
         setMinimumSelectivity("")
         setMaximumImpurity("")
-        setHardConstraintsText("")
-        setSoftConstraintsText("")
+        setHardConstraints({})
+        setSoftConstraints({})
       }
+      setObjectiveFormKey((k) => k + 1)
 
       const variableRecordsForMap = vrList.filter(isRecord) as Record<string, unknown>[]
       setExplorationByVariableId(buildExplorationMap(variableRecordsForMap, dsRaw))
@@ -2652,33 +2692,22 @@ export function ReactionProjectDetail() {
     const minimum_selectivity = putThreshold(minimumSelectivity)
     const maximum_impurity = putThreshold(maximumImpurity)
 
-    let hard_constraints_json: unknown = null
-    const hc = hardConstraintsText.trim()
-    if (hc) {
-      try {
-        hard_constraints_json = JSON.parse(hc) as unknown
-      } catch {
-        hard_constraints_json = hc
-      }
-    }
-    let soft_constraints_json: unknown = null
-    const sc = softConstraintsText.trim()
-    if (sc) {
-      try {
-        soft_constraints_json = JSON.parse(sc) as unknown
-      } catch {
-        soft_constraints_json = sc
-      }
-    }
+    // The Create model (ReactionObjectiveProfileCreate, extra=forbid) has no
+    // minimum_yield/selectivity/impurity fields — thresholds live in
+    // target_thresholds_json (which is how the read-side already hydrates them),
+    // and hard/soft constraints are `dict` (no None). The previous payload sent
+    // those thresholds as top-level keys + null/string constraints and 422'd.
+    const target_thresholds_json: Record<string, number> = {}
+    if (minimum_yield != null) target_thresholds_json.minimum_yield = minimum_yield
+    if (minimum_selectivity != null) target_thresholds_json.minimum_selectivity = minimum_selectivity
+    if (maximum_impurity != null) target_thresholds_json.maximum_impurity = maximum_impurity
 
     return {
       objective_type: objectiveType,
       weights_json,
-      minimum_yield,
-      minimum_selectivity,
-      maximum_impurity,
-      hard_constraints_json,
-      soft_constraints_json,
+      target_thresholds_json,
+      hard_constraints_json: hardConstraints,
+      soft_constraints_json: softConstraints,
     }
   }
 
@@ -3378,20 +3407,6 @@ export function ReactionProjectDetail() {
       setMsg({ tone: "err", text: "title and hypothesis are required." })
       return
     }
-    let supporting_observations_json: unknown
-    let contradicting_observations_json: unknown
-    try {
-      const rawS = mhSupportingJson.trim()
-      const rawC = mhContradictingJson.trim()
-      supporting_observations_json = rawS ? (JSON.parse(rawS) as unknown) : []
-      contradicting_observations_json = rawC ? (JSON.parse(rawC) as unknown) : []
-    } catch {
-      setMsg({
-        tone: "err",
-        text: "supporting_observations_json and contradicting_observations_json must be valid JSON when provided.",
-      })
-      return
-    }
     setBusy("mh-create")
     try {
       await apiFetch(`/reaction-projects/${reactionProjectId}/mechanistic-hypotheses`, {
@@ -3399,8 +3414,8 @@ export function ReactionProjectDetail() {
         body: {
           title,
           hypothesis,
-          supporting_observations_json,
-          contradicting_observations_json,
+          supporting_observations_json: mhSupporting,
+          contradicting_observations_json: mhContradicting,
           confidence_label: mhConfidence,
           status: "proposed",
           metadata_json: {},
@@ -3413,8 +3428,9 @@ export function ReactionProjectDetail() {
       setMhTitle("")
       setMhHypothesis("")
       setMhConfidence("speculative")
-      setMhSupportingJson("")
-      setMhContradictingJson("")
+      setMhSupporting([])
+      setMhContradicting([])
+      setMhFormKey((k) => k + 1)
       setMsg({ tone: "ok", text: "Mechanistic hypothesis created." })
       await reload()
     } catch (err) {
@@ -3450,14 +3466,7 @@ export function ReactionProjectDetail() {
       setMsg({ tone: "err", text: "title and summary are required." })
       return
     }
-    let relevance_tags_json: unknown
-    try {
-      const raw = lpTagsJson.trim()
-      relevance_tags_json = raw ? (JSON.parse(raw) as unknown) : []
-    } catch {
-      setMsg({ tone: "err", text: "relevance_tags_json must be valid JSON when provided." })
-      return
-    }
+    const relevance_tags_json = lpTags
     const citeTrim = lpCitation.trim()
     setBusy("lp-create")
     try {
@@ -3479,7 +3488,8 @@ export function ReactionProjectDetail() {
       setLpTitle("")
       setLpSummary("")
       setLpCitation("")
-      setLpTagsJson("")
+      setLpTags([])
+      setLpFormKey((k) => k + 1)
       setLpSourceType("user_note")
       setMsg({ tone: "ok", text: "Literature prior created." })
       await reload()
@@ -3810,23 +3820,13 @@ export function ReactionProjectDetail() {
       setMsg({ tone: "err", text: "Selected experiment must have status planned in the current GET experiments list." })
       return
     }
-    let checklist_json: unknown = []
-    const ck = execPlannerChecklistJsonText.trim()
-    if (ck) {
-      try {
-        checklist_json = JSON.parse(ck) as unknown
-      } catch {
-        setMsg({ tone: "err", text: "checklist_json must parse as JSON (array or object)." })
-        return
-      }
-    }
     setBusy("exec-item-add")
     try {
       const body: Record<string, unknown> = {
         item_code,
         experiment_id,
         status: "planned",
-        checklist_json,
+        checklist_json: checklistForWire(execPlannerChecklist),
         metadata_json: {},
       }
       const op = execPlannerOperatorName.trim()
@@ -3838,7 +3838,8 @@ export function ReactionProjectDetail() {
       setMsg({ tone: "ok", text: "Execution item added to batch (planning record)." })
       setExecPlannerItemCode("")
       setExecPlannerOperatorName("")
-      setExecPlannerChecklistJsonText("")
+      setExecPlannerChecklist([])
+      setExecPlannerFormKey((k) => k + 1)
       await reload()
     } catch (err) {
       setMsg({
@@ -3862,13 +3863,9 @@ export function ReactionProjectDetail() {
     setBoardDialogFailureReason("")
     setBoardDialogNote("")
     if (kind === "checklist") {
-      try {
-        setBoardDialogChecklistJson(JSON.stringify(item.checklist_json ?? [], null, 2))
-      } catch {
-        setBoardDialogChecklistJson("[]")
-      }
+      setBoardDialogChecklist(objectArrayFromField(item.checklist_json))
     } else {
-      setBoardDialogChecklistJson("")
+      setBoardDialogChecklist([])
     }
   }
 
@@ -3878,7 +3875,7 @@ export function ReactionProjectDetail() {
     setBoardDialogMessage("")
     setBoardDialogFailureReason("")
     setBoardDialogNote("")
-    setBoardDialogChecklistJson("")
+    setBoardDialogChecklist([])
   }
 
   async function submitExecutionBoardDialog(e: React.FormEvent) {
@@ -3938,19 +3935,11 @@ export function ReactionProjectDetail() {
         })
         setMsg({ tone: "ok", text: "Execution item marked failed." })
       } else if (kind === "checklist") {
-        let checklist_json: unknown
-        try {
-          checklist_json = JSON.parse(boardDialogChecklistJson) as unknown
-        } catch {
-          setMsg({ tone: "err", text: "checklist_json must be valid JSON." })
-          setBusy(null)
-          return
-        }
         await apiFetch(`/reaction-execution-items/${itemId}`, {
           method: "PATCH",
-          body: { checklist_json },
+          body: { checklist_json: checklistForWire(boardDialogChecklist) },
         })
-        setMsg({ tone: "ok", text: "checklist_json PATCH saved." })
+        setMsg({ tone: "ok", text: "Checklist saved." })
       } else if (kind === "note") {
         const text = boardDialogNote.trim()
         if (!text) {
@@ -4018,20 +4007,11 @@ export function ReactionProjectDetail() {
       setMsg({ tone: "err", text: "session_id, file_id, and artifact_id must be positive integers when provided." })
       return
     }
-    let summary_json: unknown = {}
-    const summaryRaw = arSummaryText.trim()
-    if (summaryRaw) {
-      try {
-        summary_json = JSON.parse(summaryRaw) as unknown
-      } catch {
-        summary_json = { summary_text: summaryRaw }
-      }
-    }
     setBusy("exec-analytical-add")
     try {
       const body: Record<string, unknown> = {
         result_type: arResultType,
-        summary_json: isRecord(summary_json) ? summary_json : { value: summary_json },
+        summary_json: arSummary,
         metadata_json: {},
       }
       if (spectracheck_session_id != null) body.spectracheck_session_id = spectracheck_session_id
@@ -4057,7 +4037,8 @@ export function ReactionProjectDetail() {
       setArFileId("")
       setArArtifactId("")
       setArSourceHash("")
-      setArSummaryText("")
+      setArSummary({})
+      setArFormKey((k) => k + 1)
       setMsg({ tone: "ok", text: "Analytical result linked to execution item." })
       await loadExecutionItemAnalyticalResults(executionItemId)
     } catch (err) {
@@ -4501,9 +4482,29 @@ export function ReactionProjectDetail() {
     setMsg(null)
     setBusy("ab-eval")
     try {
+      // Build the request from the structured metric/direction maps (the string helper
+      // reactionAbEvaluateBody stays for its unit tests; the UI now supplies objects directly).
+      const numOr0 = (v: string): number => {
+        const n = Number(v.trim())
+        return Number.isFinite(n) ? n : 0
+      }
+      const body: Record<string, unknown> = {
+        champion: {
+          model_version: abForm.championVersion.trim() || "champion",
+          metrics: abChampionMetrics,
+          safety_flag_recall: parseReactionRecall(abForm.championRecall) ?? 0,
+        },
+        challenger: {
+          model_version: abForm.challengerVersion.trim() || "challenger",
+          metrics: abChallengerMetrics,
+          safety_flag_recall: parseReactionRecall(abForm.challengerRecall) ?? 0,
+        },
+        tolerance: numOr0(abForm.tolerance),
+      }
+      if (Object.keys(abDirections).length > 0) body.directions = abDirections
       const data = await apiFetch<unknown>(
         `/reaction-projects/${reactionProjectId}/ab-promotion/evaluate`,
-        { method: "POST", body: reactionAbEvaluateBody(abForm) },
+        { method: "POST", body },
       )
       setAbVerdict(isRecord(data) ? data : null)
     } catch (err) {
@@ -5694,28 +5695,22 @@ export function ReactionProjectDetail() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="hard-constraints">hard constraints</Label>
-                  <p className="text-xs text-muted-foreground">JSON or text (advanced).</p>
-                  <Textarea
-                    id="hard-constraints"
-                    rows={5}
-                    value={hardConstraintsText}
-                    onChange={(e) => setHardConstraintsText(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="soft-constraints">soft constraints</Label>
-                  <p className="text-xs text-muted-foreground">JSON or text (advanced).</p>
-                  <Textarea
-                    id="soft-constraints"
-                    rows={5}
-                    value={softConstraintsText}
-                    onChange={(e) => setSoftConstraintsText(e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                </div>
+                <JsonObjectField
+                  key={`hard-constraints-${objectiveFormKey}`}
+                  label="Hard constraints"
+                  initialValue={hardConstraints}
+                  onChange={setHardConstraints}
+                  description="Conditions a candidate must satisfy (name/value pairs). Advanced — leave empty for none."
+                  idPrefix="hard-constraints"
+                />
+                <JsonObjectField
+                  key={`soft-constraints-${objectiveFormKey}`}
+                  label="Soft constraints"
+                  initialValue={softConstraints}
+                  onChange={setSoftConstraints}
+                  description="Preferences that penalize but don't exclude a candidate. Advanced — leave empty for none."
+                  idPrefix="soft-constraints"
+                />
 
                 <Button type="submit" disabled={busy === "objective-profile" || loading}>
                   {busy === "objective-profile" ? "Saving…" : "Save objective profile"}
@@ -7501,28 +7496,36 @@ export function ReactionProjectDetail() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="mh-supporting">Supporting observations</Label>
-                    <p className="text-xs text-muted-foreground">JSON array or object; leave empty for none.</p>
-                    <Textarea
-                      id="mh-supporting"
-                      rows={3}
-                      value={mhSupportingJson}
-                      onChange={(e) => setMhSupportingJson(e.target.value)}
-                      className="font-mono text-xs"
-                      placeholder="[]"
+                  <div className="md:col-span-2">
+                    <ObjectArrayField
+                      key={`mh-supporting-${mhFormKey}`}
+                      label="Supporting observations"
+                      itemLabel="Observation"
+                      addLabel="Add observation"
+                      fields={[
+                        { key: "observation", label: "Observation", type: "textarea" },
+                        { key: "experiment_code", label: "Experiment code" },
+                      ]}
+                      initialValue={mhSupporting}
+                      onChange={setMhSupporting}
+                      description="Evidence that supports this hypothesis. Leave empty for none."
+                      idPrefix="mh-supporting"
                     />
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="mh-contradicting">Contradicting observations</Label>
-                    <p className="text-xs text-muted-foreground">JSON array or object; leave empty for none.</p>
-                    <Textarea
-                      id="mh-contradicting"
-                      rows={3}
-                      value={mhContradictingJson}
-                      onChange={(e) => setMhContradictingJson(e.target.value)}
-                      className="font-mono text-xs"
-                      placeholder="[]"
+                  <div className="md:col-span-2">
+                    <ObjectArrayField
+                      key={`mh-contradicting-${mhFormKey}`}
+                      label="Contradicting observations"
+                      itemLabel="Observation"
+                      addLabel="Add observation"
+                      fields={[
+                        { key: "observation", label: "Observation", type: "textarea" },
+                        { key: "experiment_code", label: "Experiment code" },
+                      ]}
+                      initialValue={mhContradicting}
+                      onChange={setMhContradicting}
+                      description="Evidence that contradicts this hypothesis. Leave empty for none."
+                      idPrefix="mh-contradicting"
                     />
                   </div>
                 </div>
@@ -7709,18 +7712,18 @@ export function ReactionProjectDetail() {
                       maxLength={2000}
                     />
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="lp-tags">Relevance tags</Label>
-                    <p className="text-xs text-muted-foreground">
-                      JSON array (e.g. [&quot;solvent&quot;, &quot;amidation&quot;]) or object; leave empty for none.
-                    </p>
-                    <Textarea
-                      id="lp-tags"
-                      rows={2}
-                      value={lpTagsJson}
-                      onChange={(e) => setLpTagsJson(e.target.value)}
-                      className="font-mono text-xs"
-                      placeholder="[]"
+                  <div className="md:col-span-2">
+                    <StringListField
+                      key={`lp-tags-${lpFormKey}`}
+                      label="Relevance tags"
+                      itemLabel="Tag"
+                      itemPlaceholder="e.g. solvent, amidation"
+                      addLabel="Add tag"
+                      initialValue={lpTags}
+                      onChange={setLpTags}
+                      suggestions={categoricalSuggestions}
+                      description="Short tags for retrieval/relevance. Leave empty for none."
+                      idPrefix="lp-tags"
                     />
                   </div>
                 </div>
@@ -8651,17 +8654,15 @@ export function ReactionProjectDetail() {
                         placeholder={side.ph}
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label htmlFor={`ab-${side.key}-met`} className="text-xs">metrics (name=value, …)</Label>
-                      <Textarea
-                        id={`ab-${side.key}-met`}
-                        rows={2}
-                        className="text-xs"
-                        value={abForm[side.metLabel]}
-                        onChange={(e) => setAbForm((p) => ({ ...p, [side.metLabel]: e.target.value }))}
-                        placeholder="r2=0.88, rmse=0.21"
-                      />
-                    </div>
+                    <KeyNumberTableField
+                      label="Metrics"
+                      keyLabel="Metric"
+                      valueLabel="Value"
+                      addLabel="Add metric"
+                      initialValue={side.key === "champion" ? abChampionMetrics : abChallengerMetrics}
+                      onChange={side.key === "champion" ? setAbChampionMetrics : setAbChallengerMetrics}
+                      idPrefix={`ab-${side.key}-met`}
+                    />
                     <div className="space-y-1">
                       <Label htmlFor={`ab-${side.key}-rec`} className="text-xs">safety_flag_recall</Label>
                       <Input
@@ -8676,16 +8677,20 @@ export function ReactionProjectDetail() {
                 ))}
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label htmlFor="ab-dirs" className="text-xs">directions (name=higher|lower, …)</Label>
-                  <Input
-                    id="ab-dirs"
-                    className="h-8 text-xs"
-                    value={abForm.directions}
-                    onChange={(e) => setAbForm((p) => ({ ...p, directions: e.target.value }))}
-                    placeholder="r2=higher, rmse=lower"
-                  />
-                </div>
+                <KeyChoiceTableField
+                  label="Directions"
+                  keyLabel="Metric"
+                  valueLabel="Better when"
+                  addLabel="Add direction"
+                  options={[
+                    { value: "higher", label: "Higher is better" },
+                    { value: "lower", label: "Lower is better" },
+                  ]}
+                  initialValue={abDirections}
+                  onChange={setAbDirections}
+                  description="Which way is better for each metric (defaults apply when unset)."
+                  idPrefix="ab-dirs"
+                />
                 <div className="space-y-1">
                   <Label htmlFor="ab-tol" className="text-xs">tolerance</Label>
                   <Input
@@ -9267,15 +9272,20 @@ export function ReactionProjectDetail() {
                           placeholder="Optional POST body."
                         />
                       </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="eb-pl-checklist">Checklist</Label>
-                        <Textarea
-                          id="eb-pl-checklist"
-                          rows={3}
-                          className="font-mono text-xs"
-                          value={execPlannerChecklistJsonText}
-                          onChange={(e) => setExecPlannerChecklistJsonText(e.target.value)}
-                          placeholder='Optional JSON array or object ([{"done":false,"task":"rinse"}]).'
+                      <div className="md:col-span-2">
+                        <ObjectArrayField
+                          key={`eb-pl-checklist-${execPlannerFormKey}`}
+                          label="Checklist"
+                          itemLabel="Step"
+                          addLabel="Add step"
+                          fields={[
+                            { key: "task", label: "Task" },
+                            { key: "done", label: "Done? (true/false)", type: "text" },
+                          ]}
+                          initialValue={execPlannerChecklist}
+                          onChange={setExecPlannerChecklist}
+                          description="Optional prep/run steps for this execution item."
+                          idPrefix="eb-pl-checklist"
                         />
                       </div>
                     </div>
@@ -9723,15 +9733,16 @@ export function ReactionProjectDetail() {
                     />
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="ar-summary">Summary</Label>
-                    <Textarea
-                      id="ar-summary"
-                      rows={5}
-                      className="font-mono text-xs"
-                      value={arSummaryText}
-                      onChange={(e) => setArSummaryText(e.target.value)}
-                      placeholder='Advanced field. JSON preferred; plain text is stored as {"summary_text": "..."}'
+                  <div className="md:col-span-2">
+                    <JsonObjectField
+                      key={`ar-summary-${arFormKey}`}
+                      label="Summary"
+                      initialValue={arSummary}
+                      onChange={setArSummary}
+                      fields={[{ key: "summary_text", label: "Summary text", type: "textarea" }]}
+                      allowCustomKeys
+                      description="A free-text summary, and/or your own labeled fields. Leave empty for none."
+                      idPrefix="ar-summary"
                     />
                   </div>
                 </div>
@@ -11077,16 +11088,19 @@ export function ReactionProjectDetail() {
                   </>
                 )}
                 {boardDialog.kind === "checklist" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="ebd-checklist">Checklist</Label>
-                    <Textarea
-                      id="ebd-checklist"
-                      rows={10}
-                      className="font-mono text-xs"
-                      value={boardDialogChecklistJson}
-                      onChange={(e) => setBoardDialogChecklistJson(e.target.value)}
-                    />
-                  </div>
+                  <ObjectArrayField
+                    key={`ebd-checklist-${boardDialog.itemId}`}
+                    label="Checklist"
+                    itemLabel="Step"
+                    addLabel="Add step"
+                    fields={[
+                      { key: "task", label: "Task" },
+                      { key: "done", label: "Done? (true/false)", type: "text" },
+                    ]}
+                    initialValue={boardDialogChecklist}
+                    onChange={setBoardDialogChecklist}
+                    idPrefix="ebd-checklist"
+                  />
                 )}
                 {boardDialog.kind === "note" && (
                   <div className="space-y-2">

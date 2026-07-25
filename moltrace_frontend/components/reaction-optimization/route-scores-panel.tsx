@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { RouteTreeField } from "@/components/ui/route-tree-field"
 import {
   Collapsible,
   CollapsibleContent,
@@ -36,15 +36,6 @@ import {
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v)
 }
-
-const ROUTE_PLACEHOLDER = `{
-  "smiles": "CC(=O)Oc1ccccc1C(=O)O",
-  "reagents": ["CC(=O)OC(C)=O"],
-  "solvent": "CCO",
-  "children": [
-    { "smiles": "Oc1ccccc1C(=O)O", "reagents": [], "children": [] }
-  ]
-}`
 
 /** Native, dependency-free render of the nested route tree (product → precursors). */
 function RouteTreeNode({ node, depth }: { node: Record<string, unknown>; depth: number }) {
@@ -219,7 +210,7 @@ function RouteScoreResult({ view }: { view: RouteScoreView }) {
 }
 
 export function RouteScoresPanel({ projectId }: { projectId: number }) {
-  const [routeText, setRouteText] = useState("")
+  const [route, setRoute] = useState<Record<string, unknown>>({})
   const [label, setLabel] = useState("")
   const [inputError, setInputError] = useState("")
   const [busy, setBusy] = useState(false)
@@ -247,17 +238,8 @@ export function RouteScoresPanel({ projectId }: { projectId: number }) {
   async function score(e: React.FormEvent) {
     e.preventDefault()
     setMsg("")
-    let route: Record<string, unknown>
-    try {
-      const parsed: unknown = JSON.parse(routeText)
-      if (!isRecord(parsed)) throw new Error("not an object")
-      route = parsed
-    } catch {
-      setInputError("The route must be a JSON object: {smiles, children[], reagents[], solvent?}.")
-      return
-    }
     if (typeof route.smiles !== "string" || route.smiles.trim() === "") {
-      setInputError("The route's root node needs a SMILES.")
+      setInputError("The route's root node needs a product SMILES.")
       return
     }
     setInputError("")
@@ -299,16 +281,11 @@ export function RouteScoresPanel({ projectId }: { projectId: number }) {
     >
       <form className="space-y-3" onSubmit={(e) => void score(e)}>
         <div className="space-y-1">
-          <Label htmlFor="rs-route" className="text-xs">
-            route tree (JSON: {"{smiles, children[], reagents[], solvent?}"})
-          </Label>
-          <Textarea
-            id="rs-route"
-            rows={7}
-            className="font-mono text-xs"
-            value={routeText}
-            onChange={(e) => setRouteText(e.target.value)}
-            placeholder={ROUTE_PLACEHOLDER}
+          <RouteTreeField
+            label="Route tree"
+            initialValue={route}
+            onChange={setRoute}
+            description="Build the target product and its precursors, or paste a route with the JSON toggle."
           />
           {inputError ? (
             <p role="alert" className="text-[11px] text-destructive">
