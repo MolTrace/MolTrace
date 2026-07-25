@@ -131,7 +131,7 @@ const DEMO_RISK = {
 export function RegulatoryHubWorkspace() {
   const [jurisdiction, setJurisdiction] = useState<string>(DEMO_JURISDICTIONS[0].id)
   const [reviewerNotes, setReviewerNotes] = useState(
-    "Demo scratchpad — notes are local-only until persistence API exists.",
+    "Demo scratchpad — notes are local-only and are not saved yet.",
   )
 
   return (
@@ -225,7 +225,7 @@ export function RegulatoryHubWorkspace() {
             eyebrow="Regulatory · Jurisdiction"
             title={<span id="jurisdiction-heading">Jurisdiction</span>}
             icon={Globe}
-            description="Select target regulator context (demo — does not change backend rules)."
+            description="Select target regulator context (demo — does not change the app's rules)."
             className="h-full"
           >
             <Label htmlFor="jurisdiction-select" className="text-xs text-muted-foreground">
@@ -339,7 +339,7 @@ export function RegulatoryHubWorkspace() {
             </h2>
             <p className="text-sm text-muted-foreground">
               Each card lists sources or explicit placeholders. Review state must reach approved before any excerpt could
-              feed export pipelines.
+              be included in an export.
             </p>
           </div>
           <Badge variant="outline" className="shrink-0 font-normal">
@@ -396,7 +396,7 @@ export function RegulatoryHubWorkspace() {
           eyebrow="Regulatory · Notes"
           title={<span id="notes-heading">Reviewer notes</span>}
           icon={UserRound}
-          description="Local-only draft — no sync. Replace with authenticated review service when API exists."
+          description="Local-only draft — no sync. Saving will be available in a future update."
         >
           <Textarea
             value={reviewerNotes}
@@ -417,7 +417,7 @@ export function RegulatoryHubWorkspace() {
           eyebrow="Regulatory · Export"
           title={<span id="export-heading">Report export controls</span>}
           icon={FileOutput}
-          description="Bundling requires validated artefacts and reviewer workflow — controls remain disabled without backend."
+          description="Bundling requires validated artefacts and reviewer workflow — controls remain disabled in this demo."
         >
           <div className="flex flex-wrap gap-3">
             <Button disabled className="gap-2">
@@ -430,7 +430,7 @@ export function RegulatoryHubWorkspace() {
             </Button>
             <Button variant="outline" disabled className="gap-2">
               <Download className="h-4 w-4" />
-              eCTD stub (disabled)
+              eCTD export (disabled)
             </Button>
           </div>
           <Separator />
@@ -445,7 +445,7 @@ export function RegulatoryHubWorkspace() {
 
       <Card className="border-dashed bg-muted/30">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4 text-xs text-muted-foreground">
-          <span>MolTrace Regentry · UI scaffold · no regulatory AI inference executed</span>
+          <span>MolTrace Regentry · demo layout · no regulatory AI has been run</span>
           <Badge variant="outline" className="font-normal">
             Citations + human review required for any production export
           </Badge>

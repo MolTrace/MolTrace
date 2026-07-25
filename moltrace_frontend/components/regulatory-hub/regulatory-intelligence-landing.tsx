@@ -375,7 +375,7 @@ export function RegulatoryIntelligenceLanding() {
 
   const unavailableSub = (
     <p className="text-xs text-muted-foreground">
-      {dossierListError ? "Backend unavailable." : "Loading…"}
+      {dossierListError ? "Service unavailable." : "Loading…"}
     </p>
   )
 
@@ -414,7 +414,7 @@ export function RegulatoryIntelligenceLanding() {
 
   const liveMetricsSub = (
     <p className="text-xs text-muted-foreground">
-      {enrichBusy ? "Refreshing requirement and risk aggregates…" : "Derived from loaded dossiers and evidence."}
+      {enrichBusy ? "Refreshing requirement and risk totals…" : "Derived from loaded dossiers and evidence."}
     </p>
   )
 
@@ -528,7 +528,7 @@ export function RegulatoryIntelligenceLanding() {
       setProductName("")
       await load()
     } catch (err) {
-      setCreateError(formatApiError(err, "Create dossier failed."))
+      setCreateError(formatApiError(err, "Could not create the dossier."))
     } finally {
       setCreateBusy(false)
     }
@@ -577,7 +577,7 @@ export function RegulatoryIntelligenceLanding() {
       {dossierListError ? (
         <AlertCard
           variant="error"
-          title="Backend unavailable"
+          title="Service unavailable"
           description={dossierListError}
         />
       ) : null}
@@ -683,7 +683,7 @@ export function RegulatoryIntelligenceLanding() {
           <DataState
             state="unavailable"
             title="No regulatory action cards yet."
-            description="Regulatory action cards could not be loaded from the backend right now."
+            description="Regulatory action cards could not be loaded right now."
           />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -788,7 +788,7 @@ export function RegulatoryIntelligenceLanding() {
         >
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="reg-create-title">title</Label>
+                <Label htmlFor="reg-create-title">Title</Label>
                 <Input
                   id="reg-create-title"
                   value={createTitle}
@@ -799,7 +799,7 @@ export function RegulatoryIntelligenceLanding() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>project selector optional</Label>
+                <Label>Project (optional)</Label>
                 <Select
                   value={selectedProjectId || "none"}
                   onValueChange={(v) => setSelectedProjectId(v === "none" ? "" : v)}
@@ -819,7 +819,7 @@ export function RegulatoryIntelligenceLanding() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>sample selector optional</Label>
+                <Label>Sample (optional)</Label>
                 <Select
                   value={createSampleId || "none"}
                   onValueChange={(v) => setCreateSampleId(v === "none" ? "" : v)}
@@ -839,7 +839,7 @@ export function RegulatoryIntelligenceLanding() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="reg-spectra-session">SpectraCheck session ID optional</Label>
+                <Label htmlFor="reg-spectra-session">SpectraCheck session ID (optional)</Label>
                 <Input
                   id="reg-spectra-session"
                   value={spectraSessionId}
@@ -851,7 +851,7 @@ export function RegulatoryIntelligenceLanding() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>reaction project ID optional</Label>
+                <Label>Reaction project (optional)</Label>
                 <Select
                   value={reactionProjectId || "none"}
                   onValueChange={(v) => setReactionProjectId(v === "none" ? "" : v)}
@@ -871,7 +871,7 @@ export function RegulatoryIntelligenceLanding() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>jurisdiction selector</Label>
+                <Label>Jurisdiction</Label>
                 <Select
                   value={createJurisdictionId || "none"}
                   onValueChange={(v) => setCreateJurisdictionId(v === "none" ? "" : v)}
@@ -891,7 +891,7 @@ export function RegulatoryIntelligenceLanding() {
                 </Select>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="reg-intended-use">intended use</Label>
+                <Label htmlFor="reg-intended-use">Intended use</Label>
                 <Textarea
                   id="reg-intended-use"
                   rows={3}
@@ -902,14 +902,14 @@ export function RegulatoryIntelligenceLanding() {
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="reg-compound">compound/product name optional</Label>
+                <Label htmlFor="reg-compound">Compound / product name (optional)</Label>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Input
                     id="reg-compound"
                     aria-label="compound name"
                     value={compoundName}
                     onChange={(e) => setCompoundName(e.target.value)}
-                    placeholder="compound_name"
+                    placeholder="Compound name"
                     disabled={loading}
                     autoComplete="off"
                   />
@@ -918,7 +918,7 @@ export function RegulatoryIntelligenceLanding() {
                     aria-label="product name"
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
-                    placeholder="product_name"
+                    placeholder="Product name"
                     disabled={loading}
                     autoComplete="off"
                   />
@@ -926,13 +926,13 @@ export function RegulatoryIntelligenceLanding() {
               </div>
             </div>
             {createError ? (
-              <AlertCard variant="error" title="Create failed" description={createError} />
+              <AlertCard variant="error" title="Could not create dossier" description={createError} />
             ) : null}
             {createSucceeded ? (
               <AlertCard
                 variant="success"
                 title="Dossier created"
-                description="The list below was refreshed from the server."
+                description="The list below has been refreshed."
               />
             ) : null}
             <div className="flex flex-wrap gap-2">
@@ -994,11 +994,11 @@ export function RegulatoryIntelligenceLanding() {
                     <TableRow>
                       <TableHead>title</TableHead>
                       <TableHead>jurisdiction</TableHead>
-                      <TableHead>intended use</TableHead>
+                      <TableHead>Intended use</TableHead>
                       <TableHead>status</TableHead>
-                      <TableHead className="text-right">requirements count</TableHead>
-                      <TableHead className="text-right">missing evidence count</TableHead>
-                      <TableHead>risk</TableHead>
+                      <TableHead className="text-right">Requirements</TableHead>
+                      <TableHead className="text-right">Missing evidence</TableHead>
+                      <TableHead>Risk</TableHead>
                       <TableHead>updated date</TableHead>
                       <TableHead className="w-[100px]">open button</TableHead>
                     </TableRow>
@@ -1157,9 +1157,9 @@ export function RegulatoryIntelligenceLanding() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>title</TableHead>
-                      <TableHead>source_type</TableHead>
+                      <TableHead>Source type</TableHead>
                       <TableHead>status</TableHead>
-                      <TableHead>version</TableHead>
+                      <TableHead>Version</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1188,7 +1188,7 @@ export function RegulatoryIntelligenceLanding() {
           </p>
           <h2 className="font-mono text-xl font-bold tracking-tight">Regulatory review queue</h2>
           <p className="text-sm text-muted-foreground">
-            Dossiers in <code className="rounded bg-muted px-1 font-mono text-xs">in_review</code> status — promote to a reviewer once human sign-off lands.
+            Dossiers in <code className="rounded bg-muted px-1 font-mono text-xs">review</code> status — promote to a reviewer once human sign-off lands.
           </p>
         </div>
         {loading ? (
@@ -1220,7 +1220,7 @@ export function RegulatoryIntelligenceLanding() {
             status="unavailable"
             risk_level="unknown"
             summary="No dossiers are currently in review."
-            evidence_items={["Human-review evidence will appear here when a dossier enters in_review status."]}
+            evidence_items={["Human-review evidence will appear here when a dossier enters review."]}
             citations={[]}
             review_status="no active review items"
           />
@@ -1228,7 +1228,7 @@ export function RegulatoryIntelligenceLanding() {
           <ModuleCard
             accent="cyan"
             eyebrow="Regulatory · Review"
-            title="Dossiers with status in_review"
+            title="Dossiers in review"
             description="Human review is required before relying on outputs for regulatory decisions."
           >
               <div className="table-scroll">

@@ -38,7 +38,7 @@ import type { components } from "@/src/lib/api/schema"
  * (no new top-level nav). Data is entered/pasted for now — there is no
  * persisted measurement-series table yet.
  *
- * Decision-support only: the response is ALWAYS human_review_required and
+ * Decision-support only: the response is ALWAYS Human review required and
  * carries a verbatim disclaimer — this is never a disposition. The early-
  * warning story (a drift/shift signal firing BEFORE the first spec breach,
  * i.e. lead_points > 0) is surfaced prominently.
@@ -546,7 +546,7 @@ export function SPCProcessCapabilityPanel() {
               spellCheck={false}
             />
             <p className="text-xs text-muted-foreground">
-              One per line: <code>value[, batch_id[, timepoint[, label]]]</code> (comma- or tab-separated). At least one
+              One per line: <code>value[, batch[, timepoint[, label]]]</code> (comma- or tab-separated). At least one
               of USL / LSL is required.{" "}
               <span className="font-medium text-foreground">{parsed.rows.length}</span> parsed
               {parsed.skipped > 0 ? ` · ${parsed.skipped} skipped` : ""}.

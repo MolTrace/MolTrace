@@ -421,7 +421,7 @@ export function SpectraCheckReviewCollaborationPanel({ sessionId }: SpectraCheck
             <div className="min-w-0 space-y-1">
               <CardTitle className="text-base">Review & Collaboration</CardTitle>
               <CardDescription>
-                Session-linked review workflow for this SpectraCheck workspace (requires backend endpoints).
+                Session-linked review workflow for this SpectraCheck workspace.
               </CardDescription>
             </div>
             <ChevronDown
@@ -709,7 +709,7 @@ export function SpectraCheckReviewCollaborationPanel({ sessionId }: SpectraCheck
               <h3 className="text-sm font-medium">Approval decisions</h3>
               <p className="text-xs text-muted-foreground">
                 Recorded decisions use labels such as &quot;Approved (plausible)&quot; or &quot;Approved (confirmed)&quot; only when the
-                stored decision matches <code className="text-[10px]">approved_confirmed</code>.
+                recorded decision is Approved (confirmed).
               </p>
               {approvalErr ? <p className="text-xs text-destructive">{approvalErr}</p> : null}
               <div className="grid gap-3 sm:grid-cols-2">

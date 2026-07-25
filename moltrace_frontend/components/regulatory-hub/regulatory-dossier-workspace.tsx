@@ -1920,7 +1920,7 @@ export function RegulatoryDossierWorkspace() {
       setDossier(updated)
       setStatusDraft(readRecordString(updated, "status") ?? statusDraft)
     } catch (e) {
-      setPatchErr(formatApiError(e, "PATCH failed."))
+      setPatchErr(formatApiError(e, "Could not save changes."))
     } finally {
       setPatchBusy(false)
     }
@@ -2578,7 +2578,7 @@ export function RegulatoryDossierWorkspace() {
                         </span>
                       </p>
                       <p className="text-xs">
-                        Uses missing_evidence_json from the latest risk assessment when present; otherwise requirements
+                        Uses missing evidence from the latest risk assessment when present; otherwise requirements
                         in evidence_needed.
                       </p>
                     </CardContent>
@@ -2677,7 +2677,7 @@ export function RegulatoryDossierWorkspace() {
                   <h3 className="text-sm font-semibold">Add requirement</h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="req-add-title">title</Label>
+                      <Label htmlFor="req-add-title">Title</Label>
                       <Input
                         id="req-add-title"
                         value={reqTitle}
@@ -2716,7 +2716,7 @@ export function RegulatoryDossierWorkspace() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>status</Label>
+                      <Label>Status</Label>
                       <Select value={reqStatus} onValueChange={setReqStatus}>
                         <SelectTrigger>
                           <SelectValue />
@@ -2763,10 +2763,10 @@ export function RegulatoryDossierWorkspace() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>title</TableHead>
+                          <TableHead>Title</TableHead>
                           <TableHead>category</TableHead>
                           <TableHead>priority</TableHead>
-                          <TableHead>status</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="text-right">citations count</TableHead>
                           <TableHead className="text-right">evidence links count</TableHead>
                           <TableHead className="min-w-[220px]">update status action</TableHead>
@@ -2870,7 +2870,7 @@ export function RegulatoryDossierWorkspace() {
               accent="cyan"
               eyebrow="Dossier · Evidence Links"
               title="Evidence Links"
-              description="Link analytical or reaction artefacts to dossier requirements by ID and summary — open SpectraCheck or Reaction Studio for full evidence detail without copying raw payloads here."
+              description="Link analytical or reaction artefacts to dossier requirements by ID and summary — open SpectraCheck or Reaction Studio for full evidence detail without copying raw data here."
             >
               <div className="space-y-6">
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
@@ -2923,7 +2923,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="ev-title">title</Label>
+                      <Label htmlFor="ev-title">Title</Label>
                       <Input id="ev-title" value={evTitle} onChange={(e) => setEvTitle(e.target.value)} autoComplete="off" />
                     </div>
                     <div className="space-y-2 md:col-span-2">
@@ -2938,7 +2938,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>status</Label>
+                      <Label>Status</Label>
                       <Select value={evStatus} onValueChange={setEvStatus}>
                         <SelectTrigger>
                           <SelectValue />
@@ -2974,9 +2974,9 @@ export function RegulatoryDossierWorkspace() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>evidence type</TableHead>
-                          <TableHead>title</TableHead>
+                          <TableHead>Title</TableHead>
                           <TableHead>linked requirement</TableHead>
-                          <TableHead>status</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead>resource ID</TableHead>
                           <TableHead>review status</TableHead>
                           <TableHead className="w-[120px]">open source</TableHead>
@@ -3048,8 +3048,7 @@ export function RegulatoryDossierWorkspace() {
               title="Compliance Rules"
               description={
                 <>
-                  Counts of requirement rows on this dossier by <span className="font-mono">category</span> (GET
-                  /regulatory/dossiers/{"{dossier_id}"}/requirements). For editing rows, use the Requirements tab.
+                  Counts of requirement rows on this dossier by <span className="font-mono">category</span>. For editing rows, use the Requirements tab.
                 </>
               }
             >
@@ -3086,8 +3085,7 @@ export function RegulatoryDossierWorkspace() {
               title="Active rule sets"
               description={
                 <>
-                  Tenant rule sets currently <span className="font-mono">active</span> (GET
-                  /regulatory/rule-sets?status=active). Manage them in the rule-updates workspace.
+                  Tenant rule sets currently <span className="font-mono">active</span>. Manage them in the rule-updates workspace.
                 </>
               }
             >
@@ -3099,10 +3097,10 @@ export function RegulatoryDossierWorkspace() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>name</TableHead>
-                        <TableHead>version</TableHead>
+                        <TableHead>Version</TableHead>
                         <TableHead>source</TableHead>
-                        <TableHead>jurisdiction</TableHead>
-                        <TableHead>status</TableHead>
+                        <TableHead>Jurisdiction</TableHead>
+                        <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -3297,7 +3295,7 @@ export function RegulatoryDossierWorkspace() {
                         value={impNotes}
                         onChange={(e) => setImpNotes(e.target.value)}
                         className="text-sm"
-                        placeholder="Sent as notes_json (one string when a single block is entered)."
+                        placeholder="Saved as notes (one block of text)."
                       />
                     </div>
                   </div>
@@ -3327,7 +3325,7 @@ export function RegulatoryDossierWorkspace() {
                           <TableHead>threshold triggered</TableHead>
                           <TableHead>structural assignment</TableHead>
                           <TableHead>linked evidence</TableHead>
-                          <TableHead>status</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead>warnings</TableHead>
                           <TableHead>action item</TableHead>
                           <TableHead>review status</TableHead>
@@ -3469,7 +3467,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>source evidence (metadata_json.source_evidence)</Label>
+                      <Label>Source evidence</Label>
                       <Select value={rsSourceEvidence} onValueChange={setRsSourceEvidence}>
                         <SelectTrigger>
                           <SelectValue />
@@ -3484,7 +3482,7 @@ export function RegulatoryDossierWorkspace() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>jurisdiction / rule set (metadata_json.selected_rule_set_id)</Label>
+                      <Label>Jurisdiction / rule set</Label>
                       <Select value={rsRuleSetId} onValueChange={setRsRuleSetId}>
                         <SelectTrigger>
                           <SelectValue placeholder="Optional traceability" />
@@ -3726,8 +3724,7 @@ export function RegulatoryDossierWorkspace() {
                     <>
                       Signals here are nitrosamine-related review triggers only. They indicate possible nitrosamine risk for
                       triage, not a confirmed structural finding. Do not treat results as confirmed nitrosamine unless the
-                      backend response explicitly marks confirmation (see <span className="font-mono">nitrosamine_confirmed</span>
-                      ).
+                      assessment explicitly marks it confirmed.
                     </>
                   }
                 />
@@ -3803,7 +3800,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label>impurity risk register (risk_signals_json)</Label>
+                      <Label>Impurity risk register</Label>
                       <Select value={naImpurityId} onValueChange={setNaImpurityId}>
                         <SelectTrigger>
                           <SelectValue placeholder="Optional" />
@@ -3822,8 +3819,7 @@ export function RegulatoryDossierWorkspace() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Adds a dict to <span className="font-mono">risk_signals_json</span> with{" "}
-                        <span className="font-mono">impurity_risk_register_id</span> and text fields for screening.
+                        Adds this impurity register entry to the screening signals.
                       </p>
                     </div>
                     <div className="space-y-2 md:col-span-2">
@@ -3846,13 +3842,12 @@ export function RegulatoryDossierWorkspace() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Adds <span className="font-mono">regulatory_evidence_link_id</span> and titles to{" "}
-                        <span className="font-mono">risk_signals_json</span>. Uses dossier evidence link ids (not compound
+                        Adds this evidence link and its title to the screening signals. Uses dossier evidence link ids (not compound
                         evidence links).
                       </p>
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label>rule set / jurisdiction trace (metadata_json.selected_rule_set_id)</Label>
+                      <Label>Rule set / jurisdiction trace</Label>
                       <Select value={naRuleSetId} onValueChange={setNaRuleSetId}>
                         <SelectTrigger>
                           <SelectValue placeholder="Optional" />
@@ -3871,8 +3866,7 @@ export function RegulatoryDossierWorkspace() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Matching uses active rule sets for the dossier on the server; this field is recorded in{" "}
-                        <span className="font-mono">metadata_json</span> for traceability.
+                        Matching uses active rule sets for the dossier; this field is recorded in the notes for traceability.
                       </p>
                     </div>
                   </div>
@@ -3954,7 +3948,7 @@ export function RegulatoryDossierWorkspace() {
                           <span className="font-medium text-foreground">nitrosamine_confirmed (API field): </span>
                           <span className="font-mono">{String(nitroConf)}</span>
                           <p className="mt-1 text-muted-foreground">
-                            Backend flag only; a value of false does not eliminate all possible nitrosamine risk without
+                            System flag only; a value of false does not eliminate all possible nitrosamine risk without
                             further evidence and qualified review.
                           </p>
                         </div>
@@ -3962,7 +3956,7 @@ export function RegulatoryDossierWorkspace() {
                         {metaRec && Object.keys(metaRec).length > 0 ? (
                           <div>
                             <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                              evidence source (metadata_json)
+                              Evidence source
                             </p>
                             <ul className="space-y-1 font-mono text-[11px] text-muted-foreground">
                               {Object.entries(metaRec).map(([k, v]) => (
@@ -3973,13 +3967,13 @@ export function RegulatoryDossierWorkspace() {
                             </ul>
                           </div>
                         ) : (
-                          <p className="text-xs text-muted-foreground">metadata_json: —</p>
+                          <p className="text-xs text-muted-foreground">Evidence source: —</p>
                         )}
 
                         {rsj.length ? (
                           <div>
                             <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                              risk_signals_json (returned)
+                              Risk signals (returned)
                             </p>
                             <pre className="max-h-40 overflow-auto rounded-md border bg-muted/30 p-2 text-[11px]">
                               {JSON.stringify(rsj, null, 2)}
@@ -3999,7 +3993,7 @@ export function RegulatoryDossierWorkspace() {
                         ) : null}
 
                         {matched.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No matched_rules in nitrosamine_summary_json.</p>
+                          <p className="text-sm text-muted-foreground">No matched rules in the nitrosamine summary.</p>
                         ) : (
                           <div className="table-scroll">
                             <Table>
@@ -4092,20 +4086,20 @@ export function RegulatoryDossierWorkspace() {
                   <InfoTooltip label="qNMR / Method Validation" content={QNMR_METHOD_VALIDATION_TOOLTIP} />
                 </span>
               }
-              description="qNMR compliance readiness and method validation profile — readiness states are ready for review, gaps identified, or not assessed. Do not equate with validated unless both backend outputs and a qualified reviewer explicitly support that qualification."
+              description="qNMR compliance readiness and method validation profile — readiness states are ready for review, gaps identified, or not assessed. Do not equate with validated unless both system outputs and a qualified reviewer explicitly support that qualification."
             >
               <div className="space-y-6">
                 <AlertCard
                   variant="info"
                   title="Documentation readiness signals only"
-                  description="This workspace captures documentation readiness signals only. Use “ready for review”, “gaps identified”, or “not assessed” when describing states; avoid calling a method “validated” unless both backend outputs and qualified review explicitly support that wording."
+                  description="This workspace captures documentation readiness signals only. Use “ready for review”, “gaps identified”, or “not assessed” when describing states; avoid calling a method “validated” unless both system outputs and qualified review explicitly support that wording."
                 />
 
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                   <h3 className="text-sm font-semibold">Assess method validation readiness</h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2 md:col-span-2">
-                      <Label>method_type</Label>
+                      <Label>Method type</Label>
                       <Select value={mvMethodType} onValueChange={setMvMethodType}>
                         <SelectTrigger>
                           <SelectValue />
@@ -4135,7 +4129,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mv-cal">calibration_method</Label>
+                      <Label htmlFor="mv-cal">Calibration method</Label>
                       <Input
                         id="mv-cal"
                         value={mvCalibration}
@@ -4144,7 +4138,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mv-is">internal_standard</Label>
+                      <Label htmlFor="mv-is">Internal standard</Label>
                       <Input
                         id="mv-is"
                         value={mvInternalStandard}
@@ -4173,12 +4167,11 @@ export function RegulatoryDossierWorkspace() {
                         onChange={(obj) => setMvQnmrMetaJson(jsonStringFromObject(obj))}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Optional <span className="font-mono">spectracheck_session_id</span> is added from the dossier when
-                        omitted. Use <span className="font-mono">source_hash</span> / sample identifiers per your process.
+                        The dossier's SpectraCheck session is added automatically when omitted. Add a source file hash / sample identifiers per your process.
                       </p>
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="mv-sh">linked raw file hash (metadata_json.source_hash)</Label>
+                      <Label htmlFor="mv-sh">Linked raw file hash</Label>
                       <Input
                         id="mv-sh"
                         value={mvSourceHash}
@@ -4211,8 +4204,7 @@ export function RegulatoryDossierWorkspace() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Stored under <span className="font-mono">metadata_json.regulatory_evidence_link_id</span> on the
-                        qNMR compliance POST.
+                        Stored with the qNMR compliance record.
                       </p>
                     </div>
                     <div className="space-y-2 md:col-span-2">
@@ -4229,7 +4221,7 @@ export function RegulatoryDossierWorkspace() {
                         value={mvMethodValSource}
                         onChange={(e) => setMvMethodValSource(e.target.value)}
                         autoComplete="off"
-                        placeholder="Stored as metadata_json.method_validation_source"
+                        placeholder="Stored with the method validation record"
                       />
                     </div>
                     <div className="space-y-2">
@@ -4297,7 +4289,7 @@ export function RegulatoryDossierWorkspace() {
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="space-y-3 rounded-lg border p-4">
-                    <h3 className="text-sm font-semibold">Latest qNMR compliance (GET …/qnmr-compliance)</h3>
+                    <h3 className="text-sm font-semibold">Latest qNMR compliance</h3>
                     {latestQnmrProfile ? (
                       <>
                         <div className="text-xs text-muted-foreground">
@@ -4308,14 +4300,14 @@ export function RegulatoryDossierWorkspace() {
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-muted-foreground">q2_q14_readiness_status:</span>
+                          <span className="text-xs text-muted-foreground">Q2/Q14 readiness status:</span>
                           <Badge variant="outline" className="text-xs capitalize">
                             {readinessLabel(readRecordString(latestQnmrProfile, "q2_q14_readiness_status"))}
                           </Badge>
                         </div>
                         <div>
                           <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                            missing validation items (metadata_json.missing_metadata)
+                            Missing validation items
                           </p>
                           {(() => {
                             const m = latestQnmrProfile.metadata_json
@@ -4357,7 +4349,7 @@ export function RegulatoryDossierWorkspace() {
                         </div>
                         <div>
                           <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                            recommended actions (metadata_json.action_item_ids)
+                            Recommended actions
                           </p>
                           {(() => {
                             const m = latestQnmrProfile.metadata_json
@@ -4373,7 +4365,7 @@ export function RegulatoryDossierWorkspace() {
                           })()}
                         </div>
                         <div>
-                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">citations_json</p>
+                          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Citations</p>
                           <pre className="max-h-32 overflow-auto rounded-md border bg-muted/30 p-2 text-[11px]">
                             {JSON.stringify(latestQnmrProfile.citations_json ?? [], null, 2)}
                           </pre>
@@ -4391,7 +4383,7 @@ export function RegulatoryDossierWorkspace() {
                   </div>
 
                   <div className="space-y-3 rounded-lg border p-4">
-                    <h3 className="text-sm font-semibold">Latest method validation profile (GET …/method-validation-profile)</h3>
+                    <h3 className="text-sm font-semibold">Latest method validation profile</h3>
                     {latestMethodProfile ? (
                       <>
                         <div className="text-xs text-muted-foreground">
@@ -4406,14 +4398,14 @@ export function RegulatoryDossierWorkspace() {
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-muted-foreground">validation_status:</span>
+                          <span className="text-xs text-muted-foreground">Validation status:</span>
                           <Badge variant="outline" className="text-xs capitalize">
                             {readinessLabel(readRecordString(latestMethodProfile, "validation_status"))}
                           </Badge>
                         </div>
                         <div>
                           <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                            missing validation items (metadata_json.missing_categories)
+                            Missing validation items
                           </p>
                           {(() => {
                             const m = latestMethodProfile.metadata_json
@@ -4600,7 +4592,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="ag-gs">governance_status</Label>
+                      <Label htmlFor="ag-gs">Governance status</Label>
                       <Select
                         value={agGovernanceStatus || "__unset__"}
                         onValueChange={(v) => setAgGovernanceStatus(v === "__unset__" ? "" : v)}
@@ -4609,7 +4601,7 @@ export function RegulatoryDossierWorkspace() {
                           <SelectValue placeholder="optional" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__unset__">— optional (backend default)</SelectItem>
+                          <SelectItem value="__unset__">— optional (default)</SelectItem>
                           {AI_GOVERNANCE_STATUSES.map((s) => (
                             <SelectItem key={s} value={s}>
                               {readinessLabel(s)}
@@ -4724,7 +4716,7 @@ export function RegulatoryDossierWorkspace() {
                               </div>
                               <div>
                                 <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                                  evidence_item_ids_json
+                                  Evidence items
                                 </dt>
                                 <dd className="mt-1 font-mono text-xs">
                                   {evid.length ? evid.join(", ") : "—"}
@@ -4738,7 +4730,7 @@ export function RegulatoryDossierWorkspace() {
                               </div>
                               <div>
                                 <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                                  human_review_required
+                                  Human review required
                                 </dt>
                                 <dd className="mt-1 font-mono text-xs">{hReview}</dd>
                               </div>
@@ -4901,10 +4893,8 @@ export function RegulatoryDossierWorkspace() {
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                   <h3 className="text-sm font-semibold">Build jurisdictional map</h3>
                   <p className="text-xs text-muted-foreground">
-                    Select one or more jurisdictions. The lowest numeric <span className="font-mono">jurisdiction_id</span>{" "}
-                    in the selection is sent as <span className="font-mono">jurisdiction_id</span>; the remainder populate{" "}
-                    <span className="font-mono">compare_jurisdiction_ids_json</span>. With only one selected, the server
-                    compares against the dossier baseline when configured.
+                    Select one or more jurisdictions. The lowest-numbered jurisdiction in the selection is the primary;
+                    the remainder are compared against it. With only one selected, the map compares against the dossier baseline when configured.
                   </p>
 
                   <div className="space-y-2">
@@ -4957,7 +4947,7 @@ export function RegulatoryDossierWorkspace() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="jm-ruleset">rule_set_id</Label>
+                    <Label htmlFor="jm-ruleset">Rule set</Label>
                     <Select value={jmRuleSetId} onValueChange={setJmRuleSetId}>
                       <SelectTrigger id="jm-ruleset">
                         <SelectValue placeholder="Optional" />
@@ -4985,7 +4975,7 @@ export function RegulatoryDossierWorkspace() {
                         onCheckedChange={setJmIncNitrosamine}
                       />
                       <Label htmlFor="jm-nitro" className="cursor-pointer font-mono text-xs">
-                        include_nitrosamine_rules (metadata_json)
+                        Include nitrosamine rules
                       </Label>
                     </div>
                     <div className="flex items-center gap-2">
@@ -4995,7 +4985,7 @@ export function RegulatoryDossierWorkspace() {
                         onCheckedChange={setJmIncResidual}
                       />
                       <Label htmlFor="jm-res" className="cursor-pointer font-mono text-xs">
-                        include_residual_solvent_rules (metadata_json)
+                        Include residual solvent rules
                       </Label>
                     </div>
                     <div className="flex items-center gap-2">
@@ -5005,7 +4995,7 @@ export function RegulatoryDossierWorkspace() {
                         onCheckedChange={setJmIncQnmr}
                       />
                       <Label htmlFor="jm-qnmr" className="cursor-pointer font-mono text-xs">
-                        include_qnmr_method_validation_rules (metadata_json)
+                        Include qNMR method validation rules
                       </Label>
                     </div>
                     <div className="flex items-center gap-2">
@@ -5015,7 +5005,7 @@ export function RegulatoryDossierWorkspace() {
                         onCheckedChange={setJmIncAiGov}
                       />
                       <Label htmlFor="jm-ai" className="cursor-pointer font-mono text-xs">
-                        include_ai_governance_rules (metadata_json)
+                        Include AI governance rules
                       </Label>
                     </div>
                   </div>
@@ -5115,7 +5105,7 @@ export function RegulatoryDossierWorkspace() {
 
                             <div>
                               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                                requirement_summary_json
+                                Requirement summary
                               </p>
                               <div className="mt-2">
                                 <DeveloperJsonPanel data={reqSummary && typeof reqSummary === "object" ? reqSummary : {}} />
@@ -5167,7 +5157,7 @@ export function RegulatoryDossierWorkspace() {
 
                             <Collapsible className="rounded-md border bg-muted/15">
                               <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-medium hover:bg-muted/40">
-                                metadata_json
+                                Details
                                 <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
                               </CollapsibleTrigger>
                               <CollapsibleContent className="border-t px-3 pb-3 pt-2">
@@ -5256,7 +5246,7 @@ export function RegulatoryDossierWorkspace() {
                 {!changeImpactErr && changeImpact ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                      human_review_required
+                      Human review required
                     </span>
                     <Badge
                       variant="outline"
@@ -5287,8 +5277,8 @@ export function RegulatoryDossierWorkspace() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>change_event_id</TableHead>
-                            <TableHead>title</TableHead>
-                            <TableHead>review_status</TableHead>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Review status</TableHead>
                             <TableHead className="w-[130px]">open change button</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -5473,7 +5463,7 @@ export function RegulatoryDossierWorkspace() {
               accent="cyan"
               eyebrow="Dossier · Cited Q&A"
               title="Cited Q&A"
-              description="Cited regulatory Q&A — questions are answered by the backend using source-referenced guidance; responses are not synthesized in the browser. This is not legal advice."
+              description="Cited regulatory Q&A — questions are answered by the app using source-referenced guidance; responses are not synthesized in the browser. This is not legal advice."
             >
               <div className="space-y-4">
                 <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -5510,7 +5500,7 @@ export function RegulatoryDossierWorkspace() {
                   <Label>source scope selector optional</Label>
                   <Select value={qaSourceScope || "none"} onValueChange={(v) => setQaSourceScope(v === "none" ? "" : v)}>
                     <SelectTrigger className="max-w-md">
-                      <SelectValue placeholder="No explicit scope in metadata_json" />
+                      <SelectValue placeholder="No explicit scope" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No explicit scope</SelectItem>
@@ -5522,8 +5512,7 @@ export function RegulatoryDossierWorkspace() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    When set, stored under <span className="font-mono">metadata_json.source_scope</span> on the query
-                    request body.
+                    When set, saved with the query.
                   </p>
                 </div>
                 {qaErr ? (
@@ -5650,7 +5639,7 @@ export function RegulatoryDossierWorkspace() {
                       )}
 
                       <div>
-                        <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">missing_sources_json</p>
+                        <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Missing sources</p>
                         {Array.isArray((queryResult.answer as Record<string, unknown>).missing_sources_json) &&
                         ((queryResult.answer as Record<string, unknown>).missing_sources_json as unknown[]).length >
                           0 ? (
@@ -5990,7 +5979,7 @@ export function RegulatoryDossierWorkspace() {
                             <TableHead>id</TableHead>
                             <TableHead>decision</TableHead>
                             <TableHead>reviewer_name</TableHead>
-                            <TableHead>created_at</TableHead>
+                            <TableHead>Created</TableHead>
                             <TableHead>rationale (truncated)</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -6222,7 +6211,7 @@ export function RegulatoryDossierWorkspace() {
                               ))}
                             </div>
                           ) : (
-                            <p className="text-xs text-muted-foreground">No download URLs returned in metadata_json.</p>
+                            <p className="text-xs text-muted-foreground">No download URLs available.</p>
                           )}
                         </div>
                       )
@@ -6265,7 +6254,7 @@ export function RegulatoryDossierWorkspace() {
               </p>
               <h2 className="font-mono text-xl font-bold tracking-tight">Assemble draft submission artefacts</h2>
               <p className="text-sm text-muted-foreground">
-                Source-backed artefacts staged for review. Package status is backend-driven — treat as ready only when the status field explicitly says so.
+                Source-backed artefacts staged for review. Package status is system-driven — treat as ready only when the status field explicitly says so.
               </p>
             </div>
             <ModuleCard
@@ -6274,7 +6263,7 @@ export function RegulatoryDossierWorkspace() {
               title="Submission Package Builder"
               description={
                 <>
-                  Assemble a draft regulatory submission package with source-backed artefacts. Package status is backend-driven — treat as{" "}
+                  Assemble a draft regulatory submission package with source-backed artefacts. Package status is system-driven — treat as{" "}
                   <span className="font-medium text-foreground">ready for review</span> only when the status field explicitly indicates it.
                 </>
               }
@@ -6285,7 +6274,7 @@ export function RegulatoryDossierWorkspace() {
                   description={
                     <>
                       Build a <span className="font-medium text-foreground">draft package</span> with source-backed artifacts.
-                      Package status is backend-driven; treat outputs as <span className="font-medium text-foreground">ready for review</span> or{" "}
+                      Package status is system-driven; treat outputs as <span className="font-medium text-foreground">ready for review</span> or{" "}
                       <span className="font-medium text-foreground">exported package</span> only when status fields explicitly say so.
                     </>
                   }

@@ -334,10 +334,10 @@ export function RegulatoryRuleUpdatesWorkspace() {
               <Label htmlFor="rup-change-id">source change</Label>
               <Select value={createChangeId || "__none__"} onValueChange={(v) => setCreateChangeId(v === "__none__" ? "" : v)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select change_id" />
+                  <SelectValue placeholder="Select a change" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Select change_id</SelectItem>
+                  <SelectItem value="__none__">Select a change</SelectItem>
                   {changes.map((row, idx) => {
                     const id = readRecordNumber(row, "id")
                     if (id == null) return null
@@ -385,7 +385,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
                 id="rup-rule-set"
                 value={createRuleSetId}
                 onChange={(e) => setCreateRuleSetId(e.target.value)}
-                placeholder="rule_set_id"
+                placeholder="Rule set ID"
                 autoComplete="off"
               />
             </div>
@@ -442,7 +442,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
                   <TableHead>status</TableHead>
                   <TableHead>reviewer</TableHead>
                   <TableHead>updated date</TableHead>
-                  <TableHead>open button</TableHead>
+                  <TableHead>Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -529,12 +529,12 @@ export function RegulatoryRuleUpdatesWorkspace() {
                 <p className="font-medium">{readRecordString(selectedProposal, "title") ?? "—"}</p>
                 <p className="text-muted-foreground">{readRecordString(selectedProposal, "rationale") ?? "—"}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  status {readRecordString(selectedProposal, "status") ?? "—"} · proposal_id{" "}
+                  status {readRecordString(selectedProposal, "status") ?? "—"} · Proposal ID{" "}
                   {readRecordNumber(selectedProposal, "id") ?? "—"}
                 </p>
                 {readRecordString(selectedProposal, "status") === "applied" ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Backend returned applied status. This page displays status only and does not apply updates from the frontend.
+                    This proposal is marked as applied. This page displays status only and does not apply updates itself.
                   </p>
                 ) : null}
               </div>

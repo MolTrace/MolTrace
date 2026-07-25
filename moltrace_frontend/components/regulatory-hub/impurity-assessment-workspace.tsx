@@ -262,7 +262,7 @@ export function ImpurityAssessmentWorkspace() {
       setResult(data)
       setActiveTab("thresholds")
     } catch (err) {
-      setError(formatApiError(err, "Impurity assessment failed."))
+      setError(formatApiError(err, "Could not run the impurity assessment."))
     } finally {
       setSubmitting(false)
     }
@@ -601,7 +601,7 @@ export function ImpurityAssessmentWorkspace() {
               Assess
             </Button>
             <span className="text-xs text-muted-foreground">
-              Sends one request to all five engines; unknown items are reported as non-blocking notices.
+              Runs all five engines in one pass; unknown items are reported as non-blocking notices.
             </span>
           </div>
         </div>
@@ -719,7 +719,7 @@ export function ImpurityAssessmentWorkspace() {
                             {el.route_data_available ? (
                               num(el.permitted_concentration_ppm)
                             ) : (
-                              <span className="text-xs text-muted-foreground">cutaneous PDE not encoded</span>
+                              <span className="text-xs text-muted-foreground">cutaneous PDE not available</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">{num(el.control_threshold_ppm)}</TableCell>
@@ -833,7 +833,7 @@ export function ImpurityAssessmentWorkspace() {
                     <Info className="h-3.5 w-3.5" aria-hidden />
                     Audit · rule-set versions
                   </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+                  <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=Open]:rotate-180" aria-hidden />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <dl className="grid gap-2 border-t p-3 text-xs sm:grid-cols-2">

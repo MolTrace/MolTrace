@@ -182,7 +182,7 @@ function LcmsAdvGroupingDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">RT shift summary</CardTitle>
-            <CardDescription>Per-run alignment summaries from the response payload.</CardDescription>
+            <CardDescription>Per-run alignment summaries.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -261,7 +261,7 @@ function LcmsAdvGroupingDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Grouped feature table (text)</CardTitle>
-            <CardDescription>Server-exported <code className="text-xs">feature_table_text</code>.</CardDescription>
+            <CardDescription>Exported by the app <code className="text-xs">feature_table_text</code>.</CardDescription>
           </CardHeader>
           <CardContent>
             <pre className="max-h-[320px] overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-xs">{ft}</pre>
@@ -466,7 +466,7 @@ function LcmsAdvDereplicationDetailTables({ result }: { result: unknown }) {
             <div>
               <span className="text-muted-foreground">Spectral / consensus shape</span>
               <p className="text-xs text-muted-foreground">
-                Rank uses LC-MS consensus bridge scoring on this endpoint—not a full spectral library match unless your
+                Rank uses LC-MS consensus bridge scoring here—not a full spectral library match unless your
                 upstream evidence included MS/MS similarity fields in metadata.
               </p>
             </div>
@@ -517,7 +517,7 @@ function LcmsAdvDereplicationDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Provenance</CardTitle>
-            <CardDescription>Subset of <code className="text-xs">metadata</code> from the response.</CardDescription>
+            <CardDescription>Subset of <code className="text-xs">metadata</code> for this run.</CardDescription>
           </CardHeader>
           <CardContent>
             <pre className="max-h-[200px] overflow-auto rounded-md border bg-muted/30 p-3 text-xs">
@@ -533,7 +533,7 @@ function LcmsAdvDereplicationDetailTables({ result }: { result: unknown }) {
           <CardDescription>Use bridge / unified confidence workflows downstream with the same candidate lines and hashes.</CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Candidate rows submitted here are parsed server-side; reuse them when linking LC-MS layers into unified scoring.
+          Candidate rows submitted here are parsed automatically; reuse them when linking LC-MS layers into unified scoring.
         </CardContent>
       </Card>
 
@@ -682,7 +682,7 @@ function HrmsMatchDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Candidate metrics</CardTitle>
-            <CardDescription>Theoretical m/z, ppm error, score, and DBE/IHD from the backend payload.</CardDescription>
+            <CardDescription>Theoretical m/z, ppm error, score, and DBE/IHD.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -745,7 +745,7 @@ function AdductInferenceDetailTables({ result }: { result: unknown }) {
       <Card className="min-w-0">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Inferred metrics</CardTitle>
-          <CardDescription>Primary m/z, charge state, and isotope ratios from the response payload.</CardDescription>
+          <CardDescription>Primary m/z, charge state, and isotope ratios.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="text-sm">
@@ -1398,7 +1398,7 @@ function LcmsImportBridgeDetailTables({ result }: { result: unknown }) {
       <Card className="min-w-0">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Import summary</CardTitle>
-          <CardDescription>Hashed file metadata and scan counts from the bridge response.</CardDescription>
+          <CardDescription>Hashed file metadata and scan counts from the import.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
           <div>
@@ -1470,7 +1470,7 @@ function LcmsImportBridgeDetailTables({ result }: { result: unknown }) {
       <Card className="min-w-0">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Selected MS/MS</CardTitle>
-          <CardDescription>Backend-selected scan when applicable.</CardDescription>
+          <CardDescription>Automatically selected scan when applicable.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p>
@@ -1595,12 +1595,12 @@ function LcmsFeatureDetectionDetailTables({ result }: { result: unknown }) {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">XIC / EIC preview</CardTitle>
           <CardDescription>
-            Placeholder for extracted-ion chromatograms ({xicN} trace points in payload). Plotting integration can replace
+            Placeholder for extracted-ion chromatograms ({xicN} trace points available). Plotting integration can replace
             this panel later.
           </CardDescription>
         </CardHeader>
         <CardContent className="rounded-md border border-dashed bg-muted/30 py-8 text-center text-sm text-muted-foreground">
-          Interactive trace preview not loaded — data available in developer JSON and backend tables.
+          Interactive trace preview not loaded — data available in the developer JSON view.
         </CardContent>
       </Card>
 
@@ -1684,7 +1684,7 @@ function FormulaSearchDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Formula table</CardTitle>
-            <CardDescription>Exact mass, DBE/IHD, and isotope predictions from the backend.</CardDescription>
+            <CardDescription>Exact mass, DBE/IHD, and isotope predictions.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -2821,7 +2821,7 @@ export function SpectraCheckMsEvidence({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                  POST /ms/hrms/candidates/match/evidence
+                  Runs the HRMS candidate match.
                 </TooltipContent>
               </Tooltip>
             </ModuleCard>
@@ -2837,7 +2837,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="HRMS · Step 3 · Results"
               fullscreenLabel="HRMS"
               title="HRMS candidate match output"
-              description="Per-candidate exact-mass evidence + detail tables from /ms/hrms/candidates/match/evidence."
+              description="Per-candidate exact-mass evidence + detail tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -2972,7 +2972,7 @@ export function SpectraCheckMsEvidence({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                  POST /ms/hrms/formulas/search
+                  Runs the formula search.
                 </TooltipContent>
               </Tooltip>
             </ModuleCard>
@@ -2988,7 +2988,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="Formula · Step 3 · Results"
               fullscreenLabel="Formula"
               title="Formula search output"
-              description="Candidate formulas + detail tables from /ms/hrms/formulas/search."
+              description="Candidate formulas + detail tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -3174,7 +3174,7 @@ export function SpectraCheckMsEvidence({
                     </button>
                   </TooltipTrigger>
                   <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                    POST /ms/adducts/infer/evidence
+                    Runs adduct and isotope inference.
                   </TooltipContent>
                 </Tooltip>
                 {adductResult != null && (
@@ -3210,7 +3210,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="Adduct · Step 3 · Results"
               fullscreenLabel="Adduct"
               title="Adduct + isotope inference output"
-              description="Per-adduct hypotheses, charge state, halogen signature, and detail tables from /ms/adducts/infer/evidence."
+              description="Per-adduct hypotheses, charge state, halogen signature, and detail tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -3287,7 +3287,7 @@ export function SpectraCheckMsEvidence({
                       ))}
                   </select>
                   {msmsSessionFileId ? (
-                    <p className="break-all font-mono text-xs text-muted-foreground">file_id: {msmsSessionFileId}</p>
+                    <p className="break-all font-mono text-xs text-muted-foreground">File ID: {msmsSessionFileId}</p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
                       Traceability only — paste peak list below or use LC-MS tabs for file-based jobs.
@@ -3398,7 +3398,7 @@ export function SpectraCheckMsEvidence({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                  POST /ms/msms/annotate/evidence
+                  Runs the MS/MS annotation.
                 </TooltipContent>
               </Tooltip>
             </ModuleCard>
@@ -3414,7 +3414,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="MS/MS · Step 3 · Results"
               fullscreenLabel="MS/MS"
               title="MS/MS annotation output"
-              description="Per-fragment annotations + detail tables from /ms/msms/annotate/evidence."
+              description="Per-fragment annotations + detail tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -3576,7 +3576,7 @@ export function SpectraCheckMsEvidence({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                  POST /ms/msms/fragmentation-tree/evidence
+                  Builds the fragmentation-tree evidence.
                 </TooltipContent>
               </Tooltip>
             </ModuleCard>
@@ -3592,7 +3592,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="Frag Tree · Step 3 · Results"
               fullscreenLabel="Frag Tree"
               title="Fragmentation tree output"
-              description="Tree node detail + diagnostic-loss tables from /ms/msms/fragmentation-tree/evidence."
+              description="Tree node detail + diagnostic-loss tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -3631,7 +3631,7 @@ export function SpectraCheckMsEvidence({
               />
             </h3>
             <p className="text-sm text-muted-foreground">
-              Import mzML/mzXML or a processed peak table — server parses scans, computes hashes, and extracts MS1/MS2 peak lists.
+              Import mzML/mzXML or a processed peak table — the app parses scans, computes hashes, and extracts MS1/MS2 peak lists.
             </p>
           </div>
 
@@ -3678,7 +3678,7 @@ export function SpectraCheckMsEvidence({
                   <Input
                     value={lcmsImportSourceLabel}
                     onChange={(e) => setLcmsImportSourceLabel(e.target.value)}
-                    placeholder="Optional — sent as sample_id when set; otherwise session sample ID is used"
+                    placeholder="Optional — used as the sample ID when set; otherwise the session sample ID is used"
                   />
                 </label>
                 <label className="block space-y-2">
@@ -3699,7 +3699,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="LC-MS Import · Step 2 · Run"
               title="Import LC-MS/MS"
               icon={Zap}
-              description="Upload LC-MS data for server-side parsing and peak extraction. Use the long-running job if the file is large."
+              description="Upload LC-MS data for automatic parsing and peak extraction. Use the long-running job if the file is large."
               className="min-w-0"
             >
               <div className="space-y-4">
@@ -3734,18 +3734,18 @@ export function SpectraCheckMsEvidence({
                         {lcmsImportLoading ? "Importing LC-MS/MS…" : "Import LC-MS/MS"}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        Server-side parse: source hashes, scan summary, MS1/MS2 peak lists.
+                        Parses source hashes, scan summary, and MS1/MS2 peak lists.
                       </span>
                     </button>
                   </TooltipTrigger>
                   <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                    POST /ms/lcms/import/bridge/upload
+                    Imports the LC-MS/MS file.
                   </TooltipContent>
                 </Tooltip>
                 <div className="space-y-2 border-t pt-4">
                   <p className="text-xs font-medium text-muted-foreground">Long-running analysis job</p>
                   <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void startLcmsImportJob()}>
-                    Start as job (lcms_import)
+                    Start as job (LC-MS import)
                   </Button>
                   {lcmsImportJobErr ? (
                     <p className="text-sm" style={{ color: "var(--mt-red)" }}>{lcmsImportJobErr}</p>
@@ -3800,7 +3800,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="LC-MS Import · Step 3 · Results"
               fullscreenLabel="LC-MS Import"
               title="LC-MS import bridge output"
-              description="Source hashes, scan summary, MS1/MS2 peak lists from /ms/lcms/import/bridge/upload."
+              description="Source hashes, scan summary, MS1/MS2 peak lists."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -3975,7 +3975,7 @@ export function SpectraCheckMsEvidence({
                     </button>
                   </TooltipTrigger>
                   <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                    POST /ms/lcms/features/detect/upload
+                    Runs LC-MS feature detection.
                   </TooltipContent>
                 </Tooltip>
                 <div className="space-y-2 border-t pt-4">
@@ -3986,7 +3986,7 @@ export function SpectraCheckMsEvidence({
                     className="w-full sm:w-auto"
                     onClick={() => void startLcmsFeatureDetectionJob()}
                   >
-                    Start as job (lcms_feature_detection)
+                    Start as job (LC-MS feature detection)
                   </Button>
                   {lcmsFeatureJobErr ? (
                     <p className="text-sm" style={{ color: "var(--mt-red)" }}>{lcmsFeatureJobErr}</p>
@@ -4014,7 +4014,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="LC-MS Features · Step 3 · Results"
               fullscreenLabel="LC-MS Features"
               title="LC-MS feature detection output"
-              description="Per-feature evidence + EIC/XIC + purity + detail tables from /ms/lcms/features/detect/upload."
+              description="Per-feature evidence + EIC/XIC + purity + detail tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -4186,7 +4186,7 @@ export function SpectraCheckMsEvidence({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                  POST /ms/lcms/features/group/evidence
+                  Runs LC-MS feature grouping.
                 </TooltipContent>
               </Tooltip>
             </ModuleCard>
@@ -4202,7 +4202,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="LC-MS Grouping · Step 3 · Results"
               fullscreenLabel="LC-MS Grouping"
               title="LC-MS grouping output"
-              description="Per-group evidence + detail tables from /ms/lcms/features/group/evidence."
+              description="Per-group evidence + detail tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -4267,7 +4267,7 @@ export function SpectraCheckMsEvidence({
                     value={lcmsConFeatTable}
                     onChange={(e) => setLcmsConFeatTable(e.target.value)}
                     rows={6}
-                    placeholder="Paste feature_table_text from grouping or detection exports"
+                    placeholder="Paste the grouped feature-table text from grouping or detection exports"
                   />
                 </label>
                 <div className="space-y-2">
@@ -4377,7 +4377,7 @@ export function SpectraCheckMsEvidence({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                  POST /ms/lcms/features/consensus/evidence
+                  Runs the feature-family consensus scoring.
                 </TooltipContent>
               </Tooltip>
             </ModuleCard>
@@ -4393,7 +4393,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="LC-MS Consensus · Step 3 · Results"
               fullscreenLabel="LC-MS Consensus"
               title="Feature-family consensus output"
-              description="Per-family confidence + detail tables from /ms/lcms/features/consensus/evidence."
+              description="Per-family confidence + detail tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -4545,7 +4545,7 @@ export function SpectraCheckMsEvidence({
                     onCheckedChange={(v) => setLcmsDerReqPromoted(v === true)}
                   />
                   <Label htmlFor="lcms-der-req" className="text-sm font-normal">
-                    Use feature-family consensus (require_promoted_family)
+                    Use feature-family consensus
                   </Label>
                 </div>
               </div>
@@ -4596,7 +4596,7 @@ export function SpectraCheckMsEvidence({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                  POST /ms/lcms/dereplication/evidence
+                  Runs the LC-MS dereplication.
                 </TooltipContent>
               </Tooltip>
             </ModuleCard>
@@ -4612,7 +4612,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="LC-MS Derep · Step 3 · Results"
               fullscreenLabel="LC-MS Derep"
               title="LC-MS dereplication output"
-              description="Per-candidate ranks + detail tables from /ms/lcms/dereplication/evidence."
+              description="Per-candidate ranks + detail tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">
@@ -4700,7 +4700,7 @@ export function SpectraCheckMsEvidence({
                     <Input value={lcmsBridgeMzDa} onChange={(e) => setLcmsBridgeMzDa(e.target.value)} inputMode="decimal" />
                   </label>
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium">Bridge threshold (min_family_consensus_score)</span>
+                    <span className="text-sm font-medium">Bridge threshold</span>
                     <Input value={lcmsBridgeMinFam} onChange={(e) => setLcmsBridgeMinFam(e.target.value)} inputMode="decimal" />
                   </label>
                   <label className="block space-y-2">
@@ -4717,7 +4717,7 @@ export function SpectraCheckMsEvidence({
                     value={lcmsBridgeFamilyTable}
                     onChange={(e) => setLcmsBridgeFamilyTable(e.target.value)}
                     rows={5}
-                    placeholder="Week 38 family_table_text CSV — optional if consensus was run in-panel"
+                    placeholder="Week 38 family-table CSV — optional if consensus was run in-panel"
                   />
                 </label>
                 {lcmsConResult != null && (
@@ -4732,7 +4732,7 @@ export function SpectraCheckMsEvidence({
                     onCheckedChange={(v) => setLcmsBridgeReqPromoted(v === true)}
                   />
                   <Label htmlFor="lcms-br-req" className="text-sm font-normal">
-                    Require promoted families (require_promoted_family)
+                    Require promoted families
                   </Label>
                 </div>
               </div>
@@ -4783,7 +4783,7 @@ export function SpectraCheckMsEvidence({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                  POST /confidence/candidates/lcms-consensus-bridge
+                  Bridges LC-MS consensus into unified confidence.
                 </TooltipContent>
               </Tooltip>
             </ModuleCard>
@@ -4799,7 +4799,7 @@ export function SpectraCheckMsEvidence({
               eyebrow="LC-MS Bridge · Step 3 · Results"
               fullscreenLabel="LC-MS Bridge"
               title="LC-MS confidence bridge output"
-              description="Per-candidate consensus anchors + detail tables from /confidence/candidates/lcms-consensus-bridge."
+              description="Per-candidate consensus anchors + detail tables."
               tag={sampleId.trim() || undefined}
             >
               <div className="space-y-6">

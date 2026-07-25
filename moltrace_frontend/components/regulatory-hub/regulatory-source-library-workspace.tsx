@@ -193,7 +193,7 @@ export function RegulatorySourceLibraryWorkspace() {
       return
     }
     if (!uploadFile || uploadFile.size === 0) {
-      setUploadErr("The upload API requires a non-empty file.")
+      setUploadErr("Please choose a non-empty file to upload.")
       return
     }
     setUploadBusy(true)
@@ -264,7 +264,7 @@ export function RegulatorySourceLibraryWorkspace() {
   const selectedSourceTitle = useMemo(() => {
     if (selectedSourceId == null) return ""
     const row = sources.find((s) => readRecordNumber(s, "id") === selectedSourceId)
-    return readRecordString(row ?? null, "title") ?? `source_id ${selectedSourceId}`
+    return readRecordString(row ?? null, "title") ?? `Source ${selectedSourceId}`
   }, [selectedSourceId, sources])
 
   function renderCitationCard(c: Record<string, unknown>, key: string | number) {
@@ -282,7 +282,7 @@ export function RegulatorySourceLibraryWorkspace() {
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p className="text-xs text-muted-foreground">
-            page_number / paragraph_number:{" "}
+            Page / paragraph:{" "}
             <span className="font-mono text-foreground">
               {page != null ? page : "—"} / {para != null ? para : "—"}
             </span>
@@ -392,15 +392,14 @@ export function RegulatorySourceLibraryWorkspace() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Source Library</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Register documents, list catalog entries, search indexed sources, and inspect citations returned by the
-          service only.
+          Register documents, list catalog entries, search indexed sources, and inspect citations from the library.
         </p>
       </header>
 
       <AlertCard
         variant="warning"
         title="Important"
-        description="Citations and excerpts are shown exactly as returned by the backend. Do not treat search or excerpt text as final regulatory authority without controlled sources and qualified review."
+        description="Citations and excerpts are shown exactly as stored. Do not treat search or excerpt text as final regulatory authority without controlled sources and qualified review."
       />
 
       {/* 1. Upload */}
@@ -414,7 +413,7 @@ export function RegulatorySourceLibraryWorkspace() {
         >
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              The server rejects empty files. Choose a non-empty file, or skip registration until a file is available.
+              Empty files are not accepted. Choose a non-empty file, or skip registration until a file is available.
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
@@ -442,7 +441,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>jurisdiction selector optional</Label>
+                <Label>Jurisdiction (optional)</Label>
                 <Select value={uploadJurisdictionId || "none"} onValueChange={(v) => setUploadJurisdictionId(v === "none" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Not specified" />
@@ -664,7 +663,7 @@ export function RegulatorySourceLibraryWorkspace() {
                       <TableHead>source date</TableHead>
                       <TableHead>SHA-256</TableHead>
                       <TableHead>status</TableHead>
-                      <TableHead className="w-[90px]">open button</TableHead>
+                      <TableHead className="w-[90px]">Open</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -740,7 +739,7 @@ export function RegulatorySourceLibraryWorkspace() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>jurisdiction_id optional</Label>
+                <Label>Jurisdiction (optional)</Label>
                 <Select value={searchJurisdictionId || "none"} onValueChange={(v) => setSearchJurisdictionId(v === "none" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Any" />
@@ -756,7 +755,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>source_type optional</Label>
+                <Label>Source type (optional)</Label>
                 <Select value={searchSourceType || "none"} onValueChange={(v) => setSearchSourceType(v === "none" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Any" />
@@ -780,7 +779,7 @@ export function RegulatorySourceLibraryWorkspace() {
 
             {searchResult ? (
               <div className="space-y-4 border-t pt-4">
-                <p className="text-xs font-medium uppercase text-muted-foreground">Search response</p>
+                <p className="text-xs font-medium uppercase text-muted-foreground">Search results</p>
                 {Array.isArray(searchResult.warnings) && searchResult.warnings.length > 0 ? (
                   <ul className="list-inside list-disc text-xs text-muted-foreground">
                     {(searchResult.warnings as unknown[]).filter((w) => typeof w === "string").map((w, i) => (
@@ -846,7 +845,7 @@ export function RegulatorySourceLibraryWorkspace() {
               <>
                 <p className="text-sm font-medium">
                   Selected: <span className="text-muted-foreground">{selectedSourceTitle}</span>{" "}
-                  <span className="font-mono text-xs">source_id {selectedSourceId}</span>
+                  <span className="font-mono text-xs">Source ID {selectedSourceId}</span>
                 </p>
                 {citationsErr ? (
                   <AlertCard variant="error" title="Citation error" description={citationsErr} />

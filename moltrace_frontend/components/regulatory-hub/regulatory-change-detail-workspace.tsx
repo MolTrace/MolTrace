@@ -297,7 +297,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       <AlertCard
         variant="warning"
         title="Requires qualified review"
-        description="This page shows source change detected and possible impact summaries from backend records. It is not legal advice."
+        description="This page shows source change detected and possible impact summaries from stored records. It is not legal advice."
       />
 
       {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
@@ -315,14 +315,14 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
           <p className="font-medium">{readRecordString(change, "title") ?? "—"}</p>
           <p className="text-muted-foreground">{readRecordString(change, "summary") ?? "—"}</p>
           <div className="flex flex-wrap gap-2 text-xs">
-            <Badge variant="outline">change_id {changeId}</Badge>
-            <Badge variant="outline">change_type {readRecordString(change, "change_type") ?? "—"}</Badge>
+            <Badge variant="outline">Change ID {changeId}</Badge>
+            <Badge variant="outline">Change type {readRecordString(change, "change_type") ?? "—"}</Badge>
             <Badge variant="outline">severity {readRecordString(change, "severity") ?? "—"}</Badge>
-            <Badge variant="outline">review_status {readRecordString(change, "review_status") ?? "—"}</Badge>
-            <Badge variant="outline">source_id {readRecordNumber(change, "source_id") ?? "—"}</Badge>
+            <Badge variant="outline">Review status {readRecordString(change, "review_status") ?? "—"}</Badge>
+            <Badge variant="outline">Source ID {readRecordNumber(change, "source_id") ?? "—"}</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            created_at {formatWhen(readRecordString(change, "created_at") ?? undefined)}
+            Created {formatWhen(readRecordString(change, "created_at") ?? undefined)}
           </p>
         </div>
       </ModuleCard>
@@ -338,7 +338,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
         <div className="grid gap-4 md:grid-cols-2">
           <ModuleCard accent="cyan" eyebrow="Old" title="Old version" icon={FileText}>
             <div className="space-y-1 text-xs">
-              <p className="font-mono">old_version_id {readRecordNumber(change, "old_version_id") ?? "—"}</p>
+              <p className="font-mono">Old version ID {readRecordNumber(change, "old_version_id") ?? "—"}</p>
               <p>version label: {readRecordString(oldVersion, "version_label") ?? "—"}</p>
               <p>source date: {formatWhen(readRecordString(oldVersion, "source_date") ?? undefined)}</p>
               <p>retrieved date: {formatWhen(readRecordString(oldVersion, "retrieved_at") ?? undefined)}</p>
@@ -351,7 +351,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
           </ModuleCard>
           <ModuleCard accent="cyan" eyebrow="New" title="New version" icon={FileText}>
             <div className="space-y-1 text-xs">
-              <p className="font-mono">new_version_id {readRecordNumber(change, "new_version_id") ?? "—"}</p>
+              <p className="font-mono">New version ID {readRecordNumber(change, "new_version_id") ?? "—"}</p>
               <p>version label: {readRecordString(newVersion, "version_label") ?? "—"}</p>
               <p>source date: {formatWhen(readRecordString(newVersion, "source_date") ?? undefined)}</p>
               <p>retrieved date: {formatWhen(readRecordString(newVersion, "retrieved_at") ?? undefined)}</p>
@@ -371,7 +371,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
         eyebrow="Diff"
         title="Diff excerpts"
         icon={ScrollText}
-        description="Structured diff rows from the change payload."
+        description="Structured diff rows from the change record."
       >
         <div className="space-y-3">
           {diffs.length === 0 ? (
@@ -382,7 +382,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                 key={readRecordNumber(row, "id") ?? idx}
                 accent="cyan"
                 eyebrow="Diff"
-                title={`diff_type ${readRecordString(row, "diff_type") ?? "—"} · id ${readRecordNumber(row, "id") ?? "—"}`}
+                title={`Diff type ${readRecordString(row, "diff_type") ?? "—"} · ID ${readRecordNumber(row, "id") ?? "—"}`}
                 icon={ScrollText}
               >
                 <div className="grid gap-4 md:grid-cols-2">
@@ -595,7 +595,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                           <p className="font-medium">{readRecordString(act, "title") ?? "—"}</p>
                           <p className="text-muted-foreground">{readRecordString(act, "description") ?? "—"}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            action_type {readRecordString(act, "action_type") ?? "—"}
+                            Action type {readRecordString(act, "action_type") ?? "—"}
                           </p>
                         </CardContent>
                       </Card>
@@ -646,7 +646,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                           <TableHead>affected requirements</TableHead>
                           <TableHead>open action items</TableHead>
                           <TableHead>recommended action</TableHead>
-                          <TableHead>open dossier button</TableHead>
+                          <TableHead>Open dossier</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -720,7 +720,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                   <SelectItem value="accepted">accepted</SelectItem>
                   <SelectItem value="rejected">rejected</SelectItem>
                   <SelectItem value="deferred">deferred</SelectItem>
-                  <SelectItem value="in_review">in_review</SelectItem>
+                  <SelectItem value="in_review">In review</SelectItem>
                 </SelectContent>
               </Select>
             </div>

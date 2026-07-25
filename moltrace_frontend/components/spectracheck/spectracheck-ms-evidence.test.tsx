@@ -478,7 +478,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
     await user.click(screen.getByRole("tab", { name: "LC-MS consensus" }))
-    await user.type(await screen.findByPlaceholderText(/Paste feature_table_text from grouping/), "group_id\nx\n")
+    await user.type(await screen.findByPlaceholderText(/Paste the grouped feature-table text from grouping/), "group_id\nx\n")
     await user.click(screen.getByRole("button", { name: "Score feature-family consensus" }))
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled())
     expect(await screen.findByText("Promoted feature family table")).toBeInTheDocument()

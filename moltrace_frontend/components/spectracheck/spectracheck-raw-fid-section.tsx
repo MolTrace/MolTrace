@@ -918,7 +918,7 @@ export function SpectraCheckRawFidSection({
   const resultTitle = resultsMode === "process" ? "Processed FID output" : "Raw archive metadata"
   const resultDescription =
     resultsMode === "process"
-      ? "Spectrum, processing parameters, and acquisition metadata from /nmr/raw-fid/process."
+      ? "Spectrum, processing parameters, and acquisition metadata from the processed FID."
       : "Archive metadata, vendor, SHA-256 hash, and an automatic quick spectrum from Preview."
 
   // Memoise xy extraction against the source result. Without this the
@@ -1195,7 +1195,7 @@ export function SpectraCheckRawFidSection({
                 Original FID preserved
               </p>
               <p className="text-xs text-muted-foreground">
-                Processing always operates on a derived copy. <span className="font-mono">preserve_raw=true</span> is locked on.
+                Processing always operates on a derived copy; the original is always preserved.
               </p>
             </div>
           </div>
@@ -1262,7 +1262,7 @@ export function SpectraCheckRawFidSection({
                   ))}
                 </select>
                 <p className="text-[11px] text-muted-foreground">
-                  Used for full <span className="font-mono">/process</span>; preview uses the locked quick-spectrum preset.
+                  Used for full processing; preview uses the locked quick-spectrum preset.
                 </p>
               </div>
             </CollapsibleContent>
@@ -1332,7 +1332,7 @@ export function SpectraCheckRawFidSection({
                 </button>
               </TooltipTrigger>
               <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                POST /nmr/raw-fid/preview
+                Preview the archive metadata and a quick spectrum.
               </TooltipContent>
             </Tooltip>
 
@@ -1391,8 +1391,8 @@ export function SpectraCheckRawFidSection({
               </TooltipTrigger>
               <TooltipContent sideOffset={4} className="max-w-xs text-xs">
                 {analysisBackend === "gsd_prompt3"
-                  ? "POST /spectrum/analyze/gsd (experimental)"
-                  : "POST /nmr/raw-fid/process"}
+                  ? "Run GSD analysis (experimental)"
+                  : "Process the FID through the full recipe"}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -1817,7 +1817,7 @@ export function SpectraCheckRawFidSection({
                         },
                         warnings: warnings,
                         notes: [
-                          "Spectrum was forwarded from the Raw FID tab — re-runs against /nmr/processed/analyze when you press the Analyze action.",
+                          "Spectrum was forwarded from the Raw FID tab — it re-runs through the processed-NMR analysis when you press Analyze.",
                         ],
                       },
                     })

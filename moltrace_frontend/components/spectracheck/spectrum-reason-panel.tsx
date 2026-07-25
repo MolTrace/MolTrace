@@ -378,7 +378,7 @@ export function SpectrumReasonPanel({
         eyebrow="Decision-support · Retrieval-augmented reasoning"
         title="Retrieval-augmented structure reasoning"
         icon={Brain}
-        description="Encodes the displayed spectrum, retrieves precedent analogues from the server-configured similarity index, then asks the reasoning backend to propose retrieval-grounded structures. Every proposal is verifier-arbitrated against the observed spectrum — decision-support, never a standalone assignment."
+        description="Encodes the displayed spectrum, retrieves precedent analogues from the server-configured similarity index, then asks the reasoning model to propose retrieval-grounded structures. Every proposal is verifier-arbitrated against the observed spectrum — decision-support, never a standalone assignment."
         className="min-w-0 overflow-visible shadow-none"
       >
         <div className="space-y-4">
@@ -434,7 +434,7 @@ export function SpectrumReasonPanel({
                     <Badge
                       variant="outline"
                       className="gap-1 border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
-                      title={audit?.model ? `model: ${audit.model}` : "reasoning backend available"}
+                      title={audit?.model ? `model: ${audit.model}` : "reasoning model available"}
                     >
                       <Sparkles className="h-3 w-3" aria-hidden />
                       Reasoner · {audit?.model ?? "available"}
@@ -471,7 +471,7 @@ export function SpectrumReasonPanel({
                   </p>
                   {result.reasoner_available === false ? (
                     <div className="rounded-md border border-dashed bg-muted/10 px-4 py-6 text-center text-sm text-muted-foreground">
-                      Retrieval succeeded, but the reasoning backend is not configured on this
+                      Retrieval succeeded, but the reasoning model is not configured on this
                       deployment. Set <code className="font-mono">ANTHROPIC_API_KEY</code> server-side to
                       enable structure proposals.
                     </div>
@@ -525,8 +525,8 @@ export function SpectrumReasonPanel({
                 ) : null}
 
                 <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Decision-support · candidate score = posterior_confidence × verdict (verifier);
-                  self_confidence is advisory only.
+                  Decision-support · candidate score = posterior confidence × verdict (verifier);
+                  the self-confidence value is advisory only.
                 </p>
               </>
             )
