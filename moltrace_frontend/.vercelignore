@@ -1,0 +1,22 @@
+# Files Vercel does NOT need in the source upload — it runs `pnpm install` and
+# `next build` remotely, so shipping local deps/build output is pure waste and
+# was pushing the upload past Vercel's 15,000-file limit.
+node_modules
+.next
+.git
+
+# Local caches / build artifacts
+tsconfig.tsbuildinfo
+.DS_Store
+**/.DS_Store
+
+# Tests are never part of the production build
+tests
+**/*.test.ts
+**/*.test.tsx
+vitest.config.ts
+
+# Editor / tooling noise
+.vscode
+.idea
+coverage
