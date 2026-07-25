@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { StringListField } from "@/components/ui/string-list-field"
 import { StructuredJsonObjectEditor } from "@/components/ui/structured-json-editor"
 import {
   Table,
@@ -83,7 +83,7 @@ export function MlCalibrationWorkspace() {
   const [method, setMethod] = useState<string>("not_assessed")
   const [calibrationMetrics, setCalibrationMetrics] = useState<Record<string, unknown>>({})
   const [statusDraft, setStatusDraft] = useState<string>("not_assessed")
-  const [notesLine, setNotesLine] = useState("")
+  const [notes, setNotes] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -125,7 +125,7 @@ export function MlCalibrationWorkspace() {
       calibration_metrics_json,
       status: statusDraft,
       warnings_json: [],
-      notes_json: notesLine.trim() ? [notesLine.trim()] : [],
+      notes_json: notes,
       metadata_json: {},
     }
 
@@ -293,8 +293,7 @@ export function MlCalibrationWorkspace() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="calibration-notes">notes_json (single line → one entry)</Label>
-            <Textarea id="calibration-notes" value={notesLine} onChange={(e) => setNotesLine(e.target.value)} rows={2} />
+            <StringListField idPrefix="calibration-notes" label="Notes" itemLabel="Note" addLabel="Add note" initialValue={notes} onChange={setNotes} />
           </div>
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-muted-foreground">{formOk}</p> : null}

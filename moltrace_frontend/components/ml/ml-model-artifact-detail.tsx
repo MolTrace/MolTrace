@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
 import {
   Table,
   TableBody,
@@ -96,12 +97,12 @@ export function MlModelArtifactDetail() {
   const [createOk, setCreateOk] = useState("")
   const [intendedUse, setIntendedUse] = useState("")
   const [limitations, setLimitations] = useState("")
-  const [trainingSummaryJson, setTrainingSummaryJson] = useState("{}")
-  const [evaluationSummaryJson, setEvaluationSummaryJson] = useState("{}")
-  const [biasJson, setBiasJson] = useState("{}")
-  const [oodJson, setOodJson] = useState("{}")
-  const [calibrationJson, setCalibrationJson] = useState("{}")
-  const [humanReviewJson, setHumanReviewJson] = useState("{}")
+  const [trainingSummary, setTrainingSummary] = useState<Record<string, unknown>>({})
+  const [evaluationSummary, setEvaluationSummary] = useState<Record<string, unknown>>({})
+  const [bias, setBias] = useState<Record<string, unknown>>({})
+  const [ood, setOod] = useState<Record<string, unknown>>({})
+  const [calibration, setCalibration] = useState<Record<string, unknown>>({})
+  const [humanReview, setHumanReview] = useState<Record<string, unknown>>({})
   const [approvalDraft, setApprovalDraft] = useState<string>("draft")
 
   const loadAll = useCallback(async () => {
@@ -174,32 +175,12 @@ export function MlModelArtifactDetail() {
       setCreateErr("intended_use and limitations are required.")
       return
     }
-    const parseObj = (raw: string, label: string): Record<string, unknown> => {
-      try {
-        const o = JSON.parse(raw.trim() || "{}") as unknown
-        if (!o || typeof o !== "object" || Array.isArray(o)) throw new Error("object")
-        return o as Record<string, unknown>
-      } catch {
-        throw new Error(label)
-      }
-    }
-    let training_data_summary_json: Record<string, unknown>
-    let evaluation_summary_json: Record<string, unknown>
-    let bias_risk_summary_json: Record<string, unknown>
-    let out_of_domain_summary_json: Record<string, unknown>
-    let calibration_summary_json: Record<string, unknown>
-    let human_review_summary_json: Record<string, unknown>
-    try {
-      training_data_summary_json = parseObj(trainingSummaryJson, "training_data_summary_json")
-      evaluation_summary_json = parseObj(evaluationSummaryJson, "evaluation_summary_json")
-      bias_risk_summary_json = parseObj(biasJson, "bias_risk_summary_json")
-      out_of_domain_summary_json = parseObj(oodJson, "out_of_domain_summary_json")
-      calibration_summary_json = parseObj(calibrationJson, "calibration_summary_json")
-      human_review_summary_json = parseObj(humanReviewJson, "human_review_summary_json")
-    } catch (e) {
-      setCreateErr(e instanceof Error ? `${e.message} must be valid JSON objects.` : "Invalid JSON.")
-      return
-    }
+    const training_data_summary_json = trainingSummary
+    const evaluation_summary_json = evaluationSummary
+    const bias_risk_summary_json = bias
+    const out_of_domain_summary_json = ood
+    const calibration_summary_json = calibration
+    const human_review_summary_json = humanReview
 
     setCreateBusy(true)
     try {
@@ -498,12 +479,12 @@ export function MlModelArtifactDetail() {
                   <Label htmlFor="lim">limitations</Label>
                   <Textarea id="lim" value={limitations} onChange={(e) => setLimitations(e.target.value)} rows={4} />
                 </div>
-                <JsonField label="training_data_summary_json" value={trainingSummaryJson} onChange={setTrainingSummaryJson} />
-                <JsonField label="evaluation_summary_json" value={evaluationSummaryJson} onChange={setEvaluationSummaryJson} />
-                <JsonField label="bias_risk_summary_json" value={biasJson} onChange={setBiasJson} />
-                <JsonField label="out_of_domain_summary_json" value={oodJson} onChange={setOodJson} />
-                <JsonField label="calibration_summary_json" value={calibrationJson} onChange={setCalibrationJson} />
-                <JsonField label="human_review_summary_json" value={humanReviewJson} onChange={setHumanReviewJson} />
+                <JsonObjectField idPrefix="ma-training" label="Training data summary" initialValue={trainingSummary} onChange={setTrainingSummary} />
+                <JsonObjectField idPrefix="ma-evaluation" label="Evaluation summary" initialValue={evaluationSummary} onChange={setEvaluationSummary} />
+                <JsonObjectField idPrefix="ma-bias" label="Bias & risk summary" initialValue={bias} onChange={setBias} />
+                <JsonObjectField idPrefix="ma-ood" label="Out-of-domain summary" initialValue={ood} onChange={setOod} />
+                <JsonObjectField idPrefix="ma-calibration" label="Calibration summary" initialValue={calibration} onChange={setCalibration} />
+                <JsonObjectField idPrefix="ma-humanreview" label="Human review summary" initialValue={humanReview} onChange={setHumanReview} />
                 <div className="space-y-2">
                   <Label>approval_status</Label>
                   <Select value={approvalDraft} onValueChange={setApprovalDraft}>
@@ -549,19 +530,3 @@ export function MlModelArtifactDetail() {
   )
 }
 
-function JsonField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={label}>{label}</Label>
-      <Textarea id={label} className="min-h-[80px] font-mono text-xs" value={value} onChange={(e) => onChange(e.target.value)} spellCheck={false} />
-    </div>
-  )
-}

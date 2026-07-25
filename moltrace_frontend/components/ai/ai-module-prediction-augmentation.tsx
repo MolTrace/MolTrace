@@ -11,11 +11,10 @@ import {
 } from "@/src/lib/analytics/analytics-client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { cn } from "@/lib/utils"
 import { AlertTriangle, BarChart3, Brain, Loader2, Settings2, Sparkles, Zap } from "lucide-react"
@@ -133,17 +132,11 @@ export function AiModulePredictionAugmentation({
     [selectedServiceId, serviceOptions],
   )
 
-  const [inputSummaryJson, setInputSummaryJson] = useState(
-    JSON.stringify(
-      {
-        ...summarySeed,
-        module: moduleKey,
-        note: "IDs and summaries only",
-      },
-      null,
-      2,
-    ),
-  )
+  const [inputSummary, setInputSummary] = useState<Record<string, unknown>>(() => ({
+    ...summarySeed,
+    module: moduleKey,
+    note: "IDs and summaries only",
+  }))
   const [artifactId, setArtifactId] = useState("")
   const [evidenceItemId, setEvidenceItemId] = useState("")
   const [compoundId, setCompoundId] = useState("")
@@ -179,18 +172,7 @@ export function AiModulePredictionAugmentation({
     setErr("")
     setOk("")
     setPrediction(null)
-    let parsedSummary: Record<string, unknown>
-    try {
-      const parsed = JSON.parse(inputSummaryJson.trim() || "{}") as unknown
-      if (!isRecord(parsed)) {
-        setErr("input summary JSON must be an object.")
-        return
-      }
-      parsedSummary = parsed
-    } catch {
-      setErr("input summary JSON must be valid JSON.")
-      return
-    }
+    const parsedSummary = inputSummary
     trackAiPredictionRunStarted({
       service_key: selected.serviceKey,
       target_module: moduleKey,
@@ -395,7 +377,7 @@ export function AiModulePredictionAugmentation({
           </div>
           <div className="space-y-2">
             <Label>input summary JSON</Label>
-            <Textarea rows={5} value={inputSummaryJson} onChange={(e) => setInputSummaryJson(e.target.value)} className="font-mono text-xs" />
+            <JsonObjectField idPrefix="augmentation-input-summary" label="Input summary" initialValue={inputSummary} onChange={setInputSummary} description="IDs and summaries only — no raw spectra or source text." />
           </div>
           <div className="space-y-2">
             <Label>notes</Label>

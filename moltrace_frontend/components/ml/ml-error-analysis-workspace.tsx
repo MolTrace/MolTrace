@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { KeyNumberTableField } from "@/components/ui/key-number-table-field"
+import { ObjectArrayField } from "@/components/ui/object-array-field"
 import {
   Table,
   TableBody,
@@ -75,8 +76,8 @@ export function MlErrorAnalysisWorkspace() {
   const [sliceName, setSliceName] = useState("")
   const [sliceType, setSliceType] = useState<string>("other")
   const [sampleCount, setSampleCount] = useState("0")
-  const [metricsJson, setMetricsJson] = useState("{}")
-  const [repErrorsJson, setRepErrorsJson] = useState("[]")
+  const [metrics, setMetrics] = useState<Record<string, number>>({})
+  const [repErrors, setRepErrors] = useState<Record<string, unknown>[]>([])
   const [severity, setSeverity] = useState<string>("info")
 
   const [detailId, setDetailId] = useState<number | null>(null)
@@ -121,25 +122,8 @@ export function MlErrorAnalysisWorkspace() {
       setFormErr("sample_count must be a non-negative integer.")
       return
     }
-    let metrics_json: Record<string, unknown>
-    let representative_errors_json: unknown[]
-    try {
-      const om = JSON.parse(metricsJson.trim() || "{}") as unknown
-      if (!om || typeof om !== "object" || Array.isArray(om)) {
-        setFormErr("metrics_json must be a JSON object.")
-        return
-      }
-      metrics_json = om as Record<string, unknown>
-      const re = JSON.parse(repErrorsJson.trim() || "[]") as unknown
-      if (!Array.isArray(re)) {
-        setFormErr("representative_errors_json must be a JSON array.")
-        return
-      }
-      representative_errors_json = re
-    } catch {
-      setFormErr("metrics_json and representative_errors_json must be valid JSON.")
-      return
-    }
+    const metrics_json = metrics
+    const representative_errors_json = repErrors
 
     setSubmitBusy(true)
     try {
@@ -305,17 +289,18 @@ export function MlErrorAnalysisWorkspace() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="error-analysis-metrics-json">metrics_json</Label>
-            <Textarea id="error-analysis-metrics-json" className="min-h-[72px] font-mono text-xs" value={metricsJson} onChange={(e) => setMetricsJson(e.target.value)} spellCheck={false} />
+            <KeyNumberTableField idPrefix="error-analysis-metrics-json" label="Metrics" keyLabel="Metric" valueLabel="Value" addLabel="Add metric" initialValue={metrics} onChange={setMetrics} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="error-analysis-rep-errors-json">representative_errors_json (summary entries)</Label>
-            <Textarea
-              id="error-analysis-rep-errors-json"
-              className="min-h-[100px] font-mono text-xs"
-              value={repErrorsJson}
-              onChange={(e) => setRepErrorsJson(e.target.value)}
-              spellCheck={false}
-              placeholder='[{"case_id":"…","error":"…"}]'
+            <ObjectArrayField
+              idPrefix="error-analysis-rep-errors-json"
+              label="Representative errors"
+              itemLabel="Error"
+              addLabel="Add error"
+              fields={[{ key: "case_id", label: "Case ID" }, { key: "error", label: "Error", type: "textarea" }]}
+              initialValue={repErrors}
+              onChange={setRepErrors}
             />
           </div>
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}

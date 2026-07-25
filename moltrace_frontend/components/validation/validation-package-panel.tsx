@@ -8,7 +8,8 @@ import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
+import { KeyNumberTableField } from "@/components/ui/key-number-table-field"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
@@ -78,8 +79,9 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const [testJson, setTestJson] = useState("")
-  const [riskJson, setRiskJson] = useState("")
+  const [testSummary, setTestSummary] = useState<Record<string, unknown>>({})
+  const [riskSummary, setRiskSummary] = useState<Record<string, number>>({})
+  const [evidenceFormKey, setEvidenceFormKey] = useState(0)
   const [source, setSource] = useState<"ci" | "manual">("ci")
   const [ingestBusy, setIngestBusy] = useState(false)
   const [ingestMsg, setIngestMsg] = useState("")
@@ -105,15 +107,8 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
   async function handleIngest() {
     setIngestErr("")
     setIngestMsg("")
-    let testObj: Record<string, unknown> | undefined
-    let riskObj: Record<string, unknown> | undefined
-    try {
-      if (testJson.trim()) testObj = JSON.parse(testJson)
-      if (riskJson.trim()) riskObj = JSON.parse(riskJson)
-    } catch {
-      setIngestErr("Test/risk summary must be valid JSON.")
-      return
-    }
+    const testObj = Object.keys(testSummary).length > 0 ? testSummary : undefined
+    const riskObj = Object.keys(riskSummary).length > 0 ? riskSummary : undefined
     setIngestBusy(true)
     try {
       await ingestReleaseEvidence(releaseId, {
@@ -122,8 +117,9 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
         source,
       })
       setIngestMsg("CI evidence ingested.")
-      setTestJson("")
-      setRiskJson("")
+      setTestSummary({})
+      setRiskSummary({})
+      setEvidenceFormKey((k) => k + 1)
       await load()
     } catch (e) {
       // 409/400 when the release is already approved/released — surface verbatim.
@@ -256,27 +252,26 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
               </div>
             ) : null}
             <div className="space-y-1">
-              <Label className="text-xs" htmlFor="vp-test-json">
-                test_summary_json
-              </Label>
-              <Textarea
-                id="vp-test-json"
-                className="min-h-[60px] font-mono text-xs"
-                placeholder='{ "passed": 142, "failed": 0, "coverage_percent": 87.4 }'
-                value={testJson}
-                onChange={(e) => setTestJson(e.target.value)}
+              <JsonObjectField
+                key={`vp-test-${evidenceFormKey}`}
+                idPrefix="vp-test-json"
+                label="Test summary"
+                initialValue={testSummary}
+                onChange={setTestSummary}
+                description="CI test results, e.g. passed / failed / coverage_percent."
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs" htmlFor="vp-risk-json">
-                risk_summary_json
-              </Label>
-              <Textarea
-                id="vp-risk-json"
-                className="min-h-[48px] font-mono text-xs"
-                placeholder='{ "high": 1, "medium": 4, "open": 2 }'
-                value={riskJson}
-                onChange={(e) => setRiskJson(e.target.value)}
+              <KeyNumberTableField
+                key={`vp-risk-${evidenceFormKey}`}
+                idPrefix="vp-risk-json"
+                label="Risk summary"
+                keyLabel="Severity"
+                valueLabel="Count"
+                addLabel="Add severity"
+                initialValue={riskSummary}
+                onChange={setRiskSummary}
+                description="Open risk counts by severity, e.g. high / medium / open."
               />
             </div>
             <div className="flex flex-wrap items-end gap-3">

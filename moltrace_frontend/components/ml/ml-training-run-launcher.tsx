@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
 import {
   Table,
   TableBody,
@@ -125,7 +125,7 @@ export function MlTrainingRunLauncher() {
   const [modelFamily, setModelFamily] = useState<string>("baseline")
   const [modelName, setModelName] = useState("")
   const [modelVersion, setModelVersion] = useState("")
-  const [parametersJson, setParametersJson] = useState("{}")
+  const [parameters, setParameters] = useState<Record<string, unknown>>({})
   const [experimental, setExperimental] = useState(false)
 
   const load = useCallback(async () => {
@@ -230,18 +230,7 @@ export function MlTrainingRunLauncher() {
       setFormErr("model_name and model_version are required.")
       return
     }
-    let parameters_json: Record<string, unknown>
-    try {
-      const parsed = JSON.parse(parametersJson.trim() || "{}") as unknown
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        setFormErr("parameters_json must be a JSON object.")
-        return
-      }
-      parameters_json = parsed as Record<string, unknown>
-    } catch {
-      setFormErr("parameters_json must be valid JSON.")
-      return
-    }
+    const parameters_json = parameters
 
     const body: Record<string, unknown> = {
       task_key: tk,
@@ -486,13 +475,7 @@ export function MlTrainingRunLauncher() {
 
           <div className="space-y-2">
             <Label htmlFor="params-json">parameters_json</Label>
-            <Textarea
-              id="params-json"
-              className="min-h-[100px] font-mono text-xs"
-              value={parametersJson}
-              onChange={(e) => setParametersJson(e.target.value)}
-              spellCheck={false}
-            />
+            <JsonObjectField idPrefix="params-json" label="Parameters" initialValue={parameters} onChange={setParameters} />
           </div>
 
           {showExperimentalToggle ? (

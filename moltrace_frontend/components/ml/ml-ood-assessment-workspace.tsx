@@ -18,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
+import { ObjectArrayField } from "@/components/ui/object-array-field"
 import {
   Table,
   TableBody,
@@ -80,8 +81,8 @@ export function MlOodAssessmentWorkspace() {
   const [artifactId, setArtifactId] = useState("")
   const [datasetVersionId, setDatasetVersionId] = useState("")
   const [method, setMethod] = useState<string>("rule_based")
-  const [summaryJson, setSummaryJson] = useState("{}")
-  const [regionsJson, setRegionsJson] = useState("[]")
+  const [summary, setSummary] = useState<Record<string, unknown>>({})
+  const [regions, setRegions] = useState<Record<string, unknown>[]>([])
   const [statusDraft, setStatusDraft] = useState<string>("requires_review")
 
   const [detailId, setDetailId] = useState<number | null>(null)
@@ -120,25 +121,8 @@ export function MlOodAssessmentWorkspace() {
       setFormErr("model_artifact_id is required.")
       return
     }
-    let ood_summary_json: Record<string, unknown>
-    let high_risk_regions_json: unknown[]
-    try {
-      const os = JSON.parse(summaryJson.trim() || "{}") as unknown
-      if (!os || typeof os !== "object" || Array.isArray(os)) {
-        setFormErr("ood_summary_json must be a JSON object.")
-        return
-      }
-      ood_summary_json = os as Record<string, unknown>
-      const hr = JSON.parse(regionsJson.trim() || "[]") as unknown
-      if (!Array.isArray(hr)) {
-        setFormErr("high_risk_regions_json must be a JSON array.")
-        return
-      }
-      high_risk_regions_json = hr
-    } catch {
-      setFormErr("ood_summary_json and high_risk_regions_json must be valid JSON.")
-      return
-    }
+    const ood_summary_json = summary
+    const high_risk_regions_json = regions
 
     const dvid = Number.parseInt(datasetVersionId, 10)
     const body: Record<string, unknown> = {
@@ -297,11 +281,11 @@ export function MlOodAssessmentWorkspace() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="ood-summary-json">ood_summary_json</Label>
-            <Textarea id="ood-summary-json" className="min-h-[88px] font-mono text-xs" value={summaryJson} onChange={(e) => setSummaryJson(e.target.value)} spellCheck={false} />
+            <JsonObjectField idPrefix="ood-summary-json" label="OOD summary" initialValue={summary} onChange={setSummary} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="ood-high-risk-regions-json">high_risk_regions_json</Label>
-            <Textarea id="ood-high-risk-regions-json" className="min-h-[100px] font-mono text-xs" value={regionsJson} onChange={(e) => setRegionsJson(e.target.value)} spellCheck={false} />
+            <ObjectArrayField idPrefix="ood-high-risk-regions-json" label="High-risk regions" itemLabel="Region" addLabel="Add region" initialValue={regions} onChange={setRegions} />
           </div>
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-muted-foreground">{formOk}</p> : null}

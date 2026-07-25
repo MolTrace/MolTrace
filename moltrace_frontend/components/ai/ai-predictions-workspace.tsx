@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react"
 
 type Row = Record<string, unknown>
@@ -93,7 +94,7 @@ export function AiPredictionsWorkspace() {
   const [serviceKey, setServiceKey] = useState("")
   const [targetModule, setTargetModule] = useState<string>(TARGET_MODULE_OPTIONS[0])
   const [taskKey, setTaskKey] = useState("")
-  const [inputSummaryJson, setInputSummaryJson] = useState("{}")
+  const [inputSummary, setInputSummary] = useState<Record<string, unknown>>({})
   const [artifactId, setArtifactId] = useState("")
   const [evidenceItemId, setEvidenceItemId] = useState("")
   const [compoundId, setCompoundId] = useState("")
@@ -104,7 +105,7 @@ export function AiPredictionsWorkspace() {
   const [formOk, setFormOk] = useState("")
   const [submitBusy, setSubmitBusy] = useState(false)
 
-  const jsonWarningVisible = useMemo(() => inputSummaryJson.trim().length > 0, [inputSummaryJson])
+  const jsonWarningVisible = useMemo(() => Object.keys(inputSummary).length > 0, [inputSummary])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -145,18 +146,7 @@ export function AiPredictionsWorkspace() {
       return
     }
 
-    let parsedSummary: Record<string, unknown>
-    try {
-      const parsed = JSON.parse(inputSummaryJson.trim() || "{}") as unknown
-      if (!isRecord(parsed)) {
-        setFormErr("input_summary_json must be a JSON object.")
-        return
-      }
-      parsedSummary = parsed
-    } catch {
-      setFormErr("input_summary_json must be valid JSON.")
-      return
-    }
+    const parsedSummary = inputSummary
 
     const artifact = Number.parseInt(artifactId, 10)
     const evidence = Number.parseInt(evidenceItemId, 10)
@@ -306,13 +296,12 @@ export function AiPredictionsWorkspace() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="prediction-input-summary-json">input summary JSON</Label>
-            <Textarea
-              id="prediction-input-summary-json"
-              value={inputSummaryJson}
-              onChange={(e) => setInputSummaryJson(e.target.value)}
-              rows={6}
-              placeholder='{"summary": "ID-based analytical context only"}'
+            <JsonObjectField
+              idPrefix="prediction-input-summary-json"
+              label="Input summary"
+              initialValue={inputSummary}
+              onChange={setInputSummary}
+              description="ID-based analytical context only — no raw spectra or source text."
             />
           </div>
 
