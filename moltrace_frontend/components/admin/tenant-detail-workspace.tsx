@@ -32,6 +32,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
+import { ObjectArrayField } from "@/components/ui/object-array-field"
+import { StringListField } from "@/components/ui/string-list-field"
+import { NumberListField } from "@/components/ui/number-list-field"
+import { KeyNumberTableField } from "@/components/ui/key-number-table-field"
 import { MultiEntityPicker } from "@/components/ui/multi-entity-picker"
 import { loadValidationProjects } from "@/lib/ui/entity-options"
 import { GsdReadinessVerdictCard } from "@/components/spectracheck/gsd-telemetry-panel"
@@ -182,6 +187,19 @@ const AUDIT_EXPORT_SCOPE_OPTIONS = [
 const SENSITIVE_KEY_PATTERN =
   /(secret|password|token|credential|authorization|api[_-]?key|raw|spectrum|spectra|full_smiles|smiles|molfile|source_text|source_document|document_text|content|blob|binary|model_artifact|private_key)/i
 
+/** Wire-field readers for the structured editors (tolerant of the backend's list|dict|null shapes). */
+function stringsFromField(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((v) => v != null).map((v) => String(v)) : []
+}
+function numbersFromField(raw: unknown): number[] {
+  return Array.isArray(raw)
+    ? raw.map((v) => (typeof v === "number" ? v : Number(v))).filter((n) => Number.isFinite(n))
+    : []
+}
+function objectFromField(raw: unknown): Row {
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Row) : {}
+}
+
 function isRecord(value: unknown): value is Row {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value)
 }
@@ -245,12 +263,6 @@ function parseJsonArrayField(raw: string, label: string): unknown[] {
   const value = parseJsonField(raw, label)
   if (Array.isArray(value)) return value
   throw new Error(`${label} must be a JSON array.`)
-}
-
-function parseJsonObjectField(raw: string, label: string): Row {
-  const value = parseJsonField(raw, label)
-  if (isRecord(value)) return value
-  throw new Error(`${label} must be a JSON object.`)
 }
 
 /** Non-throwing parse of a JSON id-array string → ids, for picker `value`. */
@@ -455,7 +467,8 @@ function EntitlementsPanel({
   const [featureKey, setFeatureKey] = useState("")
   const [program, setProgram] = useState<(typeof ENTITLEMENT_PROGRAM_OPTIONS)[number]>("spectracheck")
   const [enabled, setEnabled] = useState("true")
-  const [limitsJson, setLimitsJson] = useState("{}")
+  const [limits, setLimits] = useState<Record<string, number>>({})
+  const [entitlementFormKey, setEntitlementFormKey] = useState(0)
   const [effectiveStart, setEffectiveStart] = useState("")
   const [effectiveEnd, setEffectiveEnd] = useState("")
   const [createBusy, setCreateBusy] = useState(false)
@@ -485,7 +498,7 @@ function EntitlementsPanel({
           feature_key: featureKey.trim(),
           program,
           enabled: enabled === "true",
-          limit_json: parseJsonField(limitsJson, "limits JSON"),
+          limit_json: limits,
           effective_start: effectiveStart.trim() || null,
           effective_end: effectiveEnd.trim() || null,
         },
@@ -498,7 +511,8 @@ function EntitlementsPanel({
       setFeatureKey("")
       setProgram("spectracheck")
       setEnabled("true")
-      setLimitsJson("{}")
+      setLimits({})
+      setEntitlementFormKey((k) => k + 1)
       setEffectiveStart("")
       setEffectiveEnd("")
       await onReload()
@@ -661,12 +675,16 @@ function EntitlementsPanel({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-entitlement-limits-json">limits JSON</Label>
-            <Textarea
-              id="tenant-entitlement-limits-json"
-              value={limitsJson}
-              onChange={(event) => setLimitsJson(event.target.value)}
-              rows={4}
+            <KeyNumberTableField
+              key={`ent-limits-${entitlementFormKey}`}
+              label="Limits"
+              keyLabel="Quota"
+              valueLabel="Limit"
+              addLabel="Add limit"
+              initialValue={limits}
+              onChange={setLimits}
+              description="Per-quota numeric limits for this entitlement."
+              idPrefix="tenant-entitlement-limits-json"
             />
           </div>
         </div>
@@ -713,9 +731,10 @@ function PilotProgramsPanel({
   const [status, setStatus] = useState<(typeof PILOT_STATUS_OPTIONS)[number]>("planned")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
-  const [targetPrograms, setTargetPrograms] = useState(JSON.stringify([...DEFAULT_PROGRAM_KEYS], null, 2))
-  const [successCriteriaJson, setSuccessCriteriaJson] = useState("[]")
-  const [risksJson, setRisksJson] = useState("[]")
+  const [targetPrograms, setTargetPrograms] = useState<string[]>([...DEFAULT_PROGRAM_KEYS])
+  const [pilotFormKey, setPilotFormKey] = useState(0)
+  const [successCriteria, setSuccessCriteria] = useState<Row[]>([])
+  const [risks, setRisks] = useState<Row[]>([])
   const [selectedPilot, setSelectedPilot] = useState<Row | null>(null)
   const [selectedPilotError, setSelectedPilotError] = useState("")
   const [createBusy, setCreateBusy] = useState(false)
@@ -736,9 +755,9 @@ function PilotProgramsPanel({
           status,
           start_date: startDate.trim() || null,
           end_date: endDate.trim() || null,
-          target_programs_json: parseJsonArrayField(targetPrograms, "target programs").map((item) => String(item)),
-          success_criteria_json: parseJsonArrayField(successCriteriaJson, "success criteria JSON"),
-          risks_json: parseJsonArrayField(risksJson, "risks JSON"),
+          target_programs_json: targetPrograms,
+          success_criteria_json: successCriteria,
+          risks_json: risks,
         },
       })
       trackPilotProgramCreated({ status })
@@ -747,9 +766,10 @@ function PilotProgramsPanel({
       setStatus("planned")
       setStartDate("")
       setEndDate("")
-      setTargetPrograms(JSON.stringify([...DEFAULT_PROGRAM_KEYS], null, 2))
-      setSuccessCriteriaJson("[]")
-      setRisksJson("[]")
+      setTargetPrograms([...DEFAULT_PROGRAM_KEYS])
+      setSuccessCriteria([])
+      setRisks([])
+      setPilotFormKey((k) => k + 1)
       await onReload()
     } catch (err) {
       setFormError(formatErr(err, "Could not create pilot program."))
@@ -904,16 +924,37 @@ function PilotProgramsPanel({
             <Textarea id="tenant-pilot-objective" value={objective} onChange={(event) => setObjective(event.target.value)} rows={3} />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-pilot-target-programs">target programs</Label>
-            <Textarea id="tenant-pilot-target-programs" value={targetPrograms} onChange={(event) => setTargetPrograms(event.target.value)} rows={4} />
+            <StringListField
+              key={`pilot-programs-${pilotFormKey}`}
+              label="Target programs"
+              itemLabel="Program"
+              addLabel="Add program"
+              initialValue={targetPrograms}
+              onChange={setTargetPrograms}
+              idPrefix="tenant-pilot-target-programs"
+            />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-pilot-success-criteria-json">success criteria JSON</Label>
-            <Textarea id="tenant-pilot-success-criteria-json" value={successCriteriaJson} onChange={(event) => setSuccessCriteriaJson(event.target.value)} rows={4} />
+            <ObjectArrayField
+              key={`pilot-success-${pilotFormKey}`}
+              label="Success criteria"
+              itemLabel="Criterion"
+              addLabel="Add criterion"
+              initialValue={successCriteria}
+              onChange={setSuccessCriteria}
+              idPrefix="tenant-pilot-success-criteria-json"
+            />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-pilot-risks-json">risks JSON</Label>
-            <Textarea id="tenant-pilot-risks-json" value={risksJson} onChange={(event) => setRisksJson(event.target.value)} rows={4} />
+            <ObjectArrayField
+              key={`pilot-risks-${pilotFormKey}`}
+              label="Risks"
+              itemLabel="Risk"
+              addLabel="Add risk"
+              initialValue={risks}
+              onChange={setRisks}
+              idPrefix="tenant-pilot-risks-json"
+            />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1403,7 +1444,8 @@ function DataBoundaryPanel({
     useState<(typeof DATA_BOUNDARY_ISOLATION_OPTIONS)[number]>("shared_database_tenant_scoped")
   const [encryptionProfile, setEncryptionProfile] = useState("")
   const [storagePrefix, setStoragePrefix] = useState("")
-  const [allowedRegionsJson, setAllowedRegionsJson] = useState("[]")
+  const [allowedRegions, setAllowedRegions] = useState<string[]>([])
+  const [boundaryFormKey, setBoundaryFormKey] = useState(0)
   const [dataResidencyNotes, setDataResidencyNotes] = useState("")
   const [status, setStatus] = useState<(typeof TENANT_PROFILE_STATUS_OPTIONS)[number]>("draft")
   const [busy, setBusy] = useState(false)
@@ -1419,7 +1461,8 @@ function DataBoundaryPanel({
     }
     setEncryptionProfile(readFirst(row, ["encryption_profile"]))
     setStoragePrefix(readFirst(row, ["storage_prefix"]))
-    setAllowedRegionsJson(JSON.stringify(row.allowed_regions_json ?? [], null, 2))
+    setAllowedRegions(stringsFromField(row.allowed_regions_json))
+    setBoundaryFormKey((k) => k + 1)
     setDataResidencyNotes(readFirst(row, ["data_residency_notes"]))
     const nextStatus = readFirst(row, ["status"])
     if ((TENANT_PROFILE_STATUS_OPTIONS as readonly string[]).includes(nextStatus)) {
@@ -1432,7 +1475,7 @@ function DataBoundaryPanel({
       isolation_mode: isolationMode,
       encryption_profile: encryptionProfile.trim() || null,
       storage_prefix: storagePrefix.trim() || null,
-      allowed_regions_json: parseJsonArrayField(allowedRegionsJson, "allowed regions").map((item) => String(item)),
+      allowed_regions_json: allowedRegions,
       data_residency_notes: dataResidencyNotes.trim() || null,
       status,
     }
@@ -1536,11 +1579,14 @@ function DataBoundaryPanel({
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="tenant-boundary-allowed-regions">allowed regions</Label>
-            <Textarea
-              id="tenant-boundary-allowed-regions"
-              value={allowedRegionsJson}
-              onChange={(event) => setAllowedRegionsJson(event.target.value)}
-              rows={4}
+            <StringListField
+              key={`boundary-regions-${boundaryFormKey}`}
+              label="Allowed regions"
+              itemLabel="Region"
+              addLabel="Add region"
+              initialValue={allowedRegions}
+              onChange={setAllowedRegions}
+              idPrefix="tenant-boundary-allowed-regions"
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
@@ -1579,11 +1625,12 @@ function SecurityProfilePanel({
 }) {
   const [ssoEnabled, setSsoEnabled] = useState("false")
   const [mfaRequired, setMfaRequired] = useState("false")
-  const [allowedDomainsJson, setAllowedDomainsJson] = useState("[]")
+  const [allowedDomains, setAllowedDomains] = useState<string[]>([])
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState("")
-  const [ipAllowlistJson, setIpAllowlistJson] = useState("[]")
-  const [securityFrameworksJson, setSecurityFrameworksJson] = useState("[]")
-  const [riskSummaryJson, setRiskSummaryJson] = useState("{}")
+  const [ipAllowlist, setIpAllowlist] = useState<string[]>([])
+  const [securityFrameworks, setSecurityFrameworks] = useState<string[]>([])
+  const [riskSummary, setRiskSummary] = useState<Row>({})
+  const [securityFormKey, setSecurityFormKey] = useState(0)
   const [status, setStatus] = useState<(typeof TENANT_PROFILE_STATUS_OPTIONS)[number]>("draft")
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState("")
@@ -1594,11 +1641,12 @@ function SecurityProfilePanel({
     if (!row) return
     setSsoEnabled(readFirst(row, ["sso_enabled"]).toLowerCase() === "true" ? "true" : "false")
     setMfaRequired(readFirst(row, ["mfa_required"]).toLowerCase() === "true" ? "true" : "false")
-    setAllowedDomainsJson(JSON.stringify(row.allowed_domains_json ?? [], null, 2))
+    setAllowedDomains(stringsFromField(row.allowed_domains_json))
     setSessionTimeoutMinutes(readFirst(row, ["session_timeout_minutes"]))
-    setIpAllowlistJson(JSON.stringify(row.ip_allowlist_json ?? [], null, 2))
-    setSecurityFrameworksJson(JSON.stringify(row.security_frameworks_json ?? [], null, 2))
-    setRiskSummaryJson(JSON.stringify(row.risk_summary_json ?? {}, null, 2))
+    setIpAllowlist(stringsFromField(row.ip_allowlist_json))
+    setSecurityFrameworks(stringsFromField(row.security_frameworks_json))
+    setRiskSummary(objectFromField(row.risk_summary_json))
+    setSecurityFormKey((k) => k + 1)
     const nextStatus = readFirst(row, ["status"])
     if ((TENANT_PROFILE_STATUS_OPTIONS as readonly string[]).includes(nextStatus)) {
       setStatus(nextStatus as typeof status)
@@ -1610,13 +1658,11 @@ function SecurityProfilePanel({
     const body = {
       sso_enabled: ssoEnabled === "true",
       mfa_required: mfaRequired === "true",
-      allowed_domains_json: parseJsonArrayField(allowedDomainsJson, "allowed domains").map((item) => String(item)),
+      allowed_domains_json: allowedDomains,
       session_timeout_minutes: timeoutValue ? Number(timeoutValue) : null,
-      ip_allowlist_json: parseJsonArrayField(ipAllowlistJson, "IP allowlist").map((item) => String(item)),
-      security_frameworks_json: parseJsonArrayField(securityFrameworksJson, "security frameworks").map((item) =>
-        String(item),
-      ),
-      risk_summary_json: parseJsonObjectField(riskSummaryJson, "risk summary"),
+      ip_allowlist_json: ipAllowlist,
+      security_frameworks_json: securityFrameworks,
+      risk_summary_json: riskSummary,
       status,
     }
     setBusy(true)
@@ -1721,38 +1767,48 @@ function SecurityProfilePanel({
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="tenant-security-allowed-domains">allowed domains</Label>
-            <Textarea
-              id="tenant-security-allowed-domains"
-              value={allowedDomainsJson}
-              onChange={(event) => setAllowedDomainsJson(event.target.value)}
-              rows={4}
+            <StringListField
+              key={`security-domains-${securityFormKey}`}
+              label="Allowed domains"
+              itemLabel="Domain"
+              addLabel="Add domain"
+              initialValue={allowedDomains}
+              onChange={setAllowedDomains}
+              idPrefix="tenant-security-allowed-domains"
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="tenant-security-ip-allowlist">IP allowlist</Label>
-            <Textarea
-              id="tenant-security-ip-allowlist"
-              value={ipAllowlistJson}
-              onChange={(event) => setIpAllowlistJson(event.target.value)}
-              rows={4}
+            <StringListField
+              key={`security-ip-${securityFormKey}`}
+              label="IP allowlist"
+              itemLabel="IP / CIDR"
+              addLabel="Add entry"
+              initialValue={ipAllowlist}
+              onChange={setIpAllowlist}
+              idPrefix="tenant-security-ip-allowlist"
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="tenant-security-frameworks">security frameworks</Label>
-            <Textarea
-              id="tenant-security-frameworks"
-              value={securityFrameworksJson}
-              onChange={(event) => setSecurityFrameworksJson(event.target.value)}
-              rows={4}
+            <StringListField
+              key={`security-frameworks-${securityFormKey}`}
+              label="Security frameworks"
+              itemLabel="Framework"
+              addLabel="Add framework"
+              initialValue={securityFrameworks}
+              onChange={setSecurityFrameworks}
+              idPrefix="tenant-security-frameworks"
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="tenant-security-risk-summary">risk summary</Label>
-            <Textarea
-              id="tenant-security-risk-summary"
-              value={riskSummaryJson}
-              onChange={(event) => setRiskSummaryJson(event.target.value)}
-              rows={4}
+            <JsonObjectField
+              key={`security-risk-${securityFormKey}`}
+              idPrefix="tenant-security-risk-summary"
+              label="Risk summary"
+              initialValue={riskSummary}
+              onChange={setRiskSummary}
             />
           </div>
         </div>
@@ -1784,8 +1840,9 @@ function ValidationProfilePanel({
   const [validationProjectIdsJson, setValidationProjectIdsJson] = useState("[]")
   const [controlledRecordPolicy, setControlledRecordPolicy] = useState("")
   const [esignatureRequired, setEsignatureRequired] = useState("false")
-  const [dataIntegrityAssessmentIdsJson, setDataIntegrityAssessmentIdsJson] = useState("[]")
-  const [inspectionPackageIdsJson, setInspectionPackageIdsJson] = useState("[]")
+  const [diAssessmentIds, setDiAssessmentIds] = useState<number[]>([])
+  const [validationFormKey, setValidationFormKey] = useState(0)
+  const [inspectionPkgIds, setInspectionPkgIds] = useState<number[]>([])
   const [status, setStatus] = useState<(typeof TENANT_VALIDATION_PROFILE_STATUS_OPTIONS)[number]>("draft")
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState("")
@@ -1803,8 +1860,9 @@ function ValidationProfilePanel({
     setValidationProjectIdsJson(JSON.stringify(row.validation_project_ids_json ?? [], null, 2))
     setControlledRecordPolicy(readFirst(row, ["controlled_record_policy"]))
     setEsignatureRequired(readFirst(row, ["esignature_required"]).toLowerCase() === "true" ? "true" : "false")
-    setDataIntegrityAssessmentIdsJson(JSON.stringify(row.data_integrity_assessment_ids_json ?? [], null, 2))
-    setInspectionPackageIdsJson(JSON.stringify(row.inspection_package_ids_json ?? [], null, 2))
+    setDiAssessmentIds(numbersFromField(row.data_integrity_assessment_ids_json))
+    setInspectionPkgIds(numbersFromField(row.inspection_package_ids_json))
+    setValidationFormKey((k) => k + 1)
     const nextStatus = readFirst(row, ["status"])
     if ((TENANT_VALIDATION_PROFILE_STATUS_OPTIONS as readonly string[]).includes(nextStatus)) {
       setStatus(nextStatus as typeof status)
@@ -1817,11 +1875,8 @@ function ValidationProfilePanel({
       validation_project_ids_json: parseIdArrayField(validationProjectIdsJson, "validation project IDs"),
       controlled_record_policy: controlledRecordPolicy.trim() || null,
       esignature_required: esignatureRequired === "true",
-      data_integrity_assessment_ids_json: parseIdArrayField(
-        dataIntegrityAssessmentIdsJson,
-        "data integrity assessment IDs",
-      ),
-      inspection_package_ids_json: parseIdArrayField(inspectionPackageIdsJson, "inspection package IDs"),
+      data_integrity_assessment_ids_json: diAssessmentIds,
+      inspection_package_ids_json: inspectionPkgIds,
       status,
     }
     setBusy(true)
@@ -1965,20 +2020,26 @@ function ValidationProfilePanel({
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="tenant-validation-data-integrity-assessment-ids">data integrity assessment IDs</Label>
-            <Textarea
-              id="tenant-validation-data-integrity-assessment-ids"
-              value={dataIntegrityAssessmentIdsJson}
-              onChange={(event) => setDataIntegrityAssessmentIdsJson(event.target.value)}
-              rows={4}
+            <NumberListField
+              key={`val-di-${validationFormKey}`}
+              label="Data integrity assessment IDs"
+              itemLabel="Assessment ID"
+              addLabel="Add assessment"
+              initialValue={diAssessmentIds}
+              onChange={setDiAssessmentIds}
+              idPrefix="tenant-validation-data-integrity-assessment-ids"
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="tenant-validation-inspection-package-ids">inspection package IDs</Label>
-            <Textarea
-              id="tenant-validation-inspection-package-ids"
-              value={inspectionPackageIdsJson}
-              onChange={(event) => setInspectionPackageIdsJson(event.target.value)}
-              rows={4}
+            <NumberListField
+              key={`val-insp-${validationFormKey}`}
+              label="Inspection package IDs"
+              itemLabel="Package ID"
+              addLabel="Add package"
+              initialValue={inspectionPkgIds}
+              onChange={setInspectionPkgIds}
+              idPrefix="tenant-validation-inspection-package-ids"
             />
           </div>
         </div>
