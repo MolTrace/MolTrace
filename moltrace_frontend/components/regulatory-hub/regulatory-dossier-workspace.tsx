@@ -65,6 +65,9 @@ import {
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { JsonObjectField } from "@/components/ui/json-object-field"
+import { ObjectArrayField } from "@/components/ui/object-array-field"
+import { StringListField } from "@/components/ui/string-list-field"
+import { NumberListField } from "@/components/ui/number-list-field"
 import { AlertTriangle, ArrowLeft, ChevronDown, Loader2 } from "lucide-react"
 import { RegulatoryDossierLinkedCompoundCard } from "@/components/regulatory-hub/regulatory-dossier-linked-compound-card"
 import { RegulatoryDossierKnowledgeLinksCard } from "@/components/knowledge/knowledge-links-integration"
@@ -471,25 +474,6 @@ function impurityWarningsForRow(row: Record<string, unknown>): string[] {
   return readStringArray(row, "warnings_json")
 }
 
-function parseResidualSolventLines(text: string): { solvent_name: string; observed_ppm?: number }[] {
-  const out: { solvent_name: string; observed_ppm?: number }[] = []
-  for (const raw of text.split("\n")) {
-    const line = raw.trim()
-    if (!line || line.startsWith("#")) continue
-    const lastComma = line.lastIndexOf(",")
-    if (lastComma > 0) {
-      const name = line.slice(0, lastComma).trim()
-      const num = Number.parseFloat(line.slice(lastComma + 1).trim())
-      if (name && Number.isFinite(num)) {
-        out.push({ solvent_name: name, observed_ppm: num })
-        continue
-      }
-    }
-    out.push({ solvent_name: line })
-  }
-  return out
-}
-
 function pairResidualSolventRowActions(
   matches: Record<string, unknown>[],
   actionIds: number[]
@@ -547,19 +531,6 @@ function parseOptionalJsonObjectInput(
 // required fields parse to {} exactly as before — the wire payload is unchanged.
 function jsonStringFromObject(obj: Record<string, unknown>): string {
   return Object.keys(obj).length > 0 ? JSON.stringify(obj) : ""
-}
-
-function parseCommaSeparatedInts(raw: string): number[] {
-  const out: number[] = []
-  for (const line of raw.split(/\r?\n/)) {
-    for (const part of line.split(",")) {
-      const t = part.trim()
-      if (!t) continue
-      const n = Number.parseInt(t, 10)
-      if (Number.isFinite(n)) out.push(n)
-    }
-  }
-  return out
 }
 
 function parseOptionalIdField(
@@ -688,7 +659,7 @@ export function RegulatoryDossierWorkspace() {
 
   const [residualAssessments, setResidualAssessments] = useState<Record<string, unknown>[]>([])
   const [ruleSets, setRuleSets] = useState<Record<string, unknown>[]>([])
-  const [rsSolventLines, setRsSolventLines] = useState("")
+  const [rsSolvents, setRsSolvents] = useState<Record<string, unknown>[]>([])
   const [rsSourceEvidence, setRsSourceEvidence] = useState("user_entered")
   const [rsRuleSetId, setRsRuleSetId] = useState<string>("none")
   const [rsAssessBusy, setRsAssessBusy] = useState(false)
@@ -736,12 +707,12 @@ export function RegulatoryDossierWorkspace() {
   const [agModelVersionId, setAgModelVersionId] = useState("")
   const [agMethodId, setAgMethodId] = useState("")
   const [agWorkflowRunId, setAgWorkflowRunId] = useState("")
-  const [agEvidenceIds, setAgEvidenceIds] = useState("")
+  const [agEvidenceIds, setAgEvidenceIds] = useState<number[]>([])
   const [agExplainJson, setAgExplainJson] = useState("{}")
   const [agHumanOverride, setAgHumanOverride] = useState(false)
-  const [agValidationRecordIds, setAgValidationRecordIds] = useState("")
+  const [agValidationRecordIds, setAgValidationRecordIds] = useState<number[]>([])
   const [agGovernanceStatus, setAgGovernanceStatus] = useState("")
-  const [agNotesLines, setAgNotesLines] = useState("")
+  const [agNotes, setAgNotes] = useState<string[]>([])
   const [agCreateBusy, setAgCreateBusy] = useState(false)
   const [agCreateErr, setAgCreateErr] = useState("")
 
@@ -1462,19 +1433,22 @@ export function RegulatoryDossierWorkspace() {
 
   async function runAssessResidualSolvents() {
     if (!Number.isFinite(dossierId)) return
-    const parsed = parseResidualSolventLines(rsSolventLines)
-    if (parsed.length === 0) {
-      setRsAssessErr("Add at least one detected solvent (one per line).")
+    const solvents_json: Record<string, unknown>[] = []
+    for (const r of rsSolvents) {
+      const name = typeof r.solvent_name === "string" ? r.solvent_name.trim() : ""
+      if (!name) continue
+      const row: Record<string, unknown> = { solvent_name: name }
+      const ppm = typeof r.observed_ppm === "number" ? r.observed_ppm : Number(r.observed_ppm)
+      if (Number.isFinite(ppm)) row.observed_ppm = ppm
+      solvents_json.push(row)
+    }
+    if (solvents_json.length === 0) {
+      setRsAssessErr("Add at least one detected solvent.")
       return
     }
     setRsAssessBusy(true)
     setRsAssessErr("")
     try {
-      const solvents_json = parsed.map((s) => {
-        const row: Record<string, unknown> = { solvent_name: s.solvent_name }
-        if (s.observed_ppm !== undefined) row.observed_ppm = s.observed_ppm
-        return row
-      })
       const metadata_json: Record<string, unknown> = {
         source_evidence: rsSourceEvidence,
       }
@@ -1771,12 +1745,12 @@ export function RegulatoryDossierWorkspace() {
         model_version_id: mvid.value,
         method_id: mid.value,
         workflow_run_id: wf.value,
-        evidence_item_ids_json: parseCommaSeparatedInts(agEvidenceIds),
+        evidence_item_ids_json: agEvidenceIds,
         explainability_summary_json: explain.value,
         human_override_available: agHumanOverride,
-        validation_record_ids_json: parseCommaSeparatedInts(agValidationRecordIds),
+        validation_record_ids_json: agValidationRecordIds,
         warnings_json: [],
-        notes_json: agNotesLines.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
+        notes_json: agNotes,
         metadata_json: {},
       }
       const gs = agGovernanceStatus.trim()
@@ -3479,21 +3453,20 @@ export function RegulatoryDossierWorkspace() {
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                   <h3 className="text-sm font-semibold">Detected solvent list</h3>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="reg-rs-solvents">solvents_json</Label>
-                      <Textarea
-                        id="reg-rs-solvents"
-                        rows={6}
-                        value={rsSolventLines}
-                        onChange={(e) => setRsSolventLines(e.target.value)}
-                        className="font-mono text-sm"
-                        placeholder={"One solvent per line. Optional observed ppm after the last comma, e.g. MeOH, 1200"}
+                    <div className="md:col-span-2">
+                      <ObjectArrayField
+                        label="Detected solvents"
+                        itemLabel="Solvent"
+                        addLabel="Add solvent"
+                        fields={[
+                          { key: "solvent_name", label: "Solvent name" },
+                          { key: "observed_ppm", label: "Observed ppm (optional)", type: "number" },
+                        ]}
+                        initialValue={rsSolvents}
+                        onChange={setRsSolvents}
+                        description="Each detected solvent, with its observed level in ppm if known."
+                        idPrefix="reg-rs-solvents"
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Parsed into POST body <span className="font-mono">solvents_json</span> with{" "}
-                        <span className="font-mono">solvent_name</span> and optional{" "}
-                        <span className="font-mono">observed_ppm</span>.
-                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label>source evidence (metadata_json.source_evidence)</Label>
@@ -4586,26 +4559,23 @@ export function RegulatoryDossierWorkspace() {
                         autoComplete="off"
                       />
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="ag-ev">evidence_item_ids_json</Label>
-                      <Textarea
-                        id="ag-ev"
-                        rows={2}
-                        className="font-mono text-xs"
-                        value={agEvidenceIds}
-                        onChange={(e) => setAgEvidenceIds(e.target.value)}
-                        placeholder="Comma- or newline-separated integers, e.g. 12, 34"
+                    <div className="md:col-span-2">
+                      <NumberListField
+                        label="Evidence item IDs"
+                        itemLabel="Evidence item ID"
+                        addLabel="Add evidence item"
+                        initialValue={agEvidenceIds}
+                        onChange={setAgEvidenceIds}
+                        description="IDs of the evidence items this AI decision relied on."
+                        idPrefix="ag-ev"
                       />
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="ag-explain">explainability_summary_json</Label>
-                      <Textarea
-                        id="ag-explain"
-                        rows={4}
-                        className="font-mono text-xs"
-                        value={agExplainJson}
-                        onChange={(e) => setAgExplainJson(e.target.value)}
-                        placeholder="{}"
+                    <div className="md:col-span-2">
+                      <JsonObjectField
+                        idPrefix="ag-explain"
+                        label="Explainability summary"
+                        description="How the AI reached this decision (name/value pairs, or raw JSON for nested detail)."
+                        onChange={(obj) => setAgExplainJson(jsonStringFromObject(obj))}
                       />
                     </div>
                     <div className="flex items-center gap-3 md:col-span-2">
@@ -4618,15 +4588,15 @@ export function RegulatoryDossierWorkspace() {
                         human_override_available
                       </Label>
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="ag-val">validation_record_ids_json</Label>
-                      <Textarea
-                        id="ag-val"
-                        rows={2}
-                        className="font-mono text-xs"
-                        value={agValidationRecordIds}
-                        onChange={(e) => setAgValidationRecordIds(e.target.value)}
-                        placeholder="Comma- or newline-separated integers"
+                    <div className="md:col-span-2">
+                      <NumberListField
+                        label="Validation record IDs"
+                        itemLabel="Validation record ID"
+                        addLabel="Add validation record"
+                        initialValue={agValidationRecordIds}
+                        onChange={setAgValidationRecordIds}
+                        description="IDs of the validation records supporting this AI system."
+                        idPrefix="ag-val"
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
@@ -4648,14 +4618,15 @@ export function RegulatoryDossierWorkspace() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="ag-notes">notes_json (one line per entry)</Label>
-                      <Textarea
-                        id="ag-notes"
-                        rows={3}
-                        className="text-sm"
-                        value={agNotesLines}
-                        onChange={(e) => setAgNotesLines(e.target.value)}
+                    <div className="md:col-span-2">
+                      <StringListField
+                        label="Notes"
+                        itemLabel="Note"
+                        addLabel="Add note"
+                        initialValue={agNotes}
+                        onChange={setAgNotes}
+                        description="Free-text notes on this AI governance record. Leave empty for none."
+                        idPrefix="ag-notes"
                       />
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useId, useState } from "react"
+import { useState } from "react"
 import { Braces, ListPlus, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,52 +8,53 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
 /**
- * A labeled list-of-strings editor for `["value", ...]` wire arrays — blocked
- * reagents, required controls, tag lists — with one input per row, optional
- * autocomplete suggestions (native <datalist>), and a raw-JSON escape hatch.
+ * A labeled list-of-numbers editor for `[1, 2, ...]` wire arrays — record-id
+ * references (evidence items, validation records, citations) that the backend
+ * stores as `list[int]`. One numeric input per row plus a raw-JSON escape hatch.
  *
- * Contract mirrors the other Phase-7 field components: emits a plain string
- * array on every change (blank rows omitted; an all-empty list emits []),
- * seeds from `initialValue` ONCE on mount, resets via a React `key` bump.
+ * Emits a plain number[] on every change (blank/non-numeric rows omitted; an
+ * all-empty list emits []). Seeds from `initialValue` ONCE on mount; reset via a
+ * React `key` bump. Mirrors StringListField for the string case.
  */
-export function StringListField({
+export function NumberListField({
   label,
   onChange,
   initialValue = [],
-  itemLabel = "Item",
-  itemPlaceholder,
-  addLabel = "Add item",
-  suggestions = [],
-  suggestionsHint,
+  itemLabel = "ID",
+  itemPlaceholder = "e.g. 42",
+  addLabel = "Add ID",
   description,
-  idPrefix = "slf",
 }: {
   label: string
-  onChange: (next: string[]) => void
+  onChange: (next: number[]) => void
   initialValue?: unknown[]
   itemLabel?: string
   itemPlaceholder?: string
   addLabel?: string
-  suggestions?: string[]
-  suggestionsHint?: string
   description?: string
   idPrefix?: string
 }) {
   type Row = { id: number; value: string }
 
-  const reactId = useId()
-  const listId = `${idPrefix}-${reactId}-suggestions`
-
   const [rows, setRows] = useState<Row[]>(() =>
-    initialValue.filter((v) => v != null).map((v, i) => ({ id: i, value: String(v) })),
+    initialValue
+      .filter((v) => v != null && v !== "")
+      .map((v, i) => ({ id: i, value: String(v) })),
   )
   const [nextId, setNextId] = useState(() => 10_000)
   const [mode, setMode] = useState<"list" | "raw">("list")
   const [rawDraft, setRawDraft] = useState("")
   const [rawError, setRawError] = useState("")
 
-  function assemble(nextRows: Row[]): string[] {
-    return nextRows.map((r) => r.value.trim()).filter((v) => v !== "")
+  function assemble(nextRows: Row[]): number[] {
+    const out: number[] = []
+    for (const r of nextRows) {
+      const t = r.value.trim()
+      if (t === "") continue
+      const n = Number(t)
+      if (Number.isFinite(n)) out.push(n)
+    }
+    return out
   }
 
   function updateRow(id: number, value: string) {
@@ -75,7 +76,7 @@ export function StringListField({
 
   function enterRaw() {
     const list = assemble(rows)
-    setRawDraft(list.length ? JSON.stringify(list, null, 2) : "")
+    setRawDraft(list.length ? JSON.stringify(list) : "")
     setRawError("")
     setMode("raw")
   }
@@ -83,17 +84,20 @@ export function StringListField({
   function enterList() {
     const trimmed = rawDraft.trim()
     if (!trimmed) {
-      // The raw box was cleared (onRawChange already emitted []). Clear the rows to match.
+      // The raw box was cleared (onRawChange already emitted []). Clear the rows to match,
+      // so the displayed list can't disagree with the emitted value.
       setRows([])
       onChange([])
     } else if (!rawError) {
       try {
         const parsed = JSON.parse(trimmed) as unknown[]
         let id = nextId
-        setRows(parsed.filter((v) => v != null).map((v) => ({ id: id++, value: String(v) })))
+        setRows(
+          parsed.filter((v) => v != null && v !== "").map((v) => ({ id: id++, value: String(v) })),
+        )
         setNextId(id)
       } catch {
-        // Unparseable text never reached onChange; keep the existing rows.
+        /* keep existing rows */
       }
     }
     setRawError("")
@@ -116,17 +120,20 @@ export function StringListField({
       return
     }
     if (!Array.isArray(parsed)) {
-      setRawError('Must be a JSON array (e.g. ["DMF", "benzene"]).')
+      setRawError("Must be a JSON array of numbers (e.g. [12, 47]).")
       return
     }
+    const out: number[] = []
+    for (const v of parsed) {
+      const n = typeof v === "number" ? v : Number(v)
+      if (!Number.isFinite(n)) {
+        setRawError(`"${String(v)}" is not a number.`)
+        return
+      }
+      out.push(n)
+    }
     setRawError("")
-    // Trim and drop blanks, exactly like the list view's `assemble` — so the raw
-    // hatch can never emit an empty-string entry the list can't represent.
-    onChange(
-      parsed
-        .map((v) => (v == null ? "" : String(v).trim()))
-        .filter((v) => v !== ""),
-    )
+    onChange(out)
   }
 
   return (
@@ -164,9 +171,9 @@ export function StringListField({
                 <div key={row.id} className="flex items-center gap-2">
                   <Input
                     aria-label={`${itemLabel} (row)`}
-                    list={suggestions.length ? listId : undefined}
+                    inputMode="numeric"
                     value={row.value}
-                    placeholder={itemPlaceholder ?? itemLabel}
+                    placeholder={itemPlaceholder}
                     onChange={(e) => updateRow(row.id, e.target.value)}
                   />
                   <Button
@@ -191,25 +198,12 @@ export function StringListField({
             <Plus className="h-3.5 w-3.5" />
             {addLabel}
           </Button>
-
-          {suggestions.length > 0 ? (
-            <>
-              <datalist id={listId}>
-                {suggestions.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-              {suggestionsHint ? (
-                <p className="text-[11px] text-muted-foreground">{suggestionsHint}</p>
-              ) : null}
-            </>
-          ) : null}
         </div>
       ) : (
         <div className="space-y-1">
           <Textarea
             aria-label={`${label} (raw JSON)`}
-            className="min-h-[100px] font-mono text-xs"
+            className="min-h-[80px] font-mono text-xs"
             value={rawDraft}
             spellCheck={false}
             placeholder="[]"
