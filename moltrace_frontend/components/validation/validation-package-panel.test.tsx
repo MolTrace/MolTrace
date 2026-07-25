@@ -56,11 +56,18 @@ describe("ValidationPackagePanel", () => {
     await waitFor(() => expect(m.get).toHaveBeenCalled())
 
     await user.click(screen.getByRole("button", { name: /Attach CI evidence/i }))
-    // userEvent treats { and [ as special — escape the brace so it types literally.
-    await user.type(await screen.findByLabelText("test_summary_json"), '{{"passed":1}')
+    // The test summary is now a structured editor: add one field instead of typing raw JSON.
+    await user.click(await screen.findByRole("button", { name: "Add field" }))
+    await user.type(screen.getByPlaceholderText("key"), "passed")
+    await user.type(screen.getByPlaceholderText("value"), "1")
     await user.click(screen.getByRole("button", { name: /Ingest evidence/i }))
 
-    await waitFor(() => expect(m.ingest).toHaveBeenCalledWith(1, expect.objectContaining({ source: "ci" })))
+    await waitFor(() =>
+      expect(m.ingest).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ source: "ci", test_summary_json: { passed: 1 } }),
+      ),
+    )
     expect(await screen.findByText(/already approved; evidence is locked/i)).toBeInTheDocument()
   })
 })

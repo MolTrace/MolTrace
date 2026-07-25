@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react"
 import {
   REASON_CODES,
@@ -107,7 +108,7 @@ export function AiActiveLearningWorkspace() {
   const [reasonCode, setReasonCode] = useState<ReasonCode | "">("")
   const [reviewerName, setReviewerName] = useState("")
   const [reviewerComment, setReviewerComment] = useState("")
-  const [correctedOutputJson, setCorrectedOutputJson] = useState("")
+  const [correctedOutput, setCorrectedOutput] = useState<Record<string, unknown>>({})
   const [sensitiveConfirmed, setSensitiveConfirmed] = useState(false)
   const [feedbackBusy, setFeedbackBusy] = useState(false)
   const [feedbackErr, setFeedbackErr] = useState("")
@@ -124,7 +125,10 @@ export function AiActiveLearningWorkspace() {
   const [candidateOk, setCandidateOk] = useState("")
   const [rowBusyId, setRowBusyId] = useState<number | null>(null)
 
-  const sensitiveWarning = useMemo(() => hasSensitiveCorrectionContent(correctedOutputJson), [correctedOutputJson])
+  const sensitiveWarning = useMemo(
+    () => hasSensitiveCorrectionContent(JSON.stringify(correctedOutput)),
+    [correctedOutput],
+  )
 
   const loadQueue = useCallback(async () => {
     setLoading(true)
@@ -157,20 +161,9 @@ export function AiActiveLearningWorkspace() {
       return
     }
 
-    let correctedOutputParsed: Record<string, unknown> | null = null
-    if (correctedOutputJson.trim()) {
-      try {
-        const parsed = JSON.parse(correctedOutputJson) as unknown
-        if (!isRecord(parsed)) {
-          setFeedbackErr("corrected_output_json must be a JSON object when provided.")
-          return
-        }
-        correctedOutputParsed = parsed
-      } catch {
-        setFeedbackErr("corrected_output_json must be valid JSON.")
-        return
-      }
-    }
+    // Optional: an empty editor sends null (unchanged wire), a filled one the object.
+    const correctedOutputParsed: Record<string, unknown> | null =
+      Object.keys(correctedOutput).length > 0 ? correctedOutput : null
 
     setFeedbackBusy(true)
     try {
@@ -358,13 +351,7 @@ export function AiActiveLearningWorkspace() {
 
           <div className="space-y-2">
             <Label htmlFor="corrected-output-json">corrected output JSON optional</Label>
-            <Textarea
-              id="corrected-output-json"
-              value={correctedOutputJson}
-              onChange={(e) => setCorrectedOutputJson(e.target.value)}
-              rows={5}
-              placeholder='{"correction_summary":"ID-based correction only"}'
-            />
+            <JsonObjectField idPrefix="corrected-output-json" label="Corrected output (optional)" initialValue={correctedOutput} onChange={setCorrectedOutput} description="A structured correction, if any. Leave empty for none." />
           </div>
 
           {sensitiveWarning ? (
