@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
+import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from '@/lib/seo/site'
+import { OrganizationJsonLd } from '@/components/seo/json-ld'
 import { ThemeProvider } from '@/components/theme-provider'
 import { DeveloperModeProvider } from '@/components/developer-mode-provider'
 import { Toaster } from '@/components/ui/toaster'
@@ -13,9 +15,63 @@ const PWA_ASSET_VERSION = '2026-05-21-engraved-white-cube-edge-v1'
 const versionedIcon = (src: string) => `${src}?v=${PWA_ASSET_VERSION}`
 
 export const metadata: Metadata = {
-  title: 'MolTrace | AI-Native Scientific Intelligence Platform',
-  description: 'AI-powered spectroscopy interpretation, reaction optimization, and regulatory intelligence for chemistry and R&D teams.',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    // Per-route `title` strings render as "About · MolTrace" etc.; this template
+    // only applies to child pages that set a plain string title without their
+    // own suffix. Pages here already suffix themselves, so keep it minimal.
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
   generator: 'v0.app',
+  keywords: [
+    'spectroscopy interpretation',
+    'NMR structure elucidation',
+    'reaction optimization',
+    'Bayesian optimization chemistry',
+    'regulatory intelligence',
+    'pharmaceutical R&D software',
+    'audit-ready AI',
+    '21 CFR Part 11',
+    'GxP',
+    'cheminformatics',
+  ],
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  // Explicit, permissive robots directive so crawlers get rich SERP features.
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
+  // Google Search Console meta-tag verification. Set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+  // to the token from Search Console → this emits <meta name="google-site-verification">.
+  verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+    : undefined,
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    siteName: SITE_NAME,
+    locale: 'en_US',
+    url: SITE_URL,
+    title: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
   icons: {
     icon: [
       {
@@ -55,6 +111,7 @@ export default function RootLayout({
         <DevToolsBridge />
       </head>
       <body suppressHydrationWarning className="font-sans antialiased">
+        <OrganizationJsonLd />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
