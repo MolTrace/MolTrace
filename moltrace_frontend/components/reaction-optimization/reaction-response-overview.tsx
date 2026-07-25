@@ -42,8 +42,8 @@ const EMPTY_COPY =
   "Add completed experiments with numeric outcomes to visualize reaction response."
 
 const OUTCOME_FIELDS = [
-  { value: "yield_percent", label: "yield_percent" },
-  { value: "selectivity_percent", label: "selectivity_percent" },
+  { value: "yield_percent", label: "Yield (%)" },
+  { value: "selectivity_percent", label: "Selectivity (%)" },
 ] as const
 
 const CHART_FILLS = [
@@ -225,8 +225,7 @@ export function ReactionResponseOverview({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Reaction response overview</CardTitle>
         <CardDescription>
-          Completed experiments with numeric condition values and outcome_json / outcome fields (yield_percent or
-          selectivity_percent). Points are colored by experiment status.
+          Completed experiments with numeric condition values and a recorded outcome (yield or selectivity). Points are colored by experiment status.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -342,7 +341,7 @@ export function ReactionResponseOverview({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>experiment_code</TableHead>
+                    <TableHead>Experiment code</TableHead>
                     <TableHead className="font-mono text-xs">{xAxisKey}</TableHead>
                     <TableHead className="font-mono text-xs">{outcomeField}</TableHead>
                     <TableHead>status</TableHead>

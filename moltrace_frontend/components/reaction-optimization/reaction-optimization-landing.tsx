@@ -246,7 +246,7 @@ export function ReactionOptimizationLanding() {
       </div>
 
       {showListUnavailable ? (
-        <AlertCard variant="warning" title="Backend unavailable" description={listError ?? ""} />
+        <AlertCard variant="warning" title="Reaction projects unavailable" description={listError ?? ""} />
       ) : null}
 
       <AlertCard
@@ -312,7 +312,7 @@ export function ReactionOptimizationLanding() {
             title="Experiments avoided"
             icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
             value={listLoading || countsLoading ? "…" : "—"}
-            sub={<p className="text-xs text-muted-foreground">Not returned by loaded campaign data.</p>}
+            sub={<p className="text-xs text-muted-foreground">Not included in the loaded campaign data.</p>}
           />
         </div>
         {reactionDataState === "empty" ? (
@@ -419,7 +419,7 @@ export function ReactionOptimizationLanding() {
               <AlertCard
                 variant="success"
                 title="Project created"
-                description="Reloaded project list from the server."
+                description="Refreshed your project list."
               />
             ) : null}
             <div className="grid gap-4 md:grid-cols-2">
@@ -511,7 +511,7 @@ export function ReactionOptimizationLanding() {
           accent="violet"
           eyebrow="Reaction · Projects"
           title="Reaction projects"
-        description="Columns include linked experiment and recommendation counts when project details respond."
+        description="Columns include linked experiment and recommendation counts when project details are available."
         badge={
           <Badge variant="secondary" className="font-normal">
             Project list

@@ -153,13 +153,13 @@ export function YieldPredictionPanel({
         setGuidance(
           detail.includes("zero examples")
             ? requireVerified
-              ? "No verified completed experiments with a numeric yield_percent yet — confirm outcomes (or turn off verified-only) first."
-              : "No completed experiments with a numeric yield_percent yet — record completed experiments with yields first."
+              ? "No verified completed experiments with a numeric yield yet — confirm outcomes (or turn off verified-only) first."
+              : "No completed experiments with a numeric yield yet — record completed experiments with yields first."
             : detail || "The surrogate could not fit on this project's data yet.",
         )
       } else {
         // A genuine failure is not guidance — render it in the neutral message style.
-        setMsg(formatApiError(err, "POST …/yield-predictions failed."))
+        setMsg(formatApiError(err, "Could not run the yield prediction."))
       }
     } finally {
       setBusy(false)
@@ -229,7 +229,7 @@ export function YieldPredictionPanel({
               model: {run.backend ?? "—"}
             </Badge>
             <Badge variant="outline" className="tabular-nums text-[11px]">
-              trained_n: {run.trainedN ?? "—"}
+              training examples: {run.trainedN ?? "—"}
             </Badge>
             <Badge variant="outline" className="text-[11px]">
               {run.requireVerified ? "verified-only fit" : "all completed experiments"}
@@ -277,7 +277,7 @@ export function YieldPredictionPanel({
           {run.capabilityProvenance != null ? (
             <details className="rounded-md border">
               <summary className="cursor-pointer px-3 py-2 text-[11px] font-medium focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                capability_provenance — why this backend produced these numbers
+                Capability provenance — why this model produced these numbers
               </summary>
               <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words border-t bg-muted/40 p-2 text-[10px] leading-snug">
                 {JSON.stringify(run.capabilityProvenance, null, 2)}

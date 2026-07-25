@@ -107,7 +107,7 @@ export function ForwardCheckPanel({ projectId }: { projectId: number }) {
             : err.message || "The check was rejected — verify the SMILES lists and try again.",
         )
       } else {
-        setMsg(formatApiError(err, "POST …/forward-checks failed."))
+        setMsg(formatApiError(err, "Could not run the forward check."))
       }
     } finally {
       setBusy(false)

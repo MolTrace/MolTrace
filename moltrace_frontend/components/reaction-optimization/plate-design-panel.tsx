@@ -575,8 +575,7 @@ export function PlateDesignPanel({
             ) : null}
 
             <p className="text-[11px] text-muted-foreground">
-              CSV/JSON exports feed lab robotics — Mettler-Toledo / Chemspeed / Unchained adapters are thin
-              server-side wrappers over these files (coming later).
+              CSV/JSON exports feed lab robotics — Mettler-Toledo / Chemspeed / Unchained integrations build on these files (coming later).
             </p>
           </div>
         ) : null}

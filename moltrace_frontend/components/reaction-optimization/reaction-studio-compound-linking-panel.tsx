@@ -162,7 +162,7 @@ export function ReactionStudioCompoundLinkSummary({
         <CardTitle className="text-base">Linked compounds (summary)</CardTitle>
         <CardDescription>
           Registry links and product batches are managed on the Evidence Links tab. Summaries below are parsed from
-          project and experiment payloads when those fields are returned.
+          project and experiment records when available.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
@@ -186,7 +186,7 @@ export function ReactionStudioCompoundLinkSummary({
               <span>{hints.batchLabels.length > 0 ? hints.batchLabels.join(" · ") : "—"}</span>
             </p>
             <p className="text-xs text-muted-foreground">
-              Open SpectraCheck evidence from the Evidence Links table — full analytical payloads are not copied here.
+              Open SpectraCheck evidence from the Evidence Links table — full analytical records are not copied here.
             </p>
           </>
         ) : null}
@@ -249,7 +249,7 @@ export function ReactionStudioCompoundLinkingPanel({
     }
     const expId = Number.parseInt(eid, 10)
     if (!Number.isFinite(expId)) {
-      setLinkErr("experiment_id must be a positive integer.")
+      setLinkErr("Experiment ID must be a positive whole number.")
       return
     }
     const cid = selectedCompoundId.trim()
@@ -259,7 +259,7 @@ export function ReactionStudioCompoundLinkingPanel({
     }
     const compound_id = Number.parseInt(cid, 10)
     if (!Number.isFinite(compound_id)) {
-      setLinkErr("compound_id must be a positive integer.")
+      setLinkErr("Compound ID must be a positive whole number.")
       return
     }
     setLinkBusy(true)
@@ -297,12 +297,12 @@ export function ReactionStudioCompoundLinkingPanel({
     const cid = batchCompoundId.trim() || selectedCompoundId.trim()
     const bc = batchCode.trim()
     if (!cid || !bc) {
-      setBatchErr("batch compound id and batch_code are required.")
+      setBatchErr("Batch compound ID and batch code are required.")
       return
     }
     const compound_id = Number.parseInt(cid, 10)
     if (!Number.isFinite(compound_id)) {
-      setBatchErr("compound_id must be a positive integer.")
+      setBatchErr("Compound ID must be a positive whole number.")
       return
     }
     if (!Number.isFinite(expId)) {
@@ -323,7 +323,7 @@ export function ReactionStudioCompoundLinkingPanel({
       })
       const batchId = readNum(created, "id") ?? readNum(created, "batch_id")
       if (batchId == null) {
-        setBatchErr("Batch created but response had no batch id — link batch manually when id is available.")
+        setBatchErr("Batch created, but no batch ID came back — link the batch manually once an ID is available.")
         await onRefresh()
         return
       }
@@ -370,8 +370,7 @@ export function ReactionStudioCompoundLinkingPanel({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Linked compounds</CardTitle>
           <CardDescription>
-            Registry compound links and material batches (summary). Use SpectraCheck or compound detail for full
-            payloads.
+            Registry compound links and material batches (summary). Use SpectraCheck or compound detail for full details.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -409,7 +408,7 @@ export function ReactionStudioCompoundLinkingPanel({
             <Label htmlFor="rs-exp">experiment</Label>
             <Select value={selectedExperimentId || "__none__"} onValueChange={(v) => setSelectedExperimentId(v === "__none__" ? "" : v)}>
               <SelectTrigger id="rs-exp">
-                <SelectValue placeholder="experiment_id" />
+                <SelectValue placeholder="Select an experiment" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">—</SelectItem>
@@ -500,16 +499,16 @@ export function ReactionStudioCompoundLinkingPanel({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="rs-bcid">compound_id for batch (defaults to selected compound)</Label>
+            <Label htmlFor="rs-bcid">Compound ID for batch (defaults to selected compound)</Label>
             <Input
               id="rs-bcid"
               value={batchCompoundId}
               onChange={(e) => setBatchCompoundId(e.target.value)}
-              placeholder={selectedCompoundId || "compound_id"}
+              placeholder={selectedCompoundId || "Compound ID"}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="rs-bcode">batch_code</Label>
+            <Label htmlFor="rs-bcode">Batch code</Label>
             <Input id="rs-bcode" value={batchCode} onChange={(e) => setBatchCode(e.target.value)} />
           </div>
           {batchErr ? (
@@ -532,7 +531,7 @@ export function ReactionStudioCompoundLinkingPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>experiment_id</TableHead>
+                <TableHead>Experiment ID</TableHead>
                 <TableHead>code</TableHead>
                 <TableHead>status</TableHead>
                 <TableHead>link hints</TableHead>
