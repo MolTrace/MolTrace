@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
 import { trackFeatureFlagUpdated } from "@/src/lib/analytics/analytics-client"
 
 type Row = Record<string, unknown>
@@ -111,16 +112,6 @@ function formatErr(error: unknown, fallback: string): string {
   return fallback
 }
 
-function parseJsonField(raw: string, label: string): unknown {
-  const text = raw.trim()
-  if (!text) return {}
-  try {
-    return JSON.parse(text)
-  } catch {
-    throw new Error(`${label} must be valid JSON.`)
-  }
-}
-
 function programSortIndex(program: string): number {
   const normalized = program.trim().toLowerCase()
   const index = PROGRAM_ORDER.findIndex((item) => (item.values as readonly string[]).includes(normalized))
@@ -154,7 +145,8 @@ export function FeatureFlagsWorkspace() {
   const [planKey, setPlanKey] = useState("")
   const [planDisplayName, setPlanDisplayName] = useState("")
   const [planDescription, setPlanDescription] = useState("")
-  const [planDefaultEntitlementsJson, setPlanDefaultEntitlementsJson] = useState("{}")
+  const [planDefaultEntitlements, setPlanDefaultEntitlements] = useState<Record<string, unknown>>({})
+  const [planFormKey, setPlanFormKey] = useState(0)
   const [planStatus, setPlanStatus] = useState<(typeof SUBSCRIPTION_PLAN_STATUS_OPTIONS)[number]>("active")
   const [planBusy, setPlanBusy] = useState(false)
 
@@ -162,7 +154,8 @@ export function FeatureFlagsWorkspace() {
   const [flagDisplayName, setFlagDisplayName] = useState("")
   const [flagProgram, setFlagProgram] = useState<(typeof PROGRAM_OPTIONS)[number]>("spectracheck")
   const [flagDefaultEnabled, setFlagDefaultEnabled] = useState("false")
-  const [flagRolloutRulesJson, setFlagRolloutRulesJson] = useState("{}")
+  const [flagRolloutRules, setFlagRolloutRules] = useState<Record<string, unknown>>({})
+  const [flagFormKey, setFlagFormKey] = useState(0)
   const [flagStatus, setFlagStatus] = useState<(typeof FEATURE_FLAG_STATUS_OPTIONS)[number]>("active")
   const [flagBusy, setFlagBusy] = useState(false)
   const [actionBusyId, setActionBusyId] = useState("")
@@ -211,14 +204,15 @@ export function FeatureFlagsWorkspace() {
           plan_key: planKey.trim(),
           display_name: planDisplayName.trim(),
           description: planDescription.trim(),
-          default_entitlements_json: parseJsonField(planDefaultEntitlementsJson, "default entitlements JSON"),
+          default_entitlements_json: planDefaultEntitlements,
           status: planStatus,
         },
       })
       setPlanKey("")
       setPlanDisplayName("")
       setPlanDescription("")
-      setPlanDefaultEntitlementsJson("{}")
+      setPlanDefaultEntitlements({})
+      setPlanFormKey((k) => k + 1)
       setPlanStatus("active")
       await load()
     } catch (err) {
@@ -239,7 +233,7 @@ export function FeatureFlagsWorkspace() {
           display_name: flagDisplayName.trim(),
           program: flagProgram,
           default_enabled: flagDefaultEnabled === "true",
-          rollout_rules_json: parseJsonField(flagRolloutRulesJson, "rollout rules JSON"),
+          rollout_rules_json: flagRolloutRules,
           status: flagStatus,
         },
       })
@@ -252,7 +246,8 @@ export function FeatureFlagsWorkspace() {
       setFlagDisplayName("")
       setFlagProgram("spectracheck")
       setFlagDefaultEnabled("false")
-      setFlagRolloutRulesJson("{}")
+      setFlagRolloutRules({})
+      setFlagFormKey((k) => k + 1)
       setFlagStatus("active")
       await load()
     } catch (err) {
@@ -540,12 +535,13 @@ export function FeatureFlagsWorkspace() {
               </Select>
             </div>
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="feature-flag-rollout-rules-json">rollout rules JSON</Label>
-              <Textarea
-                id="feature-flag-rollout-rules-json"
-                value={flagRolloutRulesJson}
-                onChange={(event) => setFlagRolloutRulesJson(event.target.value)}
-                rows={4}
+              <JsonObjectField
+                key={`flag-rollout-${flagFormKey}`}
+                idPrefix="feature-flag-rollout-rules-json"
+                label="Rollout rules"
+                initialValue={flagRolloutRules}
+                onChange={setFlagRolloutRules}
+                description="Targeting rules for this flag (name/value pairs, or raw JSON for nested tenant lists / percentages)."
               />
             </div>
           </div>
@@ -661,12 +657,13 @@ export function FeatureFlagsWorkspace() {
               />
             </div>
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="subscription-plan-default-entitlements-json">default entitlements JSON</Label>
-              <Textarea
-                id="subscription-plan-default-entitlements-json"
-                value={planDefaultEntitlementsJson}
-                onChange={(event) => setPlanDefaultEntitlementsJson(event.target.value)}
-                rows={4}
+              <JsonObjectField
+                key={`plan-entitlements-${planFormKey}`}
+                idPrefix="subscription-plan-default-entitlements-json"
+                label="Default entitlements"
+                initialValue={planDefaultEntitlements}
+                onChange={setPlanDefaultEntitlements}
+                description="Feature entitlements granted by this plan (feature_key → value)."
               />
             </div>
           </div>

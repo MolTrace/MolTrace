@@ -8,7 +8,7 @@ import { ModuleCard } from "@/components/dashboard/module-card"
 import { ExternalLink, FileBox, FileSpreadsheet, Link2, Plus, Tags } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { JsonObjectField } from "@/components/ui/json-object-field"
 import {
   Table,
   TableBody,
@@ -143,7 +143,8 @@ export function MappingTemplatesWorkspace() {
   const [name, setName] = useState("")
   const [sourceType, setSourceType] = useState<(typeof SOURCE_TYPE_OPTIONS)[number]>("eln_experiment")
   const [targetType, setTargetType] = useState<(typeof TARGET_TYPE_OPTIONS)[number]>("spectracheck_session")
-  const [fieldMapJson, setFieldMapJson] = useState("{\n  \"external_field\": \"moltrace_field\"\n}")
+  const [fieldMap, setFieldMap] = useState<Record<string, unknown>>({ external_field: "moltrace_field" })
+  const [fieldMapFormKey, setFieldMapFormKey] = useState(0)
   const [createTemplateBusy, setCreateTemplateBusy] = useState(false)
   const [updateTemplateBusy, setUpdateTemplateBusy] = useState(false)
 
@@ -234,7 +235,13 @@ export function MappingTemplatesWorkspace() {
         if (TARGET_TYPE_OPTIONS.includes(row.target_type as (typeof TARGET_TYPE_OPTIONS)[number])) {
           setTargetType(row.target_type as (typeof TARGET_TYPE_OPTIONS)[number])
         }
-        setFieldMapJson(row.field_map_json)
+        try {
+          const parsedMap = JSON.parse(row.field_map_json)
+          setFieldMap(isRecord(parsedMap) ? parsedMap : {})
+        } catch {
+          setFieldMap({})
+        }
+        setFieldMapFormKey((k) => k + 1)
       } catch {
         // keep current form state when detail fails
       }
@@ -258,7 +265,6 @@ export function MappingTemplatesWorkspace() {
     setCreateTemplateBusy(true)
     setError("")
     try {
-      const parsed = JSON.parse(fieldMapJson)
       await apiFetch("/mapping-templates", {
         method: "POST",
         body: {
@@ -266,7 +272,7 @@ export function MappingTemplatesWorkspace() {
           name: name.trim(),
           source_type: sourceType,
           target_type: targetType,
-          field_map_json: parsed,
+          field_map_json: fieldMap,
         },
       })
       trackMappingTemplateCreated({
@@ -289,7 +295,6 @@ export function MappingTemplatesWorkspace() {
     setUpdateTemplateBusy(true)
     setError("")
     try {
-      const parsed = JSON.parse(fieldMapJson)
       await apiFetch(`/mapping-templates/${selectedTemplateId}`, {
         method: "PATCH",
         body: {
@@ -297,7 +302,7 @@ export function MappingTemplatesWorkspace() {
           name: name.trim(),
           source_type: sourceType,
           target_type: targetType,
-          field_map_json: parsed,
+          field_map_json: fieldMap,
         },
       })
       await loadTemplates()
@@ -428,12 +433,13 @@ export function MappingTemplatesWorkspace() {
               </select>
             </div>
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="mapping-field-map-json">field map JSON</Label>
-              <Textarea
-                id="mapping-field-map-json"
-                rows={8}
-                value={fieldMapJson}
-                onChange={(e) => setFieldMapJson(e.target.value)}
+              <JsonObjectField
+                key={`field-map-${fieldMapFormKey}`}
+                idPrefix="mapping-field-map-json"
+                label="Field map"
+                initialValue={fieldMap}
+                onChange={setFieldMap}
+                description="External field name → MolTrace field name. Add a row per mapping; use raw JSON for anything nested."
               />
             </div>
           </div>
