@@ -62,9 +62,10 @@ export default function ProjectDetailPage() {
 
   const [sampleOpen, setSampleOpen] = useState(false)
   const [sampleIdField, setSampleIdField] = useState("")
-  const [smiles, setSmiles] = useState("")
-  const [nmrText, setNmrText] = useState("")
+  const [displayName, setDisplayName] = useState("")
+  const [moleculeName, setMoleculeName] = useState("")
   const [solvent, setSolvent] = useState("")
+  const [notes, setNotes] = useState("")
   const [sampleBusy, setSampleBusy] = useState(false)
   const [sampleError, setSampleError] = useState("")
 
@@ -98,23 +99,34 @@ export default function ProjectDetailPage() {
 
   async function submitSample() {
     if (!projectId) return
+    const trimmedSampleId = sampleIdField.trim()
+    if (!trimmedSampleId) {
+      setSampleError("sample_id is required.")
+      return
+    }
     setSampleBusy(true)
     setSampleError("")
     try {
+      // POST /projects/{id}/samples is bound to SpectraCheckSampleCreate (extra=forbid): a required
+      // sample_id plus optional display_name/molecule_name/solvent/notes. It has NO smiles/nmr_text
+      // (those belong to the separate ProjectSample model), so sending them 422'd on every save.
+      // `status` defaults to "draft" server-side and is omitted.
       await apiFetch(`/projects/${encodeURIComponent(projectId)}/samples`, {
         method: "POST",
         body: {
-          sample_id: sampleIdField.trim() || null,
-          smiles: smiles.trim(),
-          nmr_text: nmrText.trim(),
+          sample_id: trimmedSampleId,
+          display_name: displayName.trim() || null,
+          molecule_name: moleculeName.trim() || null,
           solvent: solvent.trim() || null,
+          notes: notes.trim() || null,
         },
       })
       setSampleOpen(false)
       setSampleIdField("")
-      setSmiles("")
-      setNmrText("")
+      setDisplayName("")
+      setMoleculeName("")
       setSolvent("")
+      setNotes("")
       await load()
     } catch (err) {
       setSampleError(projectsErrorMessage(err, "Create sample failed."))
@@ -264,26 +276,30 @@ export default function ProjectDetailPage() {
               <DialogHeader>
                 <DialogTitle>Create sample</DialogTitle>
                 <DialogDescription>
-                  Required fields follow the backend schema (<code className="text-xs">smiles</code>,{" "}
-                  <code className="text-xs">nmr_text</code>).
+                  <code className="text-xs">sample_id</code> is required; the other fields are
+                  optional. Structure and NMR are captured later by linking an analysis to the sample.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="s-id">sample_id (optional)</Label>
+                  <Label htmlFor="s-id">sample_id</Label>
                   <Input id="s-id" value={sampleIdField} onChange={(e) => setSampleIdField(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="s-smiles">smiles</Label>
-                  <Input id="s-smiles" value={smiles} onChange={(e) => setSmiles(e.target.value)} />
+                  <Label htmlFor="s-name">display_name (optional)</Label>
+                  <Input id="s-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="s-nmr">nmr_text</Label>
-                  <Textarea id="s-nmr" value={nmrText} onChange={(e) => setNmrText(e.target.value)} rows={4} />
+                  <Label htmlFor="s-mol">molecule_name (optional)</Label>
+                  <Input id="s-mol" value={moleculeName} onChange={(e) => setMoleculeName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="s-solv">solvent (optional)</Label>
                   <Input id="s-solv" value={solvent} onChange={(e) => setSolvent(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="s-notes">notes (optional)</Label>
+                  <Textarea id="s-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
                 </div>
                 {sampleError ? <p className="text-sm text-destructive">{sampleError}</p> : null}
               </div>
