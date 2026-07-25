@@ -3,7 +3,8 @@ import { ArrowRight, Bell, BookOpen, FileText, Mail, Rss } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
-import { BlogPostsGrid, type BlogPost } from "@/components/marketing/blog-posts-grid"
+import { BlogPostsGrid } from "@/components/marketing/blog-posts-grid"
+import { POSTS } from "@/lib/blog/posts"
 
 /**
  * Blog (editorial index) — full marketing-shell route at /blog.
@@ -22,119 +23,6 @@ import { BlogPostsGrid, type BlogPost } from "@/components/marketing/blog-posts-
  * validation harness + white papers. When an essay is published, swap
  * `status: "forthcoming"` for `status: "live"` and add an `href`.
  */
-
-// Curated editorial calendar. Each post reflects real work that's
-// documented in the codebase + white papers. Update as essays ship.
-const POSTS: BlogPost[] = [
-  {
-    slug: "chemical-environments-not-peaks",
-    title: "Why we count chemical environments, not peaks",
-    dek: "The expert-reference vs detector-output mismatch that nearly broke our promotion gate — and the clustering layer that fixed it.",
-    claim:
-      "NMRShiftDB2 references count distinct chemical environments; detectors faithfully resolve multiplet lines. Median peak-count deltas of 17 looked like an algorithm failure; they were a units mismatch. Field notes from the Phase 10 multiplet-clustering work.",
-    topic: "methodology",
-    topicLabel: "Methodology",
-    date: "2026-05-27",
-    readingMinutes: 9,
-    status: "forthcoming",
-  },
-  {
-    slug: "regression-by-fixture-id",
-    title: "A regression test that fails by fixture_id",
-    dek: "How a 20-fixture A/B JSON sidecar replaced our 'looks-good-to-me' detector reviews.",
-    claim:
-      "Every detector change runs against a curated NMRShiftDB2 corpus before merge. CI fails by name when any single fixture drifts >50% — so reviewers see 'nmrshiftdb2_60000006_13c regressed' instead of 'tests passed (with notes).' The boring infrastructure meant to keep ship velocity high.",
-    topic: "engineering",
-    topicLabel: "Engineering",
-    date: "2026-05-27",
-    readingMinutes: 7,
-    status: "forthcoming",
-  },
-  {
-    slug: "experimental-default-promotion-gate",
-    title: "What 'experimental' actually means in our promotion gate",
-    dek: "Every new AI backend ships as opt-in. Promotion to default is a published-threshold decision, not a vibes call.",
-    claim:
-      "GSD-Prompt-3 shipped as `experimental: true` with a documented promotion gate (target: 95% solvent detection, median compound-count delta ≤2). Until both clear, the default stays legacy. We publish the corpus, the threshold, and the date a feature crosses each one.",
-    topic: "methodology",
-    topicLabel: "Methodology",
-    date: "2026-05-27",
-    readingMinutes: 6,
-    status: "forthcoming",
-  },
-  {
-    slug: "auditable-confidence",
-    title: "No confidence number without an audit trail",
-    dek: "Why we'd rather show 'pending' than a polished score with no provenance.",
-    claim:
-      "Every numerical claim in the UI links to its source — the spectrum file, the picked peaks, the SMILES candidate, the literature citation, the human reviewer who signed off. The implementation cost is real. The regulatory cost of doing it otherwise is higher.",
-    topic: "regulatory",
-    topicLabel: "Regulatory",
-    date: "2026-05-21",
-    readingMinutes: 8,
-    status: "forthcoming",
-  },
-  {
-    slug: "bruker-sfo1-to-gsd",
-    title: "From Bruker SFO1 to GSD: plumbing instrument metadata through the contract",
-    dek: "A 500-MHz field hardcoded in the FE became a real number from the vendor metadata. Three lines of code, one cascade, no contract change.",
-    claim:
-      "Phase 8 traced field_mhz through the preview → process → analyze chain so the GSD endpoint receives the spectrometer frequency the instrument actually used (600.13 MHz, in our verification fixture) instead of a hardcoded 500. The same plumbing pattern works for vendor / solvent / nucleus.",
-    topic: "engineering",
-    topicLabel: "Engineering",
-    date: "2026-05-27",
-    readingMinutes: 5,
-    status: "forthcoming",
-  },
-  {
-    slug: "fit-chi-squared-of-10-15",
-    title: "Why legacy's fit χ² of 10¹⁵ is honest",
-    dek: "Per-peak QC metrics landed on legacy peaks and immediately surfaced a units mismatch. We shipped the column anyway.",
-    claim:
-      "GSD reports fit residuals normalized to baseline σ; legacy reports them in raw signal-domain units. The same threshold paints 31/37 peaks 'red' on legacy spectra. The right fix is detector-side normalization — but in the meantime, the column tells the truth.",
-    topic: "engineering",
-    topicLabel: "Engineering",
-    date: "2026-05-28",
-    readingMinutes: 6,
-    status: "forthcoming",
-  },
-  {
-    slug: "hmdb-style-validation",
-    title: "Validation against references that count the way detectors count",
-    dek: "NMRShiftDB2 said the algorithm was failing. HMDB-style references said it was clearing the strict gate. Both were right.",
-    claim:
-      "Same algorithm, two corpora, two verdicts. The Phase 14 framework added expert-curated multiplet-line references so we could finally separate detector quality from corpus granularity. Strict gate cleared at multiplet-line scale; NMRShiftDB2 environment-scale stays xfailed by design.",
-    topic: "science",
-    topicLabel: "Science",
-    date: "2026-05-27",
-    readingMinutes: 10,
-    status: "forthcoming",
-  },
-  {
-    slug: "additive-never-destructive",
-    title: "Additive, never destructive — across 39 evidence layers",
-    dek: "Every existing endpoint and regression test must stay green as new layers land. Here's how the typed-Pydantic contract makes that affordable.",
-    claim:
-      "Layer 22 (proton/carbon-13 scoring) and Layer 39 (LCMS feature grouping) speak the same API style. Stable JSON keys, additive fields, openapi-typescript regen on every contract change. The 'never overwrite a prior layer' rule is what lets us ship weekly without breaking last year's dossier.",
-    topic: "engineering",
-    topicLabel: "Engineering",
-    date: "2026-05-15",
-    readingMinutes: 12,
-    status: "forthcoming",
-  },
-  {
-    slug: "fda-ai-framework-2025",
-    title: "Reading the FDA's January 2025 AI framework, in code",
-    dek: "Stage-4 human oversight gates aren't a paragraph in a policy; they're a release queue in your audit table.",
-    claim:
-      "The FDA's 2025 framework formalizes risk-based credibility for AI in regulatory submissions. We mapped each stage onto concrete code: model-card registry, recipe-hash provenance, human-signoff queue, immutable raw vault. The PRs are linkable; the audit ledger is queryable.",
-    topic: "regulatory",
-    topicLabel: "Regulatory",
-    date: "2026-05-10",
-    readingMinutes: 11,
-    status: "forthcoming",
-  },
-]
 
 // Featured (top-of-page) essay — most timely + highest-claim of the set.
 const FEATURED_SLUG = "chemical-environments-not-peaks"
@@ -227,9 +115,11 @@ export function BlogPage() {
                   <span className="inline-flex items-center rounded-full border bg-violet-50 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 border-violet-200 dark:border-violet-900">
                     {featured.topicLabel}
                   </span>
-                  <span className="inline-flex items-center rounded-full border border-dashed px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    Forthcoming
-                  </span>
+                  {featured.status === "forthcoming" ? (
+                    <span className="inline-flex items-center rounded-full border border-dashed px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Forthcoming
+                    </span>
+                  ) : null}
                 </div>
                 <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
                   {featured.title}
@@ -247,6 +137,16 @@ export function BlogPage() {
                   <span aria-hidden>·</span>
                   <span>MolTrace research team</span>
                 </div>
+                {featured.status === "live" ? (
+                  <div className="mt-8">
+                    <Button asChild size="lg" className="gap-2">
+                      <Link href={`/blog/${featured.slug}`}>
+                        Read the essay
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                ) : null}
               </div>
 
               {/* Visual flank — scientific-grid plate with the essay's key

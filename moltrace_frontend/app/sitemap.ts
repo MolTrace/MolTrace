@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next"
 
 import { SITE_URL } from "@/lib/seo/site"
+import { getLivePosts } from "@/lib/blog/posts"
 
 // Public marketing routes only. This list is intentionally the same set as
 // MARKETING_PATHS in next.config.mjs (the cacheable, prerendered pages) minus
@@ -33,10 +34,21 @@ const ROUTES: Entry[] = [
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date()
-  return ROUTES.map(({ path, priority, changeFrequency }) => ({
+  const staticEntries = ROUTES.map(({ path, priority, changeFrequency }) => ({
     url: `${SITE_URL}${path === "/" ? "" : path}`,
     lastModified,
     changeFrequency,
     priority,
   }))
+
+  // Published blog posts (status: "live"). Forthcoming posts have no route and
+  // are deliberately excluded so we never submit an unindexable URL.
+  const postEntries: MetadataRoute.Sitemap = getLivePosts().map((post) => ({
+    url: `${SITE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.date),
+    changeFrequency: "yearly",
+    priority: 0.6,
+  }))
+
+  return [...staticEntries, ...postEntries]
 }
