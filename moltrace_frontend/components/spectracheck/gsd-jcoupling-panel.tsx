@@ -122,6 +122,17 @@ export function parseCandidatesFromText(text: string): CandidateInput[] {
   for (const raw of text.split(/[\n;,]+/)) {
     const line = raw.trim()
     if (!line || line.startsWith("#")) continue
+    // Pipe-delimited display form takes precedence: "name | smiles | role" (from the
+    // linked-compound card) or the compact "name|smiles" this same panel builds for its
+    // textarea. A SMILES never contains '|', so the SMILES is always the SECOND field.
+    // Without this branch the whole labeled string fell through to the bare-SMILES case
+    // below and was sent to RDKit verbatim → "Could not parse SMILES: 'C11 | … | Product'".
+    if (line.includes("|")) {
+      const parts = line.split("|").map((p) => p.trim())
+      const smiles = parts[1] ?? ""
+      if (smiles) items.push({ name: parts[0] || null, smiles })
+      continue
+    }
     const labelMatch = line.match(/^([^:\t]+)[:\t]\s*(.+)$/)
     if (labelMatch) {
       const name = labelMatch[1].trim()
