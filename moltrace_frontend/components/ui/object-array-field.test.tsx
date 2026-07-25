@@ -34,4 +34,32 @@ describe("ObjectArrayField", () => {
     await user.click(screen.getByRole("button", { name: "Remove Step 1" }))
     expect(onChange.mock.calls.at(-1)![0]).toEqual([{ action: "b" }])
   })
+
+  it("displays seeded labeled-field values and preserves siblings on edit", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(
+      <ObjectArrayField
+        label="Checklist"
+        onChange={onChange}
+        itemLabel="Step"
+        addLabel="Add step"
+        fields={[
+          { key: "task", label: "Task" },
+          { key: "done", label: "Done" },
+        ]}
+        initialValue={[{ task: "rinse", done: "true" }]}
+      />,
+    )
+
+    // The seeded values must RENDER in the labeled inputs (not blank).
+    expect(screen.getByDisplayValue("rinse")).toBeInTheDocument()
+    expect(screen.getByDisplayValue("true")).toBeInTheDocument()
+
+    // Editing one field must not drop the sibling field's value.
+    const doneInput = screen.getByDisplayValue("true")
+    await user.clear(doneInput)
+    await user.type(doneInput, "false")
+    expect(onChange.mock.calls.at(-1)![0]).toEqual([{ task: "rinse", done: "false" }])
+  })
 })

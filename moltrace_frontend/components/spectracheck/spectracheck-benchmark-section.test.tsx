@@ -53,21 +53,19 @@ describe("SpectraCheckBenchmarkSection", () => {
     expect(screen.getByTestId("benchmark-run-button")).toBeInTheDocument()
   })
 
-  it("rejects invalid JSON before calling the backend", async () => {
+  it("renders the seeded benchmark case in the structured editor", () => {
     render(<SpectraCheckBenchmarkSection />)
-    const textarea = screen.getByTestId("benchmark-suite-input") as HTMLTextAreaElement
-    fireEvent.change(textarea, { target: { value: "not-json" } })
-    fireEvent.click(screen.getByTestId("benchmark-run-button"))
-    await waitFor(() => expect(screen.getByText(/Cases JSON is invalid/i)).toBeInTheDocument())
-    expect(apiFetchMock).not.toHaveBeenCalled()
+    // The default suite hydrates the labeled fields (no raw JSON to author).
+    expect(screen.getByDisplayValue("ethanol-1")).toBeInTheDocument()
+    expect(screen.getByDisplayValue("CCO")).toBeInTheDocument()
   })
 
-  it("rejects empty JSON arrays before calling the backend", async () => {
+  it("rejects running with no cases before calling the backend", async () => {
     render(<SpectraCheckBenchmarkSection />)
-    fireEvent.change(screen.getByTestId("benchmark-suite-input"), { target: { value: "[]" } })
+    fireEvent.click(screen.getByRole("button", { name: /Remove Case 1/i }))
     fireEvent.click(screen.getByTestId("benchmark-run-button"))
     await waitFor(() =>
-      expect(screen.getByText(/Cases must be a non-empty JSON array\./i)).toBeInTheDocument(),
+      expect(screen.getByText(/Add at least one benchmark case\./i)).toBeInTheDocument(),
     )
     expect(apiFetchMock).not.toHaveBeenCalled()
   })
