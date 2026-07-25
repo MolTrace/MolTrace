@@ -204,7 +204,7 @@ export function SpectraCheckBenchmarkSection() {
       })
       const normalized = normalizeResponse(data)
       if (!normalized) {
-        setError("Backend returned an unexpected payload shape.")
+        setError("The app returned an unexpected result.")
         return
       }
       setResult(normalized)
@@ -230,7 +230,7 @@ export function SpectraCheckBenchmarkSection() {
         eyebrow="Step 1 · Suite"
         title="5-layer SpectraCheck benchmark"
         icon={Sparkles}
-        description="Score curated (structure, observed NMR) cases across peak-level accuracy, structural ranking, explainability, robustness, and regulatory evidence. Reuses the same prediction + categorization pipeline as /nmr/processed/analyze so results are directly comparable."
+        description="Score curated (structure, observed NMR) cases across peak-level accuracy, structural ranking, explainability, robustness, and regulatory evidence. Reuses the same prediction and categorization pipeline as the processed-NMR analysis so results are directly comparable."
       >
         <div className="space-y-4">
           <div data-testid="benchmark-suite-input">
@@ -365,7 +365,7 @@ function BenchmarkResultPanels({ result }: { result: BenchmarkResponse }) {
         eyebrow="Step 3 · Per-case"
         title="Per-case scorecards"
         icon={Activity}
-        description="Each row shows the per-layer score with the components the backend used. Click into a case to see notes."
+        description="Each row shows the per-layer score with the components used. Click into a case to see notes."
       >
         <div className="space-y-3" data-testid="benchmark-cases">
           {result.cases.map((row) => (

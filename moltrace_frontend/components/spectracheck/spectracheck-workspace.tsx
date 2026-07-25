@@ -151,7 +151,7 @@ const SPECTRACHECK_NAV: SpectraNavGroup[] = [
     id: "start",
     label: "Overview",
     sections: [
-      { value: "tab-overview", label: "Overview", desc: "Summary of available evidence, backend connection status, and next recommended actions." },
+      { value: "tab-overview", label: "Overview", desc: "Summary of available evidence, connection status, and next recommended actions." },
       { value: "tab-workflow", label: "Workflow", desc: "Workflow templates run a predefined sequence of analysis, QC, evidence, unified confidence, and report steps so the session can be reproduced." },
     ],
   },
@@ -1384,7 +1384,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               </p>
               <h2 className="font-mono text-xl font-bold tracking-tight">Saved-session value & linked compound</h2>
               <p className="text-sm text-muted-foreground">
-                Snapshot of the current backend session and any compound it is bound to.
+                Snapshot of the current saved session and any compound it is bound to.
               </p>
             </div>
             <div className="space-y-4">
@@ -1498,7 +1498,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 id="spectracheck-gsd-telemetry-heading"
                 className="font-mono text-xl font-bold tracking-tight"
               >
-                Experimental backend usage on your spectra
+                Experimental engine usage on your spectra
               </h2>
               <p className="text-sm text-muted-foreground">
                 Live aggregation of every <code className="font-mono">spectrum.analyze_gsd</code>{" "}
@@ -2247,7 +2247,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                       </button>
                     </TooltipTrigger>
                     <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                      POST /carbon13/dept/preview
+                      Parse the uploaded peak table and preview carbon typing.
                     </TooltipContent>
                   </Tooltip>
 
@@ -2294,7 +2294,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                       </button>
                     </TooltipTrigger>
                     <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                      POST /carbon13/dept/analyze
+                      Run full DEPT/APT carbon-type analysis.
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -2323,7 +2323,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   <p className="font-mono text-sm font-bold tracking-tight">
                     {deptPreviewLoading ? "Previewing DEPT/APT…" : "Analyzing DEPT/APT…"}
                   </p>
-                  <p className="text-xs text-muted-foreground">Waiting for API response</p>
+                  <p className="text-xs text-muted-foreground">Waiting for results</p>
                 </CardContent>
               </Card>
             )}
@@ -2352,8 +2352,8 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                   icon={BarChart3}
                   description={
                     deptAnalyzeResult != null
-                      ? "Carbon multiplicities and matching evidence from /carbon13/dept/analyze."
-                      : "Parsed peak table preview from /carbon13/dept/preview."
+                      ? "Carbon multiplicities and matching evidence from the DEPT/APT analysis."
+                      : "Parsed peak table preview."
                   }
                   className="min-w-0"
                 >
@@ -2572,7 +2572,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 >
                   <Checkbox id="nmr2d-contour" checked={nmr2dContour} onCheckedChange={(v) => setNmr2dContour(v === true)} />
                   <Label htmlFor="nmr2d-contour" className="text-xs font-normal text-muted-foreground">
-                    Include contour preview (if enabled server-side)
+                    Include contour preview (if available)
                   </Label>
                 </div>
 
@@ -2747,7 +2747,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     </button>
                   </TooltipTrigger>
                   <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                    POST /nmr2d/analyze
+                    Run the 2D correlation analysis.
                   </TooltipContent>
                 </Tooltip>
 
@@ -2776,7 +2776,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 eyebrow="2D NMR · Step 3 · Results"
                 title="2D correlation output"
                 icon={BarChart3}
-                description={`Correlation evidence from /nmr2d/analyze (${nmr2dExperiment}).`}
+                description={`Correlation evidence from the 2D analysis (${nmr2dExperiment}).`}
                 className="min-w-0"
               >
                 {/* Full screen entry point — only once a settled result exists
@@ -2938,7 +2938,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     </button>
                   </TooltipTrigger>
                   <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                    POST /prediction/nmr/match/evidence
+                    Match predicted spectra against your observed NMR.
                   </TooltipContent>
                 </Tooltip>
                 {nmrError && <AlertCard variant="error" title="Predicted NMR match failed" description={nmrError} />}
@@ -2952,7 +2952,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 eyebrow="Predicted 1H/13C · Step 3 · Results"
                 title="1H / 13C match output"
                 icon={BarChart3}
-                description="Per-candidate evidence from /prediction/nmr/match/evidence."
+                description="Per-candidate evidence from the predicted-NMR match."
                 className="min-w-0"
               >
                 <TabResultSection
@@ -3297,7 +3297,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     </button>
                   </TooltipTrigger>
                   <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                    POST /similarity/score/evidence
+                    Score spectral similarity across layers.
                   </TooltipContent>
                 </Tooltip>
                 {simError && <AlertCard variant="error" title="Similarity scoring failed" description={simError} />}
@@ -3311,7 +3311,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 eyebrow="Similarity · Step 3 · Results"
                 title="Similarity score output"
                 icon={BarChart3}
-                description="Per-layer similarity scores from /similarity/score/evidence."
+                description="Per-layer similarity scores."
                 className="min-w-0"
               >
                 <TabResultSection
@@ -3647,7 +3647,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     </button>
                   </TooltipTrigger>
                   <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                    POST /candidates/compare/evidence
+                    Compare candidates using all attached evidence.
                   </TooltipContent>
                 </Tooltip>
                 {candError && <AlertCard variant="error" title="Candidate compare failed" description={candError} />}
@@ -3661,7 +3661,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 eyebrow="Compare · Step 3 · Results"
                 title="Candidate compare output"
                 icon={BarChart3}
-                description="Per-candidate evidence from /candidates/compare/evidence."
+                description="Per-candidate evidence from the candidate comparison."
                 className="min-w-0"
               >
                 <TabResultSection

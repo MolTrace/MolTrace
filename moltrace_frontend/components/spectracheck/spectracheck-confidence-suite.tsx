@@ -182,7 +182,7 @@ const REPORT_STATUS_DISPLAY: Record<string, string> = {
 }
 
 const BUNDLE_UNAVAILABLE_MSG =
-  "Unified evidence bundle endpoint not available yet. Ask Codex to add or update the unified evidence endpoint."
+  "Unified evidence isn't available yet in this build."
 
 /** Layers treated as optional coverage targets for the synthesis summary (excludes unified_confidence and report). */
 const SYNTHESIS_EXPECTED_LAYERS: EvidenceLayerType[] = [
@@ -237,7 +237,7 @@ function summarizeUnifiedResultForReport(data: unknown): string | null {
     const parts = [label, name, smi ?? ikey].filter(Boolean)
     if (parts.length > 0) return parts.join(" · ")
   }
-  if (typeof data.confidence_score === "number") return `confidence_score ${data.confidence_score}`
+  if (typeof data.confidence_score === "number") return `confidence score ${data.confidence_score}`
   return null
 }
 
@@ -1168,14 +1168,14 @@ function ReportComposerTab({
         setHtmlPreview(sanitizeReportHtml(data.html_report))
       }
     } catch (err) {
-      let msg = formatApiError(err, "Report compose failed")
+      let msg = formatApiError(err, "Could not compose the report")
       if (err instanceof ApiError && (err.status === 404 || err.status === 405 || err.status === 503)) {
         msg +=
-          " The report-composition service may be unavailable — check the deployment or API proxy."
+          " The report composer may be unavailable right now — please try again later."
       }
       if (err instanceof ApiError && (err.status === 400 || err.status === 422)) {
         msg +=
-          " If the server rejected the payload, inspect the response body — nested workflow_provenance under provenance_metadata_json may need API support."
+          " Some report details weren't accepted — please review your entries and try again."
       }
       setError(msg)
     } finally {
@@ -1194,9 +1194,9 @@ function ReportComposerTab({
       })
       if (typeof html === "string") setHtmlPreview(sanitizeReportHtml(html))
     } catch (err) {
-      let msg = formatApiError(err, "HTML compose failed")
+      let msg = formatApiError(err, "Could not generate the HTML report")
       if (err instanceof ApiError && (err.status === 404 || err.status === 405 || err.status === 503)) {
-        msg += " The alternate HTML compose route may be unavailable."
+        msg += " The HTML report may be unavailable right now."
       }
       setError(msg)
     } finally {
@@ -1334,8 +1334,7 @@ function ReportComposerTab({
         description={
           <>
             Fields from selected Evidence Queue items, linked workflow runs, session QC, unified confidence, and composer
-            choices — serialized under <code className="text-xs">method_provenance</code> inside{" "}
-            <code className="text-xs">provenance_metadata_json</code>.
+            choices — included in the report provenance details.
           </>
         }
       >
@@ -1394,12 +1393,12 @@ function ReportComposerTab({
                     <TableHead className="text-xs">Threshold profile</TableHead>
                     <TableHead className="text-xs">Workflow template version</TableHead>
                     <TableHead className="text-xs">Validation status</TableHead>
-                    <TableHead className="text-xs">model_artifact_id</TableHead>
+                    <TableHead className="text-xs">Model artifact ID</TableHead>
                     <TableHead className="text-xs">model card / model line</TableHead>
-                    <TableHead className="text-xs">dataset_version_id</TableHead>
-                    <TableHead className="text-xs">evaluation_run_id</TableHead>
-                    <TableHead className="text-xs">deployment_candidate_id</TableHead>
-                    <TableHead className="text-xs">approval_status</TableHead>
+                    <TableHead className="text-xs">Dataset version ID</TableHead>
+                    <TableHead className="text-xs">Evaluation run ID</TableHead>
+                    <TableHead className="text-xs">Deployment candidate ID</TableHead>
+                    <TableHead className="text-xs">Approval status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1516,11 +1515,9 @@ function ReportComposerTab({
         title="Selected Visual Evidence"
         description={
           <>
-            Queue rows selected for unified synthesis that carry visualizable payloads (kinds below). Compose sends{" "}
-            <code className="text-xs">selected_visual_evidence</code> inside{" "}
-            <code className="text-xs">provenance_metadata</code> — artifact references and plot-export placeholders only;
-            raster or Plotly embeds are not included until export support is stable. Compact previews below are for this
-            workspace only (orientation).
+            Queue rows selected for unified synthesis that carry visualizable data (kinds below). Compose includes
+            artifact references and plot-export placeholders only; rendered images or interactive charts are not
+            included until export support is stable. Compact previews below are for this workspace only (orientation).
           </>
         }
       >
@@ -1624,7 +1621,7 @@ function ReportComposerTab({
         title="AI Prediction Provenance"
         description={
           <>
-            Controlled AI prediction metadata included in <code className="text-xs">provenance_metadata_json</code> when available.
+            Controlled AI-prediction details included in the report provenance metadata when available.
             Predictions remain decision support and require review.
           </>
         }
@@ -1695,9 +1692,8 @@ function ReportComposerTab({
         title="Workflow provenance"
         description={
           <>
-            Included under <code className="text-xs">workflow_provenance</code> inside{" "}
-            <code className="text-xs">provenance_metadata_json</code> on compose. Summaries require live workflow APIs —
-            does not assert final approval or identification.
+            Included in the report provenance details on compose. Summaries require live workflow data —
+            this does not assert final approval or identification.
           </>
         }
       >
@@ -1822,8 +1818,7 @@ function ReportComposerTab({
         title="Evidence quality & session QC"
         description={
           <>
-            QC and provenance context included under <code className="text-xs">qc_provenance_section</code> inside{" "}
-            <code className="text-xs">provenance_metadata_json</code>. Language stays non-identifying unless human review
+            QC and provenance context included in the report provenance details. Language stays non-identifying unless human review
             signals support stronger statements.
           </>
         }
@@ -1949,15 +1944,15 @@ function ReportComposerTab({
         title="Provenance"
         description={
           <>
-            Session files, jobs, and artifacts for this SpectraCheck session. Included in{" "}
-            <code className="text-xs">provenance_metadata_json</code> on compose.
+            Session files, jobs, and artifacts for this SpectraCheck session. Included in the report
+            provenance details on compose.
           </>
         }
       >
         <div className="space-y-4 text-sm">
           {!backendSessionId?.trim() ? (
             <p className="text-xs text-muted-foreground">
-              Connect a backend session to load file, job, and artifact provenance.
+              Connect a saved session to load file, job, and artifact provenance.
             </p>
           ) : null}
           {backendSessionId?.trim() && provBusy ? (
@@ -2131,10 +2126,10 @@ function ReportComposerTab({
                   onChange={(e) => setReviewStatus(e.target.value)}
                 >
                   <option value="">(unset)</option>
-                  <option value="pending_review">pending_review</option>
-                  <option value="approved">approved</option>
-                  <option value="rejected">rejected</option>
-                  <option value="needs_revision">needs_revision</option>
+                  <option value="pending_review">Pending review</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="needs_revision">Needs revision</option>
                 </select>
               </label>
               <label className="block space-y-2">
@@ -2144,10 +2139,10 @@ function ReportComposerTab({
                   value={intendedUse}
                   onChange={(e) => setIntendedUse(e.target.value)}
                 >
-                  <option value="research_decision_support">research_decision_support</option>
-                  <option value="qc_batch_record">qc_batch_record</option>
-                  <option value="regulatory_support">regulatory_support</option>
-                  <option value="training_or_education">training_or_education</option>
+                  <option value="research_decision_support">Research decision support</option>
+                  <option value="qc_batch_record">QC batch record</option>
+                  <option value="regulatory_support">Regulatory support</option>
+                  <option value="training_or_education">Training or education</option>
                 </select>
               </label>
               <label className="block space-y-2">
@@ -2196,7 +2191,7 @@ function ReportComposerTab({
                   {busy ? "Composing…" : "Compose report"}
                 </Button>
                 <Button type="button" variant="outline" disabled={busy} onClick={() => void fetchHtmlAlternate()}>
-                  Fetch HTML (JSON body)
+                  Fetch HTML
                 </Button>
               </div>
             </form>
@@ -2297,7 +2292,7 @@ function ReportComposerTab({
                 accent="teal"
                 eyebrow="Result · Status"
                 title="Report status"
-                description="Backend workflow labels for release."
+                description="Release status labels from the review workflow."
               >
                 <div className="flex flex-wrap gap-2">
                   {statusLabel && (
@@ -2307,7 +2302,7 @@ function ReportComposerTab({
                   )}
                   {releaseGate && (
                     <Badge variant="outline" className="font-mono text-xs">
-                      release_gate: {releaseGate}
+                      Release gate: {releaseGate}
                     </Badge>
                   )}
                   {"human_review_required" in result && result.human_review_required === true && (
@@ -2318,7 +2313,7 @@ function ReportComposerTab({
                   )}
                   {humanReviewApprovedFlag && !humanApprovalClaimSupported && (
                     <Badge variant="outline" className="font-mono text-xs">
-                      human_review_approved (verify release gate / review_status)
+                      Human review approved (verify release status)
                     </Badge>
                   )}
                 </div>
@@ -2488,7 +2483,7 @@ function ReportComposerTab({
                     <CardTitle className="font-mono text-base font-bold tracking-tight">
                       HTML preview
                     </CardTitle>
-                    <CardDescription>Sandboxed iframe — content from composed report.</CardDescription>
+                    <CardDescription>Sandboxed preview — content from the composed report.</CardDescription>
                   </CardHeader>
                   <CardContent className="p-0">
                     <iframe
@@ -2701,7 +2696,7 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
     <div className="space-y-4">
       <AlertCard
         variant="success"
-        title="Unified synthesis response"
+        title="Unified synthesis result"
         description={
           <span>
             Selected adduct: <code className="text-xs">{String(data.selected_adduct ?? "—")}</code>
@@ -2713,7 +2708,7 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
         accent="teal"
         eyebrow="Unified · Metrics"
         title="Synthesis metrics"
-        description="Summary fields returned by the unified confidence endpoint."
+        description="Summary fields from the unified confidence result."
         className="min-w-0"
       >
         <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4 items-center">
@@ -2831,7 +2826,7 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
         accent="teal"
         eyebrow="Unified · Ranked Candidates"
         title="Candidate confidence"
-        description="Ranked candidates from the synthesis response."
+        description="Ranked candidates from the synthesis result."
         className="min-w-0"
       >
         <div className="overflow-x-auto">
@@ -3001,14 +2996,14 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Human review gate</CardTitle>
           <CardDescription>
-            Backend <code className="text-xs">human_review_required</code> plus automated flags from labels and
+            Combines the required-human-review flag with automated flags from labels and
             contradictions.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-3">
           {humanReviewRequired && (
             <Badge variant="destructive" className="font-mono text-xs">
-              human_review_required
+              Human review required
             </Badge>
           )}
           {gateActive ? (

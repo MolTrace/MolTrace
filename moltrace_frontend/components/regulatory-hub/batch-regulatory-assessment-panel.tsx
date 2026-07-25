@@ -15,7 +15,7 @@ import { Loader2, ChevronDown } from "lucide-react"
 import { readRegulatoryDossierCompoundLink } from "@/components/regulatory-hub/regulatory-dossier-linked-compound-card"
 
 const BATCH_REGULATORY_ASSESSMENT_TOOLTIP =
-  "Aggregates impurity register counts, residual solvent and nitrosamine prior assessments on dossier, latest qNMR compliance snapshot, AI governance snapshot, and open regulatory action items."
+  "Aggregates impurity register counts, residual solvent and nitrosamine prior assessments on dossier, latest qNMR compliance snapshot, AI governance snapshot, and Open regulatory action items."
 
 const MISSING_BATCH_MSG = "Link a compound batch before running batch-level assessment."
 
@@ -154,7 +154,7 @@ export function BatchRegulatoryAssessmentPanel({
       trackRegulatoryBatchAssessmentRun({ dossier_id: dossierId, status: "batch_linked_run" })
       await load()
     } catch (e) {
-      setErr(formatApiError(e, "Run batch assessment failed."))
+      setErr(formatApiError(e, "Could not run the batch assessment."))
     } finally {
       setRunBusy(false)
     }
@@ -177,7 +177,7 @@ export function BatchRegulatoryAssessmentPanel({
               <InfoTooltip label="Batch regulatory assessment" content={BATCH_REGULATORY_ASSESSMENT_TOOLTIP} />
             </div>
             <CardDescription>
-              Run a batch regulatory assessment across all requirements and evidence links for this dossier — impurity thresholds, solvent limits, and jurisdiction-specific rule sets are evaluated in a single pass.
+              Run a batch regulatory assessment across all requirements and evidence links for this dossier — impurity thresholds, solvent limits, and Jurisdiction-specific rule sets are evaluated in a single pass.
             </CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" disabled={runBusy} onClick={() => void run()}>
@@ -210,16 +210,16 @@ export function BatchRegulatoryAssessmentPanel({
           <div className="space-y-4">
             <dl className="grid gap-3 sm:grid-cols-2">
               <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">overall status</dt>
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Overall status</dt>
                 <dd className="mt-1 text-sm font-medium">{readinessLabel(readRecordString(latest, "overall_status"))}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">action item count</dt>
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Action items</dt>
                 <dd className="mt-1 font-mono text-sm">{readIntListField(latest, "action_item_ids_json").length}</dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  human_review_required
+                  Human review required
                 </dt>
                 <dd className="mt-1 font-mono text-xs">{hrr}</dd>
               </div>
@@ -230,7 +230,7 @@ export function BatchRegulatoryAssessmentPanel({
             </dl>
 
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">warnings</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Warnings</p>
               {warningLines(latest).length ? (
                 <ul className="mt-1 list-inside list-disc text-xs leading-relaxed">
                   {warningLines(latest).map((w, i) => (
@@ -243,7 +243,7 @@ export function BatchRegulatoryAssessmentPanel({
             </div>
 
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">notes</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes</p>
               {noteLines(latest).length ? (
                 <ul className="mt-1 list-inside list-disc text-xs leading-relaxed">
                   {noteLines(latest).map((n, i) => (
@@ -257,14 +257,14 @@ export function BatchRegulatoryAssessmentPanel({
 
             <div className="grid gap-3 lg:grid-cols-2">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">impurity summary</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Impurity summary</p>
                 <div className="mt-2">
                   <DeveloperJsonPanel data={latest.impurity_summary_json && typeof latest.impurity_summary_json === "object" ? latest.impurity_summary_json : {}} />
                 </div>
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  residual solvent summary
+                  Residual solvent summary
                 </p>
                 <div className="mt-2">
                   <DeveloperJsonPanel
@@ -277,7 +277,7 @@ export function BatchRegulatoryAssessmentPanel({
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">nitrosamine summary</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Nitrosamine summary</p>
                 <div className="mt-2">
                   <DeveloperJsonPanel
                     data={
@@ -312,7 +312,7 @@ export function BatchRegulatoryAssessmentPanel({
 
             <Collapsible className="rounded-md border bg-muted/15">
               <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-medium hover:bg-muted/40">
-                metadata_json (latest row)
+                Details (latest record)
                 <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
               </CollapsibleTrigger>
               <CollapsibleContent className="border-t px-3 pb-3 pt-2">

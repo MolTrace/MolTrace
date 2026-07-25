@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Atom, Cpu, Loader2, MonitorCog, Sparkles, Waves, Zap } from "lucide-react"
+import { Atom, Loader2, MonitorCog, Sparkles, Waves, Zap } from "lucide-react"
 import { apiFetch } from "@/lib/api/client"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
@@ -283,7 +283,7 @@ export function ShiftPredictionPanel({
         eyebrow="Candidate tool · Predicted shifts"
         title="Per-atom ¹H / ¹³C shift prediction"
         icon={Atom}
-        description="Structure-derived chemical-shift prediction from a candidate SMILES. The method is server-configured (NMRNet when wired, else the HOSE-code / NMRShiftDB2 fallback) and named in the response, with the compute device it ran on."
+        description="Structure-derived chemical-shift prediction from a candidate SMILES. The method is server-configured (NMRNet when available, else the HOSE-code / NMRShiftDB2 fallback) and reported along with the compute device it ran on."
         className="min-w-0 overflow-visible shadow-none"
       >
         <div className="space-y-4">

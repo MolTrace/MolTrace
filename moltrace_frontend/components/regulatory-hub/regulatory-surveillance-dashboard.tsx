@@ -219,7 +219,7 @@ export function RegulatorySurveillanceDashboard() {
   async function addWatcher() {
     const title = createTitle.trim()
     if (!title) {
-      setCreateErr("title is required.")
+      setCreateErr("Title is required.")
       return
     }
     setCreateBusy(true)
@@ -259,7 +259,7 @@ export function RegulatorySurveillanceDashboard() {
       setCreateStatus("active")
       await load()
     } catch (e) {
-      setCreateErr(formatApiError(e, "Create watcher failed."))
+      setCreateErr(formatApiError(e, "Could not create the watcher."))
     } finally {
       setCreateBusy(false)
     }
@@ -281,7 +281,7 @@ export function RegulatorySurveillanceDashboard() {
       })
       await load()
     } catch (e) {
-      setLoadErr(formatApiError(e, "Surveillance run failed."))
+      setLoadErr(formatApiError(e, "Could not run the surveillance check."))
     } finally {
       setRunBusyId(null)
     }
@@ -298,7 +298,7 @@ export function RegulatorySurveillanceDashboard() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Surveillance</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Track regulatory source versions, detect changes, and assess impact on dossiers, rules, action items, and reports.
+          Track regulatory source Versions, detect changes, and assess impact on dossiers, rules, action items, and reports.
         </p>
       </div>
 
@@ -318,28 +318,28 @@ export function RegulatorySurveillanceDashboard() {
           title="Changes detected"
           icon={Activity}
           value={loading ? "—" : String(summary.changesDetected)}
-          sub={<p className="text-xs text-muted-foreground">Excludes change_type no_change</p>}
+          sub={<p className="text-xs text-muted-foreground">Excludes sources with no change</p>}
           accent="var(--mt-cyan)"
         />
         <SummaryMetricCard
           title="High-impact changes"
           icon={AlertTriangle}
           value={loading ? "—" : String(summary.highImpact)}
-          sub={<p className="text-xs text-muted-foreground">severity high or critical</p>}
+          sub={<p className="text-xs text-muted-foreground">High or critical severity</p>}
           accent="var(--mt-amber)"
         />
         <SummaryMetricCard
           title="Rule update proposals"
           icon={ClipboardList}
           value={loading ? "—" : String(summary.proposals)}
-          sub={<p className="text-xs text-muted-foreground">status proposed</p>}
+          sub={<p className="text-xs text-muted-foreground">In proposed status</p>}
           accent="var(--mt-violet)"
         />
         <SummaryMetricCard
           title="Dossiers affected"
           icon={FolderOpen}
           value={loading ? "—" : String(summary.dossiersAffected)}
-          sub={<p className="text-xs text-muted-foreground">Union of affected_dossier_ids_json</p>}
+          sub={<p className="text-xs text-muted-foreground">Across all affected dossiers</p>}
           accent="var(--mt-cyan)"
         />
       </div>
@@ -373,14 +373,14 @@ export function RegulatorySurveillanceDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>title</TableHead>
-                  <TableHead>source type</TableHead>
-                  <TableHead>jurisdiction</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>check frequency</TableHead>
-                  <TableHead>last checked</TableHead>
-                  <TableHead>last change detected</TableHead>
-                  <TableHead className="w-[100px]">open</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Source type</TableHead>
+                  <TableHead>Jurisdiction</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Check frequency</TableHead>
+                  <TableHead>Last checked</TableHead>
+                  <TableHead>Last change detected</TableHead>
+                  <TableHead className="w-[100px]">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -472,10 +472,10 @@ export function RegulatorySurveillanceDashboard() {
         description="Register a new regulatory source for automated surveillance — agency guidance, pharmacopoeial standards, or jurisdiction-specific publications."
       >
         <div className="space-y-4">
-          {createErr ? <AlertCard variant="error" title="Create error" description={createErr} /> : null}
+          {createErr ? <AlertCard variant="error" title="Could not add source" description={createErr} /> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="rw-title">title</Label>
+              <Label htmlFor="rw-title">Title</Label>
               <Input
                 id="rw-title"
                 value={createTitle}
@@ -485,7 +485,7 @@ export function RegulatorySurveillanceDashboard() {
               />
             </div>
             <div className="space-y-2">
-              <Label>source type</Label>
+              <Label>Source type</Label>
               <Select value={createSourceType} onValueChange={setCreateSourceType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -500,7 +500,7 @@ export function RegulatorySurveillanceDashboard() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>jurisdiction optional</Label>
+              <Label>Jurisdiction (optional)</Label>
               <Select value={createJurisdictionId || "__none__"} onValueChange={(v) => setCreateJurisdictionId(v === "__none__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="None" />
@@ -516,7 +516,7 @@ export function RegulatorySurveillanceDashboard() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rw-url">source_url optional</Label>
+              <Label htmlFor="rw-url">Source URL (optional)</Label>
               <Input
                 id="rw-url"
                 value={createSourceUrl}
@@ -526,7 +526,7 @@ export function RegulatorySurveillanceDashboard() {
               />
             </div>
             <div className="space-y-2">
-              <Label>check frequency</Label>
+              <Label>Check frequency</Label>
               <Select value={createFrequency} onValueChange={setCreateFrequency}>
                 <SelectTrigger>
                   <SelectValue />
@@ -541,7 +541,7 @@ export function RegulatorySurveillanceDashboard() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>status</Label>
+              <Label>Status</Label>
               <Select value={createStatus} onValueChange={setCreateStatus}>
                 <SelectTrigger>
                   <SelectValue />
@@ -578,13 +578,13 @@ export function RegulatorySurveillanceDashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>id</TableHead>
-                  <TableHead>title</TableHead>
-                  <TableHead>change_type</TableHead>
-                  <TableHead>severity</TableHead>
-                  <TableHead>review_status</TableHead>
-                  <TableHead>affected dossiers</TableHead>
-                  <TableHead>created_at</TableHead>
-                  <TableHead className="w-[90px]">open</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Change type</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Review status</TableHead>
+                  <TableHead>Affected dossiers</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="w-[90px]">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -698,7 +698,7 @@ export function RegulatorySurveillanceDashboard() {
       </ModuleCard>
 
       <p className="text-xs text-muted-foreground">
-        Surveillance outputs are operational signals from your tenant API — not legal conclusions or agency positions.
+        Surveillance outputs are operational signals from your workspace — not legal conclusions or agency positions.
       </p>
     </div>
   )
