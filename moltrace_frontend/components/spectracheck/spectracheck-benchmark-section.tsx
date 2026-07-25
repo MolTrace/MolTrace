@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { ObjectArrayField } from "@/components/ui/object-array-field"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import {
@@ -32,20 +32,32 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 import { Activity, BarChart3, PlayCircle, RotateCcw, ShieldCheck, Sparkles } from "lucide-react"
 
-const DEFAULT_SUITE = `[
+const DEFAULT_CASES: Record<string, unknown>[] = [
   {
-    "case_id": "ethanol-1",
-    "smiles": "CCO",
-    "nucleus": "1H",
-    "solvent": "CDCl3",
-    "observed_nmr_text": "1H NMR (400 MHz, CDCl3) \\u03b4 3.65 (q, J = 7.1 Hz, 2H), 1.26 (t, J = 7.1 Hz, 3H), 2.10 (br s, 1H)",
-    "candidate_block": "Ethanol | CCO\\nMethanol | CO\\nPropanol | CCCO",
-    "sample_id": "SAMPLE-001",
-    "sha256": "${"a".repeat(64)}",
-    "operator": "alice",
-    "instrument": "Bruker 400"
-  }
-]`
+    case_id: "ethanol-1",
+    smiles: "CCO",
+    nucleus: "1H",
+    solvent: "CDCl3",
+    observed_nmr_text:
+      "1H NMR (400 MHz, CDCl3) \u03b4 3.65 (q, J = 7.1 Hz, 2H), 1.26 (t, J = 7.1 Hz, 3H), 2.10 (br s, 1H)",
+    candidate_block: "Ethanol | CCO\nMethanol | CO\nPropanol | CCCO",
+    sample_id: "SAMPLE-001",
+    sha256: "a".repeat(64),
+    operator: "alice",
+    instrument: "Bruker 400",
+  },
+]
+
+/** Labeled fields for the benchmark-case editor; audit fields (sample_id, sha256, operator,
+ *  instrument) ride along as custom rows / the raw-JSON hatch so the common form stays focused. */
+const BENCHMARK_CASE_FIELDS = [
+  { key: "case_id", label: "Case ID" },
+  { key: "smiles", label: "SMILES" },
+  { key: "nucleus", label: "Nucleus", help: "1H or 13C" },
+  { key: "solvent", label: "Solvent" },
+  { key: "observed_nmr_text", label: "Observed NMR text", type: "textarea" as const },
+  { key: "candidate_block", label: "Candidate block", type: "textarea" as const, help: "One candidate per line: Name | SMILES" },
+]
 
 const LAYER_META: Record<
   string,
@@ -168,7 +180,8 @@ function ScoreBar({ score, color }: { score: number; color: string }) {
 }
 
 export function SpectraCheckBenchmarkSection() {
-  const [suiteText, setSuiteText] = useState(DEFAULT_SUITE)
+  const [cases, setCases] = useState<Record<string, unknown>[]>(DEFAULT_CASES)
+  const [casesFormKey, setCasesFormKey] = useState(0)
   const [dropPeaks, setDropPeaks] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -177,15 +190,9 @@ export function SpectraCheckBenchmarkSection() {
   const runBenchmark = useCallback(async () => {
     setError("")
     setResult(null)
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(suiteText)
-    } catch (err) {
-      setError(`Cases JSON is invalid: ${String((err as Error).message)}`)
-      return
-    }
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      setError("Cases must be a non-empty JSON array.")
+    const nonEmpty = cases.filter((c) => Object.keys(c).length > 0)
+    if (nonEmpty.length === 0) {
+      setError("Add at least one benchmark case.")
       return
     }
     setLoading(true)
@@ -193,7 +200,7 @@ export function SpectraCheckBenchmarkSection() {
       const data = await apiFetch<unknown>("/benchmark/spectracheck/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cases: parsed, robustness_drop_peaks: dropPeaks }),
+        body: JSON.stringify({ cases: nonEmpty, robustness_drop_peaks: dropPeaks }),
       })
       const normalized = normalizeResponse(data)
       if (!normalized) {
@@ -206,10 +213,11 @@ export function SpectraCheckBenchmarkSection() {
     } finally {
       setLoading(false)
     }
-  }, [suiteText, dropPeaks])
+  }, [cases, dropPeaks])
 
   function reset() {
-    setSuiteText(DEFAULT_SUITE)
+    setCases(DEFAULT_CASES)
+    setCasesFormKey((k) => k + 1)
     setDropPeaks(1)
     setError("")
     setResult(null)
@@ -225,26 +233,18 @@ export function SpectraCheckBenchmarkSection() {
         description="Score curated (structure, observed NMR) cases across peak-level accuracy, structural ranking, explainability, robustness, and regulatory evidence. Reuses the same prediction + categorization pipeline as /nmr/processed/analyze so results are directly comparable."
       >
         <div className="space-y-4">
-          <div>
-            <Label
-              htmlFor="bench-cases"
-              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-            >
-              Benchmark cases (JSON array)
-            </Label>
-            <Textarea
-              id="bench-cases"
-              value={suiteText}
-              onChange={(e) => setSuiteText(e.target.value)}
-              rows={10}
-              className="font-mono text-xs"
-              data-testid="benchmark-suite-input"
+          <div data-testid="benchmark-suite-input">
+            <ObjectArrayField
+              key={`bench-cases-${casesFormKey}`}
+              label="Benchmark cases"
+              itemLabel="Case"
+              addLabel="Add case"
+              fields={BENCHMARK_CASE_FIELDS}
+              initialValue={cases}
+              onChange={setCases}
+              description="Each case is a (structure, observed NMR) pair. Nucleus is 1H or 13C; audit fields (sample_id, sha256, operator, instrument) and anything else are editable via each case's raw-JSON toggle."
+              idPrefix="bench-cases"
             />
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Each case carries case_id, smiles, nucleus, solvent, observed_nmr_text, and
-              optional candidate_block + audit fields (sample_id, sha256, operator,
-              instrument).
-            </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>

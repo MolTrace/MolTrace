@@ -90,6 +90,8 @@ export function ObjectArrayField({
                 idPrefix={`${idPrefix}-${row.id}`}
                 label={`${itemLabel} ${i + 1} details`}
                 fields={fields}
+                initialValue={row.obj}
+                allowCustomKeys
                 customValueType="auto"
                 onChange={(obj) => updateRow(row.id, obj)}
               />
