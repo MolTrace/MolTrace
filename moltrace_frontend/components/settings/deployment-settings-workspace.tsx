@@ -22,7 +22,7 @@ import { parseReleaseHealthDiagnostics } from "@/src/lib/admin/release-health"
 import { ServerOff } from "lucide-react"
 
 const DEPLOYMENT_SETTINGS_TOOLTIP =
-  "Deployment Settings helps verify that frontend, backend, storage, database, jobs, and environment configuration are ready for deployment."
+  "Deployment Settings helps verify that the app, storage, database, jobs, and environment configuration are ready for deployment."
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -177,7 +177,7 @@ export function DeploymentSettingsWorkspace() {
       const e = await apiFetch<Record<string, unknown>>("/system/environment-check", { method: "GET" })
       setEnvCheck(e ?? null)
     } catch (err) {
-      setErrEnv(formatErr(err, "Could not load /system/environment-check."))
+      setErrEnv(formatErr(err, "Could not load the environment check."))
       setEnvCheck(null)
     }
 
@@ -185,7 +185,7 @@ export function DeploymentSettingsWorkspace() {
       const v = await apiFetch<Record<string, unknown>>("/system/version", { method: "GET" })
       setVersion(v ?? null)
     } catch (err) {
-      setErrVersion(formatErr(err, "Could not load /system/version."))
+      setErrVersion(formatErr(err, "Could not load version info."))
       setVersion(null)
     }
 
@@ -194,7 +194,7 @@ export function DeploymentSettingsWorkspace() {
       const list = Array.isArray(d) ? d.filter(isRecord) : []
       setDeps(list as Record<string, unknown>[])
     } catch (err) {
-      setErrDeps(formatErr(err, "Could not load /system/dependencies."))
+      setErrDeps(formatErr(err, "Could not load dependency status."))
       setDeps([])
     }
 
@@ -202,7 +202,7 @@ export function DeploymentSettingsWorkspace() {
       const r = await apiFetch<Record<string, unknown>>("/admin/release-health", { method: "GET" })
       setReleaseHealth(r ?? null)
     } catch (err) {
-      setErrReleaseHealth(formatErr(err, "Could not load /admin/release-health."))
+      setErrReleaseHealth(formatErr(err, "Could not load release health."))
       setReleaseHealth(null)
     }
 
@@ -312,7 +312,7 @@ export function DeploymentSettingsWorkspace() {
             <InfoTooltip content={DEPLOYMENT_SETTINGS_TOOLTIP} label="About Deployment Settings" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Environment and dependency snapshot from the backend (admin-capable routes).
+            Environment and dependency snapshot from the app (requires administrator access).
           </p>
         </div>
         <BackendStatusIndicator />
@@ -328,7 +328,7 @@ export function DeploymentSettingsWorkspace() {
         <AlertCard
           variant="error"
           icon={ServerOff}
-          title="Backend unavailable"
+          title="Service unavailable"
           description="Deployment data is not reachable. Verify you're signed in as an administrator and try again."
         />
       ) : null}
@@ -369,7 +369,7 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">frontend URL</CardTitle>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">App URL</CardTitle>
             <CardDescription>Browser origin</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
@@ -382,8 +382,8 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">backend status</CardTitle>
-            <CardDescription>openapi.json reachability</CardDescription>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Service status</CardTitle>
+            <CardDescription>API reachability</CardDescription>
           </CardHeader>
           <CardContent>
             <BackendStatusIndicator />
@@ -407,7 +407,7 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">OpenAPI availability</CardTitle>
-            <CardDescription>dependency name openapi</CardDescription>
+            <CardDescription>API contract reachability</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -435,8 +435,8 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">backend version</CardTitle>
-            <CardDescription>Backend service build identifier.</CardDescription>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Service version</CardTitle>
+            <CardDescription>Service build identifier.</CardDescription>
           </CardHeader>
           <CardContent className="font-mono text-xs">
             {loading ? "…" : version ? readStr(version, ["backend_version"]) || "—" : "—"}
@@ -448,7 +448,7 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">frontend build</CardTitle>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">App build</CardTitle>
             <CardDescription>NEXT_PUBLIC_APP_BUILD or NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA</CardDescription>
           </CardHeader>
           <CardContent className="font-mono text-xs">
@@ -462,7 +462,7 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">database status</CardTitle>
-            <CardDescription>dependency name database</CardDescription>
+            <CardDescription>Database reachability</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -485,8 +485,8 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">storage backend</CardTitle>
-            <CardDescription>dependency name storage</CardDescription>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Storage service</CardTitle>
+            <CardDescription>Object storage reachability</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -509,8 +509,8 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">job backend</CardTitle>
-            <CardDescription>dependency name job_queue</CardDescription>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Job queue</CardTitle>
+            <CardDescription>Job queue reachability</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -531,7 +531,7 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">worker status</CardTitle>
-            <CardDescription>dependency name worker</CardDescription>
+            <CardDescription>Background worker reachability</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -555,11 +555,11 @@ export function DeploymentSettingsWorkspace() {
         eyebrow="Variables"
         title="Required variables"
         icon={ListChecks}
-        description="required_variables_present · missing_variables — secret values are never returned by the API."
+        description="Whether all required variables are present, plus the names of any that are missing — secret values are never shown."
       >
         <div className="space-y-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground">required_variables_present</span>
+            <span className="text-muted-foreground">Required variables present</span>
             {loading ? (
               <span>…</span>
             ) : envCheck && typeof envCheck.required_variables_present === "boolean" ? (
@@ -571,7 +571,7 @@ export function DeploymentSettingsWorkspace() {
             )}
           </div>
           <div>
-            <p className="text-xs font-medium text-muted-foreground">missing_variables (names only)</p>
+            <p className="text-xs font-medium text-muted-foreground">Missing variables (names only)</p>
             {missingVars.length === 0 ? (
               <p className="text-xs text-muted-foreground">None listed.</p>
             ) : (
@@ -619,7 +619,7 @@ export function DeploymentSettingsWorkspace() {
                 <dd className="font-mono break-all">{rawFidPromptSmoke.failureScope || "—"}</dd>
               </div>
               <div>
-                <dt className="font-medium text-muted-foreground">admin report endpoint</dt>
+                <dt className="font-medium text-muted-foreground">Admin report path</dt>
                 <dd className="font-mono break-all">{rawFidPromptSmoke.adminReportEndpoint || "—"}</dd>
               </div>
               <div>
@@ -1000,7 +1000,7 @@ export function DeploymentSettingsWorkspace() {
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-medium text-muted-foreground">report payload SHA-256</dt>
+                        <dt className="font-medium text-muted-foreground">Report data SHA-256</dt>
                         <dd className="font-mono break-all">
                           {readStr(fixtureProvenance, ["report_payload_sha256"]) || "—"}
                         </dd>
@@ -1183,7 +1183,7 @@ export function DeploymentSettingsWorkspace() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-[11px] text-muted-foreground">No promotion-gate failures returned.</p>
+                      <p className="text-[11px] text-muted-foreground">No promotion-gate failures found.</p>
                     )}
                   </div>
                 ) : null}
@@ -1270,7 +1270,7 @@ export function DeploymentSettingsWorkspace() {
                         </Table>
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No activation-readiness gates returned.</p>
+                      <p className="text-sm text-muted-foreground">No activation-readiness gates found.</p>
                     )}
                   </div>
                 ) : null}
@@ -1318,13 +1318,13 @@ export function DeploymentSettingsWorkspace() {
                     </Table>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No fixture rows returned.</p>
+                  <p className="text-sm text-muted-foreground">No fixture rows found.</p>
                 )}
               </div>
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Raw FID sidecar smoke is not reported by this backend.</p>
+          <p className="text-sm text-muted-foreground">Raw FID sidecar smoke is not reported by this build.</p>
         )}
       </ModuleCard>
 
@@ -1333,7 +1333,7 @@ export function DeploymentSettingsWorkspace() {
         eyebrow="Warnings"
         title="Unsafe config warnings"
         icon={AlertTriangle}
-        description="unsafe_variables — configuration keys flagged as unsafe for production."
+        description="Configuration keys flagged as unsafe for production."
       >
         <div>
           {unsafeVars.length === 0 ? (
@@ -1368,9 +1368,9 @@ export function DeploymentSettingsWorkspace() {
       <ModuleCard
         accent="slate"
         eyebrow="Public Vars"
-        title="public_variables"
+        title="Public variables"
         icon={Settings2}
-        description="Non-secret fields returned under public_variables. Values may be truncated; SECRET_LIKE_VARIABLES_PRESENT lists names only."
+        description="Non-secret configuration values. Long values are truncated; secret-like variable names are listed only."
       >
         <div>
           {!publicVars ? (
@@ -1380,8 +1380,8 @@ export function DeploymentSettingsWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs">name</TableHead>
-                    <TableHead className="text-xs">value (sanitized display)</TableHead>
+                    <TableHead className="text-xs">Name</TableHead>
+                    <TableHead className="text-xs">Value</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1409,15 +1409,15 @@ export function DeploymentSettingsWorkspace() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : deps.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{errDeps || "No rows."}</p>
+            <p className="text-sm text-muted-foreground">{errDeps || "No dependency checks found."}</p>
           ) : (
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs">name</TableHead>
-                    <TableHead className="text-xs">status</TableHead>
-                    <TableHead className="text-xs">message</TableHead>
+                    <TableHead className="text-xs">Name</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs">Message</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1445,21 +1445,21 @@ export function DeploymentSettingsWorkspace() {
       <ModuleCard
         accent="slate"
         eyebrow="Version"
-        title="Version payload"
+        title="Version details"
         icon={FileCog}
         description="Full version metadata: API, build hash, branch, build time."
       >
         <div className="space-y-2 font-mono text-xs">
           <p>
-            <span className="text-muted-foreground">api_version </span>
+            <span className="text-muted-foreground">API version </span>
             {version ? readStr(version, ["api_version"]) || "—" : "—"}
           </p>
           <p>
-            <span className="text-muted-foreground">environment </span>
+            <span className="text-muted-foreground">Environment </span>
             {version ? readStr(version, ["environment"]) || "—" : "—"}
           </p>
           <p>
-            <span className="text-muted-foreground">timestamp </span>
+            <span className="text-muted-foreground">Timestamp </span>
             {version ? readStr(version, ["timestamp"]) || "—" : "—"}
           </p>
         </div>

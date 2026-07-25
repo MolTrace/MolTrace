@@ -177,9 +177,9 @@ export function OpsDashboardWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Release control &amp; model lineage</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            The fail-closed deployment-gate posture and per-model lineage from the Prompt 18 MLOps
-            layer. Read-only and admin-gated; the backend computes the gate live and owns the
-            release policy — this surface renders it as-is.
+            The fail-closed deployment-gate posture and per-model lineage from the MLOps layer.
+            Read-only and admin-gated; the app computes the gate automatically and owns the
+            release policy — this view shows it as-is.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void reload()}>
@@ -203,7 +203,7 @@ export function OpsDashboardWorkspace() {
         <AlertCard
           variant="error"
           title="Admin access required"
-          description="These ops endpoints are admin-only. Sign in with an admin account to view the deployment gate and model lineage."
+          description="These ops views are admin-only. Sign in with an admin account to view the deployment gate and model lineage."
         />
       ) : null}
 
@@ -257,7 +257,7 @@ export function OpsDashboardWorkspace() {
               </Badge>
 
               <span className="font-mono text-[10px] text-muted-foreground">
-                output contract v{gate.output_contract_schema_version}
+                output format v{gate.output_contract_schema_version}
               </span>
             </div>
 
@@ -349,13 +349,13 @@ export function OpsDashboardWorkspace() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-xs">model_id</TableHead>
-                      <TableHead className="text-xs">role</TableHead>
-                      <TableHead className="text-xs">nucleus</TableHead>
-                      <TableHead className="text-xs">version</TableHead>
-                      <TableHead className="text-xs">metrics</TableHead>
-                      <TableHead className="text-xs">promoted</TableHead>
-                      <TableHead className="text-xs">drift</TableHead>
+                      <TableHead className="text-xs">Model ID</TableHead>
+                      <TableHead className="text-xs">Role</TableHead>
+                      <TableHead className="text-xs">Nucleus</TableHead>
+                      <TableHead className="text-xs">Version</TableHead>
+                      <TableHead className="text-xs">Metrics</TableHead>
+                      <TableHead className="text-xs">Promoted</TableHead>
+                      <TableHead className="text-xs">Drift</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -409,11 +409,10 @@ export function OpsDashboardWorkspace() {
       >
         <div className="flex flex-col items-center gap-2 rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center">
           <Activity className="h-6 w-6 text-muted-foreground" aria-hidden />
-          <p className="text-sm font-medium text-foreground">Drift telemetry not wired yet</p>
+          <p className="text-sm font-medium text-foreground">Drift telemetry not available yet</p>
           <p className="max-w-md text-xs text-muted-foreground">
             The live drift panels arrive once a training baseline and assembled production telemetry
-            are plumbed into the API (a future <code className="font-mono">GET /admin/ops/drift</code>{" "}
-            endpoint). The gate posture and lineage above ship now.
+            are available in this build. The gate posture and lineage above ship now.
           </p>
         </div>
       </ModuleCard>

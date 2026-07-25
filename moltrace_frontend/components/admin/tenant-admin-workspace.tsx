@@ -344,13 +344,13 @@ export function TenantAdminWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>display name</TableHead>
-                    <TableHead>tenant key</TableHead>
-                    <TableHead>tenant type</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>primary contact</TableHead>
-                    <TableHead>updated date</TableHead>
-                    <TableHead>open</TableHead>
+                    <TableHead>Display name</TableHead>
+                    <TableHead>Tenant key</TableHead>
+                    <TableHead>Tenant type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Primary contact</TableHead>
+                    <TableHead>Updated date</TableHead>
+                    <TableHead>Open</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -396,11 +396,11 @@ export function TenantAdminWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="tenant-admin-tenant-key">tenant key</Label>
+              <Label htmlFor="tenant-admin-tenant-key">Tenant key</Label>
               <Input id="tenant-admin-tenant-key" value={tenantKey} onChange={(e) => setTenantKey(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="tenant-admin-display-name">display name</Label>
+              <Label htmlFor="tenant-admin-display-name">Display name</Label>
               <Input
                 id="tenant-admin-display-name"
                 value={displayName}
@@ -408,7 +408,7 @@ export function TenantAdminWorkspace() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="tenant-admin-tenant-type">tenant type</Label>
+              <Label htmlFor="tenant-admin-tenant-type">Tenant type</Label>
               <Select value={tenantType} onValueChange={(value) => setTenantType(value as typeof tenantType)}>
                 <SelectTrigger id="tenant-admin-tenant-type">
                   <SelectValue />
@@ -423,7 +423,7 @@ export function TenantAdminWorkspace() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="tenant-admin-status">status</Label>
+              <Label htmlFor="tenant-admin-status">Status</Label>
               <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
                 <SelectTrigger id="tenant-admin-status">
                   <SelectValue />
@@ -438,7 +438,7 @@ export function TenantAdminWorkspace() {
               </Select>
             </div>
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="tenant-admin-primary-contact-email">primary contact email</Label>
+              <Label htmlFor="tenant-admin-primary-contact-email">Primary contact email</Label>
               <Input
                 id="tenant-admin-primary-contact-email"
                 type="email"

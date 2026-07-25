@@ -77,7 +77,7 @@ export function MlModelArtifactsList() {
 
       {err ? (
         <Alert variant="destructive">
-          <AlertTitle>GET /ml/model-artifacts</AlertTitle>
+          <AlertTitle>Could not load model artifacts</AlertTitle>
           <AlertDescription>{err}</AlertDescription>
         </Alert>
       ) : null}
@@ -93,17 +93,17 @@ export function MlModelArtifactsList() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No artifacts returned.</p>
+            <p className="text-sm text-muted-foreground">No artifacts found.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>model_name</TableHead>
-                  <TableHead>model_version</TableHead>
-                  <TableHead>task_key</TableHead>
-                  <TableHead>model_family</TableHead>
-                  <TableHead>status</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Model name</TableHead>
+                  <TableHead>Model version</TableHead>
+                  <TableHead>Task type</TableHead>
+                  <TableHead>Model family</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="w-[100px]" />
                 </TableRow>
               </TableHeader>

@@ -219,15 +219,15 @@ export function MlTrainingRunLauncher() {
     const mn = modelName.trim()
     const mv = modelVersion.trim()
     if (!tk) {
-      setFormErr("task_key is required.")
+      setFormErr("Task is required.")
       return
     }
     if (!Number.isFinite(dvid) || dvid < 1) {
-      setFormErr("dataset_version_id is required.")
+      setFormErr("Dataset version is required.")
       return
     }
     if (!mn || !mv) {
-      setFormErr("model_name and model_version are required.")
+      setFormErr("Model name and model version are required.")
       return
     }
     const parameters_json = parameters
@@ -284,7 +284,7 @@ export function MlTrainingRunLauncher() {
           dataset_type: dsType,
         })
       }
-      setFormOk("Start training run accepted. When the run finishes with status succeeded: training complete.")
+      setFormOk("Training run started. When it finishes successfully, training is complete.")
       setReloadToken((x) => x + 1)
     } catch (e) {
       setFormErr(formatApiError(e, "Could not start training run."))
@@ -334,7 +334,7 @@ export function MlTrainingRunLauncher() {
           Training completion creates artifacts for follow-up work: when a run succeeds, treat outcomes as{" "}
           <span className="font-medium text-foreground">training complete</span> and check for{" "}
           <span className="font-medium text-foreground">model artifact created</span> via{" "}
-          <code className="text-xs">model_artifact_id</code>. Every run still{" "}
+          <code className="text-xs">the model artifact ID</code>. Every run still{" "}
           <span className="font-medium text-foreground">requires evaluation</span> before deployment decisions.
         </AlertDescription>
       </Alert>
@@ -369,12 +369,12 @@ export function MlTrainingRunLauncher() {
         eyebrow="Launch"
         title="Start training run"
         icon={PlayCircle}
-        description="Launch a supervised ML training run against a curated knowledge dataset version. Only dataset IDs and hyperparameters are sent — no raw data payload."
+        description="Launch a supervised ML training run against a curated knowledge dataset version. Only dataset IDs and hyperparameters are sent — no raw data."
       >
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="task-key">task_key</Label>
+              <Label htmlFor="task-key">Task</Label>
               {taskKeyOptions.length > 0 ? (
                 <Select value={taskKey || undefined} onValueChange={setTaskKey}>
                   <SelectTrigger id="task-key">
@@ -393,16 +393,16 @@ export function MlTrainingRunLauncher() {
                   id="task-key"
                   value={taskKey}
                   onChange={(e) => setTaskKey(e.target.value)}
-                  placeholder="task_key from GET /ml/tasks"
+                  placeholder="Enter a task key"
                   autoComplete="off"
                 />
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dataset-version">dataset_version_id</Label>
+              <Label htmlFor="dataset-version">Dataset version</Label>
               <Select value={datasetVersionId || undefined} onValueChange={setDatasetVersionId}>
                 <SelectTrigger id="dataset-version">
-                  <SelectValue placeholder={datasetVersions.length ? "Select dataset version" : "Load versions from API"} />
+                  <SelectValue placeholder={datasetVersions.length ? "Select dataset version" : "No versions available"} />
                 </SelectTrigger>
                 <SelectContent>
                   {datasetVersions.map((row) => {
@@ -424,7 +424,7 @@ export function MlTrainingRunLauncher() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="pipeline">feature_pipeline_id (optional)</Label>
+              <Label htmlFor="pipeline">Feature pipeline (optional)</Label>
               <Select value={pipelineId || "__none__"} onValueChange={(v) => setPipelineId(v === "__none__" ? "" : v)}>
                 <SelectTrigger id="pipeline">
                   <SelectValue placeholder="None" />
@@ -446,7 +446,7 @@ export function MlTrainingRunLauncher() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="model-family">model_family</Label>
+              <Label htmlFor="model-family">Model family</Label>
               <Select value={modelFamily} onValueChange={setModelFamily}>
                 <SelectTrigger id="model-family">
                   <SelectValue />
@@ -464,24 +464,24 @@ export function MlTrainingRunLauncher() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="model-name">model_name</Label>
+              <Label htmlFor="model-name">Model name</Label>
               <Input id="model-name" value={modelName} onChange={(e) => setModelName(e.target.value)} autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="model-version">model_version</Label>
+              <Label htmlFor="model-version">Model version</Label>
               <Input id="model-version" value={modelVersion} onChange={(e) => setModelVersion(e.target.value)} autoComplete="off" />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="params-json">parameters_json</Label>
+            <Label htmlFor="params-json">Parameters</Label>
             <JsonObjectField idPrefix="params-json" label="Parameters" initialValue={parameters} onChange={setParameters} />
           </div>
 
           {showExperimentalToggle ? (
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
-                <p className="text-sm font-medium">experimental</p>
+                <p className="text-sm font-medium">Experimental</p>
                 <p className="text-xs text-muted-foreground">
                   Dataset version is not approved; enable experimental mode to proceed under governance rules.
                 </p>
@@ -509,14 +509,14 @@ export function MlTrainingRunLauncher() {
         eyebrow="Runs"
         title="Training runs"
         icon={Activity}
-        description="ML training run history — status, metrics, and artifact IDs for each completed or in-progress run. Artifact IDs appear when the backend reports success."
+        description="ML training run history — status, metrics, and artifact IDs for each completed or in-progress run. Artifact IDs appear when a run succeeds."
       >
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
             Labels: <span className="font-medium text-foreground">training complete</span> aligns with{" "}
-            <code className="text-xs">status === succeeded</code>;{" "}
+            <code className="text-xs">the run succeeds</code>;{" "}
             <span className="font-medium text-foreground">model artifact created</span> when{" "}
-            <code className="text-xs">model_artifact_id</code> is present;{" "}
+            <code className="text-xs">the model artifact ID</code> is present;{" "}
             <span className="font-medium text-foreground">requires evaluation</span> for downstream release checks.
           </p>
           <div className="table-scroll min-w-0">
@@ -530,14 +530,14 @@ export function MlTrainingRunLauncher() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[72px]">id</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>dataset_version_id</TableHead>
-                    <TableHead>model_family</TableHead>
-                    <TableHead>metrics</TableHead>
-                    <TableHead>warnings</TableHead>
-                    <TableHead>model_artifact_id</TableHead>
-                    <TableHead className="w-[100px]">actions</TableHead>
+                    <TableHead className="w-[72px]">ID</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Dataset version ID</TableHead>
+                    <TableHead>Model family</TableHead>
+                    <TableHead>Metrics</TableHead>
+                    <TableHead>Warnings</TableHead>
+                    <TableHead>Model artifact ID</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

@@ -460,7 +460,7 @@ export function ValidationProjectDetailWorkspace() {
     const id = validationProjectId.trim()
     if (!id) {
       setLoading(false)
-      setError("Missing validation project id.")
+      setError("Missing validation project ID.")
       return
     }
     setLoading(true)
@@ -872,7 +872,7 @@ export function ValidationProjectDetailWorkspace() {
     let linkedRequirementIdsJson: unknown
     let linkedRiskIdsJson: unknown
     try {
-      stepsJson = parseJsonField(testCaseStepsJson, "steps JSON")
+      stepsJson = parseJsonField(testCaseStepsJson, "Steps")
       linkedRequirementIdsJson = parseJsonField(testCaseLinkedRequirementsJson, "linked requirements")
       linkedRiskIdsJson = parseJsonField(testCaseLinkedRisksJson, "linked risks")
     } catch (err) {
@@ -1047,15 +1047,15 @@ export function ValidationProjectDetailWorkspace() {
               description="Summary of the selected validation project — scope, status, intended use, and regulated context."
             >
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="validation scope" value={readFirst(project, ["scope"])} />
+                <Field label="Validation scope" value={readFirst(project, ["scope"])} />
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">status</p>
+                  <p className="text-xs font-medium text-muted-foreground">Status</p>
                   <div className="mt-1">
                     <StatusBadge status={readFirst(project, ["status"])} />
                   </div>
                 </div>
-                <Field label="intended use" value={readFirst(project, ["intended_use"])} />
-                <Field label="regulated context" value={readFirst(project, ["regulated_context"])} />
+                <Field label="Intended use" value={readFirst(project, ["intended_use"])} />
+                <Field label="Regulated context" value={readFirst(project, ["regulated_context"])} />
               </div>
             </ModuleCard>
 
@@ -1086,7 +1086,7 @@ export function ValidationProjectDetailWorkspace() {
                 {ursError ? <p className="text-xs text-destructive">{ursError}</p> : null}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-1">
-                    <Label htmlFor="urs-requirement-code">requirement code</Label>
+                    <Label htmlFor="urs-requirement-code">Requirement code</Label>
                     <Input
                       id="urs-requirement-code"
                       value={ursRequirementCode}
@@ -1095,14 +1095,14 @@ export function ValidationProjectDetailWorkspace() {
                   </div>
                   <FormSelect
                     id="urs-module"
-                    label="module"
+                    label="Module"
                     value={ursModule}
                     onValueChange={setUrsModule}
                     options={MODULE_OPTIONS}
                   />
                   <FormSelect
                     id="urs-criticality"
-                    label="criticality"
+                    label="Criticality"
                     value={ursCriticality}
                     onValueChange={setUrsCriticality}
                     options={CRITICALITY_OPTIONS}
@@ -1116,13 +1116,13 @@ export function ValidationProjectDetailWorkspace() {
                   />
                   <FormSelect
                     id="urs-status"
-                    label="status"
+                    label="Status"
                     value={ursStatus}
                     onValueChange={setUrsStatus}
                     options={SPEC_STATUS_OPTIONS}
                   />
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                    <Label htmlFor="urs-requirement-text">requirement text</Label>
+                    <Label htmlFor="urs-requirement-text">Requirement text</Label>
                     <Textarea
                       id="urs-requirement-text"
                       value={ursRequirementText}
@@ -1146,14 +1146,14 @@ export function ValidationProjectDetailWorkspace() {
               <CardContent>
                 <GenericTable
                   rows={ursRows}
-                  empty="No URS rows returned."
+                  empty="No URS entries yet."
                   columns={[
-                    { key: "requirement_code", label: "requirement code" },
-                    { key: "module", label: "module" },
-                    { key: "criticality", label: "criticality" },
-                    { key: "gxp_impact", label: "gxp impact" },
-                    { key: "status", label: "status" },
-                    { key: "requirement_text", label: "requirement text" },
+                    { key: "requirement_code", label: "Requirement code" },
+                    { key: "module", label: "Module" },
+                    { key: "criticality", label: "Criticality" },
+                    { key: "gxp_impact", label: "GxP impact" },
+                    { key: "status", label: "Status" },
+                    { key: "requirement_text", label: "Requirement text" },
                   ]}
                 />
               </CardContent>
@@ -1165,16 +1165,14 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Create functional spec</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">
-                    POST /validation-center/projects/{"{validation_project_id}"}/functional-specs
-                  </code>
+                  Adds a functional specification to this project — linked requirement, function code, name, description, and expected behavior.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {fsError ? <p className="text-xs text-destructive">{fsError}</p> : null}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-1">
-                    <Label htmlFor="fs-linked-requirement">linked requirement</Label>
+                    <Label htmlFor="fs-linked-requirement">Linked requirement</Label>
                     <Select value={fsRequirementId} onValueChange={setFsRequirementId}>
                       <SelectTrigger id="fs-linked-requirement">
                         <SelectValue />
@@ -1190,7 +1188,7 @@ export function ValidationProjectDetailWorkspace() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="fs-function-code">function code</Label>
+                    <Label htmlFor="fs-function-code">Function code</Label>
                     <Input
                       id="fs-function-code"
                       value={fsFunctionCode}
@@ -1198,7 +1196,7 @@ export function ValidationProjectDetailWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="fs-function-name">function name</Label>
+                    <Label htmlFor="fs-function-name">Function name</Label>
                     <Input
                       id="fs-function-name"
                       value={fsFunctionName}
@@ -1207,20 +1205,20 @@ export function ValidationProjectDetailWorkspace() {
                   </div>
                   <FormSelect
                     id="fs-module"
-                    label="module"
+                    label="Module"
                     value={fsModule}
                     onValueChange={setFsModule}
                     options={MODULE_OPTIONS}
                   />
                   <FormSelect
                     id="fs-status"
-                    label="status"
+                    label="Status"
                     value={fsStatus}
                     onValueChange={setFsStatus}
                     options={SPEC_STATUS_OPTIONS}
                   />
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                    <Label htmlFor="fs-function-description">function description</Label>
+                    <Label htmlFor="fs-function-description">Function description</Label>
                     <Textarea
                       id="fs-function-description"
                       value={fsFunctionDescription}
@@ -1229,7 +1227,7 @@ export function ValidationProjectDetailWorkspace() {
                     />
                   </div>
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                    <Label htmlFor="fs-expected-behavior">expected behavior</Label>
+                    <Label htmlFor="fs-expected-behavior">Expected behavior</Label>
                     <Textarea
                       id="fs-expected-behavior"
                       value={fsExpectedBehavior}
@@ -1247,23 +1245,21 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Functional Specs</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">
-                    GET /validation-center/projects/{"{validation_project_id}"}/functional-specs
-                  </code>
+                  Functional specifications defined for this project.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
                   rows={functionalSpecRows}
-                  empty="No functional specs returned."
+                  empty="No functional specs yet."
                   columns={[
-                    { key: "requirement_id", label: "linked requirement", keys: ["requirement_id", "linked_requirement_id"] },
-                    { key: "function_code", label: "function code" },
-                    { key: "function_name", label: "function name" },
-                    { key: "function_description", label: "function description" },
-                    { key: "module", label: "module" },
-                    { key: "status", label: "status" },
-                    { key: "expected_behavior", label: "expected behavior" },
+                    { key: "requirement_id", label: "Linked requirement", keys: ["requirement_id", "linked_requirement_id"] },
+                    { key: "function_code", label: "Function code" },
+                    { key: "function_name", label: "Function name" },
+                    { key: "function_description", label: "Function description" },
+                    { key: "module", label: "Module" },
+                    { key: "status", label: "Status" },
+                    { key: "expected_behavior", label: "Expected behavior" },
                   ]}
                 />
               </CardContent>
@@ -1275,9 +1271,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Create risk assessment</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">
-                    POST /validation-center/projects/{"{validation_project_id}"}/risk-assessment
-                  </code>
+                  Records a risk assessment for this project.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1285,13 +1279,13 @@ export function ValidationProjectDetailWorkspace() {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <FormSelect
                     id="risk-target-type"
-                    label="target type"
+                    label="Target type"
                     value={riskTargetType}
                     onValueChange={setRiskTargetType}
                     options={RISK_TARGET_TYPE_OPTIONS}
                   />
                   <div className="space-y-1">
-                    <Label htmlFor="risk-target-id">target ID optional</Label>
+                    <Label htmlFor="risk-target-id">Target ID (optional)</Label>
                     <Input
                       id="risk-target-id"
                       value={riskTargetId}
@@ -1300,41 +1294,41 @@ export function ValidationProjectDetailWorkspace() {
                   </div>
                   <FormSelect
                     id="risk-severity"
-                    label="severity"
+                    label="Severity"
                     value={riskSeverity}
                     onValueChange={setRiskSeverity}
                     options={RISK_LEVEL_OPTIONS}
                   />
                   <FormSelect
                     id="risk-probability"
-                    label="probability"
+                    label="Probability"
                     value={riskProbability}
                     onValueChange={setRiskProbability}
                     options={PROBABILITY_OPTIONS}
                   />
                   <FormSelect
                     id="risk-detectability"
-                    label="detectability"
+                    label="Detectability"
                     value={riskDetectability}
                     onValueChange={setRiskDetectability}
                     options={PROBABILITY_OPTIONS}
                   />
                   <FormSelect
                     id="risk-testing-rigor"
-                    label="testing rigor"
+                    label="Testing rigor"
                     value={riskTestingRigor}
                     onValueChange={setRiskTestingRigor}
                     options={TESTING_RIGOR_OPTIONS}
                   />
                   <FormSelect
                     id="risk-status"
-                    label="status"
+                    label="Status"
                     value={riskStatus}
                     onValueChange={setRiskStatus}
                     options={RISK_STATUS_OPTIONS}
                   />
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                    <Label htmlFor="risk-description">risk description</Label>
+                    <Label htmlFor="risk-description">Risk description</Label>
                     <Textarea
                       id="risk-description"
                       value={riskDescription}
@@ -1343,7 +1337,7 @@ export function ValidationProjectDetailWorkspace() {
                     />
                   </div>
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                    <Label htmlFor="risk-mitigation">mitigation</Label>
+                    <Label htmlFor="risk-mitigation">Mitigation</Label>
                     <Textarea
                       id="risk-mitigation"
                       value={riskMitigation}
@@ -1361,25 +1355,23 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Risk Assessment</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">
-                    GET /validation-center/projects/{"{validation_project_id}"}/risk-assessment
-                  </code>
+                  Risk assessments recorded for this project.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
                   rows={riskRows}
-                  empty="No risk assessment rows returned."
+                  empty="No risk assessments yet."
                   columns={[
-                    { key: "target_type", label: "target type" },
-                    { key: "target_id", label: "target ID" },
-                    { key: "severity", label: "severity" },
-                    { key: "probability", label: "probability" },
-                    { key: "detectability", label: "detectability" },
-                    { key: "testing_rigor", label: "testing rigor" },
-                    { key: "status", label: "status" },
-                    { key: "risk_description", label: "risk description" },
-                    { key: "mitigation", label: "mitigation" },
+                    { key: "target_type", label: "Target type" },
+                    { key: "target_id", label: "Target ID" },
+                    { key: "severity", label: "Severity" },
+                    { key: "probability", label: "Probability" },
+                    { key: "detectability", label: "Detectability" },
+                    { key: "testing_rigor", label: "Testing rigor" },
+                    { key: "status", label: "Status" },
+                    { key: "risk_description", label: "Risk description" },
+                    { key: "mitigation", label: "Mitigation" },
                   ]}
                 />
               </CardContent>
@@ -1391,16 +1383,14 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Create test protocol</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">
-                    POST /validation-center/projects/{"{validation_project_id}"}/test-protocols
-                  </code>
+                  Adds a test protocol to this project.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {protocolError ? <p className="text-xs text-destructive">{protocolError}</p> : null}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-1">
-                    <Label htmlFor="protocol-code">protocol code</Label>
+                    <Label htmlFor="protocol-code">Protocol code</Label>
                     <Input
                       id="protocol-code"
                       value={protocolCode}
@@ -1408,7 +1398,7 @@ export function ValidationProjectDetailWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="protocol-title">title</Label>
+                    <Label htmlFor="protocol-title">Title</Label>
                     <Input
                       id="protocol-title"
                       value={protocolTitle}
@@ -1417,21 +1407,21 @@ export function ValidationProjectDetailWorkspace() {
                   </div>
                   <FormSelect
                     id="protocol-module"
-                    label="module"
+                    label="Module"
                     value={protocolModule}
                     onValueChange={setProtocolModule}
                     options={MODULE_OPTIONS}
                   />
                   <FormSelect
                     id="protocol-type"
-                    label="protocol type"
+                    label="Protocol type"
                     value={protocolType}
                     onValueChange={setProtocolType}
                     options={PROTOCOL_TYPE_OPTIONS}
                   />
                   <FormSelect
                     id="protocol-status"
-                    label="status"
+                    label="Status"
                     value={protocolStatus}
                     onValueChange={setProtocolStatus}
                     options={PROTOCOL_STATUS_OPTIONS}
@@ -1447,9 +1437,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Test Protocols</CardTitle>
                 <CardDescription>
-                  <code className="text-xs">
-                    GET /validation-center/projects/{"{validation_project_id}"}/test-protocols
-                  </code>
+                  Test protocols defined for this project.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1457,19 +1445,19 @@ export function ValidationProjectDetailWorkspace() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">protocol code</TableHead>
-                        <TableHead className="text-xs">title</TableHead>
-                        <TableHead className="text-xs">module</TableHead>
-                        <TableHead className="text-xs">protocol type</TableHead>
-                        <TableHead className="text-xs">status</TableHead>
-                        <TableHead className="text-xs">open</TableHead>
+                        <TableHead className="text-xs">Protocol code</TableHead>
+                        <TableHead className="text-xs">Title</TableHead>
+                        <TableHead className="text-xs">Module</TableHead>
+                        <TableHead className="text-xs">Protocol type</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs">Open</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {protocolRows.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={6} className="text-xs text-muted-foreground">
-                            No test protocols returned.
+                            No test protocols yet.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -1514,7 +1502,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Selected protocol detail</CardTitle>
                 <CardDescription>
-                  Detail for the selected test protocol — protocol code, title, type, module, and status.
+                  Details for the selected test protocol — protocol code, title, type, module, and status.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1524,17 +1512,17 @@ export function ValidationProjectDetailWorkspace() {
                   <p className="text-sm text-muted-foreground">Open a protocol to load detail and test cases.</p>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <Field label="protocol id" value={selectedProtocolId} />
-                    <Field label="protocol code" value={readFirst(protocolDetail ?? selectedProtocol, ["protocol_code"])} />
+                    <Field label="Protocol ID" value={selectedProtocolId} />
+                    <Field label="Protocol code" value={readFirst(protocolDetail ?? selectedProtocol, ["protocol_code"])} />
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground">status</p>
+                      <p className="text-xs font-medium text-muted-foreground">Status</p>
                       <div className="mt-1">
                         <StatusBadge status={readFirst(protocolDetail ?? selectedProtocol, ["status"])} />
                       </div>
                     </div>
-                    <Field label="title" value={readFirst(protocolDetail ?? selectedProtocol, ["title"])} />
-                    <Field label="module" value={readFirst(protocolDetail ?? selectedProtocol, ["module"])} />
-                    <Field label="protocol type" value={readFirst(protocolDetail ?? selectedProtocol, ["protocol_type"])} />
+                    <Field label="Title" value={readFirst(protocolDetail ?? selectedProtocol, ["title"])} />
+                    <Field label="Module" value={readFirst(protocolDetail ?? selectedProtocol, ["module"])} />
+                    <Field label="Protocol type" value={readFirst(protocolDetail ?? selectedProtocol, ["protocol_type"])} />
                   </div>
                 )}
               </CardContent>
@@ -1551,7 +1539,7 @@ export function ValidationProjectDetailWorkspace() {
                 {testCaseError ? <p className="text-xs text-destructive">{testCaseError}</p> : null}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-1">
-                    <Label htmlFor="test-case-code">test case code</Label>
+                    <Label htmlFor="test-case-code">Test case code</Label>
                     <Input
                       id="test-case-code"
                       value={testCaseCode}
@@ -1559,7 +1547,7 @@ export function ValidationProjectDetailWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="test-case-title">title</Label>
+                    <Label htmlFor="test-case-title">Title</Label>
                     <Input
                       id="test-case-title"
                       value={testCaseTitle}
@@ -1568,13 +1556,13 @@ export function ValidationProjectDetailWorkspace() {
                   </div>
                   <FormSelect
                     id="test-case-status"
-                    label="status"
+                    label="Status"
                     value={testCaseStatus}
                     onValueChange={setTestCaseStatus}
                     options={TEST_CASE_STATUS_OPTIONS}
                   />
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                    <Label htmlFor="test-case-preconditions">preconditions</Label>
+                    <Label htmlFor="test-case-preconditions">Preconditions</Label>
                     <Textarea
                       id="test-case-preconditions"
                       value={testCasePreconditions}
@@ -1586,7 +1574,7 @@ export function ValidationProjectDetailWorkspace() {
                     <ObjectArrayField
                       key={`steps-${testCaseFormNonce}`}
                       idPrefix="test-case-steps"
-                      label="steps"
+                      label="Steps"
                       itemLabel="Step"
                       addLabel="Add step"
                       description="Add each procedure step; use raw JSON within a step for nested detail."
@@ -1594,7 +1582,7 @@ export function ValidationProjectDetailWorkspace() {
                     />
                   </div>
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                    <Label htmlFor="test-case-expected-results">expected results</Label>
+                    <Label htmlFor="test-case-expected-results">Expected results</Label>
                     <Textarea
                       id="test-case-expected-results"
                       value={testCaseExpectedResults}
@@ -1606,7 +1594,7 @@ export function ValidationProjectDetailWorkspace() {
                     <ScalarListField
                       key={`linked-req-${testCaseFormNonce}`}
                       idPrefix="test-case-linked-requirements"
-                      label="linked requirement IDs"
+                      label="Linked requirement IDs"
                       onChange={(arr) => setTestCaseLinkedRequirementsJson(jsonArrayString(arr))}
                     />
                   </div>
@@ -1614,7 +1602,7 @@ export function ValidationProjectDetailWorkspace() {
                     <ScalarListField
                       key={`linked-risk-${testCaseFormNonce}`}
                       idPrefix="test-case-linked-risks"
-                      label="linked risk IDs"
+                      label="Linked risk IDs"
                       onChange={(arr) => setTestCaseLinkedRisksJson(jsonArrayString(arr))}
                     />
                   </div>
@@ -1653,19 +1641,19 @@ export function ValidationProjectDetailWorkspace() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">test case code</TableHead>
-                        <TableHead className="text-xs">title</TableHead>
-                        <TableHead className="text-xs">status</TableHead>
-                        <TableHead className="text-xs">linked requirements</TableHead>
-                        <TableHead className="text-xs">linked risks</TableHead>
-                        <TableHead className="text-xs">open</TableHead>
+                        <TableHead className="text-xs">Test case code</TableHead>
+                        <TableHead className="text-xs">Title</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs">Linked requirements</TableHead>
+                        <TableHead className="text-xs">Linked risks</TableHead>
+                        <TableHead className="text-xs">Open</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {testCaseRows.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={6} className="text-xs text-muted-foreground">
-                            No test cases returned.
+                            No test cases yet.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -1722,9 +1710,9 @@ export function ValidationProjectDetailWorkspace() {
               <CardContent className="space-y-4">
                 {executionError ? <p className="text-xs text-destructive">{executionError}</p> : null}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <Field label="selected test case" value={selectedTestCaseId || rowId(selectedTestCase) || "Open a test case in Test Protocols"} />
+                  <Field label="Selected test case" value={selectedTestCaseId || rowId(selectedTestCase) || "Open a test case in Test Protocols"} />
                   <div className="space-y-1">
-                    <Label htmlFor="execution-executed-by">executed by</Label>
+                    <Label htmlFor="execution-executed-by">Executed by</Label>
                     <Input
                       id="execution-executed-by"
                       value={executedBy}
@@ -1733,13 +1721,13 @@ export function ValidationProjectDetailWorkspace() {
                   </div>
                   <FormSelect
                     id="execution-status"
-                    label="execution status"
+                    label="Execution status"
                     value={executionStatus}
                     onValueChange={setExecutionStatus}
                     options={EXECUTION_STATUS_OPTIONS}
                   />
                   <div className="space-y-1 sm:col-span-2 lg:col-span-3">
-                    <Label htmlFor="execution-actual-results">actual results</Label>
+                    <Label htmlFor="execution-actual-results">Actual results</Label>
                     <Textarea
                       id="execution-actual-results"
                       value={actualResults}
@@ -1751,7 +1739,7 @@ export function ValidationProjectDetailWorkspace() {
                     <ScalarListField
                       key={`evidence-file-${executionFormNonce}`}
                       idPrefix="execution-evidence-file-ids"
-                      label="evidence file IDs"
+                      label="Evidence file IDs"
                       onChange={(arr) => setEvidenceFileIdsJson(jsonArrayString(arr))}
                     />
                   </div>
@@ -1759,7 +1747,7 @@ export function ValidationProjectDetailWorkspace() {
                     <ScalarListField
                       key={`evidence-artifact-${executionFormNonce}`}
                       idPrefix="execution-evidence-artifact-ids"
-                      label="evidence artifact IDs"
+                      label="Evidence artifact IDs"
                       onChange={(arr) => setEvidenceArtifactIdsJson(jsonArrayString(arr))}
                     />
                   </div>
@@ -1791,19 +1779,19 @@ export function ValidationProjectDetailWorkspace() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">test case</TableHead>
-                        <TableHead className="text-xs">execution status</TableHead>
-                        <TableHead className="text-xs">executed by</TableHead>
-                        <TableHead className="text-xs">executed at</TableHead>
-                        <TableHead className="text-xs">deviation id</TableHead>
-                        <TableHead className="text-xs">open</TableHead>
+                        <TableHead className="text-xs">Test case</TableHead>
+                        <TableHead className="text-xs">Execution status</TableHead>
+                        <TableHead className="text-xs">Executed by</TableHead>
+                        <TableHead className="text-xs">Executed at</TableHead>
+                        <TableHead className="text-xs">Deviation ID</TableHead>
+                        <TableHead className="text-xs">Open</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {displayedExecutionRows.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={6} className="text-xs text-muted-foreground">
-                            No test executions returned.
+                            No test executions yet.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -1860,12 +1848,12 @@ export function ValidationProjectDetailWorkspace() {
                   <p className="text-sm text-muted-foreground">Open an execution to load detail.</p>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <Field label="execution id" value={selectedExecutionId} />
-                    <Field label="execution status" value={readFirst(executionDetail, ["execution_status", "status"])} />
-                    <Field label="executed by" value={readFirst(executionDetail, ["executed_by"])} />
-                    <Field label="executed at" value={readFirst(executionDetail, ["executed_at"])} />
-                    <Field label="actual results" value={readFirst(executionDetail, ["actual_results"])} />
-                    <Field label="deviation id" value={readFirst(executionDetail, ["deviation_id"])} />
+                    <Field label="Execution ID" value={selectedExecutionId} />
+                    <Field label="Execution status" value={readFirst(executionDetail, ["execution_status", "status"])} />
+                    <Field label="Executed by" value={readFirst(executionDetail, ["executed_by"])} />
+                    <Field label="Executed at" value={readFirst(executionDetail, ["executed_at"])} />
+                    <Field label="Actual results" value={readFirst(executionDetail, ["actual_results"])} />
+                    <Field label="Deviation ID" value={readFirst(executionDetail, ["deviation_id"])} />
                   </div>
                 )}
               </CardContent>
@@ -1884,18 +1872,18 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">e-Signatures</CardTitle>
-                <CardDescription>Signature rows when included in the validation project payload.</CardDescription>
+                <CardDescription>Signature records included with this validation project.</CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
                   rows={signaturesRows}
-                  empty="No e-signature records returned in the project payload."
+                  empty="No e-signature records for this project."
                   columns={[
-                    { key: "signer_name", label: "signer name" },
-                    { key: "signature_meaning", label: "signature meaning" },
-                    { key: "target_type", label: "target type" },
-                    { key: "target_id", label: "target id" },
-                    { key: "signed_at", label: "signed at" },
+                    { key: "signer_name", label: "Signer name" },
+                    { key: "signature_meaning", label: "Signature meaning" },
+                    { key: "target_type", label: "Target type" },
+                    { key: "target_id", label: "Target ID" },
+                    { key: "signed_at", label: "Signed at" },
                   ]}
                 />
               </CardContent>
@@ -1906,18 +1894,18 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Deviations</CardTitle>
-                <CardDescription>Deviation rows when included in the validation project payload.</CardDescription>
+                <CardDescription>Deviation records included with this validation project.</CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
                   rows={deviationsRows}
-                  empty="No deviation records returned in the project payload."
+                  empty="No deviation records for this project."
                   columns={[
-                    { key: "deviation_code", label: "deviation code" },
-                    { key: "title", label: "title" },
-                    { key: "severity", label: "severity" },
-                    { key: "status", label: "status" },
-                    { key: "source_type", label: "source type" },
+                    { key: "deviation_code", label: "Deviation code" },
+                    { key: "title", label: "Title" },
+                    { key: "severity", label: "Severity" },
+                    { key: "status", label: "Status" },
+                    { key: "source_type", label: "Source type" },
                   ]}
                 />
               </CardContent>
@@ -1925,18 +1913,18 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">CAPA</CardTitle>
-                <CardDescription>CAPA rows when included in the validation project payload.</CardDescription>
+                <CardDescription>CAPA records included with this validation project.</CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
                   rows={capaRows}
-                  empty="No CAPA records returned in the project payload."
+                  empty="No CAPA records for this project."
                   columns={[
                     { key: "capa_code", label: "CAPA code" },
-                    { key: "title", label: "title" },
-                    { key: "owner", label: "owner" },
-                    { key: "due_date", label: "due date" },
-                    { key: "status", label: "status" },
+                    { key: "title", label: "Title" },
+                    { key: "owner", label: "Owner" },
+                    { key: "due_date", label: "Due date" },
+                    { key: "status", label: "Status" },
                   ]}
                 />
               </CardContent>
@@ -1947,18 +1935,18 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Inspection Package</CardTitle>
-                <CardDescription>Inspection package rows when included in the validation project payload.</CardDescription>
+                <CardDescription>Inspection package records included with this validation project.</CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
                   rows={inspectionRows}
-                  empty="No inspection package rows returned in the project payload."
+                  empty="No inspection package records for this project."
                   columns={[
-                    { key: "title", label: "title" },
-                    { key: "scope", label: "scope" },
-                    { key: "package_status", label: "package status" },
-                    { key: "package_sha256", label: "package sha256" },
-                    { key: "created_at", label: "created at" },
+                    { key: "title", label: "Title" },
+                    { key: "scope", label: "Scope" },
+                    { key: "package_status", label: "Package status" },
+                    { key: "package_sha256", label: "Package SHA-256" },
+                    { key: "created_at", label: "Created" },
                   ]}
                 />
               </CardContent>
@@ -1970,7 +1958,7 @@ export function ValidationProjectDetailWorkspace() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Developer JSON</CardTitle>
-                  <CardDescription>Raw payloads from the validation project detail endpoints.</CardDescription>
+                  <CardDescription>Raw data behind this validation project, for troubleshooting.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <JsonBlock value={developerBundle} />

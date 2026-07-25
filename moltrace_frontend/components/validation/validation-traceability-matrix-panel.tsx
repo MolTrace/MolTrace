@@ -175,7 +175,7 @@ export function ValidationTraceabilityMatrixPanel({
       setRaw(payload)
       onTraceabilityChange?.(payload)
     } catch (err) {
-      setError(formatErr(err, "Generate traceability matrix failed."))
+      setError(formatErr(err, "Could not generate traceability matrix."))
     } finally {
       setGenerating(false)
     }
@@ -255,31 +255,31 @@ export function ValidationTraceabilityMatrixPanel({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">requirements covered</CardTitle>
+                <CardTitle className="text-sm font-medium">Requirements covered</CardTitle>
               </CardHeader>
               <CardContent className="text-2xl font-semibold">{requirementsCovered}</CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">risks covered</CardTitle>
+                <CardTitle className="text-sm font-medium">Risks covered</CardTitle>
               </CardHeader>
               <CardContent className="text-2xl font-semibold">{risksCovered}</CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">tests passed</CardTitle>
+                <CardTitle className="text-sm font-medium">Tests passed</CardTitle>
               </CardHeader>
               <CardContent className="text-2xl font-semibold">{testsPassed}</CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">tests failed</CardTitle>
+                <CardTitle className="text-sm font-medium">Tests failed</CardTitle>
               </CardHeader>
               <CardContent className="text-2xl font-semibold">{testsFailed}</CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">missing coverage</CardTitle>
+                <CardTitle className="text-sm font-medium">Missing coverage</CardTitle>
               </CardHeader>
               <CardContent className="text-2xl font-semibold">{missingCoverageCount}</CardContent>
             </Card>
@@ -289,21 +289,21 @@ export function ValidationTraceabilityMatrixPanel({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">requirement code</TableHead>
-                  <TableHead className="text-xs">function code</TableHead>
-                  <TableHead className="text-xs">risk ID</TableHead>
-                  <TableHead className="text-xs">test case ID</TableHead>
-                  <TableHead className="text-xs">latest execution status</TableHead>
-                  <TableHead className="text-xs">evidence IDs</TableHead>
-                  <TableHead className="text-xs">coverage status</TableHead>
-                  <TableHead className="text-xs">gaps</TableHead>
+                  <TableHead className="text-xs">Requirement code</TableHead>
+                  <TableHead className="text-xs">Function code</TableHead>
+                  <TableHead className="text-xs">Risk ID</TableHead>
+                  <TableHead className="text-xs">Test case ID</TableHead>
+                  <TableHead className="text-xs">Latest execution status</TableHead>
+                  <TableHead className="text-xs">Evidence IDs</TableHead>
+                  <TableHead className="text-xs">Coverage status</TableHead>
+                  <TableHead className="text-xs">Gaps</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-xs text-muted-foreground">
-                      No traceability matrix rows returned.
+                      No traceability matrix rows yet.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -322,9 +322,9 @@ export function ValidationTraceabilityMatrixPanel({
                         </TableCell>
                         <TableCell className="text-xs">{latestExecutionStatus(row)}</TableCell>
                         <TableCell className="max-w-[16rem] font-mono text-[10px]">
-                          files: {listValue(row.evidence_file_ids)}
+                          Files: {listValue(row.evidence_file_ids)}
                           <br />
-                          artifacts: {listValue(row.evidence_artifact_ids)}
+                          Artifacts: {listValue(row.evidence_artifact_ids)}
                         </TableCell>
                         <TableCell className="text-xs">
                           <Badge variant="outline" className={`font-normal ${statusBadgeClass(status)}`}>

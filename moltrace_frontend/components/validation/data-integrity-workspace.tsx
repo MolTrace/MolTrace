@@ -39,15 +39,15 @@ const SCOPE_OPTIONS = [
 ] as const
 
 const ALCOA_STATUS_FIELDS = [
-  { key: "attributable_status", label: "attributable" },
-  { key: "legible_status", label: "legible" },
-  { key: "contemporaneous_status", label: "contemporaneous" },
-  { key: "original_status", label: "original" },
-  { key: "accurate_status", label: "accurate" },
-  { key: "complete_status", label: "complete" },
-  { key: "consistent_status", label: "consistent" },
-  { key: "enduring_status", label: "enduring" },
-  { key: "available_status", label: "available" },
+  { key: "attributable_status", label: "Attributable" },
+  { key: "legible_status", label: "Legible" },
+  { key: "contemporaneous_status", label: "Contemporaneous" },
+  { key: "original_status", label: "Original" },
+  { key: "accurate_status", label: "Accurate" },
+  { key: "complete_status", label: "Complete" },
+  { key: "consistent_status", label: "Consistent" },
+  { key: "enduring_status", label: "Enduring" },
+  { key: "available_status", label: "Available" },
 ] as const
 
 const SENSITIVE_KEY_PATTERN = /(secret|password|token|credential|authorization|raw|blob|binary|content_json)/i
@@ -205,7 +205,7 @@ export function DataIntegrityWorkspace() {
   async function runAssessment() {
     const parsedScopeId = scopeId.trim() ? readInt(scopeId) : null
     if (scopeId.trim() && parsedScopeId == null) {
-      setError("scope ID must be a positive integer.")
+      setError("Scope ID must be a positive integer.")
       return
     }
 
@@ -274,7 +274,7 @@ export function DataIntegrityWorkspace() {
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label htmlFor="data-integrity-scope">scope</Label>
+                <Label htmlFor="data-integrity-scope">Scope</Label>
                 <Select value={scope} onValueChange={setScope}>
                   <SelectTrigger id="data-integrity-scope">
                     <SelectValue />
@@ -289,7 +289,7 @@ export function DataIntegrityWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="data-integrity-scope-id">scope ID optional</Label>
+                <Label htmlFor="data-integrity-scope-id">Scope ID (optional)</Label>
                 <Input
                   id="data-integrity-scope-id"
                   inputMode="numeric"
@@ -316,21 +316,21 @@ export function DataIntegrityWorkspace() {
               <>
                 <div className="grid gap-3 sm:grid-cols-4">
                   <div>
-                    <p className="text-xs text-muted-foreground">scope</p>
+                    <p className="text-xs text-muted-foreground">Scope</p>
                     <p className="font-medium">{readStr(detailAssessment.scope) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">scope ID</p>
+                    <p className="text-xs text-muted-foreground">Scope ID</p>
                     <p className="font-medium">{readStr(detailAssessment.scope_id) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">status</p>
+                    <p className="text-xs text-muted-foreground">Status</p>
                     <Badge variant={statusVariant(detailAssessment.assessment_status)}>
                       {readStr(detailAssessment.assessment_status) || "-"}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">created date</p>
+                    <p className="text-xs text-muted-foreground">Created date</p>
                     <p className="font-medium">{formatDate(detailAssessment.created_at)}</p>
                   </div>
                 </div>
@@ -348,7 +348,7 @@ export function DataIntegrityWorkspace() {
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="space-y-2">
-                    <h3 className="text-sm font-medium">findings</h3>
+                    <h3 className="text-sm font-medium">Findings</h3>
                     <div className="space-y-2">
                       {listFrom(detailAssessment.findings_json).map((item, index) => (
                         <div key={index} className="rounded-lg border p-3 text-sm">
@@ -361,7 +361,7 @@ export function DataIntegrityWorkspace() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-sm font-medium">recommended actions</h3>
+                    <h3 className="text-sm font-medium">Recommended actions</h3>
                     <div className="space-y-2">
                       {listFrom(detailAssessment.recommended_actions_json).map((item, index) => (
                         <div key={index} className="rounded-lg border p-3 text-sm">
@@ -376,7 +376,7 @@ export function DataIntegrityWorkspace() {
                 </div>
 
                 <details className="rounded-lg border p-3">
-                  <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
+                  <summary className="cursor-pointer text-sm font-medium">Raw record data</summary>
                   <pre className="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
                     {JSON.stringify(developerJson, null, 2)}
                   </pre>
@@ -408,15 +408,15 @@ export function DataIntegrityWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>scope</TableHead>
-                  <TableHead>scope ID</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>created date</TableHead>
-                  <TableHead>attributable</TableHead>
-                  <TableHead>legible</TableHead>
-                  <TableHead>complete</TableHead>
-                  <TableHead>available</TableHead>
-                  <TableHead className="text-right">open</TableHead>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Scope ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created date</TableHead>
+                  <TableHead>Attributable</TableHead>
+                  <TableHead>Legible</TableHead>
+                  <TableHead>Complete</TableHead>
+                  <TableHead>Available</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

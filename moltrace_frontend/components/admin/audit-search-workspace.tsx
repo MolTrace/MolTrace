@@ -212,7 +212,7 @@ export function AuditSearchWorkspace() {
       const list = Array.isArray(data) ? data : []
       setRowsRaw(list.filter(isRecord) as Record<string, unknown>[])
     } catch (e) {
-      setErr(formatErr(e, "Could not load /admin/audit/search."))
+      setErr(formatErr(e, "Could not load audit events."))
       setRowsRaw([])
     }
 
@@ -260,7 +260,7 @@ export function AuditSearchWorkspace() {
           {!loading && backendUnreachable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Backend unavailable — try again in a moment, or contact your platform administrator.
+              Audit search is unavailable — try again in a moment, or contact your platform administrator.
             </p>
           ) : null}
         </div>
@@ -276,13 +276,13 @@ export function AuditSearchWorkspace() {
       {backendUnreachable ? (
         <AlertCard
           variant="error"
-          title="Backend unavailable"
-          description="Audit search is not reachable. Verify you're signed in as an administrator and try again."
+          title="Audit search unavailable"
+          description="Audit search is currently unavailable. Verify you're signed in as an administrator and try again."
         />
       ) : null}
 
       {!backendUnreachable && err ? (
-        <AlertCard variant="error" title="Request failed" description={err} />
+        <AlertCard variant="error" title="Search failed" description={err} />
       ) : null}
 
       <div>
@@ -294,7 +294,7 @@ export function AuditSearchWorkspace() {
           >
             <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
               <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Rows from API
+                Rows returned
               </CardTitle>
               <Database className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
             </CardHeader>
@@ -305,7 +305,7 @@ export function AuditSearchWorkspace() {
               >
                 {loading ? "…" : String(rowsRaw.length)}
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">Before client date filter</p>
+              <p className="mt-2 text-xs text-muted-foreground">Before date range filter</p>
             </CardContent>
           </Card>
           <Card
@@ -338,96 +338,96 @@ export function AuditSearchWorkspace() {
           eyebrow="Search"
           title="Filters"
           icon={Search}
-          description="Narrow audit results by event type, entity, actor email, or free-text search. MolTrace and SpectraCheck projects use distinct entity types — pick whichever matches your investigation. The date range is applied locally after results load."
+          description="Narrow audit results by event type, entity, actor email, or free-text search. MolTrace and SpectraCheck projects use different record types — pick whichever matches your investigation. The date range is applied after results load."
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="moltrace-project">project ID (MolTrace workspace)</Label>
+              <Label htmlFor="moltrace-project">Project ID (MolTrace workspace)</Label>
               <Input
                 id="moltrace-project"
                 inputMode="numeric"
-                placeholder="entity_id for entity_type project"
+                placeholder="MolTrace project ID"
                 value={filterMoltraceProjectId}
                 onChange={(e) => setFilterMoltraceProjectId(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sc-project">project ID (SpectraCheck persistence)</Label>
+              <Label htmlFor="sc-project">Project ID (SpectraCheck)</Label>
               <Input
                 id="sc-project"
                 inputMode="numeric"
-                placeholder="entity_id for spectracheck_project"
+                placeholder="SpectraCheck project ID"
                 value={filterSpectracheckProjectId}
                 onChange={(e) => setFilterSpectracheckProjectId(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sc-sample">sample ID (SpectraCheck persistence)</Label>
+              <Label htmlFor="sc-sample">Sample ID (SpectraCheck)</Label>
               <Input
                 id="sc-sample"
                 inputMode="numeric"
-                placeholder="entity_id for spectracheck_sample"
+                placeholder="SpectraCheck sample ID"
                 value={filterSpectracheckSampleId}
                 onChange={(e) => setFilterSpectracheckSampleId(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sess-id">session ID</Label>
+              <Label htmlFor="sess-id">Session ID</Label>
               <Input
                 id="sess-id"
-                placeholder="merged into q"
+                placeholder="Included in text search"
                 value={filterSessionId}
                 onChange={(e) => setFilterSessionId(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rep-id">report ID</Label>
+              <Label htmlFor="rep-id">Report ID</Label>
               <Input
                 id="rep-id"
-                placeholder="merged into q"
+                placeholder="Included in text search"
                 value={filterReportId}
                 onChange={(e) => setFilterReportId(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="actor-audit">actor</Label>
+              <Label htmlFor="actor-audit">Actor</Label>
               <Input
                 id="actor-audit"
                 type="email"
                 autoComplete="off"
-                placeholder="actor_email"
+                placeholder="Email address"
                 value={filterActorEmail}
                 onChange={(e) => setFilterActorEmail(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ev-type">event type</Label>
+              <Label htmlFor="ev-type">Event type</Label>
               <Input
                 id="ev-type"
-                placeholder="event_type"
+                placeholder="Event type"
                 value={filterEventType}
                 onChange={(e) => setFilterEventType(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="from-audit">date range from</Label>
+              <Label htmlFor="from-audit">From date</Label>
               <Input id="from-audit" type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="to-audit">date range to</Label>
+              <Label htmlFor="to-audit">To date</Label>
               <Input id="to-audit" type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
             </div>
             <div className="space-y-2 lg:col-span-2">
-              <Label htmlFor="q-audit">text query</Label>
+              <Label htmlFor="q-audit">Text search</Label>
               <Input
                 id="q-audit"
-                placeholder="q (message substring)"
+                placeholder="Search message text"
                 value={filterTextQuery}
                 onChange={(e) => setFilterTextQuery(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lim-audit">limit</Label>
+              <Label htmlFor="lim-audit">Limit</Label>
               <Input id="lim-audit" inputMode="numeric" value={filterLimit} onChange={(e) => setFilterLimit(e.target.value)} />
             </div>
             <div className="flex items-end">
@@ -456,12 +456,12 @@ export function AuditSearchWorkspace() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-xs">event type</TableHead>
-                      <TableHead className="text-xs">message</TableHead>
-                      <TableHead className="text-xs">actor</TableHead>
-                      <TableHead className="text-xs">timestamp</TableHead>
-                      <TableHead className="text-xs">resource</TableHead>
-                      <TableHead className="text-xs">metadata preview</TableHead>
+                      <TableHead className="text-xs">Event type</TableHead>
+                      <TableHead className="text-xs">Message</TableHead>
+                      <TableHead className="text-xs">Actor</TableHead>
+                      <TableHead className="text-xs">Timestamp</TableHead>
+                      <TableHead className="text-xs">Resource</TableHead>
+                      <TableHead className="text-xs">Details preview</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

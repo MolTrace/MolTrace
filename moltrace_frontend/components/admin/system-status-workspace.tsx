@@ -33,7 +33,7 @@ import {
 } from "lucide-react"
 
 const SYSTEM_STATUS_TOOLTIP =
-  "System Status checks whether the backend, database, storage, job queue, and environment configuration are ready for scientific workflows."
+  "System Status checks whether the platform, database, storage, job queue, and environment configuration are ready for scientific workflows."
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -125,7 +125,7 @@ export function SystemStatusWorkspace() {
         const data = await apiFetch<T>(path, { method: "GET" })
         setter((data ?? empty) as T | null)
       } catch (e) {
-        setErr(formatErr(e, `Could not load ${path}.`))
+        setErr(formatErr(e, "Could not load this section."))
         setter(empty)
       }
     }
@@ -136,7 +136,7 @@ export function SystemStatusWorkspace() {
         setDependencies(Array.isArray(data) ? data : null)
         setErrDeps("")
       } catch (e) {
-        setErrDeps(formatErr(e, "Could not load /system/dependencies."))
+        setErrDeps(formatErr(e, "Could not load dependency status."))
         setDependencies(null)
       }
     }
@@ -189,7 +189,7 @@ export function SystemStatusWorkspace() {
       .catch((err) => {
         if (cancelled) return
         setConnectorHealthBackendUnavailable(true)
-        setConnectorHealthError(formatErr(err, "Could not load /connectors."))
+        setConnectorHealthError(formatErr(err, "Could not load connector health."))
       })
       .finally(() => {
         if (!cancelled) setConnectorHealthLoading(false)
@@ -274,12 +274,12 @@ export function SystemStatusWorkspace() {
             <InfoTooltip content={SYSTEM_STATUS_TOOLTIP} label="About System Status" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Operational visibility for backend health, dependencies, and environment checks.
+            Operational visibility for platform health, dependencies, and environment checks.
           </p>
           {!loading && backendUnreachable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Backend unavailable — try again in a moment, or contact your platform administrator.
+              The platform is unavailable — try again in a moment, or contact your platform administrator.
             </p>
           ) : null}
         </div>
@@ -295,15 +295,15 @@ export function SystemStatusWorkspace() {
       {backendUnreachable ? (
         <AlertCard
           variant="error"
-          title="Backend unavailable"
-          description="System status checks could not be reached. Refresh once the backend is back online."
+          title="Platform unavailable"
+          description="System status checks could not be reached. Refresh once the platform is back online."
         />
       ) : null}
 
       {!backendUnreachable && (errHealth || errStatus || errVersion || errDeps || errEnv) ? (
-        <AlertCard variant="error" title="Partial load">
+        <AlertCard variant="error" title="Partial results">
           <div className="space-y-1 text-xs text-foreground/90">
-            {errHealth ? <p>Health probe: {errHealth}</p> : null}
+            {errHealth ? <p>Health check: {errHealth}</p> : null}
             {errStatus ? <p>Status check: {errStatus}</p> : null}
             {errVersion ? <p>Version info: {errVersion}</p> : null}
             {errDeps ? <p>Dependency status: {errDeps}</p> : null}
@@ -320,13 +320,13 @@ export function SystemStatusWorkspace() {
           eyebrow="Health"
           title="Overall health"
           icon={Heart}
-          description="Live health probe and overall service status from the backend."
+          description="Live health check and overall service status."
         >
           <div className="space-y-3 text-sm">
             {loading ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : errHealth && errStatus ? (
-              <p className="text-xs text-destructive">Overall status unavailable — health and status requests failed.</p>
+              <p className="text-xs text-destructive">Overall status unavailable — health and status checks failed.</p>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className={`font-normal ${healthBadgeClass(overallUi)}`}>
@@ -334,12 +334,12 @@ export function SystemStatusWorkspace() {
                 </Badge>
                 {health && health.uptime_seconds != null ? (
                   <span className="text-xs text-muted-foreground">
-                    uptime_seconds: {String(health.uptime_seconds)}
+                    Uptime (seconds): {String(health.uptime_seconds)}
                   </span>
                 ) : null}
                 {health && readStr(health, ["timestamp"]) ? (
                   <span className="text-xs text-muted-foreground">
-                    timestamp: {readStr(health, ["timestamp"])}
+                    Timestamp: {readStr(health, ["timestamp"])}
                   </span>
                 ) : null}
               </div>
@@ -350,23 +350,23 @@ export function SystemStatusWorkspace() {
 
       {/* 2. Backend version */}
       <div>
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Backend version</h2>
+        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Platform version</h2>
         <ModuleCard
           accent="slate"
           eyebrow="Version"
-          title="Backend version"
+          title="Platform version"
           icon={Tag}
-          description="Backend service build, version, and Git commit identifier."
+          description="Platform build, version, and Git commit identifier."
         >
           <div className="space-y-2 text-sm">
             {loading ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : errVersion && !health && !status ? (
-              <p className="text-xs text-destructive">Version metadata unavailable.</p>
+              <p className="text-xs text-destructive">Version information unavailable.</p>
             ) : (
               <dl className="grid gap-2 text-xs sm:grid-cols-2">
                 <div>
-                  <dt className="text-muted-foreground">backend_version</dt>
+                  <dt className="text-muted-foreground">Version</dt>
                   <dd className="font-mono">
                     {readStr(version ?? {}, ["backend_version"]) ||
                       readStr(health ?? {}, ["backend_version"]) ||
@@ -375,19 +375,19 @@ export function SystemStatusWorkspace() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">api_version</dt>
+                  <dt className="text-muted-foreground">API version</dt>
                   <dd className="font-mono">
                     {readStr(version ?? {}, ["api_version"]) || readStr(status ?? {}, ["api_version"]) || "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">environment</dt>
+                  <dt className="text-muted-foreground">Environment</dt>
                   <dd className="font-mono">
                     {readStr(version ?? {}, ["environment"]) || readStr(health ?? {}, ["environment"]) || "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">timestamp</dt>
+                  <dt className="text-muted-foreground">Timestamp</dt>
                   <dd className="font-mono">{readStr(version ?? {}, ["timestamp"]) || "—"}</dd>
                 </div>
               </dl>
@@ -404,7 +404,7 @@ export function SystemStatusWorkspace() {
           eyebrow="Dependencies"
           title="Dependency checks"
           icon={ListChecks}
-          description="Status of upstream services the platform depends on, plus liveness/readiness checks."
+          description="Status of upstream services the platform depends on, plus availability checks."
         >
           <div className="space-y-4 text-sm">
             {loading ? (
@@ -415,17 +415,17 @@ export function SystemStatusWorkspace() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">name</TableHead>
-                        <TableHead className="text-xs">status</TableHead>
-                        <TableHead className="text-xs">latency_ms</TableHead>
-                        <TableHead className="text-xs">message</TableHead>
+                        <TableHead className="text-xs">Name</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs">Latency (ms)</TableHead>
+                        <TableHead className="text-xs">Message</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {dependencyRows.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={4} className="text-xs text-muted-foreground">
-                            {errDeps ? String(errDeps) : "No dependency rows returned."}
+                            {errDeps ? String(errDeps) : "No dependencies found."}
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -453,15 +453,15 @@ export function SystemStatusWorkspace() {
                 {healthChecksRows.length > 0 ? (
                   <div className="overflow-x-auto rounded-md border">
                     <p className="border-b bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
-                      Health check probes
+                      Health checks
                     </p>
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="text-xs">name</TableHead>
-                          <TableHead className="text-xs">status</TableHead>
-                          <TableHead className="text-xs">latency_ms</TableHead>
-                          <TableHead className="text-xs">message</TableHead>
+                          <TableHead className="text-xs">Name</TableHead>
+                          <TableHead className="text-xs">Status</TableHead>
+                          <TableHead className="text-xs">Latency (ms)</TableHead>
+                          <TableHead className="text-xs">Message</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -561,7 +561,7 @@ export function SystemStatusWorkspace() {
               ) : status ? (
                 <>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground">job_queue_status</span>
+                    <span className="text-muted-foreground">Job queue status</span>
                     <Badge
                       variant="outline"
                       className={`font-normal ${dependencyBadgeClass(readStr(status, ["job_queue_status"]))}`}
@@ -570,7 +570,7 @@ export function SystemStatusWorkspace() {
                     </Badge>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground">worker_status</span>
+                    <span className="text-muted-foreground">Worker status</span>
                     <Badge
                       variant="outline"
                       className={`font-normal ${dependencyBadgeClass(readStr(status, ["worker_status"]))}`}
@@ -630,11 +630,11 @@ export function SystemStatusWorkspace() {
                 <>
                   <div className="flex flex-wrap gap-4">
                     <span>
-                      <span className="text-muted-foreground">environment </span>
+                      <span className="text-muted-foreground">Environment </span>
                       <span className="font-mono">{readStr(environmentCheck, ["environment"]) || "—"}</span>
                     </span>
                     <span>
-                      <span className="text-muted-foreground">required_variables_present </span>
+                      <span className="text-muted-foreground">Required variables present </span>
                       <span className="font-mono">
                         {typeof environmentCheck.required_variables_present === "boolean"
                           ? String(environmentCheck.required_variables_present)
@@ -643,14 +643,14 @@ export function SystemStatusWorkspace() {
                     </span>
                   </div>
                   <p className="text-muted-foreground">
-                    missing_variables:{" "}
+                    Missing variables:{" "}
                     {Array.isArray(environmentCheck.missing_variables)
                       ? (environmentCheck.missing_variables as unknown[]).filter((x) => typeof x === "string").join(", ") ||
                         "—"
                       : "—"}
                   </p>
                   <p className="text-muted-foreground">
-                    unsafe_variables:{" "}
+                    Unsafe variables:{" "}
                     {Array.isArray(environmentCheck.unsafe_variables)
                       ? (environmentCheck.unsafe_variables as unknown[]).filter((x) => typeof x === "string").join(", ") ||
                         "—"
@@ -669,8 +669,8 @@ export function SystemStatusWorkspace() {
       <div>
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Environment check summary</h2>
         <p className="text-xs text-muted-foreground">
-          Summary fields for environment checks are shown on the Environment card (required_variables_present,
-          missing_variables, unsafe_variables).
+          Summary fields for environment checks are shown on the Environment card (required variables present,
+          missing variables, unsafe variables).
         </p>
       </div>
 
@@ -686,7 +686,7 @@ export function SystemStatusWorkspace() {
         >
           <div>
             {mergedWarnings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No warnings merged from loaded payloads.</p>
+              <p className="text-sm text-muted-foreground">No warnings to show.</p>
             ) : (
               <ul className="list-inside list-disc space-y-1 text-xs">
                 {mergedWarnings.map((w, i) => (
@@ -727,7 +727,7 @@ export function SystemStatusWorkspace() {
             ) : null}
             {!connectorHealthLoading && connectorHealthBackendUnavailable ? (
               <p className="text-xs text-muted-foreground">
-                Connector health unavailable — current admin system content continues.
+                Connector health unavailable — the rest of System Status is still shown.
               </p>
             ) : null}
             {!connectorHealthLoading && connectorHealthError && connectorHealthBackendUnavailable ? (
@@ -739,10 +739,10 @@ export function SystemStatusWorkspace() {
 
       {/* 9. Developer JSON */}
       <div>
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Developer JSON</h2>
+        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Raw system data</h2>
         <Collapsible className="group rounded-md border">
           <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-            Raw responses
+            Raw data
             <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
           </CollapsibleTrigger>
           <CollapsibleContent>

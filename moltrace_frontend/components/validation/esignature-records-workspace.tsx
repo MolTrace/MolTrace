@@ -223,19 +223,19 @@ export function ESignatureRecordsWorkspace() {
   async function createSignatureRecord() {
     const parsedTargetId = readInt(targetId)
     if (!signatureMeaning.trim()) {
-      setError("signature meaning is required.")
+      setError("Signature meaning is required.")
       return
     }
     if (!reason.trim()) {
-      setError("reason is required.")
+      setError("Reason is required.")
       return
     }
     if (!targetType.trim()) {
-      setError("target type is required.")
+      setError("Target type is required.")
       return
     }
     if (parsedTargetId == null) {
-      setError("target ID must be a positive integer.")
+      setError("Target ID must be a positive integer.")
       return
     }
 
@@ -319,12 +319,12 @@ export function ESignatureRecordsWorkspace() {
         >
           <div className="space-y-4">
             <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              You sign as the authenticated user — signer identity is recorded server-side from your
+              You sign as the authenticated user — signer identity is recorded automatically from your
               session (§11.100), not from this form. Provide the meaning and reason for the signature.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label htmlFor="signature-meaning">signature meaning</Label>
+                <Label htmlFor="signature-meaning">Signature meaning</Label>
                 <Select value={signatureMeaning} onValueChange={setSignatureMeaning}>
                   <SelectTrigger id="signature-meaning">
                     <SelectValue />
@@ -339,7 +339,7 @@ export function ESignatureRecordsWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="signature-target-type">target type</Label>
+                <Label htmlFor="signature-target-type">Target type</Label>
                 <Input
                   id="signature-target-type"
                   value={targetType}
@@ -347,7 +347,7 @@ export function ESignatureRecordsWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="signature-target-id">target ID</Label>
+                <Label htmlFor="signature-target-id">Target ID</Label>
                 <Input
                   id="signature-target-id"
                   inputMode="numeric"
@@ -357,7 +357,7 @@ export function ESignatureRecordsWorkspace() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="signature-reason">reason</Label>
+              <Label htmlFor="signature-reason">Reason</Label>
               <Textarea
                 id="signature-reason"
                 value={reason}
@@ -382,41 +382,41 @@ export function ESignatureRecordsWorkspace() {
             {detailRecord ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-xs text-muted-foreground">signer name</p>
+                  <p className="text-xs text-muted-foreground">Signer name</p>
                   <p className="font-medium">{readStr(detailRecord.signer_name) || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">signature meaning</p>
+                  <p className="text-xs text-muted-foreground">Signature meaning</p>
                   <Badge variant="secondary">{readStr(detailRecord.signature_meaning) || "-"}</Badge>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">target type</p>
+                  <p className="text-xs text-muted-foreground">Target type</p>
                   <p className="font-medium">{readStr(detailRecord.target_type) || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">target ID</p>
+                  <p className="text-xs text-muted-foreground">Target ID</p>
                   <p className="font-medium">{readStr(detailRecord.target_id) || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">server timestamp</p>
+                  <p className="text-xs text-muted-foreground">Server timestamp</p>
                   <p className="font-medium">{formatDate(detailRecord.signed_at)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">signature hash</p>
+                  <p className="text-xs text-muted-foreground">Signature hash</p>
                   <p className="break-all font-mono text-xs">{readStr(detailRecord.signature_hash) || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">signer_user_id (§11.100)</p>
+                  <p className="text-xs text-muted-foreground">Signer user ID (§11.100)</p>
                   <p className="font-mono text-xs">{readStr(detailRecord.signer_user_id) || "—"}</p>
                 </div>
                 <div className="sm:col-span-2">
-                  <p className="text-xs text-muted-foreground">record content hash (§11.70)</p>
+                  <p className="text-xs text-muted-foreground">Record content hash (§11.70)</p>
                   <p className="break-all font-mono text-xs">
-                    {readStr(detailRecord.record_content_hash) || "— (unbound / legacy)"}
+                    {readStr(detailRecord.record_content_hash) || "— (not bound to a record)"}
                   </p>
                 </div>
                 <div className="sm:col-span-2">
-                  <p className="text-xs text-muted-foreground">reason</p>
+                  <p className="text-xs text-muted-foreground">Reason</p>
                   <p className="whitespace-pre-wrap text-sm">{readStr(detailRecord.reason) || "-"}</p>
                 </div>
 
@@ -471,7 +471,7 @@ export function ESignatureRecordsWorkspace() {
                         <div className={cn("rounded-md border p-3 text-sm", toneClass)}>
                           <p className="font-medium">{status.label}</p>
                           <p className="mt-0.5 text-xs opacity-90">{status.detail}</p>
-                          <p className="mt-1 font-mono text-[11px] opacity-70">reason: {verification.reason}</p>
+                          <p className="mt-1 font-mono text-[11px] opacity-70">Reason: {verification.reason}</p>
                         </div>
                       )
                     })()
@@ -487,8 +487,8 @@ export function ESignatureRecordsWorkspace() {
                       </p>
                       <p className="whitespace-pre-wrap">{manifestation.attestationText}</p>
                       <p className="text-muted-foreground">
-                        binding: {manifestation.bindingStatus}
-                        {manifestation.authenticationMethod ? ` · auth: ${manifestation.authenticationMethod}` : ""}
+                        Binding: {manifestation.bindingStatus}
+                        {manifestation.authenticationMethod ? ` · Authentication: ${manifestation.authenticationMethod}` : ""}
                         {manifestation.stepUpAal ? ` · AAL: ${manifestation.stepUpAal}` : ""}
                       </p>
                       {/* §11 grounding: surface the backend compliance notice verbatim. */}
@@ -525,13 +525,13 @@ export function ESignatureRecordsWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>signer name</TableHead>
-                  <TableHead>signature meaning</TableHead>
-                  <TableHead>target type</TableHead>
-                  <TableHead>target ID</TableHead>
-                  <TableHead>server timestamp</TableHead>
-                  <TableHead>signature hash</TableHead>
-                  <TableHead className="text-right">open</TableHead>
+                  <TableHead>Signer name</TableHead>
+                  <TableHead>Signature meaning</TableHead>
+                  <TableHead>Target type</TableHead>
+                  <TableHead>Target ID</TableHead>
+                  <TableHead>Server timestamp</TableHead>
+                  <TableHead>Signature hash</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -202,7 +202,7 @@ export function MlEvaluationDashboard() {
     setFormOk("")
     const aid = Number.parseInt(artifactId, 10)
     if (!Number.isFinite(aid) || aid < 1) {
-      setFormErr("model_artifact_id is required.")
+      setFormErr("Model artifact is required.")
       return
     }
 
@@ -216,14 +216,14 @@ export function MlEvaluationDashboard() {
     if (dataMode === "dataset_version") {
       const dvid = Number.parseInt(datasetVersionId, 10)
       if (!Number.isFinite(dvid) || dvid < 1) {
-        setFormErr("dataset_version_id is required when using dataset version.")
+        setFormErr("Dataset version is required when using a dataset version.")
         return
       }
       dataset_version_id = dvid
     } else {
       const bid = Number.parseInt(benchmarkDatasetId, 10)
       if (!Number.isFinite(bid) || bid < 1) {
-        setFormErr("benchmark_dataset_id is required when using benchmark registry target.")
+        setFormErr("Benchmark dataset is required when using a benchmark registry target.")
         return
       }
       benchmark_dataset_id = bid
@@ -339,8 +339,8 @@ export function MlEvaluationDashboard() {
         <AlertTriangle className="h-4 w-4" aria-hidden />
         <AlertTitle className="text-sm">Privacy</AlertTitle>
         <AlertDescription className="text-sm text-muted-foreground">
-          Tables show IDs and summaries — not raw knowledge records or source text. Full payloads stay in collapsed
-          developer JSON for audit use.
+          Tables show IDs and summaries — not raw knowledge records or source text. Full details stay in the collapsed
+          developer view for audit use.
         </AlertDescription>
       </Alert>
 
@@ -361,10 +361,10 @@ export function MlEvaluationDashboard() {
         <Alert variant="destructive">
           <AlertTitle>Partial load</AlertTitle>
           <AlertDescription className="space-y-1 text-xs">
-            {errArtifacts ? <p>GET /ml/model-artifacts: {errArtifacts}</p> : null}
-            {errVersions ? <p>GET /knowledge/dataset-versions: {errVersions}</p> : null}
-            {errBenchCand ? <p>GET /knowledge/benchmark-dataset-candidates: {errBenchCand}</p> : null}
-            {errRuns ? <p>GET /ml/evaluation-runs: {errRuns}</p> : null}
+            {errArtifacts ? <p>Model artifacts: {errArtifacts}</p> : null}
+            {errVersions ? <p>Dataset versions: {errVersions}</p> : null}
+            {errBenchCand ? <p>Benchmark dataset candidates: {errBenchCand}</p> : null}
+            {errRuns ? <p>Evaluation runs: {errRuns}</p> : null}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -378,7 +378,7 @@ export function MlEvaluationDashboard() {
       >
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="artifact">model_artifact_id</Label>
+            <Label htmlFor="artifact">Model artifact</Label>
             <Select value={artifactId || undefined} onValueChange={setArtifactId}>
               <SelectTrigger id="artifact">
                 <SelectValue placeholder="Select artifact" />
@@ -416,7 +416,7 @@ export function MlEvaluationDashboard() {
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="benchmark_registry" id="dm-bm" />
                 <Label htmlFor="dm-bm" className="font-normal">
-                  Benchmark dataset (registry id)
+                  Benchmark dataset (registry ID)
                 </Label>
               </div>
             </RadioGroup>
@@ -424,7 +424,7 @@ export function MlEvaluationDashboard() {
 
           {dataMode === "dataset_version" ? (
             <div className="space-y-2">
-              <Label htmlFor="dsv">dataset_version_id</Label>
+              <Label htmlFor="dsv">Dataset version</Label>
               <Select value={datasetVersionId || undefined} onValueChange={setDatasetVersionId}>
                 <SelectTrigger id="dsv">
                   <SelectValue placeholder="Select dataset version" />
@@ -468,7 +468,7 @@ export function MlEvaluationDashboard() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="split">evaluation_split (metadata_json)</Label>
+              <Label htmlFor="split">Evaluation split</Label>
               <Select value={split} onValueChange={setSplit}>
                 <SelectTrigger id="split">
                   <SelectValue />
@@ -483,7 +483,7 @@ export function MlEvaluationDashboard() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="notes">notes (optional → notes_json)</Label>
+              <Label htmlFor="notes">Notes (optional)</Label>
               <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
             </div>
           </div>
@@ -543,7 +543,7 @@ export function MlEvaluationDashboard() {
                         <span className="font-mono text-xs">#{id ?? "—"}</span>
                         <Badge variant="secondary">{st || "—"}</Badge>
                         <span className="text-xs text-muted-foreground">
-                          dataset_version_id: {dvid ?? "—"} · benchmark_dataset_id: {bid ?? "—"}
+                          Dataset version ID: {dvid ?? "—"} · Benchmark dataset ID: {bid ?? "—"}
                         </span>
                       </div>
                       {id != null ? (
@@ -567,9 +567,9 @@ export function MlEvaluationDashboard() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>metric</TableHead>
-                                <TableHead>split</TableHead>
-                                <TableHead>value</TableHead>
+                                <TableHead>Metric</TableHead>
+                                <TableHead>Split</TableHead>
+                                <TableHead>Value</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -610,8 +610,8 @@ export function MlEvaluationDashboard() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>slice</TableHead>
-                                <TableHead>summary</TableHead>
+                                <TableHead>Slice</TableHead>
+                                <TableHead>Summary</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -640,8 +640,8 @@ export function MlEvaluationDashboard() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead>field</TableHead>
-                                  <TableHead>value</TableHead>
+                                  <TableHead>Field</TableHead>
+                                  <TableHead>Value</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -663,8 +663,8 @@ export function MlEvaluationDashboard() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>case_id</TableHead>
-                                <TableHead>summary</TableHead>
+                                <TableHead>Case ID</TableHead>
+                                <TableHead>Summary</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>

@@ -241,7 +241,7 @@ export function ValidationDashboardWorkspace() {
         const data = await apiFetch<unknown>(path, { method: "GET" })
         setRows(extractRows(data, keys))
       } catch (e) {
-        setErr(formatErr(e, `Could not load ${path}.`))
+        setErr(formatErr(e, `Could not load this list.`))
         setRows([])
       }
     }
@@ -268,7 +268,7 @@ export function ValidationDashboardWorkspace() {
           const data = await apiFetch<unknown>("/model-health", { method: "GET" })
           setModelHealthRaw(data)
         } catch (e) {
-          setErrHealth(formatErr(e, "Could not load /model-health."))
+          setErrHealth(formatErr(e, "Could not load model health."))
           setModelHealthRaw(null)
         }
       })(),
@@ -393,8 +393,8 @@ export function ValidationDashboardWorkspace() {
 
   function statSubline(opts: { empty?: boolean; errored: boolean; loading: boolean; label: string }) {
     if (opts.loading) return <p className="text-xs text-muted-foreground">Loading…</p>
-    if (opts.errored) return <p className="text-xs text-muted-foreground">Unable to load from backend.</p>
-    if (opts.empty) return <p className="text-xs text-muted-foreground">No data returned.</p>
+    if (opts.errored) return <p className="text-xs text-muted-foreground">Unable to load right now.</p>
+    if (opts.empty) return <p className="text-xs text-muted-foreground">No data available.</p>
     return <p className="text-xs text-muted-foreground">{opts.label}</p>
   }
 
@@ -410,11 +410,11 @@ export function ValidationDashboardWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Validation Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Validation runs, benchmarks, model health, drift, and method comparisons from the backend.
+            Validation runs, benchmarks, model health, drift, and method comparisons.
           </p>
           {!loading && errRuns && !showGlobalUnavailable ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              Validation runs list unavailable — refresh or verify the backend.
+              Validation runs list unavailable — try refreshing.
             </p>
           ) : null}
         </div>
@@ -495,7 +495,7 @@ export function ValidationDashboardWorkspace() {
                 loading,
                 errored: Boolean(errRuns),
                 empty: !errRuns && validationRuns.length === 0,
-                label: "Runs with succeeded-like status from API",
+                label: "Runs reported as passed",
               })}
             </CardContent>
           </Card>
@@ -519,7 +519,7 @@ export function ValidationDashboardWorkspace() {
                 loading,
                 errored: Boolean(errRuns),
                 empty: !errRuns && validationRuns.length === 0,
-                label: "Runs with failed- or review-like status from API",
+                label: "Runs reported as failed or needing review",
               })}
             </CardContent>
           </Card>
@@ -572,7 +572,7 @@ export function ValidationDashboardWorkspace() {
                   modelHealthRaw != null &&
                   !Array.isArray(modelHealthRaw) &&
                   !readStr(modelHealthRaw as Record<string, unknown>, ["active_methods"]),
-                label: "From model health payload",
+                label: "From model health data",
               })}
             </CardContent>
           </Card>
@@ -596,7 +596,7 @@ export function ValidationDashboardWorkspace() {
                 loading,
                 errored: Boolean(errHealth),
                 empty: !errHealth && healthCounts.experimental === null && modelHealthRaw != null,
-                label: "From model health payload",
+                label: "From model health data",
               })}
             </CardContent>
           </Card>
@@ -609,7 +609,7 @@ export function ValidationDashboardWorkspace() {
         eyebrow="Runs"
         title="Recent validation runs"
         icon={Activity}
-        description="Latest validation runs reported by the backend."
+        description="Latest validation runs."
       >
         <div>
           {loading ? (
@@ -617,7 +617,7 @@ export function ValidationDashboardWorkspace() {
           ) : errRuns ? (
             <div className="flex items-start gap-2 text-sm text-destructive">
               <ServerOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <span>Backend unavailable for validation runs.</span>
+              <span>Validation runs are unavailable right now.</span>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -638,7 +638,7 @@ export function ValidationDashboardWorkspace() {
                   {sortedRuns.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-xs text-muted-foreground">
-                        No validation runs returned.
+                        No validation runs found.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -696,7 +696,7 @@ export function ValidationDashboardWorkspace() {
         eyebrow="Benchmarks"
         title="Benchmark datasets"
         icon={BarChart3}
-        description="Benchmark datasets exposed by the API."
+        description="Benchmark datasets available for validation runs."
       >
         <div>
           {loading ? (
@@ -704,7 +704,7 @@ export function ValidationDashboardWorkspace() {
           ) : errBenchmarks ? (
             <div className="flex items-start gap-2 text-sm text-destructive">
               <ServerOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <span>Backend unavailable for benchmark datasets.</span>
+              <span>Benchmark datasets are unavailable right now.</span>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -722,7 +722,7 @@ export function ValidationDashboardWorkspace() {
                   {benchmarks.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-xs text-muted-foreground">
-                        No benchmark datasets returned.
+                        No benchmark datasets found.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -765,7 +765,7 @@ export function ValidationDashboardWorkspace() {
           ) : errDrift ? (
             <div className="flex items-start gap-2 text-sm text-destructive">
               <ServerOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <span>Backend unavailable for drift alerts.</span>
+              <span>Drift alerts are unavailable right now.</span>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -785,7 +785,7 @@ export function ValidationDashboardWorkspace() {
                   {driftRows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-xs text-muted-foreground">
-                        No drift alerts returned.
+                        No drift alerts found.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -852,7 +852,7 @@ export function ValidationDashboardWorkspace() {
                                 <span className="text-[10px] text-muted-foreground">—</span>
                               ) : null}
                               {!alertId ? (
-                                <span className="text-[10px] text-muted-foreground">No id</span>
+                                <span className="text-[10px] text-muted-foreground">No ID</span>
                               ) : null}
                             </div>
                             {rowErr ? (
@@ -884,10 +884,10 @@ export function ValidationDashboardWorkspace() {
           ) : errComparisons ? (
             <div className="flex items-start gap-2 text-sm text-destructive">
               <ServerOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <span>Backend unavailable for method comparisons.</span>
+              <span>Method comparisons are unavailable right now.</span>
             </div>
           ) : methodComparisons.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No method comparisons returned.</p>
+            <p className="text-sm text-muted-foreground">No method comparisons found.</p>
           ) : (
             <div className="overflow-x-auto rounded-md border">
               <Table>

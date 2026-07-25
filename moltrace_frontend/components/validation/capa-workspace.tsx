@@ -97,7 +97,7 @@ function parseDatetimeInput(value: string): string | null {
   const trimmed = value.trim()
   if (!trimmed) return null
   const date = new Date(trimmed)
-  if (Number.isNaN(date.getTime())) throw new Error("due date must be valid.")
+  if (Number.isNaN(date.getTime())) throw new Error("Due date must be valid.")
   return date.toISOString()
 }
 
@@ -215,25 +215,25 @@ export function CapaWorkspace() {
 
   async function createCapa() {
     if (!title.trim()) {
-      setError("title is required.")
+      setError("Title is required.")
       return
     }
     if (!description.trim()) {
-      setError("description is required.")
+      setError("Description is required.")
       return
     }
     if (!correctiveAction.trim()) {
-      setError("corrective action is required.")
+      setError("Corrective action is required.")
       return
     }
     if (!preventiveAction.trim()) {
-      setError("preventive action is required.")
+      setError("Preventive action is required.")
       return
     }
 
     const parsedSourceDeviationId = sourceDeviationId.trim() ? readInt(sourceDeviationId) : null
     if (sourceDeviationId.trim() && parsedSourceDeviationId == null) {
-      setError("source deviation must be a positive integer.")
+      setError("Source deviation must be a positive integer.")
       return
     }
 
@@ -290,25 +290,25 @@ export function CapaWorkspace() {
     const id = rowId(detailCapa)
     if (!id) return
     if (!editTitle.trim()) {
-      setError("title is required.")
+      setError("Title is required.")
       return
     }
     if (!editDescription.trim()) {
-      setError("description is required.")
+      setError("Description is required.")
       return
     }
     if (!editCorrectiveAction.trim()) {
-      setError("corrective action is required.")
+      setError("Corrective action is required.")
       return
     }
     if (!editPreventiveAction.trim()) {
-      setError("preventive action is required.")
+      setError("Preventive action is required.")
       return
     }
 
     const parsedSourceDeviationId = editSourceDeviationId.trim() ? readInt(editSourceDeviationId) : null
     if (editSourceDeviationId.trim() && parsedSourceDeviationId == null) {
-      setError("source deviation must be a positive integer.")
+      setError("Source deviation must be a positive integer.")
       return
     }
 
@@ -395,11 +395,11 @@ export function CapaWorkspace() {
                 <Input id="capa-code" value={capaCode} onChange={(event) => setCapaCode(event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="capa-title">title</Label>
+                <Label htmlFor="capa-title">Title</Label>
                 <Input id="capa-title" value={title} onChange={(event) => setTitle(event.target.value)} />
               </div>
               <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="capa-description">description</Label>
+                <Label htmlFor="capa-description">Description</Label>
                 <Textarea
                   id="capa-description"
                   value={description}
@@ -408,7 +408,7 @@ export function CapaWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="capa-source-deviation">source deviation</Label>
+                <Label htmlFor="capa-source-deviation">Source deviation</Label>
                 <Input
                   id="capa-source-deviation"
                   inputMode="numeric"
@@ -417,7 +417,7 @@ export function CapaWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="capa-status">status</Label>
+                <Label htmlFor="capa-status">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger id="capa-status">
                     <SelectValue />
@@ -432,11 +432,11 @@ export function CapaWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="capa-owner">owner</Label>
+                <Label htmlFor="capa-owner">Owner</Label>
                 <Input id="capa-owner" value={owner} onChange={(event) => setOwner(event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="capa-due-date">due date</Label>
+                <Label htmlFor="capa-due-date">Due date</Label>
                 <Input
                   id="capa-due-date"
                   type="datetime-local"
@@ -445,7 +445,7 @@ export function CapaWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="capa-corrective-action">corrective action</Label>
+                <Label htmlFor="capa-corrective-action">Corrective action</Label>
                 <Textarea
                   id="capa-corrective-action"
                   value={correctiveAction}
@@ -454,7 +454,7 @@ export function CapaWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="capa-preventive-action">preventive action</Label>
+                <Label htmlFor="capa-preventive-action">Preventive action</Label>
                 <Textarea
                   id="capa-preventive-action"
                   value={preventiveAction}
@@ -485,27 +485,27 @@ export function CapaWorkspace() {
                     <p className="font-medium">{readStr(detailCapa.capa_code) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">status</p>
+                    <p className="text-xs text-muted-foreground">Status</p>
                     <Badge variant={statusVariant(detailCapa.status)}>{readStr(detailCapa.status) || "-"}</Badge>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">overdue marker</p>
+                    <p className="text-xs text-muted-foreground">Overdue</p>
                     {isOverdue(detailCapa) ? <Badge variant="destructive">overdue</Badge> : <span className="text-sm">-</span>}
                   </div>
                   <div className="sm:col-span-2">
-                    <p className="text-xs text-muted-foreground">source deviation</p>
+                    <p className="text-xs text-muted-foreground">Source deviation</p>
                     <p className="font-medium">{deviationLabel(detailSourceDeviation, detailSourceDeviationId)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">linked validation test/source</p>
+                    <p className="text-xs text-muted-foreground">Linked validation test / source</p>
                     <p className="font-medium">{deviationSourceLabel(detailSourceDeviation)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">owner</p>
+                    <p className="text-xs text-muted-foreground">Owner</p>
                     <p className="font-medium">{readStr(detailCapa.owner) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">due date</p>
+                    <p className="text-xs text-muted-foreground">Due date</p>
                     <p className="font-medium">{formatDate(detailCapa.due_date)}</p>
                   </div>
                   <div>
@@ -516,11 +516,11 @@ export function CapaWorkspace() {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1 sm:col-span-2">
-                    <Label htmlFor="edit-capa-title">title</Label>
+                    <Label htmlFor="edit-capa-title">Title</Label>
                     <Input id="edit-capa-title" value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
                   </div>
                   <div className="space-y-1 sm:col-span-2">
-                    <Label htmlFor="edit-capa-description">description</Label>
+                    <Label htmlFor="edit-capa-description">Description</Label>
                     <Textarea
                       id="edit-capa-description"
                       value={editDescription}
@@ -529,7 +529,7 @@ export function CapaWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-capa-source-deviation">source deviation</Label>
+                    <Label htmlFor="edit-capa-source-deviation">Source deviation</Label>
                     <Input
                       id="edit-capa-source-deviation"
                       inputMode="numeric"
@@ -538,7 +538,7 @@ export function CapaWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-capa-status">status</Label>
+                    <Label htmlFor="edit-capa-status">Status</Label>
                     <Select value={editStatus} onValueChange={setEditStatus}>
                       <SelectTrigger id="edit-capa-status">
                         <SelectValue />
@@ -553,11 +553,11 @@ export function CapaWorkspace() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-capa-owner">owner</Label>
+                    <Label htmlFor="edit-capa-owner">Owner</Label>
                     <Input id="edit-capa-owner" value={editOwner} onChange={(event) => setEditOwner(event.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-capa-due-date">due date</Label>
+                    <Label htmlFor="edit-capa-due-date">Due date</Label>
                     <Input
                       id="edit-capa-due-date"
                       type="datetime-local"
@@ -566,7 +566,7 @@ export function CapaWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-capa-corrective-action">corrective action</Label>
+                    <Label htmlFor="edit-capa-corrective-action">Corrective action</Label>
                     <Textarea
                       id="edit-capa-corrective-action"
                       value={editCorrectiveAction}
@@ -575,7 +575,7 @@ export function CapaWorkspace() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-capa-preventive-action">preventive action</Label>
+                    <Label htmlFor="edit-capa-preventive-action">Preventive action</Label>
                     <Textarea
                       id="edit-capa-preventive-action"
                       value={editPreventiveAction}
@@ -615,14 +615,14 @@ export function CapaWorkspace() {
               <TableHeader>
                 <TableRow>
                   <TableHead>CAPA code</TableHead>
-                  <TableHead>title</TableHead>
-                  <TableHead>source deviation</TableHead>
-                  <TableHead>linked validation test/source</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>owner</TableHead>
-                  <TableHead>due date</TableHead>
-                  <TableHead>overdue marker</TableHead>
-                  <TableHead className="text-right">open</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Source deviation</TableHead>
+                  <TableHead>Linked validation test / source</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Owner</TableHead>
+                  <TableHead>Due date</TableHead>
+                  <TableHead>Overdue</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

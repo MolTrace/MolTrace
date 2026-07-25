@@ -86,7 +86,7 @@ export function DebugBundlesWorkspace() {
       })
       setBundle(data)
     } catch (e) {
-      setErr(formatErr(e, "Create debug bundle failed."))
+      setErr(formatErr(e, "Could not create the debug bundle."))
     } finally {
       setLoadingCreate(false)
     }
@@ -95,7 +95,7 @@ export function DebugBundlesWorkspace() {
   const getBundle = useCallback(async (idStr: string) => {
     const id = Math.floor(Number(idStr.trim()))
     if (!Number.isFinite(id) || id < 1) {
-      setErr("Enter a valid bundle id.")
+      setErr("Enter a valid bundle ID.")
       return
     }
     setLoadingGet(true)
@@ -188,7 +188,7 @@ export function DebugBundlesWorkspace() {
         >
           <div className="space-y-4 text-sm">
             <div className="space-y-2">
-              <Label htmlFor="db-title">title</Label>
+              <Label htmlFor="db-title">Title</Label>
               <Input
                 id="db-title"
                 placeholder="Optional title"
@@ -199,10 +199,10 @@ export function DebugBundlesWorkspace() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>scope</Label>
+                <Label>Scope</Label>
                 <Select value={scope} onValueChange={setScope}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="scope" />
+                    <SelectValue placeholder="Select scope" />
                   </SelectTrigger>
                   <SelectContent>
                     {SCOPE_OPTIONS.map((s) => (
@@ -214,10 +214,10 @@ export function DebugBundlesWorkspace() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="db-resource">resource ID (optional)</Label>
+                <Label htmlFor="db-resource">Resource ID (optional)</Label>
                 <Input
                   id="db-resource"
-                  placeholder="resource_id"
+                  placeholder="Resource ID"
                   value={resourceId}
                   onChange={(e) => setResourceId(e.target.value)}
                   maxLength={100}
@@ -228,7 +228,7 @@ export function DebugBundlesWorkspace() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <Label htmlFor="sw-audit" className="text-sm font-medium">
-                    include recent audit events
+                    Include recent audit events
                   </Label>
                   <p className="text-xs text-muted-foreground">Append the most recent audit log entries scoped to the bundle.</p>
                 </div>
@@ -242,7 +242,7 @@ export function DebugBundlesWorkspace() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <Label htmlFor="sw-hash" className="text-sm font-medium">
-                    include file hashes
+                    Include file hashes
                   </Label>
                   <p className="text-xs text-muted-foreground">Capture SHA-256 hashes of every artifact for integrity verification.</p>
                 </div>
@@ -272,13 +272,13 @@ export function DebugBundlesWorkspace() {
         <ModuleCard
           accent="slate"
           eyebrow="Load"
-          title="Fetch bundle"
+          title="Load bundle"
           icon={FolderDown}
           description="Load a previously created debug bundle by its ID."
         >
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-2">
-              <Label htmlFor="db-load-id">bundle id</Label>
+              <Label htmlFor="db-load-id">Bundle ID</Label>
               <Input
                 id="db-load-id"
                 inputMode="numeric"
@@ -306,37 +306,37 @@ export function DebugBundlesWorkspace() {
             <div className="space-y-3 text-sm">
               <dl className="grid gap-2 text-xs sm:grid-cols-2">
                 <div>
-                  <dt className="text-muted-foreground">id</dt>
+                  <dt className="text-muted-foreground">ID</dt>
                   <dd className="font-mono">{bundleId != null ? String(bundleId) : "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">status</dt>
+                  <dt className="text-muted-foreground">Status</dt>
                   <dd className="font-mono">{status || "—"}</dd>
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-muted-foreground">bundle_sha256</dt>
+                  <dt className="text-muted-foreground">Bundle SHA-256</dt>
                   <dd className="break-all font-mono text-[10px]">{readStr(bundle, ["bundle_sha256"]) || "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">title</dt>
+                  <dt className="text-muted-foreground">Title</dt>
                   <dd>{readStr(bundle, ["title"]) || "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">scope</dt>
+                  <dt className="text-muted-foreground">Scope</dt>
                   <dd className="font-mono">{readStr(bundle, ["scope"]) || "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">resource_id</dt>
+                  <dt className="text-muted-foreground">Resource ID</dt>
                   <dd className="font-mono">{readStr(bundle, ["resource_id"]) || "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">created_at</dt>
+                  <dt className="text-muted-foreground">Created</dt>
                   <dd className="font-mono text-[10px]">{readStr(bundle, ["created_at"]) || "—"}</dd>
                 </div>
               </dl>
               {warnings.length > 0 ? (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">warnings_json</p>
+                  <p className="text-xs font-medium text-muted-foreground">Warnings</p>
                   <ul className="mt-1 list-inside list-disc text-xs">
                     {warnings.map((w, i) => (
                       <li key={i}>{w}</li>
@@ -346,7 +346,7 @@ export function DebugBundlesWorkspace() {
               ) : null}
               {notes.length > 0 ? (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">notes_json</p>
+                  <p className="text-xs font-medium text-muted-foreground">Notes</p>
                   <ul className="mt-1 list-inside list-disc text-xs">
                     {notes.map((n, i) => (
                       <li key={i}>{n}</li>

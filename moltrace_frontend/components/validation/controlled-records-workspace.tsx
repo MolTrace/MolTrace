@@ -204,16 +204,16 @@ export function ControlledRecordsWorkspace() {
 
   async function createControlledRecord() {
     if (!title.trim()) {
-      setError("title is required.")
+      setError("Title is required.")
       return
     }
     if (!version.trim()) {
-      setError("version is required.")
+      setError("Version is required.")
       return
     }
     const parsedResourceId = resourceId.trim() ? readInt(resourceId) : null
     if (resourceId.trim() && parsedResourceId == null) {
-      setError("resource ID must be a positive integer.")
+      setError("Resource ID must be a positive integer.")
       return
     }
 
@@ -288,11 +288,11 @@ export function ControlledRecordsWorkspace() {
     const id = rowId(detailRecord)
     if (!id) return
     if (!lockedBy.trim()) {
-      setError("locked by is required.")
+      setError("Locked by is required.")
       return
     }
     if (!lockReason.trim()) {
-      setError("reason is required.")
+      setError("Reason is required.")
       return
     }
 
@@ -325,7 +325,7 @@ export function ControlledRecordsWorkspace() {
     const id = rowId(detailRecord)
     if (!id) return
     if (!archiveReason.trim()) {
-      setError("reason is required.")
+      setError("Reason is required.")
       return
     }
 
@@ -389,11 +389,11 @@ export function ControlledRecordsWorkspace() {
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="controlled-record-title">title</Label>
+                <Label htmlFor="controlled-record-title">Title</Label>
                 <Input id="controlled-record-title" value={title} onChange={(event) => setTitle(event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="controlled-record-type">record type</Label>
+                <Label htmlFor="controlled-record-type">Record type</Label>
                 <Select value={recordType} onValueChange={setRecordType}>
                   <SelectTrigger id="controlled-record-type">
                     <SelectValue />
@@ -408,7 +408,7 @@ export function ControlledRecordsWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="controlled-record-resource-id">resource ID</Label>
+                <Label htmlFor="controlled-record-resource-id">Resource ID</Label>
                 <Input
                   id="controlled-record-resource-id"
                   inputMode="numeric"
@@ -417,7 +417,7 @@ export function ControlledRecordsWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="controlled-record-version">version</Label>
+                <Label htmlFor="controlled-record-version">Version</Label>
                 <Input
                   id="controlled-record-version"
                   value={version}
@@ -425,7 +425,7 @@ export function ControlledRecordsWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="controlled-record-status">status</Label>
+                <Label htmlFor="controlled-record-status">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger id="controlled-record-status">
                     <SelectValue />
@@ -440,7 +440,7 @@ export function ControlledRecordsWorkspace() {
                 </Select>
               </div>
               <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="controlled-record-content-hash">content hash</Label>
+                <Label htmlFor="controlled-record-content-hash">Content hash</Label>
                 <Input
                   id="controlled-record-content-hash"
                   value={contentHash}
@@ -466,23 +466,23 @@ export function ControlledRecordsWorkspace() {
               <>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <p className="text-xs text-muted-foreground">title</p>
+                    <p className="text-xs text-muted-foreground">Title</p>
                     <p className="font-medium">{readStr(detailRecord.title) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">status</p>
+                    <p className="text-xs text-muted-foreground">Status</p>
                     <StatusBadge status={detailRecord.status} />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">record type</p>
+                    <p className="text-xs text-muted-foreground">Record type</p>
                     <p className="font-medium">{readStr(detailRecord.record_type) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">version</p>
+                    <p className="text-xs text-muted-foreground">Version</p>
                     <p className="font-medium">{readStr(detailRecord.version) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">locked by</p>
+                    <p className="text-xs text-muted-foreground">Locked by</p>
                     <p className="font-medium">{readStr(detailRecord.locked_by) || "-"}</p>
                   </div>
                   <div>
@@ -490,12 +490,12 @@ export function ControlledRecordsWorkspace() {
                     <p className="font-medium">{formatDate(detailRecord.updated_at)}</p>
                   </div>
                   <div className="sm:col-span-2">
-                    <p className="text-xs text-muted-foreground">content hash</p>
+                    <p className="text-xs text-muted-foreground">Content hash</p>
                     <p className="break-all font-mono text-xs">{readStr(detailRecord.content_hash) || "-"}</p>
                   </div>
                   {readStr(detailRecord.reason_for_change) ? (
                     <div className="sm:col-span-2">
-                      <p className="text-xs text-muted-foreground">reason for change</p>
+                      <p className="text-xs text-muted-foreground">Reason for change</p>
                       <p className="whitespace-pre-wrap text-sm">{readStr(detailRecord.reason_for_change)}</p>
                     </div>
                   ) : null}
@@ -518,21 +518,21 @@ export function ControlledRecordsWorkspace() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Input
-                      aria-label="new version title"
-                      placeholder="title"
+                      aria-label="New version title"
+                      placeholder="Title"
                       value={newVersionTitle}
                       onChange={(event) => setNewVersionTitle(event.target.value)}
                     />
                     <Input
-                      aria-label="new version"
-                      placeholder="version"
+                      aria-label="New version"
+                      placeholder="Version"
                       value={newVersion}
                       onChange={(event) => setNewVersion(event.target.value)}
                     />
                     <Input
-                      aria-label="new version content hash"
+                      aria-label="New version content hash"
                       className="sm:col-span-2"
-                      placeholder="content hash"
+                      placeholder="Content hash"
                       value={newVersionHash}
                       onChange={(event) => setNewVersionHash(event.target.value)}
                     />
@@ -554,21 +554,21 @@ export function ControlledRecordsWorkspace() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Input
-                      aria-label="locked by"
-                      placeholder="locked by"
+                      aria-label="Locked by"
+                      placeholder="Locked by"
                       value={lockedBy}
                       onChange={(event) => setLockedBy(event.target.value)}
                     />
                     <Input
-                      aria-label="lock content hash"
-                      placeholder="content hash"
+                      aria-label="Lock content hash"
+                      placeholder="Content hash"
                       value={lockHash}
                       onChange={(event) => setLockHash(event.target.value)}
                     />
                     <Textarea
-                      aria-label="lock reason"
+                      aria-label="Lock reason"
                       className="sm:col-span-2"
-                      placeholder="reason"
+                      placeholder="Reason"
                       rows={3}
                       value={lockReason}
                       onChange={(event) => setLockReason(event.target.value)}
@@ -590,8 +590,8 @@ export function ControlledRecordsWorkspace() {
                     <p className="text-xs text-muted-foreground">Archive (soft-delete) this record: it is removed from the default list but retained and reversible-by-record for the ALCOA+ audit trail. A reason is required.</p>
                   </div>
                   <Textarea
-                    aria-label="archive reason"
-                    placeholder="reason"
+                    aria-label="Archive reason"
+                    placeholder="Reason"
                     rows={3}
                     value={archiveReason}
                     onChange={(event) => setArchiveReason(event.target.value)}
@@ -640,16 +640,16 @@ export function ControlledRecordsWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>title</TableHead>
-                  <TableHead>record type</TableHead>
-                  <TableHead>resource ID</TableHead>
-                  <TableHead>version</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>reason for change</TableHead>
-                  <TableHead>content hash</TableHead>
-                  <TableHead>locked by</TableHead>
-                  <TableHead>updated date</TableHead>
-                  <TableHead className="text-right">actions</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Record type</TableHead>
+                  <TableHead>Resource ID</TableHead>
+                  <TableHead>Version</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Reason for change</TableHead>
+                  <TableHead>Content hash</TableHead>
+                  <TableHead>Locked by</TableHead>
+                  <TableHead>Updated</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

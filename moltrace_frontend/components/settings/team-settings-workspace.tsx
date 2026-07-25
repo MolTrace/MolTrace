@@ -294,7 +294,7 @@ export function TeamSettingsWorkspace() {
         <AlertCard
           variant="info"
           title="Local development mode"
-          description="No access token found in this browser session. Sign in to use organization APIs, or continue with backend authentication enabled."
+          description="You are not signed in on this device. Sign in to manage your organization and team members, or continue if sign-in is not required for this build."
         />
       ) : null}
 
@@ -400,7 +400,7 @@ export function TeamSettingsWorkspace() {
                       {members.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={5} className="text-xs text-muted-foreground">
-                            No members returned for this organization.
+                            No members found for this organization.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -510,7 +510,7 @@ export function TeamSettingsWorkspace() {
         eyebrow="Roles"
         title="Roles"
         icon={KeyRound}
-        description="How roles are typically used in MolTrace (exact permissions follow backend policy)."
+        description="How roles are typically used in MolTrace (exact permissions are enforced automatically)."
       >
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>
@@ -541,12 +541,12 @@ export function TeamSettingsWorkspace() {
         eyebrow="Permissions"
         title="Permissions"
         icon={ShieldAlert}
-        description="Permission boundaries are enforced by the API."
+        description="Permission boundaries are enforced automatically."
       >
         <div className="space-y-3 text-sm text-muted-foreground">
           <p>
             Role changes and invitations only succeed when your account has sufficient privileges. If an action fails, the
-            error message from the server explains the reason.
+            error message explains the reason.
           </p>
           <Separator />
           <p className="text-xs">

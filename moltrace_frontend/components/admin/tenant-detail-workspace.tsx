@@ -120,10 +120,10 @@ const ONBOARDING_STATUS_OPTIONS = [
   "archived",
 ] as const
 const TASK_BOARD_COLUMNS = [
-  { label: "open", value: "open" },
-  { label: "in progress", value: "in_progress" },
-  { label: "blocked", value: "blocked" },
-  { label: "completed", value: "completed" },
+  { label: "Open", value: "open" },
+  { label: "In progress", value: "in_progress" },
+  { label: "Blocked", value: "blocked" },
+  { label: "Completed", value: "completed" },
 ] as const
 const IMPLEMENTATION_TASK_TYPE_OPTIONS = [
   "security",
@@ -570,20 +570,20 @@ function EntitlementsPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs">feature key</TableHead>
-                <TableHead className="text-xs">program</TableHead>
-                <TableHead className="text-xs">enabled</TableHead>
-                <TableHead className="text-xs">limits JSON</TableHead>
-                <TableHead className="text-xs">effective start</TableHead>
-                <TableHead className="text-xs">effective end</TableHead>
-                <TableHead className="text-xs">action</TableHead>
+                <TableHead className="text-xs">Feature key</TableHead>
+                <TableHead className="text-xs">Program</TableHead>
+                <TableHead className="text-xs">Enabled</TableHead>
+                <TableHead className="text-xs">Limits</TableHead>
+                <TableHead className="text-xs">Effective start</TableHead>
+                <TableHead className="text-xs">Effective end</TableHead>
+                <TableHead className="text-xs">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-xs text-muted-foreground">
-                    No entitlements returned.
+                    No entitlements yet.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -624,7 +624,7 @@ function EntitlementsPanel({
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="tenant-entitlement-feature-key">feature key</Label>
+            <Label htmlFor="tenant-entitlement-feature-key">Feature key</Label>
             <Input
               id="tenant-entitlement-feature-key"
               value={featureKey}
@@ -632,7 +632,7 @@ function EntitlementsPanel({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-entitlement-program">program</Label>
+            <Label htmlFor="tenant-entitlement-program">Program</Label>
             <Select value={program} onValueChange={(value) => setProgram(value as typeof program)}>
               <SelectTrigger id="tenant-entitlement-program">
                 <SelectValue />
@@ -647,7 +647,7 @@ function EntitlementsPanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-entitlement-enabled">enabled</Label>
+            <Label htmlFor="tenant-entitlement-enabled">Enabled</Label>
             <Select value={enabled} onValueChange={setEnabled}>
               <SelectTrigger id="tenant-entitlement-enabled">
                 <SelectValue />
@@ -659,7 +659,7 @@ function EntitlementsPanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-entitlement-effective-start">effective start</Label>
+            <Label htmlFor="tenant-entitlement-effective-start">Effective start</Label>
             <Input
               id="tenant-entitlement-effective-start"
               value={effectiveStart}
@@ -667,7 +667,7 @@ function EntitlementsPanel({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-entitlement-effective-end">effective end</Label>
+            <Label htmlFor="tenant-entitlement-effective-end">Effective end</Label>
             <Input
               id="tenant-entitlement-effective-end"
               value={effectiveEnd}
@@ -821,15 +821,15 @@ function PilotProgramsPanel({
       >
         <GenericTable
           rows={rows}
-          empty="No pilot programs returned."
+          empty="No pilot programs yet."
           columns={[
-            { key: "title", label: "title" },
-            { key: "objective", label: "objective" },
-            { key: "status", label: "status" },
-            { key: "start_date", label: "start date" },
-            { key: "end_date", label: "end date" },
-            { key: "target_programs_json", label: "target programs" },
-            { key: "updated_at", label: "updated date", keys: ["updated_at", "updated_date"] },
+            { key: "title", label: "Title" },
+            { key: "objective", label: "Objective" },
+            { key: "status", label: "Status" },
+            { key: "start_date", label: "Start date" },
+            { key: "end_date", label: "End date" },
+            { key: "target_programs_json", label: "Target programs" },
+            { key: "updated_at", label: "Updated date", keys: ["updated_at", "updated_date"] },
           ]}
         />
         {rows.length > 0 ? (
@@ -878,14 +878,14 @@ function PilotProgramsPanel({
           row={selectedPilot}
           empty="Select Load detail from a pilot program row."
           fields={[
-            { label: "title", key: "title" },
-            { label: "objective", key: "objective" },
-            { label: "status", key: "status" },
-            { label: "start date", key: "start_date" },
-            { label: "end date", key: "end_date" },
-            { label: "target programs", key: "target_programs_json" },
-            { label: "success criteria JSON", key: "success_criteria_json" },
-            { label: "risks JSON", key: "risks_json" },
+            { label: "Title", key: "title" },
+            { label: "Objective", key: "objective" },
+            { label: "Status", key: "status" },
+            { label: "Start date", key: "start_date" },
+            { label: "End date", key: "end_date" },
+            { label: "Target programs", key: "target_programs_json" },
+            { label: "Success criteria", key: "success_criteria_json" },
+            { label: "Risks", key: "risks_json" },
           ]}
         />
       </SectionCard>
@@ -893,11 +893,11 @@ function PilotProgramsPanel({
       <SectionCard title="Create pilot program" description="Create a new pilot program for this tenant — title, objective, start/end dates, and target modules.">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="tenant-pilot-title">title</Label>
+            <Label htmlFor="tenant-pilot-title">Title</Label>
             <Input id="tenant-pilot-title" value={title} onChange={(event) => setTitle(event.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-pilot-status">status</Label>
+            <Label htmlFor="tenant-pilot-status">Status</Label>
             <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
               <SelectTrigger id="tenant-pilot-status">
                 <SelectValue />
@@ -912,15 +912,15 @@ function PilotProgramsPanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-pilot-start-date">start date</Label>
+            <Label htmlFor="tenant-pilot-start-date">Start date</Label>
             <Input id="tenant-pilot-start-date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-pilot-end-date">end date</Label>
+            <Label htmlFor="tenant-pilot-end-date">End date</Label>
             <Input id="tenant-pilot-end-date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-pilot-objective">objective</Label>
+            <Label htmlFor="tenant-pilot-objective">Objective</Label>
             <Textarea id="tenant-pilot-objective" value={objective} onChange={(event) => setObjective(event.target.value)} rows={3} />
           </div>
           <div className="space-y-1 sm:col-span-2">
@@ -1187,14 +1187,14 @@ function OnboardingPanel({
       >
         <GenericTable
           rows={rows}
-          empty="No onboarding projects returned."
+          empty="No onboarding projects yet."
           columns={[
-            { key: "title", label: "title" },
-            { key: "status", label: "status" },
-            { key: "owner_name", label: "owner" },
-            { key: "customer_contact", label: "customer contact" },
-            { key: "implementation_stage", label: "implementation stage" },
-            { key: "updated_at", label: "updated date", keys: ["updated_at", "updated_date"] },
+            { key: "title", label: "Title" },
+            { key: "status", label: "Status" },
+            { key: "owner_name", label: "Owner" },
+            { key: "customer_contact", label: "Customer contact" },
+            { key: "implementation_stage", label: "Implementation stage" },
+            { key: "updated_at", label: "Updated date", keys: ["updated_at", "updated_date"] },
           ]}
         />
         {rows.length > 0 ? (
@@ -1221,19 +1221,19 @@ function OnboardingPanel({
       <SectionCard title="Create onboarding project" description="Create a new onboarding project — specify title, owner, customer contact, and implementation stage.">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="tenant-onboarding-title">title</Label>
+            <Label htmlFor="tenant-onboarding-title">Title</Label>
             <Input id="tenant-onboarding-title" value={title} onChange={(event) => setTitle(event.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-onboarding-owner-name">owner name</Label>
+            <Label htmlFor="tenant-onboarding-owner-name">Owner name</Label>
             <Input id="tenant-onboarding-owner-name" value={ownerName} onChange={(event) => setOwnerName(event.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-onboarding-customer-contact">customer contact</Label>
+            <Label htmlFor="tenant-onboarding-customer-contact">Customer contact</Label>
             <Input id="tenant-onboarding-customer-contact" value={customerContact} onChange={(event) => setCustomerContact(event.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-onboarding-implementation-stage">implementation stage</Label>
+            <Label htmlFor="tenant-onboarding-implementation-stage">Implementation stage</Label>
             <Select value={implementationStage} onValueChange={(value) => setImplementationStage(value as typeof implementationStage)}>
               <SelectTrigger id="tenant-onboarding-implementation-stage">
                 <SelectValue />
@@ -1263,11 +1263,11 @@ function OnboardingPanel({
           row={selectedProjectDetail}
           empty="Select an onboarding project."
           fields={[
-            { label: "title", key: "title" },
-            { label: "status", key: "status" },
-            { label: "owner name", key: "owner_name" },
-            { label: "customer contact", key: "customer_contact" },
-            { label: "implementation stage", key: "implementation_stage" },
+            { label: "Title", key: "title" },
+            { label: "Status", key: "status" },
+            { label: "Owner name", key: "owner_name" },
+            { label: "Customer contact", key: "customer_contact" },
+            { label: "Implementation stage", key: "implementation_stage" },
           ]}
         />
         {selectedProjectId ? (
@@ -1345,15 +1345,15 @@ function OnboardingPanel({
       <SectionCard title="Create implementation task" description="Add an implementation task to the selected onboarding project — specify title, owner, type, and initial status.">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="tenant-task-title">title</Label>
+            <Label htmlFor="tenant-task-title">Title</Label>
             <Input id="tenant-task-title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-task-owner">owner</Label>
+            <Label htmlFor="tenant-task-owner">Owner</Label>
             <Input id="tenant-task-owner" value={taskOwner} onChange={(event) => setTaskOwner(event.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-task-type">task type</Label>
+            <Label htmlFor="tenant-task-type">Task type</Label>
             <Select value={taskType} onValueChange={(value) => setTaskType(value as typeof taskType)}>
               <SelectTrigger id="tenant-task-type">
                 <SelectValue />
@@ -1368,7 +1368,7 @@ function OnboardingPanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-task-program">program</Label>
+            <Label htmlFor="tenant-task-program">Program</Label>
             <Select value={taskProgram} onValueChange={(value) => setTaskProgram(value as typeof taskProgram)}>
               <SelectTrigger id="tenant-task-program">
                 <SelectValue />
@@ -1383,7 +1383,7 @@ function OnboardingPanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-task-status">status</Label>
+            <Label htmlFor="tenant-task-status">Status</Label>
             <Select value={taskStatus} onValueChange={setTaskStatus}>
               <SelectTrigger id="tenant-task-status">
                 <SelectValue />
@@ -1398,11 +1398,11 @@ function OnboardingPanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-task-due-date">due date</Label>
+            <Label htmlFor="tenant-task-due-date">Due date</Label>
             <Input id="tenant-task-due-date" value={taskDueDate} onChange={(event) => setTaskDueDate(event.target.value)} />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-task-description">description</Label>
+            <Label htmlFor="tenant-task-description">Description</Label>
             <Textarea id="tenant-task-description" value={taskDescription} onChange={(event) => setTaskDescription(event.target.value)} rows={3} />
           </div>
         </div>
@@ -1514,14 +1514,14 @@ function DataBoundaryPanel({
       >
         <RecordFields
           row={row}
-          empty="No data boundary returned."
+          empty="No data boundary yet."
           fields={[
-            { label: "isolation mode", key: "isolation_mode" },
-            { label: "encryption profile", key: "encryption_profile" },
-            { label: "storage prefix", key: "storage_prefix" },
-            { label: "allowed regions", key: "allowed_regions_json" },
-            { label: "data residency notes", key: "data_residency_notes" },
-            { label: "status", key: "status" },
+            { label: "Isolation mode", key: "isolation_mode" },
+            { label: "Encryption profile", key: "encryption_profile" },
+            { label: "Storage prefix", key: "storage_prefix" },
+            { label: "Allowed regions", key: "allowed_regions_json" },
+            { label: "Data residency notes", key: "data_residency_notes" },
+            { label: "Status", key: "status" },
           ]}
         />
       </SectionCard>
@@ -1532,7 +1532,7 @@ function DataBoundaryPanel({
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="tenant-boundary-isolation-mode">isolation mode</Label>
+            <Label htmlFor="tenant-boundary-isolation-mode">Isolation mode</Label>
             <Select value={isolationMode} onValueChange={(value) => setIsolationMode(value as typeof isolationMode)}>
               <SelectTrigger id="tenant-boundary-isolation-mode">
                 <SelectValue />
@@ -1547,7 +1547,7 @@ function DataBoundaryPanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-boundary-status">status</Label>
+            <Label htmlFor="tenant-boundary-status">Status</Label>
             <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
               <SelectTrigger id="tenant-boundary-status">
                 <SelectValue />
@@ -1562,7 +1562,7 @@ function DataBoundaryPanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-boundary-encryption-profile">encryption profile</Label>
+            <Label htmlFor="tenant-boundary-encryption-profile">Encryption profile</Label>
             <Input
               id="tenant-boundary-encryption-profile"
               value={encryptionProfile}
@@ -1570,7 +1570,7 @@ function DataBoundaryPanel({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-boundary-storage-prefix">storage prefix</Label>
+            <Label htmlFor="tenant-boundary-storage-prefix">Storage prefix</Label>
             <Input
               id="tenant-boundary-storage-prefix"
               value={storagePrefix}
@@ -1578,7 +1578,7 @@ function DataBoundaryPanel({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-boundary-allowed-regions">allowed regions</Label>
+            <Label htmlFor="tenant-boundary-allowed-regions">Allowed regions</Label>
             <StringListField
               key={`boundary-regions-${boundaryFormKey}`}
               label="Allowed regions"
@@ -1590,7 +1590,7 @@ function DataBoundaryPanel({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-boundary-data-residency-notes">data residency notes</Label>
+            <Label htmlFor="tenant-boundary-data-residency-notes">Data residency notes</Label>
             <Textarea
               id="tenant-boundary-data-residency-notes"
               value={dataResidencyNotes}
@@ -1699,16 +1699,16 @@ function SecurityProfilePanel({
       >
         <RecordFields
           row={row}
-          empty="No security profile returned."
+          empty="No security profile yet."
           fields={[
             { label: "SSO enabled", key: "sso_enabled" },
             { label: "MFA required", key: "mfa_required" },
-            { label: "allowed domains", key: "allowed_domains_json" },
-            { label: "session timeout", key: "session_timeout_minutes" },
+            { label: "Allowed domains", key: "allowed_domains_json" },
+            { label: "Session timeout", key: "session_timeout_minutes" },
             { label: "IP allowlist", key: "ip_allowlist_json" },
-            { label: "security frameworks", key: "security_frameworks_json" },
-            { label: "risk summary", key: "risk_summary_json" },
-            { label: "status", key: "status" },
+            { label: "Security frameworks", key: "security_frameworks_json" },
+            { label: "Risk summary", key: "risk_summary_json" },
+            { label: "Status", key: "status" },
           ]}
         />
       </SectionCard>
@@ -1743,7 +1743,7 @@ function SecurityProfilePanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-security-session-timeout">session timeout</Label>
+            <Label htmlFor="tenant-security-session-timeout">Session timeout</Label>
             <Input
               id="tenant-security-session-timeout"
               value={sessionTimeoutMinutes}
@@ -1751,7 +1751,7 @@ function SecurityProfilePanel({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-security-status">status</Label>
+            <Label htmlFor="tenant-security-status">Status</Label>
             <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
               <SelectTrigger id="tenant-security-status">
                 <SelectValue />
@@ -1766,7 +1766,7 @@ function SecurityProfilePanel({
             </Select>
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-security-allowed-domains">allowed domains</Label>
+            <Label htmlFor="tenant-security-allowed-domains">Allowed domains</Label>
             <StringListField
               key={`security-domains-${securityFormKey}`}
               label="Allowed domains"
@@ -1790,7 +1790,7 @@ function SecurityProfilePanel({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-security-frameworks">security frameworks</Label>
+            <Label htmlFor="tenant-security-frameworks">Security frameworks</Label>
             <StringListField
               key={`security-frameworks-${securityFormKey}`}
               label="Security frameworks"
@@ -1802,7 +1802,7 @@ function SecurityProfilePanel({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-security-risk-summary">risk summary</Label>
+            <Label htmlFor="tenant-security-risk-summary">Risk summary</Label>
             <JsonObjectField
               key={`security-risk-${securityFormKey}`}
               idPrefix="tenant-security-risk-summary"
@@ -1918,32 +1918,32 @@ function ValidationProfilePanel({
       >
         <RecordFields
           row={row}
-          empty="No validation profile returned."
+          empty="No validation profile yet."
           fields={[
-            { label: "validation required", key: "validation_required" },
-            { label: "validation project IDs", key: "validation_project_ids_json" },
-            { label: "controlled record policy", key: "controlled_record_policy" },
-            { label: "e-signature required", key: "esignature_required" },
-            { label: "data integrity assessment IDs", key: "data_integrity_assessment_ids_json" },
-            { label: "inspection package IDs", key: "inspection_package_ids_json" },
-            { label: "status", key: "status" },
+            { label: "Validation required", key: "validation_required" },
+            { label: "Validation project IDs", key: "validation_project_ids_json" },
+            { label: "Controlled record policy", key: "controlled_record_policy" },
+            { label: "E-signature required", key: "esignature_required" },
+            { label: "Data integrity assessment IDs", key: "data_integrity_assessment_ids_json" },
+            { label: "Inspection package IDs", key: "inspection_package_ids_json" },
+            { label: "Status", key: "status" },
           ]}
         />
       </SectionCard>
 
       <SectionCard title="Linked validation artifacts">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="linked validation projects" value={validationProjectIds} valueKey="validation_project_ids_json" />
-          <Field label="controlled record policy" value={row?.controlled_record_policy} valueKey="controlled_record_policy" />
-          <Field label="e-signature setting" value={esignatureSetting} valueKey="esignature_required" />
+          <Field label="Linked validation projects" value={validationProjectIds} valueKey="validation_project_ids_json" />
+          <Field label="Controlled record policy" value={row?.controlled_record_policy} valueKey="controlled_record_policy" />
+          <Field label="E-signature setting" value={esignatureSetting} valueKey="esignature_required" />
           <Field
-            label="data integrity assessments"
+            label="Data integrity assessments"
             value={dataIntegrityAssessmentIds}
             valueKey="data_integrity_assessment_ids_json"
           />
-          <Field label="inspection packages" value={inspectionPackageIds} valueKey="inspection_package_ids_json" />
+          <Field label="Inspection packages" value={inspectionPackageIds} valueKey="inspection_package_ids_json" />
           <div>
-            <p className="text-xs font-medium text-muted-foreground">readiness status</p>
+            <p className="text-xs font-medium text-muted-foreground">Readiness status</p>
             <div className="mt-1">
               <Badge variant="outline" className={`font-normal ${statusBadgeClass(readinessStatus)}`}>
                 {readinessStatus}
@@ -1959,7 +1959,7 @@ function ValidationProfilePanel({
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="tenant-validation-required">validation required</Label>
+            <Label htmlFor="tenant-validation-required">Validation required</Label>
             <Select value={validationRequired} onValueChange={setValidationRequired}>
               <SelectTrigger id="tenant-validation-required">
                 <SelectValue />
@@ -1971,7 +1971,7 @@ function ValidationProfilePanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-validation-esignature-required">e-signature required</Label>
+            <Label htmlFor="tenant-validation-esignature-required">E-signature required</Label>
             <Select value={esignatureRequired} onValueChange={setEsignatureRequired}>
               <SelectTrigger id="tenant-validation-esignature-required">
                 <SelectValue />
@@ -1983,7 +1983,7 @@ function ValidationProfilePanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-validation-status">status</Label>
+            <Label htmlFor="tenant-validation-status">Status</Label>
             <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
               <SelectTrigger id="tenant-validation-status">
                 <SelectValue />
@@ -1998,7 +1998,7 @@ function ValidationProfilePanel({
             </Select>
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-validation-controlled-record-policy">controlled record policy</Label>
+            <Label htmlFor="tenant-validation-controlled-record-policy">Controlled record policy</Label>
             <Textarea
               id="tenant-validation-controlled-record-policy"
               value={controlledRecordPolicy}
@@ -2007,7 +2007,7 @@ function ValidationProfilePanel({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-validation-project-ids">validation projects</Label>
+            <Label htmlFor="tenant-validation-project-ids">Validation projects</Label>
             <MultiEntityPicker
               id="tenant-validation-project-ids"
               ariaLabel="Validation projects"
@@ -2019,7 +2019,7 @@ function ValidationProfilePanel({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-validation-data-integrity-assessment-ids">data integrity assessment IDs</Label>
+            <Label htmlFor="tenant-validation-data-integrity-assessment-ids">Data integrity assessment IDs</Label>
             <NumberListField
               key={`val-di-${validationFormKey}`}
               label="Data integrity assessment IDs"
@@ -2031,7 +2031,7 @@ function ValidationProfilePanel({
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="tenant-validation-inspection-package-ids">inspection package IDs</Label>
+            <Label htmlFor="tenant-validation-inspection-package-ids">Inspection package IDs</Label>
             <NumberListField
               key={`val-insp-${validationFormKey}`}
               label="Inspection package IDs"
@@ -2105,7 +2105,7 @@ function UsageProgramCard({
         </div>
         {usage ? (
           <details className="rounded-md border bg-muted/20 p-3">
-            <summary className="cursor-pointer text-sm font-medium">Aggregate JSON</summary>
+            <summary className="cursor-pointer text-sm font-medium">Aggregate details</summary>
             <div className="mt-3">
               <JsonBlock value={usage} />
             </div>
@@ -2141,13 +2141,13 @@ function UsageRoiPanel({
         error={usageError || roiError}
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="reports generated" value={roi?.reports_generated ?? usageSummary?.reports_generated} />
-          <MetricCard label="tasks automated" value={roi?.tasks_automated ?? usageSummary?.actions_completed} />
-          <MetricCard label="hours saved" value={roi?.total_hours_saved ?? usageSummary?.hours_saved} />
-          <MetricCard label="regulatory actions created" value={roi?.regulatory_actions_created} />
-          <MetricCard label="regulatory actions completed" value={usageSummary?.actions_completed} />
+          <MetricCard label="Reports generated" value={roi?.reports_generated ?? usageSummary?.reports_generated} />
+          <MetricCard label="Tasks automated" value={roi?.tasks_automated ?? usageSummary?.actions_completed} />
+          <MetricCard label="Hours saved" value={roi?.total_hours_saved ?? usageSummary?.hours_saved} />
+          <MetricCard label="Regulatory actions created" value={roi?.regulatory_actions_created} />
+          <MetricCard label="Regulatory actions completed" value={usageSummary?.actions_completed} />
           <MetricCard
-            label="reaction recommendations approved"
+            label="Reaction recommendations approved"
             value={roi?.reaction_recommendations_approved}
           />
         </div>
@@ -2165,11 +2165,11 @@ function UsageRoiPanel({
           usage={spectracheckUsage}
           metrics={[
             {
-              label: "sessions created",
+              label: "Sessions created",
               value: metricValue(spectracheckUsage, ["sessions_created", "sessions", "session_count"]),
             },
             {
-              label: "reports generated",
+              label: "Reports generated",
               value: metricValue(spectracheckUsage, ["reports_generated", "reports", "report_count"]),
             },
           ]}
@@ -2180,11 +2180,11 @@ function UsageRoiPanel({
           usage={regulatoryUsage}
           metrics={[
             {
-              label: "regulatory actions created",
+              label: "Regulatory actions created",
               value: metricValue(regulatoryUsage, ["regulatory_actions_created", "actions_created", "created"]),
             },
             {
-              label: "regulatory actions completed",
+              label: "Regulatory actions completed",
               value: metricValue(regulatoryUsage, ["regulatory_actions_completed", "actions_completed", "completed"]),
             },
           ]}
@@ -2195,7 +2195,7 @@ function UsageRoiPanel({
           usage={reactionUsage}
           metrics={[
             {
-              label: "reaction recommendations approved",
+              label: "Reaction recommendations approved",
               value: metricValue(reactionUsage, [
                 "reaction_recommendations_approved",
                 "recommendations_approved",
@@ -2203,7 +2203,7 @@ function UsageRoiPanel({
               ]),
             },
             {
-              label: "tasks automated",
+              label: "Tasks automated",
               value: metricValue(reactionUsage, ["tasks_automated", "automated_tasks"]),
             },
           ]}
@@ -2211,7 +2211,7 @@ function UsageRoiPanel({
       </div>
 
       <SectionCard title="Warnings">
-        {usageSummary?.warnings_json ? <JsonBlock value={usageSummary.warnings_json} /> : <p className="text-sm text-muted-foreground">No warnings returned.</p>}
+        {usageSummary?.warnings_json ? <JsonBlock value={usageSummary.warnings_json} /> : <p className="text-sm text-muted-foreground">No warnings yet.</p>}
       </SectionCard>
     </div>
   )
@@ -2232,9 +2232,9 @@ function HealthScorePanel({
     <div className="space-y-6">
       <SectionCard title="Health Score" description="Computed health score for this tenant — overall score, status, onboarding progress, usage trends, ROI indicators, blockers, and recommended actions." error={error}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="score" value={healthScore?.score ?? "-"} />
+          <MetricCard label="Score" value={healthScore?.score ?? "-"} />
           <div className="rounded-md border bg-muted/20 p-3">
-            <p className="text-xs font-medium text-muted-foreground">healthy/watch/at risk/unknown</p>
+            <p className="text-xs font-medium text-muted-foreground">Status</p>
             <div className="mt-2">
               <Badge variant="outline" className={`font-normal ${statusBadgeClass(status)}`}>
                 {status}
@@ -2254,28 +2254,28 @@ function HealthScorePanel({
           {healthScore?.onboarding_summary_json ? (
             <JsonBlock value={healthScore.onboarding_summary_json} />
           ) : (
-            <p className="text-sm text-muted-foreground">No onboarding summary returned.</p>
+            <p className="text-sm text-muted-foreground">No onboarding summary yet.</p>
           )}
         </SectionCard>
         <SectionCard title="Usage summary">
           {healthScore?.usage_summary_json ? (
             <JsonBlock value={healthScore.usage_summary_json} />
           ) : (
-            <p className="text-sm text-muted-foreground">No usage summary returned.</p>
+            <p className="text-sm text-muted-foreground">No usage summary yet.</p>
           )}
         </SectionCard>
         <SectionCard title="ROI summary">
           {healthScore?.roi_summary_json ? (
             <JsonBlock value={healthScore.roi_summary_json} />
           ) : (
-            <p className="text-sm text-muted-foreground">No ROI summary returned.</p>
+            <p className="text-sm text-muted-foreground">No ROI summary yet.</p>
           )}
         </SectionCard>
         <SectionCard title="Blockers">
           {healthScore?.blockers_json ? (
             <JsonBlock value={healthScore.blockers_json} />
           ) : (
-            <p className="text-sm text-muted-foreground">No blockers returned.</p>
+            <p className="text-sm text-muted-foreground">No blockers yet.</p>
           )}
         </SectionCard>
       </div>
@@ -2284,7 +2284,7 @@ function HealthScorePanel({
         {healthScore?.recommended_actions_json ? (
           <JsonBlock value={healthScore.recommended_actions_json} />
         ) : (
-          <p className="text-sm text-muted-foreground">No recommended actions returned.</p>
+          <p className="text-sm text-muted-foreground">No recommended actions yet.</p>
         )}
       </SectionCard>
     </div>
@@ -2428,19 +2428,19 @@ function ProcurementPackagesPanel({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs">title</TableHead>
-                <TableHead className="text-xs">package type</TableHead>
-                <TableHead className="text-xs">package status</TableHead>
-                <TableHead className="text-xs">package SHA-256</TableHead>
-                <TableHead className="text-xs">created date</TableHead>
-                <TableHead className="text-xs">action</TableHead>
+                <TableHead className="text-xs">Title</TableHead>
+                <TableHead className="text-xs">Package type</TableHead>
+                <TableHead className="text-xs">Package status</TableHead>
+                <TableHead className="text-xs">Package SHA-256</TableHead>
+                <TableHead className="text-xs">Created date</TableHead>
+                <TableHead className="text-xs">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-xs text-muted-foreground">
-                    No procurement packages returned.
+                    No procurement packages yet.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -2485,11 +2485,11 @@ function ProcurementPackagesPanel({
       <SectionCard title="Create procurement evidence package" description="Generate a procurement evidence package — specify type and choose which summaries to include: security profile, data boundary, validation, AI governance, audit, mobile safety, connectors, and ROI.">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="tenant-procurement-title">title</Label>
+            <Label htmlFor="tenant-procurement-title">Title</Label>
             <Input id="tenant-procurement-title" value={title} onChange={(event) => setTitle(event.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-procurement-package-type">package type</Label>
+            <Label htmlFor="tenant-procurement-package-type">Package type</Label>
             <Select value={packageType} onValueChange={(value) => setPackageType(value as typeof packageType)}>
               <SelectTrigger id="tenant-procurement-package-type">
                 <SelectValue />
@@ -2507,49 +2507,49 @@ function ProcurementPackagesPanel({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <IncludeCheckbox
             id="tenant-procurement-include-security-profile"
-            label="include security profile"
+            label="Include security profile"
             checked={includeSecurityProfile}
             onCheckedChange={setIncludeSecurityProfile}
           />
           <IncludeCheckbox
             id="tenant-procurement-include-data-boundary"
-            label="include data boundary"
+            label="Include data boundary"
             checked={includeDataBoundary}
             onCheckedChange={setIncludeDataBoundary}
           />
           <IncludeCheckbox
             id="tenant-procurement-include-validation-profile"
-            label="include validation profile"
+            label="Include validation profile"
             checked={includeValidationProfile}
             onCheckedChange={setIncludeValidationProfile}
           />
           <IncludeCheckbox
             id="tenant-procurement-include-ai-governance-summary"
-            label="include AI governance summary"
+            label="Include AI governance summary"
             checked={includeAiGovernanceSummary}
             onCheckedChange={setIncludeAiGovernanceSummary}
           />
           <IncludeCheckbox
             id="tenant-procurement-include-audit-summary"
-            label="include audit summary"
+            label="Include audit summary"
             checked={includeAuditSummary}
             onCheckedChange={setIncludeAuditSummary}
           />
           <IncludeCheckbox
             id="tenant-procurement-include-mobile-offline-safety-summary"
-            label="include mobile/offline safety summary"
+            label="Include mobile/offline safety summary"
             checked={includeMobileOfflineSafetySummary}
             onCheckedChange={setIncludeMobileOfflineSafetySummary}
           />
           <IncludeCheckbox
             id="tenant-procurement-include-connector-safety-summary"
-            label="include connector safety summary"
+            label="Include connector safety summary"
             checked={includeConnectorSafetySummary}
             onCheckedChange={setIncludeConnectorSafetySummary}
           />
           <IncludeCheckbox
             id="tenant-procurement-include-roi-summary"
-            label="include ROI summary"
+            label="Include ROI summary"
             checked={includeRoiSummary}
             onCheckedChange={setIncludeRoiSummary}
           />
@@ -2573,10 +2573,10 @@ function ProcurementPackagesPanel({
           row={selectedPackage}
           empty="Open a procurement package to view safe summaries."
           fields={[
-            { label: "package status", key: "status" },
-            { label: "package SHA-256", key: "package_sha256" },
-            { label: "package type", key: "package_type" },
-            { label: "created date", key: "created_at" },
+            { label: "Package status", key: "status" },
+            { label: "Package SHA-256", key: "package_sha256" },
+            { label: "Package type", key: "package_type" },
+            { label: "Created date", key: "created_at" },
           ]}
         />
         {openHref ? (
@@ -2622,7 +2622,7 @@ function ProcurementPackagesPanel({
       </SectionCard>
 
       <SectionCard title="Warnings">
-        {warningValue ? <JsonBlock value={warningValue} /> : <p className="text-sm text-muted-foreground">No warnings returned.</p>}
+        {warningValue ? <JsonBlock value={warningValue} /> : <p className="text-sm text-muted-foreground">No warnings yet.</p>}
       </SectionCard>
 
       <DeveloperOnly>
@@ -2720,7 +2720,7 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
       <SectionCard title="Request tenant audit export" description="Request an audit trail export for this tenant — specify export scope, optional date range, and whether to include metadata and hashes." error={error}>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="tenant-audit-export-scope">export scope</Label>
+            <Label htmlFor="tenant-audit-export-scope">Export scope</Label>
             <Select value={exportScope} onValueChange={(value) => setExportScope(value as typeof exportScope)}>
               <SelectTrigger id="tenant-audit-export-scope">
                 <SelectValue />
@@ -2735,17 +2735,17 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="tenant-audit-export-start">date range optional</Label>
+            <Label htmlFor="tenant-audit-export-start">Date range (optional)</Label>
             <div className="grid gap-2 sm:grid-cols-2">
               <Input
                 id="tenant-audit-export-start"
-                placeholder="start"
+                placeholder="Start date"
                 value={dateRangeStart}
                 onChange={(event) => setDateRangeStart(event.target.value)}
               />
               <Input
                 id="tenant-audit-export-end"
-                placeholder="end"
+                placeholder="End date"
                 value={dateRangeEnd}
                 onChange={(event) => setDateRangeEnd(event.target.value)}
               />
@@ -2755,13 +2755,13 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <IncludeCheckbox
             id="tenant-audit-export-include-metadata"
-            label="include metadata"
+            label="Include metadata"
             checked={includeMetadata}
             onCheckedChange={setIncludeMetadata}
           />
           <IncludeCheckbox
             id="tenant-audit-export-include-hashes"
-            label="include hashes"
+            label="Include hashes"
             checked={includeHashes}
             onCheckedChange={setIncludeHashes}
           />
@@ -2775,7 +2775,7 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
 
       <SectionCard title="Load audit export" description="Load a completed audit export by ID — view export status, scope, and download link.">
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Input value={exportId} onChange={(event) => setExportId(event.target.value)} placeholder="export ID" />
+          <Input value={exportId} onChange={(event) => setExportId(event.target.value)} placeholder="Export ID" />
           <Button type="button" variant="outline" disabled={busy || !exportId.trim()} onClick={() => void loadAuditExport()}>
             Load export
           </Button>
@@ -2784,17 +2784,17 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
 
       <SectionCard title="Audit export status">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="export ID" value={selectedExportId || "-"} valueKey="id" />
+          <Field label="Export ID" value={selectedExportId || "-"} valueKey="id" />
           <div>
-            <p className="text-xs font-medium text-muted-foreground">export status</p>
+            <p className="text-xs font-medium text-muted-foreground">Export status</p>
             <div className="mt-1">
               <Badge variant="outline" className={`font-normal ${statusBadgeClass(selectedExportStatus)}`}>
                 {selectedExportStatus}
               </Badge>
             </div>
           </div>
-          <Field label="export SHA-256" value={selectedExportSha} valueKey="export_sha256" />
-          <Field label="created date" value={selectedExport?.created_at} valueKey="created_at" />
+          <Field label="Export SHA-256" value={selectedExportSha} valueKey="export_sha256" />
+          <Field label="Created date" value={selectedExport?.created_at} valueKey="created_at" />
         </div>
         {downloadHref ? (
           <Button type="button" variant="outline" asChild>
@@ -2806,7 +2806,7 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
       </SectionCard>
 
       <SectionCard title="Warnings">
-        {warnings ? <JsonBlock value={warnings} /> : <p className="text-sm text-muted-foreground">No warnings returned.</p>}
+        {warnings ? <JsonBlock value={warnings} /> : <p className="text-sm text-muted-foreground">No warnings yet.</p>}
       </SectionCard>
 
       <DeveloperOnly>
@@ -3016,25 +3016,25 @@ export function TenantDetailWorkspace() {
           <TenantGsdReadinessCard tenantId={tenantId} tenantLabel={title || tenantKey || `tenant ${tenantId}`} />
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-            <StatCard title="environments" value={environments.length} />
-            <StatCard title="entitlements" value={entitlements.length} />
-            <StatCard title="pilot programs" value={pilotPrograms.length} />
-            <StatCard title="onboarding" value={onboardingProjects.length} />
-            <StatCard title="procurement packages" value={procurementPackages.length} />
-            <StatCard title="health score" value={readFirst(healthScore, ["score", "status"]) || "-"} />
+            <StatCard title="Environments" value={environments.length} />
+            <StatCard title="Entitlements" value={entitlements.length} />
+            <StatCard title="Pilot programs" value={pilotPrograms.length} />
+            <StatCard title="Onboarding" value={onboardingProjects.length} />
+            <StatCard title="Procurement packages" value={procurementPackages.length} />
+            <StatCard title="Health score" value={readFirst(healthScore, ["score", "status"]) || "-"} />
           </div>
 
           <SectionCard title="Overview" description="Core tenant record — display name, tenant key, type, status, and primary contact." error={sections.tenant.error}>
             <RecordFields
               row={tenant}
-              empty="No tenant detail returned."
+              empty="No tenant details yet."
               fields={[
-                { label: "display name", key: "display_name" },
-                { label: "tenant key", key: "tenant_key" },
-                { label: "tenant type", key: "tenant_type" },
-                { label: "status", key: "status" },
-                { label: "primary contact", key: "primary_contact_email", keys: ["primary_contact_email", "primary_contact"] },
-                { label: "updated date", key: "updated_at", keys: ["updated_at", "updated_date"] },
+                { label: "Display name", key: "display_name" },
+                { label: "Tenant key", key: "tenant_key" },
+                { label: "Tenant type", key: "tenant_type" },
+                { label: "Status", key: "status" },
+                { label: "Primary contact", key: "primary_contact_email", keys: ["primary_contact_email", "primary_contact"] },
+                { label: "Updated date", key: "updated_at", keys: ["updated_at", "updated_date"] },
               ]}
             />
           </SectionCard>
@@ -3058,13 +3058,13 @@ export function TenantDetailWorkspace() {
           >
             <GenericTable
               rows={environments}
-              empty="No environments returned."
+              empty="No environments yet."
               columns={[
-                { key: "environment_type", label: "environment type" },
-                { key: "base_url", label: "base url" },
-                { key: "status", label: "status" },
-                { key: "data_retention_policy_id", label: "data retention policy ID" },
-                { key: "updated_at", label: "updated date", keys: ["updated_at", "updated_date"] },
+                { key: "environment_type", label: "Environment type" },
+                { key: "base_url", label: "Base URL" },
+                { key: "status", label: "Status" },
+                { key: "data_retention_policy_id", label: "Data retention policy ID" },
+                { key: "updated_at", label: "Updated date", keys: ["updated_at", "updated_date"] },
               ]}
             />
           </SectionCard>

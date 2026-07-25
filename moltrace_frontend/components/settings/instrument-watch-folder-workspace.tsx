@@ -346,7 +346,7 @@ export function InstrumentWatchFolderWorkspace() {
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="watch-connector">connector selector</Label>
+              <Label htmlFor="watch-connector">Connector</Label>
               <select
                 id="watch-connector"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -362,11 +362,11 @@ export function InstrumentWatchFolderWorkspace() {
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="watch-folder-path">folder path</Label>
+              <Label htmlFor="watch-folder-path">Folder path</Label>
               <Input id="watch-folder-path" value={folderPath} onChange={(e) => setFolderPath(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="watch-file-patterns">file patterns</Label>
+              <Label htmlFor="watch-file-patterns">File patterns</Label>
               <Textarea
                 id="watch-file-patterns"
                 rows={3}
@@ -376,7 +376,7 @@ export function InstrumentWatchFolderWorkspace() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="watch-target-program">target program</Label>
+              <Label htmlFor="watch-target-program">Target program</Label>
               <select
                 id="watch-target-program"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -391,7 +391,7 @@ export function InstrumentWatchFolderWorkspace() {
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="watch-target-route">target route</Label>
+              <Label htmlFor="watch-target-route">Target route</Label>
               <select
                 id="watch-target-route"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -406,7 +406,7 @@ export function InstrumentWatchFolderWorkspace() {
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="watch-status">status</Label>
+              <Label htmlFor="watch-status">Status</Label>
               <select
                 id="watch-status"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
@@ -423,7 +423,7 @@ export function InstrumentWatchFolderWorkspace() {
           </div>
           <div className="flex items-center gap-3 rounded-md border p-3">
             <Label htmlFor="watch-recursive" className="text-sm">
-              recursive toggle
+              Scan subfolders
             </Label>
             <Switch id="watch-recursive" checked={recursive} onCheckedChange={setRecursive} />
           </div>
@@ -447,21 +447,21 @@ export function InstrumentWatchFolderWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>folder path</TableHead>
-                    <TableHead>target program</TableHead>
-                    <TableHead>target route</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>last scan</TableHead>
-                    <TableHead>counts</TableHead>
-                    <TableHead>warnings</TableHead>
-                    <TableHead>open</TableHead>
+                    <TableHead>Folder path</TableHead>
+                    <TableHead>Target program</TableHead>
+                    <TableHead>Target route</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last scan</TableHead>
+                    <TableHead>Counts</TableHead>
+                    <TableHead>Warnings</TableHead>
+                    <TableHead>Open</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {watchFolders.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-xs text-muted-foreground">
-                        No watch folders returned.
+                        No watch folders found.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -513,25 +513,25 @@ export function InstrumentWatchFolderWorkspace() {
             <>
               <div className="rounded-md border p-3 text-xs">
                 <p>
-                  <span className="font-semibold">folder path:</span> {selectedDetails?.folder_path ?? "—"}
+                  <span className="font-semibold">Folder path:</span> {selectedDetails?.folder_path ?? "—"}
                 </p>
                 <p>
-                  <span className="font-semibold">target program:</span> {selectedDetails?.target_program ?? "—"}
+                  <span className="font-semibold">Target program:</span> {selectedDetails?.target_program ?? "—"}
                 </p>
                 <p>
-                  <span className="font-semibold">target route:</span> {selectedDetails?.target_route ?? "—"}
+                  <span className="font-semibold">Target route:</span> {selectedDetails?.target_route ?? "—"}
                 </p>
                 <p>
-                  <span className="font-semibold">status:</span> {selectedDetails?.status ?? "—"}
+                  <span className="font-semibold">Status:</span> {selectedDetails?.status ?? "—"}
                 </p>
                 <p>
-                  <span className="font-semibold">last scan:</span> {selectedDetails?.last_scan ?? "—"}
+                  <span className="font-semibold">Last scan:</span> {selectedDetails?.last_scan ?? "—"}
                 </p>
                 <p>
-                  <span className="font-semibold">counts:</span> {selectedCounts}
+                  <span className="font-semibold">Counts:</span> {selectedCounts}
                 </p>
                 <p>
-                  <span className="font-semibold">warnings:</span>{" "}
+                  <span className="font-semibold">Warnings:</span>{" "}
                   {selectedDetails?.warnings.length ? selectedDetails.warnings.join("; ") : "—"}
                 </p>
               </div>

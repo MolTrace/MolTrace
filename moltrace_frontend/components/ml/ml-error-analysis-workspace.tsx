@@ -109,17 +109,17 @@ export function MlErrorAnalysisWorkspace() {
     setFormOk("")
     const eid = Number.parseInt(evalRunId, 10)
     if (!Number.isFinite(eid) || eid < 1) {
-      setFormErr("evaluation_run_id is required.")
+      setFormErr("Evaluation run ID is required.")
       return
     }
     const sn = sliceName.trim()
     if (!sn) {
-      setFormErr("slice_name is required.")
+      setFormErr("Slice name is required.")
       return
     }
     const sc = Number.parseInt(sampleCount, 10)
     if (!Number.isFinite(sc) || sc < 0) {
-      setFormErr("sample_count must be a non-negative integer.")
+      setFormErr("Sample count must be a non-negative integer.")
       return
     }
     const metrics_json = metrics
@@ -180,7 +180,7 @@ export function MlErrorAnalysisWorkspace() {
           </Button>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Error analysis</h1>
           <p className="text-muted-foreground">
-            Slice-level error summaries; representative_errors_json stores compact entries — not full raw records.
+            Slice-level error summaries; representative errors store compact entries — not full raw records.
           </p>
         </div>
         <BackendStatusIndicator />
@@ -205,7 +205,7 @@ export function MlErrorAnalysisWorkspace() {
         eyebrow="Reference"
         title="Slice types (reference)"
         icon={Layers}
-        description={<><code className="text-xs">slice_type</code> values align with backend literals.</>}
+        description={<><code className="text-xs">slice_type</code> values match the options the app supports.</>}
       >
         <div>
           <div className="flex flex-wrap gap-2">
@@ -227,7 +227,7 @@ export function MlErrorAnalysisWorkspace() {
       >
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>evaluation_run_id</Label>
+            <Label>Evaluation run ID</Label>
             <Select value={evalRunId || undefined} onValueChange={setEvalRunId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select evaluation run" />
@@ -247,11 +247,11 @@ export function MlErrorAnalysisWorkspace() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="sn">slice_name</Label>
+              <Label htmlFor="sn">Slice name</Label>
               <Input id="sn" value={sliceName} onChange={(e) => setSliceName(e.target.value)} autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label>slice_type</Label>
+              <Label>Slice type</Label>
               <Select value={sliceType} onValueChange={setSliceType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -268,11 +268,11 @@ export function MlErrorAnalysisWorkspace() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="sc">sample_count</Label>
+              <Label htmlFor="sc">Sample count</Label>
               <Input id="sc" inputMode="numeric" value={sampleCount} onChange={(e) => setSampleCount(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>severity</Label>
+              <Label>Severity</Label>
               <Select value={severity} onValueChange={setSeverity}>
                 <SelectTrigger>
                   <SelectValue />
@@ -288,11 +288,11 @@ export function MlErrorAnalysisWorkspace() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="error-analysis-metrics-json">metrics_json</Label>
+            <Label htmlFor="error-analysis-metrics-json">Metrics</Label>
             <KeyNumberTableField idPrefix="error-analysis-metrics-json" label="Metrics" keyLabel="Metric" valueLabel="Value" addLabel="Add metric" initialValue={metrics} onChange={setMetrics} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="error-analysis-rep-errors-json">representative_errors_json (summary entries)</Label>
+            <Label htmlFor="error-analysis-rep-errors-json">Representative errors (summary entries)</Label>
             <ObjectArrayField
               idPrefix="error-analysis-rep-errors-json"
               label="Representative errors"
@@ -329,13 +329,13 @@ export function MlErrorAnalysisWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[72px]">id</TableHead>
-                    <TableHead>evaluation_run_id</TableHead>
-                    <TableHead>slice_type</TableHead>
-                    <TableHead>slice_name</TableHead>
-                    <TableHead>sample_count</TableHead>
-                    <TableHead>severity</TableHead>
-                    <TableHead>representative (summary)</TableHead>
+                    <TableHead className="w-[72px]">ID</TableHead>
+                    <TableHead>Evaluation run ID</TableHead>
+                    <TableHead>Slice type</TableHead>
+                    <TableHead>Slice name</TableHead>
+                    <TableHead>Sample count</TableHead>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Representative (summary)</TableHead>
                     <TableHead className="w-[90px]" />
                   </TableRow>
                 </TableHeader>
@@ -374,7 +374,7 @@ export function MlErrorAnalysisWorkspace() {
           {detailId != null ? (
             <div className="space-y-3 rounded-lg border p-3">
               <p className="text-sm font-medium">
-                GET /ml/error-analysis/{detailId}
+                Error analysis slice #{detailId}
                 {detailLoading ? <Loader2 className="ml-2 inline h-4 w-4 animate-spin" aria-hidden /> : null}
               </p>
               {detail ? (
@@ -385,8 +385,8 @@ export function MlErrorAnalysisWorkspace() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>case_id</TableHead>
-                            <TableHead>summary</TableHead>
+                            <TableHead>Case ID</TableHead>
+                            <TableHead>Summary</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

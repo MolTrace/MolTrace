@@ -65,7 +65,7 @@ function QualCard({ title, sub, block }: { title: string; sub: string; block: Qu
         <p className="mt-2 font-mono text-xs tabular-nums">
           {block.passed ?? 0} passed · {block.failed ?? 0} failed
           {block.skipped != null ? ` · ${block.skipped} skipped` : ""}
-          {block.coveragePercent != null ? ` · ${block.coveragePercent}% cov` : ""}
+          {block.coveragePercent != null ? ` · ${block.coveragePercent}% coverage` : ""}
         </p>
       ) : block.note ? (
         <p className="mt-2 text-xs text-muted-foreground">{block.note}</p>
@@ -174,14 +174,14 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
             {/* Change control + risk */}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-md bg-muted/40 p-3 text-sm">
-                <p className="text-xs text-muted-foreground">change-control state</p>
+                <p className="text-xs text-muted-foreground">Change-control state</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="text-xs">
-                    {pkg.changeControl.validated ? "validated" : "not validated"}
+                    {pkg.changeControl.validated ? "Validated" : "Not validated"}
                   </Badge>
                   {pkg.changeControl.changeControlled ? (
                     <Badge variant="outline" className="text-xs">
-                      change-controlled
+                      Change-controlled
                     </Badge>
                   ) : null}
                   <Badge variant="outline" className="tabular-nums text-xs">
@@ -190,7 +190,7 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
                 </div>
               </div>
               <div className="rounded-md bg-muted/40 p-3 text-sm">
-                <p className="text-xs text-muted-foreground">risk summary</p>
+                <p className="text-xs text-muted-foreground">Risk summary</p>
                 <p className="mt-1 font-mono text-xs">
                   {Object.keys(pkg.riskSummary).length
                     ? Object.entries(pkg.riskSummary)
@@ -238,8 +238,7 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 border-t border-border px-3 py-3">
             <p className="text-xs text-muted-foreground">
-              POST parsed pytest/coverage + risk JSON into this release (typically a CI step). Ingest is
-              rejected (409/400) once the release is approved/released.
+              Attach parsed pytest and coverage results plus open-risk counts to this release (typically a CI step). Once the release is approved or released, new evidence can no longer be added.
             </p>
             {ingestErr ? (
               <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -258,7 +257,7 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
                 label="Test summary"
                 initialValue={testSummary}
                 onChange={setTestSummary}
-                description="CI test results, e.g. passed / failed / coverage_percent."
+                description="CI test results, e.g. passed / failed / coverage percent."
               />
             </div>
             <div className="space-y-1">
@@ -276,14 +275,14 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">source</Label>
+                <Label className="text-xs">Source</Label>
                 <Select value={source} onValueChange={(v) => setSource(v as "ci" | "manual")}>
                   <SelectTrigger className="h-9 w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ci">ci</SelectItem>
-                    <SelectItem value="manual">manual</SelectItem>
+                    <SelectItem value="ci">CI</SelectItem>
+                    <SelectItem value="manual">Manual</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

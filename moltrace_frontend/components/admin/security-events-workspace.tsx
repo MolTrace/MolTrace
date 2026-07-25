@@ -167,7 +167,7 @@ export function SecurityEventsWorkspace() {
       const s = await apiFetch<Record<string, unknown>>("/security/summary", { method: "GET" })
       setSummary(s ?? null)
     } catch (e) {
-      setErrSummary(formatErr(e, "Could not load /security/summary."))
+      setErrSummary(formatErr(e, "Could not load the security summary."))
       setSummary(null)
     }
 
@@ -188,7 +188,7 @@ export function SecurityEventsWorkspace() {
       const list = Array.isArray(data) ? data : []
       setEventsRaw(list.filter(isRecord) as Record<string, unknown>[])
     } catch (e) {
-      setErrEvents(formatErr(e, "Could not load /security/events."))
+      setErrEvents(formatErr(e, "Could not load the security events."))
       setEventsRaw([])
     }
 
@@ -243,12 +243,12 @@ export function SecurityEventsWorkspace() {
             <InfoTooltip content={SECURITY_EVENTS_TOOLTIP} label="About Security Events" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Administrative view of security signals returned by the backend.
+            Administrative view of recorded security signals.
           </p>
           {!loading && backendUnreachable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Backend unavailable — try again in a moment, or contact your platform administrator.
+              The app is unavailable — try again in a moment, or contact your platform administrator.
             </p>
           ) : null}
         </div>
@@ -264,7 +264,7 @@ export function SecurityEventsWorkspace() {
       {backendUnreachable ? (
         <AlertCard
           variant="error"
-          title="Backend unavailable"
+          title="Service unavailable"
           description="Security event services are not reachable. Verify you're signed in as an administrator and try again."
         />
       ) : null}
@@ -327,7 +327,7 @@ export function SecurityEventsWorkspace() {
             eyebrow="Severity"
             title="Counts by severity"
             icon={ShieldAlert}
-            description="counts_by_severity"
+            description="Counts grouped by severity."
             className="sm:col-span-2"
           >
             <div className="text-xs">
@@ -353,7 +353,7 @@ export function SecurityEventsWorkspace() {
             eyebrow="Type"
             title="Counts by event type"
             icon={Layers}
-            description="counts_by_type"
+            description="Counts grouped by event type."
             className="sm:col-span-2 lg:col-span-4"
           >
             <div className="text-xs">
@@ -385,11 +385,11 @@ export function SecurityEventsWorkspace() {
           eyebrow="Filters"
           title="Filters"
           icon={Filter}
-          description="Severity, event type, actor email, and limit are applied server-side. Date range and resource type narrow the loaded rows in your browser."
+          description="Severity, event type, actor email, and limit are applied automatically. Date range and resource type narrow the loaded rows in your browser."
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="sev-filter">severity</Label>
+              <Label htmlFor="sev-filter">Severity</Label>
               <Input
                 id="sev-filter"
                 placeholder="info, warning, error, critical"
@@ -398,7 +398,7 @@ export function SecurityEventsWorkspace() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="etype-filter">event type</Label>
+              <Label htmlFor="etype-filter">Event type</Label>
               <Input
                 id="etype-filter"
                 placeholder="e.g. login_failure"
@@ -407,7 +407,7 @@ export function SecurityEventsWorkspace() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="actor-filter">actor email</Label>
+              <Label htmlFor="actor-filter">Actor email</Label>
               <Input
                 id="actor-filter"
                 type="email"
@@ -417,7 +417,7 @@ export function SecurityEventsWorkspace() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="from-filter">date range from</Label>
+              <Label htmlFor="from-filter">Date range from</Label>
               <Input
                 id="from-filter"
                 type="date"
@@ -426,20 +426,20 @@ export function SecurityEventsWorkspace() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="to-filter">date range to</Label>
+              <Label htmlFor="to-filter">Date range to</Label>
               <Input id="to-filter" type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rt-filter">resource type</Label>
+              <Label htmlFor="rt-filter">Resource type</Label>
               <Input
                 id="rt-filter"
-                placeholder="substring match"
+                placeholder="Partial match"
                 value={filterResourceType}
                 onChange={(e) => setFilterResourceType(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lim-filter">limit</Label>
+              <Label htmlFor="lim-filter">Limit</Label>
               <Input
                 id="lim-filter"
                 inputMode="numeric"
@@ -449,7 +449,7 @@ export function SecurityEventsWorkspace() {
             </div>
             <div className="flex items-end">
               <Button type="button" variant="secondary" size="sm" disabled={loading} onClick={() => void load()}>
-                Apply server filters
+                Apply filters
               </Button>
             </div>
           </div>
@@ -476,14 +476,14 @@ export function SecurityEventsWorkspace() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-xs">timestamp</TableHead>
-                      <TableHead className="text-xs">severity</TableHead>
-                      <TableHead className="text-xs">event type</TableHead>
-                      <TableHead className="text-xs">actor</TableHead>
-                      <TableHead className="text-xs">resource</TableHead>
-                      <TableHead className="text-xs">message</TableHead>
+                      <TableHead className="text-xs">Timestamp</TableHead>
+                      <TableHead className="text-xs">Severity</TableHead>
+                      <TableHead className="text-xs">Event type</TableHead>
+                      <TableHead className="text-xs">Actor</TableHead>
+                      <TableHead className="text-xs">Resource</TableHead>
+                      <TableHead className="text-xs">Message</TableHead>
                       <TableHead className="text-xs">IP</TableHead>
-                      <TableHead className="text-xs">status / details</TableHead>
+                      <TableHead className="text-xs">Status / details</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -521,11 +521,11 @@ export function SecurityEventsWorkspace() {
                             <TableCell className="font-mono text-[10px]">{readStr(row, ["ip_address"]) || "—"}</TableCell>
                             <TableCell className="max-w-[14rem] align-top text-xs">
                               <div className="space-y-1">
-                                <span className="text-muted-foreground">id {readStr(row, ["id"]) || "—"}</span>
+                                <span className="text-muted-foreground">ID {readStr(row, ["id"]) || "—"}</span>
                                 {hasMeta ? (
                                   <Collapsible className="group rounded border bg-muted/20">
                                     <CollapsibleTrigger className="flex w-full items-center justify-between gap-1 px-2 py-1 text-left text-[10px] font-medium hover:bg-muted/40">
-                                      metadata_json
+                                      Details
                                       <ChevronDown className="h-3 w-3 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>

@@ -112,7 +112,7 @@ export function MlCalibrationWorkspace() {
     setFormOk("")
     const aid = Number.parseInt(artifactId, 10)
     if (!Number.isFinite(aid) || aid < 1) {
-      setFormErr("model_artifact_id is required.")
+      setFormErr("Model artifact ID is required.")
       return
     }
     const calibration_metrics_json = calibrationMetrics
@@ -178,7 +178,7 @@ export function MlCalibrationWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Calibration assessments</h1>
           <p className="text-sm text-muted-foreground">
-            Assess probabilistic calibration using registry methods; metrics and status come from the API.
+            Assess probabilistic calibration using registry methods; metrics and status come from the recorded assessment.
           </p>
         </div>
         <BackendStatusIndicator />
@@ -208,7 +208,7 @@ export function MlCalibrationWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>model_artifact_id</Label>
+              <Label>Model artifact ID</Label>
               <Select value={artifactId || undefined} onValueChange={setArtifactId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select artifact" />
@@ -227,7 +227,7 @@ export function MlCalibrationWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>evaluation_run_id (optional)</Label>
+              <Label>Evaluation run ID (optional)</Label>
               <Select value={evalRunId || "__none__"} onValueChange={(v) => setEvalRunId(v === "__none__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="None" />
@@ -249,7 +249,7 @@ export function MlCalibrationWorkspace() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>calibration_method</Label>
+              <Label>Calibration method</Label>
               <Select value={method} onValueChange={setMethod}>
                 <SelectTrigger>
                   <SelectValue />
@@ -264,7 +264,7 @@ export function MlCalibrationWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>status</Label>
+              <Label>Status</Label>
               <Select value={statusDraft} onValueChange={setStatusDraft}>
                 <SelectTrigger>
                   <SelectValue />
@@ -321,12 +321,12 @@ export function MlCalibrationWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[72px]">id</TableHead>
-                    <TableHead>model_artifact_id</TableHead>
-                    <TableHead>evaluation_run_id</TableHead>
-                    <TableHead>calibration_method</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>calibration_metrics_json</TableHead>
+                    <TableHead className="w-[72px]">ID</TableHead>
+                    <TableHead>Model artifact ID</TableHead>
+                    <TableHead>Evaluation run ID</TableHead>
+                    <TableHead>Calibration method</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Calibration metrics</TableHead>
                     <TableHead className="w-[100px]" />
                   </TableRow>
                 </TableHeader>
@@ -363,7 +363,7 @@ export function MlCalibrationWorkspace() {
           {detailId != null ? (
             <div className="space-y-3 rounded-lg border p-3">
               <p className="text-sm font-medium">
-                GET /ml/calibration-assessments/{detailId}
+                Calibration assessment #{detailId}
                 {detailLoading ? <Loader2 className="ml-2 inline h-4 w-4 animate-spin" aria-hidden /> : null}
               </p>
               {detail ? (
@@ -372,8 +372,8 @@ export function MlCalibrationWorkspace() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>field</TableHead>
-                          <TableHead>value (summary)</TableHead>
+                          <TableHead>Field</TableHead>
+                          <TableHead>Value</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

@@ -143,7 +143,7 @@ export function MethodRegistryWorkspace() {
         const data = await apiFetch<unknown>(path, { method: "GET" })
         setRows(extractRows(data, listKeys))
       } catch (e) {
-        setErr(formatErr(e, `Could not load ${path}.`))
+        setErr(formatErr(e, `Could not load this data.`))
         setRows([])
       }
     }
@@ -188,7 +188,7 @@ export function MethodRegistryWorkspace() {
             <InfoTooltip content={TOOLTIP} label="About method registry" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Read-only view of registered methods, models, scoring, thresholds, and drift signals from the backend.
+            Read-only view of registered methods, models, scoring, thresholds, and drift signals.
           </p>
         </div>
 
@@ -231,7 +231,7 @@ export function MethodRegistryWorkspace() {
                       <TableHead className="text-xs">Status</TableHead>
                       <TableHead className="text-xs">Default scoring profile</TableHead>
                       <TableHead className="text-xs">Default threshold profile</TableHead>
-                      <TableHead className="text-xs">Endpoint paths</TableHead>
+                      <TableHead className="text-xs">API paths</TableHead>
                       <TableHead className="text-xs">Updated date</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -239,7 +239,7 @@ export function MethodRegistryWorkspace() {
                     {methods.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-xs text-muted-foreground">
-                          No method registry rows returned.
+                          No methods found.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -315,7 +315,7 @@ export function MethodRegistryWorkspace() {
                     {models.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-xs text-muted-foreground">
-                          No model versions returned.
+                          No model versions found.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -372,7 +372,7 @@ export function MethodRegistryWorkspace() {
                     {scoring.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-xs text-muted-foreground">
-                          No scoring profiles returned.
+                          No scoring profiles found.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -426,7 +426,7 @@ export function MethodRegistryWorkspace() {
                     {thresholds.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-xs text-muted-foreground">
-                          No threshold profiles returned.
+                          No threshold profiles found.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -459,7 +459,7 @@ export function MethodRegistryWorkspace() {
           eyebrow="Drift"
           title="Drift alerts summary"
           icon={Activity}
-          description="Model health drift signals from the monitoring service."
+          description="Model health drift signals."
         >
           <div className="space-y-3">
             {loading ? (
@@ -475,7 +475,7 @@ export function MethodRegistryWorkspace() {
                   <p className="text-sm text-muted-foreground">{driftSummaryLine}</p>
                 ) : null}
                 {driftRows.length === 0 && !driftSummaryLine ? (
-                  <p className="text-sm text-muted-foreground">No drift alerts returned.</p>
+                  <p className="text-sm text-muted-foreground">No drift alerts found.</p>
                 ) : null}
                 {driftRows.length > 0 ? (
                   <div className="overflow-x-auto rounded-md border">

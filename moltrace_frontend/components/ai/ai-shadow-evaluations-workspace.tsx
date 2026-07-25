@@ -84,7 +84,7 @@ export function AiShadowEvaluationsWorkspace() {
       const data = await apiFetch<unknown>("/ai/shadow-evaluations", { method: "GET" })
       setRows(extractRows(data))
     } catch (err) {
-      setLoadErr(formatErr(err, "Could not load /ai/shadow-evaluations."))
+      setLoadErr(formatErr(err, "Could not load shadow evaluations."))
       setRows([])
     } finally {
       setLoading(false)
@@ -101,7 +101,7 @@ export function AiShadowEvaluationsWorkspace() {
       const data = await apiFetch<unknown>(`/ai/shadow-evaluations/${shadowRunId}`, { method: "GET" })
       setSelected(isRecord(data) ? data : null)
     } catch (err) {
-      setDetailErr(formatErr(err, `Could not load /ai/shadow-evaluations/${shadowRunId}.`))
+      setDetailErr(formatErr(err, `Could not load shadow evaluation ${shadowRunId}.`))
       setSelected(null)
     }
   }
@@ -110,7 +110,7 @@ export function AiShadowEvaluationsWorkspace() {
     setFormErr("")
     setFormOk("")
     if (!serviceKey.trim() || !productionModelArtifact.trim() || !candidateModelArtifact.trim() || !datasetVersion.trim()) {
-      setFormErr("service key, production model artifact, candidate model artifact, and dataset version are required.")
+      setFormErr("Service key, production model artifact, candidate model artifact, and dataset version are required.")
       return
     }
     trackAiShadowEvaluationStarted({
@@ -169,10 +169,10 @@ export function AiShadowEvaluationsWorkspace() {
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-emerald-700">{formOk}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor="se-service-key">service key</Label><Input id="se-service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="se-prod-artifact">production model artifact</Label><Input id="se-prod-artifact" inputMode="numeric" value={productionModelArtifact} onChange={(e) => setProductionModelArtifact(e.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="se-candidate-artifact">candidate model artifact</Label><Input id="se-candidate-artifact" inputMode="numeric" value={candidateModelArtifact} onChange={(e) => setCandidateModelArtifact(e.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="se-dataset-version">dataset version</Label><Input id="se-dataset-version" inputMode="numeric" value={datasetVersion} onChange={(e) => setDatasetVersion(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="se-service-key">Service key</Label><Input id="se-service-key" value={serviceKey} onChange={(e) => setServiceKey(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="se-prod-artifact">Production model artifact</Label><Input id="se-prod-artifact" inputMode="numeric" value={productionModelArtifact} onChange={(e) => setProductionModelArtifact(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="se-candidate-artifact">Candidate model artifact</Label><Input id="se-candidate-artifact" inputMode="numeric" value={candidateModelArtifact} onChange={(e) => setCandidateModelArtifact(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="se-dataset-version">Dataset version</Label><Input id="se-dataset-version" inputMode="numeric" value={datasetVersion} onChange={(e) => setDatasetVersion(e.target.value)} /></div>
           </div>
           <Button type="button" onClick={() => void submitRun()} disabled={submitBusy}>
             {submitBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
@@ -191,7 +191,7 @@ export function AiShadowEvaluationsWorkspace() {
         <div className="overflow-x-auto">
           {loadErr ? <p className="mb-3 text-sm text-destructive">{loadErr}</p> : null}
           <Table>
-            <TableHeader><TableRow><TableHead>shadow run</TableHead><TableHead>service key</TableHead><TableHead>status</TableHead><TableHead>created</TableHead><TableHead>detail</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Shadow run</TableHead><TableHead>Service key</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Detail</TableHead></TableRow></TableHeader>
             <TableBody>
               {rows.map((row, idx) => {
                 const id = readStr(row, ["shadow_run_id", "id"])
@@ -223,9 +223,9 @@ export function AiShadowEvaluationsWorkspace() {
           {detailErr ? <p className="mt-3 text-sm text-destructive">{detailErr}</p> : null}
           {selected ? (
             <div className="mt-3 rounded-md border bg-muted/20 p-3 text-sm">
-              <p><span className="font-medium">shadow run:</span> {readRecordString(selected, "shadow_run_id") ?? readRecordString(selected, "id") ?? "-"}</p>
-              <p><span className="font-medium">status:</span> {readRecordString(selected, "status") ?? "-"}</p>
-              <p><span className="font-medium">summary:</span> {readRecordString(selected, "summary") ?? "-"}</p>
+              <p><span className="font-medium">Shadow run:</span> {readRecordString(selected, "shadow_run_id") ?? readRecordString(selected, "id") ?? "-"}</p>
+              <p><span className="font-medium">Status:</span> {readRecordString(selected, "status") ?? "-"}</p>
+              <p><span className="font-medium">Summary:</span> {readRecordString(selected, "summary") ?? "-"}</p>
             </div>
           ) : null}
         </div>

@@ -69,9 +69,9 @@ describe("ESignatureRecordsWorkspace — Part 11 hardening", () => {
     render(<ESignatureRecordsWorkspace />)
     await waitFor(() => expect(apiMock.fn).toHaveBeenCalled())
 
-    await user.type(screen.getByLabelText("target type"), "reaction_project")
-    await user.type(screen.getByLabelText("target ID"), "2")
-    await user.type(screen.getByLabelText("reason"), "Approving the batch.")
+    await user.type(screen.getByLabelText("Target type"), "reaction_project")
+    await user.type(screen.getByLabelText("Target ID"), "2")
+    await user.type(screen.getByLabelText("Reason"), "Approving the batch.")
     await user.click(screen.getByRole("button", { name: /Create e-signature record/i }))
 
     await waitFor(() => expect(lastPostBody).not.toBeNull())

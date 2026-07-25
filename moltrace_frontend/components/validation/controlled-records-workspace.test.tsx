@@ -90,7 +90,7 @@ describe("ControlledRecordsWorkspace — ALCOA+ hardening", () => {
     render(<ControlledRecordsWorkspace />)
     await waitFor(() => expect(screen.getByText("Archived Doc")).toBeInTheDocument())
 
-    await user.type(screen.getByLabelText("title"), "New SOP")
+    await user.type(screen.getByLabelText("Title"), "New SOP")
     await user.click(screen.getByRole("button", { name: /Create controlled record/i }))
 
     await waitFor(() => expect(lastPostBody).not.toBeNull())
@@ -110,10 +110,10 @@ describe("ControlledRecordsWorkspace — ALCOA+ hardening", () => {
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Open" }).length).toBeGreaterThan(0))
     await user.click(screen.getAllByRole("button", { name: "Open" })[0]) // open the active record
 
-    await user.type(await screen.findByLabelText("archive reason"), "   ")
+    await user.type(await screen.findByLabelText("Archive reason"), "   ")
     // client requires a non-blank reason; type real text so the request is sent, then the server 422s
-    await user.clear(screen.getByLabelText("archive reason"))
-    await user.type(screen.getByLabelText("archive reason"), "obsolete")
+    await user.clear(screen.getByLabelText("Archive reason"))
+    await user.type(screen.getByLabelText("Archive reason"), "obsolete")
     await user.click(screen.getByRole("button", { name: /^Archive$/ }))
 
     expect(await screen.findByText("Reason must not be blank.")).toBeInTheDocument()

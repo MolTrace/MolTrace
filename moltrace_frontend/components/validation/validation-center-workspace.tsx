@@ -406,14 +406,14 @@ export function ValidationCenterWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>title</TableHead>
-                    <TableHead>scope</TableHead>
-                    <TableHead>validation type</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>owner</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Scope</TableHead>
+                    <TableHead>Validation type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Owner</TableHead>
                     <TableHead>QA reviewer</TableHead>
-                    <TableHead>updated date</TableHead>
-                    <TableHead>open</TableHead>
+                    <TableHead>Updated date</TableHead>
+                    <TableHead>Open</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -473,15 +473,15 @@ export function ValidationCenterWorkspace() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="validation-center-title">title</Label>
+              <Label htmlFor="validation-center-title">Title</Label>
               <Input id="validation-center-title" value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="validation-center-scope">scope</Label>
+              <Label htmlFor="validation-center-scope">Scope</Label>
               <Input id="validation-center-scope" value={scope} onChange={(e) => setScope(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="validation-center-type">validation type</Label>
+              <Label htmlFor="validation-center-type">Validation type</Label>
               <Input
                 id="validation-center-type"
                 value={validationType}
@@ -489,7 +489,7 @@ export function ValidationCenterWorkspace() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="validation-center-owner-name">owner name</Label>
+              <Label htmlFor="validation-center-owner-name">Owner name</Label>
               <Input
                 id="validation-center-owner-name"
                 value={ownerName}
@@ -505,7 +505,7 @@ export function ValidationCenterWorkspace() {
               />
             </div>
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="validation-center-intended-use">intended use</Label>
+              <Label htmlFor="validation-center-intended-use">Intended use</Label>
               <Textarea
                 id="validation-center-intended-use"
                 value={intendedUse}
@@ -514,7 +514,7 @@ export function ValidationCenterWorkspace() {
               />
             </div>
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="validation-center-regulated-context">regulated context</Label>
+              <Label htmlFor="validation-center-regulated-context">Regulated context</Label>
               <Textarea
                 id="validation-center-regulated-context"
                 value={regulatedContext}

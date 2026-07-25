@@ -61,14 +61,14 @@ export function MlModelProvenanceSummary({
           ML model provenance
         </span>
       </div>
-      {line("model_artifact_id", merged.modelArtifactId)}
+      {line("Model artifact ID", merged.modelArtifactId)}
       {nameVer ? line("model name / version", nameVer) : null}
-      {line("method_id", merged.methodId)}
-      {line("dataset_version_id", merged.datasetVersionId)}
-      {line("evaluation_run_id", merged.evaluationRunId)}
-      {line("deployment_candidate_id", merged.deploymentCandidateId)}
-      {line("model_card_id", merged.modelCardId)}
-      {line("approval_status", merged.approvalStatus)}
+      {line("Method ID", merged.methodId)}
+      {line("Dataset version ID", merged.datasetVersionId)}
+      {line("Evaluation run ID", merged.evaluationRunId)}
+      {line("Deployment candidate ID", merged.deploymentCandidateId)}
+      {line("Model card ID", merged.modelCardId)}
+      {line("Approval status", merged.approvalStatus)}
       {humanReviewExtras}
     </div>
   )
