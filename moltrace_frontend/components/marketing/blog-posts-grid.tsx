@@ -1,8 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { ArrowRight, Clock, Tag } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { BlogPost, BlogTopic } from "@/lib/blog/posts"
+
+export type { BlogPost, BlogTopic } from "@/lib/blog/posts"
 
 /**
  * Topic-filtered post grid (client component).
@@ -16,27 +20,6 @@ import { cn } from "@/lib/utils"
  * Methodology. "All" shows everything. Filter state is local; no URL
  * sync (keeps it dependency-light; can be added later).
  */
-
-export type BlogTopic =
-  | "all"
-  | "science"
-  | "engineering"
-  | "methodology"
-  | "regulatory"
-  | "company"
-
-export type BlogPost = {
-  slug: string
-  title: string
-  dek: string
-  claim: string
-  topic: Exclude<BlogTopic, "all">
-  topicLabel: string
-  date: string
-  readingMinutes: number
-  status: "live" | "forthcoming"
-  href?: string
-}
 
 type Props = {
   posts: BlogPost[]
@@ -123,24 +106,17 @@ export function BlogPostsGrid({ posts }: Props) {
       <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((post) => {
           const chip = TOPIC_CHIP_STYLE[post.topic]
-          const Wrapper = post.href ? "a" : "div"
-          const wrapperProps = post.href
-            ? {
-                href: post.href,
-                target: "_blank" as const,
-                rel: "noopener noreferrer" as const,
-              }
-            : {}
-          return (
-            <Wrapper
-              key={post.slug}
-              {...wrapperProps}
-              className={cn(
-                "group flex flex-col rounded-2xl border bg-card p-6 shadow-sm transition-all",
-                post.href ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md" : "",
-              )}
-              style={{ borderTop: "3px solid var(--mt-teal)" }}
-            >
+          // Live posts link to their internal /blog/{slug} route; a bare `href`
+          // is treated as an external link; forthcoming posts aren't clickable.
+          const internalHref = post.status === "live" ? `/blog/${post.slug}` : undefined
+          const clickable = Boolean(internalHref || post.href)
+          const cardClassName = cn(
+            "group flex flex-col rounded-2xl border bg-card p-6 shadow-sm transition-all",
+            clickable ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md" : "",
+          )
+          const cardStyle = { borderTop: "3px solid var(--mt-teal)" } as const
+          const inner = (
+            <>
               <div className="flex items-center gap-2">
                 <span
                   className={cn(
@@ -175,7 +151,7 @@ export function BlogPostsGrid({ posts }: Props) {
                     {post.readingMinutes} min read
                   </span>
                 </div>
-                {post.href ? (
+                {clickable ? (
                   <span
                     className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] transition-transform group-hover:translate-x-0.5"
                     style={{ color: "var(--mt-teal-ink)" }}
@@ -189,7 +165,34 @@ export function BlogPostsGrid({ posts }: Props) {
                   </span>
                 )}
               </div>
-            </Wrapper>
+            </>
+          )
+
+          if (internalHref) {
+            return (
+              <Link key={post.slug} href={internalHref} className={cardClassName} style={cardStyle}>
+                {inner}
+              </Link>
+            )
+          }
+          if (post.href) {
+            return (
+              <a
+                key={post.slug}
+                href={post.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cardClassName}
+                style={cardStyle}
+              >
+                {inner}
+              </a>
+            )
+          }
+          return (
+            <div key={post.slug} className={cardClassName} style={cardStyle}>
+              {inner}
+            </div>
           )
         })}
       </div>
