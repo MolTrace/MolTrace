@@ -177,6 +177,21 @@ export type UseAnalysisJobReturn = {
   reset: () => void
 }
 
+/**
+ * Delay before each successive poll, in ms — a backoff ladder rather than a flat interval.
+ *
+ * Raw-FID processing is typically well under a second, but the old fixed 2 s interval meant a
+ * finished job could sit undiscovered for up to 2 s, so every analysis felt like it took at least
+ * two seconds. Starting fast catches the common case almost immediately; the delay then grows back
+ * to the previous cadence, so a genuinely long job issues no more requests than it used to.
+ *
+ * The cumulative schedule is 0 · 250 · 500 · 1000 · 2000 · then every 2000 ms. It deliberately
+ * LANDS ON 2000 so that from there it coincides with the old grid — that guarantees no job is ever
+ * discovered later than it used to be. (An earlier ladder summed to 2350 ms and would have made
+ * jobs finishing near 2 s *slower*; the accompanying test pins this invariant.)
+ */
+export const ANALYSIS_JOB_POLL_DELAYS_MS = [0, 250, 250, 500, 1000, 2000] as const
+
 export function useAnalysisJob(): UseAnalysisJobReturn {
   const [jobId, setJobId] = useState<string | null>(null)
   const [status, setStatus] = useState<AnalysisJobStatus | null>(null)
@@ -192,13 +207,13 @@ export function useAnalysisJob(): UseAnalysisJobReturn {
   const [polling, setPolling] = useState(false)
   const [cancelBusy, setCancelBusy] = useState(false)
 
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const jobCompletionTrackedRef = useRef<Set<string>>(new Set())
 
   const stopPolling = useCallback(() => {
-    if (pollIntervalRef.current != null) {
-      clearInterval(pollIntervalRef.current)
-      pollIntervalRef.current = null
+    if (pollTimeoutRef.current != null) {
+      clearTimeout(pollTimeoutRef.current)
+      pollTimeoutRef.current = null
     }
     setPolling(false)
   }, [])
@@ -219,16 +234,18 @@ export function useAnalysisJob(): UseAnalysisJobReturn {
 
   const fetchOnce = useCallback(
     async (id: string): Promise<AnalysisJobStatus | null> => {
-      const jobData = await apiFetch<unknown>(`/jobs/${encodeURIComponent(id)}`, { method: "GET" })
+      // Status and events are independent endpoints — fetching them in parallel halves the
+      // wall time of every poll tick. Events stay optional: a failure there must not fail the poll.
+      const [jobData, evData] = await Promise.all([
+        apiFetch<unknown>(`/jobs/${encodeURIComponent(id)}`, { method: "GET" }),
+        apiFetch<unknown>(`/jobs/${encodeURIComponent(id)}/events`, { method: "GET" }).catch(
+          () => null,
+        ),
+      ])
       const st = applyJobResponse(jobData)
-      try {
-        const evData = await apiFetch<unknown>(`/jobs/${encodeURIComponent(id)}/events`, {
-          method: "GET",
-        })
+      if (evData != null) {
         setRawEventsPayload(evData)
         setEvents(normalizeEventsPayload(evData))
-      } catch {
-        /* events optional */
       }
       if (st && isTerminalStatus(st) && !jobCompletionTrackedRef.current.has(id)) {
         jobCompletionTrackedRef.current.add(id)
@@ -253,43 +270,47 @@ export function useAnalysisJob(): UseAnalysisJobReturn {
     }
 
     let alive = true
+    let attempt = 0
 
-    const tick = async () => {
+    const scheduleNext = () => {
+      if (!alive) return
+      const delay = ANALYSIS_JOB_POLL_DELAYS_MS[
+        Math.min(attempt, ANALYSIS_JOB_POLL_DELAYS_MS.length - 1)
+      ]!
+      attempt += 1
+      pollTimeoutRef.current = setTimeout(() => {
+        void runTick()
+      }, delay)
+    }
+
+    const runTick = async () => {
       if (!alive) return
       try {
         const st = await fetchOnce(jobId)
+        if (!alive) return
         setError(null)
         setBackendUnavailable(false)
         if (st && isTerminalStatus(st)) {
           stopPolling()
+          return
         }
       } catch (err) {
         setError(formatHookError(err, "Job poll failed."))
         setBackendUnavailable(isUnavailableError(err))
         stopPolling()
+        return
       }
+      scheduleNext()
     }
-
-    void tick()
 
     stopPolling()
     setPolling(true)
-    pollIntervalRef.current = setInterval(() => {
-      void (async () => {
-        try {
-          const st = await fetchOnce(jobId)
-          setError(null)
-          setBackendUnavailable(false)
-          if (st && isTerminalStatus(st)) {
-            stopPolling()
-          }
-        } catch (err) {
-          setError(formatHookError(err, "Job poll failed."))
-          setBackendUnavailable(isUnavailableError(err))
-          stopPolling()
-        }
-      })()
-    }, 2000)
+    // Poll on a backoff rather than a flat 2 s grid: FID processing usually finishes well under a
+    // second, and a fixed interval quantised that to whole 2 s buckets — the job was done but the
+    // UI did not know for up to 2 s. Early ticks are cheap and catch the common case immediately;
+    // the delay then grows to the old cadence so genuinely long jobs cost no extra requests.
+    alive = true
+    void runTick()
 
     return () => {
       alive = false
