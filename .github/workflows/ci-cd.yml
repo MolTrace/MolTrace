@@ -269,12 +269,16 @@ jobs:
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 11.0.3
+      # No pnpm dependency cache on purpose: this job generates the SBOM with
+      # --lockfile-only and never runs `pnpm install`, so no pnpm store is ever
+      # created. With `cache: pnpm`, setup-node's Post-step cache-save fails path
+      # validation ("Path(s) specified in the action for caching do(es) not exist")
+      # and reddens the whole job even though every SBOM step passes. There is
+      # nothing to cache here, so we simply don't enable it.
       - name: Setup Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22.14.0
-          cache: pnpm
-          cache-dependency-path: moltrace_frontend/pnpm-lock.yaml
       # pnpm's built-in SBOM (pnpm >= 11). --lockfile-only avoids a full install; emits CycloneDX 1.7.
       # --silent suppresses pnpm log lines that would otherwise leak into the redirected stdout and
       # corrupt the JSON (pnpm prints some notices to stdout, not stderr).
