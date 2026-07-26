@@ -354,8 +354,9 @@ const PROTON_INVENTORY_ROWS: Array<{ key: string; label: string }> = [
   // Bucket key renamed from ``olefinic_vinylic`` → ``anomeric_or_olefinic`` —
   // see peak_categorization.build_proton_inventory. Covers anomeric sugar
   // protons (e.g. tobramycin), olefinic CH, and the ambiguous-without-SMILES
-  // case.
-  { key: "anomeric_or_olefinic", label: "Anomeric / olefinic (structure-capped)" },
+  // case. The cap is NOT asserted in the label — it is read from
+  // ``anomeric_cap`` so the UI only claims a cap that was actually applied.
+  { key: "anomeric_or_olefinic", label: "Anomeric / olefinic" },
   { key: "carbohydrate_sugar", label: "Sugar backbone (2.9–5.3 ppm)" },
   { key: "aldehyde", label: "Aldehyde (9–10 ppm)" },
   { key: "carboxylic_acid", label: "Carboxylic acid OH (10–13 ppm)" },
@@ -364,6 +365,65 @@ const PROTON_INVENTORY_ROWS: Array<{ key: string; label: string }> = [
   { key: "non_labile", label: "Non-labile total" },
   { key: "total", label: "Grand total" },
 ]
+
+/** True when a backend warning refers to this inventory row.
+ *
+ * The backend phrases every per-bucket warning as ``Observed {key} integration
+ * is …`` (peak_categorization.build_proton_inventory), so we anchor on that
+ * instead of re-implementing the significance threshold client-side — the
+ * threshold is the backend's to own and may become nucleus/size dependent. */
+export function warningRefersToInventoryRow(warning: string, key: string): boolean {
+  return warning.toLowerCase().startsWith(`observed ${key.toLowerCase()} integration`)
+}
+
+/** Rows the backend flagged, so Δ colouring follows the backend's own rule. */
+export function inventoryRowsWithWarnings(warnings: string[], keys: string[]): Set<string> {
+  const flagged = new Set<string>()
+  for (const key of keys) {
+    if (warnings.some((w) => warningRefersToInventoryRow(w, key))) flagged.add(key)
+  }
+  return flagged
+}
+
+/** Order the rendered rows so each sub-count sits DIRECTLY under its true parent.
+ *
+ * The static row list is display order, not structure: ``carbohydrate_sugar`` is a
+ * sub-count of ``aliphatic`` and ``carboxylic_acid`` of ``labile``, but they are
+ * listed elsewhere. Indenting without reordering would place the ↳ under whatever
+ * row happened to precede it — a false containment claim. Order is therefore
+ * derived from ``bucket_hierarchy``, and a child whose parent is not being
+ * rendered falls back to a flat row rather than floating under an unrelated one. */
+export function orderInventoryRows<T extends { key: string }>(
+  rows: T[],
+  hierarchy: Record<string, unknown>,
+): Array<{ row: T; nestedUnder: string | null }> {
+  const rendered = new Set(rows.map((r) => r.key))
+  const parentOf = (key: string): string | null => {
+    const parent = hierarchy[key]
+    // Only nest under a parent that is actually on screen.
+    return typeof parent === "string" && parent && rendered.has(parent) ? parent : null
+  }
+  const childrenOf = new Map<string, T[]>()
+  const topLevel: T[] = []
+  for (const row of rows) {
+    const parent = parentOf(row.key)
+    if (parent) {
+      const bucket = childrenOf.get(parent)
+      if (bucket) bucket.push(row)
+      else childrenOf.set(parent, [row])
+    } else {
+      topLevel.push(row)
+    }
+  }
+  const out: Array<{ row: T; nestedUnder: string | null }> = []
+  for (const row of topLevel) {
+    out.push({ row, nestedUnder: null })
+    for (const child of childrenOf.get(row.key) ?? []) {
+      out.push({ row: child, nestedUnder: row.key })
+    }
+  }
+  return out
+}
 
 export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
   if (!isRecord(payload)) return null
@@ -379,11 +439,35 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
   const warnings = Array.isArray(warningsRaw)
     ? warningsRaw.filter((w): w is string => typeof w === "string" && w.length > 0)
     : []
+  // Positive channel: observations that AGREE with the structure (e.g. labile
+  // protons correctly absent in a deuterated protic solvent). Never amber.
+  const notesRaw = inventory.notes
+  const notes = Array.isArray(notesRaw)
+    ? notesRaw.filter((n): n is string => typeof n === "string" && n.length > 0)
+    : []
+  // ``carbohydrate_sugar``/``carboxylic_acid`` are SUB-counts of aliphatic/labile.
+  const bucketHierarchy = isRecord(inventory.bucket_hierarchy) ? inventory.bucket_hierarchy : {}
+  // Provenance for the 4.4–6.0 ppm conservation cap — only claimed when applied.
+  const anomericCap = isRecord(inventory.anomeric_cap) ? inventory.anomeric_cap : null
+  const capApplied = anomericCap?.applied === true
+  const capLimit = anomericCap ? asNumber(anomericCap.limit) : null
+  const capReassigned = anomericCap ? asNumber(anomericCap.reassigned_h) : null
+  const flaggedRows = inventoryRowsWithWarnings(
+    warnings,
+    PROTON_INVENTORY_ROWS.map((r) => r.key),
+  )
   const hasObserved = Object.values(observed).some(
     (v) => typeof v === "number" && v > 0,
   )
   if (!hasObserved && Object.keys(expected).length === 0) return null
   const hasExpected = Object.keys(expected).length > 0
+  // Only rows with data render; order them so every sub-count follows its true parent.
+  const visibleRows = PROTON_INVENTORY_ROWS.filter(
+    (row) => asNumber(observed[row.key]) !== null || asNumber(expected[row.key]) !== null,
+  )
+  const orderedRows = orderInventoryRows(visibleRows, bucketHierarchy)
+  const labelForKey = (key: string): string =>
+    PROTON_INVENTORY_ROWS.find((r) => r.key === key)?.label ?? key
 
   return (
     <Card
@@ -450,16 +534,38 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {PROTON_INVENTORY_ROWS.map((row) => {
+            {orderedRows.map(({ row, nestedUnder }) => {
               const obs = asNumber(observed[row.key])
               const exp = asNumber(expected[row.key])
               const delta = asNumber(deltas[row.key])
-              if (obs === null && exp === null) return null
-              const deltaColor =
-                delta !== null && Math.abs(delta) >= 1.0 ? "var(--mt-amber)" : undefined
+              // Amber iff the BACKEND flagged this row — no client-side copy of
+              // the significance threshold (it is the backend's to own).
+              const deltaColor = flaggedRows.has(row.key) ? "var(--mt-amber)" : undefined
+              const showCap = row.key === "anomeric_or_olefinic" && capApplied
               return (
                 <TableRow key={row.key} data-testid={`proton-inventory-${row.key}`}>
-                  <TableCell className="text-[11px] text-muted-foreground">{row.label}</TableCell>
+                  <TableCell
+                    className="text-[11px] text-muted-foreground"
+                    data-nested={nestedUnder ? "true" : undefined}
+                  >
+                    {nestedUnder ? (
+                      <span className="pl-4">
+                        <span aria-hidden className="mr-1 opacity-60">
+                          ↳
+                        </span>
+                        {row.label}
+                        <span className="sr-only"> (sub-count of {labelForKey(nestedUnder)})</span>
+                      </span>
+                    ) : (
+                      row.label
+                    )}
+                    {showCap ? (
+                      <span className="ml-1.5 text-[10px] text-muted-foreground/80">
+                        capped at {capLimit != null ? `${capLimit} H` : "the structural budget"}
+                        {capReassigned != null ? ` — ${capReassigned.toFixed(1)} H reassigned` : ""}
+                      </span>
+                    ) : null}
+                  </TableCell>
                   <TableCell className="font-mono text-xs text-right">
                     {obs !== null ? obs.toFixed(1) : "—"}
                   </TableCell>
@@ -515,12 +621,43 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
             ) : null}
           </div>
         ) : null}
+        {/* Both channels carry a visible label, so they are distinguishable without
+            relying on hue alone (and are announced separately to screen readers). */}
         {warnings.length > 0 ? (
-          <ul className="list-inside list-disc space-y-0.5 text-[11px]" style={{ color: "var(--mt-amber)" }}>
-            {warnings.map((warning, idx) => (
-              <li key={idx}>{warning}</li>
-            ))}
-          </ul>
+          <div className="space-y-0.5" data-testid="proton-inventory-warnings">
+            <p
+              className="text-[10px] font-bold uppercase tracking-wide"
+              style={{ color: "var(--mt-amber)" }}
+            >
+              Disagrees with the structure
+            </p>
+            <ul
+              className="list-inside list-disc space-y-0.5 text-[11px]"
+              style={{ color: "var(--mt-amber)" }}
+            >
+              {warnings.map((warning, idx) => (
+                <li key={idx}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {/* Confirmations, not warnings: these AGREE with the structure (e.g. labile
+            protons correctly absent in CD3OD). Never amber. The body text stays
+            neutral so a note reads as context, not as an endorsement of the run. */}
+        {notes.length > 0 ? (
+          <div className="space-y-0.5" data-testid="proton-inventory-notes">
+            <p
+              className="text-[10px] font-bold uppercase tracking-wide"
+              style={{ color: "var(--mt-teal-ink)" }}
+            >
+              Consistent with the structure
+            </p>
+            <ul className="list-inside list-disc space-y-0.5 text-[11px] text-muted-foreground">
+              {notes.map((note, idx) => (
+                <li key={idx}>{note}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
       </CardContent>
     </Card>
@@ -604,7 +741,18 @@ export function ImpurityCandidatesPanel({ payload }: { payload: unknown }) {
           <TableHeader>
             <TableRow>
               <TableHead className="text-[10px] uppercase tracking-wide">δ (ppm)</TableHead>
-              <TableHead className="text-[10px] uppercase tracking-wide">∫ H</TableHead>
+              {/* The as-reported per-peak integral — NOT the inventory's proton scale
+                  (the inventory uses inventory_integration_h, 0.0 for solvent-excluded
+                  peaks). Note this is the reference-text value once 1H text
+                  reconciliation has run (the pre-reconciliation spectrum integral lives
+                  on spectrum_integration_h), so it is "as reported", not "raw".
+                  Labelled distinctly so the two ∫ H columns are not read as comparable. */}
+              <TableHead
+                className="text-[10px] uppercase tracking-wide"
+                title="Integral as reported for this peak — not the proton-inventory scale (solvent-excluded peaks count 0 H there)"
+              >
+                Reported ∫ H
+              </TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Match</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Reason</TableHead>
             </TableRow>
