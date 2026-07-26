@@ -290,6 +290,56 @@ class TestGoldenSnapshots:
         )
 
 
+class TestImpurityIdentification:
+    """A physical peak has one identity, ranked against its alternatives."""
+
+    def test_residual_solvent_wins_ties_over_arbitrary_contaminants(self) -> None:
+        from nmrcheck.impurities import match_h1_impurity_shifts
+
+        matches = match_h1_impurity_shifts(7.26, "CDCl3")
+        assert matches, "expected library hits at the CDCl3 residual shift"
+        # 7.26 is the CDCl3 residual. Ranking used to break ties alphabetically,
+        # which let "chloroform CH" outrank "solvent residual peak" on spelling.
+        assert matches[0]["kind"] in {"residual", "water"}, (
+            f"residual solvent should win at its own shift, got {matches[0]['label']}"
+        )
+
+    def test_partner_shifts_are_available_for_corroboration(self) -> None:
+        from nmrcheck.impurities import partner_shifts_for_compound
+
+        # Ethyl acetate is a multi-signal contaminant: identifying it from one
+        # shift alone, with none of its other resonances present, is a
+        # coincidence rather than an identification.
+        partners = partner_shifts_for_compound("ethyl acetate", "CDCl3")
+        assert len(partners) >= 2, (
+            f"ethyl acetate should expose partner resonances, got {partners}"
+        )
+
+    def test_single_peak_yields_one_candidate_with_alternatives(self) -> None:
+        from nmrcheck.models import Peak
+        from nmrcheck.spectrum import _build_impurity_candidates
+
+        # 1.247 ppm in CDCl3 sits inside the windows of several tabulated
+        # contaminants at once (ethanol CH3, ethyl acetate CH3, grease CH2).
+        candidates = _build_impurity_candidates(
+            [Peak(shift_ppm=1.247, multiplicity="br s", integration_h=0.5, j_values_hz=[])],
+            "CDCl3",
+        )
+        at_shift = [c for c in candidates if c.get("shift_ppm") == 1.247]
+        assert len(at_shift) == 1, (
+            f"one peak must yield one identity, got {len(at_shift)}: "
+            f"{[c['library_match']['label'] for c in at_shift]}"
+        )
+        candidate = at_shift[0]
+        assert candidate.get("alternatives"), "runners-up must be kept as alternatives"
+        corroboration = candidate.get("corroboration") or {}
+        assert "confirmed" in corroboration
+        # The compound's other resonances are absent from this one-peak
+        # spectrum, so the identification must not be presented as confirmed.
+        assert corroboration.get("confirmed") is False
+        assert "unconfirmed" in candidate["reason"]
+
+
 @pytest.mark.parametrize("name", sorted(CASES))
 class TestScientificInvariants:
     """Truths that hold for any molecule, independent of implementation."""

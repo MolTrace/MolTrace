@@ -1269,7 +1269,10 @@ def build_impurity_candidates(
         match = peak.get("impurity_match")
         if not isinstance(match, dict):
             continue
-        key = (peak.get("shift_ppm"), match.get("label"))
+        # Keyed on the PEAK alone, not (peak, label): a physical resonance has
+        # one identity, so a second library entry whose window also contains
+        # this shift is an alternative, never a sibling candidate.
+        key = (peak.get("shift_ppm"),)
         if key in seen:
             continue
         seen.add(key)

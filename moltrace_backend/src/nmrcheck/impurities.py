@@ -13,6 +13,12 @@ class H1ImpurityShift:
     solvent: str | None = None
     tolerance_ppm: float = 0.05
     kind: str = "impurity"
+    # Compound name without the proton descriptor ("ethyl acetate" for the
+    # label "ethyl acetate OCH2CH3"). Multi-signal contaminants occupy several
+    # rows, so this is what lets an identification be corroborated by the
+    # compound's OTHER expected resonances instead of resting on a single
+    # coincidental shift match.
+    compound: str = ""
 
 
 @dataclass(frozen=True)
@@ -68,6 +74,7 @@ def _row(
                 solvent=solvent,
                 tolerance_ppm=tolerance_ppm or range_tolerance,
                 kind=kind,
+                compound=compound,
             )
         )
     return tuple(entries)
@@ -254,6 +261,7 @@ def match_h1_impurity_shifts(
             matches.append(
                 {
                     "label": entry.label,
+                    "compound": entry.compound,
                     "expected_ppm": round(entry.shift_ppm, 3),
                     "observed_ppm": round(float(shift_ppm), 3),
                     "delta_ppm": round(delta, 4),
@@ -261,8 +269,47 @@ def match_h1_impurity_shifts(
                     "kind": entry.kind,
                 }
             )
-    matches.sort(key=lambda item: (float(item["delta_ppm"]), str(item["label"])))
+    # Rank by shift agreement, then by how strong a prior the assignment is:
+    # the residual solvent and its water peak are present in essentially every
+    # spectrum, so on an equal shift match they outrank an arbitrary
+    # contaminant. The previous alphabetical tie-break let, say, "acetic acid"
+    # beat the residual-solvent identity purely on spelling.
+    matches.sort(
+        key=lambda item: (
+            float(item["delta_ppm"]),
+            0 if str(item.get("kind")) in {"residual", "water"} else 1,
+            str(item["label"]),
+        )
+    )
     return matches[:max_matches]
+
+
+def partner_shifts_for_compound(
+    compound: str,
+    solvent: str | None,
+    *,
+    exclude_ppm: float | None = None,
+) -> list[float]:
+    """Other expected 1H shifts of the same contaminant in this solvent.
+
+    Used to corroborate an identification: ethyl acetate should show its CH3
+    and OCH2 partners, n-hexane its terminal triplet. A single shift match with
+    no partner support is a coincidence candidate, not an identification.
+    """
+    if not compound:
+        return []
+    solvent_key = _canonical_solvent_key(solvent)
+    shifts: list[float] = []
+    for entry in H1_IMPURITY_SHIFTS:
+        if entry.compound != compound:
+            continue
+        entry_key = _canonical_solvent_key(entry.solvent)
+        if entry_key is not None and solvent_key is not None and entry_key != solvent_key:
+            continue
+        if exclude_ppm is not None and abs(entry.shift_ppm - exclude_ppm) <= 1e-6:
+            continue
+        shifts.append(float(entry.shift_ppm))
+    return shifts
 
 
 def match_c13_impurity_shifts(
