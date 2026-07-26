@@ -1325,6 +1325,56 @@ def _in_priority_region(value: float, regions: tuple[tuple[float, float], ...]) 
     return any(lo <= value <= hi for lo, hi in regions)
 
 
+def _half_width_at_half_max_points(trace: list[float], idx: int) -> float:
+    """Half-width at half-maximum of the peak at ``idx``, in grid points.
+
+    Measured by walking out to the half-height crossing on each side and
+    averaging, so an asymmetric or shouldered peak still yields a usable
+    width. Falls back to 1 point when the crossing cannot be located (a peak
+    riding on a pedestal, or one that runs into the array edge).
+    """
+    peak = trace[idx]
+    if peak <= 0.0:
+        return 1.0
+    half = peak * 0.5
+
+    left = idx
+    while left > 0 and trace[left] > half:
+        left -= 1
+    right = idx
+    last = len(trace) - 1
+    while right < last and trace[right] > half:
+        right += 1
+
+    widths: list[float] = []
+    if trace[left] <= half < peak:
+        widths.append(float(idx - left))
+    if trace[right] <= half < peak:
+        widths.append(float(right - idx))
+    if not widths:
+        return 1.0
+    return max(1.0, sum(widths) / len(widths))
+
+
+def _lorentzian_capture_fraction(
+    *, half_window_points: int, half_width_points: float
+) -> float:
+    """Fraction of a Lorentzian's area lying within +/- the integration window.
+
+    For L(x) = A·hwhm²/(x²+hwhm²) the definite integral over [-w, w] divided by
+    the full-line integral is (2/pi)·arctan(w/hwhm). Dividing the measured area
+    by this factor restores the truncated tails, which is what makes the
+    recovered integral independent of linewidth.
+
+    Clamped to a floor so a badly-shaped or barely-resolved peak can never be
+    inflated without bound by a near-zero denominator.
+    """
+    if half_width_points <= 0 or half_window_points <= 0:
+        return 1.0
+    fraction = (2.0 / math.pi) * math.atan(half_window_points / half_width_points)
+    return min(1.0, max(0.35, fraction))
+
+
 def _infer_peak_estimates(
     points: list[tuple[float, float]],
     *,
@@ -1395,23 +1445,43 @@ def _infer_peak_estimates(
         if center < y_smoothed[idx - 1] or center < y_smoothed[idx + 1]:
             continue
 
+        # Integration window. A FIXED point cap makes the recovered area depend
+        # on linewidth rather than on the number of protons: a Lorentzian
+        # integrated over +/- w captures only (2/pi)*arctan(w/hwhm) of its area,
+        # so at a fixed w a broad resonance loses most of its integral while a
+        # sharp one keeps nearly all of it. Two lines of identical true area
+        # and 10x differing width integrated ~50x apart. The window is
+        # therefore scaled to the peak's own half-width, and the residual
+        # Lorentzian tail beyond it is restored analytically below.
+        half_width_points = _half_width_at_half_max_points(y_smoothed, idx)
+        flank_cap = max(40, int(math.ceil(half_width_points * 12.0)))
+        flank_cap = min(flank_cap, 4000, len(y_smoothed))
+
         left = idx - 1
         while left > 0 and y_smoothed[left] >= y_smoothed[left - 1]:
             left -= 1
-            if idx - left > 40:
+            if idx - left > flank_cap:
                 break
         right = idx + 1
         while right < len(y_smoothed) - 1 and y_smoothed[right] >= y_smoothed[right + 1]:
             right += 1
-            if right - idx > 40:
+            if right - idx > flank_cap:
                 break
 
         base = min(y_smoothed[left], y_smoothed[right])
+        # Trapezoidal rather than rectangular: the endpoints of the window sit
+        # on the flanks, where a rectangle sum systematically overshoots.
         area = 0.0
-        for j in range(left, right + 1):
-            area += max(0.0, y_smoothed[j] - base)
+        for j in range(left, right):
+            lo_val = max(0.0, y_smoothed[j] - base)
+            hi_val = max(0.0, y_smoothed[j + 1] - base)
+            area += 0.5 * (lo_val + hi_val)
         if area <= 0.0:
             continue
+        area /= _lorentzian_capture_fraction(
+            half_window_points=min(idx - left, right - idx),
+            half_width_points=half_width_points,
+        )
         components.append(
             _PeakComponent(
                 shift_ppm=x_vals[idx],
