@@ -59,6 +59,16 @@ export type SpectrumViewer1DProps = {
   height?: number
   onPeakClick?: (peak: SpectrumViewer1DPeak) => void
   className?: string
+  /**
+   * Render the zoom/pan/scale toolbar. Default true (the full interactive workspace).
+   *
+   * Set false for COMPACT PREVIEWS. The toolbar's buttons are `w-full sm:w-auto`, and `sm:` is a
+   * VIEWPORT breakpoint — inside a narrow preview card on a wide screen they stay auto-width and
+   * wrap to three or four rows, which is taller than the whole preview box. The chart then gets
+   * pushed out of the container entirely and the card shows nothing but buttons. A preview wants
+   * the plot; the workbench belongs on the full-size surface.
+   */
+  showControls?: boolean
 }
 
 const DISPLAY_Y_CAP = 1e120
@@ -131,6 +141,7 @@ export function SpectrumViewer1D({
   height = 360,
   onPeakClick,
   className,
+  showControls = true,
 }: SpectrumViewer1DProps) {
   const [gain01, setGain01] = useState(0.45)
   const [showPeakLabels, setShowPeakLabels] = useState(true)
@@ -455,6 +466,7 @@ export function SpectrumViewer1D({
         </p>
       ) : null}
 
+      {showControls ? (
       <div className="flex flex-wrap items-center gap-2 border-b pb-3">
         {!isMobile ? (
           <>
@@ -677,7 +689,9 @@ export function SpectrumViewer1D({
           </details>
         )}
       </div>
+      ) : null}
 
+      {showControls ? (
       <div className="space-y-2 px-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -707,16 +721,24 @@ export function SpectrumViewer1D({
           className="py-2"
         />
       </div>
+      ) : null}
 
       <div
-        className="min-h-[280px] w-full min-w-0 overflow-hidden rounded-lg border bg-card"
+        className={cn(
+          "w-full min-w-0 overflow-hidden rounded-lg border bg-card",
+          // The 280px floor is right for the interactive workspace, but in a compact
+          // preview it would overflow the card and hide the chart entirely.
+          showControls && "min-h-[280px]",
+        )}
         style={{ height: effectiveHeight }}
       >
         <Plot
           data={data}
           layout={layout}
           config={{
-            displayModeBar: true,
+            // Previews are non-interactive: the hover modebar would add reflow noise
+            // in a compact card and there is no room for it.
+            displayModeBar: showControls,
             displaylogo: false,
             responsive: true,
             scrollZoom: true,

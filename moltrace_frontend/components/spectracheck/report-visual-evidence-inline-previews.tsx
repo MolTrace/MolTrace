@@ -109,39 +109,40 @@ export function ReportVisualEvidenceInlinePreviews({
 
   return (
     <div className="grid min-w-0 gap-3 sm:grid-cols-1 lg:grid-cols-2">
+      {/* Previews render the CHART ONLY (showControls={false}). The interactive toolbars are
+          sized for a full-width workspace — in a preview card they wrap to several rows, and
+          under the old `max-h + overflow-hidden` wrapper they pushed the plot out of the box
+          entirely, so the card showed nothing but buttons. Giving each plot a definite height
+          (instead of clipping an over-tall subtree) also removes the hover/resize jitter. */}
       {showSpectrum && spectrumXy ? (
         <div className="min-w-0 rounded-md border bg-background/80 p-2">
           <p className="mb-1 text-[10px] font-medium text-muted-foreground">1D spectrum</p>
-          <div className="max-h-[min(200px,28vh)] min-h-0 min-w-0 overflow-hidden">
-            <SpectrumViewer1D
-              className="max-h-[min(200px,28vh)]"
-              height={plotHeight}
-              x={spectrumXy.x}
-              y={spectrumXy.y}
-              peaks={peaks1d.length > 0 ? peaks1d : undefined}
-              overlays={overlays1d}
-              nucleus="1H"
-            />
-          </div>
+          <SpectrumViewer1D
+            showControls={false}
+            height={plotHeight}
+            x={spectrumXy.x}
+            y={spectrumXy.y}
+            peaks={peaks1d.length > 0 ? peaks1d : undefined}
+            overlays={overlays1d}
+            nucleus="1H"
+          />
         </div>
       ) : null}
 
       {showMsmsMirrorPlot && msmsBundle ? (
         <div className="min-w-0 rounded-md border bg-background/80 p-2">
           <p className="mb-1 text-[10px] font-medium text-muted-foreground">MS/MS mirror</p>
-          <div className="max-h-[min(200px,28vh)] min-w-0 overflow-hidden">
-            <MsmsMirrorPlot
-              className="max-h-[min(200px,28vh)]"
-              height={plotHeight}
-              observedPeaks={msmsBundle.observedPeaks}
-              referencePeaks={msmsBundle.referencePeaks}
-              fragmentMatches={msmsBundle.fragmentMatches}
-              precursorMz={msmsBundle.precursorMz}
-              adduct={msmsBundle.adduct}
-              toleranceDa={msmsBundle.toleranceDa}
-              tolerancePpm={msmsBundle.tolerancePpm}
-            />
-          </div>
+          <MsmsMirrorPlot
+            showControls={false}
+            height={plotHeight}
+            observedPeaks={msmsBundle.observedPeaks}
+            referencePeaks={msmsBundle.referencePeaks}
+            fragmentMatches={msmsBundle.fragmentMatches}
+            precursorMz={msmsBundle.precursorMz}
+            adduct={msmsBundle.adduct}
+            toleranceDa={msmsBundle.toleranceDa}
+            tolerancePpm={msmsBundle.tolerancePpm}
+          />
         </div>
       ) : null}
 
