@@ -1532,48 +1532,60 @@ function ReportComposerTab({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs">Evidence ID</TableHead>
-                    <TableHead className="text-xs">Title</TableHead>
-                    <TableHead className="text-xs">Artifact ID</TableHead>
-                    <TableHead className="text-xs">Types / previews</TableHead>
-                    <TableHead className="text-xs">Artifact SHA-256</TableHead>
-                    <TableHead className="text-xs">Source file SHA-256</TableHead>
-                    <TableHead className="text-xs">Job ID</TableHead>
-                    <TableHead className="text-xs">QC</TableHead>
-                    <TableHead className="text-xs">Visual review</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Evidence ID</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Title</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Artifact ID</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Types / previews</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Artifact SHA-256</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Source file SHA-256</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Job ID</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">QC</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">Visual review</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {/* NOTE: `max-w-*` on a <td> is ignored under table-layout:auto — the browser
+                      sizes columns from content, so long hashes/UUIDs never wrap and spill into
+                      the neighbouring column. The width constraint therefore lives on an inner
+                      block element, which does respect it. */}
                   {selectedVisualEvidence.map((row) => (
                     <TableRow key={row.evidence_item_id}>
-                      <TableCell className="max-w-[8rem] align-top font-mono text-[10px] break-all">
-                        {row.evidence_item_id}
+                      <TableCell className="align-top font-mono text-[10px]">
+                        <div className="w-[8rem] break-all">{row.evidence_item_id}</div>
                       </TableCell>
-                      <TableCell className="max-w-[10rem] align-top text-xs">{row.title}</TableCell>
-                      <TableCell className="max-w-[8rem] align-top font-mono text-[10px] break-all">
-                        {row.artifact_id ?? "—"}
-                      </TableCell>
-                      <TableCell className="max-w-[12rem] align-top text-[10px] text-muted-foreground">
-                        <span className="block font-mono">{row.artifact_type ?? "—"}</span>
-                        <span className="mt-1 block text-[10px]">{row.preview_kinds.join(", ") || "—"}</span>
-                      </TableCell>
-                      <TableCell className="max-w-[9rem] align-top font-mono text-[10px] break-all">
-                        {row.sha256 ?? "—"}
-                      </TableCell>
-                      <TableCell className="max-w-[9rem] align-top font-mono text-[10px] break-all">
-                        {row.source_file_sha256 ?? "—"}
-                      </TableCell>
-                      <TableCell className="max-w-[7rem] align-top font-mono text-[10px] break-all">
-                        {row.job_id ?? "—"}
-                      </TableCell>
-                      <TableCell className="align-top text-xs">{row.qc_status ?? "—"}</TableCell>
                       <TableCell className="align-top text-xs">
-                        {row.visual_reviewed ? "Recorded" : "Not recorded"}
-                        {row.visual_review_comment ? (
-                          <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                            {row.visual_review_comment}
-                          </span>
-                        ) : null}
+                        <div className="w-[10rem] break-words">{row.title}</div>
+                      </TableCell>
+                      <TableCell className="align-top font-mono text-[10px]">
+                        <div className="w-[8rem] break-all">{row.artifact_id ?? "—"}</div>
+                      </TableCell>
+                      <TableCell className="align-top text-[10px] text-muted-foreground">
+                        <div className="w-[9rem] break-words">
+                          <span className="block font-mono">{row.artifact_type ?? "—"}</span>
+                          <span className="mt-1 block text-[10px]">{row.preview_kinds.join(", ") || "—"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top font-mono text-[10px]">
+                        <div className="w-[9rem] break-all">{row.sha256 ?? "—"}</div>
+                      </TableCell>
+                      <TableCell className="align-top font-mono text-[10px]">
+                        <div className="w-[9rem] break-all">{row.source_file_sha256 ?? "—"}</div>
+                      </TableCell>
+                      <TableCell className="align-top font-mono text-[10px]">
+                        <div className="w-[7rem] break-all">{row.job_id ?? "—"}</div>
+                      </TableCell>
+                      <TableCell className="align-top text-xs">
+                        <div className="w-[4rem] break-words">{row.qc_status ?? "—"}</div>
+                      </TableCell>
+                      <TableCell className="align-top text-xs">
+                        <div className="w-[8rem] break-words">
+                          {row.visual_reviewed ? "Recorded" : "Not recorded"}
+                          {row.visual_review_comment ? (
+                            <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                              {row.visual_review_comment}
+                            </span>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

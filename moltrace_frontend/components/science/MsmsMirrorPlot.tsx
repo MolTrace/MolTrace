@@ -47,6 +47,9 @@ export type MsmsMirrorPlotProps = {
   tolerancePpm?: number
   height?: number
   className?: string
+  /** Render the toolbar. False for compact previews — see SpectrumViewer1D for why
+   *  a viewport-breakpoint toolbar overflows a narrow preview card. */
+  showControls?: boolean
 }
 
 function relativeIntensitySeries(peaks: ReadonlyArray<{ intensity: number }>): number[] {
@@ -132,6 +135,7 @@ export function MsmsMirrorPlot({
   tolerancePpm,
   height = 380,
   className,
+  showControls = true,
 }: MsmsMirrorPlotProps) {
   const [xRange, setXRange] = useState<[number, number] | null>(null)
   const [showMatchedLabels, setShowMatchedLabels] = useState(true)
@@ -421,6 +425,7 @@ export function MsmsMirrorPlot({
         not compound identification.
       </p>
 
+      {showControls ? (
       <div className="flex flex-wrap items-center gap-2 border-b pb-3">
         {!isMobile ? (
           <>
@@ -529,16 +534,22 @@ export function MsmsMirrorPlot({
           </details>
         )}
       </div>
+      ) : null}
 
       <div
-        className="min-h-[280px] w-full min-w-0 overflow-hidden rounded-lg border bg-card"
+        className={cn(
+          "w-full min-w-0 overflow-hidden rounded-lg border bg-card",
+          showControls && "min-h-[280px]",
+        )}
         style={{ height: effectiveHeight }}
       >
         <Plot
           data={plotData}
           layout={layout}
           config={{
-            displayModeBar: true,
+            // Previews are non-interactive: the hover modebar would add reflow noise
+            // in a compact card and there is no room for it.
+            displayModeBar: showControls,
             displaylogo: false,
             responsive: true,
             scrollZoom: true,

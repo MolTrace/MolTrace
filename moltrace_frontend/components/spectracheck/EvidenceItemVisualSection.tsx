@@ -219,9 +219,11 @@ export function EvidenceItemVisualSection({ item, spectracheckSessionId = null }
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="px-2 pb-2">
-                <div className="max-h-[220px] min-h-0 min-w-0 overflow-hidden">
+                {/* Chart only — the interactive toolbar is sized for the full-width workspace
+                    and would overflow this compact box, hiding the plot (see SpectrumViewer1D). */}
+                <div className="min-w-0">
                   <SpectrumViewer1D
-                    className="max-h-[200px]"
+                    showControls={false}
                     height={COMPACT_VIZ_H}
                     x={spectrumXy.x}
                     y={spectrumXy.y}
@@ -247,9 +249,9 @@ export function EvidenceItemVisualSection({ item, spectracheckSessionId = null }
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="px-2 pb-2">
-                <div className="max-h-[220px] min-w-0 overflow-hidden">
+                <div className="min-w-0">
                   <MsmsMirrorPlot
-                    className="max-h-[200px]"
+                    showControls={false}
                     height={COMPACT_VIZ_H}
                     observedPeaks={msmsBundle.observedPeaks}
                     referencePeaks={msmsBundle.referencePeaks}
