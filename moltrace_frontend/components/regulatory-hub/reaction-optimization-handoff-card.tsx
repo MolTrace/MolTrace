@@ -114,11 +114,17 @@ export function ReactionOptimizationHandoffCard({
     setSending(true)
     setErr("")
     try {
+      // RegulatoryToReactionBridgeCreate is extra="forbid" and declares a SINGULAR,
+      // optional `regulatory_action_item_id` — the plural array 422'd this button
+      // unconditionally. Send the id only when the user names exactly one item; leaving
+      // the field blank is the supported "all of them" path (the bridge then sweeps every
+      // open / in_progress / deferred action item on the dossier).
+      const actionItemIds = parseActionItemIdsCsv(actionItemIdsInput)
       const body: Record<string, unknown> = {
         dossier_id: dossierId,
-        regulatory_action_item_ids: parseActionItemIdsCsv(actionItemIdsInput),
         reaction_project_id: parseOptionalNumber(reactionProjectIdInput),
       }
+      if (actionItemIds.length === 1) body.regulatory_action_item_id = actionItemIds[0]
       const compoundIdNum = parseOptionalNumber(compoundIdInput)
       const batchIdNum = parseOptionalNumber(batchIdInput)
       if (compoundIdNum != null) body.compound_id = compoundIdNum
@@ -273,7 +279,10 @@ export function ReactionOptimizationHandoffCard({
                 bridge_records: bridges,
                 request_preview: {
                   dossier_id: dossierId,
-                  regulatory_action_item_ids: parseActionItemIdsCsv(actionItemIdsInput),
+                  regulatory_action_item_id:
+                    parseActionItemIdsCsv(actionItemIdsInput).length === 1
+                      ? parseActionItemIdsCsv(actionItemIdsInput)[0]
+                      : null,
                   reaction_project_id: parseOptionalNumber(reactionProjectIdInput),
                   compound_id: parseOptionalNumber(compoundIdInput),
                   batch_id: parseOptionalNumber(batchIdInput),
