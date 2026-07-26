@@ -78,6 +78,11 @@ from .solvents import (
     solvent_exchangeable_elements,
     solvent_exchanges_labile_protons,
 )
+from .structure_assignment import (
+    assign_from_smiles,
+    class_rollup,
+    structure_assignment_enabled,
+)
 
 # Public peak categories. Keep the set small and visualisable; resist adding
 # every flavour of chemical region — those live in ``chemical_region`` instead.
@@ -1028,6 +1033,46 @@ def _sum_integration(peaks: Iterable[dict[str, Any]], categories: frozenset[str]
     return total
 
 
+def _build_structure_assignment(
+    *,
+    peaks: Sequence[dict[str, Any]],
+    structure: StructureSummary,
+    solvent: str | None,
+) -> dict[str, Any] | None:
+    """Run the assignment engine and roll its result up by inventory class.
+
+    Returns None (rather than raising) whenever the structure cannot be parsed
+    or the solve is infeasible: this is a shadow view, so it must never be able
+    to break the analysis that ships today.
+    """
+    signals: list[tuple[float, float]] = []
+    for peak in peaks:
+        shift = peak.get("shift_ppm")
+        if not isinstance(shift, (int, float)):
+            continue
+        # Residual solvent and water are identified, not analyte; feeding them
+        # in would make the contaminant sink absorb tens of protons of solvent.
+        if peak.get("category") == "solvent":
+            continue
+        integration = _inventory_integration(peak)
+        if integration is None or integration <= 0:
+            continue
+        signals.append((float(shift), float(integration)))
+    if not signals:
+        return None
+    try:
+        result = assign_from_smiles(
+            smiles=structure.smiles, signals=signals, solvent=solvent
+        )
+    except Exception:
+        return None
+    if not result.feasible:
+        return {"feasible": False, "notes": list(result.notes)}
+    payload = result.to_payload()
+    payload["class_rollup"] = class_rollup(result)
+    return payload
+
+
 def build_proton_inventory(
     *,
     peaks: Sequence[dict[str, Any]],
@@ -1220,6 +1265,17 @@ def build_proton_inventory(
         "reassigned_h": _round(reassigned_h),
     }
 
+    # Structure-constrained global assignment, shadowing the window classifier
+    # when enabled. Default OFF: this reports an alternative view alongside the
+    # existing numbers so the two can be compared on real data before it drives
+    # anything. Conservation is a hard constraint there, so it cannot
+    # over-assign a class the way a ppm-window lookup can.
+    assignment_payload: dict[str, Any] | None = None
+    if structure is not None and structure_assignment_enabled():
+        assignment_payload = _build_structure_assignment(
+            peaks=peaks, structure=structure, solvent=solvent
+        )
+
     return {
         "nucleus": "1H",
         "integration_basis": integration_basis,
@@ -1229,6 +1285,7 @@ def build_proton_inventory(
         "warnings": warnings,
         "notes": notes,
         "anomeric_cap": anomeric_cap,
+        "structure_assignment": assignment_payload,
         # ``carbohydrate_sugar`` and ``carboxylic_acid`` are SUB-counts of
         # ``aliphatic`` and ``labile`` respectively, not sibling classes. The
         # UI must nest them, otherwise the displayed rows do not sum to the

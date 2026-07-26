@@ -69,6 +69,22 @@ def _is_anomeric_or_acetal_carbon(atom: Chem.Atom) -> bool:
     return _is_saturated_carbon(atom) and attached_h > 0 and _single_bond_neighbor_count(atom, 8) >= 2
 
 
+def _is_arylidene_acetal_carbon(atom: Chem.Atom) -> bool:
+    """O-CH-O carbon that also carries an aryl ring.
+
+    That is a benzylidene / arylidene protecting-group acetal (4,6-O-benzylidene
+    glucosides, PMP acetals), not a glycosidic anomeric centre. It is worth
+    separating because ``chemistry.count_anomeric_protons`` already excludes
+    aryl acetals from the expected anomeric count, so labelling them
+    ``anomeric_or_acetal`` here made the predictor disagree with the counter
+    about the same atom. The benzylidene CH also sits slightly downfield of a
+    typical anomeric proton and is a clean singlet rather than a doublet.
+    """
+    if not _is_anomeric_or_acetal_carbon(atom):
+        return False
+    return any(neighbor.GetIsAromatic() for neighbor in _atom_neighbors(atom))
+
+
 def _alpha_to_carbonyl(atom: Chem.Atom) -> bool:
     return any(neighbor.GetAtomicNum() == 6 and _is_carbonyl_carbon(neighbor) for neighbor in _atom_neighbors(atom))
 
@@ -133,6 +149,8 @@ def _predict_carbon_shift(atom: Chem.Atom) -> tuple[float, float, str, list[str]
         return 78.0, 4.0, "alkyne_or_nitrile_carbon", warnings
     oxygen_neighbors = _single_bond_neighbor_count(atom, 8)
     nitrogen_neighbors = _single_bond_neighbor_count(atom, 7)
+    if _is_arylidene_acetal_carbon(atom):
+        return 101.5, 2.5, "arylidene_acetal_carbon", warnings
     if _is_anomeric_or_acetal_carbon(atom):
         return 100.0, 2.5, "anomeric_or_acetal_carbon", warnings
     if oxygen_neighbors and nitrogen_neighbors:
@@ -195,6 +213,10 @@ def _predict_proton_shift_for_carbon(atom: Chem.Atom) -> tuple[float, float, str
         return 2.20, 0.30, "alkynyl_proton", "s", warnings
     oxygen_neighbors = _single_bond_neighbor_count(atom, 8)
     nitrogen_neighbors = _single_bond_neighbor_count(atom, 7)
+    if _is_arylidene_acetal_carbon(atom):
+        # PhCH(O)(O) of a 4,6-O-benzylidene acetal: ~5.5 ppm, a clean singlet
+        # (no vicinal partner), unlike an anomeric H which couples to H-2.
+        return 5.50, 0.30, "arylidene_acetal_proton", "s", warnings
     if _is_anomeric_or_acetal_carbon(atom):
         return 5.05, 0.30, "anomeric_or_acetal_proton", "d", warnings
     if oxygen_neighbors and nitrogen_neighbors:

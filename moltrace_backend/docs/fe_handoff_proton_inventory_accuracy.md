@@ -128,6 +128,20 @@ proton scale.
 
 ---
 
+## 7. `structure_assignment` — ignore it for now
+
+`proton_inventory.structure_assignment` is `null` unless the backend is run
+with `MOLTRACE_STRUCTURE_ASSIGNMENT=1`. It carries a second, independent view
+of the same spectrum produced by a structure-constrained global assignment
+(each proton environment's count is a hard constraint, so it cannot
+over-assign a class). It exists so the two routes can be compared on real data
+before either drives the UI.
+
+**Do:** nothing yet — just don't crash on the key being present or null. When
+we promote it, the shape is `{feasible, total_cost, class_rollup, environments,
+flows, contaminant_h, exchanged_h, unexplained_h, notes}` and `class_rollup`
+is directly comparable to the `observed` block.
+
 ## Verification
 
 Point the FE at a 1H analysis of an aromatic-protected aminoglycoside in CD₃OD

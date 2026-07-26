@@ -69,6 +69,7 @@
       "non_labile": 8.0,
       "total": 8.0
     },
+    "structure_assignment": null,
     "warnings": [
       "Observed aromatic integration is +1.0 H above the structural expectation (5 H) \u2014 likely overlap, impurity, or unresolved multiplet.",
       "Observed anomeric_or_olefinic integration is -2.0 H below the structural expectation (3 H) \u2014 possible exchange, suppression, or truncation.",

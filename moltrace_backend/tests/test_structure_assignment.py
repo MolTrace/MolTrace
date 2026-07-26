@@ -116,6 +116,49 @@ class TestSolventExchange:
         assert result.exchanged_h == pytest.approx(0.0, abs=1e-6)
 
 
+class TestAgainstTheWindowClassifier:
+    """A/B: does the engine reach the classifier's answer independently?
+
+    The window classifier gets the protected-sugar case right only because a
+    conservation cap was added to it. The assignment engine has no cap — the
+    proton count IS the constraint — so agreement here is evidence the two
+    routes converge for the right reason rather than by shared special-casing.
+    """
+
+    def test_engine_reproduces_corrected_classification_without_a_cap(self) -> None:
+        from nmrcheck.structure_assignment import class_rollup
+
+        # Aromatic-protected glucoside: 5 aromatic H, ONE anomeric H, plus a
+        # benzylidene acetal CH that resonates in the same 4.4-6.0 band.
+        signals = [
+            (7.45, 5.0),  # aromatic
+            (5.52, 1.0),  # benzylidene acetal CH -> NOT anomeric
+            (4.78, 1.0),  # true anomeric
+            (4.25, 2.0),
+            (3.70, 4.0),
+            (3.40, 3.0),
+        ]
+        result = assign_from_smiles(
+            smiles=BENZYLIDENE_GLUCOSIDE, signals=signals, solvent="CDCl3"
+        )
+        assert result.feasible, result.notes
+        rollup = class_rollup(result)
+
+        assert rollup["aromatic"] == pytest.approx(5.0, abs=1e-3)
+        # Exactly one anomeric proton, even though 2 H of signal sit in the
+        # anomeric window. No cap involved: the environment holds one proton.
+        assert rollup["anomeric_or_olefinic"] == pytest.approx(1.0, abs=1e-3)
+        # The benzylidene CH is counted as a protecting-group methine.
+        assert rollup["aliphatic"] == pytest.approx(10.0, abs=1e-3)
+
+    def test_arylidene_acetal_is_not_bucketed_as_anomeric(self) -> None:
+        from nmrcheck.structure_assignment import bucket_for_kind
+
+        assert bucket_for_kind("arylidene_acetal_proton") == "aliphatic"
+        assert bucket_for_kind("anomeric_or_acetal_proton") == "anomeric_or_olefinic"
+        assert bucket_for_kind("labile_OH") == "labile"
+
+
 class TestAssignmentQuality:
     def test_signal_lands_on_the_environment_its_shift_predicts(self) -> None:
         # Ethylbenzene-like: aromatic H near 7.2, CH2 near 2.6, CH3 near 1.2.

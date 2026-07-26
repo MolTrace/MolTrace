@@ -306,6 +306,47 @@ def assign_signals(
     return result
 
 
+# Environment kind -> proton-inventory bucket, so the engine's output can be
+# compared directly against the window classifier's observed block.
+_KIND_TO_BUCKET: dict[str, str] = {
+    "aromatic_proton": "aromatic",
+    "anomeric_or_acetal_proton": "anomeric_or_olefinic",
+    "vinylic_proton": "anomeric_or_olefinic",
+    "aldehydic_proton": "aldehyde",
+}
+
+
+def bucket_for_kind(kind: str) -> str:
+    """Map an environment kind onto an inventory class.
+
+    An arylidene (benzylidene) acetal CH deliberately maps to ``aliphatic``:
+    it is a protecting-group methine, not an anomeric proton, even though it
+    resonates in the same band. Labile environments map to ``labile``;
+    everything else is aliphatic, matching the window classifier's
+    "aliphatic (incl. O/N-adjacent)" bucket.
+    """
+    if kind.startswith("labile_"):
+        return "labile"
+    return _KIND_TO_BUCKET.get(kind, "aliphatic")
+
+
+def class_rollup(result: AssignmentResult) -> dict[str, float]:
+    """Assigned protons per inventory class, for A/B against the classifier."""
+    rollup: dict[str, float] = {
+        "aromatic": 0.0,
+        "anomeric_or_olefinic": 0.0,
+        "aldehyde": 0.0,
+        "aliphatic": 0.0,
+        "labile": 0.0,
+    }
+    for env in result.environments:
+        assigned = result.assigned.get(env.key, 0.0)
+        if assigned <= 0:
+            continue
+        rollup[bucket_for_kind(env.kind)] += assigned
+    return {key: round(value, 3) for key, value in rollup.items()}
+
+
 def assign_from_smiles(
     *,
     smiles: str,
