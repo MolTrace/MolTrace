@@ -92,6 +92,20 @@
       "shift_ppm": 4.87
     },
     {
+      "integration_h": 26.0,
+      "library_match": {
+        "delta_ppm": 0.0,
+        "expected_ppm": 3.31,
+        "kind": "residual",
+        "label": "solvent residual peak",
+        "observed_ppm": 3.31,
+        "solvent": "CD3OD"
+      },
+      "reason": "matches embedded impurity shift for solvent residual peak (3.31 ppm)",
+      "score": null,
+      "shift_ppm": 3.31
+    },
+    {
       "integration_h": 0.5,
       "library_match": {
         "delta_ppm": 0.011,

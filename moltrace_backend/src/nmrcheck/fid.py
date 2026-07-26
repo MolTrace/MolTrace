@@ -26,6 +26,7 @@ from .baseline import (
     evaluate_baseline_flatness,
     normalize_baseline_mode,
 )
+from .acquisition_quality import assess_1h_acquisition
 from .display_view import weak_peak_magnifier_view
 from .models import (
     FIDPresetId,
@@ -3259,6 +3260,28 @@ def process_bruker_1d_zip(
                 ),
                 "reviewer_signoff_required": True,
                 "human_review_status": metadata.human_review_status,
+                # Whether the acquisition supports reading integrals as proton
+                # counts at all. Reported rather than assumed: a routine 1H run
+                # with a 1 s relaxation delay does not relax slowly-relaxing
+                # protons, and a presaturation sequence attenuates everything
+                # near the irradiated solvent line.
+                "acquisition_quality": assess_1h_acquisition(
+                    relaxation_delay_s=_param_float(params, "D1", "D", "RD"),
+                    td=_param_float(params, "TD"),
+                    sw_hz=_param_float(params, "SW_h", "SWH"),
+                    scans=(
+                        int(scan_count)
+                        if (scan_count := _param_float(params, "NS")) is not None
+                        else None
+                    ),
+                    pulse_program=(
+                        str(pulse_program)
+                        if (pulse_program := _param(params, "PULPROG")) is not None
+                        else None
+                    ),
+                ).to_payload()
+                if nucleus == "1H"
+                else None,
                 "impurity_candidates": impurity_candidates,
                 "reference_peak_count": len(reference_peaks),
                 "reference_total_h": round(sum(peak.integration_h for peak in reference_peaks), 4)

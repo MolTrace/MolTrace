@@ -27,7 +27,7 @@ from .models import (
 )
 from .compound_class_priors import diagnostic_regions_for
 from .gsd import deconvolve_region, multiplicity_from_lines
-from .impurities import match_h1_impurity_shifts
+from .impurities import match_h1_impurity_shifts, partner_shifts_for_compound
 from .nmr_tables import solvent_windows
 from .parser import ReferencePeakAssignment, normalize_multiplicity, normalize_nmr_text, parse_j_values_hz, parse_reference_nmr_text
 
@@ -2010,25 +2010,66 @@ def _build_impurity_candidates(
         for item in (comparison.extra_spectrum if comparison is not None else [])
     }
     library_candidates: list[dict[str, Any]] = []
-    seen_library: set[tuple[float, str]] = set()
+    seen_library: set[float] = set()
+    observed_shifts = [float(item.shift_ppm) for item in peaks]
     for peak in peaks:
-        for match in match_h1_impurity_shifts(peak.shift_ppm, solvent):
-            key_tuple = (round(peak.shift_ppm, 3), str(match["label"]))
-            if key_tuple in seen_library:
-                continue
-            seen_library.add(key_tuple)
-            library_candidates.append(
-                {
-                    "shift_ppm": round(peak.shift_ppm, 3),
-                    "integration_h": peak.integration_h,
-                    "reason": (
-                        f"matches embedded H-1 impurity shift for {match['label']} "
-                        f"({match['expected_ppm']} ppm)"
-                    ),
-                    "library_match": match,
-                    "score": 5 if match.get("kind") in {"residual", "water"} else 4,
-                }
+        matches = match_h1_impurity_shifts(peak.shift_ppm, solvent)
+        if not matches:
+            continue
+        # EXCLUSIVITY: a physical peak has ONE identity. The dedupe key used to
+        # include the label, so every library entry whose window contained the
+        # peak produced its own sibling row — a single 1.247 ppm signal was
+        # reported simultaneously as ethyl acetate, grease AND n-hexane, with
+        # the last two not even separable (both tabulated at 1.29 ppm). The
+        # runners-up are now carried as ranked alternatives.
+        peak_key = round(peak.shift_ppm, 3)
+        if peak_key in seen_library:
+            continue
+        seen_library.add(peak_key)
+        winner = matches[0]
+
+        # CORROBORATION: a multi-signal contaminant should show its other
+        # resonances. Ethyl acetate without its CH3 and OCH2 partners is a
+        # coincidence, not an identification.
+        partners = partner_shifts_for_compound(
+            str(winner.get("compound") or ""),
+            solvent,
+            exclude_ppm=float(winner["expected_ppm"]),
+        )
+        confirmed = [
+            expected
+            for expected in partners
+            if any(abs(obs - expected) <= 0.05 for obs in observed_shifts)
+        ]
+        corroboration = {
+            "expected_partner_shifts": [round(value, 3) for value in partners],
+            "observed_partner_shifts": [round(value, 3) for value in confirmed],
+            "confirmed": bool(partners) and bool(confirmed),
+            # No partners to look for (a single-signal contaminant such as
+            # dichloromethane) is not evidence either way.
+            "corroboration_available": bool(partners),
+        }
+        reason = (
+            f"matches embedded H-1 impurity shift for {winner['label']} "
+            f"({winner['expected_ppm']} ppm)"
+        )
+        if partners and not confirmed:
+            reason += (
+                f"; none of the {len(partners)} other expected "
+                f"{winner.get('compound') or 'compound'} signal(s) were observed, "
+                "so this identification is unconfirmed"
             )
+        library_candidates.append(
+            {
+                "shift_ppm": peak_key,
+                "integration_h": peak.integration_h,
+                "reason": reason,
+                "library_match": winner,
+                "alternatives": matches[1:],
+                "corroboration": corroboration,
+                "score": 5 if winner.get("kind") in {"residual", "water"} else 4,
+            }
+        )
     extracted_total_h = round(sum(float(peak.integration_h) for peak in peaks), 4)
     if not extra_peak_keys and target_total_h is not None and abs(extracted_total_h - float(target_total_h)) <= 0.5:
         return []
