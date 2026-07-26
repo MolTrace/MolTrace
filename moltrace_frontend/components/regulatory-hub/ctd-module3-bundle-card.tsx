@@ -95,8 +95,13 @@ export function CtdModule3BundleCard({ dossierId }: Props) {
     setBusy(true)
     setErr("")
     try {
+      // The route takes a REQUIRED CTDModule3ReportBundleCreate body; posting none 422'd
+      // with "missing". Every field is optional except `status`, so send that. The bundle
+      // auto-discovers nothing — pass spectracheck_report_id / regulatory_readiness_report_id
+      // explicitly (a follow-up) if you need those sections populated rather than empty.
       const created = await apiFetch<unknown>(`/regulatory/dossiers/${dossierId}/ctd-module3-bundle`, {
         method: "POST",
+        body: { status: "draft" },
       })
       const picked = pickBundle(created)
       if (picked) setBundle(picked)

@@ -89,10 +89,17 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
     setSending(true)
     setErr("")
     try {
+      // SpectroscopyToRegulatoryBridgeCreate is extra="forbid" and declares a SINGULAR,
+      // optional `evidence_item_id` (int) — sending the plural `evidence_item_ids` array
+      // 422'd this button unconditionally. Send the id only when exactly one item is in
+      // scope; otherwise omit it and let the bridge assemble evidence from the session,
+      // which is what it already does for the multi-item case.
       const body: Record<string, unknown> = {
         spectracheck_session_id: sid,
-        evidence_item_ids: evidenceItemIds.map((v) => String(v)),
       }
+      const soleEvidenceItemId =
+        evidenceItemIds.length === 1 ? parseOptionalNumber(String(evidenceItemIds[0])) : null
+      if (soleEvidenceItemId != null) body.evidence_item_id = soleEvidenceItemId
       const reportId = parseOptionalNumber(reportIdInput)
       const dossierId = parseOptionalNumber(dossierIdInput)
       const compoundId = parseOptionalNumber(compoundIdInput)
@@ -235,7 +242,10 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
                 bridge_records: bridges,
                 request_preview: {
                   spectracheck_session_id: sessionId?.trim() || null,
-                  evidence_item_ids: evidenceItemIds.map(String),
+                  evidence_item_id:
+                    evidenceItemIds.length === 1
+                      ? parseOptionalNumber(String(evidenceItemIds[0]))
+                      : null,
                   report_id: parseOptionalNumber(reportIdInput),
                   dossier_id: parseOptionalNumber(dossierIdInput),
                   compound_id: parseOptionalNumber(compoundIdInput),

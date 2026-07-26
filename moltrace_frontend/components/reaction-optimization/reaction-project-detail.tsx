@@ -1128,6 +1128,10 @@ function notesFromField(raw: unknown): string {
   return ""
 }
 
+/** Candidate pool the BO sampler draws from. Mirrors the server default
+ *  (ReactionBayesianOptimizationRunRequest.candidate_count, ge=1 le=1000). */
+const BO_CANDIDATE_COUNT = 64
+
 /** Free text → the backend's `{notes: ...}` json object (empty text → {}). */
 function notesToField(text: string): Record<string, unknown> {
   const t = text.trim()
@@ -3114,8 +3118,13 @@ export function ReactionProjectDetail() {
         exploration_weight,
         cost_aware: boCostAware,
         safety_aware: boSafetyAware,
-        include_failed_experiments_as_negative: boIncludeFailedAsNegative,
-        notes: boNotes.trim() || null,
+        // ReactionBayesianOptimizationRunRequest is extra="forbid": the field is
+        // `include_negative_outcomes`, there is no `notes` key (free text belongs in
+        // metadata_json), and candidate_count is sent explicitly because
+        // openapi-typescript renders server-defaulted fields as required.
+        include_negative_outcomes: boIncludeFailedAsNegative,
+        candidate_count: BO_CANDIDATE_COUNT,
+        metadata_json: notesToField(boNotes),
       }
       if (useRegulatoryAnchorInOptimization && regulatoryPayloadForOptimization) {
         body.regulatory_constraints_json = regulatoryPayloadForOptimization.regulatory_constraints
