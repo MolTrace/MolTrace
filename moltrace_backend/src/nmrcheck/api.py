@@ -10456,6 +10456,27 @@ async def nmr_processed_analyze_route(
     if isinstance(proton_reconciliation_payload, dict) and proton_inventory:
         proton_inventory["reconciliation"] = proton_reconciliation_payload
 
+    # Integration scale provenance. Peak areas are measured in arbitrary units,
+    # so turning them into proton counts requires a scale. When that scale is
+    # taken from the structure's own proton total, the observed grand total
+    # necessarily equals the expected grand total — so that agreement is an
+    # arithmetic identity, not corroborating evidence, and it must not be
+    # presented as though the spectrum independently confirmed the formula.
+    if proton_inventory:
+        normalized_to_target = bool(metadata.get("integration_normalized_to_target"))
+        proton_inventory["integration_scale"] = {
+            "basis": "normalized_to_structure" if normalized_to_target else "data_derived",
+            "independent_total": not normalized_to_target,
+            "raw_estimated_total_h": metadata.get("raw_estimated_total_h"),
+        }
+        if normalized_to_target:
+            proton_inventory.setdefault("notes", []).append(
+                "Integrals were scaled so the total matches the structural "
+                "proton count, so the total and non-labile rows agree by "
+                "construction. Per-class deltas remain informative; the totals "
+                "are not independent confirmation of the formula."
+            )
+
     predicted_vs_observed_rows: list[dict[str, Any]] = []
     dp4_ranking_rows: list[dict[str, Any]] = []
     if candidate_smiles:
