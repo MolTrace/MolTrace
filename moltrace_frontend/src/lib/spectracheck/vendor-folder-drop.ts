@@ -1,0 +1,239 @@
+/**
+ * Drop a vendor NMR dataset FOLDER (Bruker, Varian/Agilent) straight onto the raw-FID
+ * uploader — the MestReNova-style workflow — instead of zipping it by hand first.
+ *
+ * The backend's raw-FID endpoint takes a `.zip`/`.tar.gz` archive and locates the dataset by
+ * grouping archive members per directory and scoring each one (Bruker wants `fid` + `acqus`,
+ * Varian/Agilent wants `fid` + `procpar`). So the browser walks the dropped directory, keeps the
+ * relative paths intact, and zips it client-side. The upload contract is unchanged — the server
+ * still receives exactly one archive.
+ */
+import { zip, type Zippable } from "fflate"
+
+/** One file from a dropped folder, with its path RELATIVE to the dropped root. */
+export type VendorFolderEntry = {
+  /** e.g. "Nap/Raw/34/acqus" — POSIX separators, no leading slash. */
+  path: string
+  file: File
+}
+
+export type VendorKind = "bruker" | "varian" | "unknown"
+
+export type VendorExperiment = {
+  /** Directory holding the dataset files ("" when they sit at the dropped root). */
+  dir: string
+  kind: VendorKind
+  /** Basenames present in that directory (lower-cased). */
+  files: string[]
+}
+
+export type VendorFolderDetection = {
+  kind: VendorKind
+  experiments: VendorExperiment[]
+  fileCount: number
+  totalBytes: number
+  /** True when at least one directory looks like a processable dataset. */
+  usable: boolean
+  /** Plain-language reason when not usable, else null. */
+  reason: string | null
+}
+
+// Mirrors the backend's required sets (see fid.py `_REQUIRED_BRUKER_FILES` / `_REQUIRED_VARIAN_FILES`).
+const REQUIRED_BRUKER = ["fid", "acqus"] as const
+const REQUIRED_VARIAN = ["fid", "procpar"] as const
+
+/** Junk the OS/vendor tooling sprinkles around that must never reach the archive. */
+const IGNORED_BASENAMES = new Set([".ds_store", "thumbs.db", "desktop.ini", ".localized"])
+
+function isIgnoredPath(path: string): boolean {
+  const parts = path.split("/")
+  const base = (parts[parts.length - 1] ?? "").toLowerCase()
+  if (IGNORED_BASENAMES.has(base)) return true
+  if (base.startsWith("._")) return true // macOS AppleDouble resource forks
+  return parts.some((p) => p === "__MACOSX")
+}
+
+function dirOf(path: string): string {
+  const i = path.lastIndexOf("/")
+  return i < 0 ? "" : path.slice(0, i)
+}
+
+function baseOf(path: string): string {
+  const i = path.lastIndexOf("/")
+  return (i < 0 ? path : path.slice(i + 1)).toLowerCase()
+}
+
+/**
+ * Group entries per directory and score each the way the backend does, so the UI can tell the
+ * chemist whether the drop is processable BEFORE spending time zipping and uploading it.
+ */
+export function detectVendorDataset(entries: VendorFolderEntry[]): VendorFolderDetection {
+  const kept = entries.filter((e) => !isIgnoredPath(e.path))
+  const byDir = new Map<string, Set<string>>()
+  let totalBytes = 0
+  for (const e of kept) {
+    totalBytes += e.file.size
+    const d = dirOf(e.path)
+    const set = byDir.get(d)
+    if (set) set.add(baseOf(e.path))
+    else byDir.set(d, new Set([baseOf(e.path)]))
+  }
+
+  const experiments: VendorExperiment[] = []
+  for (const [dir, names] of byDir) {
+    const hasBruker = REQUIRED_BRUKER.every((n) => names.has(n))
+    const hasVarian = REQUIRED_VARIAN.every((n) => names.has(n))
+    if (!hasBruker && !hasVarian) continue
+    experiments.push({
+      dir,
+      // A directory with fid+acqus is Bruker; fid+procpar is Varian/Agilent.
+      kind: hasBruker ? "bruker" : "varian",
+      files: [...names].sort(),
+    })
+  }
+  experiments.sort((a, b) => a.dir.localeCompare(b.dir))
+
+  const kinds = new Set(experiments.map((e) => e.kind))
+  const kind: VendorKind = kinds.size === 1 ? [...kinds][0]! : experiments.length > 0 ? "unknown" : "unknown"
+
+  if (kept.length === 0) {
+    return { kind: "unknown", experiments: [], fileCount: 0, totalBytes: 0, usable: false, reason: "The folder is empty." }
+  }
+  if (experiments.length === 0) {
+    return {
+      kind: "unknown",
+      experiments: [],
+      fileCount: kept.length,
+      totalBytes,
+      usable: false,
+      reason:
+        "No Bruker or Varian/Agilent dataset found — a processable folder contains a raw 'fid' file next to 'acqus' (Bruker) or 'procpar' (Varian/Agilent).",
+    }
+  }
+  return { kind, experiments, fileCount: kept.length, totalBytes, usable: true, reason: null }
+}
+
+/** Recursively read a dropped directory entry into flat, relative-path entries. */
+async function readDirectoryEntry(
+  entry: FileSystemDirectoryEntry,
+  prefix: string,
+  out: VendorFolderEntry[],
+): Promise<void> {
+  const reader = entry.createReader()
+  // readEntries() returns at most ~100 per call, so it must be drained in a loop.
+  for (;;) {
+    const batch: FileSystemEntry[] = await new Promise((resolve, reject) =>
+      reader.readEntries((r) => resolve(r as FileSystemEntry[]), reject),
+    )
+    if (batch.length === 0) break
+    for (const child of batch) {
+      const path = prefix ? `${prefix}/${child.name}` : child.name
+      if (child.isDirectory) {
+        await readDirectoryEntry(child as FileSystemDirectoryEntry, path, out)
+      } else {
+        const file = await new Promise<File>((resolve, reject) =>
+          (child as FileSystemFileEntry).file(resolve, reject),
+        )
+        out.push({ path, file })
+      }
+    }
+  }
+}
+
+/**
+ * Does this drop contain a DIRECTORY? Synchronous on purpose: it lets the caller keep the ordinary
+ * single-file drop fully synchronous and only pay an async round-trip for a real folder.
+ * (`webkitGetAsEntry` must be called while the drop event is still being handled.)
+ */
+export function dataTransferHasDirectory(dataTransfer: DataTransfer): boolean {
+  for (const item of Array.from(dataTransfer.items ?? [])) {
+    if (item.kind !== "file") continue
+    if (typeof item.webkitGetAsEntry !== "function") continue
+    if (item.webkitGetAsEntry()?.isDirectory) return true
+  }
+  return false
+}
+
+/**
+ * Pull folder contents out of a drop event. Returns [] when the drop carried no directory, so the
+ * caller can fall back to its existing single-file handling.
+ */
+export async function vendorFolderEntriesFromDataTransfer(
+  dataTransfer: DataTransfer,
+): Promise<VendorFolderEntry[]> {
+  const items = Array.from(dataTransfer.items ?? [])
+  const roots: FileSystemDirectoryEntry[] = []
+  for (const item of items) {
+    if (item.kind !== "file") continue
+    // webkitGetAsEntry is the only way to see a DIRECTORY in a drop; dataTransfer.files hides it.
+    const entry = typeof item.webkitGetAsEntry === "function" ? item.webkitGetAsEntry() : null
+    if (entry?.isDirectory) roots.push(entry as FileSystemDirectoryEntry)
+  }
+  if (roots.length === 0) return []
+  const out: VendorFolderEntry[] = []
+  for (const root of roots) await readDirectoryEntry(root, root.name, out)
+  return out
+}
+
+/** Entries from a `<input type="file" webkitdirectory>` selection. */
+export function vendorFolderEntriesFromFileList(files: FileList | File[]): VendorFolderEntry[] {
+  const out: VendorFolderEntry[] = []
+  for (const file of Array.from(files)) {
+    const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath
+    out.push({ path: rel && rel.length > 0 ? rel : file.name, file })
+  }
+  return out
+}
+
+/** Name the generated archive after the dropped root folder. */
+export function archiveNameForEntries(entries: VendorFolderEntry[], fallback = "raw_fid_folder"): string {
+  const first = entries.find((e) => e.path.includes("/"))?.path ?? entries[0]?.path ?? ""
+  const root = first.split("/")[0] ?? ""
+  const safe = (root || fallback).replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "")
+  return `${safe || fallback}.zip`
+}
+
+/**
+ * Zip the folder client-side, preserving relative paths so the backend's per-directory dataset
+ * detection sees the same layout the instrument wrote.
+ */
+export async function zipVendorFolder(
+  entries: VendorFolderEntry[],
+  options: { name?: string; onProgress?: (done: number, total: number) => void } = {},
+): Promise<File> {
+  const kept = entries.filter((e) => !isIgnoredPath(e.path))
+  if (kept.length === 0) throw new Error("No usable files were found in that folder.")
+
+  const tree: Zippable = {}
+  let done = 0
+  for (const entry of kept) {
+    const buf = new Uint8Array(await entry.file.arrayBuffer())
+    // fflate builds nested folders from "a/b/c" keys, which is exactly the layout we want.
+    tree[entry.path] = buf
+    done += 1
+    options.onProgress?.(done, kept.length)
+  }
+
+  const zipped = await new Promise<Uint8Array>((resolve, reject) => {
+    zip(tree, { level: 6 }, (err, data) => (err ? reject(err) : resolve(data)))
+  })
+
+  const name = options.name ?? archiveNameForEntries(kept)
+  // Copy into a fresh ArrayBuffer so the Blob never aliases a SharedArrayBuffer-backed view.
+  const bytes = new Uint8Array(zipped.length)
+  bytes.set(zipped)
+  return new File([bytes], name, { type: "application/zip" })
+}
+
+/** Human-readable byte size for the drop summary. */
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"
+  const units = ["B", "KB", "MB", "GB"]
+  let v = bytes
+  let i = 0
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i += 1
+  }
+  return `${v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`
+}
