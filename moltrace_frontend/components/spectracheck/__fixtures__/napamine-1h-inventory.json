@@ -1,0 +1,63 @@
+{
+  "proton_inventory": {
+    "nucleus": "1H",
+    "integration_basis": "spectrum",
+    "observed": {
+      "aromatic": 9.0,
+      "anomeric_or_olefinic": 16.0,
+      "carbohydrate_sugar": 0.0,
+      "aldehyde": 0.0,
+      "carboxylic_acid": 0.0,
+      "labile": 0.0,
+      "aliphatic": 11.5,
+      "non_labile": 36.5,
+      "total": 36.5
+    },
+    "expected": {},
+    "deltas": {},
+    "warnings": [],
+    "notes": [],
+    "anomeric_cap": {
+      "applied": false,
+      "limit": null,
+      "method": "structural_anomeric_olefinic_budget",
+      "reassigned_h": 0.0
+    },
+    "bucket_hierarchy": {
+      "carbohydrate_sugar": "aliphatic",
+      "carboxylic_acid": "labile"
+    },
+    "reconciliation": {
+      "applied": false,
+      "reason": "no_reference_nmr_text"
+    },
+    "integration_scale": {
+      "basis": "data_derived",
+      "independent_total": true,
+      "raw_estimated_total_h": 29.314
+    }
+  },
+  "impurity_candidates": [
+    {
+      "shift_ppm": 0.055,
+      "integration_h": 0.5,
+      "reason": "trace-level integration; isolated singlet-like pattern",
+      "score": null,
+      "library_match": null
+    },
+    {
+      "shift_ppm": 2.109,
+      "integration_h": 0.5,
+      "reason": "trace-level integration; isolated singlet-like pattern",
+      "score": null,
+      "library_match": null
+    },
+    {
+      "shift_ppm": 8.066,
+      "integration_h": 0.5,
+      "reason": "trace-level integration; isolated singlet-like pattern",
+      "score": null,
+      "library_match": null
+    }
+  ]
+}

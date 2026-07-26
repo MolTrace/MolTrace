@@ -181,6 +181,68 @@ describe("proton inventory panel — CD3OD aromatic-protected aminoglycoside", (
     expect(row.textContent).toContain("1.0") // observed, no longer permanently "—"
   })
 
+  it("renders a REAL /nmr/processed/analyze payload (1-Napamine 1H, no SMILES)", async () => {
+    // Captured live from the backend against a 43k-point processed spectrum. This is
+    // the no-structure case: expected/deltas are empty and anomeric_cap.applied is
+    // false with limit null — precisely where the old hardcoded label wrongly said
+    // "(structure-capped)".
+    const fixture = (await import("./__fixtures__/napamine-1h-inventory.json")).default
+    const { container } = render(<ProtonInventoryPanel payload={fixture} />)
+
+    // 1. No cap is claimed, because none was applied — and no "capped at null H".
+    const anomeric = screen.getByTestId("proton-inventory-anomeric_or_olefinic")
+    expect(anomeric.textContent).not.toContain("structure-capped")
+    expect(anomeric.textContent).not.toContain("capped at")
+    expect(anomeric.textContent).not.toContain("null")
+
+    // 2. Sub-counts sit under their true parents (both are 0.0, so both render).
+    const keys = Array.from(container.querySelectorAll("[data-testid^='proton-inventory-']"))
+      .map((el) => el.getAttribute("data-testid")?.replace("proton-inventory-", "") ?? "")
+      .filter((k) => k && k !== "warnings" && k !== "notes")
+    expect(keys[keys.indexOf("carbohydrate_sugar") - 1]).toBe("aliphatic")
+    expect(keys[keys.indexOf("carboxylic_acid") - 1]).toBe("labile")
+
+    // 3. With no structure there is nothing to disagree or agree with.
+    expect(screen.queryByTestId("proton-inventory-warnings")).toBeNull()
+    expect(screen.queryByTestId("proton-inventory-notes")).toBeNull()
+
+    // 4. Observed integrals still render on the inventory scale.
+    expect(screen.getByTestId("proton-inventory-aromatic").textContent).toContain("9.0")
+    expect(screen.getByTestId("proton-inventory-total").textContent).toContain("36.5")
+  })
+
+  it("renders a REAL structure-aware CD3OD payload end-to-end (1-Napamine + SMILES)", async () => {
+    // Captured live from /nmr/processed/analyze on the same 43k-point spectrum with
+    // candidates_text=NCCc1cccc2ccccc12 and solvent=CD3OD. This single payload
+    // exercises every change in the handoff at once.
+    const fixture = (await import("./__fixtures__/napamine-1h-cd3od-structure.json")).default
+    render(<ProtonInventoryPanel payload={fixture} />)
+
+    // §1 — the cap WAS applied here, with limit 0. `0` is falsy, so a truthy check
+    // would have silently degraded this to a vague "structural budget" claim.
+    const anomeric = screen.getByTestId("proton-inventory-anomeric_or_olefinic")
+    expect(anomeric.textContent).toContain("capped at 0 H")
+    expect(anomeric.textContent).toContain("9.0 H reassigned")
+
+    // §3 — the CD3OD exchange confirmation renders in the positive channel.
+    const notes = screen.getByTestId("proton-inventory-notes")
+    expect(notes.textContent).toContain("consistent with exchange")
+    expect(notes.textContent).toContain("Consistent with the structure")
+
+    // §4 — THE regression this handoff was written for: labile Δ is -2.0, which the
+    // old client-side |Δ| >= 1.0 rule would have painted amber. The backend
+    // deliberately raised no labile warning (the absence is expected in CD3OD), so
+    // the row must stay neutral.
+    const labile = screen.getByTestId("proton-inventory-labile")
+    expect(labile.textContent).toContain("-2.0")
+    expect(labile.innerHTML).not.toContain("--mt-amber")
+
+    // …while the rows the backend DID flag are amber.
+    for (const key of ["aromatic", "aliphatic", "non_labile", "total"]) {
+      expect(screen.getByTestId(`proton-inventory-${key}`).innerHTML).toContain("--mt-amber")
+    }
+  })
+
   it("tolerates a payload without the new fields (incremental backend rollout)", () => {
     const legacy = {
       proton_inventory: {

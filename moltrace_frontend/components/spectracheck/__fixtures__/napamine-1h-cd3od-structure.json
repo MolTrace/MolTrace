@@ -1,0 +1,67 @@
+{
+  "proton_inventory": {
+    "nucleus": "1H",
+    "integration_basis": "spectrum",
+    "observed": {
+      "aromatic": 23.5,
+      "anomeric_or_olefinic": 0.0,
+      "carbohydrate_sugar": 0.0,
+      "aldehyde": 0.0,
+      "carboxylic_acid": 0.0,
+      "labile": 0.0,
+      "aliphatic": 22.5,
+      "non_labile": 46.0,
+      "total": 46.0
+    },
+    "expected": {
+      "aromatic": 7,
+      "anomeric_or_olefinic": 0,
+      "aldehyde": 0,
+      "aliphatic": 4,
+      "labile": 2,
+      "non_labile": 11,
+      "total": 13,
+      "oh": 0,
+      "nh": 2,
+      "sh": 0,
+      "labile_subset": "NH"
+    },
+    "deltas": {
+      "aromatic": 16.5,
+      "anomeric_or_olefinic": 0.0,
+      "aldehyde": 0.0,
+      "aliphatic": 18.5,
+      "labile": -2.0,
+      "non_labile": 35.0,
+      "total": 33.0
+    },
+    "warnings": [
+      "Observed aromatic integration is +16.5 H above the structural expectation (7 H) \u2014 likely overlap, impurity, or unresolved multiplet.",
+      "Observed aliphatic integration is +18.5 H above the structural expectation (4 H) \u2014 likely overlap, impurity, or unresolved multiplet.",
+      "Observed non_labile integration is +35.0 H above the structural expectation (11 H) \u2014 likely overlap, impurity, or unresolved multiplet.",
+      "Observed total integration is +33.0 H above the structural expectation (13 H) \u2014 likely overlap, impurity, or unresolved multiplet."
+    ],
+    "notes": [
+      "CD3OD exchanges NH/OH/SH protons for deuterium, so the 2 labile H are expected to be absent from the 1H spectrum. Observed 0.0 H \u2014 consistent with exchange."
+    ],
+    "anomeric_cap": {
+      "applied": true,
+      "limit": 0,
+      "method": "structural_anomeric_olefinic_budget",
+      "reassigned_h": 9.0
+    },
+    "bucket_hierarchy": {
+      "carbohydrate_sugar": "aliphatic",
+      "carboxylic_acid": "labile"
+    },
+    "reconciliation": {
+      "applied": false,
+      "reason": "no_reference_nmr_text"
+    },
+    "integration_scale": {
+      "basis": "data_derived",
+      "independent_total": true,
+      "raw_estimated_total_h": 46.776
+    }
+  }
+}
