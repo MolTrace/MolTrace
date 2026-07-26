@@ -1281,7 +1281,11 @@ def test_nmr_processed_analyze_tobramycin_peaks_are_anomeric_not_olefinic(
             f"'{peak['category']}' without an anomeric rationale."
         )
     for peak in sugar_peaks:
-        assert "aminoglycoside" in peak["category_reason"].lower(), (
+        # The sugar-backbone rule is gated on the structure being carbohydrate-
+        # like rather than specifically aminoglycoside-like, so that aromatic
+        # protecting groups cannot disable it. The reason text is phrased for
+        # carbohydrates generally; assert the substance of the justification.
+        assert "sugar-backbone" in peak["category_reason"].lower(), (
             f"Reason must justify the sugar-backbone call: {peak['category_reason']}"
         )
 

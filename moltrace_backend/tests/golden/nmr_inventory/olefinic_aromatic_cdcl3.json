@@ -1,0 +1,100 @@
+{
+  "categories": [
+    {
+      "category": "aromatic_alkene",
+      "labile_hint": false,
+      "shift_ppm": 7.4
+    },
+    {
+      "category": "aromatic_alkene",
+      "labile_hint": false,
+      "shift_ppm": 6.72
+    },
+    {
+      "category": "oxygenated",
+      "labile_hint": false,
+      "shift_ppm": 5.75
+    },
+    {
+      "category": "olefinic",
+      "labile_hint": false,
+      "shift_ppm": 5.25
+    }
+  ],
+  "impurities": [],
+  "inventory": {
+    "anomeric_cap": {
+      "applied": true,
+      "limit": 3,
+      "method": "structural_anomeric_olefinic_budget",
+      "reassigned_h": 1.0
+    },
+    "bucket_hierarchy": {
+      "carbohydrate_sugar": "aliphatic",
+      "carboxylic_acid": "labile"
+    },
+    "deltas": {
+      "aldehyde": 0.0,
+      "aliphatic": 1.0,
+      "anomeric_or_olefinic": -2.0,
+      "aromatic": 1.0,
+      "labile": 0.0,
+      "non_labile": 0.0,
+      "total": 0.0
+    },
+    "expected": {
+      "aldehyde": 0,
+      "aliphatic": 0,
+      "anomeric_or_olefinic": 3,
+      "aromatic": 5,
+      "labile": 0,
+      "labile_subset": "",
+      "nh": 0,
+      "non_labile": 8,
+      "oh": 0,
+      "sh": 0,
+      "total": 8
+    },
+    "integration_basis": "nmr_text_guided",
+    "notes": [],
+    "nucleus": "1H",
+    "observed": {
+      "aldehyde": 0.0,
+      "aliphatic": 1.0,
+      "anomeric_or_olefinic": 1.0,
+      "aromatic": 6.0,
+      "carbohydrate_sugar": 0.0,
+      "carboxylic_acid": 0.0,
+      "labile": 0.0,
+      "non_labile": 8.0,
+      "total": 8.0
+    },
+    "warnings": [
+      "Observed aromatic integration is +1.0 H above the structural expectation (5 H) \u2014 likely overlap, impurity, or unresolved multiplet.",
+      "Observed anomeric_or_olefinic integration is -2.0 H below the structural expectation (3 H) \u2014 possible exchange, suppression, or truncation.",
+      "Observed aliphatic integration is +1.0 H above the structural expectation (0 H) \u2014 likely overlap, impurity, or unresolved multiplet."
+    ]
+  },
+  "labile": {
+    "confidence": null,
+    "expected_labile_h": 0,
+    "expected_nh_h": 0,
+    "expected_oh_h": 0,
+    "expected_sh_h": 0,
+    "labile_subset": "",
+    "notes": [],
+    "observed_labile_candidates": []
+  },
+  "solvent": "CDCl3",
+  "structure": {
+    "aliphatic_protons": 3,
+    "anomeric_proton_count": 0,
+    "aromatic_atom_count": 6,
+    "aromatic_protons": 5,
+    "formula": "C8H8",
+    "labile_hydrogens": 0,
+    "non_labile_hydrogens": 8,
+    "olefinic_proton_count": 3,
+    "total_hydrogens": 8
+  }
+}

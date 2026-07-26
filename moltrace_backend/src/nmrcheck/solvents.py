@@ -171,6 +171,34 @@ def get_solvent_profile(solvent: str | None) -> SolventProfile | None:
     return None
 
 
+# Deuterated PROTIC solvents exchange labile protons for solvent deuterium, so
+# OH / NH / SH resonances disappear from the 1H spectrum within seconds. Their
+# ABSENCE is the expected result for these solvents, not a deviation from the
+# structure — reporting it as a shortfall is a false alarm.
+#
+# Aprotic deuterated solvents (DMSO-d6, CDCl3, acetone-d6, CD3CN, C6D6,
+# pyridine-d5, THF-d8, toluene-d8) are deliberately absent: they do NOT
+# exchange, which is precisely why DMSO-d6 is chosen when OH/NH must be
+# observed. Keyed on canonical_name so every registered alias resolves.
+EXCHANGEABLE_LABILE_ELEMENTS: dict[str, frozenset[str]] = {
+    "D2O": frozenset({"OH", "NH", "SH"}),
+    "CD3OD": frozenset({"OH", "NH", "SH"}),
+}
+
+
+def solvent_exchangeable_elements(solvent: str | None) -> frozenset[str]:
+    """Return the labile element classes this solvent exchanges away."""
+    profile = get_solvent_profile(solvent)
+    if profile is None:
+        return frozenset()
+    return EXCHANGEABLE_LABILE_ELEMENTS.get(profile.canonical_name, frozenset())
+
+
+def solvent_exchanges_labile_protons(solvent: str | None) -> bool:
+    """True when OH/NH/SH are expected to be invisible in this solvent."""
+    return bool(solvent_exchangeable_elements(solvent))
+
+
 def find_solvent_peak_hits(peaks: list[Peak], solvent: str | None) -> list[SolventHeuristicHit]:
     profile = get_solvent_profile(solvent)
     if profile is None:

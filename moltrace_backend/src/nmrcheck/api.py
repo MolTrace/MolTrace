@@ -10450,6 +10450,7 @@ async def nmr_processed_analyze_route(
         peaks=peaks,
         structure=structure_summary,
         nucleus=nucleus,
+        solvent=solvent,
     )
     proton_reconciliation_payload = metadata.get("proton_peak_reconciliation")
     if isinstance(proton_reconciliation_payload, dict) and proton_inventory:
@@ -11101,6 +11102,7 @@ async def nmr_raw_fid_process_route(
         peaks=fid_peaks,
         structure=structure_summary,
         nucleus=nucleus,
+        solvent=solvent,
     )
     if raw_proton_reconciliation.get("applied") and proton_inventory:
         proton_inventory["reconciliation"] = raw_proton_reconciliation

@@ -170,6 +170,10 @@ class StructureSummary(BaseModel):
     # for back-compat with older serialised summaries.
     olefinic_proton_count: int = 0
     anomeric_proton_count: int = 0
+    # Aldehyde CHO protons (9-10 ppm). Counted separately because RDKit treats
+    # the CHO hydrogen as an ordinary non-aromatic C-H, so without this the
+    # aldehyde inventory row has no structural expectation to check against.
+    aldehyde_proton_count: int = 0
 
 
 class SolventHeuristicHit(BaseModel):

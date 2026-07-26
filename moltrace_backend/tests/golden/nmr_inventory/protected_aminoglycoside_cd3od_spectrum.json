@@ -1,0 +1,199 @@
+{
+  "categories": [
+    {
+      "category": "aromatic_alkene",
+      "labile_hint": false,
+      "shift_ppm": 7.3
+    },
+    {
+      "category": "anomeric",
+      "labile_hint": false,
+      "shift_ppm": 5.45
+    },
+    {
+      "category": "anomeric",
+      "labile_hint": false,
+      "shift_ppm": 5.3
+    },
+    {
+      "category": "carbohydrate_sugar",
+      "labile_hint": false,
+      "shift_ppm": 5.2
+    },
+    {
+      "category": "carbohydrate_sugar",
+      "labile_hint": false,
+      "shift_ppm": 5.1
+    },
+    {
+      "category": "solvent",
+      "labile_hint": false,
+      "shift_ppm": 4.87
+    },
+    {
+      "category": "carbohydrate_sugar",
+      "labile_hint": false,
+      "shift_ppm": 4.1
+    },
+    {
+      "category": "carbohydrate_sugar",
+      "labile_hint": false,
+      "shift_ppm": 3.8
+    },
+    {
+      "category": "carbohydrate_sugar",
+      "labile_hint": false,
+      "shift_ppm": 3.55
+    },
+    {
+      "category": "solvent",
+      "labile_hint": false,
+      "shift_ppm": 3.31
+    },
+    {
+      "category": "nitrogen_adjacent",
+      "labile_hint": false,
+      "shift_ppm": 2.6
+    },
+    {
+      "category": "impurity",
+      "labile_hint": false,
+      "shift_ppm": 2.109
+    },
+    {
+      "category": "aliphatic",
+      "labile_hint": false,
+      "shift_ppm": 1.95
+    },
+    {
+      "category": "aliphatic",
+      "labile_hint": false,
+      "shift_ppm": 1.55
+    },
+    {
+      "category": "impurity",
+      "labile_hint": false,
+      "shift_ppm": 1.247
+    }
+  ],
+  "impurities": [
+    {
+      "integration_h": 30.0,
+      "library_match": {
+        "delta_ppm": 0.0,
+        "expected_ppm": 4.87,
+        "kind": "water",
+        "label": "water H2O",
+        "observed_ppm": 4.87,
+        "solvent": "CD3OD"
+      },
+      "reason": "matches embedded impurity shift for water H2O (4.87 ppm)",
+      "score": null,
+      "shift_ppm": 4.87
+    },
+    {
+      "integration_h": 0.5,
+      "library_match": {
+        "delta_ppm": 0.011,
+        "expected_ppm": 2.12,
+        "kind": "impurity",
+        "label": "ethyl methyl ketone CH3CO",
+        "observed_ppm": 2.109,
+        "solvent": "CD3OD"
+      },
+      "reason": "matches embedded impurity shift for ethyl methyl ketone CH3CO (2.12 ppm)",
+      "score": null,
+      "shift_ppm": 2.109
+    },
+    {
+      "integration_h": 0.5,
+      "library_match": {
+        "delta_ppm": 0.007,
+        "expected_ppm": 1.24,
+        "kind": "impurity",
+        "label": "ethyl acetate OCH2CH3",
+        "observed_ppm": 1.247,
+        "solvent": "CD3OD"
+      },
+      "reason": "matches embedded impurity shift for ethyl acetate OCH2CH3 (1.24 ppm)",
+      "score": null,
+      "shift_ppm": 1.247
+    }
+  ],
+  "inventory": {
+    "anomeric_cap": {
+      "applied": true,
+      "limit": 2,
+      "method": "structural_anomeric_olefinic_budget",
+      "reassigned_h": 8.0
+    },
+    "bucket_hierarchy": {
+      "carbohydrate_sugar": "aliphatic",
+      "carboxylic_acid": "labile"
+    },
+    "deltas": {
+      "aldehyde": 0.0,
+      "aliphatic": 0.0,
+      "anomeric_or_olefinic": 0.0,
+      "aromatic": 0.0,
+      "labile": -6.0,
+      "non_labile": 0.0,
+      "total": -6.0
+    },
+    "expected": {
+      "aldehyde": 0,
+      "aliphatic": 26,
+      "anomeric_or_olefinic": 2,
+      "aromatic": 35,
+      "labile": 6,
+      "labile_subset": "NH",
+      "nh": 6,
+      "non_labile": 63,
+      "oh": 0,
+      "sh": 0,
+      "total": 69
+    },
+    "integration_basis": "spectrum",
+    "notes": [
+      "CD3OD exchanges NH/OH/SH protons for deuterium, so the 6 labile H are expected to be absent from the 1H spectrum. Observed 0.0 H \u2014 consistent with exchange."
+    ],
+    "nucleus": "1H",
+    "observed": {
+      "aldehyde": 0.0,
+      "aliphatic": 26.0,
+      "anomeric_or_olefinic": 2.0,
+      "aromatic": 35.0,
+      "carbohydrate_sugar": 18.0,
+      "carboxylic_acid": 0.0,
+      "labile": 0.0,
+      "non_labile": 63.0,
+      "total": 63.0
+    },
+    "warnings": []
+  },
+  "labile": {
+    "confidence": 0.95,
+    "expected_labile_h": 6,
+    "expected_nh_h": 6,
+    "expected_oh_h": 0,
+    "expected_sh_h": 0,
+    "labile_subset": "NH",
+    "notes": [
+      "Structure declares 6 labile H atom(s) (NH): 6 NH.",
+      "CD3OD exchanges NH signals for deuterium; missing labile peaks are expected."
+    ],
+    "observed_labile_candidates": []
+  },
+  "solvent": "CD3OD",
+  "structure": {
+    "aliphatic_protons": 28,
+    "anomeric_proton_count": 2,
+    "aromatic_atom_count": 42,
+    "aromatic_protons": 35,
+    "formula": "C53H63N5O16",
+    "labile_hydrogens": 6,
+    "non_labile_hydrogens": 63,
+    "olefinic_proton_count": 0,
+    "total_hydrogens": 69
+  }
+}
