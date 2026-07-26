@@ -7,16 +7,13 @@ import {
   useSpectraCheckTabLink,
 } from "@/components/spectracheck/spectracheck-tab-state-context"
 import { apiFetch } from "@/lib/api/client"
-import { trackFileUploaded } from "@/src/lib/analytics/analytics-client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
-import { buildAnalysisJobPayload } from "@/src/lib/spectracheck/buildAnalysisJobPayload"
 import {
   COMPOUND_CLASS_UNSPECIFIED,
   compoundClassForRequest,
   type CompoundClassValue,
 } from "@/src/lib/spectracheck/compound-classes"
 import type { SessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
-import { normalizeSessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { SPECTRACHECK_RAW_FID_ACCEPT, isRawFidArchiveFilename } from "@/src/lib/spectracheck/spectrum-file-formats"
 import {
   archiveNameForEntries,
@@ -413,7 +410,6 @@ export function SpectraCheckRawFidSection({
     (v: string) => update({ sessionRawFileIdChoice: v }),
     [update],
   )
-  const setJobActionError = useCallback((v: string) => update({ jobActionError: v }), [update])
   const setSelectedFile = useCallback((v: File | null) => update({ selectedFile: v }), [update])
   const setSelectedFileName = useCallback(
     (v: string | null) => update({ selectedFileName: v }),
@@ -533,92 +529,11 @@ export function SpectraCheckRawFidSection({
       (f.file_kind === "raw_fid" || f.file_kind === "spectrum_archive") && isRawFidArchiveFilename(f.filename),
   )
 
-  async function ensureRawFidInputFileId(): Promise<string | null> {
-    if (sessionRawFileIdChoice.trim()) return sessionRawFileIdChoice.trim()
-    const file = getSelectedFile()
-    if (!file) return null
-    const fd = new FormData()
-    fd.append("file", file)
-    fd.append("file_kind", "raw_fid")
-    const data = await apiFetch<unknown>("/files/upload", { method: "POST", body: fd })
-    const rec = normalizeSessionFileRecord(data)
-    trackFileUploaded({
-      session_id: ws?.backendSessionId ?? undefined,
-      metadata: {
-        file_kind: "raw_fid",
-        file_size_bytes: file.size,
-        has_sha256: Boolean(rec?.sha256),
-      },
-    })
-    await ws?.refreshSessionFiles()
-    return rec?.file_id ?? null
-  }
-
-  async function startRawPreviewJob() {
-    setJobActionError("")
-    try {
-      const fid = await ensureRawFidInputFileId()
-      if (!fid) {
-        setJobActionError("Choose a session raw FID archive or pick a local archive.")
-        return
-      }
-      const ccParam = compoundClassForRequest(compoundClass)
-      const jid = await analysisJob.createJob(
-        buildAnalysisJobPayload({
-          sessionId: ws?.backendSessionId ?? null,
-          sampleId,
-          jobType: "nmr_raw_fid_preview",
-          inputFileIds: [fid],
-          parameters: {
-            solvent,
-            nucleus,
-            vendor,
-            ...(ccParam ? { compound_class: ccParam } : {}),
-          },
-        }),
-      )
-      if (jid) ws?.registerAnalysisJob(jid)
-    } catch (err) {
-      setJobActionError(formatApiError(err, "Could not start raw FID preview job"))
-    }
-  }
-
-  async function startRawProcessJob() {
-    setJobActionError("")
-    try {
-      const fid = await ensureRawFidInputFileId()
-      if (!fid) {
-        setJobActionError("Choose a session raw FID archive or pick a local archive.")
-        return
-      }
-      const ccParam = compoundClassForRequest(compoundClass)
-      const cand = candidatesText.trim()
-      const sharedProton = protonText.trim()
-      const sharedCarbon = carbonText.trim()
-      const jid = await analysisJob.createJob(
-        buildAnalysisJobPayload({
-          sessionId: ws?.backendSessionId ?? null,
-          sampleId,
-          jobType: "nmr_raw_fid_process",
-          inputFileIds: [fid],
-          parameters: {
-            solvent,
-            nucleus,
-            vendor,
-            processing_preset: preset,
-            preserve_raw: true,
-            ...(ccParam ? { compound_class: ccParam } : {}),
-            ...(cand ? { candidates_text: cand } : {}),
-            ...(sharedProton ? { proton_nmr_text: sharedProton } : {}),
-            ...(sharedCarbon ? { carbon13_text: sharedCarbon } : {}),
-          },
-        }),
-      )
-      if (jid) ws?.registerAnalysisJob(jid)
-    } catch (err) {
-      setJobActionError(formatApiError(err, "Could not start raw FID process job"))
-    }
-  }
+  // NOTE: raw-FID BACKGROUND JOBS were removed here. The server registers the
+  // nmr_raw_fid_preview/process job types but has no execution adapter for them, so every
+  // such job was created already failed — after uploading the entire archive to /files/upload.
+  // The direct Preview/Process calls below are the working path. Restore from git history if
+  // the backend gains an adapter.
 
   function appendSharedSessionGuidance(fd: FormData) {
     const ccParam = compoundClassForRequest(compoundClass)
@@ -1549,6 +1464,11 @@ export function SpectraCheckRawFidSection({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed bg-muted/20 px-3 py-2">
             <div className="flex flex-wrap items-center gap-2">
               <PlayCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+              {/* Background jobs are NOT available for raw FID on this deployment: the job types
+                  are registered but the server has no execution adapter for them, so every such
+                  job is created already failed — after uploading the whole archive. Rather than
+                  offer a control that always fails and wastes a multi-megabyte upload, the entry
+                  point is disabled and says so. The buttons above run the analysis directly. */}
               <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 Background job
               </span>
@@ -1556,8 +1476,9 @@ export function SpectraCheckRawFidSection({
                 type="button"
                 variant="outline"
                 size="sm"
+                disabled
+                title="Background processing is not available for raw FID yet — use the buttons above, which run the analysis directly."
                 className="h-7 px-2 font-mono text-[11px]"
-                onClick={() => void startRawPreviewJob()}
               >
                 Preview
               </Button>
@@ -1565,11 +1486,15 @@ export function SpectraCheckRawFidSection({
                 type="button"
                 variant="outline"
                 size="sm"
+                disabled
+                title="Background processing is not available for raw FID yet — use the buttons above, which run the analysis directly."
                 className="h-7 px-2 font-mono text-[11px]"
-                onClick={() => void startRawProcessJob()}
               >
                 Process
               </Button>
+              <span className="text-[10px] text-muted-foreground">
+                not available yet — the buttons above run it directly
+              </span>
             </div>
             <Button
               type="button"
