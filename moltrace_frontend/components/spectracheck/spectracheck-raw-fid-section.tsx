@@ -18,6 +18,16 @@ import {
 import type { SessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { normalizeSessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { SPECTRACHECK_RAW_FID_ACCEPT, isRawFidArchiveFilename } from "@/src/lib/spectracheck/spectrum-file-formats"
+import {
+  archiveNameForEntries,
+  dataTransferHasDirectory,
+  detectVendorDataset,
+  formatBytes,
+  vendorFolderEntriesFromDataTransfer,
+  vendorFolderEntriesFromFileList,
+  zipVendorFolder,
+  type VendorFolderDetection,
+} from "@/src/lib/spectracheck/vendor-folder-drop"
 import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
 import { SpectrumViewer } from "@/components/science/SpectrumViewer"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
@@ -429,6 +439,11 @@ export function SpectraCheckRawFidSection({
 
   // dragOver is purely ephemeral visual state — fine to reset on remount.
   const [dragOver, setDragOver] = useState(false)
+  /** Vendor-folder drop: zip client-side so the upload contract stays "one archive". */
+  const folderRef = useRef<HTMLInputElement>(null)
+  const [folderBusy, setFolderBusy] = useState<string | null>(null)
+  const [folderDetection, setFolderDetection] = useState<VendorFolderDetection | null>(null)
+  const [folderError, setFolderError] = useState<string | null>(null)
   // Local state for the collapsible "Processing parameters" panel at the
   // bottom of the results. Reference data the reviewer only opens when they
   // need to audit the FID processing knobs, so the default is closed.
@@ -451,6 +466,35 @@ export function SpectraCheckRawFidSection({
       // Test environments may forbid assigning FileList.
     }
   }, [selectedFile])
+
+  /**
+   * Accept a dropped/selected vendor dataset FOLDER (Bruker, Varian/Agilent) the way MestReNova
+   * does: inspect it, zip it in the browser preserving relative paths, and hand the archive to
+   * the normal upload path. The server contract is unchanged — it still receives one archive.
+   */
+  async function attachVendorFolder(entries: Awaited<ReturnType<typeof vendorFolderEntriesFromDataTransfer>>) {
+    setFolderError(null)
+    setFolderDetection(null)
+    if (entries.length === 0) return
+    const detection = detectVendorDataset(entries)
+    setFolderDetection(detection)
+    if (!detection.usable) {
+      setFolderError(detection.reason ?? "That folder does not contain a readable dataset.")
+      return
+    }
+    try {
+      setFolderBusy(`Packaging ${detection.fileCount} files…`)
+      const archive = await zipVendorFolder(entries, {
+        name: archiveNameForEntries(entries),
+        onProgress: (done, total) => setFolderBusy(`Packaging ${done}/${total} files…`),
+      })
+      attachFile(archive)
+    } catch (err) {
+      setFolderError(err instanceof Error ? err.message : "Could not package that folder.")
+    } finally {
+      setFolderBusy(null)
+    }
+  }
 
   function attachFile(file: File) {
     setSelectedFile(file)
@@ -1104,7 +1148,7 @@ export function SpectraCheckRawFidSection({
             <div
               role="button"
               tabIndex={0}
-              aria-label="Drop raw FID archive or press Enter to browse"
+              aria-label="Drop raw FID archive or instrument folder, or press Enter to browse"
               onClick={() => fileRef.current?.click()}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -1120,8 +1164,29 @@ export function SpectraCheckRawFidSection({
               onDrop={(e) => {
                 e.preventDefault()
                 setDragOver(false)
-                const file = e.dataTransfer.files?.[0]
-                if (file) attachFile(file)
+                // A dropped DIRECTORY is invisible to dataTransfer.files — it only shows up via
+                // webkitGetAsEntry. Probe for one SYNCHRONOUSLY so an ordinary archive drop stays
+                // synchronous (no behaviour change); only a real folder takes the async path.
+                const dt = e.dataTransfer
+                if (dataTransferHasDirectory(dt)) {
+                  void (async () => {
+                    try {
+                      const entries = await vendorFolderEntriesFromDataTransfer(dt)
+                      if (entries.length > 0) await attachVendorFolder(entries)
+                    } catch (err) {
+                      setFolderError(
+                        err instanceof Error ? err.message : "Could not read that folder.",
+                      )
+                    }
+                  })()
+                  return
+                }
+                const file = dt.files?.[0]
+                if (file) {
+                  setFolderDetection(null)
+                  setFolderError(null)
+                  attachFile(file)
+                }
               }}
               className={cn(
                 "group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors",
@@ -1139,12 +1204,95 @@ export function SpectraCheckRawFidSection({
                 aria-hidden
               />
               <p className="font-mono text-sm font-bold tracking-tight">
-                {selectedFileName ? "Archive ready" : dragOver ? "Drop to attach" : "Drop raw FID archive or click to browse"}
+                {folderBusy
+                  ? folderBusy
+                  : selectedFileName
+                    ? "Archive ready"
+                    : dragOver
+                      ? "Drop to attach"
+                      : "Drop the instrument folder or an archive"}
               </p>
               <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                ZIP · TAR.GZ · TGZ
+                Bruker / Varian folder · ZIP · TAR.GZ · TGZ
+              </p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Drop the acquisition folder straight from the spectrometer — it is packaged in your
+                browser, so nothing leaves this machine until you start the analysis.
               </p>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                disabled={folderBusy != null}
+                onClick={() => folderRef.current?.click()}
+              >
+                Choose folder…
+              </Button>
+              <span className="text-[10px] text-muted-foreground">
+                or click the box above to pick a single archive file
+              </span>
+            </div>
+            {/* Folder picker — webkitdirectory is the click-to-browse twin of a directory drop. */}
+            <input
+              id="raw-folder"
+              ref={folderRef}
+              type="file"
+              className="sr-only"
+              // @ts-expect-error non-standard but universally supported directory picker attributes
+              webkitdirectory=""
+              directory=""
+              multiple
+              onChange={(e) => {
+                const files = e.target.files
+                if (files && files.length > 0) {
+                  void attachVendorFolder(vendorFolderEntriesFromFileList(files))
+                }
+                // Allow re-picking the same folder.
+                e.target.value = ""
+              }}
+            />
+            {folderError ? (
+              <p role="alert" className="text-[11px] text-destructive">
+                {folderError}
+              </p>
+            ) : null}
+            {folderDetection?.usable ? (
+              <div
+                className="rounded-md border px-3 py-2 text-[11px]"
+                style={{ borderLeft: "3px solid var(--mt-teal)" }}
+                role="status"
+              >
+                <p className="font-medium text-foreground">
+                  {folderDetection.kind === "bruker"
+                    ? "Bruker dataset"
+                    : folderDetection.kind === "varian"
+                      ? "Varian/Agilent dataset"
+                      : "Vendor dataset"}{" "}
+                  · {folderDetection.experiments.length} experiment
+                  {folderDetection.experiments.length === 1 ? "" : "s"}
+                </p>
+                <p className="text-muted-foreground">
+                  {folderDetection.fileCount} files · {formatBytes(folderDetection.totalBytes)} packaged
+                  into one archive.
+                </p>
+                {folderDetection.experiments.length > 1 ? (
+                  <p className="mt-0.5 text-muted-foreground">
+                    Contains{" "}
+                    <span className="font-mono text-foreground">
+                      {folderDetection.experiments
+                        .slice(0, 6)
+                        .map((x) => x.dir.split("/").pop() || x.dir)
+                        .join(", ")}
+                      {folderDetection.experiments.length > 6 ? " …" : ""}
+                    </span>
+                    . The analyzer selects the dataset matching the nucleus you choose below.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {/* Native input — sr-only so shadcn classes don't override hidden sizing. */}
             <input
               id="raw-file"
