@@ -38811,6 +38811,11 @@ export interface components {
              * @default 0
              */
             anomeric_proton_count: number;
+            /**
+             * Aldehyde Proton Count
+             * @default 0
+             */
+            aldehyde_proton_count: number;
         };
         /** SubscriptionPlan */
         SubscriptionPlan: {
