@@ -73,7 +73,11 @@ from .nmr_tables import (
     find_solvent_or_impurity_hits,
 )
 from .parser import ReferencePeakAssignment, parse_reference_nmr_text
-from .solvents import find_solvent_peak_hit_indices
+from .solvents import (
+    find_solvent_peak_hit_indices,
+    solvent_exchangeable_elements,
+    solvent_exchanges_labile_protons,
+)
 
 # Public peak categories. Keep the set small and visualisable; resist adding
 # every flavour of chemical region — those live in ``chemical_region`` instead.
@@ -120,13 +124,22 @@ def _formula_element_count(formula: str | None, element: str) -> int:
 
 
 def _is_carbohydrate_like_structure(structure: StructureSummary | None) -> bool:
+    """Oxygen-rich, anomeric-bearing, non-olefinic structures.
+
+    Deliberately does NOT require ``aromatic_atom_count == 0``. Benzyl, Cbz,
+    benzylidene and trityl protecting groups are the norm in synthetic
+    carbohydrate chemistry, and an aromatic gate silently disabled the entire
+    sugar-aware refinement — including the anomeric cap — for exactly the
+    samples a synthesis lab actually runs. The aromatic protons are accounted
+    for separately by their own inventory bucket, so their presence says
+    nothing about whether the core is a sugar.
+    """
     if structure is None:
         return False
     oxygen_count = _formula_element_count(getattr(structure, "formula", None), "O")
     anomeric_h = int(getattr(structure, "anomeric_proton_count", 0) or 0)
     olefinic_h = int(getattr(structure, "olefinic_proton_count", 0) or 0)
-    aromatic_atoms = int(getattr(structure, "aromatic_atom_count", 0) or 0)
-    return oxygen_count >= 4 and anomeric_h > 0 and olefinic_h == 0 and aromatic_atoms == 0
+    return oxygen_count >= 4 and anomeric_h > 0 and olefinic_h == 0
 
 
 def is_aminoglycoside_like_structure(structure: StructureSummary | None) -> bool:
@@ -205,9 +218,25 @@ def _refine_carbohydrate_peak_categories(
     peaks: Sequence[dict[str, Any]],
     structure: StructureSummary | None,
 ) -> list[dict[str, Any]]:
-    if not _is_carbohydrate_like_structure(structure):
+    """Apply the 4.4-6.0 ppm conservation cap, plus sugar-backbone routing.
+
+    Two separate concerns, deliberately gated differently:
+
+    * The **cap** is a conservation law and runs for *every* structure: a
+      molecule cannot show more anomeric/olefinic protons than it contains.
+      Peaks beyond that budget are demoted (they are heteroatom-adjacent CH
+      that drifted into the band - benzylic OCH2Ph of Cbz/Bn protecting groups
+      is the classic case at ~5.0-5.2 ppm).
+    * The **sugar-backbone routing** (2.9-5.3 ppm) is carbohydrate-specific and
+      stays gated on :func:`_is_carbohydrate_like_structure`.
+
+    Demotions are recorded on each peak so the reassignment is auditable rather
+    than a silent clamp.
+    """
+    if structure is None:
         return [dict(peak) for peak in peaks]
 
+    carbohydrate_like = _is_carbohydrate_like_structure(structure)
     expected_anomeric_count = _expected_anomeric_signal_count(structure)
     candidate_indices: list[int] = []
     for idx, peak in enumerate(peaks):
@@ -243,36 +272,49 @@ def _refine_carbohydrate_peak_categories(
             continue
 
         if idx in selected_anomeric:
-            peak["category"] = "anomeric"
-            reason = (
-                "Selected as one of the structure-supported anomeric 1H signals; "
-                "the SMILES/formula are carbohydrate-like with no olefinic protons."
-            )
+            if carbohydrate_like:
+                reason = (
+                    "Selected as one of the structure-supported anomeric 1H signals; "
+                    "the SMILES/formula are carbohydrate-like with no olefinic protons."
+                )
+                peak["category"] = "anomeric"
+            else:
+                reason = (
+                    f"Retained in the 4.4-6 ppm band: the structure supports "
+                    f"{expected_anomeric_count} anomeric/olefinic proton(s) and this "
+                    "peak is among the best-supported candidates."
+                )
             if aminoglycoside_like:
                 reason += " Aminoglycoside-like inputs are capped at two anomeric peaks."
             refined.append(_with_appended_reason(peak, reason))
             continue
 
-        if aminoglycoside_like and AMINOGLYCOSIDE_SUGAR_LOW_PPM <= shift_value <= AMINOGLYCOSIDE_SUGAR_HIGH_PPM:
+        if carbohydrate_like and AMINOGLYCOSIDE_SUGAR_LOW_PPM <= shift_value <= AMINOGLYCOSIDE_SUGAR_HIGH_PPM:
+            if category in {"anomeric", "anomeric_or_olefinic", "olefinic"}:
+                peak["anomeric_cap_reassigned_from"] = category
             peak["category"] = "carbohydrate_sugar"
             refined.append(
                 _with_appended_reason(
                     peak,
-                    "Aminoglycoside sugar-backbone refinement: 2.9-5.3 ppm "
-                    "belongs to the pseudo-trisaccharide CH/CH2 envelope unless "
-                    "selected as one of the two anomeric signals.",
+                    "Sugar-backbone refinement: 2.9-5.3 ppm belongs to the "
+                    "carbohydrate CH/CH2 envelope unless selected as one of the "
+                    "structure-supported anomeric signals.",
                 )
             )
             continue
 
         if category in {"anomeric", "anomeric_or_olefinic", "olefinic"} and 4.4 <= shift_value < 6.0:
+            peak["anomeric_cap_reassigned_from"] = category
             peak["category"] = "oxygenated"
             refined.append(
                 _with_appended_reason(
                     peak,
-                    "Carbohydrate-like structure has no olefinic protons and this "
-                    "peak was not selected as an anomeric signal, so it is treated "
-                    "as heteroatom-adjacent sugar/protected-carbohydrate CH.",
+                    f"The structure supports only {expected_anomeric_count} "
+                    "anomeric/olefinic proton(s) and this peak was not among the "
+                    "best-supported candidates, so it is treated as a "
+                    "heteroatom-adjacent CH that falls in the same band "
+                    "(benzylic OCH2Ar of benzyl/Cbz/benzylidene protecting groups "
+                    "resonates here).",
                 )
             )
             continue
@@ -475,6 +517,44 @@ def _solvent_hit_for_peak(
     }
 
 
+def _is_singlet_like(multiplicity: str | None) -> bool:
+    if not multiplicity:
+        return False
+    normalized = multiplicity.strip().lower()
+    return normalized in {"s", "br s", "brs", "br", "broad", "broad singlet"}
+
+
+def _is_plausible_trace_contaminant(
+    *,
+    multiplicity: str | None,
+    integration_h: float | None,
+    structure: StructureSummary | None,
+) -> bool:
+    """Decide whether an impurity-library hit may REMOVE a peak from the analyte.
+
+    The curated contaminants (grease, EtOAc, DCM, benzene, hexane, silicone)
+    are overwhelmingly singlets present at trace level. Two conditions must
+    therefore both hold before a library coincidence is allowed to delete a
+    resonance:
+
+    * singlet-like lineshape — a doublet or multiplet carries coupling the
+      tabulated contaminants do not have, so it is analyte;
+    * small integration relative to the molecule — a contaminant does not
+      account for a large share of the proton budget.
+
+    A 35 H aromatic multiplet 0.03 ppm from the benzene singlet, and a 1 H
+    anomeric doublet 0.04 ppm from dichloromethane, both fail these tests and
+    are correctly retained as analyte.
+    """
+    if not _is_singlet_like(multiplicity):
+        return False
+    if integration_h is None:
+        return True
+    total_h = float(getattr(structure, "total_hydrogens", 0) or 0) if structure else 0.0
+    budget = max(1.0, 0.02 * total_h)
+    return float(integration_h) <= budget
+
+
 def categorize_peak(
     *,
     nucleus: Nucleus,
@@ -482,6 +562,7 @@ def categorize_peak(
     multiplicity: str | None = None,
     solvent: str | None = None,
     structure: StructureSummary | None = None,
+    integration_h: float | None = None,
 ) -> dict[str, Any]:
     """Compute the per-peak enrichment dict.
 
@@ -494,6 +575,29 @@ def categorize_peak(
     )
     is_solvent_hit = bool(solvent_hit and solvent_hit.get("kind") in {"solvent", "water", "residual"})
     is_impurity_hit = bool(impurity_match and impurity_match["kind"] == "impurity")
+
+    # A curated-impurity shift falling within tolerance of an analyte resonance
+    # is a coincidence, not evidence. The impurity library is dense (71
+    # compounds x 7 solvents) with ~0.03-0.05 ppm tolerances, so on a crowded
+    # spectrum almost every analyte peak sits near SOME tabulated contaminant:
+    # a 35 H aromatic multiplet was being deleted as the benzene CH singlet and
+    # an anomeric doublet as dichloromethane. When a structure is supplied it
+    # is the stronger prior, so the match is downgraded to a review flag that
+    # annotates the peak instead of removing it from the proton inventory.
+    # This is the policy the pasted-1H-text path already applied; applying it
+    # uniformly also removes a text-vs-spectrum inconsistency.
+    #
+    # Residual solvent and water are deliberately NOT downgraded: they really
+    # are not analyte, and are routinely the largest signals in the spectrum.
+    impurity_review_only = False
+    if is_impurity_hit and structure is not None:
+        if not _is_plausible_trace_contaminant(
+            multiplicity=multiplicity,
+            integration_h=integration_h,
+            structure=structure,
+        ):
+            is_impurity_hit = False
+            impurity_review_only = True
 
     if nucleus == "1H":
         chemical_region = classify_proton_region(shift_ppm)
@@ -523,17 +627,47 @@ def categorize_peak(
         structure=structure,
     )
 
+    if labile_hint and solvent_exchanges_labile_protons(solvent):
+        # In a deuterated protic solvent the exchangeable protons are gone, so
+        # a broad singlet cannot be OH/NH/SH — it is a contaminant or an
+        # unresolved analyte multiplet. Claiming it as labile evidence
+        # contradicts the exchange model applied everywhere else.
+        labile_hint = False
+        reason = (
+            f"{reason} Broad lineshape is not treated as exchangeable-proton "
+            f"evidence because {solvent} exchanges OH/NH/SH for deuterium."
+        ).strip()
+
     if labile_hint and category not in {"solvent", "impurity"}:
         category = "labile_OH_NH_SH"
         if labile_reason:
             reason = labile_reason
+    elif labile_hint:
+        # The peak was claimed by the solvent or impurity libraries, so it is
+        # NOT exchangeable-proton evidence. Clear the flag at source rather
+        # than merely declining to overwrite the category: downstream the
+        # labile summary harvests on this boolean alone, which is how curated
+        # impurity peaks ended up presented as labile candidates whose stated
+        # reason was "Matches a curated impurity reference shift."
+        labile_hint = False
+
+    if impurity_review_only:
+        reason = (
+            f"{reason} A curated impurity shift ({impurity_match['label']}) lies "
+            "within tolerance of this peak, but the supplied structure accounts "
+            "for analyte protons here, so the overlap is a review flag rather "
+            "than grounds to remove the peak from the proton inventory."
+        ).strip()
 
     return {
         "category": category,
         "chemical_region": chemical_region,
         "labile_hint": labile_hint,
         "solvent_hit": solvent_hit,
-        "impurity_match": impurity_match,
+        # Kept out of ``impurity_match`` so downstream consumers cannot mistake
+        # a coincidental overlap for a positive contaminant identification.
+        "impurity_match": None if impurity_review_only else impurity_match,
+        "overlapping_impurity_match": impurity_match if impurity_review_only else None,
         "category_reason": reason,
     }
 
@@ -561,6 +695,7 @@ def enrich_peaks(
             multiplicity=str(raw.get("multiplicity") or "") or None,
             solvent=solvent,
             structure=structure,
+            integration_h=_peak_inventory_integration_value(raw),
         )
         if (
             nucleus == "1H"
@@ -811,7 +946,7 @@ def reconcile_proton_peaks_with_reference_text(
     if structure is not None:
         expected_visible_h = (
             float(structure.non_labile_hydrogens)
-            if solvent and solvent.upper() == "D2O"
+            if solvent_exchanges_labile_protons(solvent)
             else float(structure.total_hydrogens)
         )
 
@@ -898,6 +1033,7 @@ def build_proton_inventory(
     peaks: Sequence[dict[str, Any]],
     structure: StructureSummary | None,
     nucleus: Nucleus,
+    solvent: str | None = None,
 ) -> dict[str, Any]:
     """Aggregate observed + expected proton counts by chemical class.
 
@@ -972,11 +1108,34 @@ def build_proton_inventory(
     expected_block: dict[str, Any] = {}
     deltas: dict[str, float] = {}
     warnings: list[str] = []
+    # Positive confirmations: observations that AGREE with the structure and
+    # would otherwise be silent. Kept separate from ``warnings`` so the UI can
+    # render agreement as agreement instead of colouring it amber.
+    notes: list[str] = []
     if structure is not None:
+        # The per-class expectations must PARTITION the non-labile total.
+        # ``structure.aliphatic_protons`` counts every H on a non-aromatic
+        # carbon, so it already contains the anomeric/olefinic and aldehyde
+        # protons. Reporting it verbatim alongside its own sub-counts made the
+        # rows sum to more than the stated total, which meant the deltas could
+        # never all reach zero even for a perfectly matching spectrum.
+        # Deriving aliphatic as the remainder keeps the partition exact by
+        # construction.
+        expected_anomeric = _expected_anomeric_signal_count(structure)
+        expected_aromatic = int(structure.aromatic_protons)
+        expected_aldehyde = int(getattr(structure, "aldehyde_proton_count", 0) or 0)
+        expected_aliphatic = max(
+            0,
+            int(structure.non_labile_hydrogens)
+            - expected_aromatic
+            - expected_anomeric
+            - expected_aldehyde,
+        )
         expected_block = {
-            "aromatic": int(structure.aromatic_protons),
-            "anomeric_or_olefinic": _expected_anomeric_signal_count(structure),
-            "aliphatic": int(structure.aliphatic_protons),
+            "aromatic": expected_aromatic,
+            "anomeric_or_olefinic": expected_anomeric,
+            "aldehyde": expected_aldehyde,
+            "aliphatic": expected_aliphatic,
             "labile": int(structure.labile_hydrogens),
             "non_labile": int(structure.non_labile_hydrogens),
             "total": int(structure.total_hydrogens),
@@ -994,14 +1153,36 @@ def build_proton_inventory(
             "anomeric_or_olefinic": _round(
                 observed_anomeric_olefinic - expected_block["anomeric_or_olefinic"]
             ),
+            "aldehyde": _round(observed_aldehyde - expected_block["aldehyde"]),
             "aliphatic": _round(observed_aliphatic - expected_block["aliphatic"]),
             "labile": _round(observed_labile - expected_block["labile"]),
             "non_labile": _round(observed_non_labile - expected_block["non_labile"]),
             "total": _round(observed_total - expected_block["total"]),
         }
+        # In a deuterated protic solvent the labile protons exchange away, so
+        # their absence CONFIRMS the structure instead of contradicting it.
+        # Suppress the labile shortfall (and the total shortfall it causes) and
+        # state the expectation positively.
+        exchanging = solvent_exchanges_labile_protons(solvent)
+        exchanged_h = float(expected_block["labile"]) if exchanging else 0.0
+        if exchanging and expected_block["labile"] > 0:
+            elements = "/".join(sorted(solvent_exchangeable_elements(solvent)))
+            notes.append(
+                f"{solvent} exchanges {elements} protons for deuterium, so the "
+                f"{expected_block['labile']} labile H are expected to be absent "
+                f"from the 1H spectrum. Observed {observed_labile:.1f} H — "
+                "consistent with exchange."
+            )
+
         # Threshold for "meaningfully different from expectation".
         # 0.5 H accommodates legitimate integration rounding; > 1 H is flagged.
         for key, delta in deltas.items():
+            if exchanging and key == "labile":
+                continue
+            # The grand total is short by exactly the exchanged labile protons;
+            # that is the same expected absence, not a second problem.
+            if exchanging and key == "total" and abs(delta + exchanged_h) < 1.0:
+                continue
             if abs(delta) >= 1.0:
                 if delta > 0:
                     warnings.append(
@@ -1022,6 +1203,23 @@ def build_proton_inventory(
         else "spectrum"
     )
 
+    # Provenance for the 4.4-6.0 ppm conservation cap. The UI previously
+    # asserted "(structure-capped)" as a static label with nothing in the
+    # payload to substantiate it; this reports whether a cap was actually
+    # applied, what the limit was, and how much integration it moved.
+    reassigned_h = 0.0
+    for peak in peaks:
+        if peak.get("anomeric_cap_reassigned_from"):
+            value = _inventory_integration(peak)
+            if value is not None:
+                reassigned_h += float(value)
+    anomeric_cap: dict[str, Any] = {
+        "applied": bool(structure is not None and reassigned_h > 0),
+        "limit": expected_block.get("anomeric_or_olefinic") if expected_block else None,
+        "method": "structural_anomeric_olefinic_budget",
+        "reassigned_h": _round(reassigned_h),
+    }
+
     return {
         "nucleus": "1H",
         "integration_basis": integration_basis,
@@ -1029,6 +1227,16 @@ def build_proton_inventory(
         "expected": expected_block,
         "deltas": deltas,
         "warnings": warnings,
+        "notes": notes,
+        "anomeric_cap": anomeric_cap,
+        # ``carbohydrate_sugar`` and ``carboxylic_acid`` are SUB-counts of
+        # ``aliphatic`` and ``labile`` respectively, not sibling classes. The
+        # UI must nest them, otherwise the displayed rows do not sum to the
+        # grand total.
+        "bucket_hierarchy": {
+            "carbohydrate_sugar": "aliphatic",
+            "carboxylic_acid": "labile",
+        },
     }
 
 
@@ -1158,22 +1366,44 @@ def build_labile_hydrogen_summary(
         notes.append(
             f"Detected {len(observed)} peak(s) consistent with exchangeable protons."
         )
-    if solvent and solvent.strip().upper() == "D2O" and expected_labile:
+    exchanging_solvent = solvent_exchanges_labile_protons(solvent)
+    if exchanging_solvent and expected_labile:
         # Match the actual subset rather than the generic "OH/NH/SH" message.
         exchange_subject = subset_label if subset_label else "OH/NH/SH"
         notes.append(
-            f"D2O solvent will exchange {exchange_subject} signals; missing labile peaks are expected."
+            f"{solvent} exchanges {exchange_subject} signals for deuterium; "
+            "missing labile peaks are expected."
         )
-    if not observed and expected_labile and not (solvent and solvent.upper() == "D2O"):
+    if not observed and expected_labile and not exchanging_solvent:
         missing_subject = subset_label if subset_label else "OH/NH/SH"
         notes.append(
             f"No broad labile-region peaks detected; consider whether {missing_subject} integrations were truncated."
         )
 
-    matched = min(len(observed), expected_labile) if expected_labile else 0
+    # Confidence that the labile-proton picture is UNDERSTOOD — not a raw
+    # coverage ratio. The previous formula divided a peak COUNT by a proton
+    # COUNT and therefore scored a perfectly-explained exchanging spectrum
+    # 0.0: the more correct the pipeline was about D2O/CD3OD, the worse it
+    # claimed to be.
     confidence: float | None = None
     if expected_labile:
-        confidence = round(min(1.0, matched / max(1, expected_labile)), 4)
+        if exchanging_solvent:
+            # Absence is predicted. Observing nothing is the strong result;
+            # unexplained leftover broad peaks weaken it.
+            confidence = 0.95 if not observed else round(max(0.5, 0.95 - 0.1 * len(observed)), 4)
+        else:
+            observed_h = 0.0
+            for candidate in observed:
+                value = candidate.get("integration_h")
+                if isinstance(value, (int, float)):
+                    observed_h += float(value)
+            if observed_h > 0:
+                # Compare PROTONS with PROTONS.
+                ratio = min(observed_h, expected_labile) / float(expected_labile)
+                confidence = round(min(1.0, ratio), 4)
+            else:
+                # Non-exchanging solvent and nothing seen: genuinely unresolved.
+                confidence = 0.0
 
     return {
         "expected_labile_h": expected_labile,

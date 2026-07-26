@@ -154,7 +154,15 @@ class TestSummaries:
         assert summary["expected_labile_h"] == 1
         assert summary["observed_labile_candidates"] == []
         assert any("D2O" in note for note in summary["notes"])
-        assert summary["confidence"] == 0.0
+        # DELIBERATE RE-BASELINE. This previously asserted 0.0, which encoded a
+        # defect: D2O exchanges the labile proton away, so observing nothing is
+        # the PREDICTED result and the pipeline understands the spectrum
+        # completely. The old formula divided a peak count by a proton count,
+        # so the more correct the exchange handling was, the lower the reported
+        # confidence — it was anti-correlated with being right. Confidence now
+        # measures whether the labile picture is explained, so a fully
+        # explained exchanging spectrum scores high.
+        assert summary["confidence"] == 0.95
 
     def test_labile_hydrogen_summary_with_observed_candidate(self) -> None:
         peaks = [
@@ -645,7 +653,10 @@ class TestAminoglycosideCarbohydrateRefinement:
         assert by_shift[4.12]["category"] == "carbohydrate_sugar"
         assert by_shift[3.21]["category"] == "carbohydrate_sugar"
         assert by_shift[2.72]["category"] == "nitrogen_adjacent"
-        assert "Aminoglycoside" in by_shift[4.58]["category_reason"]
+        # The sugar-backbone rule is gated on the structure being carbohydrate-
+        # like rather than specifically aminoglycoside-like, so the reason text
+        # is phrased for carbohydrates generally. Assert the substance.
+        assert "Sugar-backbone refinement" in by_shift[4.58]["category_reason"]
 
     def test_proton_inventory_includes_sugar_backbone_and_two_anomeric_expectation(
         self,

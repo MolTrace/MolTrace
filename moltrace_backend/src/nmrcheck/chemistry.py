@@ -130,6 +130,13 @@ def count_anomeric_protons(mol: Chem.Mol) -> int:
     rule captures all classical anomeric / acetal / ketal / orthoester
     centres without false-positives on simple ethers (one O) or esters
     (sp2 / one O).
+
+    Exclusion: an O-CH-O carbon that also carries an *aromatic* substituent is
+    a benzylidene / arylidene protecting-group acetal (e.g. 4,6-O-benzylidene
+    glucosides, PMP acetals), not a glycosidic anomeric centre. Counting those
+    inflates the expected anomeric H of every aryl-protected sugar, which then
+    licenses over-assignment in the 4.4-6.0 ppm window. A genuine anomeric
+    carbon bonds two oxygens plus ring/chain carbon, never an aryl ring.
     """
     count = 0
     for atom in mol.GetAtoms():
@@ -138,15 +145,35 @@ def count_anomeric_protons(mol: Chem.Mol) -> int:
         if atom.GetIsAromatic():
             continue
         oxygen_neighbours = 0
+        has_aromatic_substituent = False
         for bond in atom.GetBonds():
+            other = bond.GetOtherAtom(atom)
+            if other.GetIsAromatic():
+                has_aromatic_substituent = True
             if bond.GetBondType() != Chem.BondType.SINGLE:
                 continue
-            other = bond.GetOtherAtom(atom)
             if other.GetAtomicNum() == 8:
                 oxygen_neighbours += 1
-        if oxygen_neighbours >= 2:
+        if oxygen_neighbours >= 2 and not has_aromatic_substituent:
             count += atom.GetTotalNumHs(includeNeighbors=False)
     return count
+
+
+def count_aldehyde_protons(mol: Chem.Mol) -> int:
+    """Count aldehyde CHO protons (9-10 ppm).
+
+    Needed so the aldehyde row of the proton inventory carries a structural
+    expectation. RDKit counts the CHO hydrogen as an ordinary non-aromatic
+    C-H, so without an explicit count it is silently absorbed into the
+    aliphatic expectation and the aldehyde row can never be checked.
+    """
+    pattern = Chem.MolFromSmarts("[CX3H1](=O)")
+    if pattern is None:
+        return 0
+    return sum(
+        mol.GetAtomWithIdx(match[0]).GetTotalNumHs(includeNeighbors=False)
+        for match in mol.GetSubstructMatches(pattern)
+    )
 
 
 def count_aromatic_atoms(mol: Chem.Mol) -> int:
@@ -179,6 +206,7 @@ def structure_summary_from_smiles(smiles: str) -> StructureSummary:
     sh_h = count_thiol_protons(mol)
     olefinic_h = count_olefinic_protons(mol)
     anomeric_h = count_anomeric_protons(mol)
+    aldehyde_h = count_aldehyde_protons(mol)
     non_labile_h = total_h - labile_h
     formula = rdMolDescriptors.CalcMolFormula(mol)
     mw = round(float(Descriptors.MolWt(mol)), 4)
@@ -196,6 +224,7 @@ def structure_summary_from_smiles(smiles: str) -> StructureSummary:
         sh_hydrogen_count=sh_h,
         olefinic_proton_count=olefinic_h,
         anomeric_proton_count=anomeric_h,
+        aldehyde_proton_count=aldehyde_h,
         non_labile_hydrogens=non_labile_h,
         aromatic_protons=aromatic_protons,
         aliphatic_protons=aliphatic_protons,

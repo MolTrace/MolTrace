@@ -1,0 +1,121 @@
+{
+  "categories": [
+    {
+      "category": "aromatic_alkene",
+      "labile_hint": false,
+      "shift_ppm": 7.45
+    },
+    {
+      "category": "oxygenated",
+      "labile_hint": false,
+      "shift_ppm": 5.52
+    },
+    {
+      "category": "anomeric",
+      "labile_hint": false,
+      "shift_ppm": 4.78
+    },
+    {
+      "category": "carbohydrate_sugar",
+      "labile_hint": false,
+      "shift_ppm": 4.25
+    },
+    {
+      "category": "carbohydrate_sugar",
+      "labile_hint": false,
+      "shift_ppm": 3.7
+    },
+    {
+      "category": "carbohydrate_sugar",
+      "labile_hint": false,
+      "shift_ppm": 3.4
+    },
+    {
+      "category": "labile_OH_NH_SH",
+      "labile_hint": true,
+      "shift_ppm": 2.4
+    }
+  ],
+  "impurities": [],
+  "inventory": {
+    "anomeric_cap": {
+      "applied": true,
+      "limit": 1,
+      "method": "structural_anomeric_olefinic_budget",
+      "reassigned_h": 1.0
+    },
+    "bucket_hierarchy": {
+      "carbohydrate_sugar": "aliphatic",
+      "carboxylic_acid": "labile"
+    },
+    "deltas": {
+      "aldehyde": 0.0,
+      "aliphatic": 0.0,
+      "anomeric_or_olefinic": 0.0,
+      "aromatic": 0.0,
+      "labile": 0.0,
+      "non_labile": 0.0,
+      "total": 0.0
+    },
+    "expected": {
+      "aldehyde": 0,
+      "aliphatic": 10,
+      "anomeric_or_olefinic": 1,
+      "aromatic": 5,
+      "labile": 2,
+      "labile_subset": "OH",
+      "nh": 0,
+      "non_labile": 16,
+      "oh": 2,
+      "sh": 0,
+      "total": 18
+    },
+    "integration_basis": "nmr_text_guided",
+    "notes": [],
+    "nucleus": "1H",
+    "observed": {
+      "aldehyde": 0.0,
+      "aliphatic": 10.0,
+      "anomeric_or_olefinic": 1.0,
+      "aromatic": 5.0,
+      "carbohydrate_sugar": 9.0,
+      "carboxylic_acid": 0.0,
+      "labile": 2.0,
+      "non_labile": 16.0,
+      "total": 18.0
+    },
+    "warnings": []
+  },
+  "labile": {
+    "confidence": 1.0,
+    "expected_labile_h": 2,
+    "expected_nh_h": 0,
+    "expected_oh_h": 2,
+    "expected_sh_h": 0,
+    "labile_subset": "OH",
+    "notes": [
+      "Structure declares 2 labile H atom(s) (OH): 2 OH.",
+      "Detected 1 peak(s) consistent with exchangeable protons."
+    ],
+    "observed_labile_candidates": [
+      {
+        "integration_h": 2.0,
+        "multiplicity": "br s",
+        "reason": "Broad lineshape is consistent with an exchangeable OH/NH/SH proton. Structure carries 2 labile H atom(s); exchange-driven broadening or D2O suppression should be expected. A curated impurity shift (toluene CH3) lies within tolerance of this peak, but the supplied structure accounts for analyte protons here, so the overlap is a review flag rather than grounds to remove the peak from the proton inventory.",
+        "shift_ppm": 2.4
+      }
+    ]
+  },
+  "solvent": "CDCl3",
+  "structure": {
+    "aliphatic_protons": 11,
+    "anomeric_proton_count": 1,
+    "aromatic_atom_count": 6,
+    "aromatic_protons": 5,
+    "formula": "C14H18O6",
+    "labile_hydrogens": 2,
+    "non_labile_hydrogens": 16,
+    "olefinic_proton_count": 0,
+    "total_hydrogens": 18
+  }
+}
