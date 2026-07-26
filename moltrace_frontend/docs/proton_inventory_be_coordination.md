@@ -2,31 +2,50 @@
 
 All six FE items from the handoff are shipped. These are **informational** — none block the change.
 
-## 1. Please do add per-row `severity` (you offered it; we now want it)
+## 1. Per-row `severity` — the FE is already wired; the field is all that is missing
 
 Handoff §4 said: *"colour a row amber if and only if a backend `warnings[]` entry refers to that
 row… If you want a cleaner contract than string-matching, ask the backend session for per-row
 `severity`."*
 
-We took the string-matching route for now, but anchored rather than fuzzy: the FE matches
-`warning.toLowerCase().startsWith("observed {key} integration")`, which is exactly how
-`build_proton_inventory` phrases every per-bucket warning. It is exported and unit-tested
-(`warningRefersToInventoryRow`).
+**We want it, and the FE now reads it already.** `inventoryFlaggedRows()` prefers a structured
+`proton_inventory.row_severity` map and falls back to prose matching when it is absent. Ship the
+field whenever convenient — no coordinated FE release is required, and no FE change either.
 
-**The risk we are carrying:** any future warning that refers to a bucket but is phrased differently
-(a different call site, a reworded message, a bucket key containing a space) will silently stop
-colouring its row — a warning that *should* be amber rendering neutral. That is a fail-open on an
-evidence panel, so a structured field is genuinely better than prose parsing here.
-
-Suggested minimal shape (additive, keeps `warnings[]` as-is):
+### The contract the FE honours today
 
 ```jsonc
-"row_severity": { "labile": "warning", "total": "warning" }   // key → "warning" | "info"
+"row_severity": {           // bucket key → severity
+  "labile": "info",         // "info"     → NOT flagged (renders neutral)
+  "aromatic": "warning",    // "warning"  → flagged (amber)
+  "total": "error"          // "error" / "critical" → also flagged
+}
 ```
 
-The FE will switch to it and keep the string matcher only as a fallback.
+Semantics the FE implements (all unit-tested in `spectracheck-proton-inventory.test.tsx`):
+
+- Values are matched case-insensitively. `warning` / `error` / `critical` flag the row; `info`
+  explicitly does not.
+- **Structured wins over prose.** If `row_severity` names at least one row with a string value,
+  the prose matcher is not consulted at all — so a map in which every row is `info` is an
+  affirmative "nothing is wrong here", and a stale/reworded warning string can no longer re-flag a
+  row you have cleared.
+- Absent / `null` / `{}` / non-object / non-string values fall back to prose, so partial or
+  malformed data degrades to today's behaviour rather than silently clearing every row.
+- Keys the FE does not render are ignored; rows missing from the map are simply unflagged.
+
+### Why this matters (the risk we were carrying)
+
+The prose matcher anchors on `warning.toLowerCase().startsWith("observed {key} integration")`,
+which is exactly how `build_proton_inventory` phrases every per-bucket warning today. But it is a
+fail-OPEN contract: a warning from a different call site, a reworded message, or a bucket key
+containing a space silently stops colouring its row — a real disagreement rendering neutral on an
+evidence panel. The structured field removes that failure mode entirely.
 
 ## 2. A row can be discrepant, unflagged, and therefore visually silent
+
+> Largely closed by item 1 once `row_severity` ships — a bucket you consider discrepant can be
+> marked `warning` even when you choose not to emit prose for it.
 
 Because we removed the client-side `|Δ| >= 1.0` rule (correctly — it was a second copy of your
 threshold), a row whose Δ is large but which the backend did not warn about now renders with no

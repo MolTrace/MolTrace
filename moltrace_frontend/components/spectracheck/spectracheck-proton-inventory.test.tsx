@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import {
   ProtonInventoryPanel,
+  inventoryFlaggedRows,
   inventoryRowsWithWarnings,
   warningRefersToInventoryRow,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
@@ -61,6 +62,50 @@ describe("proton inventory — warning/row association (no client-side threshold
     expect(flagged.has("total")).toBe(true)
     expect(flagged.has("aromatic")).toBe(false)
     expect(flagged.has("aliphatic")).toBe(false)
+  })
+
+  const KEYS = ["aromatic", "labile", "total", "aliphatic"]
+
+  it("prefers structured row_severity over prose when the backend supplies it", () => {
+    // Deliberately contradictory: the prose names `labile`, the structured field names
+    // `aromatic`. The structured contract must win — that is the point of adding it.
+    const flagged = inventoryFlaggedRows(
+      ["Observed labile integration is -6.0 H below the structural expectation (6 H) — …"],
+      KEYS,
+      { aromatic: "warning", labile: "info" },
+    )
+    expect(flagged.has("aromatic")).toBe(true)
+    expect(flagged.has("labile")).toBe(false) // info is not an alert
+    expect(flagged.has("total")).toBe(false)
+  })
+
+  it("treats error/critical as alerts and info as not, case-insensitively", () => {
+    const flagged = inventoryFlaggedRows([], KEYS, {
+      aromatic: "ERROR",
+      labile: "critical",
+      total: "Info",
+      aliphatic: "warning",
+    })
+    expect([...flagged].sort()).toEqual(["aliphatic", "aromatic", "labile"])
+  })
+
+  it("falls back to prose when row_severity is absent, empty, or unusable", () => {
+    const prose = ["Observed labile integration is -6.0 H below the structural expectation (6 H) — …"]
+    for (const rowSeverity of [undefined, null, {}, "nope", { labile: 7 }]) {
+      const flagged = inventoryFlaggedRows(prose, KEYS, rowSeverity)
+      expect(flagged.has("labile")).toBe(true)
+    }
+  })
+
+  it("a structured map that flags nothing means nothing is flagged (not a fallback)", () => {
+    // All rows reported as info == an affirmative "no alerts", so the prose must NOT
+    // re-flag a row the backend has explicitly cleared.
+    const flagged = inventoryFlaggedRows(
+      ["Observed labile integration is -6.0 H below the structural expectation (6 H) — …"],
+      KEYS,
+      { labile: "info" },
+    )
+    expect(flagged.size).toBe(0)
   })
 })
 

@@ -385,6 +385,39 @@ export function inventoryRowsWithWarnings(warnings: string[], keys: string[]): S
   return flagged
 }
 
+/** Severities that mean "this row disagrees with the structure" (amber). ``info`` does not. */
+const INVENTORY_ALERT_SEVERITIES = new Set(["warning", "error", "critical"])
+
+/**
+ * Rows to colour amber — structured `row_severity` when the backend provides it, else the
+ * prose matcher.
+ *
+ * Prose matching is a fail-OPEN contract: a warning phrased differently (new call site,
+ * reworded message) silently stops colouring its row, so a real disagreement renders neutral.
+ * `row_severity` is the structured replacement — `{ "labile": "warning", … }` — and takes
+ * precedence whenever it is present and non-empty. Both are read here so the FE closes the gap
+ * the moment the field ships, with no lockstep release.
+ */
+export function inventoryFlaggedRows(
+  warnings: string[],
+  keys: string[],
+  rowSeverity: unknown,
+): Set<string> {
+  if (isRecord(rowSeverity)) {
+    const flagged = new Set<string>()
+    let sawAny = false
+    for (const key of keys) {
+      const sev = rowSeverity[key]
+      if (typeof sev !== "string") continue
+      sawAny = true
+      if (INVENTORY_ALERT_SEVERITIES.has(sev.toLowerCase())) flagged.add(key)
+    }
+    // An empty/unrecognised map is not an assertion that nothing is wrong — fall back.
+    if (sawAny) return flagged
+  }
+  return inventoryRowsWithWarnings(warnings, keys)
+}
+
 /** Order the rendered rows so each sub-count sits DIRECTLY under its true parent.
  *
  * The static row list is display order, not structure: ``carbohydrate_sugar`` is a
@@ -452,9 +485,11 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
   const capApplied = anomericCap?.applied === true
   const capLimit = anomericCap ? asNumber(anomericCap.limit) : null
   const capReassigned = anomericCap ? asNumber(anomericCap.reassigned_h) : null
-  const flaggedRows = inventoryRowsWithWarnings(
+  // Structured per-row severity when the backend supplies it; prose matching otherwise.
+  const flaggedRows = inventoryFlaggedRows(
     warnings,
     PROTON_INVENTORY_ROWS.map((r) => r.key),
+    inventory.row_severity,
   )
   const hasObserved = Object.values(observed).some(
     (v) => typeof v === "number" && v > 0,
