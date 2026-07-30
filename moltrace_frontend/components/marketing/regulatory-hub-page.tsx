@@ -23,6 +23,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
+import { FaqSection } from "@/components/marketing/faq-section"
+import { ModuleJsonLd } from "@/components/seo/structured-data"
+import { REGULATORY_SEO } from "@/lib/seo/modules"
 
 /**
  * Regentry module page — full marketing-shell route
@@ -1037,7 +1040,15 @@ export function RegulatoryHubPage() {
             </div>
           </div>
         </section>
+        <FaqSection items={REGULATORY_SEO.faqs} title="Frequently asked questions about Regentry" />
       </main>
+      <ModuleJsonLd
+        name="Regentry"
+        path="/regulatory-hub"
+        description={REGULATORY_SEO.oneLiner}
+        applicationCategory={REGULATORY_SEO.applicationCategory}
+        faqs={REGULATORY_SEO.faqs}
+      />
       <Footer />
     </div>
   )

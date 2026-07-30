@@ -22,6 +22,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
+import { FaqSection } from "@/components/marketing/faq-section"
+import { ModuleJsonLd } from "@/components/seo/structured-data"
+import { SPECTROSCOPY_SEO } from "@/lib/seo/modules"
 
 /**
  * Spectroscopy module page — full marketing-shell route at /spectroscopy.
@@ -976,7 +979,15 @@ export function SpectroscopyPage() {
             </div>
           </div>
         </section>
+        <FaqSection items={SPECTROSCOPY_SEO.faqs} title="Frequently asked questions about SpectraCheck" />
       </main>
+      <ModuleJsonLd
+        name="SpectraCheck"
+        path="/spectroscopy"
+        description={SPECTROSCOPY_SEO.oneLiner}
+        applicationCategory={SPECTROSCOPY_SEO.applicationCategory}
+        faqs={SPECTROSCOPY_SEO.faqs}
+      />
       <Footer />
     </div>
   )
