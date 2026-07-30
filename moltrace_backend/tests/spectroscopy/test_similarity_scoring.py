@@ -273,3 +273,133 @@ def test_index_retrieval_under_1s_at_45k():
     assert hits[0][0] == 12_345
     assert len(hits) == 100
     assert elapsed < 1.0
+
+
+# --------------------------------------------------------------------------- #
+# Encoder v2: per-nucleus sigma, per-half normalization, contract versioning
+# --------------------------------------------------------------------------- #
+def test_encode_normalizes_each_half_independently():
+    """Each nucleus half is unit-norm, so distance can't be driven by peak count."""
+    v = encode_spectrum([1.0, 2.0, 3.0, 4.0], [20.0, 60.0])
+    assert np.linalg.norm(v[:128]) == pytest.approx(1.0, abs=1e-5)
+    assert np.linalg.norm(v[128:]) == pytest.approx(1.0, abs=1e-5)
+
+
+def test_encode_absent_nucleus_half_stays_zero_not_nan():
+    """Normalization must skip an empty half rather than divide by zero."""
+    v = encode_spectrum([1.0, 2.0], [])
+    assert np.isfinite(v).all()
+    assert np.linalg.norm(v[:128]) == pytest.approx(1.0, abs=1e-5)
+    assert not v[128:].any()
+
+
+def test_encode_distance_is_bounded_by_two():
+    """Two unit halves put every pairwise L2 in [0, 2] — what makes a threshold possible."""
+    a = encode_spectrum([1.0], [20.0])
+    b = encode_spectrum([9.0], [200.0])
+    assert 0.0 <= vector_similarity(a, b) <= 2.0 + 1e-6
+
+
+def test_encode_peak_count_does_not_dominate_distance():
+    """Adding duplicate-region peaks must not move a spectrum as far as changing chemistry."""
+    base = encode_spectrum([2.0, 2.1, 2.2], [40.0, 41.0])
+    more_peaks = encode_spectrum([2.0, 2.1, 2.2, 2.05, 2.15], [40.0, 41.0, 40.5])
+    different = encode_spectrum([7.5, 7.6, 7.7], [150.0, 151.0])
+    assert vector_similarity(base, more_peaks) < vector_similarity(base, different)
+
+
+def test_13c_peaks_survive_encoding():
+    """Regression guard for the aliasing defect fixed in encoder v2.
+
+    The pre-v2 shared sigma of 0.05 was ~35x narrower than the 13C grid step, so
+    most 13C peaks landed between grid nodes and encoded to ~0 — 13C was silently
+    dropped from every distance. Assert real 13C shifts still register.
+    """
+    for shift in (18.4, 55.7, 128.9, 171.2, 205.0):
+        half = encode_spectrum([], [shift])[128:]
+        assert half.max() > 0.5, f"13C peak at {shift} ppm aliased away"
+
+
+def test_legacy_shared_sigma_escape_hatch_reproduces_old_geometry():
+    """Passing `sigma` overrides both nuclei and disables normalization on request."""
+    legacy = encode_spectrum([1.0], [100.0], sigma=0.05, normalize=False)
+    assert np.linalg.norm(legacy[:128]) != pytest.approx(1.0, abs=1e-3)
+    assert legacy[128:].max() < 0.5  # the aliasing this fix removes
+
+
+def test_save_records_encoder_contract(tmp_path):
+    import json
+
+    from moltrace.spectroscopy.similarity.scoring import (
+        ENCODER_VERSION,
+        current_encoder_meta,
+    )
+
+    index = SpectrumIndex()
+    index.add(encode_spectrum([1.0], [20.0]).reshape(1, -1), ["a"])
+    path = tmp_path / "i.faiss"
+    index.save(str(path))
+
+    meta = json.loads((tmp_path / "i.faiss.ids.json").read_text())
+    assert meta["encoder"] == current_encoder_meta()
+    assert meta["encoder"]["encoder_version"] == ENCODER_VERSION
+    assert meta["encoder"]["sigma_1h"] != meta["encoder"]["sigma_13c"]
+
+
+def test_load_warns_but_does_not_raise_on_encoder_mismatch(tmp_path):
+    """A stale index must degrade loudly, never raise.
+
+    `nmrcheck.api._load_similarity_index` calls `load()` with no guard, so raising
+    would turn a stale index into a 500 instead of a serving-but-warning surface.
+    """
+    import json
+
+    index = SpectrumIndex()
+    index.add(encode_spectrum([1.0], [20.0]).reshape(1, -1), ["a"])
+    path = tmp_path / "i.faiss"
+    index.save(str(path))
+
+    sidecar = tmp_path / "i.faiss.ids.json"
+    meta = json.loads(sidecar.read_text())
+    meta["encoder"]["sigma_13c"] = 0.05
+    sidecar.write_text(json.dumps(meta))
+
+    with pytest.warns(RuntimeWarning, match="different encoding contract"):
+        loaded = SpectrumIndex.load(str(path))
+    assert len(loaded) == 1
+    assert loaded.encoder_meta["sigma_13c"] == 0.05
+
+
+def test_load_warns_on_pre_v2_sidecar_without_encoder_metadata(tmp_path):
+    """The dimension is unchanged by a sigma change, so absence of metadata is the
+    only signal that an index predates v2 — it must not pass silently."""
+    import json
+
+    index = SpectrumIndex()
+    index.add(encode_spectrum([1.0], [20.0]).reshape(1, -1), ["a"])
+    path = tmp_path / "i.faiss"
+    index.save(str(path))
+
+    sidecar = tmp_path / "i.faiss.ids.json"
+    meta = json.loads(sidecar.read_text())
+    del meta["encoder"]
+    sidecar.write_text(json.dumps(meta))
+
+    with pytest.warns(RuntimeWarning, match="no encoder metadata"):
+        loaded = SpectrumIndex.load(str(path))
+    assert len(loaded) == 1
+    assert loaded.encoder_meta is None
+
+
+def test_load_roundtrip_with_matching_contract_is_silent(tmp_path):
+    import warnings
+
+    index = SpectrumIndex()
+    index.add(encode_spectrum([1.0], [20.0]).reshape(1, -1), ["a"])
+    path = tmp_path / "i.faiss"
+    index.save(str(path))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        loaded = SpectrumIndex.load(str(path))
+    assert loaded.encoder_meta is not None

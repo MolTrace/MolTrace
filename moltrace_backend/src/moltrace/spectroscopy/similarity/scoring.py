@@ -56,12 +56,79 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 _DEFAULT_SIGMA = 0.05
 _DEFAULT_N_POINTS = 128
 
+#: Encoding contract version. Bump on ANY change to sigma, ranges, n_points or
+#: normalization — the geometry of every persisted index depends on them, and the
+#: dimension alone cannot detect a change (see :meth:`SpectrumIndex.save`).
+ENCODER_VERSION = 2
+
+#: Per-nucleus Gaussian widths, in ppm, chosen from the expected shift ERROR —
+#: **not** from the grid step (tying sigma to the step measurably degrades recall
+#: as ``n_points`` grows). The two optima differ ~20×, so a single shared sigma
+#: cannot serve both nuclei: at the pre-v2 shared 0.05, a ¹³C Gaussian is ~35×
+#: narrower than the ¹³C grid step of 220/127 = 1.732 ppm, so peaks land between
+#: grid nodes and alias away — measured on this repo's corpus, only 6.4 % of 1048
+#: real ¹³C peaks retained >0.5 amplitude and ¹³C contributed 4.1 % of squared
+#: distance. At 0.30/2.00 retention is 100 % and the ¹³C share is 56.4 %.
+DEFAULT_SIGMA_1H = 0.30
+DEFAULT_SIGMA_13C = 2.00
+
 #: Default ppm grid bounds per nucleus (the bulk of organic ¹H / ¹³C shifts).
 RANGE_1H: tuple[float, float] = (0.0, 12.0)
 RANGE_13C: tuple[float, float] = (0.0, 220.0)
 
 #: Dimension of :func:`encode_spectrum` output at the default ``n_points`` (2×128).
 ENCODING_DIM = 2 * _DEFAULT_N_POINTS
+
+
+def current_encoder_meta() -> dict[str, Any]:
+    """The encoding contract this module currently produces.
+
+    Persisted alongside an index by :meth:`SpectrumIndex.save` and compared on load.
+    """
+
+    return {
+        "encoder_version": ENCODER_VERSION,
+        "sigma_1h": DEFAULT_SIGMA_1H,
+        "sigma_13c": DEFAULT_SIGMA_13C,
+        "n_points": _DEFAULT_N_POINTS,
+        "range_1h": list(RANGE_1H),
+        "range_13c": list(RANGE_13C),
+        "normalize": "per_half_l2",
+    }
+
+
+def _warn_on_encoder_mismatch(recorded: dict[str, Any] | None, path: str) -> None:
+    """Warn when a persisted index's encoding contract differs from the live one."""
+
+    import warnings
+
+    if recorded is None:
+        warnings.warn(
+            f"similarity index {path!r} carries no encoder metadata, so it predates "
+            f"encoder v{ENCODER_VERSION} (shared sigma, unnormalized halves). Its "
+            f"geometry does not match the current query encoder and retrieval quality "
+            f"is unreliable — rebuild it with scripts/build_similarity_index.py.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        return
+    live = current_encoder_meta()
+    differing: list[str] = []
+    for key, want in live.items():
+        got = recorded.get(key)
+        # Ranges round-trip through JSON as lists, so compare both as lists.
+        if isinstance(want, list):
+            got = list(got) if isinstance(got, (list, tuple)) else got
+        if got != want:
+            differing.append(key)
+    if differing:
+        warnings.warn(
+            f"similarity index {path!r} was built with a different encoding contract "
+            f"(differing: {', '.join(differing)}). Distances are not comparable to "
+            f"freshly-encoded queries — rebuild the index.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -105,29 +172,63 @@ def gaussian_smooth_encode(
 def encode_spectrum(
     shifts_1h: Sequence[float],
     shifts_13c: Sequence[float],
-    sigma: float = _DEFAULT_SIGMA,
+    sigma: float | None = None,
     n_points: int = _DEFAULT_N_POINTS,
     range_1h: tuple[float, float] = RANGE_1H,
     range_13c: tuple[float, float] = RANGE_13C,
+    *,
+    sigma_1h: float = DEFAULT_SIGMA_1H,
+    sigma_13c: float = DEFAULT_SIGMA_13C,
+    normalize: bool = True,
 ) -> np.ndarray:
     """Concatenated encoding ``[v_1H (n_points); v_13C (n_points)]``.
 
     With the default ``n_points=128`` this is a 256-D ``float32`` vector (the
     NMR-Solver encoding dimension). Either nucleus list may be empty (its half is
     then all zeros), so the encoding is well-defined for ¹H-only or ¹³C-only data.
+
+    Each nucleus is smoothed with its own width (``sigma_1h`` / ``sigma_13c``) and,
+    when ``normalize`` is set, each half is **L2-normalized independently before
+    concatenation**. Normalization is what makes the resulting distance a measure of
+    chemistry rather than of peak count: unnormalized, a vector's magnitude grows
+    with the number of peaks, so L2 ranks by spectrum size. Measured on this repo's
+    68 both-nuclei molecules (2278 pairs, Morgan r=2/2048): Spearman(L2, 1−Tanimoto)
+    rises +0.087 → +0.594 while the peak-count confound Spearman(L2, |Δpeak count|)
+    falls +0.585 → −0.051, and distance becomes bounded on [0, 2] (was [1.6, 15.6]),
+    which is what lets a similarity threshold exist at all. Per-half rather than
+    global normalization keeps the two nuclei contributing comparably regardless of
+    how many peaks each carries.
+
+    ``sigma`` is the pre-v2 shared-width escape hatch: when given it overrides
+    **both** nuclei (and so reproduces the aliasing described at
+    :data:`DEFAULT_SIGMA_13C`). Prefer the per-nucleus arguments.
+
+    An encoding is only comparable to others built with the same parameters — see
+    :data:`ENCODER_VERSION` and :meth:`SpectrumIndex.save`.
     """
 
-    v_1h = gaussian_smooth_encode(shifts_1h, range_1h, sigma, n_points)
-    v_13c = gaussian_smooth_encode(shifts_13c, range_13c, sigma, n_points)
+    s_1h = sigma_1h if sigma is None else sigma
+    s_13c = sigma_13c if sigma is None else sigma
+    v_1h = gaussian_smooth_encode(shifts_1h, range_1h, s_1h, n_points)
+    v_13c = gaussian_smooth_encode(shifts_13c, range_13c, s_13c, n_points)
+    if normalize:
+        for half in (v_1h, v_13c):
+            norm = float(np.linalg.norm(half))
+            if norm > 0.0:
+                half /= norm
     return np.concatenate([v_1h, v_13c]).astype(np.float32)
 
 
 def encode_prediction(
     prediction: ShiftPrediction,
-    sigma: float = _DEFAULT_SIGMA,
+    sigma: float | None = None,
     n_points: int = _DEFAULT_N_POINTS,
     range_1h: tuple[float, float] = RANGE_1H,
     range_13c: tuple[float, float] = RANGE_13C,
+    *,
+    sigma_1h: float = DEFAULT_SIGMA_1H,
+    sigma_13c: float = DEFAULT_SIGMA_13C,
+    normalize: bool = True,
 ) -> np.ndarray:
     """Encode a ``ShiftPrediction`` (from ``predict_shifts``) into the 256-D vector.
 
@@ -146,6 +247,7 @@ def encode_prediction(
     return encode_spectrum(
         shifts_1h, shifts_13c, sigma=sigma, n_points=n_points,
         range_1h=range_1h, range_13c=range_13c,
+        sigma_1h=sigma_1h, sigma_13c=sigma_13c, normalize=normalize,
     )
 
 
@@ -185,6 +287,14 @@ def set_similarity_kuhn_munkres(
 
     Identical equal-size sets score 1.0; far-apart or disjoint sets score ≈ 0.
     Returns 0.0 if either set is empty. Non-finite values are dropped.
+
+    .. warning::
+       ``sigma`` is **nucleus-specific and the default is not suitable for ¹³C.**
+       This function compares one set of shifts and cannot know which nucleus it
+       holds, so it keeps the legacy shared 0.05 — appropriate for ¹H at best. Pass
+       :data:`DEFAULT_SIGMA_1H` / :data:`DEFAULT_SIGMA_13C` (or a noise-matched
+       value) explicitly. Using this as a re-ranking stage at the default width was
+       measured to be a severe regression rather than an improvement.
     """
 
     if sigma <= 0:
@@ -272,6 +382,9 @@ class SpectrumIndex:
         index.hnsw.efSearch = int(ef_search)
         self.index = index
         self.ids: list[Any] = []
+        #: Encoding contract recorded in a loaded index's sidecar (``None`` for a
+        #: freshly-constructed index or a pre-v2 sidecar). See :meth:`load`.
+        self.encoder_meta: dict[str, Any] | None = None
 
     def __len__(self) -> int:
         return int(self.index.ntotal)
@@ -326,18 +439,46 @@ class SpectrumIndex:
             )
         return results[0] if single else results
 
-    def save(self, path: str) -> None:
-        """Persist the FAISS index (``path``) + the id sidecar (``path + '.ids.json'``)."""
+    def save(self, path: str, encoder: dict[str, Any] | None = None) -> None:
+        """Persist the FAISS index (``path``) + the id sidecar (``path + '.ids.json'``).
+
+        The sidecar also records the **encoding contract** the vectors were built
+        with, so a later load can detect that the live encoder no longer matches.
+        This is not cosmetic: the dimension is unchanged by a sigma or normalization
+        change, so every dimension guard in this module still passes and a stale
+        index reads back as valid while its geometry no longer matches the query
+        encoder — measured on this repo's corpus, a silent recall@1 collapse from
+        100 % to 10.3 % with no exception raised anywhere.
+
+        ``encoder`` defaults to this module's current parameters, which assumes the
+        vectors were encoded with them (true for every in-repo caller, none of which
+        overrides sigma). Pass it explicitly when building with custom parameters.
+        """
         import json
 
         path = str(path)
         self._faiss.write_index(self.index, path)
         with open(path + ".ids.json", "w", encoding="utf-8") as handle:
-            json.dump({"dim": self.dim, "ids": self.ids}, handle)
+            json.dump(
+                {
+                    "dim": self.dim,
+                    "ids": self.ids,
+                    "encoder": encoder if encoder is not None else current_encoder_meta(),
+                },
+                handle,
+            )
 
     @classmethod
     def load(cls, path: str) -> SpectrumIndex:
-        """Load an index previously written by :meth:`save`."""
+        """Load an index previously written by :meth:`save`.
+
+        Warns (never raises) when the sidecar's encoding contract does not match the
+        live encoder, including a pre-v2 sidecar that records none at all. Loading
+        deliberately still succeeds: this is called from the request path without a
+        guard (``nmrcheck.api._load_similarity_index``), so raising would turn a
+        stale index into a 500 instead of a degraded-but-serving surface. The
+        recorded contract is kept on ``encoder_meta`` for callers to surface.
+        """
         import json
 
         faiss = _import_faiss()
@@ -348,4 +489,6 @@ class SpectrumIndex:
         obj = cls(dim=int(meta["dim"]))
         obj.index = index
         obj.ids = list(meta["ids"])
+        obj.encoder_meta = meta.get("encoder")
+        _warn_on_encoder_mismatch(obj.encoder_meta, path)
         return obj
