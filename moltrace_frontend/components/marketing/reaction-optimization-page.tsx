@@ -24,6 +24,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
+import { FaqSection } from "@/components/marketing/faq-section"
+import { ModuleJsonLd } from "@/components/seo/structured-data"
+import { REACTION_SEO } from "@/lib/seo/modules"
 
 /**
  * Reaction Optimization (Repho) module page — full marketing-shell
@@ -73,7 +76,7 @@ const PIPELINE: Stage[] = [
     stage: "03",
     title: "Propose",
     detail:
-      "Bayesian acquisition over a Gaussian-process surrogate. Expected Improvement (single objective), q-Noisy Expected Hypervolume Improvement (multi-objective batch), upper confidence bound for exploration. Reproducible — same seed, same batch.",
+      "Bayesian acquisition over a Gaussian-process surrogate. Expected Improvement (single objective), upper confidence bound for exploration, and constraint-aware ranking sliced into batches. Multi-objective campaigns surface a deterministic Pareto front. Reproducible — same seed, same batch.",
     artifact: "recommendation_batch · acquisition_score · expected_improvement",
   },
   {
@@ -132,7 +135,7 @@ const METHODS: Method[] = [
     scope: "Pareto-frontier · batch-aware",
     bullets: [
       "Yield × purity × cost × impurity-load trade-off",
-      "q-Noisy Expected Hypervolume Improvement (qNEHVI)",
+      "Deterministic Pareto front + hypervolume indicator (pure NumPy)",
       "Batch recommendations — propose N reactions at once",
       "Pareto-set visualisation with non-dominated frontier",
       "Diversity penalty against redundant proposals",
@@ -248,7 +251,7 @@ const CAMPAIGN_SAMPLE: CampaignRow[] = [
   },
   {
     round: "03",
-    acquisition: "qNEHVI batch · k=3",
+    acquisition: "Pareto-front batch · k=3",
     proposed: "T 65 °C · 1.5 eq · MeCN · 8 h",
     measured: "yield 74% · imp 1.1% · cost mid",
     status: "exploit",
@@ -312,7 +315,7 @@ const COMPARISON: Comparison[] = [
   {
     dimension: "Batch parallelism",
     trialAndError: "One reaction at a time · serialised round-trip on the bench",
-    reactioniq: "qNEHVI batch proposes N diverse runs · plate-aware suggestions",
+    reactioniq: "Batch proposal of N diverse runs · plate-aware suggestions",
   },
   {
     dimension: "Replay 6 months later",
@@ -521,7 +524,7 @@ export function ReactionOptimizationPage() {
                   })}
                 </div>
                 <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                  qNEHVI · constraint-aware · audit-event per round
+                  Pareto front · constraint-aware · audit-event per round
                 </p>
               </aside>
             </div>
@@ -1115,7 +1118,15 @@ export function ReactionOptimizationPage() {
             </div>
           </div>
         </section>
+        <FaqSection items={REACTION_SEO.faqs} title="Frequently asked questions about Repho" />
       </main>
+      <ModuleJsonLd
+        name="Repho"
+        path="/reaction-optimization"
+        description={REACTION_SEO.oneLiner}
+        applicationCategory={REACTION_SEO.applicationCategory}
+        faqs={REACTION_SEO.faqs}
+      />
       <Footer />
     </div>
   )
