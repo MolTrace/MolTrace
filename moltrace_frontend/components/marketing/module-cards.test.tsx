@@ -45,4 +45,32 @@ describe("ModuleCards", () => {
     fireEvent.click(screen.getByLabelText("Close explore preview"))
     await waitFor(() => expect(screen.getByText("Capabilities")).toBeInTheDocument())
   })
+
+  // Each module card carries a direct link into the running module alongside the
+  // in-place "Explore Module" preview — the same "Open <module>" CTA the module
+  // marketing pages use.
+  it.each([
+    ["MODULE 01", "Open SpectraCheck", "/spectracheck"],
+    ["MODULE 02", "Open Regentry", "/regulatory"],
+    ["MODULE 03", "Open Repho", "/reactions"],
+  ])("links %s to the live module via '%s'", (tab, label, href) => {
+    render(<ModuleCards />)
+    fireEvent.click(screen.getByRole("button", { name: tab }))
+
+    // Rendered twice (desktop CTA row + mobile CTA stack); both must point at
+    // the module route.
+    const links = screen.getAllByRole("link", { name: new RegExp(label, "i") })
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", href)
+    }
+  })
+
+  it("keeps a way into the module while the explore overlay is open", async () => {
+    render(<ModuleCards />)
+    fireEvent.click(screen.getAllByRole("button", { name: /Explore Module/i })[0])
+
+    const link = await screen.findByRole("link", { name: /Open SpectraCheck/i }, { timeout: 4000 })
+    expect(link).toHaveAttribute("href", "/spectracheck")
+  })
 })
