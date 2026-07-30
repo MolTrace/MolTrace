@@ -7,8 +7,8 @@ retrieval methodology (Jin et al., arXiv:2509.00640, 2025). See
 """
 
 from moltrace.spectroscopy.similarity.scoring import (
+    COVERAGE_PENALTY_BY_ABSENT_NUCLEUS,
     ENCODING_DIM,
-    FUSED_COVERAGE_PENALTY,
     HALF_DIM,
     NUCLEI,
     RANGE_1H,
@@ -25,13 +25,15 @@ from moltrace.spectroscopy.similarity.scoring import (
     vector_similarity,
 )
 
-#: Documented in :class:`MultiNucleusSpectrumIndex`; re-exported for callers that
-#: need to interpret an ``l2_distance`` against a per-nucleus index.
-FUSED_SCORE_MAX = 2.0**0.5 + FUSED_COVERAGE_PENALTY
+#: Largest value :meth:`MultiNucleusSpectrumIndex.search` can return: two unit halves
+#: are at worst orthogonal (√2, not 2 — an encoded half is non-negative), plus the
+#: heaviest coverage penalty. Re-exported for callers that need to interpret an
+#: ``l2_distance`` against a per-nucleus index.
+FUSED_SCORE_MAX = 2.0**0.5 + max(COVERAGE_PENALTY_BY_ABSENT_NUCLEUS.values())
 
 __all__ = [
+    "COVERAGE_PENALTY_BY_ABSENT_NUCLEUS",
     "ENCODING_DIM",
-    "FUSED_COVERAGE_PENALTY",
     "FUSED_SCORE_MAX",
     "HALF_DIM",
     "NUCLEI",
