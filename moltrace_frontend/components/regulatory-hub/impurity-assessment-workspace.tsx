@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { apiFetch } from "@/lib/api/client"
+import { statusLabel } from "@/lib/ui/status"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
@@ -332,7 +333,7 @@ export function ImpurityAssessmentWorkspace() {
         eyebrow="Impurity Assessment · Input"
         title="Assessment parameters"
         icon={FlaskConical}
-        description="Only daily dose is required. Each impurity list is optional — an empty assessment still returns the Q3A/B thresholds for the dose."
+        description="Only daily dose is required. Each impurity list is optional — an empty assessment still reports the Q3A/B thresholds for the dose."
       >
         <div className="space-y-6">
           {/* Core parameters */}
@@ -423,7 +424,7 @@ export function ImpurityAssessmentWorkspace() {
             {solvents.map((row) => (
               <div key={row._id} className="flex flex-wrap items-end gap-2">
                 <div className="min-w-[200px] flex-1 space-y-1">
-                  <Label className="text-xs text-muted-foreground">identifier</Label>
+                  <Label className="text-xs text-muted-foreground">Identifier</Label>
                   <Input
                     value={row.identifier}
                     onChange={(e) =>
@@ -435,7 +436,7 @@ export function ImpurityAssessmentWorkspace() {
                   />
                 </div>
                 <div className="w-32 space-y-1">
-                  <Label className="text-xs text-muted-foreground">measured ppm</Label>
+                  <Label className="text-xs text-muted-foreground">Measured (ppm)</Label>
                   <Input
                     value={row.measured_ppm}
                     onChange={(e) =>
@@ -463,7 +464,7 @@ export function ImpurityAssessmentWorkspace() {
             {elements.map((row) => (
               <div key={row._id} className="flex flex-wrap items-end gap-2">
                 <div className="min-w-[200px] flex-1 space-y-1">
-                  <Label className="text-xs text-muted-foreground">element</Label>
+                  <Label className="text-xs text-muted-foreground">Element</Label>
                   <Input
                     value={row.element}
                     onChange={(e) =>
@@ -475,7 +476,7 @@ export function ImpurityAssessmentWorkspace() {
                   />
                 </div>
                 <div className="w-32 space-y-1">
-                  <Label className="text-xs text-muted-foreground">measured ppm</Label>
+                  <Label className="text-xs text-muted-foreground">Measured (ppm)</Label>
                   <Input
                     value={row.measured_ppm}
                     onChange={(e) =>
@@ -517,7 +518,7 @@ export function ImpurityAssessmentWorkspace() {
                     />
                   </div>
                   <div className="w-40 space-y-1">
-                    <Label className="text-xs text-muted-foreground">name (optional)</Label>
+                    <Label className="text-xs text-muted-foreground">Name (optional)</Label>
                     <Input
                       value={row.name}
                       onChange={(e) =>
@@ -529,7 +530,7 @@ export function ImpurityAssessmentWorkspace() {
                     />
                   </div>
                   <div className="w-36 space-y-1">
-                    <Label className="text-xs text-muted-foreground">ng/day (optional)</Label>
+                    <Label className="text-xs text-muted-foreground">Measured ng/day (optional)</Label>
                     <Input
                       value={row.measured_ng_per_day}
                       onChange={(e) =>
@@ -580,9 +581,9 @@ export function ImpurityAssessmentWorkspace() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="unset">not set</SelectItem>
-                            <SelectItem value="positive">positive</SelectItem>
-                            <SelectItem value="negative">negative</SelectItem>
+                            <SelectItem value="unset">Not set</SelectItem>
+                            <SelectItem value="positive">Positive</SelectItem>
+                            <SelectItem value="negative">Negative</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -629,7 +630,7 @@ export function ImpurityAssessmentWorkspace() {
             eyebrow="Impurity Assessment · Report"
             title="Assessment report"
             icon={ShieldCheck}
-            description={`Dose ${num(result.daily_dose_g)} g/day · ${result.route} · ${result.substance_type.replace(/_/g, " ")} · ${result.duration_months} months`}
+            description={`Dose ${num(result.daily_dose_g)} g/day · ${statusLabel(result.route)} · ${statusLabel(result.substance_type)} · ${result.duration_months} months`}
           >
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
               <TabsList className="h-auto w-full flex-wrap justify-start">
@@ -661,13 +662,13 @@ export function ImpurityAssessmentWorkspace() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>solvent</TableHead>
-                        <TableHead>class</TableHead>
-                        <TableHead className="text-right">permitted ppm</TableHead>
-                        <TableHead className="text-right">measured ppm</TableHead>
-                        <TableHead className="text-right">margin ppm</TableHead>
-                        <TableHead>result</TableHead>
-                        <TableHead className="w-8" aria-label="basis" />
+                        <TableHead>Solvent</TableHead>
+                        <TableHead>Class</TableHead>
+                        <TableHead className="text-right">Permitted (ppm)</TableHead>
+                        <TableHead className="text-right">Measured (ppm)</TableHead>
+                        <TableHead className="text-right">Margin (ppm)</TableHead>
+                        <TableHead>Result</TableHead>
+                        <TableHead className="w-8" aria-label="Regulatory basis" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -701,13 +702,13 @@ export function ImpurityAssessmentWorkspace() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>element</TableHead>
-                        <TableHead>class</TableHead>
-                        <TableHead className="text-right">permitted ppm</TableHead>
-                        <TableHead className="text-right">control threshold</TableHead>
-                        <TableHead className="text-right">measured ppm</TableHead>
-                        <TableHead>result</TableHead>
-                        <TableHead className="w-8" aria-label="basis" />
+                        <TableHead>Element</TableHead>
+                        <TableHead>Class</TableHead>
+                        <TableHead className="text-right">Permitted (ppm)</TableHead>
+                        <TableHead className="text-right">Control threshold</TableHead>
+                        <TableHead className="text-right">Measured (ppm)</TableHead>
+                        <TableHead>Result</TableHead>
+                        <TableHead className="w-8" aria-label="Regulatory basis" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -927,7 +928,7 @@ function RemoveRowButton({ onClick, disabled }: { onClick: () => void; disabled?
       className="text-muted-foreground hover:text-destructive"
       onClick={onClick}
       disabled={disabled}
-      aria-label="Remove row"
+      aria-label="Remove entry"
     >
       <Trash2 className="h-4 w-4" aria-hidden />
     </Button>

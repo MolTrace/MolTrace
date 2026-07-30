@@ -727,7 +727,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
               id="assign-to"
               value={assignDraft}
               onChange={(e) => setAssignDraft(e.target.value)}
-              placeholder="User id or display name"
+              placeholder="User ID or display name"
               autoComplete="off"
             />
           </div>

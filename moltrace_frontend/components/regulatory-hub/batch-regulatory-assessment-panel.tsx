@@ -15,7 +15,7 @@ import { Loader2, ChevronDown } from "lucide-react"
 import { readRegulatoryDossierCompoundLink } from "@/components/regulatory-hub/regulatory-dossier-linked-compound-card"
 
 const BATCH_REGULATORY_ASSESSMENT_TOOLTIP =
-  "Aggregates impurity register counts, residual solvent and nitrosamine prior assessments on dossier, latest qNMR compliance snapshot, AI governance snapshot, and Open regulatory action items."
+  "Aggregates impurity register counts, residual solvent and nitrosamine prior assessments on dossier, latest qNMR compliance snapshot, AI governance snapshot, and open regulatory action items."
 
 const MISSING_BATCH_MSG = "Link a compound batch before running batch-level assessment."
 
@@ -179,7 +179,7 @@ export function BatchRegulatoryAssessmentPanel({
               <InfoTooltip label="Batch regulatory assessment" content={BATCH_REGULATORY_ASSESSMENT_TOOLTIP} />
             </div>
             <CardDescription>
-              Run a batch regulatory assessment across all requirements and evidence links for this dossier — impurity thresholds, solvent limits, and Jurisdiction-specific rule sets are evaluated in a single pass.
+              Run a batch regulatory assessment across all requirements and evidence links for this dossier — impurity thresholds, solvent limits, and jurisdiction-specific rule sets are evaluated in a single pass.
             </CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" disabled={runBusy} onClick={() => void run()}>

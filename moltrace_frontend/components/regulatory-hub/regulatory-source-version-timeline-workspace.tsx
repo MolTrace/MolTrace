@@ -45,6 +45,14 @@ function readStringList(v: unknown): string[] {
   return v.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
 }
 
+/** Display-only humanizer for stored values (in_review → "In review").
+ *  The stored value is never rewritten — only what the reader sees. */
+function humanizeValue(raw: string | undefined | null): string {
+  if (!raw) return "—"
+  const words = raw.replace(/_/g, " ").trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
 function readIntList(v: unknown): number[] {
   if (!Array.isArray(v)) return []
   return v.filter((x): x is number => typeof x === "number" && Number.isFinite(x))
@@ -183,7 +191,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
       <AlertCard
         variant="warning"
         title="Requires review"
-        description="Source text changed output is decision support and potential impact triage only. Qualified human review is required."
+        description="Comparison output is decision support and potential-impact triage only. Qualified human review is required."
       />
 
       <ModuleCard
@@ -196,7 +204,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
         <div className="space-y-3">
           <p className="text-sm">
             <span className="font-medium">{sourceTitle}</span>{" "}
-            <span className="font-mono text-xs text-muted-foreground">source_id {sourceId}</span>
+            <span className="font-mono text-xs text-muted-foreground">Source ID {sourceId}</span>
           </p>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading versions…</p>
@@ -209,12 +217,12 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>version timeline</TableHead>
-                    <TableHead>version label</TableHead>
-                    <TableHead>source date</TableHead>
-                    <TableHead>retrieved date</TableHead>
-                    <TableHead>SHA-256/content hash</TableHead>
-                    <TableHead>status</TableHead>
+                    <TableHead>Version ID</TableHead>
+                    <TableHead>Version label</TableHead>
+                    <TableHead>Source date</TableHead>
+                    <TableHead>Retrieved</TableHead>
+                    <TableHead>SHA-256 content hash</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -236,7 +244,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
                           {sha ?? ch ?? "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                          <Badge variant="outline">{humanizeValue(readRecordString(row, "status"))}</Badge>
                         </TableCell>
                       </TableRow>
                     )
@@ -258,7 +266,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>old version</Label>
+              <Label>Old version</Label>
               <Select value={oldVersionId || "__none__"} onValueChange={(v) => setOldVersionId(v === "__none__" ? "" : v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Choose old version" />
@@ -271,7 +279,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
                     const label = readRecordString(row, "version_label") ?? `version ${id}`
                     return (
                       <SelectItem key={`old-${id}-${idx}`} value={String(id)}>
-                        {label} (id {id})
+                        {label} (ID {id})
                       </SelectItem>
                     )
                   })}
@@ -279,7 +287,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>new version</Label>
+              <Label>New version</Label>
               <Select value={newVersionId || "__none__"} onValueChange={(v) => setNewVersionId(v === "__none__" ? "" : v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Choose new version" />
@@ -292,7 +300,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
                     const label = readRecordString(row, "version_label") ?? `version ${id}`
                     return (
                       <SelectItem key={`new-${id}-${idx}`} value={String(id)}>
-                        {label} (id {id})
+                        {label} (ID {id})
                       </SelectItem>
                     )
                   })}
@@ -309,20 +317,20 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
           <div className="grid gap-4 md:grid-cols-2">
             <ModuleCard accent="cyan" eyebrow="Old" title="Old version details" icon={FileText}>
               <div className="space-y-1 text-xs">
-                <p>version label: {readRecordString(oldDetail, "version_label") ?? "—"}</p>
-                <p>source date: {formatWhen(readRecordString(oldDetail, "source_date") ?? undefined)}</p>
-                <p>retrieved date: {formatWhen(readRecordString(oldDetail, "retrieved_at") ?? undefined)}</p>
-                <p className="font-mono break-all">SHA-256/content hash: {readRecordString(oldDetail, "sha256") ?? readRecordString(oldDetail, "content_hash") ?? "—"}</p>
-                <p>status: {readRecordString(oldDetail, "status") ?? "—"}</p>
+                <p>Version label: {readRecordString(oldDetail, "version_label") ?? "—"}</p>
+                <p>Source date: {formatWhen(readRecordString(oldDetail, "source_date") ?? undefined)}</p>
+                <p>Retrieved: {formatWhen(readRecordString(oldDetail, "retrieved_at") ?? undefined)}</p>
+                <p className="font-mono break-all">SHA-256 content hash: {readRecordString(oldDetail, "sha256") ?? readRecordString(oldDetail, "content_hash") ?? "—"}</p>
+                <p>Status: {humanizeValue(readRecordString(oldDetail, "status"))}</p>
               </div>
             </ModuleCard>
             <ModuleCard accent="cyan" eyebrow="New" title="New version details" icon={FileText}>
               <div className="space-y-1 text-xs">
-                <p>version label: {readRecordString(newDetail, "version_label") ?? "—"}</p>
-                <p>source date: {formatWhen(readRecordString(newDetail, "source_date") ?? undefined)}</p>
-                <p>retrieved date: {formatWhen(readRecordString(newDetail, "retrieved_at") ?? undefined)}</p>
-                <p className="font-mono break-all">SHA-256/content hash: {readRecordString(newDetail, "sha256") ?? readRecordString(newDetail, "content_hash") ?? "—"}</p>
-                <p>status: {readRecordString(newDetail, "status") ?? "—"}</p>
+                <p>Version label: {readRecordString(newDetail, "version_label") ?? "—"}</p>
+                <p>Source date: {formatWhen(readRecordString(newDetail, "source_date") ?? undefined)}</p>
+                <p>Retrieved: {formatWhen(readRecordString(newDetail, "retrieved_at") ?? undefined)}</p>
+                <p className="font-mono break-all">SHA-256 content hash: {readRecordString(newDetail, "sha256") ?? readRecordString(newDetail, "content_hash") ?? "—"}</p>
+                <p>Status: {humanizeValue(readRecordString(newDetail, "status"))}</p>
               </div>
             </ModuleCard>
           </div>
@@ -343,13 +351,13 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
             <>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">before excerpt</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Before</p>
                   <blockquote className="mt-1 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm leading-relaxed">
                     {readRecordString(compareResult, "before_excerpt") ?? "—"}
                   </blockquote>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">after excerpt</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">After</p>
                   <blockquote className="mt-1 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm leading-relaxed">
                     {readRecordString(compareResult, "after_excerpt") ?? "—"}
                   </blockquote>
@@ -357,12 +365,12 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">diff summary</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Change summary</p>
                 <p className="mt-1 text-sm">{readRecordString(compareResult, "diff_summary") ?? "—"}</p>
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">affected topics</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Affected topics</p>
                 {topics.length === 0 ? (
                   <p className="mt-1 text-sm text-muted-foreground">—</p>
                 ) : (
@@ -377,7 +385,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">citations if returned</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Citations</p>
                 {citationIds.length === 0 ? (
                   <p className="mt-1 text-sm text-muted-foreground">—</p>
                 ) : (

@@ -46,6 +46,14 @@ function formatWhen(iso: string | undefined): string {
   return formatStableUtcDateTime(iso)
 }
 
+/** Display-only humanizer for stored values (action_required → "Action required").
+ *  The stored value is never rewritten — only what the reader sees. */
+function humanizeValue(raw: string | undefined | null): string {
+  if (!raw) return "—"
+  const words = raw.replace(/_/g, " ").trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
 export function RegulatoryNotificationsWorkspace() {
   const [loading, setLoading] = useState(true)
   const [loadErr, setLoadErr] = useState("")
@@ -91,7 +99,7 @@ export function RegulatoryNotificationsWorkspace() {
       }
       await load()
     } catch (e) {
-      setPatchErr(formatApiError(e, "Update failed."))
+      setPatchErr(formatApiError(e, "Could not update the notification."))
     } finally {
       setPatchBusyId(null)
     }
@@ -170,14 +178,14 @@ export function RegulatoryNotificationsWorkspace() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>severity</TableHead>
-                    <TableHead>title</TableHead>
-                    <TableHead>message</TableHead>
-                    <TableHead>linked change</TableHead>
-                    <TableHead>linked dossier / action item</TableHead>
-                    <TableHead>status</TableHead>
-                    <TableHead>created date</TableHead>
-                    <TableHead className="min-w-[200px]">actions</TableHead>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Message</TableHead>
+                    <TableHead>Linked change</TableHead>
+                    <TableHead>Linked dossier / action item</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="min-w-[200px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -191,7 +199,7 @@ export function RegulatoryNotificationsWorkspace() {
                     return (
                       <TableRow key={id != null ? `n-${id}` : `idx-${idx}`}>
                         <TableCell>
-                          <Badge variant="outline">{readRecordString(row, "severity") ?? "—"}</Badge>
+                          <Badge variant="outline">{humanizeValue(readRecordString(row, "severity"))}</Badge>
                         </TableCell>
                         <TableCell className="max-w-[180px] text-sm font-medium">
                           {readRecordString(row, "title") ?? "—"}
@@ -202,7 +210,7 @@ export function RegulatoryNotificationsWorkspace() {
                         <TableCell className="text-xs">
                           {cid != null ? (
                             <Button variant="outline" size="sm" className="h-8" asChild>
-                              <Link href={`/regulatory/changes/${cid}`}>change {cid}</Link>
+                              <Link href={`/regulatory/changes/${cid}`}>Change {cid}</Link>
                             </Button>
                           ) : (
                             "—"
@@ -212,7 +220,7 @@ export function RegulatoryNotificationsWorkspace() {
                           {did != null ? (
                             <div>
                               <Button variant="ghost" size="sm" className="h-7 px-2" asChild>
-                                <Link href={`/regulatory/dossiers/${did}`}>dossier {did}</Link>
+                                <Link href={`/regulatory/dossiers/${did}`}>Dossier {did}</Link>
                               </Button>
                             </div>
                           ) : null}
@@ -226,7 +234,7 @@ export function RegulatoryNotificationsWorkspace() {
                           {did == null && aid == null ? "—" : null}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{st || "—"}</Badge>
+                          <Badge variant="secondary">{humanizeValue(st)}</Badge>
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                           {formatWhen(readRecordString(row, "created_at") ?? undefined)}
@@ -241,7 +249,7 @@ export function RegulatoryNotificationsWorkspace() {
                               disabled={busy || st === "read" || st === "dismissed" || st === "resolved"}
                               onClick={() => id != null && void patchStatus(id, "read")}
                             >
-                              mark read
+                              Mark read
                             </Button>
                             <Button
                               type="button"
@@ -251,7 +259,7 @@ export function RegulatoryNotificationsWorkspace() {
                               disabled={busy || st === "dismissed" || st === "resolved"}
                               onClick={() => id != null && void patchStatus(id, "dismissed")}
                             >
-                              dismiss
+                              Dismiss
                             </Button>
                             <Button
                               type="button"
@@ -264,7 +272,7 @@ export function RegulatoryNotificationsWorkspace() {
                                 void patchStatus(id, "resolved", { severity: readRecordString(row, "severity") })
                               }
                             >
-                              resolve
+                              Resolve
                             </Button>
                           </div>
                         </TableCell>

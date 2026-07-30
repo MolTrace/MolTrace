@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
+import { statusLabel } from "@/lib/ui/status"
 import {
   trackMlDeploymentCandidateApproved,
   trackMlDeploymentCandidateCreated,
@@ -59,6 +60,19 @@ const TARGET_MODULES = [
 ] as const
 
 const REVIEWABLE_STATUSES = ["proposed", "in_review"] as const
+
+/** Display labels for the target modules — the generic humanizer would render
+ *  "msms"/"lcms" incorrectly, so these two need an explicit spelling. */
+const TARGET_MODULE_LABELS: Record<string, string> = {
+  msms: "MS/MS",
+  lcms: "LC-MS",
+}
+
+function targetModuleLabel(value: string | undefined): string {
+  const raw = (value ?? "").trim()
+  if (!raw) return "—"
+  return TARGET_MODULE_LABELS[raw.toLowerCase()] ?? statusLabel(raw)
+}
 
 function artifactLabel(row: Record<string, unknown>): string {
   const id = readRecordNumber(row, "id")
@@ -460,7 +474,7 @@ export function MlDeploymentCandidatesWorkspace() {
                     if (id == null) return null
                     return (
                       <SelectItem key={id} value={String(id)}>
-                        #{id} {readRecordString(row, "approval_status") ?? ""}
+                        #{id} {statusLabel(readRecordString(row, "approval_status"))}
                       </SelectItem>
                     )
                   })}
@@ -478,7 +492,7 @@ export function MlDeploymentCandidatesWorkspace() {
                 <SelectContent>
                   {TARGET_MODULES.map((m) => (
                     <SelectItem key={m} value={m}>
-                      {m}
+                      {targetModuleLabel(m)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -510,7 +524,7 @@ export function MlDeploymentCandidatesWorkspace() {
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : candidates.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No deployment candidates.</p>
+              <p className="text-sm text-muted-foreground">No deployment candidates yet.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -534,11 +548,11 @@ export function MlDeploymentCandidatesWorkspace() {
                         <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{aid ?? "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{readRecordNumber(row, "model_card_id") ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{readRecordString(row, "target_module") ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{targetModuleLabel(readRecordString(row, "target_module"))}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                          <Badge variant="outline">{statusLabel(readRecordString(row, "status"))}</Badge>
                         </TableCell>
-                        <TableCell className="text-xs">{art ? <Badge variant="secondary">{readRecordString(art, "status") ?? "—"}</Badge> : "—"}</TableCell>
+                        <TableCell className="text-xs">{art ? <Badge variant="secondary">{statusLabel(readRecordString(art, "status"))}</Badge> : "—"}</TableCell>
                         <TableCell>
                           {id != null ? (
                             <Button
@@ -569,7 +583,7 @@ export function MlDeploymentCandidatesWorkspace() {
                   <Loader2 className="ml-2 inline h-3 w-3 animate-spin" aria-hidden />
                 ) : getSnapshot ? (
                   <span className="ml-2">
-                    Registry status {readRecordString(getSnapshot, "status") ?? "—"}; candidate ID{" "}
+                    Registry status {statusLabel(readRecordString(getSnapshot, "status"))}; candidate ID{" "}
                     {readRecordNumber(getSnapshot, "candidate_id") ?? "—"}
                   </span>
                 ) : (
@@ -588,7 +602,7 @@ export function MlDeploymentCandidatesWorkspace() {
                     {selectedCard ? (
                       <>
                         Model card {readRecordNumber(selectedCard, "id") ?? "—"} —{" "}
-                        <Badge variant="outline">{readRecordString(selectedCard, "approval_status") ?? "—"}</Badge>
+                        <Badge variant="outline">{statusLabel(readRecordString(selectedCard, "approval_status"))}</Badge>
                       </>
                     ) : (
                       <span className="text-destructive">Model card missing — approval cannot proceed.</span>
@@ -609,7 +623,7 @@ export function MlDeploymentCandidatesWorkspace() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Deployment candidate status (registry)</p>
-                  <Badge variant="outline">{readRecordString(selected, "status") ?? "—"}</Badge>
+                  <Badge variant="outline">{statusLabel(readRecordString(selected, "status"))}</Badge>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Serving destination</p>
@@ -653,7 +667,7 @@ export function MlDeploymentCandidatesWorkspace() {
               ) : null}
 
               <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Reviewer fields on record</p>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">Reviewer details on record</p>
                 <p className="text-sm">
                   Reviewer name: {readRecordString(selected, "reviewer_name") ?? "—"}
                 </p>
@@ -733,7 +747,7 @@ export function MlDeploymentCandidatesWorkspace() {
               <DeveloperJsonPanel data={selected} />
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Select a candidate to inspect gates and reviewer fields.</p>
+            <p className="text-sm text-muted-foreground">Select a candidate to review its readiness checks and reviewer details.</p>
           )}
         </div>
       </ModuleCard>

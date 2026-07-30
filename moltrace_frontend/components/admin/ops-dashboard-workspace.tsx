@@ -82,6 +82,18 @@ function humanizeKey(key: string): string {
 }
 
 /**
+ * Display-only label for a stored token ("audit_chain" → "Audit chain",
+ * "breach" → "Breach"). The stored value still drives the badge palette and
+ * every comparison — only the on-screen text changes.
+ */
+function tokenLabel(value: string): string {
+  const text = value.trim().replace(/_/g, " ")
+  if (!text) return value
+  if (text.toLowerCase() === "ok") return "OK"
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/**
  * Display-only label for the stored data-mode value ("partially_synced" →
  * "Partially synced"). The stored value still drives the badge palette.
  */
@@ -291,7 +303,7 @@ export function OpsDashboardWorkspace() {
                   <li key={c.name} className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2">
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
                     <div className="min-w-0">
-                      <span className="font-mono text-xs font-semibold text-foreground">{c.name}</span>
+                      <span className="text-xs font-semibold text-foreground">{tokenLabel(c.name)}</span>
                       <p className="text-xs text-muted-foreground">{c.description}</p>
                     </div>
                   </li>
@@ -373,12 +385,12 @@ export function OpsDashboardWorkspace() {
                         <TableCell className="max-w-[16rem] truncate font-mono text-[10px]" title={row.model_id}>
                           {row.model_id}
                         </TableCell>
-                        <TableCell className="font-mono text-[10px]">{row.role}</TableCell>
+                        <TableCell className="text-[10px]">{tokenLabel(row.role)}</TableCell>
                         <TableCell className="font-mono text-[10px]">{row.nucleus ?? "—"}</TableCell>
                         <TableCell className="font-mono text-[10px]">{row.semantic_version}</TableCell>
                         <TableCell className="font-mono text-[10px]">
                           {Object.entries(row.metric_vector ?? {})
-                            .map(([k, v]) => `${k}=${v}`)
+                            .map(([k, v]) => `${tokenLabel(k)}: ${v}`)
                             .join(", ") || "—"}
                         </TableCell>
                         <TableCell
@@ -389,7 +401,7 @@ export function OpsDashboardWorkspace() {
                         </TableCell>
                         <TableCell className="text-xs">
                           <Badge variant="outline" className={cn("font-normal", driftBadgeClass(row.drift_status))}>
-                            {row.drift_status}
+                            {tokenLabel(row.drift_status)}
                           </Badge>
                         </TableCell>
                       </TableRow>

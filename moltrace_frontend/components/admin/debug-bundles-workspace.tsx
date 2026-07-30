@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { ApiError, apiFetch, readStoredAuthToken, buildApiPath } from "@/lib/api/client"
+import { statusLabel } from "@/lib/ui/status"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +24,23 @@ const DEBUG_BUNDLE_TOOLTIP =
   "Debug bundles collect safe diagnostic metadata such as versions, statuses, job events, artifact IDs, file hashes, warnings, and audit events."
 
 const SCOPE_OPTIONS = ["system", "project", "sample", "session", "job", "report"] as const
+
+/**
+ * Display-only labels for the stored scope values. The keys are what we send —
+ * only the text on screen is humanized.
+ */
+const SCOPE_LABELS: Record<(typeof SCOPE_OPTIONS)[number], string> = {
+  system: "Whole system",
+  project: "A project",
+  sample: "A sample",
+  session: "A session",
+  job: "A job",
+  report: "A report",
+}
+
+function scopeLabel(scope: string): string {
+  return SCOPE_LABELS[scope as (typeof SCOPE_OPTIONS)[number]] ?? statusLabel(scope)
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -120,8 +138,9 @@ export function DebugBundlesWorkspace() {
       if (token) headers.authorization = `Bearer ${token}`
       const res = await fetch(url, { method: "GET", headers, cache: "no-store" })
       if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || res.statusText)
+        // Deliberately generic: the raw failure text is technical and can leak
+        // internals, so keep the reader-facing message plain.
+        throw new Error("The bundle could not be downloaded. Try again in a moment.")
       }
       const blob = await res.blob()
       const a = document.createElement("a")
@@ -207,7 +226,7 @@ export function DebugBundlesWorkspace() {
                   <SelectContent>
                     {SCOPE_OPTIONS.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {scopeLabel(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -311,7 +330,7 @@ export function DebugBundlesWorkspace() {
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Status</dt>
-                  <dd className="font-mono">{status || "—"}</dd>
+                  <dd>{status ? statusLabel(status) : "—"}</dd>
                 </div>
                 <div className="sm:col-span-2">
                   <dt className="text-muted-foreground">Bundle SHA-256</dt>
@@ -323,7 +342,7 @@ export function DebugBundlesWorkspace() {
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Scope</dt>
-                  <dd className="font-mono">{readStr(bundle, ["scope"]) || "—"}</dd>
+                  <dd>{readStr(bundle, ["scope"]) ? scopeLabel(readStr(bundle, ["scope"])) : "—"}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Resource ID</dt>

@@ -64,11 +64,12 @@ describe("OpsDashboardWorkspace", () => {
 
     await waitFor(() => expect(screen.getByText("Fails closed")).toBeInTheDocument())
     expect(screen.getByText("Self-check passed")).toBeInTheDocument()
-    // The four-check policy.
-    expect(screen.getByText("dominance")).toBeInTheDocument()
-    expect(screen.getByText("audit_chain")).toBeInTheDocument()
-    expect(screen.getByText("tests_green")).toBeInTheDocument()
-    expect(screen.getByText("data_leakage")).toBeInTheDocument()
+    // The four-check policy. Re-baselined deliberately: the stored check names
+    // stay snake_case on the wire, but the screen now shows readable labels.
+    expect(screen.getByText("Dominance")).toBeInTheDocument()
+    expect(screen.getByText("Audit chain")).toBeInTheDocument()
+    expect(screen.getByText("Tests green")).toBeInTheDocument()
+    expect(screen.getByText("Data leakage")).toBeInTheDocument()
     // A monitoring threshold, key humanized (psi_warn → "psi warn").
     expect(screen.getByText("psi warn")).toBeInTheDocument()
   })
@@ -122,6 +123,7 @@ describe("OpsDashboardWorkspace", () => {
     render(<OpsDashboardWorkspace />)
 
     await waitFor(() => expect(screen.getByText("lora_adapter:13C:1.0.0")).toBeInTheDocument())
-    expect(screen.getByText("breach")).toBeInTheDocument()
+    // Drift status is humanized for display; the stored value stays "breach".
+    expect(screen.getByText("Breach")).toBeInTheDocument()
   })
 })

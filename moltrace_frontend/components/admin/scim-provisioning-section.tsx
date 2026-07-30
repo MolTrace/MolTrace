@@ -174,7 +174,9 @@ export function ScimProvisioningSection({ connectionId, enabled }: { connectionI
           />
           <p className="text-xs text-muted-foreground">
             Paste both into the SCIM provisioning settings of your IdP (Okta, Entra ID, …).
-            {SCIM_BASE_URL ? null : " Set NEXT_PUBLIC_SSO_API_ORIGIN to display the exact SCIM base URL."}
+            {SCIM_BASE_URL
+              ? null
+              : " Replace the bracketed part with your MolTrace service address — your MolTrace administrator can configure it so the exact SCIM base URL appears here."}
           </p>
           <Button type="button" size="sm" variant="outline" onClick={() => setIssued(null)}>
             Done — I&apos;ve copied it

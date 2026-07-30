@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
+import { statusLabel } from "@/lib/ui/status"
 import { countMetricKeysForAnalytics, trackMlErrorAnalysisCreated } from "@/src/lib/analytics/analytics-client"
 import { ArrowLeft, Layers, ListChecks, Loader2, Plus, RefreshCw } from "lucide-react"
 
@@ -205,13 +206,13 @@ export function MlErrorAnalysisWorkspace() {
         eyebrow="Reference"
         title="Slice types (reference)"
         icon={Layers}
-        description={<><code className="text-xs">slice_type</code> values match the options the app supports.</>}
+        description="The slice types this workspace supports."
       >
         <div>
           <div className="flex flex-wrap gap-2">
             {SLICE_TYPES.map((t) => (
-              <Badge key={t} variant="secondary" className="font-mono text-xs">
-                {t}
+              <Badge key={t} variant="secondary" className="text-xs">
+                {statusLabel(t)}
               </Badge>
             ))}
           </div>
@@ -238,7 +239,7 @@ export function MlErrorAnalysisWorkspace() {
                   if (id == null) return null
                   return (
                     <SelectItem key={id} value={String(id)}>
-                      #{id} {readRecordString(row, "status") ?? ""}
+                      #{id} {statusLabel(readRecordString(row, "status"))}
                     </SelectItem>
                   )
                 })}
@@ -259,7 +260,7 @@ export function MlErrorAnalysisWorkspace() {
                 <SelectContent>
                   {SLICE_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {statusLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -280,7 +281,7 @@ export function MlErrorAnalysisWorkspace() {
                 <SelectContent>
                   {SEVERITY_OPTIONS.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s}
+                      {statusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -324,7 +325,7 @@ export function MlErrorAnalysisWorkspace() {
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : slices.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No slices returned.</p>
+              <p className="text-sm text-muted-foreground">No slices yet.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -349,11 +350,11 @@ export function MlErrorAnalysisWorkspace() {
                       <TableRow key={id != null ? `ea-${id}` : `ea-${idx}`}>
                         <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{readRecordNumber(row, "evaluation_run_id") ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{readRecordString(row, "slice_type") ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(readRecordString(row, "slice_type"))}</TableCell>
                         <TableCell className="max-w-[180px] truncate text-sm">{readRecordString(row, "slice_name") ?? "—"}</TableCell>
                         <TableCell className="tabular-nums text-sm">{readRecordNumber(row, "sample_count") ?? "—"}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{readRecordString(row, "severity") ?? "—"}</Badge>
+                          <Badge variant="outline">{statusLabel(readRecordString(row, "severity"))}</Badge>
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{repPreview}</TableCell>
                         <TableCell>
