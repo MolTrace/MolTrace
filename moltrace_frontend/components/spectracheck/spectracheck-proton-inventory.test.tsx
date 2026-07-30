@@ -288,6 +288,37 @@ describe("proton inventory panel — CD3OD aromatic-protected aminoglycoside", (
     }
   })
 
+  // Handoff §7: proton_inventory.structure_assignment is a second, independent view of the same
+  // spectrum, emitted only under MOLTRACE_STRUCTURE_ASSIGNMENT=1. The FE must do NOTHING with it
+  // yet — but must not crash whether it is absent, null, or fully populated.
+  it("ignores structure_assignment whether it is null or fully populated (§7)", () => {
+    const base = CD3OD_PAYLOAD.proton_inventory
+    for (const structure_assignment of [
+      null,
+      // The promised shape, so promoting it later cannot surprise this panel.
+      {
+        feasible: true,
+        total_cost: 3.5,
+        class_rollup: { aromatic: 35.0, aliphatic: 26.0, labile: 0.0 },
+        environments: [{ id: "e1", count: 2 }],
+        flows: [{ from: "e1", to: "anomeric_or_olefinic", h: 2 }],
+        contaminant_h: 1.0,
+        exchanged_h: 6.0,
+        unexplained_h: 0.0,
+        notes: ["assignment engine shadow run"],
+      },
+    ]) {
+      const { unmount } = render(
+        <ProtonInventoryPanel payload={{ proton_inventory: { ...base, structure_assignment } }} />,
+      )
+      // The normal table still renders from `observed` — the shadow view drives nothing.
+      expect(screen.getByTestId("proton-inventory-aromatic")).toBeTruthy()
+      // …and none of its internals leak into the UI.
+      expect(screen.queryByText(/total_cost|class_rollup|unexplained_h/i)).toBeNull()
+      unmount()
+    }
+  })
+
   it("tolerates a payload without the new fields (incremental backend rollout)", () => {
     const legacy = {
       proton_inventory: {
