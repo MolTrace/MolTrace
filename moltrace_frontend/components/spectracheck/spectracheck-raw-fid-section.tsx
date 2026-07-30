@@ -406,6 +406,28 @@ export function SpectraCheckRawFidSection({
   const setProcessError = useCallback((v: string) => update({ processError: v }), [update])
   const setPreviewLoading = useCallback((v: boolean) => update({ previewLoading: v }), [update])
   const setProcessLoading = useCallback((v: boolean) => update({ processLoading: v }), [update])
+
+  /**
+   * Elapsed seconds while a raw-FID read/process is in flight.
+   *
+   * These two buttons call the SYNCHRONOUS endpoints, and a first-time analysis of a new spectrum
+   * genuinely costs ~5-6 s (~12 s once a structure is supplied, measured on localhost). A static
+   * "Reading…"/"Processing…" for that long reads as a hang, so show the clock ticking. This is
+   * honest feedback only — it does not claim progress toward a known total.
+   */
+  const rawFidBusy = previewLoading || processLoading
+  const [elapsedMs, setElapsedMs] = useState(0)
+  useEffect(() => {
+    if (!rawFidBusy) {
+      setElapsedMs(0)
+      return
+    }
+    const startedAt = Date.now()
+    setElapsedMs(0)
+    const id = setInterval(() => setElapsedMs(Date.now() - startedAt), 200)
+    return () => clearInterval(id)
+  }, [rawFidBusy])
+  const elapsedLabel = elapsedMs >= 1000 ? ` ${Math.floor(elapsedMs / 1000)}s` : ""
   const setSessionRawFileIdChoice = useCallback(
     (v: string) => update({ sessionRawFileIdChoice: v }),
     [update],
@@ -1387,7 +1409,7 @@ export function SpectraCheckRawFidSection({
                     </span>
                   </div>
                   <span className="font-mono text-base font-bold leading-tight">
-                    {previewLoading ? "Reading…" : "Preview spectrum"}
+                    {previewLoading ? `Reading…${elapsedLabel}` : "Preview spectrum"}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Read archive contents, vendor, file hash, and acquisition parameters, then display a quick spectrum.
@@ -1443,7 +1465,7 @@ export function SpectraCheckRawFidSection({
                   <span className="font-mono text-base font-bold leading-tight">
                     {analysisBackend === "gsd_prompt3"
                       ? (gsdLoading ? "Running GSD…" : `Run GSD analysis (level ${gsdLevel})`)
-                      : (processLoading ? "Processing…" : "Process FID")}
+                      : (processLoading ? `Processing…${elapsedLabel}` : "Process FID")}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {analysisBackend === "gsd_prompt3"
