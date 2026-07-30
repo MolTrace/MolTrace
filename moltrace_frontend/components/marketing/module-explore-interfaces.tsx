@@ -1,8 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
 import {
   AlertTriangle,
+  ArrowRight,
   Atom,
   BarChart3,
   BookCheck,
@@ -17,6 +19,35 @@ import {
   Waves,
   X,
 } from "lucide-react"
+
+// Shared "Open <module>" affordance. The overlay REPLACES the module card (and
+// with it the card's own launch link), so without this an opened preview is a
+// dead end — the reader has to close it again to get into the module.
+function OpenModuleLink({
+  href,
+  label,
+  inkVar,
+  hueVar,
+}: {
+  href: string
+  label: string
+  inkVar: string
+  hueVar: string
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors"
+      style={{
+        color: `var(${inkVar})`,
+        borderColor: `color-mix(in oklab, var(${hueVar}) 40%, transparent)`,
+      }}
+    >
+      {label}
+      <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+    </Link>
+  )
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODULE "EXPLORE" OVERLAYS — lazy-loaded chunk.
@@ -743,6 +774,12 @@ export function SpectroscopyExploreInterface({ onClose }: { onClose: () => void 
           <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             Three spectra, one continuous picture of your molecule.
           </p>
+          <OpenModuleLink
+            href="/spectracheck"
+            label="Open SpectraCheck"
+            inkVar="--mt-teal-ink"
+            hueVar="--mt-teal"
+          />
         </div>
         <button
           type="button"
@@ -884,6 +921,12 @@ export function RegulatoryExploreInterface({ onClose }: { onClose: () => void })
           <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             QA-RAG is designed to ground every answer in your regulatory corpus, with each claim tied to a retrieved citation.
           </p>
+          <OpenModuleLink
+            href="/regulatory"
+            label="Open Regentry"
+            inkVar="--mt-cyan-ink"
+            hueVar="--mt-cyan"
+          />
         </div>
         <button
           type="button"
@@ -1280,6 +1323,12 @@ export function ReactionExploreInterface({ onClose }: { onClose: () => void }) {
           <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             An LLM-GP hybrid finds the highest-yielding conditions in the fewest experiments.
           </p>
+          <OpenModuleLink
+            href="/reactions"
+            label="Open Repho"
+            inkVar="--mt-violet-ink"
+            hueVar="--mt-violet"
+          />
         </div>
         <button
           type="button"
