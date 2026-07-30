@@ -79,6 +79,46 @@ RANGE_13C: tuple[float, float] = (0.0, 220.0)
 #: Dimension of :func:`encode_spectrum` output at the default ``n_points`` (2×128).
 ENCODING_DIM = 2 * _DEFAULT_N_POINTS
 
+#: Length of one nucleus half of an encoding. ``vec[:HALF_DIM]`` is ¹H,
+#: ``vec[HALF_DIM:]`` is ¹³C.
+HALF_DIM = _DEFAULT_N_POINTS
+
+#: Weight of the coverage penalty in :class:`MultiNucleusSpectrumIndex` ranking —
+#: added per *query* nucleus that a candidate does not carry. Chosen by measurement
+#: on the 42 449-molecule NMRShiftDB2 corpus, not by intuition; see that class's
+#: docstring for the sweep. λ=0.20 is the knee: it restores full-vector precision on
+#: both-nuclei queries (99.7 % recall@1, matching a 256-D index exactly) while still
+#: reaching single-nucleus references (90.7 % @1 / 99.7 % @10, which routing serves
+#: at 0 %). λ=0 costs 6.4 points on the common case; λ=0.5 costs 15 points on the
+#: single-nucleus case.
+FUSED_COVERAGE_PENALTY = 0.20
+
+#: Nucleus keys used by the per-nucleus sub-indices, in encoding order.
+NUCLEI: tuple[str, str] = ("1h", "13c")
+
+
+def nuclei_present(vector: np.ndarray, half_dim: int | None = None) -> tuple[str, ...]:
+    """Which nuclei an encoding actually carries.
+
+    :func:`encode_spectrum` L2-normalizes each half that has peaks and leaves an
+    absent nucleus as exact zeros, so a nonzero half *is* the presence signal. This
+    is what lets a query be routed and scored by the nuclei it really measured
+    rather than by the fixed 256-D shape it is padded into.
+
+    ``half_dim`` defaults to half the vector's own length rather than to the module
+    constant, so a non-default ``n_points`` encoding is split where its halves
+    actually meet. Reading a fixed 128 would mis-slice such a vector and report the
+    wrong nucleus — a 64-bin ¹³C-only encoding came back as ``('1h',)``.
+    """
+
+    vec = np.asarray(vector)
+    width = int(half_dim) if half_dim is not None else vec.shape[-1] // 2
+    return tuple(
+        name
+        for name, half in zip(NUCLEI, (vec[..., :width], vec[..., width:]), strict=True)
+        if bool(np.any(half))
+    )
+
 
 def current_encoder_meta() -> dict[str, Any]:
     """The encoding contract this module currently produces.
@@ -416,7 +456,15 @@ class SpectrumIndex:
         """Top-``k`` nearest ids by L2 distance.
 
         A 1-D ``query`` returns ``[(id, distance), ...]``; a 2-D batch returns one
-        such list per row. Distances are L2 (lower = closer).
+        such list per row. Distances are **true** L2 (lower = closer).
+
+        FAISS ``METRIC_L2`` reports *squared* L2, so the raw values are square-rooted
+        here. Without that, this method disagreed with :func:`exact_knn` and
+        :func:`vector_similarity` — which both return true L2 — by a square, and the
+        endpoint surfaced the squared number under the field name ``l2_distance``.
+        Ranking is unaffected (√ is monotonic on non-negatives) but the magnitudes
+        were not comparable across code paths, and the [0, 2] bound that per-half
+        normalization buys applies to true L2 only.
         """
         q = np.ascontiguousarray(np.asarray(query, dtype=np.float32))
         single = q.ndim == 1
@@ -432,7 +480,7 @@ class SpectrumIndex:
         for row_idx, row_dist in zip(indices, distances, strict=True):
             results.append(
                 [
-                    (self.ids[i], float(d))
+                    (self.ids[i], math.sqrt(max(0.0, float(d))))
                     for i, d in zip(row_idx, row_dist, strict=True)
                     if i != -1
                 ]
@@ -492,3 +540,405 @@ class SpectrumIndex:
         obj.encoder_meta = meta.get("encoder")
         _warn_on_encoder_mismatch(obj.encoder_meta, path)
         return obj
+
+
+#: Marker written into a :class:`MultiNucleusSpectrumIndex` manifest so
+#: :func:`load_index` can tell the two artifact layouts apart.
+_MULTI_NUCLEUS_KIND = "multi_nucleus_v1"
+
+
+class MultiNucleusSpectrumIndex:
+    """Per-nucleus sub-indices, ranked by coverage-penalised mean nucleus distance.
+
+    Why this exists
+    ===============
+    A single index over the concatenated 256-D encoding is only sound when every
+    molecule carries every nucleus. Real reference data does not: of the 42 449
+    molecules in the full NMRShiftDB2 export, **82.2 % carry one nucleus only**
+    (59.7 % ¹³C-only, 22.6 % ¹H-only). Because :func:`encode_spectrum` leaves an
+    absent nucleus as exact zeros, those zero halves match *each other* perfectly,
+    and a missing half costs a candidate the half's full unit norm. Measured on
+    that corpus, a single 256-D index is catastrophic in **both** directions:
+
+    ==================================  ===============  ===============
+    scenario                            one 256-D index  this class
+    ==================================  ===============  ===============
+    ¹³C-only query → both-nuclei ref     0.0 % @1/@10     99.0 % @1
+    both-nuclei query → ¹³C-only ref     4.3 % @1         90.7 % @1
+    ==================================  ===============  ===============
+
+    In the first row 100 % of a ¹³C-only query's top-10 were zero-¹H entries against
+    a 59.7 % base rate — the zero halves act as a magnet no chemical agreement can
+    overcome.
+
+    How it ranks
+    ============
+    Each nucleus gets its own ``half_dim``-D HNSW sub-index holding every molecule
+    that actually carries it, so no zero half is ever indexed. A query is scored
+    against a candidate on the nuclei the two **share**::
+
+        score = mean(L2 per shared nucleus) + λ · (query nuclei the candidate lacks)
+                                                  ────────────────────────────────
+                                                        query nuclei
+
+    The mean alone is not enough: averaging over fewer nuclei has lower variance, so
+    single-nucleus candidates crowd out both-nuclei ones — the mirror of the bug
+    being fixed, measured as 93.3 % vs 99.7 % recall@1 on both-nuclei queries. The
+    coverage penalty restores that precision without making missing data
+    unreachable. λ was swept on the real corpus (recall@1, both-nuclei query /
+    ¹³C-only reference): 0.0 → 93.3/94.0, 0.05 → 98.3/94.0, **0.20 → 99.7/90.7**,
+    0.35 → 99.7/86.3, 0.50 → 99.7/75.7. λ=0.20 is the knee and is
+    :data:`FUSED_COVERAGE_PENALTY`.
+
+    Two rejected alternatives, both measured rather than argued away:
+
+    * **Routing** the query to the sub-index matching its own nuclei scores 99.7 %
+      on both-nuclei queries but **0 % @1 and @10** for a both-nuclei query whose
+      reference carries one nucleus — a structural blind spot over 82 % of the
+      corpus that no choice of ``k`` can fix.
+    * **Reciprocal-rank fusion** across sub-indices also scores **0 %** there: a
+      both-nuclei candidate collects a contribution from every list it appears in
+      while a single-nucleus one collects from a single list, so RRF reproduces the
+      coverage bias it was meant to remove.
+
+    Distances returned by :meth:`search` are therefore that fused score — a mean of
+    **true** (not squared) per-nucleus L2 distances plus the penalty, lower = closer,
+    bounded on **[0, √2 + λ]**. It is not the L2 norm of the 256-D difference; for a
+    both-nuclei query matched to a both-nuclei candidate it equals that norm's
+    per-nucleus mean. The √2 is not 2 because an encoded half is non-negative
+    (a sum of Gaussians), so two unit halves can be at most orthogonal, never
+    antipodal — measured at 1.414214 for disjoint halves.
+
+    A consequence worth naming: for a candidate that shares only some of the query's
+    nuclei, part of the score is the penalty rather than measured disagreement, and
+    in the limit (identical on the shared nucleus, missing the other) it is *entirely*
+    penalty — 0.1 at λ=0.20 with one of two nuclei absent. Use
+    :meth:`search_with_coverage` when the caller needs to tell that apart from 0.1
+    worth of real disagreement across both nuclei; the two carry different evidential
+    weight and the bare number cannot distinguish them.
+
+    Known characteristic: ¹H-only entries are over-represented below rank 1
+    ==================================================================
+    For a both-nuclei query the correct answer comes back at rank 1 in 99.7–100 % of
+    cases, but the remaining slots skew: measured over 300 real queries, the top-10
+    ran 68.7 % ¹H-only against a 22.6 % base rate (3.0×), with ¹³C-only entries at
+    5.1 % against 59.7 % (0.09×).
+
+    The cause is **variance, not scale**. A candidate sharing one nucleus is scored on
+    a single distance while a both-nuclei candidate is scored on the *average* of two,
+    and averaging shrinks the lower tail, so single-nucleus candidates reach extreme
+    low scores more easily. ¹H dominates ¹³C within that effect because ¹H is the less
+    discriminative nucleus here — σ/range is 0.30/12 = 0.025 against 0.0091 for ¹³C,
+    so arbitrary ¹H halves overlap more and the lower tail of ``d_1h`` is fatter.
+
+    A per-nucleus scale calibration was tried and **refuted**: the two typical corpus
+    distances are 1.174 (¹H) and 1.222 (¹³C), a ratio of 1.04, so there is no scale
+    gap to correct — dividing by them left the composition essentially unchanged and
+    cost 8 points on the single-nucleus-reference case. No fix is applied because no
+    measured objective is harmed: every scenario in the table above is at or above
+    99 % @1 except the demoted-reference case at 92.8 % @1 / 100 % @10. Anyone
+    revisiting this should weight the nuclei in the mean rather than rescale them,
+    and must re-sweep λ if they do.
+    """
+
+    def __init__(
+        self,
+        half_dim: int = HALF_DIM,
+        hnsw_m: int = 32,
+        ef_construction: int = 200,
+        ef_search: int = 128,
+        coverage_penalty: float = FUSED_COVERAGE_PENALTY,
+    ) -> None:
+        faiss = _import_faiss()
+        self._faiss = faiss
+        self.half_dim = int(half_dim)
+        self.dim = 2 * self.half_dim
+        self.coverage_penalty = float(coverage_penalty)
+        self.ids: list[Any] = []
+        self._sub: dict[str, Any] = {}
+        #: nucleus -> global row for each row of that sub-index
+        self._rows: dict[str, list[int]] = {}
+        #: nucleus -> {global row: sub-index row}, the inverse of ``_rows``
+        self._pos: dict[str, dict[int, int]] = {}
+        for nucleus in NUCLEI:
+            index = faiss.IndexHNSWFlat(self.half_dim, int(hnsw_m))
+            index.hnsw.efConstruction = int(ef_construction)
+            index.hnsw.efSearch = int(ef_search)
+            self._sub[nucleus] = index
+            self._rows[nucleus] = []
+            self._pos[nucleus] = {}
+        self.encoder_meta: dict[str, Any] | None = None
+
+    def __len__(self) -> int:
+        """Number of molecules, not of indexed vectors (a molecule may hold two)."""
+
+        return len(self.ids)
+
+    @property
+    def ef_search(self) -> int:
+        return int(self._sub[NUCLEI[0]].hnsw.efSearch)
+
+    @ef_search.setter
+    def ef_search(self, value: int) -> None:
+        for index in self._sub.values():
+            index.hnsw.efSearch = int(value)
+
+    def nucleus_size(self, nucleus: str) -> int:
+        """How many molecules carry ``nucleus``."""
+
+        return int(self._sub[nucleus].ntotal)
+
+    def add(self, vectors: np.ndarray, ids: Sequence[Any]) -> None:
+        """Add full ``dim``-D encodings; each half is routed to its own sub-index.
+
+        A half of exact zeros means "this nucleus was not measured" and is **not**
+        indexed — that omission is the entire point, since indexing zero halves is
+        what makes them a retrieval magnet.
+        """
+
+        vecs = np.ascontiguousarray(np.asarray(vectors, dtype=np.float32))
+        if vecs.ndim == 1:
+            vecs = vecs.reshape(1, -1)
+        if vecs.shape[1] != self.dim:
+            raise ValueError(f"expected dim {self.dim}, got {vecs.shape[1]}")
+        id_list = list(ids)
+        if len(id_list) != vecs.shape[0]:
+            raise ValueError("number of ids must match number of vectors")
+
+        base = len(self.ids)
+        self.ids.extend(id_list)
+        halves = {"1h": vecs[:, : self.half_dim], "13c": vecs[:, self.half_dim :]}
+        for nucleus, block in halves.items():
+            keep = np.flatnonzero(np.any(block != 0.0, axis=1))
+            if keep.size == 0:
+                continue
+            self._sub[nucleus].add(np.ascontiguousarray(block[keep]))
+            for offset in keep.tolist():
+                global_row = base + offset
+                self._pos[nucleus][global_row] = len(self._rows[nucleus])
+                self._rows[nucleus].append(global_row)
+
+    def _nucleus_distance(self, nucleus: str, global_row: int, half: np.ndarray) -> float:
+        """Exact true-L2 distance for a candidate the sub-index search did not return.
+
+        ``reconstruct`` is an O(1) read out of HNSW's flat storage, so this keeps the
+        full vectors out of process memory — which is what allows the same layout to
+        scale past the point where holding them would not fit.
+        """
+
+        sub_row = self._pos[nucleus][global_row]
+        stored = self._sub[nucleus].reconstruct(int(sub_row))
+        return float(np.linalg.norm(np.asarray(stored, dtype=np.float32) - half))
+
+    def _search_one(
+        self, query: np.ndarray, k: int, pool: int
+    ) -> list[tuple[Any, float, tuple[str, ...], tuple[str, ...]]]:
+        present = nuclei_present(query, self.half_dim)
+        if not present or len(self.ids) == 0:
+            return []
+        halves = {"1h": query[: self.half_dim], "13c": query[self.half_dim :]}
+
+        # 1. Coarse candidates from each sub-index the query can actually address.
+        distances: dict[int, dict[str, float]] = {}
+        for nucleus in present:
+            index = self._sub[nucleus]
+            if index.ntotal == 0:
+                continue
+            half = np.ascontiguousarray(halves[nucleus].reshape(1, -1), dtype=np.float32)
+            take = max(1, min(pool, int(index.ntotal)))
+            sub_d, sub_i = index.search(half, take)
+            for sub_row, sq in zip(sub_i[0], sub_d[0], strict=True):
+                if sub_row == -1:
+                    continue
+                global_row = self._rows[nucleus][int(sub_row)]
+                distances.setdefault(global_row, {})[nucleus] = math.sqrt(
+                    max(0.0, float(sq))
+                )
+
+        # 2. Complete each candidate: a molecule surfaced by one nucleus may also
+        #    carry the other, and scoring it on only the nucleus that found it would
+        #    reintroduce exactly the coverage bias this class exists to remove.
+        scored: list[tuple[float, Any, tuple[str, ...], tuple[str, ...]]] = []
+        for global_row, known in distances.items():
+            total = 0.0
+            compared: list[str] = []
+            absent: list[str] = []
+            for nucleus in present:
+                if global_row in self._pos[nucleus]:
+                    value = known.get(nucleus)
+                    if value is None:
+                        value = self._nucleus_distance(
+                            nucleus, global_row, halves[nucleus]
+                        )
+                    total += value
+                    compared.append(nucleus)
+                else:
+                    absent.append(nucleus)
+            if not compared:  # pragma: no cover - a candidate always shares its finder
+                continue
+            score = total / len(compared) + self.coverage_penalty * (
+                len(absent) / len(present)
+            )
+            scored.append((score, self.ids[global_row], tuple(compared), tuple(absent)))
+
+        scored.sort(key=lambda item: item[0])
+        return [
+            (identifier, float(score), compared, absent)
+            for score, identifier, compared, absent in scored[:k]
+        ]
+
+    def _search_rows(
+        self, query: np.ndarray, k: int, candidate_pool: int | None
+    ) -> tuple[list[list[tuple[Any, float, tuple[str, ...], tuple[str, ...]]]], bool]:
+        q = np.ascontiguousarray(np.asarray(query, dtype=np.float32))
+        single = q.ndim == 1
+        if single:
+            q = q.reshape(1, -1)
+        if q.shape[1] != self.dim:
+            raise ValueError(f"expected dim {self.dim}, got {q.shape[1]}")
+        k = max(1, int(k))
+        pool = int(candidate_pool) if candidate_pool else max(200, 10 * k)
+        return [self._search_one(row, k, pool) for row in q], single
+
+    def search(
+        self, query: np.ndarray, k: int = 100, candidate_pool: int | None = None
+    ) -> list[tuple[Any, float]] | list[list[tuple[Any, float]]]:
+        """Top-``k`` ids by fused per-nucleus distance (see the class docstring).
+
+        Returns ``(id, score)`` pairs, matching :meth:`SpectrumIndex.search` so the
+        two index layouts are interchangeable at the call site. Use
+        :meth:`search_with_coverage` to also learn which nuclei each score was
+        computed over.
+
+        ``candidate_pool`` is how many coarse neighbours to pull from each
+        sub-index before the exact fused re-scoring; it defaults to ``10 × k``
+        (floor 200). Raising it costs recall nothing and latency a little — the
+        re-scoring is exact on whatever set it receives, so the pool only bounds
+        which molecules get considered at all.
+        """
+
+        rows, single = self._search_rows(query, k, candidate_pool)
+        trimmed = [[(identifier, score) for identifier, score, _, _ in row] for row in rows]
+        return trimmed[0] if single else trimmed
+
+    def search_with_coverage(
+        self, query: np.ndarray, k: int = 100, candidate_pool: int | None = None
+    ) -> (
+        list[tuple[Any, float, tuple[str, ...], tuple[str, ...]]]
+        | list[list[tuple[Any, float, tuple[str, ...], tuple[str, ...]]]]
+    ):
+        """Like :meth:`search`, but also reports the coverage behind each score.
+
+        Yields ``(id, score, nuclei_compared, nuclei_absent)``. Without this, a score
+        is ambiguous in a way that matters for how much weight a reviewer should give
+        it: 0.1 can mean "a little disagreement measured across both nuclei" or
+        "perfect agreement on the only nucleus this reference has, and the other was
+        never measured". Those are different strengths of evidence, and a regulated
+        read-out should be able to say which one it is.
+        """
+
+        rows, single = self._search_rows(query, k, candidate_pool)
+        return rows[0] if single else rows
+
+    def save(self, path: str, encoder: dict[str, Any] | None = None) -> None:
+        """Write a JSON manifest at ``path`` plus one FAISS file per nucleus.
+
+        The manifest — not a FAISS blob — sits at ``path`` so that the artifact is
+        self-describing and :func:`load_index` can pick the right reader by looking
+        at the file. Sub-index filenames are stored as basenames, so the directory
+        can be moved or copied without rewriting the manifest.
+        """
+
+        import json
+        import os
+
+        path = str(path)
+        os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
+        written: dict[str, str] = {}
+        for nucleus, index in self._sub.items():
+            if index.ntotal == 0:
+                continue
+            sub_path = f"{path}.{nucleus}"
+            self._faiss.write_index(index, sub_path)
+            written[nucleus] = os.path.basename(sub_path)
+        payload = {
+            "kind": _MULTI_NUCLEUS_KIND,
+            "half_dim": self.half_dim,
+            "coverage_penalty": self.coverage_penalty,
+            "ids": self.ids,
+            "rows": {nucleus: self._rows[nucleus] for nucleus in NUCLEI},
+            "sub_indexes": written,
+            "encoder": encoder if encoder is not None else current_encoder_meta(),
+        }
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+
+    @classmethod
+    def load(cls, path: str) -> MultiNucleusSpectrumIndex:
+        """Load an artifact written by :meth:`save`.
+
+        Warns rather than raises on an encoder-contract mismatch, for the same reason
+        :meth:`SpectrumIndex.load` does: the request path calls this without a guard,
+        so raising would turn a stale index into a 500 instead of a degraded surface.
+        """
+
+        import json
+        import os
+
+        faiss = _import_faiss()
+        path = str(path)
+        with open(path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+        if payload.get("kind") != _MULTI_NUCLEUS_KIND:
+            raise ValueError(f"{path!r} is not a {_MULTI_NUCLEUS_KIND} manifest")
+
+        obj = cls(
+            half_dim=int(payload["half_dim"]),
+            coverage_penalty=float(
+                payload.get("coverage_penalty", FUSED_COVERAGE_PENALTY)
+            ),
+        )
+        obj.ids = list(payload["ids"])
+        directory = os.path.dirname(os.path.abspath(path))
+        for nucleus in NUCLEI:
+            rows = [int(r) for r in payload.get("rows", {}).get(nucleus, [])]
+            obj._rows[nucleus] = rows
+            obj._pos[nucleus] = {row: i for i, row in enumerate(rows)}
+            name = payload.get("sub_indexes", {}).get(nucleus)
+            if name:
+                obj._sub[nucleus] = faiss.read_index(os.path.join(directory, name))
+        obj.encoder_meta = payload.get("encoder")
+        _warn_on_encoder_mismatch(obj.encoder_meta, path)
+        return obj
+
+
+def load_index(path: str) -> SpectrumIndex | MultiNucleusSpectrumIndex:
+    """Load whichever index layout ``path`` holds.
+
+    A :class:`MultiNucleusSpectrumIndex` manifest is JSON; a :class:`SpectrumIndex`
+    is a raw FAISS blob whose first bytes are a binary magic. Detecting from the file
+    rather than from a caller-supplied flag means an existing deployment keeps
+    working after an upgrade without touching its configuration, and a rebuilt
+    artifact is picked up on its own.
+
+    The probe reads a few leading bytes rather than parsing the file: handing a
+    multi-gigabyte FAISS blob to ``json.load`` allocated ~3× its size and left the
+    whole thing alive inside the exception (``UnicodeDecodeError.object`` retains the
+    decoded bytes) while the real reader ran. The first non-UTF-8 byte of a FAISS
+    index is at offset 4, so a short read decides it.
+    """
+
+    import json
+
+    with open(path, "rb") as probe:
+        head = probe.read(64).lstrip()
+    if not head.startswith(b"{"):
+        return SpectrumIndex.load(path)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (UnicodeDecodeError, ValueError):
+        return SpectrumIndex.load(path)
+    if isinstance(payload, dict) and payload.get("kind") == _MULTI_NUCLEUS_KIND:
+        return MultiNucleusSpectrumIndex.load(path)
+    return SpectrumIndex.load(path)
