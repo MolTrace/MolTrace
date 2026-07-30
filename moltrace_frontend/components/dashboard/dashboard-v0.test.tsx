@@ -141,17 +141,16 @@ describe("DashboardV0 connector/ingestion fallback", () => {
     mockApiFetch.mockReset()
     mockApiFetch.mockRejectedValue(new Error("backend unavailable"))
     installDesktopMode()
+    window.localStorage.clear()
   })
 
   it("shows subtle summary unavailable message and keeps dashboard content", async () => {
-    const user = userEvent.setup()
     render(<DashboardV0 />)
 
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument()
     expect(screen.getByText("Active Analyses")).toBeInTheDocument()
 
-    await user.click(screen.getByRole("button", { name: /Expand Operations section/i }))
-
+    // Operations opens by default now — no expand click needed.
     await waitFor(() => {
       expect(screen.getByText("Connector and ingestion summary")).toBeInTheDocument()
       expect(
@@ -166,18 +165,72 @@ describe("DashboardV0 connector/ingestion fallback", () => {
     expect(screen.queryByText("Mobile Command Center")).not.toBeInTheDocument()
   })
 
-  it("surfaces testing-phase core module activity in the cross-module command center", async () => {
-    const user = userEvent.setup()
+  it("opens every section by default so each area shows its content", () => {
     render(<DashboardV0 />)
 
-    await user.click(screen.getByRole("button", { name: /Expand Science section/i }))
+    for (const section of ["Overview", "Science", "Regulatory", "Operations", "Recent Activity"]) {
+      expect(
+        screen.getByRole("button", { name: new RegExp(`Collapse ${section} section`, "i") }),
+      ).toBeInTheDocument()
+    }
+  })
+
+  it("keeps section cards visible with placeholder values when live data is unavailable", async () => {
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      // Science cards render even though every fetch failed.
+      expect(screen.getByText("ML factory health")).toBeInTheDocument()
+      expect(screen.getByText("AI inference summary")).toBeInTheDocument()
+      expect(screen.getByText("Compound Registry")).toBeInTheDocument()
+      // Regulatory cards likewise. ("Regentry" also names a core-module-activity
+      // row, so assert at-least-one rather than exactly-one.)
+      expect(screen.getAllByText("Regentry").length).toBeGreaterThan(0)
+      expect(screen.getByText("Regulatory compliance")).toBeInTheDocument()
+      expect(screen.getByText("Regulatory Surveillance")).toBeInTheDocument()
+      expect(
+        screen.getByText("Live regulatory surveillance data isn't available right now."),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it("surfaces testing-phase core module activity in the cross-module command center", async () => {
+    render(<DashboardV0 />)
 
     await waitFor(() => {
       expect(screen.getByText("Core module activity")).toBeInTheDocument()
-      expect(screen.getByText("SpectraCheck")).toBeInTheDocument()
-      expect(screen.getByText("Regentry")).toBeInTheDocument()
-      expect(screen.getByText("Repho")).toBeInTheDocument()
+      expect(screen.getAllByText("SpectraCheck").length).toBeGreaterThan(0)
+      expect(screen.getAllByText("Regentry").length).toBeGreaterThan(0)
+      expect(screen.getAllByText("Repho").length).toBeGreaterThan(0)
       expect(screen.getByText("5 opens")).toBeInTheDocument()
+    })
+  })
+
+  it("collapses and expands all sections with the header controls", async () => {
+    const user = userEvent.setup()
+    render(<DashboardV0 />)
+
+    await user.click(screen.getByRole("button", { name: /^Collapse all$/i }))
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Expand Operations section/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole("button", { name: /^Expand all$/i }))
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Collapse Operations section/i })).toBeInTheDocument()
+    })
+  })
+
+  it("remembers a collapsed section across a remount", async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<DashboardV0 />)
+
+    await user.click(screen.getByRole("button", { name: /Collapse Science section/i }))
+    unmount()
+
+    render(<DashboardV0 />)
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Expand Science section/i })).toBeInTheDocument()
     })
   })
 })
