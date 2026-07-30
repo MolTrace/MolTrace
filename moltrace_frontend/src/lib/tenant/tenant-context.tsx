@@ -15,6 +15,15 @@ import {
   apiFetch,
   readStoredTenantId,
 } from "@/lib/api/client"
+import {
+  invalidateShellSnapshots,
+  isShellSnapshotFresh,
+  loadShellSnapshot,
+  readShellSnapshot,
+  SHELL_SNAPSHOT_KEYS,
+  SHELL_SNAPSHOT_MAX_AGE_MS,
+  writeShellSnapshot,
+} from "@/src/lib/shell/shell-snapshot-cache"
 
 type Row = Record<string, unknown>
 
@@ -222,20 +231,45 @@ function featureEnabled(entitlements: TenantEntitlementRecord[], featureKey: str
   return matches.some((entitlement) => entitlement.enabled)
 }
 
+/** Everything the provider resolves from the network, in one cacheable shape. */
+type TenantSnapshot = {
+  tenants: TenantRecord[]
+  tenant: TenantRecord
+  entitlements: TenantEntitlementRecord[]
+}
+
 export function TenantProvider({ children }: { children: ReactNode }) {
-  const [tenants, setTenants] = useState<TenantRecord[]>([LOCAL_TENANT])
-  const [tenant, setTenant] = useState<TenantRecord>(LOCAL_TENANT)
-  const [entitlements, setEntitlements] = useState<TenantEntitlementRecord[]>([])
+  // Every top-level route change remounts the shell (each page renders its own
+  // <AppShell>), which used to re-run the whole tenant handshake — `/tenants`
+  // plus two per-tenant calls — before the nav could settle. Seed from the
+  // cross-navigation snapshot and only revalidate once it has aged out.
+  const cachedTenant = readShellSnapshot<TenantSnapshot>(SHELL_SNAPSHOT_KEYS.tenantContext)
+  const [tenants, setTenants] = useState<TenantRecord[]>(cachedTenant?.tenants ?? [LOCAL_TENANT])
+  const [tenant, setTenant] = useState<TenantRecord>(cachedTenant?.tenant ?? LOCAL_TENANT)
+  const [entitlements, setEntitlements] = useState<TenantEntitlementRecord[]>(
+    cachedTenant?.entitlements ?? [],
+  )
   const [featureFlags] = useState<TenantFeatureFlagRecord[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(cachedTenant == null)
   const [error, setError] = useState("")
+
+  const applyTenantSnapshot = useCallback((snapshot: TenantSnapshot) => {
+    setTenants(snapshot.tenants)
+    setTenant(snapshot.tenant)
+    setEntitlements(snapshot.entitlements)
+  }, [])
 
   const loadTenantDetail = useCallback(async (tenantId: string, tenantList: TenantRecord[]) => {
     if (!tenantId || tenantId === LOCAL_TENANT_ID) {
       setTenant(LOCAL_TENANT)
       setEntitlements([])
       storeTenantId(LOCAL_TENANT_ID)
+      writeShellSnapshot<TenantSnapshot>(SHELL_SNAPSHOT_KEYS.tenantContext, {
+        tenants: tenantList.length > 0 ? tenantList : [LOCAL_TENANT],
+        tenant: LOCAL_TENANT,
+        entitlements: [],
+      })
       return
     }
 
@@ -254,6 +288,49 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       .filter((item): item is TenantEntitlementRecord => item != null)
     setTenant(parsedTenant)
     setEntitlements(parsedEntitlements)
+    writeShellSnapshot<TenantSnapshot>(SHELL_SNAPSHOT_KEYS.tenantContext, {
+      tenants: tenantList.length > 0 ? tenantList : [LOCAL_TENANT],
+      tenant: parsedTenant,
+      entitlements: parsedEntitlements,
+    })
+  }, [])
+
+  // The network half of the handshake, with no state writes — so it can be
+  // shared (and deduped) through the cross-navigation snapshot cache.
+  const resolveTenantSnapshot = useCallback(async (): Promise<TenantSnapshot> => {
+    const payload = await apiFetch<unknown>("/tenants", { method: "GET" })
+    const parsedTenants = asRows(payload, ["tenants"])
+      .map(parseTenant)
+      .filter((item): item is TenantRecord => item != null)
+    const nextTenants = parsedTenants.length > 0 ? parsedTenants : [LOCAL_TENANT]
+    const storedTenantId = readStoredTenantId()
+    const nextTenantId =
+      storedTenantId && nextTenants.some((candidate) => candidate.id === storedTenantId)
+        ? storedTenantId
+        : nextTenants[0]?.id ?? LOCAL_TENANT_ID
+
+    if (!nextTenantId || nextTenantId === LOCAL_TENANT_ID) {
+      storeTenantId(LOCAL_TENANT_ID)
+      return { tenants: nextTenants, tenant: LOCAL_TENANT, entitlements: [] }
+    }
+
+    storeTenantId(nextTenantId)
+    const headers = { "x-tenant-id": nextTenantId }
+    const [tenantPayload, entitlementPayload] = await Promise.all([
+      apiFetch<unknown>(`/tenants/${encodeURIComponent(nextTenantId)}`, { method: "GET", headers }),
+      apiFetch<unknown>(`/tenants/${encodeURIComponent(nextTenantId)}/entitlements`, {
+        method: "GET",
+        headers,
+      }),
+    ])
+    const parsedTenant =
+      parseTenant(unwrapRecord(tenantPayload, ["tenant"]) ?? {}) ??
+      nextTenants.find((candidate) => candidate.id === nextTenantId) ??
+      LOCAL_TENANT
+    const parsedEntitlements = asRows(entitlementPayload, ["entitlements", "tenant_entitlements"])
+      .map(parseEntitlement)
+      .filter((item): item is TenantEntitlementRecord => item != null)
+    return { tenants: nextTenants, tenant: parsedTenant, entitlements: parsedEntitlements }
   }, [])
 
   const refreshTenantContext = useCallback(async () => {
@@ -262,18 +339,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setIsAdmin(readStoredUserIsAdmin())
 
     try {
-      const payload = await apiFetch<unknown>("/tenants", { method: "GET" })
-      const parsedTenants = asRows(payload, ["tenants"])
-        .map(parseTenant)
-        .filter((item): item is TenantRecord => item != null)
-      const nextTenants = parsedTenants.length > 0 ? parsedTenants : [LOCAL_TENANT]
-      const storedTenantId = readStoredTenantId()
-      const nextTenantId =
-        storedTenantId && nextTenants.some((candidate) => candidate.id === storedTenantId)
-          ? storedTenantId
-          : nextTenants[0]?.id ?? LOCAL_TENANT_ID
-      setTenants(nextTenants)
-      await loadTenantDetail(nextTenantId, nextTenants)
+      // An explicit refresh must hit the network, so drop the cached snapshot
+      // first rather than being served it.
+      invalidateShellSnapshots(SHELL_SNAPSHOT_KEYS.tenantContext)
+      const snapshot = await loadShellSnapshot(
+        SHELL_SNAPSHOT_KEYS.tenantContext,
+        resolveTenantSnapshot,
+      )
+      applyTenantSnapshot(snapshot)
     } catch (err) {
       setTenants([LOCAL_TENANT])
       setTenant(LOCAL_TENANT)
@@ -283,17 +356,49 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [loadTenantDetail])
+  }, [applyTenantSnapshot, resolveTenantSnapshot])
 
   useEffect(() => {
-    void refreshTenantContext()
-  }, [refreshTenantContext])
+    setIsAdmin(readStoredUserIsAdmin())
+
+    // Seeded from a fresh snapshot — the handshake already ran on this route
+    // change or the one just before it.
+    if (isShellSnapshotFresh(SHELL_SNAPSHOT_KEYS.tenantContext, SHELL_SNAPSHOT_MAX_AGE_MS)) {
+      setLoading(false)
+      return
+    }
+
+    let active = true
+    void loadShellSnapshot(SHELL_SNAPSHOT_KEYS.tenantContext, resolveTenantSnapshot)
+      .then((snapshot) => {
+        if (!active) return
+        applyTenantSnapshot(snapshot)
+        setError("")
+      })
+      .catch((err) => {
+        if (!active) return
+        setTenants([LOCAL_TENANT])
+        setTenant(LOCAL_TENANT)
+        setEntitlements([])
+        storeTenantId(LOCAL_TENANT_ID)
+        setError(formatErr(err))
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [applyTenantSnapshot, resolveTenantSnapshot])
 
   const setCurrentTenantId = useCallback(
     (tenantId: string) => {
       const nextTenants = tenants.length > 0 ? tenants : [LOCAL_TENANT]
       setLoading(true)
       setError("")
+      // Switching tenant invalidates every cached workspace list, not just the
+      // tenant record — the snapshots are per-session, not per-tenant.
+      invalidateShellSnapshots()
       void loadTenantDetail(tenantId, nextTenants)
         .catch((err) => {
           setError(formatErr(err))

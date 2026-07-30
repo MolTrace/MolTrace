@@ -9,6 +9,7 @@ import { OverviewDataProvider } from "@/components/app/overview-data-context"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { MobileBottomNav } from "@/src/components/app-shell/MobileBottomNav"
+import { invalidateShellSnapshots } from "@/src/lib/shell/shell-snapshot-cache"
 import { TenantProvider } from "@/src/lib/tenant/tenant-context"
 import { StepUpProvider } from "@/components/auth/step-up-provider"
 
@@ -24,6 +25,8 @@ export function ResponsiveAppShell({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     function onAuthReset(event: Event) {
       const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
+      // Drop cached workspace data with the session it belonged to.
+      invalidateShellSnapshots()
       router.replace(reason === "token_reuse_detected" ? "/sign-in?session_reset=reuse" : "/sign-in?session_reset=1")
     }
     window.addEventListener("moltrace:auth-reset", onAuthReset)

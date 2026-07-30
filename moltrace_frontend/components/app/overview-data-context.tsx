@@ -12,6 +12,13 @@ import { apiFetch } from "@/lib/api/client"
 import { normalizeProjectListPayload } from "@/components/projects/project-workspace-utils"
 import { fetchSpectraCheckSessionsList } from "@/src/lib/spectracheck/spectracheck-backend-session"
 import {
+  isShellSnapshotFresh,
+  loadShellSnapshot,
+  readShellSnapshot,
+  SHELL_SNAPSHOT_KEYS,
+  SHELL_SNAPSHOT_MAX_AGE_MS,
+} from "@/src/lib/shell/shell-snapshot-cache"
+import {
   buildDashboardJobRows,
   buildEvidenceQueueCards,
   buildProjectNameIndex,
@@ -55,56 +62,84 @@ export type OverviewDataContextValue = {
 
 const OverviewDataContext = createContext<OverviewDataContextValue | null>(null)
 
+/** The four workspace lists this provider owns, in one resolved shape. */
+type OverviewSnapshot = {
+  projects: unknown[]
+  projectsDataAvailable: boolean
+  sessions: Record<string, unknown>[]
+  sessionsDataAvailable: boolean
+  jobs: Record<string, unknown>[]
+  jobsDataAvailable: boolean
+  workflowRuns: Record<string, unknown>[]
+  workflowRunsDataAvailable: boolean
+}
+
+const EMPTY_OVERVIEW_SNAPSHOT: OverviewSnapshot = {
+  projects: [],
+  projectsDataAvailable: false,
+  sessions: [],
+  sessionsDataAvailable: false,
+  jobs: [],
+  jobsDataAvailable: false,
+  workflowRuns: [],
+  workflowRunsDataAvailable: false,
+}
+
+async function fetchOverviewSnapshot(): Promise<OverviewSnapshot> {
+  const [pr, sr, jr, wr] = await Promise.allSettled([
+    apiFetch<unknown>("/projects", { method: "GET" }),
+    fetchSpectraCheckSessionsList(),
+    apiFetch<unknown>("/jobs", { method: "GET" }),
+    apiFetch<unknown>("/workflow-runs", { method: "GET" }),
+  ])
+  return {
+    projects: pr.status === "fulfilled" ? normalizeProjectListPayload(pr.value) : [],
+    projectsDataAvailable: pr.status === "fulfilled",
+    sessions: sr.status === "fulfilled" ? normalizeSpectraCheckSessionsList(sr.value) : [],
+    sessionsDataAvailable: sr.status === "fulfilled",
+    jobs: jr.status === "fulfilled" ? normalizeJobsList(jr.value) : [],
+    jobsDataAvailable: jr.status === "fulfilled",
+    workflowRuns: wr.status === "fulfilled" ? normalizeWorkflowRunsList(wr.value) : [],
+    workflowRunsDataAvailable: wr.status === "fulfilled",
+  }
+}
+
 export function OverviewDataProvider({ children }: { children: ReactNode }) {
-  const [loading, setLoading] = useState(true)
-  const [sessionsDataAvailable, setSessionsDataAvailable] = useState(false)
-  const [jobsDataAvailable, setJobsDataAvailable] = useState(false)
-  const [projectsDataAvailable, setProjectsDataAvailable] = useState(false)
-  const [projects, setProjects] = useState<unknown[]>([])
-  const [sessions, setSessions] = useState<Record<string, unknown>[]>([])
-  const [jobs, setJobs] = useState<Record<string, unknown>[]>([])
-  const [workflowRuns, setWorkflowRuns] = useState<Record<string, unknown>[]>([])
-  const [workflowRunsDataAvailable, setWorkflowRunsDataAvailable] = useState(false)
+  // The shell is re-created on every top-level route change (each page renders
+  // its own <AppShell>), so seed from the cross-navigation snapshot instead of
+  // re-issuing all four requests and flashing a loading state on every tap.
+  const cached = readShellSnapshot<OverviewSnapshot>(SHELL_SNAPSHOT_KEYS.overviewData)
+  const seed = cached ?? EMPTY_OVERVIEW_SNAPSHOT
+  const [loading, setLoading] = useState(cached == null)
+  const [sessionsDataAvailable, setSessionsDataAvailable] = useState(seed.sessionsDataAvailable)
+  const [jobsDataAvailable, setJobsDataAvailable] = useState(seed.jobsDataAvailable)
+  const [projectsDataAvailable, setProjectsDataAvailable] = useState(seed.projectsDataAvailable)
+  const [projects, setProjects] = useState<unknown[]>(seed.projects)
+  const [sessions, setSessions] = useState<Record<string, unknown>[]>(seed.sessions)
+  const [jobs, setJobs] = useState<Record<string, unknown>[]>(seed.jobs)
+  const [workflowRuns, setWorkflowRuns] = useState<Record<string, unknown>[]>(seed.workflowRuns)
+  const [workflowRunsDataAvailable, setWorkflowRunsDataAvailable] = useState(
+    seed.workflowRunsDataAvailable,
+  )
 
   useEffect(() => {
+    // A fresh snapshot is already on screen — nothing to do until it ages out.
+    if (isShellSnapshotFresh(SHELL_SNAPSHOT_KEYS.overviewData, SHELL_SNAPSHOT_MAX_AGE_MS)) return
+
     let active = true
-    setLoading(true)
-    void Promise.allSettled([
-      apiFetch<unknown>("/projects", { method: "GET" }),
-      fetchSpectraCheckSessionsList(),
-      apiFetch<unknown>("/jobs", { method: "GET" }),
-      apiFetch<unknown>("/workflow-runs", { method: "GET" }),
-    ]).then((results) => {
+    if (readShellSnapshot<OverviewSnapshot>(SHELL_SNAPSHOT_KEYS.overviewData) == null) {
+      setLoading(true)
+    }
+    void loadShellSnapshot(SHELL_SNAPSHOT_KEYS.overviewData, fetchOverviewSnapshot).then((next) => {
       if (!active) return
-      const [pr, sr, jr, wr] = results
-      if (pr.status === "fulfilled") {
-        setProjects(normalizeProjectListPayload(pr.value))
-        setProjectsDataAvailable(true)
-      } else {
-        setProjects([])
-        setProjectsDataAvailable(false)
-      }
-      if (sr.status === "fulfilled") {
-        setSessions(normalizeSpectraCheckSessionsList(sr.value))
-        setSessionsDataAvailable(true)
-      } else {
-        setSessions([])
-        setSessionsDataAvailable(false)
-      }
-      if (jr.status === "fulfilled") {
-        setJobs(normalizeJobsList(jr.value))
-        setJobsDataAvailable(true)
-      } else {
-        setJobs([])
-        setJobsDataAvailable(false)
-      }
-      if (wr.status === "fulfilled") {
-        setWorkflowRuns(normalizeWorkflowRunsList(wr.value))
-        setWorkflowRunsDataAvailable(true)
-      } else {
-        setWorkflowRuns([])
-        setWorkflowRunsDataAvailable(false)
-      }
+      setProjects(next.projects)
+      setProjectsDataAvailable(next.projectsDataAvailable)
+      setSessions(next.sessions)
+      setSessionsDataAvailable(next.sessionsDataAvailable)
+      setJobs(next.jobs)
+      setJobsDataAvailable(next.jobsDataAvailable)
+      setWorkflowRuns(next.workflowRuns)
+      setWorkflowRunsDataAvailable(next.workflowRunsDataAvailable)
       setLoading(false)
     })
     return () => {
