@@ -31,6 +31,16 @@ import { useDeveloperMode } from "@/components/developer-mode-provider"
 import { apiFetch } from "@/lib/api/client"
 import { clearAuthSession } from "@/lib/auth/session"
 import { fetchAiEvidenceQueue } from "@/lib/api/ai-evidence"
+import { humanizeField } from "@/lib/ui/status"
+import {
+  invalidateShellSnapshots,
+  isShellSnapshotFresh,
+  loadShellSnapshot,
+  readShellSnapshot,
+  SHELL_SNAPSHOT_KEYS,
+  SHELL_SNAPSHOT_MAX_AGE_MS,
+  writeShellSnapshot,
+} from "@/src/lib/shell/shell-snapshot-cache"
 import { useTenant } from "@/src/lib/tenant/tenant-context"
 import { clearSpectraCheckRuntimeState } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
 import {
@@ -88,6 +98,17 @@ type SearchProject = { id: number; name: string }
 type SearchSession = { id: number | string; sample_id: string | undefined; project_id: number | undefined }
 type SearchReaction = { id: number; name: string }
 
+/** Product names for the module a queued evidence item came from (display only). */
+const MODULE_DISPLAY_NAME: Record<string, string> = {
+  spectracheck: "SpectraCheck",
+  regulatory: "Regentry",
+  reactions: "Reaction Optimization",
+  ai_services: "AI Services",
+}
+function moduleDisplayName(module: string): string {
+  return MODULE_DISPLAY_NAME[module] ?? humanizeField(module)
+}
+
 type NotificationItem = {
   id: string
   title: string
@@ -107,12 +128,21 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
   const tenantDisplayName = tenantContext.tenantDisplayName
 
   // ── Real AI Queue badge count: prefer fetched count, fall back to overview ──
-  const [aiQueueCount, setAiQueueCount] = useState<number | null>(null)
+  // Seeded from the cross-navigation snapshot: the topbar remounts on every
+  // route change (each page renders its own <AppShell>), and re-fetching the
+  // queue just to redraw a badge made every nav tap wait on a request.
+  const [aiQueueCount, setAiQueueCount] = useState<number | null>(
+    () => readShellSnapshot<number>(SHELL_SNAPSHOT_KEYS.aiEvidenceCount) ?? null,
+  )
   useEffect(() => {
+    if (isShellSnapshotFresh(SHELL_SNAPSHOT_KEYS.aiEvidenceCount, SHELL_SNAPSHOT_MAX_AGE_MS)) return
+
     let cancelled = false
-    void fetchAiEvidenceQueue(100)
-      .then((rows) => {
-        if (!cancelled) setAiQueueCount(rows.length)
+    void loadShellSnapshot(SHELL_SNAPSHOT_KEYS.aiEvidenceCount, () =>
+      fetchAiEvidenceQueue(100).then((rows) => rows.length),
+    )
+      .then((count) => {
+        if (!cancelled) setAiQueueCount(count)
       })
       .catch(() => {
         // Leave as null so the fallback (overview metrics) is used
@@ -132,7 +162,9 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
 
   // ── Real notifications: pull from regulatory + AI evidence queues ──
   const [notifLoading, setNotifLoading] = useState(false)
-  const [notifs, setNotifs] = useState<NotificationItem[]>([])
+  const [notifs, setNotifs] = useState<NotificationItem[]>(
+    () => readShellSnapshot<NotificationItem[]>(SHELL_SNAPSHOT_KEYS.topbarNotifications) ?? [],
+  )
   const loadNotifications = useCallback(async () => {
     setNotifLoading(true)
     try {
@@ -170,18 +202,26 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
         })
       const aiItems: NotificationItem[] = aiRows.slice(0, 5).map((item) => ({
         id: `ai-${item.id}`,
-        title: `AI evidence ${item.id} · ${item.module}`,
-        description: item.summary || `${item.entity_type} ${item.entity_id} awaiting review`,
+        title: `AI evidence · ${moduleDisplayName(item.module)}`,
+        description:
+          item.summary || `${humanizeField(item.entity_type)} ${item.entity_id} awaiting review`,
         href: `/spectracheck`, // Open AI Evidence Queue panel via SpectraCheck (where it surfaces)
         icon: Brain,
         accent: "var(--mt-teal)",
       }))
-      setNotifs([...regItems, ...aiItems])
+      const nextNotifs = [...regItems, ...aiItems]
+      writeShellSnapshot(SHELL_SNAPSHOT_KEYS.topbarNotifications, nextNotifs)
+      setNotifs(nextNotifs)
     } finally {
       setNotifLoading(false)
     }
   }, [])
   useEffect(() => {
+    // Seeded from the cross-navigation snapshot — the bell is already populated,
+    // so don't spend two more requests on every route change.
+    if (isShellSnapshotFresh(SHELL_SNAPSHOT_KEYS.topbarNotifications, SHELL_SNAPSHOT_MAX_AGE_MS)) {
+      return
+    }
     void loadNotifications()
   }, [loadNotifications])
   const notifBadgeCount = notifs.length
@@ -259,6 +299,8 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
     void apiFetch("/auth/logout", { method: "POST" }).catch(() => {})
     clearSpectraCheckRuntimeState()
     clearAuthSession()
+    // Cached shell snapshots are the previous user's workspace data.
+    invalidateShellSnapshots()
     if (typeof window !== "undefined") {
       try {
         window.localStorage.removeItem("moltrace.tenant_id")
@@ -435,7 +477,7 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
                 Developer mode
               </DropdownMenuCheckboxItem>
               <p className="px-2 pb-1.5 pl-8 text-xs text-muted-foreground">
-                Show raw API payloads &amp; developer JSON.
+                Show raw record data and technical detail for troubleshooting.
               </p>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -523,7 +565,7 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
                     <span>{s.sample_id ?? `Session ${s.id}`}</span>
                     {s.project_id != null ? (
                       <Badge variant="secondary" className="ml-auto">
-                        proj {s.project_id}
+                        Project {s.project_id}
                       </Badge>
                     ) : null}
                   </CommandItem>

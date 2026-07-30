@@ -1,8 +1,8 @@
 "use client"
 
-import Link from "next/link"
+import Link, { useLinkStatus } from "next/link"
 import { usePathname } from "next/navigation"
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Bot,
   Boxes,
@@ -16,6 +16,7 @@ import {
   Home,
   LayoutDashboard,
   Library,
+  Loader2,
   PackageCheck,
   Scale,
   Settings,
@@ -69,9 +70,53 @@ function hrefPath(href: string) {
   return href.split(/[?#]/)[0] || href
 }
 
+// ── Instant tap feedback ─────────────────────────────────────────────────────
+// The app's route segments are large client workspaces with no `loading.tsx`
+// boundary, so React keeps the OLD page on screen until the next one is ready.
+// Without a pending signal the tap looks like it did nothing — which is what
+// "the nav lags" actually is most of the time. `useLinkStatus` reports the
+// pending state of the enclosing <Link>, so we can respond within a frame:
+// the tapped item's icon swaps to a spinner and the cell highlights.
+//
+// Must be rendered as a DESCENDANT of <Link> — that is where the hook reads
+// its status from.
+function NavItemIcon({
+  Icon,
+  className,
+  spinnerClassName,
+}: {
+  Icon: React.ComponentType<{ className?: string }>
+  className?: string
+  spinnerClassName?: string
+}) {
+  const { pending } = useLinkStatus()
+  if (pending) {
+    return <Loader2 className={cn(className, spinnerClassName, "animate-spin")} aria-hidden />
+  }
+  return <Icon className={className} />
+}
+
+// Highlights the cell the moment it is tapped, for the same reason.
+function NavItemPendingSurface() {
+  const { pending } = useLinkStatus()
+  if (!pending) return null
+  return <span aria-hidden className="pointer-events-none absolute inset-0 rounded-md bg-secondary/70" />
+}
+
 export function MobileBottomNav() {
   const pathname = usePathname()
   const { isAdmin } = useTenant()
+  // The "More" sheet is CONTROLLED so it can be dismissed the instant a
+  // destination is tapped. Left uncontrolled, Radix keeps the modal layer
+  // mounted across the route change (this nav lives in the persistent shell) —
+  // and a mounted modal layer pins `document.body { pointer-events: none }`,
+  // which makes the whole app stop responding to taps until the sheet is
+  // manually dismissed. That is the "everything lags after using More" bug.
+  const [moreOpen, setMoreOpen] = useState(false)
+  // Prefetching is armed after first paint rather than on mount: these are
+  // heavy dynamic routes, and firing every prefetch while the current page is
+  // still settling competes with it on a phone's single slow connection.
+  const [prefetchArmed, setPrefetchArmed] = useState(false)
   const moreNavItems = useMemo(
     () => (isAdmin ? [...baseMoreNavItems, ...adminMoreNavItems] : baseMoreNavItems),
     [isAdmin],
@@ -80,6 +125,22 @@ export function MobileBottomNav() {
     () => moreNavItems.some((item) => pathname === hrefPath(item.href) || pathname.startsWith(`${hrefPath(item.href)}/`)),
     [moreNavItems, pathname],
   )
+
+  // Belt-and-braces: also close on any route change (browser back/forward, a
+  // deep link tapped from inside the sheet's own content, etc.).
+  useEffect(() => {
+    setMoreOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    const idle = window.requestIdleCallback
+    if (typeof idle === "function") {
+      const handle = idle(() => setPrefetchArmed(true), { timeout: 3000 })
+      return () => window.cancelIdleCallback?.(handle)
+    }
+    const timer = window.setTimeout(() => setPrefetchArmed(true), 1200)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   return (
     <nav
@@ -107,8 +168,15 @@ export function MobileBottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              // Full prefetch (not the `auto` default): with no `loading.tsx`
+              // boundary in these segments, `auto` prefetches almost nothing
+              // for a dynamic route, so the entire payload would be fetched at
+              // tap time.
+              prefetch={prefetchArmed}
               className={cn(
-                "relative inline-flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-md px-1 text-[11px] font-medium",
+                // `touch-manipulation` opts this cell out of double-tap-to-zoom,
+                // which is what removes mobile Safari's ~300ms tap delay.
+                "relative inline-flex min-h-12 min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 overflow-hidden rounded-md px-1 text-[11px] font-medium transition-colors active:bg-secondary",
                 isActive ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
               )}
               style={
@@ -117,25 +185,28 @@ export function MobileBottomNav() {
                   : undefined
               }
             >
-              <item.icon
+              <NavItemPendingSurface />
+              <NavItemIcon
+                Icon={item.icon}
                 className={cn(
-                  "h-4 w-4 shrink-0",
+                  "relative h-4 w-4 shrink-0",
                   isActive && "text-[color:var(--mt-teal)]",
                 )}
+                spinnerClassName="text-[color:var(--mt-teal)]"
               />
-              <span className="block w-full truncate text-center" data-testid="mobile-nav-label">
+              <span className="relative block w-full truncate text-center" data-testid="mobile-nav-label">
                 {item.label}
               </span>
             </Link>
           )
         })}
-        <Sheet>
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
           <SheetTrigger asChild>
             <Button
               type="button"
               variant={moreActive ? "secondary" : "ghost"}
               className={cn(
-                "min-h-12 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-md px-1 text-[11px]",
+                "min-h-12 min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 overflow-hidden rounded-md px-1 text-[11px] active:bg-secondary",
                 !moreActive && "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
               )}
             >
@@ -143,7 +214,13 @@ export function MobileBottomNav() {
               <span className="block w-full truncate text-center">More</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="max-h-[80vh] rounded-t-2xl px-0 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+          {/* The shared SheetContent animates in over 500ms / out over 300ms,
+              which reads as lag on a nav surface people open and dismiss
+              constantly. Override to a snappier curve for this sheet only. */}
+          <SheetContent
+            side="bottom"
+            className="max-h-[80vh] rounded-t-2xl px-0 pb-[calc(env(safe-area-inset-bottom)+1rem)] data-[state=closed]:duration-150 data-[state=open]:duration-200"
+          >
             <SheetHeader className="shrink-0 px-4">
               <SheetTitle>More</SheetTitle>
             </SheetHeader>
@@ -159,8 +236,16 @@ export function MobileBottomNav() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    // The sheet is only mounted once the user has opened it, so
+                    // intent is already signalled — prefetch every destination
+                    // immediately rather than waiting for the tap.
+                    prefetch
+                    // Dismiss immediately on tap: the route change alone would
+                    // leave this modal layer mounted (and the body pointer-event
+                    // lock with it) over the page the user just asked for.
+                    onClick={() => setMoreOpen(false)}
                     className={cn(
-                      "relative inline-flex min-h-12 items-center gap-3 rounded-md px-3 text-sm font-medium",
+                      "relative inline-flex min-h-12 touch-manipulation select-none items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors active:bg-secondary",
                       isActive
                         ? "bg-secondary text-foreground"
                         : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
@@ -171,11 +256,13 @@ export function MobileBottomNav() {
                         : undefined
                     }
                   >
-                    <item.icon
+                    <NavItemIcon
+                      Icon={item.icon}
                       className={cn(
                         "h-4 w-4 shrink-0",
                         isActive && "text-[color:var(--mt-teal)]",
                       )}
+                      spinnerClassName="text-[color:var(--mt-teal)]"
                     />
                     {item.label}
                   </Link>

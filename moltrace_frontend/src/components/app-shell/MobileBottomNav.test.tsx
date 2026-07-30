@@ -1,28 +1,33 @@
 import { describe, expect, it, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 import { MobileBottomNav } from "@/src/components/app-shell/MobileBottomNav"
 
 // Stub Next.js link + router internals so the nav can render in jsdom without
-// the surrounding app shell.
+// the surrounding app shell. `prefetch` is captured as a data attribute so the
+// prefetch-arming behaviour is assertable; `useLinkStatus` is stubbed to a
+// non-pending status (the real hook needs the app-router Link context).
 vi.mock("next/link", () => ({
   __esModule: true,
   default: function MockLink({
     href,
     className,
     children,
+    prefetch,
     ...rest
   }: {
     href: string
     className?: string
     children?: React.ReactNode
+    prefetch?: boolean | "auto" | null
   }) {
     return (
-      <a href={href} className={className} {...rest}>
+      <a href={href} className={className} data-prefetch={String(prefetch)} {...rest}>
         {children}
       </a>
     )
   },
+  useLinkStatus: () => ({ pending: false }),
 }))
 
 vi.mock("next/navigation", () => ({
@@ -74,5 +79,53 @@ describe("MobileBottomNav", () => {
     const anchor = homeLabel.closest("a")
     expect(anchor).not.toBeNull()
     expect(anchor?.getAttribute("href")).toBe("/")
+  })
+
+  // ── Perceived-latency guards ───────────────────────────────────────────────
+  it("arms full prefetching for the primary tabs after first paint", async () => {
+    render(<MobileBottomNav />)
+    // Nothing is prefetched during the initial paint (it would compete with the
+    // page still settling)...
+    const anchors = () => screen.getAllByTestId("mobile-nav-label").map((el) => el.closest("a"))
+    for (const anchor of anchors()) {
+      expect(anchor?.getAttribute("data-prefetch")).toBe("false")
+    }
+    // ...and every tab is fully prefetched once the idle callback lands. The
+    // `auto` default prefetches almost nothing for these dynamic segments.
+    await waitFor(
+      () => {
+        for (const anchor of anchors()) {
+          expect(anchor?.getAttribute("data-prefetch")).toBe("true")
+        }
+      },
+      { timeout: 4000 },
+    )
+  })
+
+  it("opts every nav target out of the mobile double-tap-zoom delay", () => {
+    render(<MobileBottomNav />)
+    for (const label of screen.getAllByTestId("mobile-nav-label")) {
+      expect(label.closest("a")?.className).toContain("touch-manipulation")
+    }
+    expect(screen.getByRole("button", { name: /More/i }).className).toContain("touch-manipulation")
+  })
+
+  it("dismisses the More sheet when a destination inside it is tapped", async () => {
+    // Regression guard: an uncontrolled sheet stays mounted across the route
+    // change, and a mounted Radix modal layer pins
+    // `document.body { pointer-events: none }` — which makes the whole app stop
+    // responding to taps until the sheet is dismissed by hand.
+    render(<MobileBottomNav />)
+
+    fireEvent.click(screen.getByRole("button", { name: /More/i }))
+    const projects = await screen.findByRole("link", { name: /Projects/i })
+    expect(projects).toBeInTheDocument()
+
+    fireEvent.click(projects)
+
+    await waitFor(() => {
+      expect(screen.queryByRole("link", { name: /Projects/i })).not.toBeInTheDocument()
+    })
+    expect(document.body.style.pointerEvents).not.toBe("none")
   })
 })
