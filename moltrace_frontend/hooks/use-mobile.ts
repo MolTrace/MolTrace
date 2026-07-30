@@ -50,12 +50,21 @@ export function useIsMobile() {
         : []
     const onChange = () => setIsMobile(isMobileViewport())
 
-    queries.forEach((mql) => mql.addEventListener('change', onChange))
+    // Older Safari (≤13) ships MediaQueryList without add/removeEventListener —
+    // only the deprecated addListener pair. Guard so the hook degrades to the
+    // resize listener instead of throwing and unmounting the page.
+    queries.forEach((mql) => {
+      if (typeof mql.addEventListener === 'function') mql.addEventListener('change', onChange)
+      else if (typeof mql.addListener === 'function') mql.addListener(onChange)
+    })
     window.addEventListener('resize', onChange)
     onChange()
 
     return () => {
-      queries.forEach((mql) => mql.removeEventListener('change', onChange))
+      queries.forEach((mql) => {
+        if (typeof mql.removeEventListener === 'function') mql.removeEventListener('change', onChange)
+        else if (typeof mql.removeListener === 'function') mql.removeListener(onChange)
+      })
       window.removeEventListener('resize', onChange)
     }
   }, [])

@@ -29,7 +29,12 @@ import {
   Cpu,
   ShieldCheck,
 } from "lucide-react"
-import { DashboardSection } from "@/components/dashboard/dashboard-section"
+import {
+  DashboardSection,
+  setAllDashboardSectionsOpen,
+  type DashboardSectionSignal,
+  type DashboardSectionSignalTone,
+} from "@/components/dashboard/dashboard-section"
 import { DashboardGreeting } from "@/components/dashboard/dashboard-greeting"
 import {
   DashboardPriorityCallout,
@@ -174,6 +179,29 @@ function formatCoreModuleActivityTime(iso: string | null): string {
   const d = Date.parse(iso)
   if (Number.isNaN(d)) return iso
   return new Date(d).toLocaleString()
+}
+
+/** Every summary card shows an em dash rather than a zero for a count it could not
+ *  read, so "nothing to do" never gets confused with "we don't know". */
+function fmtCount(n: number | null | undefined): string {
+  if (n == null) return "—"
+  return String(n)
+}
+
+/** A header pill for a collapsed section. Returns null for a count we can't read,
+ *  so a section header never advertises "— open items". A zero stays neutral: the
+ *  tone is a call to action, and there is nothing to act on. */
+function countSignal(
+  value: number | null | undefined,
+  label: string,
+  tone: DashboardSectionSignalTone = "neutral",
+): DashboardSectionSignal | null {
+  if (value == null) return null
+  return { label: `${value} ${label}`, tone: value > 0 ? tone : "neutral" }
+}
+
+function compactSignals(items: (DashboardSectionSignal | null)[]): DashboardSectionSignal[] {
+  return items.filter((item): item is DashboardSectionSignal => item != null)
 }
 
 type CustomerDeploymentSummary = {
@@ -845,11 +873,6 @@ export function DashboardV0() {
     }
   }, [])
 
-  function fmtMlCount(n: number | null | undefined): string {
-    if (n == null) return "—"
-    return String(n)
-  }
-
   const activeSub =
     !live || !metrics
       ? DEMO_STATS.activeSub
@@ -910,11 +933,6 @@ export function DashboardV0() {
         latestValidationRunStatus: methodHealthRollup?.latestValidationRunStatus ?? null,
       }
 
-  function fmtMethodHealthNum(n: number | null | undefined): string {
-    if (n == null) return "—"
-    return String(n)
-  }
-
   const opsUseDemo = !opsLoading && (opsRollup == null || !opsRollup.available)
 
   const opsDisplay = opsUseDemo
@@ -933,14 +951,71 @@ export function DashboardV0() {
         openDriftAlerts: opsRollup?.openDriftAlerts ?? null,
       }
 
-  function fmtOpsNum(n: number | null | undefined): string {
-    if (n == null) return "—"
-    return String(n)
-  }
-
   function fmtOpsHealth(status: string | null): string {
     return statusLabel(status)
   }
+
+  /* Each of the four summaries below arrives as a discriminated union, so a card
+     that reads its fields directly can only render once the data is available —
+     which is why the Science and Regulatory sections used to open onto nothing.
+     Flattening to a nullable shape lets every card render its own layout up
+     front and fill in "—" where a value is still unknown. */
+  const regulatoryDisplay = regulatorySummary?.available
+    ? {
+        activeDossiers: regulatorySummary.activeDossiers as number | null,
+        inReview: regulatorySummary.inReview as number | null,
+        reqsNeedEvidence: regulatorySummary.reqsNeedEvidence as number | null,
+        highRisk: regulatorySummary.highRisk as number | null,
+      }
+    : { activeDossiers: null, inReview: null, reqsNeedEvidence: null, highRisk: null }
+
+  const complianceDisplay = regulatoryCompliance?.available
+    ? {
+        openActionItems: regulatoryCompliance.openActionItems as number | null,
+        criticalActionItems: regulatoryCompliance.criticalActionItems as number | null,
+        blockedDossiers: regulatoryCompliance.blockedDossiers as number | null,
+        qNmrGaps: regulatoryCompliance.qNmrGaps as number | null,
+        nitrosamineReviewItems: regulatoryCompliance.nitrosamineReviewItems as number | null,
+      }
+    : {
+        openActionItems: null,
+        criticalActionItems: null,
+        blockedDossiers: null,
+        qNmrGaps: null,
+        nitrosamineReviewItems: null,
+      }
+
+  const surveillanceDisplay = regulatorySurveillanceSummary?.available
+    ? {
+        changesDetected: regulatorySurveillanceSummary.changesDetected as number | null,
+        highImpactChanges: regulatorySurveillanceSummary.highImpactChanges as number | null,
+        dossiersAffected: regulatorySurveillanceSummary.dossiersAffected as number | null,
+        pendingRuleUpdateProposals: regulatorySurveillanceSummary.pendingRuleUpdateProposals as number | null,
+        unreadRegulatoryNotifications: regulatorySurveillanceSummary.unreadRegulatoryNotifications as number | null,
+      }
+    : {
+        changesDetected: null,
+        highImpactChanges: null,
+        dossiersAffected: null,
+        pendingRuleUpdateProposals: null,
+        unreadRegulatoryNotifications: null,
+      }
+
+  const compoundRegistryDisplay = crSummary?.available
+    ? {
+        activeCompounds: crSummary.activeCompounds as number | null,
+        activeBatches: crSummary.activeBatches,
+        compoundsNeedingReview: crSummary.compoundsNeedingReview as number | null,
+        evidenceLinkedCompounds: crSummary.evidenceLinkedCompounds as number | null,
+        partial: crSummary.partial === true,
+      }
+    : {
+        activeCompounds: null,
+        activeBatches: null,
+        compoundsNeedingReview: null,
+        evidenceLinkedCompounds: null,
+        partial: false,
+      }
 
   const roiLive = roiSnapshot != null
   const hoursSavedDisplay = roiLoading
@@ -1047,6 +1122,49 @@ export function DashboardV0() {
     return items
   }, [regulatoryCompliance, qcBackendAvailable, qcFailures, live, metrics, opsRollup])
 
+  /* Header pills, so a section that a reader has collapsed still reports what is
+     happening inside it — on a phone that is often the only thing on screen. */
+  const overviewSignals = compactSignals([
+    countSignal(live && metrics ? metrics.activeAnalyses : DEMO_STATS.active, "active"),
+    countSignal(reviewRequiredCount, "to review", "warning"),
+    countSignal(live && metrics ? metrics.reportsReady : DEMO_STATS.reports, "reports ready", "info"),
+  ])
+
+  const scienceSignals = compactSignals([
+    countSignal(mlRollup?.activeModelCount, "models serving", "info"),
+    countSignal(aiSummary?.predictionsRequiringReview, "predictions to review", "warning"),
+    countSignal(compoundRegistryDisplay.activeCompounds, "compounds"),
+    countSignal(coreModuleActivity?.available ? coreModuleActivity.total : null, "module opens"),
+  ])
+
+  const regulatorySignals = compactSignals([
+    countSignal(regulatoryDisplay.activeDossiers, "dossiers"),
+    countSignal(complianceDisplay.openActionItems, "open items", "warning"),
+    countSignal(complianceDisplay.criticalActionItems, "critical", "critical"),
+    countSignal(surveillanceDisplay.highImpactChanges, "high-impact changes", "warning"),
+  ])
+
+  const operationsSignals = compactSignals([
+    opsDisplay.systemHealthStatus
+      ? {
+          label: fmtOpsHealth(opsDisplay.systemHealthStatus),
+          tone:
+            opsDisplay.systemHealthStatus.toLowerCase() === "healthy"
+              ? ("positive" as const)
+              : ("warning" as const),
+        }
+      : null,
+    countSignal(opsDisplay.activeJobs, "active jobs", "info"),
+    countSignal(opsDisplay.failedJobs, "failed", "critical"),
+    countSignal(qcFailures, "QC failures", "critical"),
+  ])
+
+  const activitySignals = compactSignals([
+    countSignal(recentRows.length, "analyses"),
+    countSignal(jobRows.length, "jobs"),
+    countSignal(activityStatusCounts.contradiction, "contradictions", "critical"),
+  ])
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1064,12 +1182,31 @@ export function DashboardV0() {
         <MobileCommandCenter />
       ) : null}
 
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setAllDashboardSectionsOpen(true)}
+          className="inline-flex min-h-9 items-center rounded-md border px-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+        >
+          Expand all
+        </button>
+        <button
+          type="button"
+          onClick={() => setAllDashboardSectionsOpen(false)}
+          className="inline-flex min-h-9 items-center rounded-md border px-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+        >
+          Collapse all
+        </button>
+      </div>
+
       <DashboardSection
         title="Overview"
         description="Top metrics, validation readiness, and tenant onboarding."
         icon={LayoutDashboard}
         accent="teal"
         eyebrow="01 · Dashboard"
+        storageKey="overview"
+        signals={overviewSignals}
         defaultOpen
       >
       {/* Stats Grid */}
@@ -1218,8 +1355,10 @@ export function DashboardV0() {
         icon={Microscope}
         accent="teal"
         eyebrow="02 · Spectroscopy"
+        storageKey="science"
+        signals={scienceSignals}
+        defaultOpen
       >
-      {!mlLoading && mlRollup?.available ? (
         <ModuleCard
           accent="teal"
           eyebrow="Spectroscopy · ML"
@@ -1229,7 +1368,15 @@ export function DashboardV0() {
           href="/ml"
           ctaLabel="Open ML Model Factory"
         >
-          {mlRollup.partial ? (
+          {mlLoading ? (
+            <p className="text-xs text-muted-foreground">Loading ML model health…</p>
+          ) : null}
+          {!mlLoading && !mlRollup?.available ? (
+            <p className="text-xs text-muted-foreground">
+              Live ML model health isn't available right now.
+            </p>
+          ) : null}
+          {!mlLoading && mlRollup?.available && mlRollup.partial ? (
             <p className="text-xs text-muted-foreground">
               Some live data didn't load — values may be partial.
             </p>
@@ -1237,37 +1384,35 @@ export function DashboardV0() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <p className="text-xs text-muted-foreground">Active serving configs</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.activeModelCount)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(mlRollup?.activeModelCount)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Approved deployment candidates</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.approvedDeploymentCandidateCount)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(mlRollup?.approvedDeploymentCandidateCount)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Models / deployment review queue</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.modelsRequiringReviewHint)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(mlRollup?.modelsRequiringReviewHint)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Failed evaluations</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.failedEvaluationsCount)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(mlRollup?.failedEvaluationsCount)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Open deployment candidates</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.openDeploymentCandidatesCount)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(mlRollup?.openDeploymentCandidatesCount)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Error-analysis warning signals</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.errorAnalysisWarningsHint)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(mlRollup?.errorAnalysisWarningsHint)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Drift / dataset warning signals</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(mlRollup.driftWarningsHint)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(mlRollup?.driftWarningsHint)}</p>
             </div>
           </div>
         </ModuleCard>
-      ) : null}
 
-      {!aiSummaryLoading && aiSummary?.available ? (
         <ModuleCard
           accent="teal"
           eyebrow="Spectroscopy · AI"
@@ -1277,7 +1422,15 @@ export function DashboardV0() {
           href="/ai"
           ctaLabel="Open AI Services"
         >
-          {aiSummary.partial ? (
+          {aiSummaryLoading ? (
+            <p className="text-xs text-muted-foreground">Loading AI inference summary…</p>
+          ) : null}
+          {!aiSummaryLoading && !aiSummary?.available ? (
+            <p className="text-xs text-muted-foreground">
+              Live AI inference data isn't available right now.
+            </p>
+          ) : null}
+          {!aiSummaryLoading && aiSummary?.available && aiSummary.partial ? (
             <p className="text-xs text-muted-foreground">
               Some AI live data didn't load — values may be partial.
             </p>
@@ -1285,34 +1438,30 @@ export function DashboardV0() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <p className="text-xs text-muted-foreground">Active AI services</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.activeAiServices)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(aiSummary?.activeAiServices)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Predictions requiring review</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.predictionsRequiringReview)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(aiSummary?.predictionsRequiringReview)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Low-confidence predictions</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.lowConfidencePredictions)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(aiSummary?.lowConfidencePredictions)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">OOD predictions</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.oodPredictions)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(aiSummary?.oodPredictions)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Active-learning candidates</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.activeLearningCandidates)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(aiSummary?.activeLearningCandidates)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Service failures</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(aiSummary.serviceFailures)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(aiSummary?.serviceFailures)}</p>
             </div>
           </div>
         </ModuleCard>
-      ) : null}
-      {!aiSummaryLoading && aiSummary != null && !aiSummary.available ? (
-        <p className="text-xs text-muted-foreground">Live AI inference data isn't available right now.</p>
-      ) : null}
 
       <Card>
         <CardHeader className="pb-2">
@@ -1337,17 +1486,17 @@ export function DashboardV0() {
             <div className="rounded-md border bg-muted/20 p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">2. Regentry summary</p>
               <p className="mt-2 text-xs text-muted-foreground">linked regulatory action items</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(crossModuleDisplay.linkedRegulatoryActionItems)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.linkedRegulatoryActionItems)}</p>
               <p className="mt-2 text-xs text-muted-foreground">open regulatory blockers</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(crossModuleDisplay.openRegulatoryBlockers)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.openRegulatoryBlockers)}</p>
             </div>
             <div className="rounded-md border bg-muted/20 p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">3. Reaction Optimization summary</p>
               <p className="mt-2 text-xs text-muted-foreground">reaction constraints created</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(crossModuleDisplay.reactionConstraintsCreated)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.reactionConstraintsCreated)}</p>
               <p className="mt-2 text-xs text-muted-foreground">optimization recommendations affected by compliance</p>
               <p className="text-2xl font-bold tabular-nums">
-                {fmtMlCount(crossModuleDisplay.optimizationRecommendationsAffectedByCompliance)}
+                {fmtCount(crossModuleDisplay.optimizationRecommendationsAffectedByCompliance)}
               </p>
             </div>
           </div>
@@ -1385,7 +1534,7 @@ export function DashboardV0() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-md border bg-card p-3">
               <p className="text-xs text-muted-foreground">Open cross-module action items</p>
-              <p className="text-2xl font-bold tabular-nums">{fmtMlCount(crossModuleDisplay.openCrossModuleActionItems)}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.openCrossModuleActionItems)}</p>
             </div>
             <div className="rounded-md border bg-card p-3">
               <p className="text-xs text-muted-foreground">Next recommended action</p>
@@ -1413,7 +1562,6 @@ export function DashboardV0() {
         </CardContent>
       </Card>
 
-      {!crLoading && crSummary?.available ? (
         <Card>
           <CardHeader className="pb-2">
             <div className="flex flex-row items-center justify-between gap-2">
@@ -1429,24 +1577,38 @@ export function DashboardV0() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <p className="text-xs text-muted-foreground">Active compounds</p>
-                <p className="text-2xl font-bold tabular-nums">{crSummary.activeCompounds}</p>
+                <p className="text-2xl font-bold tabular-nums">
+                  {fmtCount(compoundRegistryDisplay.activeCompounds)}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Active batches</p>
                 <p className="text-2xl font-bold tabular-nums">
-                  {crSummary.activeBatches != null ? crSummary.activeBatches : "—"}
+                  {fmtCount(compoundRegistryDisplay.activeBatches)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Compounds needing review</p>
-                <p className="text-2xl font-bold tabular-nums">{crSummary.compoundsNeedingReview}</p>
+                <p className="text-2xl font-bold tabular-nums">
+                  {fmtCount(compoundRegistryDisplay.compoundsNeedingReview)}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Evidence-linked compounds</p>
-                <p className="text-2xl font-bold tabular-nums">{crSummary.evidenceLinkedCompounds}</p>
+                <p className="text-2xl font-bold tabular-nums">
+                  {fmtCount(compoundRegistryDisplay.evidenceLinkedCompounds)}
+                </p>
               </div>
             </div>
-            {crSummary.partial ? (
+            {crLoading ? (
+              <p className="text-xs text-muted-foreground">Loading compound registry summary…</p>
+            ) : null}
+            {!crLoading && !crSummary?.available ? (
+              <p className="text-xs text-muted-foreground">
+                Live compound registry data isn't available right now.
+              </p>
+            ) : null}
+            {!crLoading && compoundRegistryDisplay.partial ? (
               <p className="text-xs text-muted-foreground">
                 Batch summary didn't load — active batch count is hidden until it does.
               </p>
@@ -1461,7 +1623,6 @@ export function DashboardV0() {
             </p>
           </CardContent>
         </Card>
-      ) : null}
 
       </DashboardSection>
 
@@ -1471,8 +1632,10 @@ export function DashboardV0() {
         icon={ShieldCheck}
         accent="cyan"
         eyebrow="03 · Regulatory"
+        storageKey="regulatory"
+        signals={regulatorySignals}
+        defaultOpen
       >
-      {!regulatoryLoading && regulatorySummary?.available ? (
         <ModuleCard
           accent="cyan"
           eyebrow="Regulatory · Hub"
@@ -1485,27 +1648,31 @@ export function DashboardV0() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <p className="text-xs text-muted-foreground">Active dossiers</p>
-              <p className="text-2xl font-bold tabular-nums">{regulatorySummary.activeDossiers}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(regulatoryDisplay.activeDossiers)}</p>
               <p className="text-xs text-muted-foreground">Excludes archived.</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Dossiers in review</p>
-              <p className="text-2xl font-bold tabular-nums">{regulatorySummary.inReview}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(regulatoryDisplay.inReview)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Requirements needing evidence</p>
-              <p className="text-2xl font-bold tabular-nums">{regulatorySummary.reqsNeedEvidence}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(regulatoryDisplay.reqsNeedEvidence)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">High-risk dossiers</p>
-              <p className="text-2xl font-bold tabular-nums">{regulatorySummary.highRisk}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(regulatoryDisplay.highRisk)}</p>
               <p className="text-xs text-muted-foreground">Latest risk assessment high or critical.</p>
             </div>
           </div>
+          {regulatoryLoading ? (
+            <p className="text-xs text-muted-foreground">Loading dossier summary…</p>
+          ) : null}
+          {!regulatoryLoading && !regulatorySummary?.available ? (
+            <p className="text-xs text-muted-foreground">Live dossier data isn't available right now.</p>
+          ) : null}
         </ModuleCard>
-      ) : null}
 
-      {!regulatoryComplianceLoading && regulatoryCompliance?.available ? (
         <ModuleCard
           accent="cyan"
           eyebrow="Regulatory · Compliance"
@@ -1518,29 +1685,33 @@ export function DashboardV0() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <p className="text-xs text-muted-foreground">Open action items</p>
-              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.openActionItems}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(complianceDisplay.openActionItems)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Critical action items</p>
-              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.criticalActionItems}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(complianceDisplay.criticalActionItems)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Dossiers blocked</p>
-              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.blockedDossiers}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(complianceDisplay.blockedDossiers)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">qNMR gaps (open items)</p>
-              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.qNmrGaps}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(complianceDisplay.qNmrGaps)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Nitrosamine review items</p>
-              <p className="text-2xl font-bold tabular-nums">{regulatoryCompliance.nitrosamineReviewItems}</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(complianceDisplay.nitrosamineReviewItems)}</p>
             </div>
           </div>
+          {regulatoryComplianceLoading ? (
+            <p className="text-xs text-muted-foreground">Loading compliance summary…</p>
+          ) : null}
+          {!regulatoryComplianceLoading && !regulatoryCompliance?.available ? (
+            <p className="text-xs text-muted-foreground">Live compliance data isn't available right now.</p>
+          ) : null}
         </ModuleCard>
-      ) : null}
 
-      {!surveillanceLoading && regulatorySurveillanceSummary?.available ? (
         <Card>
           <CardHeader className="pb-2">
             <div className="flex flex-row items-center justify-between gap-2">
@@ -1555,29 +1726,37 @@ export function DashboardV0() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <div>
                 <p className="text-xs text-muted-foreground">Source changes detected</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatorySurveillanceSummary.changesDetected}</p>
+                <p className="text-2xl font-bold tabular-nums">{fmtCount(surveillanceDisplay.changesDetected)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">High-impact changes</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatorySurveillanceSummary.highImpactChanges}</p>
+                <p className="text-2xl font-bold tabular-nums">{fmtCount(surveillanceDisplay.highImpactChanges)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Dossiers affected</p>
-                <p className="text-2xl font-bold tabular-nums">{regulatorySurveillanceSummary.dossiersAffected}</p>
+                <p className="text-2xl font-bold tabular-nums">{fmtCount(surveillanceDisplay.dossiersAffected)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Pending rule update proposals</p>
                 <p className="text-2xl font-bold tabular-nums">
-                  {regulatorySurveillanceSummary.pendingRuleUpdateProposals}
+                  {fmtCount(surveillanceDisplay.pendingRuleUpdateProposals)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Unread regulatory notifications</p>
                 <p className="text-2xl font-bold tabular-nums">
-                  {regulatorySurveillanceSummary.unreadRegulatoryNotifications}
+                  {fmtCount(surveillanceDisplay.unreadRegulatoryNotifications)}
                 </p>
               </div>
             </div>
+            {surveillanceLoading ? (
+              <p className="text-xs text-muted-foreground">Loading regulatory surveillance summary…</p>
+            ) : null}
+            {!surveillanceLoading && !regulatorySurveillanceSummary?.available ? (
+              <p className="text-xs text-muted-foreground">
+                Live regulatory surveillance data isn't available right now.
+              </p>
+            ) : null}
             <p>
               <Link
                 className="text-sm font-medium text-primary underline-offset-4 hover:underline"
@@ -1588,11 +1767,6 @@ export function DashboardV0() {
             </p>
           </CardContent>
         </Card>
-      ) : null}
-
-      {!surveillanceLoading && regulatorySurveillanceSummary && !regulatorySurveillanceSummary.available ? (
-        <p className="text-xs text-muted-foreground">Live regulatory surveillance data isn't available right now.</p>
-      ) : null}
 
       <RegulatoryNotificationsCompactCard />
 
@@ -1604,6 +1778,9 @@ export function DashboardV0() {
         icon={Cpu}
         accent="violet"
         eyebrow="04 · Operations"
+        storageKey="operations"
+        signals={operationsSignals}
+        defaultOpen
       >
       {/* Automation ROI — GET /analytics/roi */}
       <ModuleCard
@@ -1666,25 +1843,25 @@ export function DashboardV0() {
           <div>
             <p className="text-xs text-muted-foreground">Active jobs</p>
             <p className="text-2xl font-bold tabular-nums">
-              {fmtOpsNum(opsDisplay.activeJobs)}
+              {fmtCount(opsDisplay.activeJobs)}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Failed jobs</p>
             <p className="text-2xl font-bold tabular-nums">
-              {fmtOpsNum(opsDisplay.failedJobs)}
+              {fmtCount(opsDisplay.failedJobs)}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Security warnings</p>
             <p className="text-2xl font-bold tabular-nums">
-              {fmtOpsNum(opsDisplay.securityWarnings)}
+              {fmtCount(opsDisplay.securityWarnings)}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Open drift alerts</p>
             <p className="text-2xl font-bold tabular-nums">
-              {fmtOpsNum(opsDisplay.openDriftAlerts)}
+              {fmtCount(opsDisplay.openDriftAlerts)}
             </p>
           </div>
           <div>
@@ -1824,33 +2001,25 @@ export function DashboardV0() {
             <div>
               <p className="text-xs text-muted-foreground">Active methods</p>
               <p className="text-2xl font-bold tabular-nums">
-                {methodHealthUseDemo
-                  ? methodHealthDisplay.activeMethods
-                  : fmtMethodHealthNum(methodHealthDisplay.activeMethods)}
+                {fmtCount(methodHealthDisplay.activeMethods)}
               </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Experimental methods</p>
               <p className="text-2xl font-bold tabular-nums">
-                {methodHealthUseDemo
-                  ? methodHealthDisplay.experimentalMethods
-                  : fmtMethodHealthNum(methodHealthDisplay.experimentalMethods)}
+                {fmtCount(methodHealthDisplay.experimentalMethods)}
               </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Deprecated methods</p>
               <p className="text-2xl font-bold tabular-nums">
-                {methodHealthUseDemo
-                  ? methodHealthDisplay.deprecatedMethods
-                  : fmtMethodHealthNum(methodHealthDisplay.deprecatedMethods)}
+                {fmtCount(methodHealthDisplay.deprecatedMethods)}
               </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Open drift alerts</p>
               <p className="text-2xl font-bold tabular-nums">
-                {methodHealthUseDemo
-                  ? methodHealthDisplay.openDriftAlerts
-                  : fmtMethodHealthNum(methodHealthDisplay.openDriftAlerts)}
+                {fmtCount(methodHealthDisplay.openDriftAlerts)}
               </p>
             </div>
             <div className="lg:col-span-1">
@@ -2060,7 +2229,11 @@ export function DashboardV0() {
         title="Recent Activity"
         description="Latest sessions and workflow runs."
         icon={Activity}
+        accent="green"
         eyebrow="05 · Activity"
+        storageKey="activity"
+        signals={activitySignals}
+        defaultOpen
       >
       {/* Recent Activity Table */}
       <ModuleCard
