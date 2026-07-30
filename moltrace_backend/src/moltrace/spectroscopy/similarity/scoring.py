@@ -41,7 +41,7 @@ Performance target: < 1 s top-100 retrieval from the ~45k NMRShiftDB2 corpus
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -83,15 +83,40 @@ ENCODING_DIM = 2 * _DEFAULT_N_POINTS
 #: ``vec[HALF_DIM:]`` is ¹³C.
 HALF_DIM = _DEFAULT_N_POINTS
 
-#: Weight of the coverage penalty in :class:`MultiNucleusSpectrumIndex` ranking —
-#: added per *query* nucleus that a candidate does not carry. Chosen by measurement
-#: on the 42 449-molecule NMRShiftDB2 corpus, not by intuition; see that class's
-#: docstring for the sweep. λ=0.20 is the knee: it restores full-vector precision on
-#: both-nuclei queries (99.7 % recall@1, matching a 256-D index exactly) while still
-#: reaching single-nucleus references (90.7 % @1 / 99.7 % @10, which routing serves
-#: at 0 %). λ=0 costs 6.4 points on the common case; λ=0.5 costs 15 points on the
-#: single-nucleus case.
-FUSED_COVERAGE_PENALTY = 0.20
+#: Coverage penalty in :class:`MultiNucleusSpectrumIndex` ranking, keyed by the
+#: nucleus a candidate is **missing** — charged per *query* nucleus the candidate does
+#: not carry. Both values are measured on the 42 449-molecule NMRShiftDB2 corpus.
+#:
+#: The two differ because the nuclei are not equally diagnostic: ¹³C spans 220 ppm with
+#: roughly one signal per distinct carbon, so it carries far more skeletal information
+#: than ¹H over 12 ppm. A reference lacking ¹³C is therefore much weaker corroboration
+#: than one lacking ¹H, and charging both the same 0.20 measurably distorted results —
+#: ¹H-only entries took 71.2 % of a both-nuclei query's top-10 against a 22.6 % base
+#: rate (3.2× enrichment), while ¹³C-only entries were all but excluded at 3.2 %
+#: against 59.7 %.
+#:
+#: Sweep, as (recall@1 both-query→both-target / both-query→¹³C-only reference, then
+#: the ¹H-only share of top-10):
+#:
+#: ===============  ==============  ==============  ==============
+#: lacks ¹H / ¹³C   (a) @1          (d) @1 / @10    ¹H-only share
+#: ===============  ==============  ==============  ==============
+#: 0.20 / 0.20      99.6 %          88.8 / 98.8     71.2 %
+#: 0.20 / 0.50      100.0 %         94.4 / 100      32.8 %
+#: **0.10 / 0.50**  **100.0 %**     **98.0 / 100**  **31.0 %**
+#: 0.05 / 0.70      99.6 %          98.8 / 100      12.1 %
+#: ===============  ==============  ==============  ==============
+#:
+#: 0.10 / 0.50 is the knee: complete queries reach full precision and incomplete
+#: references become reachable, with the ¹H-only share landing near its base rate.
+#: Going further over-corrects ¹H *below* base rate and costs precision on (a).
+#:
+#: Weighting the nuclei inside the mean instead was measured and does not work: a
+#: candidate sharing one nucleus contributes one term, so its score is
+#: weight-invariant, and down-weighting ¹H only worsens both-nuclei candidates —
+#: measured as no change to (a)/(c), +0.4 on (d), and ¹H-only crowding getting *worse*
+#: (71.2 % → 75.0 %). The penalty, not the mean, is the lever.
+COVERAGE_PENALTY_BY_ABSENT_NUCLEUS: dict[str, float] = {"1h": 0.10, "13c": 0.50}
 
 #: Nucleus keys used by the per-nucleus sub-indices, in encoding order.
 NUCLEI: tuple[str, str] = ("1h", "13c")
@@ -547,6 +572,29 @@ class SpectrumIndex:
 _MULTI_NUCLEUS_KIND = "multi_nucleus_v1"
 
 
+def _normalize_coverage_penalty(
+    value: float | Mapping[str, float] | None,
+) -> dict[str, float]:
+    """Coerce a penalty spec to one value per nucleus.
+
+    ``None`` takes the measured per-nucleus defaults. A **scalar** is applied to every
+    nucleus, which is how a pre-per-nucleus manifest (which persisted a single float)
+    keeps the exact ranking it was built with instead of silently adopting new
+    asymmetric weights.
+    """
+
+    if value is None:
+        return dict(COVERAGE_PENALTY_BY_ABSENT_NUCLEUS)
+    if isinstance(value, Mapping):
+        return {
+            nucleus: float(
+                value.get(nucleus, COVERAGE_PENALTY_BY_ABSENT_NUCLEUS[nucleus])
+            )
+            for nucleus in NUCLEI
+        }
+    return {nucleus: float(value) for nucleus in NUCLEI}
+
+
 class MultiNucleusSpectrumIndex:
     """Per-nucleus sub-indices, ranked by coverage-penalised mean nucleus distance.
 
@@ -585,10 +633,10 @@ class MultiNucleusSpectrumIndex:
     single-nucleus candidates crowd out both-nuclei ones — the mirror of the bug
     being fixed, measured as 93.3 % vs 99.7 % recall@1 on both-nuclei queries. The
     coverage penalty restores that precision without making missing data
-    unreachable. λ was swept on the real corpus (recall@1, both-nuclei query /
-    ¹³C-only reference): 0.0 → 93.3/94.0, 0.05 → 98.3/94.0, **0.20 → 99.7/90.7**,
-    0.35 → 99.7/86.3, 0.50 → 99.7/75.7. λ=0.20 is the knee and is
-    :data:`FUSED_COVERAGE_PENALTY`.
+    unreachable. The penalty is charged **per absent nucleus** and is *asymmetric*,
+    because ¹³C is the more diagnostic nucleus: lacking it costs 0.50 while lacking
+    ¹H costs 0.10 — see :data:`COVERAGE_PENALTY_BY_ABSENT_NUCLEUS` for the sweep that
+    fixed both values and for why weighting the mean instead does not work.
 
     Two rejected alternatives, both measured rather than argued away:
 
@@ -612,7 +660,8 @@ class MultiNucleusSpectrumIndex:
     A consequence worth naming: for a candidate that shares only some of the query's
     nuclei, part of the score is the penalty rather than measured disagreement, and
     in the limit (identical on the shared nucleus, missing the other) it is *entirely*
-    penalty — 0.1 at λ=0.20 with one of two nuclei absent. Use
+    penalty — 0.05 for a ¹³C-only reference, 0.25 for a ¹H-only one, given a
+    both-nuclei query. Use
     :meth:`search_with_coverage` when the caller needs to tell that apart from 0.1
     worth of real disagreement across both nuclei; the two carry different evidential
     weight and the bare number cannot distinguish them.
@@ -647,13 +696,19 @@ class MultiNucleusSpectrumIndex:
         hnsw_m: int = 32,
         ef_construction: int = 200,
         ef_search: int = 128,
-        coverage_penalty: float = FUSED_COVERAGE_PENALTY,
+        coverage_penalty: float | Mapping[str, float] | None = None,
     ) -> None:
         faiss = _import_faiss()
         self._faiss = faiss
         self.half_dim = int(half_dim)
         self.dim = 2 * self.half_dim
-        self.coverage_penalty = float(coverage_penalty)
+        #: Penalty per *absent* nucleus. A scalar is accepted and applied uniformly,
+        #: which is what a manifest written before the penalty became per-nucleus
+        #: records — those artifacts keep their original ranking rather than silently
+        #: acquiring a geometry they were not built with.
+        self.coverage_penalty: dict[str, float] = _normalize_coverage_penalty(
+            coverage_penalty
+        )
         self.ids: list[Any] = []
         self._sub: dict[str, Any] = {}
         #: nucleus -> global row for each row of that sub-index
@@ -776,9 +831,9 @@ class MultiNucleusSpectrumIndex:
                     absent.append(nucleus)
             if not compared:  # pragma: no cover - a candidate always shares its finder
                 continue
-            score = total / len(compared) + self.coverage_penalty * (
-                len(absent) / len(present)
-            )
+            score = total / len(compared) + sum(
+                self.coverage_penalty[nucleus] for nucleus in absent
+            ) / len(present)
             scored.append((score, self.ids[global_row], tuple(compared), tuple(absent)))
 
         scored.sort(key=lambda item: item[0])
@@ -894,9 +949,7 @@ class MultiNucleusSpectrumIndex:
 
         obj = cls(
             half_dim=int(payload["half_dim"]),
-            coverage_penalty=float(
-                payload.get("coverage_penalty", FUSED_COVERAGE_PENALTY)
-            ),
+            coverage_penalty=payload.get("coverage_penalty"),
         )
         obj.ids = list(payload["ids"])
         directory = os.path.dirname(os.path.abspath(path))

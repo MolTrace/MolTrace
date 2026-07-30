@@ -9,8 +9,8 @@ import pytest
 
 from moltrace.spectroscopy.predict.nmrnet_wrapper import AtomShift, ShiftPrediction
 from moltrace.spectroscopy.similarity.scoring import (
+    COVERAGE_PENALTY_BY_ABSENT_NUCLEUS,
     ENCODING_DIM,
-    FUSED_COVERAGE_PENALTY,
     HALF_DIM,
     RANGE_1H,
     MultiNucleusSpectrumIndex,
@@ -536,28 +536,32 @@ def test_both_nuclei_query_still_prefers_the_both_nuclei_match():
 
 
 def test_zero_coverage_penalty_lets_a_partial_match_win():
-    """Pins *why* FUSED_COVERAGE_PENALTY is nonzero rather than a tunable nicety.
+    """Pins *why* the coverage penalty is nonzero rather than a tunable nicety.
 
-    With lambda=0 a candidate matching one nucleus exactly outranks a complete
-    candidate that is marginally off — the failure the measured 0.20 removes. The
-    margin is deliberately small: at lambda=0.20 a half-covered candidate carries a
-    0.10 handicap, so the penalty decides only genuinely close calls (here 0.0588
-    for the complete match against 0.0 + 0.10 for the partial one) and never
-    overrides a real chemical difference.
+    With no penalty at all, a candidate matching one nucleus exactly outranks a
+    complete candidate that is marginally off. The 1H-only reference used here is
+    exact on protons and carries no carbon, so it is charged the heavier 0.50 (halved
+    to 0.25 over two query nuclei) and must lose to the complete match at 0.0588.
+
+    The mirror case is deliberately NOT symmetric: a 13C-only reference is charged
+    only 0.10 (0.05 halved), so it legitimately CAN outrank a slightly-off complete
+    match. That leniency is the point of the asymmetry — it is what makes the
+    59.7% of references carrying carbon alone reachable at all — and is asserted in
+    test_missing_13c_costs_more_than_missing_1h.
     """
     entries = {
         "complete": ([1.0, 3.0], [20.0, 60.0]),
-        "c_only_exact": ([], [20.0, 60.0]),
+        "h_only_exact": ([1.05, 3.05], []),
     }
     query = encode_spectrum([1.05, 3.05], [20.0, 60.0])
 
     lenient = MultiNucleusSpectrumIndex(coverage_penalty=0.0)
-    strict = MultiNucleusSpectrumIndex(coverage_penalty=FUSED_COVERAGE_PENALTY)
+    strict = MultiNucleusSpectrumIndex()  # measured per-nucleus defaults
     for index in (lenient, strict):
         for identifier, (h, c) in entries.items():
             index.add(encode_spectrum(h, c).reshape(1, -1), [identifier])
 
-    assert lenient.search(query, k=2)[0][0] == "c_only_exact"
+    assert lenient.search(query, k=2)[0][0] == "h_only_exact"
     assert strict.search(query, k=2)[0][0] == "complete"
 
 
@@ -674,7 +678,7 @@ def test_coverage_penalty_survives_the_roundtrip(tmp_path):
     index.add(encode_spectrum([1.0], [20.0]).reshape(1, -1), ["a"])
     path = tmp_path / "spectra.faiss"
     index.save(str(path))
-    assert load_index(str(path)).coverage_penalty == pytest.approx(0.35)
+    assert load_index(str(path)).coverage_penalty == {"1h": 0.35, "13c": 0.35}
 
 
 def test_search_with_coverage_distinguishes_penalty_from_disagreement():
@@ -698,7 +702,7 @@ def test_search_with_coverage_distinguishes_penalty_from_disagreement():
     assert detailed["both"][3] == ()
 
     identifier, score, compared, absent = detailed["c_only"]
-    assert score == pytest.approx(FUSED_COVERAGE_PENALTY * 0.5)
+    assert score == pytest.approx(COVERAGE_PENALTY_BY_ABSENT_NUCLEUS["1h"] * 0.5)
     assert compared == ("13c",)
     assert absent == ("1h",)
 
@@ -706,7 +710,74 @@ def test_search_with_coverage_distinguishes_penalty_from_disagreement():
     assert index.search(query, k=2)[0] == ("both", pytest.approx(0.0, abs=1e-5))
 
 
-def test_fused_score_upper_bound_is_sqrt2_plus_lambda():
+def test_missing_13c_costs_more_than_missing_1h():
+    """The penalty is asymmetric because the nuclei are not equally diagnostic.
+
+    13C spans 220 ppm with roughly one signal per distinct carbon, so a reference
+    lacking it is much weaker corroboration than one lacking 1H. Charging both 0.20
+    let 1H-only entries take 71.2% of a both-nuclei query's top-10 against a 22.6%
+    base rate while 13C-only entries were all but excluded at 3.2% against 59.7%.
+    """
+    assert (
+        COVERAGE_PENALTY_BY_ABSENT_NUCLEUS["13c"]
+        > COVERAGE_PENALTY_BY_ABSENT_NUCLEUS["1h"]
+    )
+
+    # Two references, each perfect on the one nucleus it has, each missing the other.
+    # Their scores must differ, and the 1H-only one must be the worse of the two.
+    index = _multi({
+        "c_only": ([], [20.0, 60.0]),
+        "h_only": ([1.0, 3.0], []),
+    })
+    scores = dict(
+        (row[0], row[1])
+        for row in index.search_with_coverage(encode_spectrum([1.0, 3.0], [20.0, 60.0]), k=2)
+    )
+    assert scores["c_only"] == pytest.approx(
+        COVERAGE_PENALTY_BY_ABSENT_NUCLEUS["1h"] / 2
+    )
+    assert scores["h_only"] == pytest.approx(
+        COVERAGE_PENALTY_BY_ABSENT_NUCLEUS["13c"] / 2
+    )
+    assert scores["c_only"] < scores["h_only"]
+
+    # The consequence that makes carbon-only references reachable: an exact 13C-only
+    # match (0.05) CAN outrank a complete match that is slightly off (0.0588 here).
+    # That is intended, not a regression -- it is why (d) went 88.8% -> 98.0% @1.
+    both = _multi({
+        "complete": ([1.0, 3.0], [20.0, 60.0]),
+        "c_only": ([], [20.0, 60.0]),
+    })
+    assert both.search(encode_spectrum([1.05, 3.05], [20.0, 60.0]), k=2)[0][0] == "c_only"
+
+
+def test_scalar_coverage_penalty_is_applied_uniformly_for_legacy_artifacts():
+    """A manifest written before the penalty was per-nucleus persisted one float.
+
+    Such an artifact must keep the ranking it was built with rather than silently
+    acquiring the asymmetric weights, so a scalar spreads to every nucleus.
+    """
+    index = MultiNucleusSpectrumIndex(coverage_penalty=0.20)
+    assert index.coverage_penalty == {"1h": 0.20, "13c": 0.20}
+
+
+def test_legacy_scalar_penalty_survives_the_roundtrip(tmp_path):
+    import json
+
+    path = tmp_path / "legacy.faiss"
+    index = MultiNucleusSpectrumIndex(coverage_penalty=0.20)
+    index.add(encode_spectrum([1.0], [20.0]).reshape(1, -1), ["a"])
+    index.save(str(path))
+    # Rewrite the manifest the way a pre-per-nucleus build wrote it: a bare float.
+    payload = json.loads(path.read_text())
+    payload["coverage_penalty"] = 0.20
+    path.write_text(json.dumps(payload))
+
+    reloaded = load_index(str(path))
+    assert reloaded.coverage_penalty == {"1h": 0.20, "13c": 0.20}
+
+
+def test_fused_score_upper_bound_is_sqrt2_plus_heaviest_penalty():
     """An encoded half is non-negative, so two unit halves are at worst orthogonal.
 
     The bound is sqrt(2) + lambda, not 2 + lambda: antipodal halves are unreachable
@@ -716,7 +787,9 @@ def test_fused_score_upper_bound_is_sqrt2_plus_lambda():
 
     disjoint = float(np.linalg.norm(encode_spectrum([], [10.0]) - encode_spectrum([], [210.0])))
     assert disjoint == pytest.approx(math.sqrt(2.0), abs=1e-5)
-    assert FUSED_SCORE_MAX == pytest.approx(math.sqrt(2.0) + FUSED_COVERAGE_PENALTY)
+    assert FUSED_SCORE_MAX == pytest.approx(
+        math.sqrt(2.0) + max(COVERAGE_PENALTY_BY_ABSENT_NUCLEUS.values())
+    )
 
     index = _multi({"far": ([], [210.0])})
     worst = index.search(encode_spectrum([1.0], [10.0]), k=1)[0][1]
