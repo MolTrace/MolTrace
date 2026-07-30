@@ -254,13 +254,37 @@ def _refine_carbohydrate_peak_categories(
         if AMINOGLYCOSIDE_ANOMERIC_LOW_PPM <= float(shift) <= AMINOGLYCOSIDE_ANOMERIC_HIGH_PPM:
             candidate_indices.append(idx)
 
-    selected_anomeric = set(
-        sorted(
-            candidate_indices,
-            key=lambda idx: _score_anomeric_candidate(peaks[idx]),
-            reverse=True,
-        )[:expected_anomeric_count]
-    )
+    # Allocate a proton BUDGET, not peak slots. Selecting the best N *peaks*
+    # silently assumed one proton per peak: a single unresolved or
+    # range-collapsed multiplet carrying 10 H would be chosen as one of the two
+    # anomeric signals and contribute all 10 H, reproducing the exact defect
+    # the cap exists to prevent. Literature text routinely reports such an
+    # envelope as one assignment ("5.45-5.10 (m, 10H)"), so this is a normal
+    # input, not an edge case.
+    #
+    # Candidates are taken in descending score order and consume the budget in
+    # protons. A candidate whose integration exceeds the remaining budget is
+    # SPLIT: the budgeted share stays anomeric and the remainder is demoted,
+    # recorded as an ``inventory_partition`` so class totals still sum exactly.
+    budget = float(expected_anomeric_count)
+    anomeric_share: dict[int, float] = {}
+    for idx in sorted(
+        candidate_indices,
+        key=lambda idx: _score_anomeric_candidate(peaks[idx]),
+        reverse=True,
+    ):
+        if budget <= 1e-9:
+            break
+        integration = _peak_inventory_integration_value(peaks[idx])
+        # With no integration available a peak cannot be split; treat it as the
+        # conventional one-proton anomeric signal.
+        available = float(integration) if integration is not None else 1.0
+        share = min(budget, available)
+        if share <= 1e-9:
+            continue
+        anomeric_share[idx] = share
+        budget -= share
+    selected_anomeric = set(anomeric_share)
 
     refined: list[dict[str, Any]] = []
     aminoglycoside_like = is_aminoglycoside_like_structure(structure)
@@ -290,7 +314,42 @@ def _refine_carbohydrate_peak_categories(
                     "peak is among the best-supported candidates."
                 )
             if aminoglycoside_like:
-                reason += " Aminoglycoside-like inputs are capped at two anomeric peaks."
+                reason += (
+                    " Aminoglycoside-like inputs are capped at two anomeric protons."
+                )
+
+            # Partial allocation: this signal carries more protons than the
+            # structure can host in this band, so only the budgeted share is
+            # anomeric and the remainder belongs to whatever else occupies the
+            # window (benzylic OCH2Ar, sugar-ring CH).
+            integration = _peak_inventory_integration_value(peak)
+            share = anomeric_share.get(idx, 0.0)
+            if integration is not None and float(integration) - share > 1e-6:
+                remainder = float(integration) - share
+                spillover = (
+                    "carbohydrate_sugar"
+                    if carbohydrate_like
+                    and AMINOGLYCOSIDE_SUGAR_LOW_PPM
+                    <= shift_value
+                    <= AMINOGLYCOSIDE_SUGAR_HIGH_PPM
+                    else "oxygenated"
+                )
+                peak["inventory_partition"] = {
+                    "anomeric": round(share, 4),
+                    spillover: round(remainder, 4),
+                }
+                peak["anomeric_cap_reassigned_h"] = round(remainder, 4)
+                peak["anomeric_cap_reassigned_from"] = "anomeric"
+                # Label the peak by its dominant component so the displayed
+                # category and the arithmetic agree.
+                if remainder > share:
+                    peak["category"] = spillover
+                reason += (
+                    f" This signal carries {float(integration):.1f} H but the structure "
+                    f"supports only {expected_anomeric_count} proton(s) in this band, so "
+                    f"{share:.1f} H is counted as anomeric and {remainder:.1f} H is "
+                    "attributed to the other environments in the same window."
+                )
             refined.append(_with_appended_reason(peak, reason))
             continue
 
@@ -1021,8 +1080,26 @@ def _inventory_integration(peak: dict[str, Any]) -> float | None:
 
 
 def _sum_integration(peaks: Iterable[dict[str, Any]], categories: frozenset[str]) -> float:
+    """Sum inventory integration for the given categories.
+
+    Honours ``inventory_partition`` when present: an unresolved multiplet can
+    legitimately span two classes (e.g. a 4.4-6.0 ppm envelope carrying both
+    the structure's two anomeric protons and several benzylic OCH2Ph protons).
+    Splitting the integration is what keeps the anomeric budget in PROTONS
+    rather than in peaks — a single 10 H multiplet must not contribute 10 H of
+    "anomeric" just because it was the best-supported candidate signal.
+
+    The partition always sums to the peak's own integration, so class totals
+    and the grand total stay consistent.
+    """
     total = 0.0
     for peak in peaks:
+        partition = peak.get("inventory_partition")
+        if isinstance(partition, dict) and partition:
+            for part_category, part_value in partition.items():
+                if part_category in categories and isinstance(part_value, (int, float)):
+                    total += float(part_value)
+            continue
         category = peak.get("category")
         if not isinstance(category, str) or category not in categories:
             continue
@@ -1254,10 +1331,16 @@ def build_proton_inventory(
     # applied, what the limit was, and how much integration it moved.
     reassigned_h = 0.0
     for peak in peaks:
-        if peak.get("anomeric_cap_reassigned_from"):
-            value = _inventory_integration(peak)
-            if value is not None:
-                reassigned_h += float(value)
+        if not peak.get("anomeric_cap_reassigned_from"):
+            continue
+        partial = peak.get("anomeric_cap_reassigned_h")
+        if isinstance(partial, (int, float)):
+            # Split multiplet: only the spillover was reassigned.
+            reassigned_h += float(partial)
+            continue
+        value = _inventory_integration(peak)
+        if value is not None:
+            reassigned_h += float(value)
     anomeric_cap: dict[str, Any] = {
         "applied": bool(structure is not None and reassigned_h > 0),
         "limit": expected_block.get("anomeric_or_olefinic") if expected_block else None,

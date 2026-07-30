@@ -147,6 +147,26 @@ def _case_protected_aminoglycoside_spectrum() -> dict[str, Any]:
     }
 
 
+def _case_protected_aminoglycoside_collapsed() -> dict[str, Any]:
+    """Same molecule with the 4.4-6.0 band reported as ONE range multiplet.
+
+    Literature experimental sections routinely report an envelope as a single
+    assignment — "5.45-5.10 (m, 10H)". The parser keeps the range bounds but
+    represents it at the midpoint, so the classifier sees one peak carrying
+    10 H. A cap that selects the best N *peaks* then assigns all 10 H to
+    anomeric, reproducing the original defect. The budget must be in protons.
+    """
+    return {
+        "structure": _PROTECTED_AMINOGLYCOSIDE,
+        "solvent": "CD3OD",
+        "peaks": [
+            _peak(7.30, "m", 35.0),
+            _peak(5.25, "m", 10.0),  # 2 anomeric + 8 benzylic, unresolved
+            _peak(3.60, "m", 18.0),
+        ],
+    }
+
+
 def _case_benzylidene_glucoside() -> dict[str, Any]:
     # Aromatic-protected sugar: one true anomeric H (C-1) plus a benzylidene
     # acetal CH(Ph) that is a protecting group, not an anomeric proton.
@@ -205,6 +225,7 @@ def _case_olefinic_aromatic() -> dict[str, Any]:
 CASES: dict[str, Any] = {
     "protected_aminoglycoside_cd3od": _case_protected_aminoglycoside,
     "protected_aminoglycoside_cd3od_spectrum": _case_protected_aminoglycoside_spectrum,
+    "protected_aminoglycoside_cd3od_collapsed": _case_protected_aminoglycoside_collapsed,
     "benzylidene_glucoside_cdcl3": _case_benzylidene_glucoside,
     "free_aminoglycoside_d2o": _case_free_aminoglycoside,
     "olefinic_aromatic_cdcl3": _case_olefinic_aromatic,
@@ -406,6 +427,36 @@ class TestScientificInvariants:
             f"{name}: shifts {sorted(overlap)} are counted as curated impurities "
             "AND as exchangeable-proton evidence. The same peak cannot be both."
         )
+
+    def test_class_partitions_conserve_each_peak_integration(
+        self, name: str
+    ) -> None:
+        """A split multiplet must not lose or invent protons.
+
+        When an unresolved signal is divided between two classes, the parts
+        have to sum to the peak's own integration, otherwise the class rows
+        stop agreeing with the grand total.
+        """
+        case = CASES[name]()
+        structure = case["structure"]
+        enriched = enrich_peaks(
+            peaks=case["peaks"],
+            nucleus="1H",
+            solvent=case["solvent"],
+            structure=structure,
+        )
+        for peak in enriched:
+            partition = peak.get("inventory_partition")
+            if not partition:
+                continue
+            integration = peak.get("integration_h")
+            assert isinstance(integration, (int, float))
+            assert sum(partition.values()) == pytest.approx(
+                float(integration), abs=1e-3
+            ), (
+                f"{name}: peak at {peak.get('shift_ppm')} ppm partitions to "
+                f"{sum(partition.values())} H but carries {integration} H"
+            )
 
     def test_impurity_assignment_never_consumes_the_analyte_budget(
         self, name: str
