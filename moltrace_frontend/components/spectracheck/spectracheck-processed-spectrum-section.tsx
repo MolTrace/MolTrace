@@ -978,7 +978,7 @@ export function SpectraCheckProcessedSpectrumSection({
                   ))}
                 </select>
                 <p className="text-[11px] text-muted-foreground">
-                  Reuse a file already uploaded to <code className="text-[10px]">/files/upload</code> and attached to this session.
+                  Reuse a file you already uploaded and attached to this session.
                 </p>
               </div>
 
@@ -991,7 +991,7 @@ export function SpectraCheckProcessedSpectrumSection({
                   value={nmrTextOptional}
                   onChange={(e) => setNmrTextOptional(e.target.value)}
                   rows={3}
-                  placeholder="Optional — forwarded as nmr_text when non-empty"
+                  placeholder="Optional — included with the analysis when provided"
                   className="min-h-0 w-full min-w-0 font-mono text-xs"
                 />
               </div>
@@ -1083,7 +1083,7 @@ export function SpectraCheckProcessedSpectrumSection({
                 </button>
               </TooltipTrigger>
               <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                POST /nmr/processed/preview
+                Renders the parsed spectrum only — no candidate matching.
               </TooltipContent>
             </Tooltip>
 
@@ -1146,8 +1146,8 @@ export function SpectraCheckProcessedSpectrumSection({
               </TooltipTrigger>
               <TooltipContent sideOffset={4} className="max-w-xs text-xs">
                 {analysisBackend === "gsd_prompt3"
-                  ? "POST /spectrum/analyze/gsd (experimental)"
-                  : "POST /nmr/processed/analyze"}
+                  ? "Experimental GSD peak detection — peak picking and classification only."
+                  : "Standard analysis — peak detection plus candidate matching and scoring."}
               </TooltipContent>
             </Tooltip>
           </div>

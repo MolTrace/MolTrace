@@ -485,13 +485,13 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
     expect(screen.getByText("fam1")).toBeInTheDocument()
   })
 
-  it("shows backend-unavailable message when LC-MS grouping endpoint returns 404", async () => {
+  it("shows a capability-unavailable message when LC-MS grouping is not served", async () => {
     apiFetchMock.mockRejectedValueOnce(new ApiError(404, { detail: "Not Found" }))
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
     await user.click(screen.getByRole("tab", { name: "LC-MS grouping" }))
     await user.type(await screen.findByPlaceholderText(/Feature or peak list text/), "mz,rt\n100,1")
     await user.click(screen.getByRole("button", { name: "Group features" }))
-    expect(await screen.findByText("Backend endpoint not available yet.")).toBeInTheDocument()
+    expect(await screen.findByText("This capability is not available on this MolTrace instance yet.")).toBeInTheDocument()
   })
 })

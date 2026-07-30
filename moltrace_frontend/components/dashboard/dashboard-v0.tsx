@@ -43,6 +43,7 @@ import { MobileCommandCenter } from "@/src/components/mobile/MobileCommandCenter
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { useOverviewData } from "@/components/app/overview-data-context"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { humanizeField, statusLabel } from "@/lib/ui/status"
 import { useTenant } from "@/src/lib/tenant/tenant-context"
 import {
   fetchDashboardQcAlertsAggregate,
@@ -132,14 +133,19 @@ function readStr(o: Record<string, unknown>, keys: string[]): string {
   return ""
 }
 
+/** Extra detail worth showing a reader when a summary card can't load. Returns a
+ *  server-supplied message only when it reads as a sentence — transport-level
+ *  messages (which carry status numbers) and single machine codes are dropped, so
+ *  callers should pair this with their own plain-language fallback. */
 function formatApiErr(err: unknown): string {
   if (err instanceof ApiError) {
     const d = err.data
-    if (isRecord(d) && typeof d.detail === "string") return d.detail
-    return err.message
+    if (isRecord(d) && typeof d.detail === "string") {
+      const detail = d.detail.trim()
+      if (detail && !/^[a-z0-9]+(?:_[a-z0-9]+)+$/.test(detail)) return detail
+    }
   }
-  if (err instanceof Error) return err.message
-  return "Request failed."
+  return ""
 }
 
 function formatJobTimeLabel(iso: string | null): string {
@@ -147,6 +153,20 @@ function formatJobTimeLabel(iso: string | null): string {
   const d = Date.parse(iso)
   if (Number.isNaN(d)) return iso
   return new Date(d).toLocaleString()
+}
+
+/** Readable names for the analysis job kinds the dashboard commonly shows; anything
+ *  else falls back to sentence-cased words so a reader never sees a raw identifier. */
+const JOB_TYPE_LABELS: Record<string, string> = {
+  nmr_processed_analyze: "NMR analysis (processed spectrum)",
+  nmr_raw_fid_process: "NMR raw FID processing",
+  lcms_import: "LC-MS import",
+}
+
+function formatJobTypeLabel(jobType: string): string {
+  const raw = jobType.trim()
+  if (!raw) return "—"
+  return JOB_TYPE_LABELS[raw.toLowerCase()] ?? humanizeField(raw)
 }
 
 function formatCoreModuleActivityTime(iso: string | null): string {
@@ -481,7 +501,9 @@ export function DashboardV0() {
       .catch((err) => {
         if (!cancelled) {
           setDeploymentSummary(null)
-          setDeploymentSummaryError(formatApiErr(err))
+          setDeploymentSummaryError(
+            formatApiErr(err) || "Onboarding and readiness details couldn't load right now.",
+          )
         }
       })
       .finally(() => {
@@ -917,7 +939,7 @@ export function DashboardV0() {
   }
 
   function fmtOpsHealth(status: string | null): string {
-    return status?.trim() || "—"
+    return statusLabel(status)
   }
 
   const roiLive = roiSnapshot != null
@@ -1138,7 +1160,7 @@ export function DashboardV0() {
                 <CardTitle className="text-base">Customer Deployment</CardTitle>
                 <CardDescription>Tenant onboarding and readiness summary.</CardDescription>
               </div>
-              <Badge variant="outline">{tenant.status}</Badge>
+              <Badge variant="outline">{statusLabel(tenant.status)}</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -1151,19 +1173,19 @@ export function DashboardV0() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">onboarding status</p>
-                <p className="font-medium">{deploymentSummary?.onboardingStatus ?? "—"}</p>
+                <p className="font-medium">{statusLabel(deploymentSummary?.onboardingStatus)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">pilot status</p>
-                <p className="font-medium">{deploymentSummary?.pilotStatus ?? "—"}</p>
+                <p className="font-medium">{statusLabel(deploymentSummary?.pilotStatus)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">validation readiness</p>
-                <p className="font-medium">{deploymentSummary?.validationReadiness ?? "—"}</p>
+                <p className="font-medium">{statusLabel(deploymentSummary?.validationReadiness)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">health score</p>
-                <p className="font-medium">{deploymentSummary?.healthScore ?? "—"}</p>
+                <p className="font-medium">{statusLabel(deploymentSummary?.healthScore)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">next onboarding task</p>
@@ -1308,7 +1330,9 @@ export function DashboardV0() {
             <div className="rounded-md border bg-muted/20 p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">1. SpectraCheck summary</p>
               <p className="mt-2 text-xs text-muted-foreground">latest SpectraCheck evidence status</p>
-              <p className="text-sm font-medium">{crossModuleDisplay.latestSpectraCheckEvidenceStatus ?? "—"}</p>
+              <p className="text-sm font-medium">
+                {statusLabel(crossModuleDisplay.latestSpectraCheckEvidenceStatus)}
+              </p>
             </div>
             <div className="rounded-md border bg-muted/20 p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">2. Regentry summary</p>
@@ -1635,7 +1659,7 @@ export function DashboardV0() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <p className="text-xs text-muted-foreground">System health</p>
-            <p className="text-2xl font-bold tabular-nums capitalize">
+            <p className="text-2xl font-bold tabular-nums">
               {fmtOpsHealth(opsDisplay.systemHealthStatus)}
             </p>
           </div>
@@ -1732,7 +1756,7 @@ export function DashboardV0() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Quality Alerts</CardTitle>
           <CardDescription>
-            Session QC rollup when the API returns data; newest sessions scanned first.
+            Session QC rollup from your saved sessions; newest sessions scanned first.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -1831,10 +1855,8 @@ export function DashboardV0() {
             </div>
             <div className="lg:col-span-1">
               <p className="text-xs text-muted-foreground">Latest validation run status</p>
-              <p className="mt-1 break-words font-mono text-xs leading-snug">
-                {methodHealthUseDemo
-                  ? methodHealthDisplay.latestValidationRunStatus
-                  : methodHealthDisplay.latestValidationRunStatus?.trim() || "—"}
+              <p className="mt-1 break-words text-xs leading-snug">
+                {statusLabel(methodHealthDisplay.latestValidationRunStatus)}
               </p>
             </div>
           </div>
@@ -1994,14 +2016,16 @@ export function DashboardV0() {
                         key={j.id}
                         style={stripe ? { boxShadow: `inset 3px 0 0 0 ${stripe}` } : undefined}
                       >
-                        <TableCell className="max-w-[180px] truncate font-mono text-xs">{j.jobType}</TableCell>
+                        <TableCell className="max-w-[180px] truncate text-xs">
+                          {formatJobTypeLabel(j.jobType)}
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
                             className="text-[10px] font-normal"
                             style={badge ? { borderColor: badge, color: badge } : undefined}
                           >
-                            {j.status}
+                            {statusLabel(j.status)}
                           </Badge>
                         </TableCell>
                         <TableCell>

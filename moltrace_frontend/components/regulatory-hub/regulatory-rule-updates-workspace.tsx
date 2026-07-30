@@ -60,6 +60,13 @@ function formatWhen(iso: string | undefined): string {
   return formatStableUtcDateTime(iso)
 }
 
+/** Display-only humanizer for stored values (update_threshold → "Update threshold"). */
+function humanizeValue(raw: string | undefined | null): string {
+  if (!raw) return "—"
+  const words = raw.replace(/_/g, " ").trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
 export function RegulatoryRuleUpdatesWorkspace() {
   const searchParams = useSearchParams()
 
@@ -360,7 +367,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
                 <SelectContent>
                   {PROPOSAL_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {humanizeValue(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -453,7 +460,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
                   return (
                     <TableRow key={id != null ? `prop-${id}` : `prop-${idx}`}>
                       <TableCell className="max-w-[220px] font-medium">{readRecordString(row, "title") ?? "—"}</TableCell>
-                      <TableCell className="text-xs">{readRecordString(row, "proposal_type") ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{humanizeValue(readRecordString(row, "proposal_type"))}</TableCell>
                       <TableCell className="text-xs">
                         {changeEventId != null ? (
                           <Link

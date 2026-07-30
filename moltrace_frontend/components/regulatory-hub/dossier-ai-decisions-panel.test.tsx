@@ -65,7 +65,8 @@ describe("DossierAIDecisionsPanel", () => {
 
   it("renders a decision with risk badge, confidence, and the 7-check compliance list", () => {
     render(<DossierAIDecisionsPanel decisions={[decision({})]} dossierId={4} onReviewed={vi.fn()} />)
-    expect(screen.getByText("structure_elucidation")).toBeInTheDocument()
+    // decision type is humanized for display; the wire value stays snake_case
+    expect(screen.getByText("structure elucidation")).toBeInTheDocument()
     expect(screen.getByText("high risk")).toBeInTheDocument()
     expect(screen.getByText("conf 91%")).toBeInTheDocument()
     expect(screen.getByText("intended use documented")).toBeInTheDocument()
@@ -104,8 +105,9 @@ describe("DossierAIDecisionsPanel", () => {
     expect(screen.getByText(/approved · reviewer-1/)).toBeInTheDocument()
     expect(screen.queryByText("Pending human review")).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument()
-    // only one decision card (the .hitl_review row is not rendered as a card)
-    expect(screen.getAllByText(/structure_elucidation$/).length).toBe(1)
+    // only one decision card (the .hitl_review row is not rendered as a card);
+    // the decision type is humanized for display, so match the displayed text
+    expect(screen.getAllByText(/^structure elucidation$/).length).toBe(1)
   })
 
   it("verifies the chain and shows the ok state", async () => {

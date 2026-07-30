@@ -14,6 +14,7 @@ import type {
 } from "@/components/science/MsmsMirrorPlot"
 import { SpectrumViewer1D } from "@/components/science/SpectrumViewer1D"
 import type { SpectrumViewer1DOverlay, SpectrumViewer1DPeak } from "@/components/science/SpectrumViewer1D"
+import { artifactTypeLabel } from "@/src/components/spectracheck/spectracheck-display-labels"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
@@ -866,8 +867,8 @@ export function ArtifactViewerModal({
             <section className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Summary</p>
               <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                <Badge variant="outline" className="font-mono text-[10px]">
-                  {row.artifact_type}
+                <Badge variant="outline" className="text-[10px]">
+                  {artifactTypeLabel(row.artifact_type)}
                 </Badge>
                 <span className="text-muted-foreground">Created:</span>
                 <span className="font-mono text-xs">{row.created_at ?? "—"}</span>

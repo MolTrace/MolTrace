@@ -191,7 +191,9 @@ describe("SPCProcessCapabilityPanel", () => {
     render(<SPCProcessCapabilityPanel />)
     await user.click(screen.getByRole("button", { name: /Analyze series/ }))
     await waitFor(() => expect(screen.getByTestId("spc-control-chart")).toBeInTheDocument())
-    expect(screen.getByText("undefined")).toBeInTheDocument()
+    // the "undefined" rating renders as words, never the bare token "undefined"
+    expect(screen.getByText("not determined")).toBeInTheDocument()
+    expect(screen.queryByText("undefined")).not.toBeInTheDocument()
     expect(screen.getByText(/short-term capability is undefined\/infinite/i)).toBeInTheDocument()
     // capability cells fall back to em-dash, not "null"/"NaN"
     expect(screen.getAllByText("—").length).toBeGreaterThan(0)

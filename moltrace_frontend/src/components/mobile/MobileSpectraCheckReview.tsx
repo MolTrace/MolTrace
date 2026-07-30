@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { apiFetch } from "@/lib/api/client"
+import { statusLabel } from "@/lib/ui/status"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -161,39 +162,39 @@ export function MobileSpectraCheckReview({ sessionId: sessionIdProp = null }: { 
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {!sessionId ? (
-          <p className="text-xs text-muted-foreground">Open a SpectraCheck session to load mobile review summary.</p>
+          <p className="text-xs text-muted-foreground">Open a SpectraCheck session to see its review summary here.</p>
         ) : null}
         {sessionId && summary ? (
           <>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">sample/session status</p>
-                <p className="text-sm font-medium">{summary.sampleStatus}</p>
+                <p className="text-xs text-muted-foreground">Sample status</p>
+                <p className="text-sm font-medium">{statusLabel(summary.sampleStatus)}</p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">latest QC status</p>
-                <p className="text-sm font-medium">{summary.latestQcStatus}</p>
+                <p className="text-xs text-muted-foreground">Latest quality check</p>
+                <p className="text-sm font-medium">{statusLabel(summary.latestQcStatus)}</p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">evidence queue count</p>
+                <p className="text-xs text-muted-foreground">Awaiting review</p>
                 <p className="text-sm font-medium">{summary.evidenceQueueCount != null ? summary.evidenceQueueCount : "—"}</p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">regulatory impact status</p>
-                <p className="text-sm font-medium">{summary.regulatoryImpactStatus}</p>
+                <p className="text-xs text-muted-foreground">Regulatory impact</p>
+                <p className="text-sm font-medium">{statusLabel(summary.regulatoryImpactStatus)}</p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">open warnings</p>
+                <p className="text-xs text-muted-foreground">Open warnings</p>
                 <p className="text-sm font-medium">{summary.warnings.length > 0 ? summary.warnings.slice(0, 3).join(" · ") : "—"}</p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">report readiness</p>
-                <p className="text-sm font-medium">{summary.reportReadiness}</p>
+                <p className="text-xs text-muted-foreground">Report readiness</p>
+                <p className="text-sm font-medium">{statusLabel(summary.reportReadiness)}</p>
               </div>
             </div>
 
             <div className="rounded-md border p-2">
-              <p className="mb-2 text-xs text-muted-foreground">compact spectrum preview</p>
+              <p className="mb-2 text-xs text-muted-foreground">Spectrum preview</p>
               {summary.compactSpectrum ? (
                 <div className="min-h-[220px] w-full min-w-0 overflow-hidden rounded-md border bg-card">
                   <Plot
@@ -227,13 +228,13 @@ export function MobileSpectraCheckReview({ sessionId: sessionIdProp = null }: { 
                   />
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">No compact preview data available for this session.</p>
+                <p className="text-xs text-muted-foreground">No spectrum preview available for this session yet.</p>
               )}
             </div>
           </>
         ) : null}
 
-        {loading ? <p className="text-xs text-muted-foreground">Loading mobile SpectraCheck summary…</p> : null}
+        {loading ? <p className="text-xs text-muted-foreground">Loading session summary…</p> : null}
 
         <div className="flex min-w-0 flex-wrap gap-2">
           <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" asChild>

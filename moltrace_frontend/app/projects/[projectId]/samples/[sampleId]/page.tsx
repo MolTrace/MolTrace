@@ -132,7 +132,7 @@ export default function ProjectSampleDetailPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base text-warning">
               <ServerOff className="h-4 w-4" />
-              Backend unavailable
+              Sample unavailable
             </CardTitle>
             <CardDescription className="text-warning/90">
               We couldn&apos;t load this sample. Try refreshing in a moment, or contact your administrator if this keeps happening.
@@ -145,7 +145,7 @@ export default function ProjectSampleDetailPage() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1">
             <CardTitle className="break-words text-2xl">{headerTitle}</CardTitle>
-            <CardDescription>Route sample id: {sampleId || "—"}</CardDescription>
+            <CardDescription>Sample reference: {sampleId || "—"}</CardDescription>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
             <Badge variant="secondary">{statusDisplay}</Badge>
@@ -184,7 +184,7 @@ export default function ProjectSampleDetailPage() {
       {error && !loading ? (
         <Card className="border-destructive/40 bg-destructive/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-destructive">Request failed</CardTitle>
+            <CardTitle className="text-base text-destructive">Could not load sample</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-destructive">{error}</CardContent>
         </Card>
@@ -196,14 +196,14 @@ export default function ProjectSampleDetailPage() {
         <CardHeader>
           <CardTitle className="text-lg">Sessions</CardTitle>
           <CardDescription>
-            SpectraCheck sessions linked to this sample when returned by the API (e.g. <code className="text-xs">sessions</code>{" "}
-            array).
+            SpectraCheck sessions linked to this sample, shown when session history is recorded on the sample.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {sessionRows.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No session rows in the sample response. Save workflows may still use SpectraCheck in this browser.
+              No sessions recorded on this sample. Analyses you saved from SpectraCheck may still be available there in
+              this browser.
             </p>
           ) : (
             <Table>

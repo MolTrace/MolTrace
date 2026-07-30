@@ -39,6 +39,7 @@ import {
   pickStr,
   readBatchId,
 } from "@/components/batches/batch-registry-utils"
+import { statusLabel } from "@/lib/ui/status"
 
 const SOURCE_TYPES = [
   "synthesized",
@@ -139,12 +140,12 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
     setCreateErr("")
     const bc = batchCode.trim()
     if (!bc) {
-      setCreateErr("batch_code is required.")
+      setCreateErr("Batch code is required.")
       return
     }
     const compound_id = Number.parseInt(compoundId, 10)
     if (!Number.isFinite(compound_id)) {
-      setCreateErr("compound id in URL is not a valid integer for batch creation.")
+      setCreateErr("This compound could not be identified, so a batch cannot be created for it.")
       return
     }
     setCreateBusy(true)
@@ -217,7 +218,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
     }
     const code = aliquotCode.trim()
     if (!code) {
-      setAlCreateErr("aliquot_code is required.")
+      setAlCreateErr("Aliquot code is required.")
       return
     }
     setAlCreateBusy(true)
@@ -288,7 +289,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
           <form className="space-y-4" onSubmit={handleCreateBatch}>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
-                <Label>compound_id</Label>
+                <Label>compound</Label>
                 <Input value={compoundId} disabled readOnly className="font-mono text-xs" />
               </div>
               <div className="space-y-2">
@@ -308,7 +309,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
                   <SelectContent>
                     {SOURCE_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {statusLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -371,7 +372,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
           {loading ? <p className="text-sm text-muted-foreground">Loading batches…</p> : null}
           {err ? <p className="text-xs text-destructive">{err}</p> : null}
           {!loading && filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No batches for this compound in the registry list.</p>
+            <p className="text-sm text-muted-foreground">No batches registered for this compound yet.</p>
           ) : null}
           {filtered.length > 0 ? (
             <div className="table-scroll">
@@ -399,7 +400,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
                       <TableRow key={bid ?? i}>
                         <TableCell className="font-mono text-xs">{pickStr(row, ["batch_code", "batchCode", "code"])}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{pickStr(row, ["source_type", "sourceType"])}</Badge>
+                          <Badge variant="outline">{statusLabel(pickStr(row, ["source_type", "sourceType"]))}</Badge>
                         </TableCell>
                         <TableCell className="text-xs tabular-nums">
                           {purity != null ? `${purity}%` : "—"}
@@ -408,7 +409,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
                           {amt != null ? amt.toLocaleString() : "—"} {unit !== "—" ? unit : ""}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{pickStr(row, ["status", "state"])}</Badge>
+                          <Badge variant="secondary">{statusLabel(pickStr(row, ["status", "state"]))}</Badge>
                         </TableCell>
                         <TableCell className="max-w-[180px] text-[11px] text-muted-foreground">
                           {linkedSessionReactionDossier(row)}
@@ -444,7 +445,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
           <CardTitle className="text-sm font-medium">Aliquots</CardTitle>
           <CardDescription>
             {selectedBatchId
-              ? `GET /compound-registry/batches/${selectedBatchId}/aliquots — POST /compound-registry/batches/${selectedBatchId}/aliquots`
+              ? `Aliquots recorded for the selected batch (${selectedBatchId}). Add one below to register a new aliquot.`
               : "Select a batch above to list or add aliquots."}
           </CardDescription>
         </CardHeader>
@@ -518,7 +519,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
                           </TableCell>
                           <TableCell className="text-xs">{pickStr(row, ["storage_location", "storageLocation"])}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{pickStr(row, ["status", "state"])}</Badge>
+                            <Badge variant="outline">{statusLabel(pickStr(row, ["status", "state"]))}</Badge>
                           </TableCell>
                         </TableRow>
                       ))}

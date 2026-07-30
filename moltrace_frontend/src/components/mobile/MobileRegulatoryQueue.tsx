@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { apiFetch } from "@/lib/api/client"
+import { statusLabel } from "@/lib/ui/status"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -164,7 +165,7 @@ export function MobileRegulatoryQueue() {
           break
         } catch (e) {
           if (endpoint === endpoints[endpoints.length - 1] && !cancelled) {
-            setError(formatApiError(e, "Could not load mobile regulatory action queue."))
+            setError(formatApiError(e, "Regulatory action queue couldn't load right now."))
           }
         }
       }
@@ -295,22 +296,22 @@ export function MobileRegulatoryQueue() {
               <p className="text-sm font-medium">{item.title}</p>
               <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
                 <p>
-                  <span className="font-medium text-foreground">severity:</span> {item.severity}
+                  <span className="font-medium text-foreground">Severity:</span> {statusLabel(item.severity)}
                 </p>
                 <p>
-                  <span className="font-medium text-foreground">status:</span> {item.status}
+                  <span className="font-medium text-foreground">Status:</span> {statusLabel(item.status)}
                 </p>
                 <p>
-                  <span className="font-medium text-foreground">dossier:</span> {item.dossier}
+                  <span className="font-medium text-foreground">Dossier:</span> {item.dossier}
                 </p>
                 <p>
-                  <span className="font-medium text-foreground">source evidence:</span> {item.sourceEvidence}
+                  <span className="font-medium text-foreground">Source evidence:</span> {item.sourceEvidence}
                 </p>
                 <p>
-                  <span className="font-medium text-foreground">due date:</span> {item.dueDate}
+                  <span className="font-medium text-foreground">Due date:</span> {item.dueDate}
                 </p>
                 <p>
-                  <span className="font-medium text-foreground">human review required:</span> {item.humanReviewRequired}
+                  <span className="font-medium text-foreground">Human review required:</span> {statusLabel(item.humanReviewRequired)}
                 </p>
               </div>
 

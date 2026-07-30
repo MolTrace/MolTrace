@@ -35,18 +35,17 @@ export function GsdReadinessWorkspace() {
             className="border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
           >
             <FlaskConical className="mr-1 h-3 w-3" aria-hidden />
-            Experimental backend
+            Experimental capability
           </Badge>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           GSD-Prompt-3 promotion gate · ready to flip?
         </h1>
         <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          One screen. One verdict. One action. The card below switches its shape based on the
-          backend-owned <code className="font-mono">flip_readiness_verdict</code>, so this page
-          tells you the next step without any FE re-derivation. Policy thresholds shown are the
-          live snapshot from the same response — backend tightens the policy, FE updates
-          automatically.
+          One screen. One verdict. One action. The card below changes shape according to the
+          readiness verdict MolTrace computes centrally, so this page tells you the next step
+          without re-deriving anything here. The policy thresholds shown are the live snapshot
+          behind that verdict — when the policy tightens, this page follows automatically.
         </p>
       </header>
 
@@ -64,8 +63,8 @@ export function GsdReadinessWorkspace() {
           </p>
           <p className="text-sm leading-relaxed text-foreground">
             The verdict logic, the policy thresholds, and the corpus-level Δ numbers all live in
-            the technical paper. The CI gate that guards detector drift is wired to the FE-produced
-            A/B JSON.
+            the technical paper. An automated release check guards against detector drift using the
+            same A/B comparison set.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -447,9 +447,9 @@ export function GsdAnalysisControls({ backend, onBackendChange, level, onLevelCh
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed bg-muted/20 px-3 py-2 text-sm">
       <FlaskConical className="h-4 w-4 text-muted-foreground" aria-hidden />
       <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-        Analysis backend
+        Detection engine
       </span>
-      <div role="radiogroup" aria-label="Analysis backend" className="inline-flex overflow-hidden rounded-md border bg-card">
+      <div role="radiogroup" aria-label="Detection engine" className="inline-flex overflow-hidden rounded-md border bg-card">
         <button
           type="button"
           role="radio"
@@ -634,7 +634,7 @@ export function DetectionResultsPanel({
 
   const envCount = result.environment_count ?? result.environments?.length
   const description = (() => {
-    const head = `Backend: ${result.backend}`
+    const head = isGsdBackend ? "GSD detection (experimental)" : "Legacy detection"
     const lvl = result.level != null ? ` · level ${result.level}` : ""
     const peakLabel = `${peakCount} peak${peakCount === 1 ? "" : "s"}`
     const envLabel = envCount != null ? ` · ${envCount} environment${envCount === 1 ? "" : "s"}` : ""

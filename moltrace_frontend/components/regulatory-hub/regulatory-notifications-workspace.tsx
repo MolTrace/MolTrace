@@ -117,7 +117,7 @@ export function RegulatoryNotificationsWorkspace() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Notifications</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Operational signals from your tenant API — not final legal determinations.
+          Operational signals from your organization&apos;s regulatory monitoring — not final legal determinations.
         </p>
       </header>
 
@@ -219,7 +219,7 @@ export function RegulatoryNotificationsWorkspace() {
                           {aid != null ? (
                             <div>
                               <Button variant="ghost" size="sm" className="h-7 px-2" asChild>
-                                <Link href="/regulatory/action-queue">action_item {aid}</Link>
+                                <Link href="/regulatory/action-queue">Action item {aid}</Link>
                               </Button>
                             </div>
                           ) : null}

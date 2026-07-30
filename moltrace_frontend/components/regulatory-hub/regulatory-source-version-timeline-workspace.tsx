@@ -117,7 +117,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
 
   const sourceTitle = useMemo(() => {
     const r = newDetail ?? oldDetail ?? versions[0] ?? null
-    return readRecordString(r, "title") ?? `source_id ${sourceId}`
+    return readRecordString(r, "title") ?? `Source ${sourceId}`
   }, [sourceId, newDetail, oldDetail, versions])
 
   async function runCompare() {
@@ -128,7 +128,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
     const oldNum = Number.parseInt(oldVersionId, 10)
     const newNum = Number.parseInt(newVersionId, 10)
     if (!Number.isFinite(oldNum) || !Number.isFinite(newNum)) {
-      setCompareErr("version ids must be numeric.")
+      setCompareErr("Version IDs must be numeric.")
       return
     }
     setCompareBusy(true)
@@ -176,7 +176,7 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Source Version Timeline</h1>
         <p className="text-sm text-muted-foreground">
-          Source text changed, potential impact, and requires review indicators are shown from API comparison output.
+          Source text changed, potential impact, and requires review indicators come from the version comparison.
         </p>
       </header>
 

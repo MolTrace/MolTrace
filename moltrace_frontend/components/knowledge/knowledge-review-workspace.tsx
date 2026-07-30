@@ -107,7 +107,7 @@ export function KnowledgeReviewWorkspace() {
     const name = patchReviewerName.trim()
     const comment = patchReviewerComment.trim()
     if (!name || !comment) {
-      setPatchErr("reviewer_name and reviewer_comment are required to update a review task.")
+      setPatchErr("Reviewer name and comment are required to update a review task.")
       return
     }
     setPatchErr("")
@@ -127,7 +127,7 @@ export function KnowledgeReviewWorkspace() {
       setSelected(isRecord(updated) ? updated : null)
       await loadTasks()
     } catch (e) {
-      setPatchErr(formatApiError(e, "Update task failed."))
+      setPatchErr(formatApiError(e, "Could not update the task."))
     } finally {
       setPatchBusy(false)
     }
@@ -195,7 +195,7 @@ export function KnowledgeReviewWorkspace() {
       >
         <div className="flex flex-wrap items-end gap-4">
           <div className="space-y-2">
-            <Label>status</Label>
+            <Label>Status</Label>
             <Select value={filterStatus || "__all__"} onValueChange={(v) => setFilterStatus(v === "__all__" ? "" : v)}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="All" />
@@ -211,7 +211,7 @@ export function KnowledgeReviewWorkspace() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>record_type</Label>
+            <Label>Record type</Label>
             <Select
               value={filterRecordType || "__all__"}
               onValueChange={(v) => setFilterRecordType(v === "__all__" ? "" : v)}
@@ -261,14 +261,14 @@ export function KnowledgeReviewWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>record_type</TableHead>
-                  <TableHead className="w-[88px]">record_id</TableHead>
-                  <TableHead className="w-[96px]">run_id</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead className="max-w-[200px]">title</TableHead>
-                  <TableHead>updated_at</TableHead>
-                  <TableHead className="w-[90px]">open</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Record type</TableHead>
+                  <TableHead className="w-[88px]">Record ID</TableHead>
+                  <TableHead className="w-[96px]">Run ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="max-w-[200px]">Title</TableHead>
+                  <TableHead>Updated</TableHead>
+                  <TableHead className="w-[90px]">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -341,7 +341,7 @@ export function KnowledgeReviewWorkspace() {
             ) : null}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>status</Label>
+                <Label>Status</Label>
                 <Select value={patchStatus} onValueChange={setPatchStatus}>
                   <SelectTrigger>
                     <SelectValue />
@@ -356,11 +356,11 @@ export function KnowledgeReviewWorkspace() {
                 </Select>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="pt-rev-name">reviewer_name</Label>
+                <Label htmlFor="pt-rev-name">Reviewer name</Label>
                 <Input id="pt-rev-name" value={patchReviewerName} onChange={(e) => setPatchReviewerName(e.target.value)} />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="pt-rev-comment">reviewer_comment</Label>
+                <Label htmlFor="pt-rev-comment">Reviewer comment</Label>
                 <Textarea
                   id="pt-rev-comment"
                   value={patchReviewerComment}

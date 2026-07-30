@@ -63,7 +63,7 @@ const HOURS_SAVED_TOOLTIP =
 const TASKS_AUTOMATED_TOOLTIP =
   "Count of workflow and analysis tasks completed by MolTrace instead of manual execution."
 
-/** Clearly labeled synthetic series — not live backend metrics. */
+/** Clearly labeled synthetic series — not live metrics. */
 const DEMO_TREND_DATA = [
   { label: "W1", hours_saved: 42, tasks_automated: 120 },
   { label: "W2", hours_saved: 48, tasks_automated: 132 },
@@ -95,6 +95,13 @@ function formatFeedbackDate(iso: string): string {
   const ms = Date.parse(iso)
   if (Number.isNaN(ms)) return iso
   return new Date(ms).toLocaleString()
+}
+
+/** Display-only label for a feedback type; the stored value is never changed. */
+function feedbackTypeLabel(raw: string): string {
+  const t = raw.replace(/[_-]+/g, " ").trim()
+  if (!t) return "—"
+  return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
 export default function AutomationRoiDashboard() {
@@ -145,7 +152,7 @@ export default function AutomationRoiDashboard() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Automation ROI</h1>
           <p className="text-sm text-muted-foreground">
-            Operational value from automation definitions and usage events. Aggregates exclude raw scientific payloads.
+            Operational value from automation definitions and usage events. Aggregates exclude raw scientific results.
           </p>
           {roi?.period_start && roi?.period_end ? (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -175,7 +182,7 @@ export default function AutomationRoiDashboard() {
       {allFailed ? (
         <AlertCard
           variant="info"
-          title="Backend unavailable"
+          title="Live analytics unavailable"
           description="We couldn't load live analytics. Metrics below are blank; illustrative trends appear only in the labeled Demo data section."
         />
       ) : null}
@@ -219,42 +226,42 @@ export default function AutomationRoiDashboard() {
           icon={FileText}
           severity="green"
           value={loading ? "…" : roi ? fmtInt(roi.reports_generated) : "—"}
-          sub={<p className="text-xs text-muted-foreground">reports_generated</p>}
+          sub={<p className="text-xs text-muted-foreground">Reports produced in this window.</p>}
         />
         <MetricCard
           title="Workflows completed"
           icon={CheckCircle2}
           severity="green"
           value={loading ? "…" : roi ? fmtInt(roi.workflows_completed) : "—"}
-          sub={<p className="text-xs text-muted-foreground">workflows_completed</p>}
+          sub={<p className="text-xs text-muted-foreground">Workflow runs finished end to end.</p>}
         />
         <MetricCard
           title="Analyses completed"
           icon={FlaskConical}
           severity="violet"
           value={loading ? "…" : roi ? fmtInt(roi.analyses_completed) : "—"}
-          sub={<p className="text-xs text-muted-foreground">analyses_completed</p>}
+          sub={<p className="text-xs text-muted-foreground">Analyses completed in this window.</p>}
         />
         <MetricCard
           title="Review tasks completed"
           icon={ListChecks}
           severity="violet"
           value={loading ? "…" : roi ? fmtInt(roi.review_tasks_completed) : "—"}
-          sub={<p className="text-xs text-muted-foreground">review_tasks_completed</p>}
+          sub={<p className="text-xs text-muted-foreground">Review tasks closed by a reviewer.</p>}
         />
         <MetricCard
           title="Failed jobs"
           icon={XCircle}
           severity="red"
           value={loading ? "…" : roi ? fmtInt(roi.failed_jobs) : "—"}
-          sub={<p className="text-xs text-muted-foreground">failed_jobs</p>}
+          sub={<p className="text-xs text-muted-foreground">Runs that did not finish successfully.</p>}
         />
         <MetricCard
           title="QC warnings"
           icon={ShieldAlert}
           severity="amber"
           value={loading ? "…" : roi ? fmtInt(roi.qc_warnings) : "—"}
-          sub={<p className="text-xs text-muted-foreground">qc_warnings</p>}
+          sub={<p className="text-xs text-muted-foreground">Quality-control warnings raised for review.</p>}
         />
       </div>
 
@@ -263,15 +270,15 @@ export default function AutomationRoiDashboard() {
         eyebrow="Programs"
         title="Regentry events"
         icon={ListChecks}
-        description="Privacy-safe activity events tracked in Regentry — only metadata such as dossier ID, jurisdiction, status, and review state. No regulatory questions, answers, or raw scientific payloads are recorded."
+        description="Privacy-safe activity events tracked in Regentry — only summary details such as dossier ID, jurisdiction, status, and review state. No regulatory questions, answers, or raw scientific data are recorded."
       >
         <div className="text-xs text-muted-foreground">
           <ul className="list-inside list-disc space-y-1">
-            <li>regulatory_dossier_created</li>
-            <li>regulatory_requirement_added</li>
-            <li>regulatory_query_answered</li>
-            <li>regulatory_readiness_report_generated</li>
-            <li>regulatory_review_completed</li>
+            <li>Dossier created</li>
+            <li>Requirement added</li>
+            <li>Regulatory query answered</li>
+            <li>Readiness report generated</li>
+            <li>Regulatory review completed</li>
           </ul>
         </div>
       </ModuleCard>
@@ -313,7 +320,7 @@ export default function AutomationRoiDashboard() {
                             </EmptyMedia>
                             <EmptyTitle>No automation tasks yet</EmptyTitle>
                             <EmptyDescription>
-                              Task definitions populate here once automation tasks are configured for your tenant.
+                              Task definitions populate here once automation tasks are configured for your organization.
                             </EmptyDescription>
                           </EmptyHeader>
                         </Empty>
@@ -385,7 +392,7 @@ export default function AutomationRoiDashboard() {
                 ) : (
                   feedback.map((f: FeedbackRow) => (
                     <TableRow key={f.id}>
-                      <TableCell className="font-mono text-xs">{f.feedback_type}</TableCell>
+                      <TableCell className="text-xs">{feedbackTypeLabel(f.feedback_type)}</TableCell>
                       <TableCell className="text-right tabular-nums">{f.rating != null ? f.rating : "—"}</TableCell>
                       <TableCell className="max-w-md text-sm text-muted-foreground">{previewComment(f.comment)}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
@@ -403,7 +410,11 @@ export default function AutomationRoiDashboard() {
       <RenewalValueReportSection />
 
       {liveTrend && liveTrend.length > 0 ? (
-        <RoiTrendCharts title="Hours & tasks trend (live metadata)" description="Parsed from ROI metadata_json when present." data={liveTrend} />
+        <RoiTrendCharts
+          title="Hours & tasks trend (live)"
+          description="Shown only when your recorded ROI snapshot includes a weekly trend series."
+          data={liveTrend}
+        />
       ) : null}
 
       <ModuleCard
@@ -411,7 +422,7 @@ export default function AutomationRoiDashboard() {
         eyebrow="Demo"
         title="Illustrative trends"
         icon={BarChart3}
-        description="Synthetic weekly series for layout validation only — not derived from your deployment unless backend supplies matching trend payloads."
+        description="Synthetic weekly series for layout validation only — not derived from your data unless a matching weekly trend has been recorded for your organization."
         badge={
           <Badge variant="secondary" className="font-normal">
             Demo data

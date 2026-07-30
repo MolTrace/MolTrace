@@ -189,11 +189,11 @@ export function KnowledgeExtractionsWorkspace() {
     const sid = Number.parseInt(runSourceId, 10)
     const fid = Number.parseInt(runFileId, 10)
     if (!Number.isFinite(sid) || sid < 1) {
-      setRunErr("source_id is required.")
+      setRunErr("Select a source.")
       return
     }
     if (!Number.isFinite(fid) || fid < 1) {
-      setRunErr("source_file_id is required.")
+      setRunErr("Select a file from that source.")
       return
     }
     setRunBusy(true)
@@ -210,7 +210,7 @@ export function KnowledgeExtractionsWorkspace() {
       setRunOk("Extraction run started.")
       await loadRuns()
     } catch (e) {
-      setRunErr(formatApiError(e, "Extraction run failed."))
+      setRunErr(formatApiError(e, "Could not start the extraction run."))
     } finally {
       setRunBusy(false)
     }
@@ -250,7 +250,7 @@ export function KnowledgeExtractionsWorkspace() {
         <AlertTriangle className="h-4 w-4" aria-hidden />
         <AlertTitle className="text-sm">Decision support</AlertTitle>
         <AlertDescription className="text-sm text-muted-foreground">
-          Extraction status and counts come from the tenant API — not validated scientific conclusions.
+          Extraction status and counts are operational signals — not validated scientific conclusions.
         </AlertDescription>
       </Alert>
 
@@ -274,7 +274,7 @@ export function KnowledgeExtractionsWorkspace() {
           ) : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>source_id</Label>
+              <Label>Source</Label>
               <Select
                 value={runSourceId || "__none__"}
                 onValueChange={(v) => {
@@ -303,7 +303,7 @@ export function KnowledgeExtractionsWorkspace() {
               {sourcesErr ? <p className="text-xs text-muted-foreground">{sourcesErr}</p> : null}
             </div>
             <div className="space-y-2">
-              <Label>source_file_id</Label>
+              <Label>Source file</Label>
               <Select
                 value={runFileId || "__none__"}
                 onValueChange={(v) => setRunFileId(v === "__none__" ? "" : v)}
@@ -337,7 +337,7 @@ export function KnowledgeExtractionsWorkspace() {
               {filesErr ? <p className="text-xs text-destructive">{filesErr}</p> : null}
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>extraction_type</Label>
+              <Label>Extraction type</Label>
               <Select value={extractionType} onValueChange={setExtractionType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -391,14 +391,14 @@ export function KnowledgeExtractionsWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead className="w-[88px]">source_id</TableHead>
-                  <TableHead className="w-[96px]">source_file_id</TableHead>
-                  <TableHead>extraction_type</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead className="text-right">extracted_count</TableHead>
-                  <TableHead>finished_at</TableHead>
-                  <TableHead className="w-[100px]">open</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead className="w-[88px]">Source ID</TableHead>
+                  <TableHead className="w-[96px]">File ID</TableHead>
+                  <TableHead>Extraction type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Records extracted</TableHead>
+                  <TableHead>Finished</TableHead>
+                  <TableHead className="w-[100px]">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -460,7 +460,7 @@ export function KnowledgeExtractionsWorkspace() {
               <>
                 {warningLines.length > 0 ? (
                   <Alert variant="destructive">
-                    <AlertTitle className="text-sm">warnings_json</AlertTitle>
+                    <AlertTitle className="text-sm">Extraction warnings</AlertTitle>
                     <AlertDescription>
                       <ul className="list-inside list-disc text-sm">
                         {warningLines.map((w, i) => (
@@ -472,7 +472,7 @@ export function KnowledgeExtractionsWorkspace() {
                 ) : null}
                 {noteLines.length > 0 ? (
                   <Alert>
-                    <AlertTitle className="text-sm">notes_json</AlertTitle>
+                    <AlertTitle className="text-sm">Extraction notes</AlertTitle>
                     <AlertDescription>
                       <ul className="list-inside list-disc text-sm">
                         {noteLines.map((n, i) => (

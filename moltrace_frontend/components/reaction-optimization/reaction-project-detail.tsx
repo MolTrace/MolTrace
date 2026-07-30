@@ -10,6 +10,7 @@ import { MlModelProvenanceSummary } from "@/components/ml/ml-model-provenance-su
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { apiFetch, ApiError } from "@/lib/api/client"
 import { formatStableUtcDateTime } from "@/lib/utils"
+import { statusLabel } from "@/lib/ui/status"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -249,6 +250,86 @@ const REACTION_OPTIMIZATION_CYCLE_DECISION_OPTIONS = [
   "revise_objective",
   "requires_review",
 ] as const
+
+/** Readable text for the stored option vocabularies above. The stored value is never
+ *  rewritten — this map only supplies what a scientist reads in a picker, badge, or
+ *  table cell. Domain terms (Bayesian/GP/EI/UCB, LC-MS, qNMR, E-factor) stay intact;
+ *  anything unlisted falls back to sentence-cased words. */
+const REACTION_OPTION_LABELS: Record<string, string> = {
+  // Objectives
+  maximize_yield: "Maximize yield",
+  maximize_selectivity: "Maximize selectivity",
+  minimize_impurity: "Minimize impurity",
+  maximize_conversion: "Maximize conversion",
+  minimize_e_factor: "Minimize E-factor",
+  maximize_atom_economy: "Maximize atom economy",
+  maximize_green_score: "Maximize green score",
+  multi_objective: "Multi-objective",
+  custom: "Custom",
+  // Bayesian-optimization algorithms
+  gaussian_process_ei: "Gaussian process · expected improvement (EI)",
+  gaussian_process_ucb: "Gaussian process · upper confidence bound (UCB)",
+  random_forest_ei: "Random forest · expected improvement (EI)",
+  tpe_like: "Tree-structured Parzen estimator (TPE-like)",
+  rule_based_fallback: "Rule-based fallback (no model)",
+  // Advisor modes
+  rule_based_mechanistic: "Rule-based mechanistic",
+  llm_guided_placeholder: "Language-model guided (placeholder)",
+  hybrid_bo_llm: "Hybrid — Bayesian optimization + language model",
+  // Literature-prior sources
+  user_note: "Chemist note",
+  literature_reference: "Literature reference",
+  internal_history: "Internal history",
+  model_prior: "Model prior",
+  rule_based_prior: "Rule-based prior",
+  // Advisor review decisions
+  accept_for_review: "Accept for review",
+  request_modification: "Request modification",
+  reject_advisor_output: "Reject advisor output",
+  defer: "Defer",
+  // Analytical result types
+  nmr: "NMR",
+  lcms: "LC-MS",
+  hrms: "HRMS",
+  msms: "MS/MS",
+  hplc: "HPLC",
+  uplc: "UPLC",
+  qnmr: "qNMR",
+  other: "Other",
+  // Outcome extraction methods
+  rule_based: "Rule-based",
+  lcms_area: "LC-MS area %",
+  nmr_purity: "NMR purity",
+  unified_spectracheck: "Unified SpectraCheck confidence",
+  manual: "Manual entry",
+  // Optimization-cycle statuses
+  draft: "Draft",
+  running: "Running",
+  completed: "Completed",
+  requires_review: "Requires review",
+  failed: "Failed",
+  // Optimization-cycle decisions
+  continue_optimization: "Continue optimization",
+  pause: "Pause",
+  stop_success: "Stop — target met",
+  stop_insufficient_progress: "Stop — insufficient progress",
+  revise_design_space: "Revise design space",
+  revise_objective: "Revise objective",
+}
+
+/** Display text for a stored option/status token. Never pass the result back to the server. */
+function optionLabel(value: string | null | undefined): string {
+  const raw = (value ?? "").trim()
+  if (!raw) return "—"
+  return REACTION_OPTION_LABELS[raw] ?? statusLabel(raw)
+}
+
+/** Yes / No / — for a flag, so a reader never sees a raw true/false/undefined. */
+function flagLabel(value: unknown): string {
+  if (value === true) return "Yes"
+  if (value === false) return "No"
+  return "—"
+}
 
 /** Dedupe mirrored list fields commonly returned alongside `*_json` copies (e.g. warnings vs warnings_json). */
 function mergeDuplicateApiListPair(record: Record<string, unknown>, a: string, b: string): string[] {
@@ -1381,7 +1462,7 @@ function RecommendationAdvisorCritiqueCard({ payload }: { payload: Record<string
             variant={payload.human_review_required === true ? "secondary" : "outline"}
             className="text-xs"
           >
-            Human review required: {String(payload.human_review_required)}
+            Human review required: {flagLabel(payload.human_review_required)}
           </Badge>
         </div>
 
@@ -2483,18 +2564,18 @@ export function ReactionProjectDetail() {
       if (!det) det = kind
       items.push({
         sk,
-        detail: `${kind} · id=${idNum ?? "—"} · ${det}`,
+        detail: `${kind} · #${idNum ?? "—"} · ${optionLabel(det)}`,
         whenLabel: fmtIso(tRaw),
       })
     }
     for (const x of boRuns) {
-      if (isRecord(x)) addRecord("GET /optimization/bo/runs row", x, ["id", "bo_run_id"], ["algorithm"])
+      if (isRecord(x)) addRecord("Bayesian optimization run", x, ["id", "bo_run_id"], ["algorithm"])
     }
     for (const x of runs) {
-      if (isRecord(x)) addRecord("GET /optimization/runs row", x, ["id"], ["model_type"])
+      if (isRecord(x)) addRecord("Heuristic optimization run", x, ["id"], ["model_type"])
     }
     for (const x of advisorRunsList) {
-      if (isRecord(x)) addRecord("GET /advisor/runs row", x, ["advisor_run_id", "id"], ["advisor_mode"])
+      if (isRecord(x)) addRecord("Advisor run", x, ["advisor_run_id", "id"], ["advisor_mode"])
     }
     return items.sort((a, b) => b.sk - a.sk)
   }, [boRuns, runs, advisorRunsList])
@@ -4753,7 +4834,7 @@ export function ReactionProjectDetail() {
       </div>
 
       {error ? (
-        <AlertCard variant="error" title="Backend unavailable" description={error} />
+        <AlertCard variant="error" title="Project data unavailable" description={error} />
       ) : null}
 
       {msg ? (
@@ -4976,7 +5057,7 @@ export function ReactionProjectDetail() {
             accent="violet"
             eyebrow="Overview · Linked Evidence"
             title="linked SpectraCheck evidence"
-            description="Experiments with linked_spectracheck_session_id and evidence record counts."
+            description="Experiments with a linked SpectraCheck session, and their evidence record counts."
           >
             <div className="text-sm">
               <p>
@@ -5283,8 +5364,8 @@ export function ReactionProjectDetail() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Experiment code</TableHead>
-                    <TableHead className="font-mono text-xs">linked_spectracheck_session_id</TableHead>
-                    <TableHead className="text-xs">sample_id</TableHead>
+                    <TableHead className="text-xs">Linked SpectraCheck session</TableHead>
+                    <TableHead className="text-xs">Sample ID</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">unified status</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">report status</TableHead>
                     <TableHead className="whitespace-nowrap text-xs">QC status</TableHead>
@@ -5586,7 +5667,7 @@ export function ReactionProjectDetail() {
                     <SelectContent>
                       {OBJECTIVE_TYPE_OPTIONS.map((opt) => (
                         <SelectItem key={opt} value={opt}>
-                          {opt}
+                          {optionLabel(opt)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -6370,7 +6451,7 @@ export function ReactionProjectDetail() {
                   <SelectContent>
                     {BO_ALGORITHM_OPTIONS.map((opt) => (
                       <SelectItem key={opt} value={opt}>
-                        {opt}
+                        {optionLabel(opt)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -6474,7 +6555,7 @@ export function ReactionProjectDetail() {
                         BO run ID: {readBoRunId(lastBoRun)}
                       </Badge>
                       <Badge variant="outline" className="font-mono text-xs">
-                        algorithm: {String(lastBoRun.algorithm ?? "—")}
+                        Algorithm: {optionLabel(typeof lastBoRun.algorithm === "string" ? lastBoRun.algorithm : null)}
                       </Badge>
                       <Badge variant="outline" className="font-mono text-xs">
                         Model type: {String(lastBoRun.model_type ?? "—")}
@@ -6690,7 +6771,7 @@ export function ReactionProjectDetail() {
                     <SelectContent>
                       {BO_ALGORITHM_OPTIONS.map((opt) => (
                         <SelectItem key={opt} value={opt}>
-                          {opt}
+                          {optionLabel(opt)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -6705,7 +6786,7 @@ export function ReactionProjectDetail() {
                     <SelectContent>
                       {OBJECTIVE_TYPE_OPTIONS.map((opt) => (
                         <SelectItem key={opt} value={opt}>
-                          {opt}
+                          {optionLabel(opt)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -6785,7 +6866,7 @@ export function ReactionProjectDetail() {
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-16 text-xs">step</TableHead>
-                              <TableHead className="text-xs">row</TableHead>
+                              <TableHead className="text-xs">Recorded values</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -6886,7 +6967,7 @@ export function ReactionProjectDetail() {
                       <TableCell className="font-mono text-xs">{String(r.id ?? "—")}</TableCell>
                       <TableCell>{String(r.status ?? "")}</TableCell>
                       <TableCell className="max-w-[140px] truncate text-xs">{String(r.benchmark_name ?? "—")}</TableCell>
-                      <TableCell className="font-mono text-xs">{String(r.algorithm ?? "—")}</TableCell>
+                      <TableCell className="text-xs">{optionLabel(typeof r.algorithm === "string" ? r.algorithm : null)}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{fmtIso(r.created_at)}</TableCell>
                     </TableRow>
                   ))}
@@ -6982,7 +7063,7 @@ export function ReactionProjectDetail() {
                           return (
                             <SelectItem key={bid} value={bid}>
                               {bid}{" "}
-                              {typeof row.algorithm === "string" ? `· ${row.algorithm}` : ""} · {fmtIso(row.created_at)}
+                              {typeof row.algorithm === "string" ? `· ${optionLabel(row.algorithm)}` : ""} · {fmtIso(row.created_at)}
                             </SelectItem>
                           )
                         })}
@@ -7032,7 +7113,7 @@ export function ReactionProjectDetail() {
                     <SelectContent>
                       {ADVISOR_MODE_OPTIONS.map((m) => (
                         <SelectItem key={m} value={m}>
-                          {m}
+                          {optionLabel(m)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -7118,7 +7199,7 @@ export function ReactionProjectDetail() {
                             {String(readNum(row.advisor_run_id ?? row.id) ?? "—")}
                           </TableCell>
                           <TableCell className="text-xs">{String(row.status ?? "")}</TableCell>
-                          <TableCell className="font-mono text-xs">{String(row.advisor_mode ?? "")}</TableCell>
+                          <TableCell className="text-xs">{optionLabel(typeof row.advisor_mode === "string" ? row.advisor_mode : null)}</TableCell>
                           <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                             {fmtIso(row.created_at)}
                           </TableCell>
@@ -7148,7 +7229,7 @@ export function ReactionProjectDetail() {
 
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline" className="font-mono text-xs">
-                      Advisor mode: {String(lastAdvisorRun.advisor_mode ?? "—")}
+                      Advisor mode: {optionLabel(typeof lastAdvisorRun.advisor_mode === "string" ? lastAdvisorRun.advisor_mode : null)}
                     </Badge>
                     <Badge variant="outline" className="text-xs">
                       status: {String(lastAdvisorRun.status ?? "—")}
@@ -7181,7 +7262,7 @@ export function ReactionProjectDetail() {
                       variant={lastAdvisorRun.human_review_required === true ? "secondary" : "outline"}
                       className="text-xs"
                     >
-                      Human review required: {String(lastAdvisorRun.human_review_required)}
+                      Human review required: {flagLabel(lastAdvisorRun.human_review_required)}
                     </Badge>
                   </div>
 
@@ -7683,7 +7764,7 @@ export function ReactionProjectDetail() {
                       <SelectContent>
                         {LITERATURE_PRIOR_SOURCE_TYPES.map((s) => (
                           <SelectItem key={s} value={s}>
-                            {s}
+                            {optionLabel(s)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -7857,7 +7938,7 @@ export function ReactionProjectDetail() {
                         if (rid == null) return null
                         return (
                           <SelectItem key={`cmp-adv-${rid}-${ri}`} value={String(rid)}>
-                            {String(rid)} · {String(row.advisor_mode ?? "")} · {fmtIso(row.created_at)}
+                            {String(rid)} · {optionLabel(typeof row.advisor_mode === "string" ? row.advisor_mode : null)} · {fmtIso(row.created_at)}
                           </SelectItem>
                         )
                       })}
@@ -8042,7 +8123,7 @@ export function ReactionProjectDetail() {
                         if (rid == null) return null
                         return (
                           <SelectItem key={`review-adv-${rid}-${ri}`} value={String(rid)}>
-                            {String(rid)} · {String(row.advisor_mode ?? "")} · {fmtIso(row.created_at)}
+                            {String(rid)} · {optionLabel(typeof row.advisor_mode === "string" ? row.advisor_mode : null)} · {fmtIso(row.created_at)}
                           </SelectItem>
                         )
                       })}
@@ -8068,7 +8149,7 @@ export function ReactionProjectDetail() {
                     <SelectContent>
                       {ADVISOR_REVIEW_DECISIONS.map((d) => (
                         <SelectItem key={d} value={d}>
-                          {d}
+                          {optionLabel(d)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -8112,7 +8193,7 @@ export function ReactionProjectDetail() {
                     <p className="text-sm font-medium">Latest review</p>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="outline" className="font-mono text-xs">
-                        decision: {String(review.decision ?? "—")}
+                        Decision: {optionLabel(typeof review.decision === "string" ? review.decision : null)}
                       </Badge>
                       <Badge variant="outline" className="text-xs">
                         reviewer: {String(review.reviewer_name ?? "—")}
@@ -8177,7 +8258,7 @@ export function ReactionProjectDetail() {
             <div className="space-y-4">
               {!loading && latestBatchRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No recommendation batches loaded — run Bayesian optimization or wait for batch data from the backend.
+                  No recommendation batches yet — run Bayesian optimization, or wait for the current batch to finish.
                 </p>
               ) : (
                 <div className="table-scroll">
@@ -8806,7 +8887,7 @@ export function ReactionProjectDetail() {
                       <dt className="text-xs uppercase tracking-wide">last BO run</dt>
                       <dd className="font-mono text-xs text-foreground">
                         {execTabLatestBoRunRecord != null
-                          ? `${readBoRunId(execTabLatestBoRunRecord)} · ${String(execTabLatestBoRunRecord.algorithm ?? "—")} · ${String(execTabLatestBoRunRecord.status ?? "—")}`
+                          ? `${readBoRunId(execTabLatestBoRunRecord)} · ${optionLabel(typeof execTabLatestBoRunRecord.algorithm === "string" ? execTabLatestBoRunRecord.algorithm : null)} · ${optionLabel(typeof execTabLatestBoRunRecord.status === "string" ? execTabLatestBoRunRecord.status : null)}`
                           : "—"}
                       </dd>
                     </div>
@@ -8818,7 +8899,13 @@ export function ReactionProjectDetail() {
                               readNum(
                                 execTabLatestAdvisorRunRecord.advisor_run_id ?? execTabLatestAdvisorRunRecord.id,
                               ) ?? "—"
-                            } · ${String(execTabLatestAdvisorRunRecord.advisor_mode ?? execTabLatestAdvisorRunRecord.mode ?? "—")} · ${String(execTabLatestAdvisorRunRecord.status ?? "—")}`
+                            } · ${optionLabel(
+                              typeof execTabLatestAdvisorRunRecord.advisor_mode === "string"
+                                ? execTabLatestAdvisorRunRecord.advisor_mode
+                                : typeof execTabLatestAdvisorRunRecord.mode === "string"
+                                  ? execTabLatestAdvisorRunRecord.mode
+                                  : null,
+                            )} · ${optionLabel(typeof execTabLatestAdvisorRunRecord.status === "string" ? execTabLatestAdvisorRunRecord.status : null)}`
                           : "—"}
                       </dd>
                     </div>
@@ -9688,7 +9775,7 @@ export function ReactionProjectDetail() {
                       <SelectContent>
                         {ANALYTICAL_RESULT_TYPE_OPTIONS.map((opt) => (
                           <SelectItem key={opt} value={opt}>
-                            {opt}
+                            {optionLabel(opt)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -9896,7 +9983,7 @@ export function ReactionProjectDetail() {
                       <SelectContent>
                         {OUTCOME_EXTRACTION_METHOD_OPTIONS.map((opt) => (
                           <SelectItem key={opt} value={opt}>
-                            {opt}
+                            {optionLabel(opt)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -9960,8 +10047,8 @@ export function ReactionProjectDetail() {
                         </Badge>
                       ) : null}
                       {typeof oeExtractionRun.extraction_method === "string" && oeExtractionRun.extraction_method ? (
-                        <Badge variant="secondary" className="font-normal font-mono text-xs">
-                          {oeExtractionRun.extraction_method}
+                        <Badge variant="secondary" className="font-normal text-xs">
+                          {optionLabel(oeExtractionRun.extraction_method)}
                         </Badge>
                       ) : null}
                     </div>
@@ -10267,7 +10354,7 @@ export function ReactionProjectDetail() {
                       <SelectContent>
                         {REACTION_OPTIMIZATION_CYCLE_STATUS_OPTIONS.map((st) => (
                           <SelectItem key={st} value={st}>
-                            {st}
+                            {optionLabel(st)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -10281,7 +10368,7 @@ export function ReactionProjectDetail() {
                       className="font-mono text-xs"
                       value={optCcCycleNumber}
                       onChange={(e) => setOptCcCycleNumber(e.target.value)}
-                      placeholder="Optional server default"
+                      placeholder="Optional — numbered automatically if blank"
                     />
                   </div>
                   <div className="space-y-2">
@@ -10700,7 +10787,7 @@ export function ReactionProjectDetail() {
                                           <SelectContent>
                                             {REACTION_OPTIMIZATION_CYCLE_DECISION_OPTIONS.map((d) => (
                                               <SelectItem key={`${cid}-${d}`} value={d}>
-                                                {d}
+                                                {optionLabel(d)}
                                               </SelectItem>
                                             ))}
                                           </SelectContent>
@@ -10754,7 +10841,7 @@ export function ReactionProjectDetail() {
 
               <div className="space-y-2">
                 {!loading && executionCycleTimeline.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No optimization or advisor run rows loaded yet.</p>
+                  <p className="text-sm text-muted-foreground">No optimization or advisor runs recorded yet.</p>
                 ) : (
                   <ul className="space-y-2 text-sm">
                     {executionCycleTimeline.map((row, i) => (
@@ -10777,7 +10864,7 @@ export function ReactionProjectDetail() {
               accent="violet"
               eyebrow="Execution · Developer JSON"
               title="Developer JSON"
-              description="Aggregated execution-oriented snapshot for debugging (same API fields as elsewhere)."
+              description="Raw execution data (for troubleshooting) — the same values shown elsewhere on this tab."
             >
               <Collapsible className="rounded-md border border-border">
                 <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
@@ -10906,16 +10993,17 @@ export function ReactionProjectDetail() {
               >
                 Project · Developer JSON
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Raw payloads for debugging</h2>
+              <h2 className="font-mono text-xl font-bold tracking-tight">Raw data (for troubleshooting)</h2>
               <p className="text-sm text-muted-foreground">
-                Aggregated reaction-project payloads in this browser session — use to inspect backend response shape, audit fields, and warnings.
+                Everything this reaction project loaded in the current browser session — useful for checking exact
+                values, audit fields, and warnings.
               </p>
             </div>
             <ModuleCard
               accent="violet"
               eyebrow="Reaction · Developer JSON"
               title="Developer JSON"
-              description="Aggregated payloads from this reaction project workspace (debugging only)."
+              description="Raw data from this reaction project workspace (troubleshooting only)."
             >
               <DeveloperJsonPanel data={devPayload} />
             </ModuleCard>

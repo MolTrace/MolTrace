@@ -103,11 +103,11 @@ export function SessionValueSummaryCard({ sessionId }: { sessionId: string | nul
           <p className="text-xs text-muted-foreground">Loading session ROI…</p>
         ) : !live ? (
           <p className="text-xs text-muted-foreground">
-            Session ROI snapshot unavailable — administrator access may be required, or the backend did not return data.
+            Session ROI snapshot unavailable — administrator access may be required, or no data was returned.
           </p>
         ) : snap.evidence_items_generated == null ? (
           <p className="text-xs text-muted-foreground">
-            Evidence item counts appear when provided in snapshot metadata (evidence_items_generated).
+            Evidence item counts appear once the snapshot reports them.
           </p>
         ) : null}
       </CardContent>

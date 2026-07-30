@@ -198,9 +198,9 @@ function errLabel(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 403) return "Administrator access required."
     if (err.status === 401) return "Sign in required."
-    return `Request failed (${err.status}).`
+    return "Could not load this information right now. Please try again."
   }
-  return "Request failed."
+  return "Could not load this information right now. Please try again."
 }
 
 export async function loadRoiDashboardData(): Promise<RoiDashboardLoadResult> {
@@ -221,7 +221,7 @@ export async function loadRoiDashboardData(): Promise<RoiDashboardLoadResult> {
   if (rT.status === "fulfilled") {
     roi = parseRoiSnapshot(rT.value)
     ok.roi = roi != null
-    if (!roi) errors.roi = "Unexpected ROI payload."
+    if (!roi) errors.roi = "The ROI snapshot could not be read."
   } else {
     errors.roi = errLabel(rT.reason)
   }
@@ -236,7 +236,7 @@ export async function loadRoiDashboardData(): Promise<RoiDashboardLoadResult> {
   if (wT.status === "fulfilled") {
     workflow = parseWorkflowSummary(wT.value)
     ok.workflow = workflow != null
-    if (!workflow) errors.workflow = "Unexpected workflow summary payload."
+    if (!workflow) errors.workflow = "The workflow summary could not be read."
   } else {
     errors.workflow = errLabel(wT.reason)
   }

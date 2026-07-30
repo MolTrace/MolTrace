@@ -211,7 +211,7 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
     } catch (err) {
       const msg =
         err instanceof ApiError
-          ? err.message || `Request failed (${err.status})`
+          ? err.message || "Could not load workflow templates."
           : err instanceof Error
             ? err.message
             : "Could not reach the workflow templates service."

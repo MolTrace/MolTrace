@@ -273,7 +273,7 @@ export function GsdMultipletPanel({
         >
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            POST /spectrum/analyze/multiplets…
+            Analyzing multiplets…
           </div>
         </ModuleCard>
       </div>
@@ -313,7 +313,7 @@ export function GsdMultipletPanel({
         eyebrow="Step 3c · Multiplet analysis"
         title="GSD multiplet resolution"
         icon={Wand2}
-        description={`Backend: ${result.backend} · ${result.multiplet_count} multiplet${
+        description={`${result.multiplet_count} multiplet${
           result.multiplet_count === 1 ? "" : "s"
         } detected from ${state.filteredPeaks.length} peak${
           state.filteredPeaks.length === 1 ? "" : "s"

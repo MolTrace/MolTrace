@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { apiFetch } from "@/lib/api/client"
+import { statusLabel } from "@/lib/ui/status"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -147,7 +148,7 @@ export function MobileReportPreview({ reportId: reportIdProp = null }: { reportI
       .catch(() => {
         if (!cancelled) {
           setPreview(null)
-          setError("Could not load mobile report preview.")
+          setError("Report preview couldn't load right now.")
         }
       })
       .finally(() => {
@@ -189,50 +190,50 @@ export function MobileReportPreview({ reportId: reportIdProp = null }: { reportI
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {!reportId ? <p className="text-xs text-muted-foreground">Open a report to load mobile preview.</p> : null}
-        {loading ? <p className="text-xs text-muted-foreground">Loading mobile report preview…</p> : null}
+        {loading ? <p className="text-xs text-muted-foreground">Loading report preview…</p> : null}
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
         {reportId && preview ? (
           <>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">report title</p>
+                <p className="text-xs text-muted-foreground">Report title</p>
                 <p className="text-sm font-medium">{preview.reportTitle}</p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">sample/compound/batch</p>
+                <p className="text-xs text-muted-foreground">Sample, compound &amp; batch</p>
                 <p className="text-sm font-medium">{preview.sampleCompoundBatch}</p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">review status</p>
-                <p className="text-sm font-medium">{preview.reviewStatus}</p>
+                <p className="text-xs text-muted-foreground">Review status</p>
+                <p className="text-sm font-medium">{statusLabel(preview.reviewStatus)}</p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">human approval state</p>
-                <p className="text-sm font-medium">{preview.humanApprovalState}</p>
+                <p className="text-xs text-muted-foreground">Human approval</p>
+                <p className="text-sm font-medium">{statusLabel(preview.humanApprovalState)}</p>
               </div>
             </div>
 
             <div className="rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">QC summary</p>
+              <p className="text-xs text-muted-foreground">Quality check summary</p>
               <p className="mt-1 text-xs text-muted-foreground">{preview.qcSummary}</p>
             </div>
             <div className="rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">regulatory action summary</p>
+              <p className="text-xs text-muted-foreground">Regulatory actions</p>
               <p className="mt-1 text-xs text-muted-foreground">{preview.regulatoryActionSummary}</p>
             </div>
             <div className="rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">method/model provenance</p>
+              <p className="text-xs text-muted-foreground">Method &amp; model provenance</p>
               <p className="mt-1 text-xs text-muted-foreground">{preview.methodModelProvenance}</p>
             </div>
             <div className="rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">source hashes</p>
+              <p className="text-xs text-muted-foreground">Source file fingerprints</p>
               <p className="mt-1 break-all text-xs text-muted-foreground">
                 {preview.sourceHashes.length > 0 ? preview.sourceHashes.join(" · ") : "—"}
               </p>
             </div>
             <div className="rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">key warnings</p>
+              <p className="text-xs text-muted-foreground">Key warnings</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {preview.keyWarnings.length > 0 ? preview.keyWarnings.join(" · ") : "—"}
               </p>

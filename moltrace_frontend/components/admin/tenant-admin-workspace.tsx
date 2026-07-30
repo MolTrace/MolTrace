@@ -59,6 +59,16 @@ function isRecord(value: unknown): value is Row {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value)
 }
 
+/**
+ * Display-only label for a stored option value ("regulated_customer" → "Regulated
+ * customer"). The stored value is what we send and compare on — never humanize that.
+ */
+function optionLabel(value: string): string {
+  const text = value.trim().replace(/_/g, " ")
+  if (!text) return value
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 function readStr(value: unknown): string {
   if (typeof value === "string" && value.trim()) return value.trim()
   if (typeof value === "number" && Number.isFinite(value)) return String(value)
@@ -357,7 +367,7 @@ export function TenantAdminWorkspace() {
                   {tenants.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-xs text-muted-foreground">
-                        No tenants returned.
+                        No tenants yet.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -365,9 +375,9 @@ export function TenantAdminWorkspace() {
                       <TableRow key={tenant.id}>
                         <TableCell className="text-xs">{tenant.display_name}</TableCell>
                         <TableCell className="text-xs">{tenant.tenant_key}</TableCell>
-                        <TableCell className="text-xs">{tenant.tenant_type}</TableCell>
+                        <TableCell className="text-xs">{optionLabel(tenant.tenant_type)}</TableCell>
                         <TableCell className="text-xs">
-                          <Badge variant={statusBadgeVariant(tenant.status)}>{tenant.status}</Badge>
+                          <Badge variant={statusBadgeVariant(tenant.status)}>{optionLabel(tenant.status)}</Badge>
                         </TableCell>
                         <TableCell className="text-xs">{tenant.primary_contact}</TableCell>
                         <TableCell className="text-xs">{tenant.updated_date}</TableCell>
@@ -416,7 +426,7 @@ export function TenantAdminWorkspace() {
                 <SelectContent>
                   {TENANT_TYPE_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {option}
+                      {optionLabel(option)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -431,7 +441,7 @@ export function TenantAdminWorkspace() {
                 <SelectContent>
                   {TENANT_STATUS_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {option}
+                      {optionLabel(option)}
                     </SelectItem>
                   ))}
                 </SelectContent>

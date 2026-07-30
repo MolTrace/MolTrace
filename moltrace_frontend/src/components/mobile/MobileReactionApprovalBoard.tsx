@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { apiFetch } from "@/lib/api/client"
+import { statusLabel } from "@/lib/ui/status"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -161,7 +162,7 @@ export function MobileReactionApprovalBoard({
       .catch(() => {
         if (!cancelled) {
           setSummary(null)
-          setError("Could not load mobile reaction summary.")
+          setError("Reaction summary couldn't load right now.")
         }
       })
       .finally(() => {
@@ -258,17 +259,17 @@ export function MobileReactionApprovalBoard({
           <>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">pending recommendations</p>
+                <p className="text-xs text-muted-foreground">Pending recommendations</p>
                 <p className="text-sm font-medium">
                   {summary.pendingRecommendations != null ? summary.pendingRecommendations : "—"}
                 </p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">execution batch status</p>
-                <p className="text-sm font-medium">{summary.executionBatchStatus}</p>
+                <p className="text-xs text-muted-foreground">Execution batch</p>
+                <p className="text-sm font-medium">{statusLabel(summary.executionBatchStatus)}</p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">experiments needing outcome confirmation</p>
+                <p className="text-xs text-muted-foreground">Awaiting outcome confirmation</p>
                 <p className="text-sm font-medium">
                   {summary.experimentsNeedingOutcomeConfirmation != null
                     ? summary.experimentsNeedingOutcomeConfirmation
@@ -276,13 +277,13 @@ export function MobileReactionApprovalBoard({
                 </p>
               </div>
               <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">next BO cycle readiness</p>
-                <p className="text-sm font-medium">{summary.nextBoCycleReadiness}</p>
+                <p className="text-xs text-muted-foreground">Next optimization cycle</p>
+                <p className="text-sm font-medium">{statusLabel(summary.nextBoCycleReadiness)}</p>
               </div>
             </div>
 
             <div className="rounded-md border p-3">
-              <p className="mb-2 text-xs text-muted-foreground">regulatory constraints</p>
+              <p className="mb-2 text-xs text-muted-foreground">Regulatory constraints</p>
               <div className="flex flex-wrap gap-2">
                 {summary.regulatoryConstraints.length > 0 ? (
                   summary.regulatoryConstraints.map((constraint) => (
@@ -297,7 +298,7 @@ export function MobileReactionApprovalBoard({
             </div>
 
             <div className="rounded-md border p-3">
-              <p className="mb-2 text-xs text-muted-foreground">cost/safety flags</p>
+              <p className="mb-2 text-xs text-muted-foreground">Cost &amp; safety flags</p>
               <p className="text-xs text-muted-foreground">
                 {summary.costSafetyFlags.length > 0 ? summary.costSafetyFlags.join(" · ") : "—"}
               </p>
@@ -329,14 +330,14 @@ export function MobileReactionApprovalBoard({
               className="h-8 text-xs"
             />
             <Label htmlFor="mobile-reaction-execution-status" className="text-xs">
-              execution status draft
+              Execution status (draft)
             </Label>
             <Input
               id="mobile-reaction-execution-status"
               value={draft?.execution_status ?? ""}
               onChange={(e) => updateDraft({ execution_status: e.target.value })}
               className="h-8 text-xs"
-              placeholder="confirmed | blocked | pending"
+              placeholder="e.g. confirmed, blocked or pending"
             />
           </div>
         </div>

@@ -309,7 +309,7 @@ export function MlCalibrationWorkspace() {
         eyebrow="Records"
         title="Assessments"
         icon={ListChecks}
-        description="Calibration assessments logged for this tenant — method, status, and linked artifact and evaluation run."
+        description="Calibration assessments recorded for your organization — method, status, and linked artifact and evaluation run."
       >
         <div className="space-y-4">
           <div className="table-scroll min-w-0">

@@ -95,7 +95,7 @@ export function KnowledgeLinkMiniForm({
   async function submit() {
     const id = Number.parseInt(recordId.trim(), 10)
     if (!Number.isFinite(id) || id < 1) {
-      setErr("record_id must be a positive integer.")
+      setErr("Enter a record ID as a positive whole number.")
       return
     }
     setErr("")
@@ -113,10 +113,10 @@ export function KnowledgeLinkMiniForm({
           metadata_json: {},
         },
       })
-      setOk("Link created. Accepted records only (per API review rules).")
+      setOk("Link created. Only records that have been accepted in review can be linked.")
       onLinked?.()
     } catch (e) {
-      setErr(formatApiError(e, "Link failed."))
+      setErr(formatApiError(e, "Could not create the link."))
     } finally {
       setBusy(false)
     }
@@ -129,7 +129,7 @@ export function KnowledgeLinkMiniForm({
       </p>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-1">
-          <Label className="text-xs">record_type</Label>
+          <Label className="text-xs">Record type</Label>
           <Select value={recordType} onValueChange={setRecordType}>
             <SelectTrigger className="h-8 text-xs">
               <SelectValue />
@@ -144,15 +144,15 @@ export function KnowledgeLinkMiniForm({
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">record_id</Label>
+          <Label className="text-xs">Record ID</Label>
           <Input className="h-8 font-mono text-xs" value={recordId} onChange={(e) => setRecordId(e.target.value)} />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">relation_type</Label>
+          <Label className="text-xs">Relationship</Label>
           <Input className="h-8 text-xs" value={relationType} onChange={(e) => setRelationType(e.target.value)} />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">confidence_label</Label>
+          <Label className="text-xs">Confidence</Label>
           <Select value={confidence} onValueChange={setConfidence}>
             <SelectTrigger className="h-8 text-xs">
               <SelectValue />
@@ -178,7 +178,7 @@ export function KnowledgeLinkMiniForm({
 }
 
 const INTEGRATION_TOOLTIP =
-  "Uses GET /knowledge/search for compact previews (IDs and metadata only — no raw spectra or full source text). Link with POST /knowledge/records/{record_id}/link after records are accepted."
+  "Shows compact knowledge-library previews (identifiers and metadata only — no raw spectra or full source text). Records can be linked once they have been accepted in review."
 
 export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSessionId: string | null }) {
   const [open, setOpen] = useState(false)
@@ -241,7 +241,7 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
                 <div>
                   <CardTitle className="text-base">Knowledge links</CardTitle>
                   <CardDescription className="text-xs">
-                    Analytical / NMR literature / HRMS rows (sanitized) · training candidates for SpectraCheck-related
+                    Analytical / NMR literature / HRMS records (sanitized) · training candidates for SpectraCheck-related
                     dataset types
                   </CardDescription>
                 </div>
@@ -266,7 +266,7 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
                 onLinked={() => void load()}
               />
             ) : (
-              <p className="text-xs text-muted-foreground">Load or save a backend session to enable linking to this SpectraCheck session.</p>
+              <p className="text-xs text-muted-foreground">Load or save a session to enable linking to this SpectraCheck session.</p>
             )}
 
             {err ? (
@@ -290,17 +290,17 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[56px] text-xs">id</TableHead>
-                          <TableHead className="text-xs">compound_name</TableHead>
-                          <TableHead className="text-xs">review_status</TableHead>
-                          <TableHead className="text-right text-xs">citation_ids_json</TableHead>
+                          <TableHead className="w-[56px] text-xs">ID</TableHead>
+                          <TableHead className="text-xs">Compound</TableHead>
+                          <TableHead className="text-xs">Review status</TableHead>
+                          <TableHead className="text-right text-xs">Citations</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {analytical.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={4} className="text-xs text-muted-foreground">
-                              No rows.
+                              No records.
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -331,10 +331,10 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[56px] text-xs">id</TableHead>
-                          <TableHead className="text-xs">dataset_type</TableHead>
-                          <TableHead className="text-xs">status</TableHead>
-                          <TableHead className="text-xs">record_id</TableHead>
+                          <TableHead className="w-[56px] text-xs">ID</TableHead>
+                          <TableHead className="text-xs">Dataset type</TableHead>
+                          <TableHead className="text-xs">Status</TableHead>
+                          <TableHead className="text-xs">Record ID</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -417,8 +417,8 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
                 <div>
                   <CardTitle className="text-base">Knowledge links</CardTitle>
                   <CardDescription className="text-xs">
-                    Reaction extraction previews · literature-style summaries (no product_smiles) · reaction_optimization
-                    training candidates
+                    Reaction extraction previews · literature-style summaries (no product structures) ·
+                    reaction-optimization training candidates
                   </CardDescription>
                 </div>
               </div>
@@ -456,17 +456,17 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[56px] text-xs">id</TableHead>
-                          <TableHead className="text-xs">reaction_type</TableHead>
-                          <TableHead className="text-xs">substrate_summary</TableHead>
-                          <TableHead className="text-xs">review_status</TableHead>
+                          <TableHead className="w-[56px] text-xs">ID</TableHead>
+                          <TableHead className="text-xs">Reaction type</TableHead>
+                          <TableHead className="text-xs">Substrate</TableHead>
+                          <TableHead className="text-xs">Review status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {reactions.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={4} className="text-xs text-muted-foreground">
-                              No rows.
+                              No records.
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -490,21 +490,21 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
                 </div>
 
                 <div>
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">reaction_optimization training candidates</p>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Reaction-optimization training candidates</p>
                   <div className="table-scroll max-h-[140px] min-w-0 overflow-auto rounded-md border">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[56px] text-xs">id</TableHead>
-                          <TableHead className="text-xs">status</TableHead>
-                          <TableHead className="text-xs">record_id</TableHead>
+                          <TableHead className="w-[56px] text-xs">ID</TableHead>
+                          <TableHead className="text-xs">Status</TableHead>
+                          <TableHead className="text-xs">Record ID</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {training.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={3} className="text-xs text-muted-foreground">
-                              No rows.
+                              No records.
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -572,7 +572,8 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
                 <div>
                   <CardTitle className="text-base">Knowledge links</CardTitle>
                   <CardDescription className="text-xs">
-                    Regulatory extraction previews (topic only — no requirement_text) · JSON fields shown as present/absent
+                    Regulatory extraction previews (topic only — no requirement text) · structured fields shown as present
+                    or absent
                   </CardDescription>
                 </div>
               </div>
@@ -594,7 +595,7 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
             {warnList.length > 0 ? (
               <Alert>
                 <AlertDescription className="text-xs">
-                  <span className="font-medium">warnings</span>
+                  <span className="font-medium">Warnings</span>
                   <ul className="mt-1 list-inside list-disc">
                     {warnList.slice(0, 6).map((w, i) => (
                       <li key={`${i}-${w.slice(0, 40)}`}>{truncateLabel(w, 160)}</li>
@@ -620,13 +621,13 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[56px] text-xs">id</TableHead>
-                      <TableHead className="text-xs">topic</TableHead>
-                      <TableHead className="text-xs">review_status</TableHead>
-                      <TableHead className="text-xs">citations</TableHead>
-                      <TableHead className="text-xs">rule_candidate_json</TableHead>
-                      <TableHead className="text-xs">action_candidate_json</TableHead>
-                      <TableHead className="text-xs">threshold_summary_json</TableHead>
+                      <TableHead className="w-[56px] text-xs">ID</TableHead>
+                      <TableHead className="text-xs">Topic</TableHead>
+                      <TableHead className="text-xs">Review status</TableHead>
+                      <TableHead className="text-xs">Citations</TableHead>
+                      <TableHead className="text-xs">Rule candidate</TableHead>
+                      <TableHead className="text-xs">Action candidate</TableHead>
+                      <TableHead className="text-xs">Threshold summary</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -661,9 +662,9 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
                             <TableCell className="text-right font-mono text-[11px]">
                               {readIntList(row["citation_ids_json"]).length}
                             </TableCell>
-                            <TableCell className="text-xs">{ruleKeys > 0 ? `${ruleKeys} keys` : "—"}</TableCell>
-                            <TableCell className="text-xs">{actionKeys > 0 ? `${actionKeys} keys` : "—"}</TableCell>
-                            <TableCell className="text-xs">{thrKeys > 0 ? `${thrKeys} keys` : "—"}</TableCell>
+                            <TableCell className="text-xs">{ruleKeys > 0 ? `${ruleKeys} fields` : "—"}</TableCell>
+                            <TableCell className="text-xs">{actionKeys > 0 ? `${actionKeys} fields` : "—"}</TableCell>
+                            <TableCell className="text-xs">{thrKeys > 0 ? `${thrKeys} fields` : "—"}</TableCell>
                           </TableRow>
                         )
                       })
@@ -773,43 +774,43 @@ export function CompoundDetailKnowledgeLinksCard({
             ) : (
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">analytical_records</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Analytical records</p>
                   <ul className="space-y-1 text-[11px] text-muted-foreground">
                     {analytical.length === 0 ? (
                       <li>—</li>
                     ) : (
                       analytical.slice(0, 5).map((row, i) => (
                         <li key={readRecordNumber(row, "id") ?? i} className="font-mono">
-                          id {readRecordNumber(row, "id") ?? "—"} · {readRecordString(row, "review_status") ?? "—"} · cit{" "}
-                          {readIntList(row["citation_ids_json"]).length}
+                          ID {readRecordNumber(row, "id") ?? "—"} · {readRecordString(row, "review_status") ?? "—"} ·{" "}
+                          {readIntList(row["citation_ids_json"]).length} citations
                         </li>
                       ))
                     )}
                   </ul>
                 </div>
                 <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">reaction_records</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Reaction records</p>
                   <ul className="space-y-1 text-[11px] text-muted-foreground">
                     {reactions.length === 0 ? (
                       <li>—</li>
                     ) : (
                       reactions.slice(0, 5).map((row, i) => (
                         <li key={readRecordNumber(row, "id") ?? i} className="font-mono">
-                          id {readRecordNumber(row, "id") ?? "—"} · {readRecordString(row, "review_status") ?? "—"}
+                          ID {readRecordNumber(row, "id") ?? "—"} · {readRecordString(row, "review_status") ?? "—"}
                         </li>
                       ))
                     )}
                   </ul>
                 </div>
                 <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">regulatory_records</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Regulatory records</p>
                   <ul className="space-y-1 text-[11px] text-muted-foreground">
                     {regs.length === 0 ? (
                       <li>—</li>
                     ) : (
                       regs.slice(0, 5).map((row, i) => (
                         <li key={readRecordNumber(row, "id") ?? i} className="font-mono">
-                          id {readRecordNumber(row, "id") ?? "—"} · {truncateLabel(readRecordString(row, "topic"), 32)}
+                          ID {readRecordNumber(row, "id") ?? "—"} · {truncateLabel(readRecordString(row, "topic"), 32)}
                         </li>
                       ))
                     )}

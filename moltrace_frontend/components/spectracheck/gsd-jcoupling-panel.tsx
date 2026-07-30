@@ -309,7 +309,7 @@ export function GsdJCouplingPanel({
       <PanelShell title="J-coupling vs candidates" hint="Waiting for multiplet analysis to finish before scoring candidates…" testId={`${testId}-waiting`}>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          POST /spectrum/analyze/multiplets…
+          Analyzing multiplets…
         </div>
       </PanelShell>
     )
@@ -349,14 +349,14 @@ export function GsdJCouplingPanel({
         <KarplusControls karplus={karplus} onChange={setKarplus} busy />
         <div className="mt-4 flex items-center gap-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          POST /candidates/compare/jcoupling…
+          Comparing candidates against the observed J couplings…
         </div>
       </PanelShell>
     )
   }
   if (bridgeState.status === "error") {
     return (
-      <PanelShell title="J-coupling vs candidates" hint="Bridge endpoint returned an error." testId={`${testId}-error`}>
+      <PanelShell title="J-coupling vs candidates" hint="J-coupling scoring returned an error." testId={`${testId}-error`}>
         <KarplusControls karplus={karplus} onChange={setKarplus} />
         <div className="mt-4">
           <AlertCard variant="error" title="J-coupling bridge failed" description={bridgeState.error} />

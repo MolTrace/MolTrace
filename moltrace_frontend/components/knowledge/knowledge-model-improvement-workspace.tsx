@@ -131,7 +131,7 @@ export function KnowledgeModelImprovementWorkspace() {
     if (id == null) return
     const summary = patchSummary.trim()
     if (!summary) {
-      setPatchErr("summary is required.")
+      setPatchErr("A summary is required.")
       return
     }
     setPatchErr("")
@@ -150,7 +150,7 @@ export function KnowledgeModelImprovementWorkspace() {
       setSelected(isRecord(updated) ? updated : null)
       await loadRows()
     } catch (e) {
-      setPatchErr(formatApiError(e, "PATCH failed."))
+      setPatchErr(formatApiError(e, "Could not save changes."))
     } finally {
       setPatchBusy(false)
     }
@@ -169,11 +169,11 @@ export function KnowledgeModelImprovementWorkspace() {
           status: next,
         },
       })
-      setPatchOk(`status → ${next}`)
+      setPatchOk(`Status updated to ${next.replace(/_/g, " ")}.`)
       setSelected(isRecord(updated) ? updated : null)
       await loadRows()
     } catch (e) {
-      setPatchErr(formatApiError(e, "Status update failed."))
+      setPatchErr(formatApiError(e, "Could not update the status."))
     } finally {
       setActionBusy("")
     }
@@ -182,7 +182,7 @@ export function KnowledgeModelImprovementWorkspace() {
   async function submitCreate() {
     const summary = createSummary.trim()
     if (!summary) {
-      setCreateErr("summary is required.")
+      setCreateErr("A summary is required.")
       return
     }
     setCreateErr("")
@@ -203,7 +203,7 @@ export function KnowledgeModelImprovementWorkspace() {
       if (lidRaw) {
         const n = Number.parseInt(lidRaw, 10)
         if (!Number.isFinite(n) || n < 1) {
-          setCreateErr("linked_record_id must be a positive integer when set.")
+          setCreateErr("Enter the linked record ID as a positive whole number, or leave it blank.")
           setCreateBusy(false)
           return
         }
@@ -216,7 +216,7 @@ export function KnowledgeModelImprovementWorkspace() {
       setCreateLinkedType("")
       await loadRows()
     } catch (e) {
-      setCreateErr(formatApiError(e, "Create failed."))
+      setCreateErr(formatApiError(e, "Could not create the queue item."))
     } finally {
       setCreateBusy(false)
     }
@@ -276,7 +276,7 @@ export function KnowledgeModelImprovementWorkspace() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
-                <Label>status filter</Label>
+                <Label>Status filter</Label>
                 <Select value={filterStatus || "__all"} onValueChange={(v) => setFilterStatus(v === "__all" ? "" : v)}>
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="All" />
@@ -320,15 +320,15 @@ export function KnowledgeModelImprovementWorkspace() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[72px]">id</TableHead>
-                      <TableHead>target_module</TableHead>
-                      <TableHead>source_type</TableHead>
-                      <TableHead>priority</TableHead>
-                      <TableHead>status</TableHead>
-                      <TableHead className="max-w-[260px]">summary</TableHead>
-                      <TableHead>linked_record</TableHead>
-                      <TableHead>created_at</TableHead>
-                      <TableHead className="w-[90px]">open</TableHead>
+                      <TableHead className="w-[72px]">ID</TableHead>
+                      <TableHead>Target module</TableHead>
+                      <TableHead>Source type</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="max-w-[260px]">Summary</TableHead>
+                      <TableHead>Linked record</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="w-[90px]">Open</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -393,7 +393,7 @@ export function KnowledgeModelImprovementWorkspace() {
         >
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <Label>source_type</Label>
+              <Label>Source type</Label>
               <Select value={createSourceType} onValueChange={setCreateSourceType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -408,7 +408,7 @@ export function KnowledgeModelImprovementWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>target_module</Label>
+              <Label>Target module</Label>
               <Select value={createTarget} onValueChange={setCreateTarget}>
                 <SelectTrigger>
                   <SelectValue />
@@ -423,7 +423,7 @@ export function KnowledgeModelImprovementWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>priority</Label>
+              <Label>Priority</Label>
               <Select value={createPriority} onValueChange={setCreatePriority}>
                 <SelectTrigger>
                   <SelectValue />
@@ -438,7 +438,7 @@ export function KnowledgeModelImprovementWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>linked_record_type</Label>
+              <Label>Linked record type</Label>
               <Select value={createLinkedType || "__none__"} onValueChange={(v) => setCreateLinkedType(v === "__none__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="optional" />
@@ -454,7 +454,7 @@ export function KnowledgeModelImprovementWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="mi-linked-id">linked_record_id</Label>
+              <Label htmlFor="mi-linked-id">Linked record ID</Label>
               <Input
                 id="mi-linked-id"
                 className="font-mono"
@@ -464,7 +464,7 @@ export function KnowledgeModelImprovementWorkspace() {
               />
             </div>
             <div className="space-y-2 md:col-span-3">
-              <Label htmlFor="mi-sum">summary</Label>
+              <Label htmlFor="mi-sum">Summary</Label>
               <Textarea id="mi-sum" rows={4} value={createSummary} onChange={(e) => setCreateSummary(e.target.value)} />
             </div>
             <div className="md:col-span-3 flex flex-wrap items-center gap-2">
@@ -484,14 +484,11 @@ export function KnowledgeModelImprovementWorkspace() {
             eyebrow="Edit"
             title={
               <span>
-                Item{" "}
-                <code className="font-mono text-xs">
-                  PATCH /knowledge/model-improvement-queue/{selId}
-                </code>
+                Queue item <span className="font-mono text-xs text-muted-foreground">#{selId}</span>
               </span>
             }
             icon={Layers}
-            description="Quick actions set status via PATCH; full edit below."
+            description="Quick actions change the status only; the full edit form is below."
           >
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -540,7 +537,7 @@ export function KnowledgeModelImprovementWorkspace() {
 
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label>priority</Label>
+                  <Label>Priority</Label>
                   <Select value={patchPriority} onValueChange={setPatchPriority}>
                     <SelectTrigger>
                       <SelectValue />
@@ -555,7 +552,7 @@ export function KnowledgeModelImprovementWorkspace() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>status</Label>
+                  <Label>Status</Label>
                   <Select value={patchStatus} onValueChange={setPatchStatus}>
                     <SelectTrigger>
                       <SelectValue />
@@ -570,13 +567,13 @@ export function KnowledgeModelImprovementWorkspace() {
                   </Select>
                 </div>
                 <div className="space-y-2 md:col-span-3">
-                  <Label htmlFor="mi-patch-sum">summary</Label>
+                  <Label htmlFor="mi-patch-sum">Summary</Label>
                   <Textarea id="mi-patch-sum" rows={5} value={patchSummary} onChange={(e) => setPatchSummary(e.target.value)} />
                 </div>
               </div>
               <Button type="button" disabled={patchBusy} onClick={() => void submitPatch()}>
                 {patchBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-                Save PATCH
+                Save changes
               </Button>
 
               <DeveloperJsonPanel data={selected} />

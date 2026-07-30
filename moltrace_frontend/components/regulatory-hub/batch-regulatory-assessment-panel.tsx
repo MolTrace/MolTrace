@@ -162,9 +162,11 @@ export function BatchRegulatoryAssessmentPanel({
 
   const hrr =
     latest && typeof latest.human_review_required === "boolean"
-      ? String(latest.human_review_required)
+      ? latest.human_review_required
+        ? "Yes"
+        : "No"
       : latest
-        ? "true"
+        ? "Yes"
         : "—"
 
   return (
@@ -224,7 +226,7 @@ export function BatchRegulatoryAssessmentPanel({
                 <dd className="mt-1 font-mono text-xs">{hrr}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">created_at</dt>
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Created</dt>
                 <dd className="mt-1 text-xs text-muted-foreground">{readRecordString(latest, "created_at") ?? "—"}</dd>
               </div>
             </dl>

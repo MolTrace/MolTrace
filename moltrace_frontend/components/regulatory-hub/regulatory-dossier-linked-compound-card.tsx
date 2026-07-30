@@ -123,6 +123,22 @@ const ANALYTICAL_EVIDENCE_TYPES = new Set([
 
 const REPORT_OR_SESSION_TYPES = new Set(["spectracheck_report", "reaction_report"])
 
+/** Display-only labels for stored evidence types (the stored value is unchanged). */
+const EVIDENCE_TYPE_LABELS: Record<string, string> = {
+  unified_evidence: "Unified evidence",
+  qc_assessment: "QC assessment",
+  raw_file_hash: "Raw file hash",
+  analytical_artifact: "Analytical artifact",
+  reaction_experiment: "Reaction experiment",
+  spectracheck_report: "SpectraCheck report",
+  reaction_report: "Reaction report",
+}
+
+function evidenceTypeLabel(raw: string | undefined | null): string {
+  if (!raw) return "—"
+  return EVIDENCE_TYPE_LABELS[raw] ?? raw.replace(/_/g, " ")
+}
+
 function truncateSummary(s: string, max: number): string {
   const t = s.trim()
   if (t.length <= max) return t
@@ -262,7 +278,7 @@ export function RegulatoryDossierLinkedCompoundCard({
     }
     const compound_id = Number.parseInt(cid, 10)
     if (!Number.isFinite(compound_id)) {
-      setLinkErr("compound_id must be a positive integer for this link action.")
+      setLinkErr("Select a compound before linking.")
       return
     }
     setLinkBusy(true)
@@ -305,7 +321,7 @@ export function RegulatoryDossierLinkedCompoundCard({
   const displayName = compoundEntity
     ? pickStr(compoundEntity, ["preferred_name", "preferredName", "name"])
     : persisted
-      ? `compound_id ${persisted.compound_id}`
+      ? `Compound ${persisted.compound_id}`
       : "—"
   const registryId = compoundEntity
     ? pickStr(compoundEntity, ["registry_id", "registryId"])
@@ -314,7 +330,7 @@ export function RegulatoryDossierLinkedCompoundCard({
     batchEntity != null
       ? pickStr(batchEntity, ["batch_code", "batchCode", "lot_code", "lotCode", "label"])
       : persisted?.batch_id != null
-        ? `batch_id ${persisted.batch_id}`
+        ? `Batch ${persisted.batch_id}`
         : "—"
 
   return (
@@ -329,7 +345,7 @@ export function RegulatoryDossierLinkedCompoundCard({
         <Alert>
           <AlertTitle className="text-sm">Provenance note</AlertTitle>
           <AlertDescription className="text-xs leading-relaxed">
-            This card records which compound registry row is associated with this dossier for traceability. It does not
+            This card records which registry compound is associated with this dossier for traceability. It does not
             substitute cited sources, requirements, or human review outcomes shown elsewhere in Regentry.
           </AlertDescription>
         </Alert>
@@ -339,7 +355,7 @@ export function RegulatoryDossierLinkedCompoundCard({
         ) : null}
 
         <div className="rounded-md border bg-muted/20 p-3 text-sm">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Linked registry row</h3>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Linked registry entry</h3>
           <dl className="mt-2 grid gap-2 sm:grid-cols-2">
             <div>
               <dt className="text-xs text-muted-foreground">compound name</dt>
@@ -362,8 +378,8 @@ export function RegulatoryDossierLinkedCompoundCard({
             </div>
           ) : (
             <p className="mt-2 text-xs text-muted-foreground">
-              No compound link stored in this browser session yet. Use search below, then link — the summary is retained
-              here for convenience after a successful POST (GET dossier payload does not echo registry fields).
+              No compound link stored in this browser session yet. Use search below, then link — the summary is kept
+              here for convenience because the dossier record itself does not carry the registry details back.
             </p>
           )}
         </div>
@@ -374,7 +390,7 @@ export function RegulatoryDossierLinkedCompoundCard({
             Analytical evidence links indexed against this dossier — evidence type, source, and summary. Open the Evidence Links tab for full detail.
           </p>
           {analyticalRows.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No matching evidence rows.</p>
+            <p className="text-xs text-muted-foreground">No matching evidence entries.</p>
           ) : (
             <ul className="space-y-2 text-xs">
               {analyticalRows.map((row) => {
@@ -388,8 +404,8 @@ export function RegulatoryDossierLinkedCompoundCard({
                   <li key={id ?? `${title}-${et}`} className="rounded border bg-background/60 p-2">
                     <div className="font-medium">{title}</div>
                     <div className="mt-0.5 text-muted-foreground">
-                      <span className="font-mono">{et ?? "—"}</span>
-                      {rid != null ? <span className="ml-2">resource_id {rid}</span> : null}
+                      <span>{evidenceTypeLabel(et)}</span>
+                      {rid != null ? <span className="ml-2">ID {rid}</span> : null}
                     </div>
                     {summary ? (
                       <p className="mt-1 text-muted-foreground">{truncateSummary(summary, 220)}</p>
@@ -409,10 +425,10 @@ export function RegulatoryDossierLinkedCompoundCard({
         <div className="space-y-2 border-t pt-4">
           <h3 className="text-sm font-medium">Report links (dossier index)</h3>
           <p className="text-xs text-muted-foreground">
-            Evidence rows whose evidence_type maps to SpectraCheck or reaction report navigation (summary only).
+            Evidence entries that open a SpectraCheck or reaction report (summary only).
           </p>
           {reportRows.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No matching evidence rows.</p>
+            <p className="text-xs text-muted-foreground">No matching evidence entries.</p>
           ) : (
             <ul className="space-y-2 text-xs">
               {reportRows.map((row) => {
@@ -426,8 +442,8 @@ export function RegulatoryDossierLinkedCompoundCard({
                   <li key={id ?? `${title}-${et}`} className="rounded border bg-background/60 p-2">
                     <div className="font-medium">{title}</div>
                     <div className="mt-0.5 text-muted-foreground">
-                      <span className="font-mono">{et ?? "—"}</span>
-                      {rid != null ? <span className="ml-2">resource_id {rid}</span> : null}
+                      <span>{evidenceTypeLabel(et)}</span>
+                      {rid != null ? <span className="ml-2">ID {rid}</span> : null}
                     </div>
                     {summary ? (
                       <p className="mt-1 text-muted-foreground">{truncateSummary(summary, 220)}</p>

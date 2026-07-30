@@ -86,7 +86,7 @@ export function ReactionOptimizationHandoffCard({
         .filter((v): v is number => typeof v === "number" && Number.isFinite(v))
       setActionItemIdsInput(ids.join(", "))
     } catch (e) {
-      setErr(formatApiError(e, "Could not load reaction handoff bridge records."))
+      setErr(formatApiError(e, "Could not load previous handoffs."))
       setBridges([])
       setLastBridge(null)
     } finally {
@@ -174,7 +174,7 @@ export function ReactionOptimizationHandoffCard({
           <InfoTooltip label="Reaction Optimization handoff" content={TOOLTIP} />
         </div>
         <CardDescription>
-          Bridge handoff from dossier action items into compliance-driven optimization constraints. Requires qualified human
+          Handoff from dossier action items into compliance-driven optimization constraints. Requires qualified human
           review.
         </CardDescription>
       </CardHeader>
@@ -237,7 +237,7 @@ export function ReactionOptimizationHandoffCard({
           </Button>
         </div>
 
-        {loading ? <p className="text-xs text-muted-foreground">Loading reaction handoff bridge records…</p> : null}
+        {loading ? <p className="text-xs text-muted-foreground">Loading previous handoffs…</p> : null}
         {err ? <p className="text-xs text-destructive">{err}</p> : null}
 
         <div className="grid gap-2 md:grid-cols-2">
@@ -251,7 +251,7 @@ export function ReactionOptimizationHandoffCard({
           </div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Human review required</p>
-            <p className="mt-1 text-xs text-muted-foreground">{humanReviewRequired ? "true" : "false"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{humanReviewRequired ? "Yes" : "No"}</p>
           </div>
           <div className="rounded-md border bg-muted/20 px-3 py-2 md:col-span-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Warnings</p>

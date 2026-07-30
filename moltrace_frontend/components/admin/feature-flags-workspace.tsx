@@ -112,6 +112,24 @@ function formatErr(error: unknown, fallback: string): string {
   return fallback
 }
 
+/**
+ * Display-only label for a stored program value ("regulatory_hub" → "Regentry").
+ * The stored value is what we send and sort on — never humanize that.
+ */
+function programLabel(program: string): string {
+  const normalized = program.trim().toLowerCase()
+  const match = PROGRAM_ORDER.find((item) => (item.values as readonly string[]).includes(normalized))
+  if (match) return match.label
+  const text = program.trim().replace(/_/g, " ")
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : program
+}
+
+/** Display-only label for a stored status value ("deprecated" → "Deprecated"). */
+function statusLabel(status: string): string {
+  const text = status.trim().replace(/_/g, " ")
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : status
+}
+
 function programSortIndex(program: string): number {
   const normalized = program.trim().toLowerCase()
   const index = PROGRAM_ORDER.findIndex((item) => (item.values as readonly string[]).includes(normalized))
@@ -376,13 +394,17 @@ export function FeatureFlagsWorkspace() {
                       <TableRow key={flagId}>
                         <TableCell className="text-xs">{readFirst(row, ["flag_key"]) || "-"}</TableCell>
                         <TableCell className="text-xs">{readFirst(row, ["display_name"]) || "-"}</TableCell>
-                        <TableCell className="text-xs">{readFirst(row, ["program"]) || "-"}</TableCell>
-                        <TableCell className="text-xs">{formatValue(row.default_enabled)}</TableCell>
+                        <TableCell className="text-xs">
+                          {readFirst(row, ["program"]) ? programLabel(readFirst(row, ["program"])) : "-"}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {readFirst(row, ["default_enabled"]) ? (defaultEnabled ? "Enabled" : "Disabled") : "-"}
+                        </TableCell>
                         <TableCell className="max-w-[24rem] text-xs">{formatValue(row.rollout_rules_json)}</TableCell>
                         <TableCell className="text-xs">
                           {status ? (
                             <Badge variant="outline" className={`font-normal ${statusBadgeClass(status)}`}>
-                              {status}
+                              {statusLabel(status)}
                             </Badge>
                           ) : (
                             "-"
@@ -406,7 +428,7 @@ export function FeatureFlagsWorkspace() {
                               disabled={actionBusyId === flagId}
                               onClick={() => void patchFeatureFlag(row, { status: nextStatus })}
                             >
-                              {nextStatus}
+                              {nextStatus === "active" ? "Enable" : "Disable"}
                             </Button>
                             <Button
                               type="button"
@@ -450,15 +472,29 @@ export function FeatureFlagsWorkspace() {
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground">Program</p>
-                <p className="mt-1 break-words text-sm">{readFirst(selectedFlagDetail, ["program"]) || "-"}</p>
+                <p className="mt-1 break-words text-sm">
+                  {readFirst(selectedFlagDetail, ["program"])
+                    ? programLabel(readFirst(selectedFlagDetail, ["program"]))
+                    : "-"}
+                </p>
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground">Default enabled</p>
-                <p className="mt-1 break-words text-sm">{formatValue(selectedFlagDetail.default_enabled)}</p>
+                <p className="mt-1 break-words text-sm">
+                  {readFirst(selectedFlagDetail, ["default_enabled"])
+                    ? readFirst(selectedFlagDetail, ["default_enabled"]).toLowerCase() === "true"
+                      ? "Enabled"
+                      : "Disabled"
+                    : "-"}
+                </p>
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground">Status</p>
-                <p className="mt-1 break-words text-sm">{readFirst(selectedFlagDetail, ["status"]) || "-"}</p>
+                <p className="mt-1 break-words text-sm">
+                  {readFirst(selectedFlagDetail, ["status"])
+                    ? statusLabel(readFirst(selectedFlagDetail, ["status"]))
+                    : "-"}
+                </p>
               </div>
               <div className="sm:col-span-2 lg:col-span-3">
                 <p className="text-xs font-medium text-muted-foreground">Rollout rules</p>
@@ -501,7 +537,7 @@ export function FeatureFlagsWorkspace() {
                 <SelectContent>
                   {PROGRAM_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {option}
+                      {programLabel(option)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -514,8 +550,8 @@ export function FeatureFlagsWorkspace() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="true">true</SelectItem>
-                  <SelectItem value="false">false</SelectItem>
+                  <SelectItem value="true">Enabled</SelectItem>
+                  <SelectItem value="false">Disabled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -528,7 +564,7 @@ export function FeatureFlagsWorkspace() {
                 <SelectContent>
                   {FEATURE_FLAG_STATUS_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {option}
+                      {statusLabel(option)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -595,7 +631,7 @@ export function FeatureFlagsWorkspace() {
                         <TableCell className="text-xs">
                           {status ? (
                             <Badge variant="outline" className={`font-normal ${statusBadgeClass(status)}`}>
-                              {status}
+                              {statusLabel(status)}
                             </Badge>
                           ) : (
                             "-"
@@ -641,7 +677,7 @@ export function FeatureFlagsWorkspace() {
                 <SelectContent>
                   {SUBSCRIPTION_PLAN_STATUS_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {option}
+                      {statusLabel(option)}
                     </SelectItem>
                   ))}
                 </SelectContent>

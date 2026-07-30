@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { statusLabel } from "@/lib/ui/status"
 import { Loader2, Network } from "lucide-react"
 import { trackCompoundGraphViewed } from "@/src/lib/analytics/analytics-client"
 
@@ -209,7 +210,9 @@ export function CompoundScientificKnowledgeGraphPanel({
     return (
       <Alert variant="destructive">
         <AlertTitle>Invalid compound id</AlertTitle>
-        <AlertDescription className="text-sm">{err || "Expected a numeric compound id in the route."}</AlertDescription>
+        <AlertDescription className="text-sm">
+          {err || "This view needs a numeric compound ID. Open a compound from the registry to see its graph."}
+        </AlertDescription>
       </Alert>
     )
   }
@@ -230,8 +233,8 @@ export function CompoundScientificKnowledgeGraphPanel({
             )}
           </div>
           <CardDescription>
-            GET /compound-registry/graph with compound_id and limit query parameters — nodes and edges are returned as
-            stored; labels may be absent for non-compound vertices until expanded server-side.
+            Nodes and edges are shown exactly as recorded for this compound. Labels can be missing for items other than
+            compounds until those records are expanded.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -257,7 +260,7 @@ export function CompoundScientificKnowledgeGraphPanel({
 
           {warnings.length > 0 ? (
             <Alert variant="destructive">
-              <AlertTitle className="text-sm">warnings (payload)</AlertTitle>
+              <AlertTitle className="text-sm">Warnings</AlertTitle>
               <AlertDescription>
                 <ul className="list-inside list-disc text-xs">
                   {warnings.map((w, i) => (
@@ -270,7 +273,7 @@ export function CompoundScientificKnowledgeGraphPanel({
 
           {notes.length > 0 ? (
             <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">notes (payload)</p>
+              <p className="font-medium text-foreground">Notes</p>
               <ul className="mt-2 list-inside list-disc space-y-1">
                 {notes.map((n, i) => (
                   <li key={i}>{n}</li>
@@ -290,7 +293,7 @@ export function CompoundScientificKnowledgeGraphPanel({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Nodes by type</CardTitle>
-          <CardDescription>Grouped by node_type from the API response.</CardDescription>
+          <CardDescription>Grouped by the kind of record each node represents.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {nodesByType.length === 0 && !loading && !err ? (
@@ -300,25 +303,25 @@ export function CompoundScientificKnowledgeGraphPanel({
                   <Network />
                 </EmptyMedia>
                 <EmptyTitle>No nodes</EmptyTitle>
-                <EmptyDescription>This compound&apos;s graph payload contains no nodes to display.</EmptyDescription>
+                <EmptyDescription>This compound&apos;s graph contains no nodes to display.</EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : null}
           {nodesByType.map(([type, rows]) => (
             <div key={type} className="rounded-lg border bg-muted/10 p-3">
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="font-mono text-xs">
-                  {type}
+                <Badge variant="outline" className="text-xs">
+                  {statusLabel(type)}
                 </Badge>
-                <span className="text-xs text-muted-foreground">{rows.length} row{rows.length === 1 ? "" : "s"}</span>
+                <span className="text-xs text-muted-foreground">{rows.length} node{rows.length === 1 ? "" : "s"}</span>
               </div>
               <div className="table-scroll">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[120px]">node_id</TableHead>
+                      <TableHead className="w-[120px]">node id</TableHead>
                       <TableHead>label</TableHead>
-                      <TableHead className="min-w-[180px]">metadata_json</TableHead>
+                      <TableHead className="min-w-[180px]">details</TableHead>
                       <TableHead className="w-[100px]">open</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -356,7 +359,7 @@ export function CompoundScientificKnowledgeGraphPanel({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Lineage timeline</CardTitle>
-          <CardDescription>Edges ordered by created_at (newest first) when timestamps are present.</CardDescription>
+          <CardDescription>Links ordered by date created (newest first) when timestamps are present.</CardDescription>
         </CardHeader>
         <CardContent>
           {timelineEdges.length === 0 && !loading && !err ? (
@@ -377,22 +380,22 @@ export function CompoundScientificKnowledgeGraphPanel({
                   <li key={readRecordNumber(e, "id") ?? idx} className="text-sm">
                     <div className="text-xs text-muted-foreground">{when || "—"}</div>
                     <div className="mt-1 font-mono text-[11px] leading-relaxed">
-                      <span className="text-foreground">{st}</span>{" "}
+                      <span className="text-foreground">{statusLabel(st)}</span>{" "}
                       <span className="text-muted-foreground">{sid}</span>
                       <span className="mx-1 text-muted-foreground">—</span>
                       <Badge variant="secondary" className="mx-1 align-middle text-[10px]">
-                        {rel}
+                        {statusLabel(rel)}
                       </Badge>
                       <span className="text-muted-foreground">→</span>{" "}
-                      <span className="text-foreground">{tt}</span>{" "}
+                      <span className="text-foreground">{statusLabel(tt)}</span>{" "}
                       <span className="text-muted-foreground">{tid}</span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      confidence_label: <span className="font-mono">{conf}</span>
+                      Confidence: <span className="font-mono">{conf}</span>
                       {elid != null ? (
                         <>
                           {" "}
-                          · evidence_link_id: <span className="font-mono">{elid}</span>
+                          · Evidence link: <span className="font-mono">{elid}</span>
                         </>
                       ) : null}
                     </div>
@@ -406,8 +409,8 @@ export function CompoundScientificKnowledgeGraphPanel({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Edges by relation_type</CardTitle>
-          <CardDescription>Grouped edge table for review; relation_type values come from the API.</CardDescription>
+          <CardTitle className="text-sm font-medium">Edges by relation</CardTitle>
+          <CardDescription>Grouped edge table for review; each relation is recorded with the link itself.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {edgesByRelation.length === 0 && !loading && !err ? (
@@ -416,8 +419,8 @@ export function CompoundScientificKnowledgeGraphPanel({
           {edgesByRelation.map(([rel, relEdges], idx) => (
             <div key={rel}>
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="font-mono text-xs">
-                  {rel}
+                <Badge variant="outline" className="text-xs">
+                  {statusLabel(rel)}
                 </Badge>
                 <span className="text-xs text-muted-foreground">{relEdges.length} edge{relEdges.length === 1 ? "" : "s"}</span>
               </div>
@@ -429,19 +432,19 @@ export function CompoundScientificKnowledgeGraphPanel({
                       <TableHead>source</TableHead>
                       <TableHead>target</TableHead>
                       <TableHead>label</TableHead>
-                      <TableHead>confidence_label</TableHead>
-                      <TableHead>created_at</TableHead>
+                      <TableHead>confidence</TableHead>
+                      <TableHead>created</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {relEdges.map((e, i) => (
                       <TableRow key={readRecordNumber(e, "id") ?? `${rel}-${i}`}>
                         <TableCell className="font-mono text-xs">{readRecordNumber(e, "id") ?? "—"}</TableCell>
-                        <TableCell className="max-w-[200px] font-mono text-[11px]">
-                          {edgeSourceType(e)} {edgeSourceId(e)}
+                        <TableCell className="max-w-[200px] text-[11px]">
+                          {statusLabel(edgeSourceType(e))} <span className="font-mono">{edgeSourceId(e)}</span>
                         </TableCell>
-                        <TableCell className="max-w-[200px] font-mono text-[11px]">
-                          {edgeTargetType(e)} {edgeTargetId(e)}
+                        <TableCell className="max-w-[200px] text-[11px]">
+                          {statusLabel(edgeTargetType(e))} <span className="font-mono">{edgeTargetId(e)}</span>
                         </TableCell>
                         <TableCell className="text-xs">{readRecordString(e, "label") ?? "—"}</TableCell>
                         <TableCell className="text-xs">

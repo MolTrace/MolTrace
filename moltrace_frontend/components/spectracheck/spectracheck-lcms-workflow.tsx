@@ -445,7 +445,7 @@ export function SpectraCheckLcmsWorkflow({
       return
     }
     if (!consensusResult || !isRecord(consensusResult)) {
-      setBridgeErr("Run the Feature-Family Consensus step first so a consensus payload can be sent.")
+      setBridgeErr("Run the Feature-Family Consensus step first so a consensus result can be sent.")
       return
     }
     const payload: Record<string, unknown> = {
@@ -746,7 +746,7 @@ export function SpectraCheckLcmsWorkflow({
           {current.key === "consensus" && (
             <form onSubmit={runConsensus} className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Primary path: uses <strong>feature_table_text</strong> from step 3 when available. You may override with
+                Primary path: uses the <strong>feature table</strong> from step 3 when available. You may override with
                 uploads.
               </p>
               {groupResult && isRecord(groupResult) && typeof groupResult.feature_table_text === "string" && groupResult.feature_table_text.trim() ? (
@@ -811,8 +811,8 @@ export function SpectraCheckLcmsWorkflow({
           {current.key === "dereplication" && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Calls <code className="text-xs">/ms/lcms/dereplication/upload</code> when your backend exposes it. If the
-                route is absent, you will see a clear error—no identity or library claims are made here.
+                Library dereplication runs when your MolTrace instance provides it. If it is not available, you will
+                see a clear message—no identity or library claims are made here.
               </p>
               <form onSubmit={runDereplication} className="space-y-4">
                 <div className="space-y-2">
@@ -855,11 +855,11 @@ export function SpectraCheckLcmsWorkflow({
               </div>
               <Collapsible className="rounded-md border">
                 <CollapsibleTrigger className="flex w-full px-4 py-3 text-left text-sm font-medium hover:bg-muted/50">
-                  Advanced (payload preview)
+                  Advanced (what gets sent)
                 </CollapsibleTrigger>
                 <CollapsibleContent className="border-t px-4 py-3 text-xs text-muted-foreground">
-                  Candidates are parsed from the shared session block (pipe-separated lines). The full consensus JSON is
-                  attached as <code className="font-mono">lcms_consensus_result</code>.
+                  Candidates are parsed from the shared session block (pipe-separated lines). The full consensus
+                  result is attached alongside them.
                 </CollapsibleContent>
               </Collapsible>
               <Button type="submit" disabled={bridgeBusy}>
@@ -869,7 +869,7 @@ export function SpectraCheckLcmsWorkflow({
           )}
 
           {activeBusy && (
-            <p className="text-sm text-muted-foreground">Calling backend via <code className="text-xs">/api/backend</code>…</p>
+            <p className="text-sm text-muted-foreground">Contacting the MolTrace analysis service…</p>
           )}
 
           {!activeBusy && activeResult != null ? (

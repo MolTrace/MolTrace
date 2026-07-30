@@ -6,6 +6,11 @@ import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectrache
 import { QualityAssessmentCard } from "@/src/components/spectracheck/QualityAssessmentCard"
 import { QualityFindingsTable } from "@/src/components/spectracheck/QualityFindingsTable"
 import { QualityStatusBadge } from "@/src/components/spectracheck/QualityStatusBadge"
+import {
+  CONNECTOR_TARGET_LABELS,
+  fileKindLabel,
+  sessionRoleLabel,
+} from "@/src/components/spectracheck/spectracheck-display-labels"
 import { ApiError, apiFetch } from "@/src/lib/api/client"
 import { parseQualityControlPayload } from "@/src/lib/spectracheck/quality-control-assessment"
 import { trackFileUploaded, trackQcCompleted } from "@/src/lib/analytics/analytics-client"
@@ -413,7 +418,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
           />
         </CardTitle>
         <CardDescription>
-          Upload and attach scientific files to the current session. Uploaded file bytes are not persisted in localStorage.
+          Upload and attach scientific files to the current session. File contents are never kept in browser storage.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -436,7 +441,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
             >
               {FILE_KIND_OPTIONS.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {fileKindLabel(option)}
                 </option>
               ))}
             </select>
@@ -451,7 +456,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
             >
               {SESSION_ROLE_OPTIONS.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {sessionRoleLabel(option)}
                 </option>
               ))}
             </select>
@@ -471,14 +476,14 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
         </div>
 
         {!hasSession ? (
-          <p className="text-xs text-muted-foreground">Attach to session is available when a sessionId exists.</p>
+          <p className="text-xs text-muted-foreground">Attach to session is available once a session is open.</p>
         ) : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         {uploadedFileRecord ? (
           <Card className="border-muted">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Uploaded FileRecord</CardTitle>
+              <CardTitle className="text-base">Uploaded file</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
               <p>
@@ -491,7 +496,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
                 <span className="text-muted-foreground">SHA-256:</span> {uploadedFileRecord.sha256 ?? "—"}
               </p>
               <p>
-                <span className="text-muted-foreground">file kind:</span> {uploadedFileRecord.file_kind}
+                <span className="text-muted-foreground">file kind:</span> {fileKindLabel(uploadedFileRecord.file_kind)}
               </p>
               <p>
                 <span className="text-muted-foreground">created date:</span> {formatDate(uploadedFileRecord.created_at)}
@@ -537,7 +542,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
                   id="connector-import-file-id"
                   value={fileIdInput}
                   onChange={(e) => setFileIdInput(e.target.value)}
-                  placeholder="file_id"
+                  placeholder="file id"
                 />
               </div>
               <div className="space-y-2">
@@ -546,7 +551,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
                   id="connector-import-external-object-id"
                   value={externalObjectId}
                   onChange={(e) => setExternalObjectId(e.target.value)}
-                  placeholder="external_object_id"
+                  placeholder="external object id"
                 />
               </div>
               <div className="space-y-2">
@@ -557,15 +562,15 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
                   value={connectorTargetRoute}
                   onChange={(e) => setConnectorTargetRoute(e.target.value as ConnectorTargetRoute)}
                 >
-                  <option value="processed_nmr">processed_nmr</option>
-                  <option value="raw_fid">raw_fid</option>
-                  <option value="nmr2d">nmr2d</option>
-                  <option value="dept_apt">dept_apt</option>
-                  <option value="msms">msms</option>
-                  <option value="ms_raw">ms_raw</option>
-                  <option value="lcms">lcms</option>
-                  <option value="lcms_raw">lcms_raw</option>
-                  <option value="spectrum_file">spectrum_file</option>
+                  <option value="processed_nmr">{CONNECTOR_TARGET_LABELS.processed_nmr}</option>
+                  <option value="raw_fid">{CONNECTOR_TARGET_LABELS.raw_fid}</option>
+                  <option value="nmr2d">{CONNECTOR_TARGET_LABELS.nmr2d}</option>
+                  <option value="dept_apt">{CONNECTOR_TARGET_LABELS.dept_apt}</option>
+                  <option value="msms">{CONNECTOR_TARGET_LABELS.msms}</option>
+                  <option value="ms_raw">{CONNECTOR_TARGET_LABELS.ms_raw}</option>
+                  <option value="lcms">{CONNECTOR_TARGET_LABELS.lcms}</option>
+                  <option value="lcms_raw">{CONNECTOR_TARGET_LABELS.lcms_raw}</option>
+                  <option value="spectrum_file">{CONNECTOR_TARGET_LABELS.spectrum_file}</option>
                 </select>
               </div>
               <div className="space-y-2">
@@ -632,11 +637,11 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
                         </Link>
                       </Button>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Open artifact button unavailable for this response.</span>
+                      <span className="text-xs text-muted-foreground">This import did not produce an artifact to open.</span>
                     )}
                   </div>
                   <details className="sm:col-span-2 rounded-md border p-2">
-                    <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                    <summary className="cursor-pointer text-xs font-medium">Raw data (for troubleshooting)</summary>
                     <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(connectorImportResult, null, 2)}</pre>
                   </details>
                 </CardContent>
@@ -684,7 +689,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
                       <TableCell className="max-w-[220px] truncate">{f.filename}</TableCell>
                       <TableCell>{formatBytes(f.file_size)}</TableCell>
                       <TableCell className="max-w-[240px] truncate font-mono text-xs">{f.sha256 ?? "—"}</TableCell>
-                      <TableCell>{f.file_kind}</TableCell>
+                      <TableCell>{fileKindLabel(f.file_kind)}</TableCell>
                       <TableCell>{formatDate(f.created_at)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
@@ -717,7 +722,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
           <div className="flex flex-wrap gap-1 text-xs">
             {Object.entries(activeRoleFile).map(([role, fileId]) => (
               <Badge key={role} variant="secondary">
-                {role}: {fileId}
+                {sessionRoleLabel(role)}: {fileId}
               </Badge>
             ))}
           </div>

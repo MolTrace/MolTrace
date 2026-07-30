@@ -198,7 +198,7 @@ export function SpectraCheckLinkedCompoundCard({
     }
     const compound_id = Number.parseInt(cid, 10)
     if (!Number.isFinite(compound_id)) {
-      setLinkErr("compound_id must be a positive integer for this link action.")
+      setLinkErr("Compound ID must be a positive whole number for this link.")
       return
     }
     setLinkBusy(true)
@@ -373,7 +373,7 @@ export function SpectraCheckLinkedCompoundCard({
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No linked compound on this session payload yet.</p>
+          <p className="text-sm text-muted-foreground">No linked compound on this session yet.</p>
         )}
 
         <div className="space-y-3 border-t pt-4">

@@ -258,8 +258,8 @@ export function SSOConnectionsWorkspace() {
           </div>
           <code className="mt-1 block break-all font-mono text-xs">{REDIRECT_URI || REDIRECT_URI_PLACEHOLDER}</code>
           <p className="mt-1 text-xs text-muted-foreground">
-            Add this exact URI to the IdP application&apos;s allowed redirect URIs. The backend computes it from its own
-            base URL — it is never client-supplied.
+            Add this exact URI to the IdP application&apos;s allowed redirect URIs. MolTrace derives it from its own
+            service address — it can never be set from this page or by a browser.
             {REDIRECT_URI ? null : " Set NEXT_PUBLIC_SSO_API_ORIGIN to display the exact value."}
           </p>
         </div>
@@ -377,7 +377,8 @@ export function SSOConnectionsWorkspace() {
                 spellCheck={false}
               />
               <p className="text-xs text-muted-foreground">
-                URL-safe; used in <code>/auth/sso/{form.slug.trim() || "{slug}"}/login</code>. Immutable after creation.
+                URL-safe identifier for this organization; it appears in its sign-in link. Cannot be changed after
+                creation.
               </p>
             </div>
             <div className="space-y-1.5">
@@ -411,7 +412,7 @@ export function SSOConnectionsWorkspace() {
                 spellCheck={false}
               />
               <p className="text-xs text-muted-foreground">
-                Write-only — stored AES-256-GCM encrypted and never returned by the API.
+                Write-only — stored AES-256-GCM encrypted and never displayed again.
                 {editingId ? " Leave blank to keep the current secret." : ""}
               </p>
             </div>
@@ -479,7 +480,8 @@ export function SSOConnectionsWorkspace() {
             <h3 className="text-sm font-semibold">SCIM provisioning</h3>
             <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
               Issue the bearer token your identity provider uses to auto-provision (and deprovision) users into this
-              organization via SCIM 2.0. The token is machine-facing — the IdP calls <code>/scim/v2</code> directly.
+              organization via SCIM 2.0. The token is machine-facing — your IdP uses it to reach the MolTrace SCIM
+              service directly. The base URL to pair with it is shown when the token is issued.
             </p>
             <ScimProvisioningSection connectionId={editingId} enabled={editingConn?.enabled ?? false} />
           </div>

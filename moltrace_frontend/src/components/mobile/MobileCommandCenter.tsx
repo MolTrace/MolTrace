@@ -299,7 +299,7 @@ export function MobileCommandCenter() {
             </div>
           </div>
         ))}
-        {loading ? <p className="text-xs text-muted-foreground">Loading mobile command center…</p> : null}
+        {loading ? <p className="text-xs text-muted-foreground">Loading your workspace summary…</p> : null}
         {!loading && orderedModules.length === 0 ? (
           <p className="text-xs text-muted-foreground">Mobile command center summary unavailable.</p>
         ) : null}

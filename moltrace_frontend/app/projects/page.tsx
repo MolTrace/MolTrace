@@ -131,7 +131,7 @@ export default function ProjectsIndexPage() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Create project</DialogTitle>
-              <DialogDescription>Add a new project. The backend validates required fields.</DialogDescription>
+              <DialogDescription>Add a new project. Required fields are checked before it is saved.</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-2">
@@ -171,7 +171,7 @@ export default function ProjectsIndexPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base text-warning">
               <ServerOff className="h-4 w-4" />
-              Backend unavailable
+              Projects unavailable
             </CardTitle>
             <CardDescription className="text-warning/90">
               We couldn&apos;t load your projects. Try refreshing in a moment, or contact your administrator if this keeps happening.
@@ -183,7 +183,7 @@ export default function ProjectsIndexPage() {
       {error && !loading ? (
         <Card className="border-destructive/40 bg-destructive/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-destructive">Request failed</CardTitle>
+            <CardTitle className="text-base text-destructive">Could not load projects</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-destructive">{error}</CardContent>
         </Card>

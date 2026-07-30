@@ -30,6 +30,11 @@ const OUTCOME_FIELDS = [
   { value: "selectivity_percent", label: "Selectivity (%)" },
 ] as const
 
+/** Readable name for the selected outcome; the stored value stays untouched. */
+function outcomeFieldLabel(value: string): string {
+  return OUTCOME_FIELDS.find((o) => o.value === value)?.label ?? value
+}
+
 const CHART_FILLS = [
   "var(--chart-1)",
   "var(--chart-2)",
@@ -232,6 +237,7 @@ export function ReactionResponsePreview({
   }, [primaryPoints, showUncertainty])
 
   const xAxisKey = xVarKey || numericVars[0] || ""
+  const outcomeLabel = outcomeFieldLabel(outcomeField)
 
   return (
     <Card>
@@ -322,10 +328,10 @@ export function ReactionResponsePreview({
                   <YAxis
                     type="number"
                     dataKey="y"
-                    name={outcomeField}
+                    name={outcomeLabel}
                     tick={{ fontSize: 11 }}
                     label={{
-                      value: outcomeField,
+                      value: outcomeLabel,
                       angle: -90,
                       position: "insideLeft",
                       fontSize: 11,
@@ -343,7 +349,7 @@ export function ReactionResponsePreview({
                             {xAxisKey}: {p.x}
                           </div>
                           <div className="text-muted-foreground">
-                            {outcomeField}: {p.y}
+                            {outcomeLabel}: {p.y}
                           </div>
                           <div className="text-muted-foreground">status: {p.status}</div>
                           <div className="text-muted-foreground">color: {p.colorKey}</div>

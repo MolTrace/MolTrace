@@ -46,6 +46,11 @@ const OUTCOME_FIELDS = [
   { value: "selectivity_percent", label: "Selectivity (%)" },
 ] as const
 
+/** Readable name for the selected outcome; the stored value stays untouched. */
+function outcomeFieldLabel(value: string): string {
+  return OUTCOME_FIELDS.find((o) => o.value === value)?.label ?? value
+}
+
 const CHART_FILLS = [
   "var(--chart-1)",
   "var(--chart-2)",
@@ -219,6 +224,7 @@ export function ReactionResponseOverview({
   }
 
   const xAxisKey = xVarKey || numericVars[0] || ""
+  const outcomeLabel = outcomeFieldLabel(outcomeField)
 
   return (
     <Card>
@@ -296,10 +302,10 @@ export function ReactionResponseOverview({
                   <YAxis
                     type="number"
                     dataKey="y"
-                    name={outcomeField}
+                    name={outcomeLabel}
                     tick={{ fontSize: 11 }}
                     label={{
-                      value: outcomeField,
+                      value: outcomeLabel,
                       angle: -90,
                       position: "insideLeft",
                       fontSize: 11,
@@ -317,7 +323,7 @@ export function ReactionResponseOverview({
                             {xAxisKey}: {p.x}
                           </div>
                           <div className="text-muted-foreground">
-                            {outcomeField}: {p.y}
+                            {outcomeLabel}: {p.y}
                           </div>
                           <div className="text-muted-foreground">status: {p.status}</div>
                         </div>
@@ -343,7 +349,7 @@ export function ReactionResponseOverview({
                   <TableRow>
                     <TableHead>Experiment code</TableHead>
                     <TableHead className="font-mono text-xs">{xAxisKey}</TableHead>
-                    <TableHead className="font-mono text-xs">{outcomeField}</TableHead>
+                    <TableHead className="text-xs">{outcomeLabel}</TableHead>
                     <TableHead>status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -366,7 +372,7 @@ export function ReactionResponseOverview({
               <div className="space-y-2 border-t border-border pt-4">
                 <p className="text-sm font-medium">Two numeric conditions</p>
                 <p className="text-xs text-muted-foreground">
-                  Scatter of {v1} vs {v2}; point color reflects {outcomeField} (min→max across shown runs).
+                  Scatter of {v1} vs {v2}; point color reflects {outcomeLabel} (min→max across shown runs).
                 </p>
                 <div className="h-[260px] w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
@@ -403,7 +409,7 @@ export function ReactionResponseOverview({
                                 {v1}: {p.vx} · {v2}: {p.vy}
                               </div>
                               <div className="text-muted-foreground">
-                                {outcomeField}: {p.outcome}
+                                {outcomeLabel}: {p.outcome}
                               </div>
                             </div>
                           )

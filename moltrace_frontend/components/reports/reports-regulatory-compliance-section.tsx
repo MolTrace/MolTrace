@@ -19,7 +19,7 @@ import {
 import type { SavedReportRow } from "@/src/lib/reports/saved-reports"
 
 const DESC =
-  "Uses GET /regulatory/dossiers and GET /regulatory/action-items, plus latest-row GETs for status labels when a report session matches dossier spectracheck_session_id. Workflow signals only."
+  "Regulatory dossiers linked to the same SpectraCheck session as one of your saved reports, with their open action items and latest status labels. Workflow signals only."
 
 type Props = {
   reportRows: SavedReportRow[]
@@ -93,7 +93,7 @@ export function ReportsRegulatoryComplianceSection({ reportRows, live }: Props) 
         out.push({
           sessionId: sn,
           dossierId: did,
-          title: readRecordString(d, "title") ?? `dossier ${did}`,
+          title: readRecordString(d, "title") ?? `Dossier ${did}`,
           actionOpen,
           qnmr: qStatus ? labelStatus(qStatus) : "—",
           method: mvStatus ? labelStatus(mvStatus) : "—",
@@ -148,7 +148,7 @@ export function ReportsRegulatoryComplianceSection({ reportRows, live }: Props) 
               <EmptyTitle>No linked dossiers</EmptyTitle>
               <EmptyDescription>
                 None of your listed reports share a session with a regulatory dossier yet. Link a dossier from
-                SpectraCheck or create one from a report session when the backend supports it.
+                SpectraCheck, or create one from a report session where that is available.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -168,7 +168,7 @@ export function ReportsRegulatoryComplianceSection({ reportRows, live }: Props) 
             </div>
             <dl className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
               <div>
-                <dt className="text-muted-foreground">action items (open)</dt>
+                <dt className="text-muted-foreground">Open action items</dt>
                 <dd className="font-mono tabular-nums">{row.actionOpen}</dd>
               </div>
               <div>
@@ -182,7 +182,7 @@ export function ReportsRegulatoryComplianceSection({ reportRows, live }: Props) 
                 <dd>{row.aiGov}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">jurisdiction map status</dt>
+                <dt className="text-muted-foreground">Jurisdiction map status</dt>
                 <dd>{row.jurMap}</dd>
               </div>
             </dl>

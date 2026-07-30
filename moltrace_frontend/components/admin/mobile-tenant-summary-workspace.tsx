@@ -459,7 +459,7 @@ export function MobileTenantSummaryWorkspace() {
           ) : (
             <div className="flex min-w-0 items-start gap-2 rounded-md border p-3 text-sm text-muted-foreground">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              <span className="min-w-0 break-words">No onboarding blockers returned.</span>
+              <span className="min-w-0 break-words">No onboarding blockers.</span>
             </div>
           )}
           </div>
@@ -495,7 +495,7 @@ export function MobileTenantSummaryWorkspace() {
                 ))}
               </div>
             ) : (
-              <p className="rounded-md border p-3 text-sm text-muted-foreground">No recommended actions returned.</p>
+              <p className="rounded-md border p-3 text-sm text-muted-foreground">No recommended actions yet.</p>
             )}
           </div>
         </ModuleCard>
@@ -530,7 +530,7 @@ export function MobileTenantSummaryWorkspace() {
             ) : (
               <div className="flex min-w-0 items-start gap-2 rounded-md border p-3 text-sm text-muted-foreground">
                 <PackageCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                <span className="min-w-0 break-words">No procurement packages returned.</span>
+                <span className="min-w-0 break-words">No procurement packages yet.</span>
               </div>
             )}
 

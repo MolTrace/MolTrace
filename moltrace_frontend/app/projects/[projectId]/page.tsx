@@ -101,7 +101,7 @@ export default function ProjectDetailPage() {
     if (!projectId) return
     const trimmedSampleId = sampleIdField.trim()
     if (!trimmedSampleId) {
-      setSampleError("sample_id is required.")
+      setSampleError("Sample ID is required.")
       return
     }
     setSampleBusy(true)
@@ -198,7 +198,7 @@ export default function ProjectDetailPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base text-warning">
               <ServerOff className="h-4 w-4" />
-              Backend unavailable
+              Project unavailable
             </CardTitle>
             <CardDescription className="text-warning/90">
               We couldn&apos;t load this project. Try refreshing in a moment, or contact your administrator if this keeps happening.
@@ -251,7 +251,7 @@ export default function ProjectDetailPage() {
       {error && !loading ? (
         <Card className="border-destructive/40 bg-destructive/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-destructive">Request failed</CardTitle>
+            <CardTitle className="text-base text-destructive">Could not load project</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-destructive">{error}</CardContent>
         </Card>
@@ -276,29 +276,29 @@ export default function ProjectDetailPage() {
               <DialogHeader>
                 <DialogTitle>Create sample</DialogTitle>
                 <DialogDescription>
-                  <code className="text-xs">sample_id</code> is required; the other fields are
-                  optional. Structure and NMR are captured later by linking an analysis to the sample.
+                  A sample ID is required; the other fields are optional. Structure and NMR data are captured later by
+                  linking an analysis to the sample.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="s-id">sample_id</Label>
+                  <Label htmlFor="s-id">Sample ID</Label>
                   <Input id="s-id" value={sampleIdField} onChange={(e) => setSampleIdField(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="s-name">display_name (optional)</Label>
+                  <Label htmlFor="s-name">Display name (optional)</Label>
                   <Input id="s-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="s-mol">molecule_name (optional)</Label>
+                  <Label htmlFor="s-mol">Molecule name (optional)</Label>
                   <Input id="s-mol" value={moleculeName} onChange={(e) => setMoleculeName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="s-solv">solvent (optional)</Label>
+                  <Label htmlFor="s-solv">Solvent (optional)</Label>
                   <Input id="s-solv" value={solvent} onChange={(e) => setSolvent(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="s-notes">notes (optional)</Label>
+                  <Label htmlFor="s-notes">Notes (optional)</Label>
                   <Textarea id="s-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
                 </div>
                 {sampleError ? <p className="text-sm text-destructive">{sampleError}</p> : null}
@@ -368,11 +368,11 @@ export default function ProjectDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Recent SpectraCheck sessions</CardTitle>
-          <CardDescription>Populated when the API includes session lists on the project record.</CardDescription>
+          <CardDescription>Shown when session history is recorded on this project.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {recentSessions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No session entries returned for this project.</p>
+            <p className="text-sm text-muted-foreground">No sessions recorded for this project yet.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -399,11 +399,11 @@ export default function ProjectDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Reports</CardTitle>
-          <CardDescription>Populated when the API includes a reports collection.</CardDescription>
+          <CardDescription>Shown when reports are recorded on this project.</CardDescription>
         </CardHeader>
         <CardContent>
           {reports.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No reports returned for this project.</p>
+            <p className="text-sm text-muted-foreground">No reports for this project yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -430,11 +430,11 @@ export default function ProjectDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Audit summary</CardTitle>
-          <CardDescription>Shown when the API provides audit summary data.</CardDescription>
+          <CardDescription>Shown when audit summary data is available for this project.</CardDescription>
         </CardHeader>
         <CardContent>
           {auditSummary === undefined || auditSummary === null ? (
-            <p className="text-sm text-muted-foreground">No audit summary in the project response.</p>
+            <p className="text-sm text-muted-foreground">No audit summary available for this project.</p>
           ) : (
             <pre className="max-h-64 overflow-auto rounded-md border bg-muted/30 p-3 text-xs">
               {JSON.stringify(auditSummary, null, 2)}

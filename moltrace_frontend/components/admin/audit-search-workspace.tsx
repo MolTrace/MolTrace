@@ -294,7 +294,7 @@ export function AuditSearchWorkspace() {
           >
             <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
               <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Rows returned
+                Events found
               </CardTitle>
               <Database className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
             </CardHeader>
@@ -314,7 +314,7 @@ export function AuditSearchWorkspace() {
           >
             <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
               <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Rows shown
+                Events shown
               </CardTitle>
               <Filter className="h-4 w-4" style={{ color: "var(--mt-slate)" }} aria-hidden />
             </CardHeader>
@@ -446,7 +446,7 @@ export function AuditSearchWorkspace() {
           eyebrow="Audit"
           title="Audit events table"
           icon={ScrollText}
-          description="Rows after optional date-range refinement."
+          description="Events remaining after the optional date-range refinement."
         >
           <div>
             {loading ? (
@@ -516,10 +516,10 @@ export function AuditSearchWorkspace() {
       </div>
 
       <div>
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Developer JSON</h2>
+        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Raw data (for troubleshooting)</h2>
         <Collapsible className="group rounded-md border">
           <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-            Raw rows (redacted)
+            Raw audit records (sensitive values redacted)
             <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
           </CollapsibleTrigger>
           <CollapsibleContent>

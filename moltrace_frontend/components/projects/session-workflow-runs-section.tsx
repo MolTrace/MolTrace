@@ -15,6 +15,7 @@ import {
   formatIsoWhenPresent,
   readRecordString,
 } from "@/components/projects/project-workspace-utils"
+import { statusLabel } from "@/lib/ui/status"
 import { fetchSpectraCheckSessionWorkflowRuns } from "@/src/lib/spectracheck/spectracheck-backend-session"
 import { normalizeWorkflowRunsList } from "@/src/lib/dashboard/overview-metrics"
 
@@ -130,7 +131,7 @@ export function SessionWorkflowRunsSection({ sessionIds }: SessionWorkflowRunsSe
           <p className="text-xs text-muted-foreground">One or more session workflow lists could not be loaded.</p>
         ) : null}
         {flatRuns.length === 0 && !loading ? (
-          <p className="text-sm text-muted-foreground">No workflow runs returned for linked sessions.</p>
+          <p className="text-sm text-muted-foreground">No workflow runs recorded for linked sessions.</p>
         ) : null}
         {flatRuns.length > 0 ? (
           <div className="overflow-x-auto">
@@ -150,7 +151,7 @@ export function SessionWorkflowRunsSection({ sessionIds }: SessionWorkflowRunsSe
                     <TableCell className="max-w-[12rem] truncate font-mono text-xs">{runId(run)}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] font-normal">
-                        {runStatus(run)}
+                        {statusLabel(runStatus(run))}
                       </Badge>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">

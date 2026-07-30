@@ -221,16 +221,16 @@ export function SystemStatusWorkspace() {
       }
     }
     if (health) {
-      pushList("health", health.warnings)
-      pushList("health", health.notes)
+      pushList("Health", health.warnings)
+      pushList("Health", health.notes)
     }
     if (status) {
-      pushList("status", status.warnings)
-      pushList("status", status.notes)
+      pushList("Status", status.warnings)
+      pushList("Status", status.notes)
     }
     if (environmentCheck) {
-      pushList("environment-check", environmentCheck.warnings)
-      pushList("environment-check", environmentCheck.notes)
+      pushList("Environment", environmentCheck.warnings)
+      pushList("Environment", environmentCheck.notes)
     }
     return out
   }, [health, status, environmentCheck])
@@ -494,7 +494,7 @@ export function SystemStatusWorkspace() {
 
       {/* 4–6 Grid: Database, Storage, Jobs/Workers + OpenAPI + Environment */}
       <div>
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Database, storage, jobs, OpenAPI, environment</h2>
+        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Database, storage, jobs, API documentation, environment</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <ModuleCard
             accent="slate"
@@ -588,7 +588,7 @@ export function SystemStatusWorkspace() {
           <ModuleCard
             accent="slate"
             eyebrow="API Docs"
-            title="OpenAPI"
+            title="API documentation"
             icon={BookOpen}
             description="Whether the public API documentation is reachable."
           >
@@ -637,7 +637,9 @@ export function SystemStatusWorkspace() {
                       <span className="text-muted-foreground">Required variables present </span>
                       <span className="font-mono">
                         {typeof environmentCheck.required_variables_present === "boolean"
-                          ? String(environmentCheck.required_variables_present)
+                          ? environmentCheck.required_variables_present
+                            ? "Yes"
+                            : "No"
                           : "—"}
                       </span>
                     </span>
@@ -682,7 +684,7 @@ export function SystemStatusWorkspace() {
           eyebrow="Warnings"
           title="Recent warnings"
           icon={Bell}
-          description="All non-fatal warnings and notes returned across health, status, and environment checks."
+          description="All non-fatal warnings and notes reported by the health, status, and environment checks."
         >
           <div>
             {mergedWarnings.length === 0 ? (

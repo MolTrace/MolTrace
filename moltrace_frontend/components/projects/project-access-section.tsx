@@ -231,7 +231,7 @@ export function ProjectAccessSection({ projectId }: Props) {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Add collaborator</DialogTitle>
-              <DialogDescription>Grant access by email. The server must accept the invitation.</DialogDescription>
+              <DialogDescription>Grant access to this project by email address.</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-2">
@@ -309,7 +309,7 @@ export function ProjectAccessSection({ projectId }: Props) {
                 {rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-sm text-muted-foreground">
-                      No permissions returned for this project.
+                      No one has been granted access to this project yet.
                     </TableCell>
                   </TableRow>
                 ) : (

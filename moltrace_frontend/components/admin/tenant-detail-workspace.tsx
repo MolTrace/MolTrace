@@ -204,6 +204,48 @@ function isRecord(value: unknown): value is Row {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value)
 }
 
+/**
+ * Display-only labels for stored option values. Everything below is about what a
+ * reader sees; the stored values (sent to the server, compared against, used as
+ * `value=` on the controls) are never rewritten.
+ */
+const OPTION_LABEL_OVERRIDES: Record<string, string> = {
+  regulatory_hub: "Regentry",
+  reaction_optimization: "Reaction Optimization",
+  validation_center: "Validation Center",
+  ml_ai: "ML / AI",
+  ai_ml: "AI / ML",
+  ai_governance: "AI governance",
+  cross_module: "Cross-module",
+  shared_database_tenant_scoped: "Shared database (tenant-scoped)",
+  dedicated_schema: "Dedicated database schema",
+  go_live: "Go-live",
+  ready_for_go_live: "Ready for go-live",
+  approved_internal: "Approved (internal)",
+}
+
+const OPTION_WORD_LABELS: Record<string, string> = {
+  spectracheck: "SpectraCheck",
+  roi: "ROI",
+  ai: "AI",
+  ml: "ML",
+  sso: "SSO",
+  mfa: "MFA",
+  ip: "IP",
+}
+
+function optionLabel(value: string): string {
+  const raw = value.trim()
+  if (!raw) return value
+  const override = OPTION_LABEL_OVERRIDES[raw.toLowerCase()]
+  if (override) return override
+  const words = raw.toLowerCase().split(/[_\s]+/).filter(Boolean)
+  if (words.length === 0) return raw
+  const [firstWord, ...restWords] = words as [string, ...string[]]
+  const first = OPTION_WORD_LABELS[firstWord] ?? firstWord.charAt(0).toUpperCase() + firstWord.slice(1)
+  return [first, ...restWords.map((word) => OPTION_WORD_LABELS[word] ?? word)].join(" ")
+}
+
 function readStr(value: unknown): string {
   if (typeof value === "string" && value.trim()) return value.trim()
   if (typeof value === "number" && Number.isFinite(value)) return String(value)
@@ -298,8 +340,17 @@ function redactDeep(value: unknown): unknown {
 function safeFormatValue(key: string, value: unknown, maxLength = 220): string {
   if (SENSITIVE_KEY_PATTERN.test(key)) return "[redacted]"
   if (value == null || value === "") return "-"
-  if (typeof value === "string") return value.trim() || "-"
-  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  if (typeof value === "boolean") return value ? "Yes" : "No"
+  if (typeof value === "string") {
+    const text = value.trim()
+    if (!text) return "-"
+    // Yes/no reads better than a raw true/false for the on-off fields, which
+    // arrive already stringified by the readers above.
+    if (text === "true") return "Yes"
+    if (text === "false") return "No"
+    return text
+  }
+  if (typeof value === "number") return String(value)
   const text = JSON.stringify(redactDeep(value))
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
 }
@@ -338,7 +389,7 @@ function GenericTable({
   empty,
 }: {
   rows: Row[]
-  columns: { key: string; label: string; keys?: string[] }[]
+  columns: { key: string; label: string; keys?: string[]; humanize?: boolean }[]
   empty: string
 }) {
   return (
@@ -371,8 +422,10 @@ function GenericTable({
                     <TableCell key={column.key} className="max-w-[24rem] text-xs">
                       {statusLike && value !== "-" ? (
                         <Badge variant="outline" className={`font-normal ${statusBadgeClass(value)}`}>
-                          {value}
+                          {optionLabel(value)}
                         </Badge>
+                      ) : column.humanize && value !== "-" ? (
+                        optionLabel(value)
                       ) : (
                         value
                       )}
@@ -1193,7 +1246,7 @@ function OnboardingPanel({
             { key: "status", label: "Status" },
             { key: "owner_name", label: "Owner" },
             { key: "customer_contact", label: "Customer contact" },
-            { key: "implementation_stage", label: "Implementation stage" },
+            { key: "implementation_stage", label: "Implementation stage", humanize: true },
             { key: "updated_at", label: "Updated date", keys: ["updated_at", "updated_date"] },
           ]}
         />
@@ -3060,7 +3113,7 @@ export function TenantDetailWorkspace() {
               rows={environments}
               empty="No environments yet."
               columns={[
-                { key: "environment_type", label: "Environment type" },
+                { key: "environment_type", label: "Environment type", humanize: true },
                 { key: "base_url", label: "Base URL" },
                 { key: "status", label: "Status" },
                 { key: "data_retention_policy_id", label: "Data retention policy ID" },

@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { statusLabel } from "@/lib/ui/status"
 import { Boxes, Database, Link2, ListFilter, Microscope, Plus, Search } from "lucide-react"
 import { trackCompoundCreated } from "@/src/lib/analytics/analytics-client"
 
@@ -184,7 +185,7 @@ export function CompoundRegistryWorkspace() {
     setCreateOk(false)
     const pn = preferredName.trim()
     if (!pn) {
-      setCreateErr("preferred name is required.")
+      setCreateErr("Preferred name is required.")
       return
     }
     setCreateBusy(true)
@@ -319,7 +320,7 @@ export function CompoundRegistryWorkspace() {
             <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-teal-ink)" }}>
               {summary.activeBatches == null ? "—" : summary.activeBatches}
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">When per-row batch counts are present</p>
+            <p className="mt-2 text-xs text-muted-foreground">When batch counts are available</p>
           </CardContent>
         </Card>
         <Card
@@ -345,7 +346,7 @@ export function CompoundRegistryWorkspace() {
           </CardHeader>
           <CardContent className="pb-5">
             <div className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-amber)" }}>{summary.needingReview}</div>
-            <p className="mt-2 text-xs text-muted-foreground">Status-based when returned</p>
+            <p className="mt-2 text-xs text-muted-foreground">Based on each record&apos;s review status</p>
           </CardContent>
         </Card>
       </div>
@@ -378,7 +379,7 @@ export function CompoundRegistryWorkspace() {
                   <SelectContent>
                     {COMPOUND_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {statusLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -402,7 +403,7 @@ export function CompoundRegistryWorkspace() {
                   <SelectContent>
                     {STRUCTURE_FORMATS.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {statusLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -426,7 +427,7 @@ export function CompoundRegistryWorkspace() {
                   <SelectContent>
                     {STEREO_STATUSES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {statusLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -441,7 +442,7 @@ export function CompoundRegistryWorkspace() {
                   <SelectContent>
                     {SALT_SOLVENT_STATUSES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {statusLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -507,7 +508,7 @@ export function CompoundRegistryWorkspace() {
                   <SelectItem value="__any__">Any</SelectItem>
                   {COMPOUND_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {statusLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -585,7 +586,7 @@ export function CompoundRegistryWorkspace() {
                           {pickStr(row, ["registry_id", "registryId", "registry_code", "registryCode"])}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{pickStr(row, ["compound_type", "compoundType"])}</Badge>
+                          <Badge variant="outline">{statusLabel(pickStr(row, ["compound_type", "compoundType"]))}</Badge>
                         </TableCell>
                         <TableCell className="font-mono text-xs">{pickStr(row, ["formula", "molecular_formula", "molecularFormula"])}</TableCell>
                         <TableCell className="tabular-nums text-sm">
@@ -595,10 +596,12 @@ export function CompoundRegistryWorkspace() {
                           })()}
                         </TableCell>
                         <TableCell className="text-xs">
-                          {pickStr(row, ["stereochemistry_status", "stereochemistryStatus"])}
+                          {statusLabel(pickStr(row, ["stereochemistry_status", "stereochemistryStatus"]))}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{pickStr(row, ["status", "record_status", "recordStatus"])}</Badge>
+                          <Badge variant="secondary">
+                            {statusLabel(pickStr(row, ["status", "record_status", "recordStatus"]))}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{formatUpdated(row)}</TableCell>
                         <TableCell>

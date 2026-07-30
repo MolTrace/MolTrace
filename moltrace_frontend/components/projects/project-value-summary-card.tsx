@@ -77,7 +77,7 @@ export function ProjectValueSummaryCard({ projectId }: { projectId: string }) {
           <p className="text-xs text-muted-foreground">Loading project ROI…</p>
         ) : !live ? (
           <p className="text-xs text-muted-foreground">
-            Project ROI snapshot unavailable — administrator access may be required, or the backend did not return data.
+            Project ROI snapshot unavailable — administrator access may be required, or no data has been recorded yet.
           </p>
         ) : null}
       </CardContent>
