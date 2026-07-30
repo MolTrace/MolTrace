@@ -28,6 +28,7 @@ from .models import (
 from .compound_class_priors import diagnostic_regions_for
 from .gsd import deconvolve_region, multiplicity_from_lines
 from .impurities import match_h1_impurity_shifts, partner_shifts_for_compound
+from .solvents import solvent_exchanges_labile_protons
 from .nmr_tables import solvent_windows
 from .parser import ReferencePeakAssignment, normalize_multiplicity, normalize_nmr_text, parse_j_values_hz, parse_reference_nmr_text
 
@@ -1532,6 +1533,76 @@ def _round_half_integrations(values: list[float], *, minimum: float = 0.5, maxim
     return rounded
 
 
+def _data_derived_integration_scale(
+    areas: list[float],
+    *,
+    max_protons_for_smallest: int = 4,
+) -> tuple[float, float] | None:
+    """Find the scale that makes measured areas look like proton counts.
+
+    Peak areas are in arbitrary units, so turning them into proton counts needs
+    a scale. Taking that scale from the structure's own proton total makes the
+    observed grand total equal the expected grand total by construction, which
+    destroys the only independent check the panel has. This derives the scale
+    from the SPECTRUM instead: protons are quantised, so the correct scale is
+    the one under which every peak lands near a whole number.
+
+    Returns ``(scale, residual)`` where residual is the area-weighted RMS
+    distance from the nearest integer (0 = perfect). Returns None when no
+    candidate fits, leaving the caller to fall back.
+
+    LIMITATION — measured, not theoretical. A free scale fitting N integers has
+    one parameter, so for small N it is close to unfalsifiable: areas in the
+    ratio 1 : sqrt(2) : sqrt(3) fit "3 : 4 : 5" with residual 0.073, the golden
+    ratio fits "3 : 5 : 8", and any two peaks fit perfectly. A low residual is
+    therefore NOT on its own evidence that the scale is right, and this function
+    must never be used as the sole basis for reporting proton counts. The caller
+    is expected to corroborate the implied total against the structure; see
+    ``_resolve_integration_scale``. Fewer than four positive peaks is rejected
+    outright as hopelessly under-determined.
+
+    This only became viable at all once integration stopped being
+    linewidth-dependent: with truncated areas a broad peak was not a whole
+    number of anything.
+    """
+    positive = [float(a) for a in areas if a > 0]
+    if len(positive) < 4:
+        return None
+    smallest = min(positive)
+    total_area = sum(positive)
+
+    best: tuple[float, float] | None = None
+    for protons in range(1, max_protons_for_smallest + 1):
+        base = protons / smallest
+        # Refine around the base scale: integration carries a few percent of
+        # error, so the exact scale is near, not at, protons/smallest.
+        for step in range(-30, 31):
+            scale = base * (1.0 + step * 0.004)
+            if scale <= 0:
+                continue
+            weighted_sq = 0.0
+            for area in positive:
+                scaled = area * scale
+                if scaled > 60.0:
+                    # Implausible proton count for one environment; this scale
+                    # is wrong rather than the peak being enormous.
+                    weighted_sq = float("inf")
+                    break
+                weighted_sq += area * (scaled - round(scaled)) ** 2
+            if not math.isfinite(weighted_sq):
+                continue
+            residual = math.sqrt(weighted_sq / total_area)
+            if best is None or residual < best[1]:
+                best = (scale, residual)
+    return best
+
+
+# Area-weighted RMS distance-to-integer above which the data-derived scale is
+# not trusted. 0.12 H of drift on a typical peak is tolerable; beyond that the
+# spectrum is not telling us a consistent proton quantum.
+_DATA_SCALE_RESIDUAL_LIMIT = 0.12
+
+
 def _normalize_integrations_to_target(values: list[float], target_total_h: float) -> list[float] | None:
     if not values:
         return []
@@ -1577,9 +1648,12 @@ def _select_target_proton_count(
 ) -> float | None:
     if expected_total_h is None and expected_non_labile_h is None:
         return None
+    # Any deuterated protic solvent exchanges OH/NH/SH away, not just D2O. The
+    # literal string test missed CD3OD entirely, so a methanol-d4 spectrum was
+    # normalised against a proton total that included protons which cannot be
+    # observed.
     if (
-        solvent
-        and solvent.upper() == "D2O"
+        solvent_exchanges_labile_protons(solvent)
         and expected_non_labile_h is not None
         and expected_non_labile_h > 0
     ):
@@ -1923,11 +1997,43 @@ def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float
     integrations = _round_half_integrations(raw_integrations, minimum=0.5)
     normalized_to_target = False
     raw_total_h = round(sum(raw_integrations), 3)
-    if target_total_h is not None:
+
+    # Prefer a scale derived from the SPECTRUM. Protons are quantised, so the
+    # right scale is the one under which every peak lands near a whole number —
+    # a property of the data, not of the answer. Only when the spectrum shows
+    # no consistent proton quantum do we fall back to scaling against the
+    # structural total, and that fallback is reported rather than silent,
+    # because it makes the observed grand total match the expected one by
+    # construction.
+    scale_basis = "provisional"
+    scale_residual: float | None = None
+    totals_agree_independently = False
+    areas = [float(est.area) for est in in_range_estimates]
+    fit = _data_derived_integration_scale(areas)
+    if fit is not None and fit[1] <= _DATA_SCALE_RESIDUAL_LIMIT:
+        scale, scale_residual = fit
+        candidate = [round(area * scale * 2.0) / 2.0 for area in areas]
+        implied_total = sum(candidate)
+        # A good fit alone proves nothing (see the limitation note on
+        # _data_derived_integration_scale). Adopt the data-derived scale only
+        # when the total it implies independently lands on the structure's
+        # proton count. The structure vetoes an implausible fit; it does not
+        # supply the scale. When they agree, the agreement is real evidence
+        # rather than an arithmetic identity, because the two were computed
+        # from different information.
+        if all(value > 0 for value in candidate) and target_total_h is not None:
+            if abs(implied_total - target_total_h) <= max(1.0, 0.1 * target_total_h):
+                integrations = candidate
+                scale_basis = "data_derived_corroborated"
+                totals_agree_independently = True
+
+    if scale_basis != "data_derived_corroborated" and target_total_h is not None:
         normalized = _normalize_integrations_to_target(raw_integrations, target_total_h)
         if normalized:
             integrations = normalized
             normalized_to_target = True
+            scale_basis = "normalized_to_structure"
+
     peaks: list[Peak] = []
     for est, integration in zip(in_range_estimates, integrations):
         peaks.append(
@@ -1941,6 +2047,17 @@ def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float
     meta: dict[str, Any] = {
         "raw_estimated_total_h": raw_total_h,
         "integration_normalized_to_target": normalized_to_target,
+        "integration_scale_basis": scale_basis,
+        # RMS distance-to-integer of the fitted scale. Small values mean the
+        # spectrum itself agrees on a proton quantum, which is independent
+        # corroboration; None means no data-derived fit was usable.
+        "integration_scale_residual": (
+            round(scale_residual, 4) if scale_residual is not None else None
+        ),
+        # True only when the scale came from the spectrum AND the proton total
+        # it implies independently matched the structure. That is the one case
+        # where the totals agreeing is corroboration rather than arithmetic.
+        "integration_totals_agree_independently": totals_agree_independently,
     }
     if out_of_range_shifts:
         meta["out_of_range_dropped_count"] = len(out_of_range_shifts)
