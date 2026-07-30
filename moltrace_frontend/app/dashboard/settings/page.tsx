@@ -30,7 +30,13 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList>
+        {/* Six icon+label triggers do not fit one phone-width row. The default
+            TabsList is a fixed-height `w-fit` flex row with no overflow
+            handling, so on mobile the trailing tabs (Organization, Connectors)
+            were clipped outside the container with no way to scroll to them.
+            Wrapping keeps every tab reachable without a hidden scroll gesture,
+            and still renders as a single row from `sm` up. */}
+        <TabsList className="flex h-auto min-h-10 w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             Profile
@@ -217,7 +223,9 @@ export default function SettingsPage() {
 
         <TabsContent value="connectors">
           <Tabs defaultValue="connector-center" className="space-y-4">
-            <TabsList>
+            {/* Same treatment for the nested list — these three labels are long
+                enough to overflow on their own. */}
+            <TabsList className="flex h-auto min-h-10 w-full flex-wrap justify-start gap-1">
               <TabsTrigger value="connector-center" className="gap-2">
                 <Plug className="h-4 w-4" />
                 Connector Center
