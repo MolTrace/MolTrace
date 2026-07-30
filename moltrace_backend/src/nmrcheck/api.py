@@ -8006,6 +8006,10 @@ def _load_similarity_index():
     Returns ``None`` when ``MOLTRACE_SIMILARITY_INDEX`` is unset or the file is
     absent — the endpoint then reports ``index_available=false`` instead of
     failing, mirroring the server-configured NMRNet pattern.
+
+    ``load_index`` detects the artifact layout from the file itself, so a
+    single-index deployment and a per-nucleus one need no configuration
+    difference; both expose ``len()`` and ``search(query, k)``.
     """
 
     import os
@@ -8017,9 +8021,9 @@ def _load_similarity_index():
     cached = _SIMILARITY_INDEX_CACHE.get(key)
     if cached is not None:
         return cached
-    from moltrace.spectroscopy.similarity import SpectrumIndex
+    from moltrace.spectroscopy.similarity import load_index
 
-    index = SpectrumIndex.load(path)
+    index = load_index(path)
     _SIMILARITY_INDEX_CACHE[key] = index
     return index
 
@@ -8258,11 +8262,24 @@ async def spectrum_retrieve(
             warnings=warnings,
         )
 
-    hits = index.search(query, k=payload.top_k)
-    results = [
-        SpectrumRetrieveHit(id=str(identifier), l2_distance=float(distance))
-        for identifier, distance in hits
-    ]
+    # A per-nucleus index can say which nuclei each distance was computed over; a
+    # single concatenated index cannot, and reports empty coverage lists.
+    detailed = getattr(index, "search_with_coverage", None)
+    if detailed is not None:
+        results = [
+            SpectrumRetrieveHit(
+                id=str(identifier),
+                l2_distance=float(distance),
+                nuclei_compared=list(compared),
+                nuclei_absent=list(absent),
+            )
+            for identifier, distance, compared, absent in detailed(query, k=payload.top_k)
+        ]
+    else:
+        results = [
+            SpectrumRetrieveHit(id=str(identifier), l2_distance=float(distance))
+            for identifier, distance in index.search(query, k=payload.top_k)
+        ]
     _emit(
         error_kind=None,
         query_source=query_source,
