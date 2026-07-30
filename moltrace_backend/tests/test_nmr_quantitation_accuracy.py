@@ -173,6 +173,85 @@ def test_overlapping_envelope_conserves_total_area() -> None:
     )
 
 
+class TestDataDerivedScale:
+    """Proton counts recovered from the spectrum, not from the answer.
+
+    Scaling integrals so their sum equals the structure's proton total makes
+    the observed grand total match the expected one by construction. These
+    tests check the alternative: protons are quantised, so the correct scale is
+    the one under which every peak lands near a whole number — a property of
+    the data alone.
+    """
+
+    def test_recovers_proton_counts_without_the_structure(self) -> None:
+        from nmrcheck.spectrum import _data_derived_integration_scale
+
+        # True counts 3 : 2 : 1 : 1 in arbitrary area units, plus a few percent
+        # of integration error such as a real spectrum carries.
+        areas = [3.06, 1.98, 1.01, 0.99]
+        fit = _data_derived_integration_scale(areas)
+        assert fit is not None
+        scale, residual = fit
+        recovered = [round(a * scale) for a in areas]
+        assert recovered == [3, 2, 1, 1], (
+            f"got {recovered} (scale {scale}, resid {residual})"
+        )
+        assert residual < 0.12
+
+    def test_handles_a_smallest_peak_that_is_not_one_proton(self) -> None:
+        """The smallest peak is not always 1 H.
+
+        Assuming it is — as the provisional scale did — misprices every other
+        peak whenever the smallest resonance is a 2 H methylene.
+        """
+        from nmrcheck.spectrum import _data_derived_integration_scale
+
+        # True counts 6 : 4 : 2 : 2; the smallest peak is 2 H.
+        areas = [6.03, 3.98, 2.02, 1.99]
+        fit = _data_derived_integration_scale(areas)
+        assert fit is not None
+        scale, _residual = fit
+        recovered = [round(a * scale) for a in areas]
+        assert recovered in ([6, 4, 2, 2], [3, 2, 1, 1]), f"got {recovered}"
+        # Whichever quantum it picks, the RATIOS must be right.
+        assert recovered[0] / recovered[2] == pytest.approx(3.0)
+
+    def test_a_good_fit_alone_is_not_evidence(self) -> None:
+        """The measured limitation, pinned so it cannot be forgotten.
+
+        A free scale fitting N integers has one parameter, so for small N it is
+        close to unfalsifiable. Areas in the ratio 1 : sqrt(2) : sqrt(3) — which
+        are NOT a whole-number ratio — fit "3 : 4 : 5" with a low residual.
+        A low residual therefore must never on its own justify reporting proton
+        counts; the caller has to corroborate the implied total against the
+        structure.
+        """
+        from nmrcheck.spectrum import _data_derived_integration_scale
+
+        areas = [1.0, math.sqrt(2), math.sqrt(3), math.sqrt(5)]
+        fit = _data_derived_integration_scale(areas)
+        if fit is not None:
+            assert fit[1] < 0.2, (
+                "irrational area ratios still produce a plausible-looking fit; "
+                "this is the documented limitation, so the caller must gate on "
+                "corroboration rather than on residual alone"
+            )
+
+    def test_too_few_peaks_is_rejected_as_underdetermined(self) -> None:
+        from nmrcheck.spectrum import _data_derived_integration_scale
+
+        # Any two peaks fit perfectly; three are barely better.
+        assert _data_derived_integration_scale([1.0, 1.5]) is None
+        assert _data_derived_integration_scale([3.06, 1.98, 1.01]) is None
+
+    def test_clean_synthetic_case_fits_essentially_perfectly(self) -> None:
+        from nmrcheck.spectrum import _data_derived_integration_scale
+
+        fit = _data_derived_integration_scale([3.0, 2.0, 1.0, 1.0])
+        assert fit is not None
+        assert fit[1] < 0.01
+
+
 def test_truncation_loss_is_reported_not_silent() -> None:
     """A Lorentzian's recovered fraction must not depend on its linewidth.
 
