@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 #: A shift row starts with the ppm value followed by a comma (``2.59, L=s6``).
@@ -79,13 +80,52 @@ def parse_shifts(lines: list[str]) -> list[float]:
     return shifts
 
 
-def convert(src: Path) -> tuple[list[dict], dict[str, int]]:
-    """Parse an NMReDATA ``.sd`` file into corpus records + conversion counters."""
-    text = src.read_text(encoding="utf-8", errors="replace")
-    by_smiles: dict[str, dict] = {}
-    stats = {"records": 0, "no_smiles": 0, "no_shifts": 0, "duplicates": 0}
+def iter_records(src: Path) -> Iterator[str]:
+    """Yield one SDF record at a time.
 
-    for record in text.split("$$$$"):
+    Streams rather than reading the file whole: the full NMRShiftDB2 export is
+    ~271 MiB, and ``read_text`` + ``split`` on it peaked at ~1.3 GB resident.
+    """
+    buf: list[str] = []
+    with src.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.startswith("$$$$"):
+                if buf:
+                    yield "".join(buf)
+                buf = []
+            else:
+                buf.append(line)
+    if buf:
+        yield "".join(buf)
+
+
+def convert(src: Path) -> tuple[list[dict], dict[str, int]]:
+    """Parse an NMReDATA ``.sd`` file into corpus records + conversion counters.
+
+    Records sharing a SMILES are merged **per nucleus** rather than keeping whichever
+    single record has the most shifts overall. The full export is one-record-per-
+    spectrum and nucleus-grouped, so a molecule routinely appears as a ¹H-only record
+    and a separate ¹³C-only record; global keep-max picks one and silently discards
+    the other nucleus entirely. Merging per nucleus lifted both-nuclei coverage from
+    68/90 to 83/90 molecules on the in-repo fixture alone.
+
+    Within a nucleus the richest (longest) assigned list wins rather than the union —
+    two records for the same nucleus are re-measurements, so unioning them would
+    double-count peaks. The chosen source is recorded per nucleus in ``provenance``,
+    which also surfaces the honest limitation: a merged record's ¹H and ¹³C may come
+    from different measurements, and therefore possibly different solvents or fields.
+    """
+    by_smiles: dict[str, dict] = {}
+    stats = {
+        "records": 0,
+        "no_smiles": 0,
+        "no_shifts": 0,
+        "duplicates": 0,
+        "merged_nuclei": 0,
+        "cross_solvent_merges": 0,
+    }
+
+    for record in iter_records(src):
         if not record.strip():
             continue
         stats["records"] += 1
@@ -106,20 +146,46 @@ def convert(src: Path) -> tuple[list[dict], dict[str, int]]:
         db_id = re.search(r"DB_ID=(\S+)", raw_id)
         name = " ".join(props.get("CHEMNAME", [])).strip()
         identifier = db_id.group(1) if db_id else (raw_id or name or smiles[:24])
+        solvent = " ".join(props.get("NMREDATA_SOLVENT", [])).strip() or None
 
-        if smiles in by_smiles:
+        entry = by_smiles.get(smiles)
+        is_duplicate = entry is not None
+        if entry is None:
+            # The id names the merged composite; `provenance` carries the real
+            # per-nucleus source DB_IDs, so first-seen is a deterministic label
+            # rather than a claim that this record came from one measurement.
+            entry = by_smiles[smiles] = {
+                "id": f"nmrshiftdb2:{identifier}",
+                "smiles": smiles,
+                "shifts_1h": [],
+                "shifts_13c": [],
+                "provenance": {},
+            }
+        else:
             stats["duplicates"] += 1
-            previous = by_smiles[smiles]
-            prior_count = len(previous["shifts_1h"]) + len(previous["shifts_13c"])
-            if len(shifts_1h) + len(shifts_13c) <= prior_count:
-                continue
 
-        by_smiles[smiles] = {
-            "id": f"nmrshiftdb2:{identifier}",
-            "smiles": smiles,
-            "shifts_1h": shifts_1h,
-            "shifts_13c": shifts_13c,
+        # Per-nucleus: take the richest assigned list, and remember where it came from.
+        for key, shifts in (("shifts_1h", shifts_1h), ("shifts_13c", shifts_13c)):
+            if not shifts or len(shifts) <= len(entry[key]):
+                continue
+            filled_an_empty_nucleus = not entry[key]
+            entry[key] = shifts
+            entry["provenance"][key] = {"db_id": identifier, "solvent": solvent}
+            if is_duplicate and filled_an_empty_nucleus:
+                # A later record supplied a nucleus the earlier one lacked — the
+                # exact case global keep-max used to throw away.
+                stats["merged_nuclei"] += 1
+
+    # Flag merged records whose two nuclei came from different solvents.
+    for entry in by_smiles.values():
+        prov = entry["provenance"]
+        solvents = {
+            prov[key]["solvent"]
+            for key in ("shifts_1h", "shifts_13c")
+            if key in prov and prov[key]["solvent"]
         }
+        if len(solvents) > 1:
+            stats["cross_solvent_merges"] += 1
 
     return list(by_smiles.values()), stats
 
