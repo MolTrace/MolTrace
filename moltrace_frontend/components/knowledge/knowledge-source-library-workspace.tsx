@@ -203,7 +203,7 @@ export function KnowledgeSourceLibraryWorkspace() {
     setCreateOk("")
     const title = createTitle.trim()
     if (!title) {
-      setCreateErr("title is required.")
+      setCreateErr("A title is required.")
       return
     }
     setCreateBusy(true)
@@ -239,7 +239,7 @@ export function KnowledgeSourceLibraryWorkspace() {
       setCreateStatus("draft")
       await loadSources()
     } catch (e) {
-      setCreateErr(formatApiError(e, "Create source failed."))
+      setCreateErr(formatApiError(e, "Could not create the source."))
     } finally {
       setCreateBusy(false)
     }
@@ -250,7 +250,7 @@ export function KnowledgeSourceLibraryWorkspace() {
     setPatchErr("")
     setPatchOk("")
     if (!patchTitle.trim()) {
-      setPatchErr("title is required.")
+      setPatchErr("A title is required.")
       return
     }
     setPatchBusy(true)
@@ -272,7 +272,7 @@ export function KnowledgeSourceLibraryWorkspace() {
       setPatchOk("Source updated.")
       await loadSources()
     } catch (e) {
-      setPatchErr(formatApiError(e, "Update source failed."))
+      setPatchErr(formatApiError(e, "Could not save changes to the source."))
     } finally {
       setPatchBusy(false)
     }
@@ -283,7 +283,7 @@ export function KnowledgeSourceLibraryWorkspace() {
     setUploadErr("")
     setUploadOk("")
     if (!uploadFile || uploadFile.size === 0) {
-      setUploadErr("file is required.")
+      setUploadErr("Choose a file to upload.")
       return
     }
     setUploadBusy(true)
@@ -297,7 +297,7 @@ export function KnowledgeSourceLibraryWorkspace() {
       const f = await apiFetch<unknown>(`/knowledge/sources/${selectedId}/files`, { method: "GET" })
       setFiles(asArray(f).filter(isRecord) as Record<string, unknown>[])
     } catch (e) {
-      setUploadErr(formatApiError(e, "Upload failed."))
+      setUploadErr(formatApiError(e, "Could not upload the file."))
     } finally {
       setUploadBusy(false)
     }
@@ -328,8 +328,8 @@ export function KnowledgeSourceLibraryWorkspace() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Knowledge sources</h1>
         <p className="text-sm text-muted-foreground">
-          Register bibliographic metadata and upload files for extraction. Operational signals from your tenant API —
-          not legal or publication advice.
+          Register bibliographic metadata and upload files for extraction. Operational signals from your organization’s
+          own records — not legal or publication advice.
         </p>
       </div>
 
@@ -351,7 +351,7 @@ export function KnowledgeSourceLibraryWorkspace() {
           {createOk ? <AlertCard variant="success" title="Recorded" description={createOk} /> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="ks-title">title</Label>
+              <Label htmlFor="ks-title">Title</Label>
               <Input
                 id="ks-title"
                 value={createTitle}
@@ -360,7 +360,7 @@ export function KnowledgeSourceLibraryWorkspace() {
               />
             </div>
             <div className="space-y-2">
-              <Label>source_type</Label>
+              <Label>Source type</Label>
               <Select value={createSourceType} onValueChange={setCreateSourceType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -375,11 +375,11 @@ export function KnowledgeSourceLibraryWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ks-doi">doi</Label>
+              <Label htmlFor="ks-doi">DOI</Label>
               <Input id="ks-doi" value={createDoi} onChange={(e) => setCreateDoi(e.target.value)} autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ks-patent">patent_number</Label>
+              <Label htmlFor="ks-patent">Patent number</Label>
               <Input
                 id="ks-patent"
                 value={createPatent}
@@ -388,11 +388,11 @@ export function KnowledgeSourceLibraryWorkspace() {
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="ks-url">source_url</Label>
+              <Label htmlFor="ks-url">Source URL</Label>
               <Input id="ks-url" value={createUrl} onChange={(e) => setCreateUrl(e.target.value)} autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ks-publisher">publisher</Label>
+              <Label htmlFor="ks-publisher">Publisher</Label>
               <Input
                 id="ks-publisher"
                 value={createPublisher}
@@ -401,7 +401,7 @@ export function KnowledgeSourceLibraryWorkspace() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ks-pubdate">publication_date</Label>
+              <Label htmlFor="ks-pubdate">Publication date</Label>
               <Input
                 id="ks-pubdate"
                 type="date"
@@ -410,7 +410,7 @@ export function KnowledgeSourceLibraryWorkspace() {
               />
             </div>
             <div className="space-y-2">
-              <Label>reliability_label</Label>
+              <Label>Reliability</Label>
               <Select value={createReliability} onValueChange={setCreateReliability}>
                 <SelectTrigger>
                   <SelectValue />
@@ -425,7 +425,7 @@ export function KnowledgeSourceLibraryWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>status</Label>
+              <Label>Status</Label>
               <Select value={createStatus} onValueChange={setCreateStatus}>
                 <SelectTrigger>
                   <SelectValue />
@@ -478,12 +478,12 @@ export function KnowledgeSourceLibraryWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[80px]">id</TableHead>
-                  <TableHead>title</TableHead>
-                  <TableHead>source_type</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>reliability_label</TableHead>
-                  <TableHead className="w-[120px]">select</TableHead>
+                  <TableHead className="w-[80px]">ID</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Source type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Reliability</TableHead>
+                  <TableHead className="w-[120px]">Select</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -540,7 +540,7 @@ export function KnowledgeSourceLibraryWorkspace() {
             ) : detail ? (
               <>
                 {sourceWarnings.length > 0 ? (
-                  <AlertCard variant="error" title="warnings">
+                  <AlertCard variant="error" title="Warnings">
                     <ul className="list-inside list-disc text-sm">
                       {sourceWarnings.map((w, i) => (
                         <li key={`${i}-${w.slice(0, 80)}`}>{w}</li>
@@ -549,16 +549,16 @@ export function KnowledgeSourceLibraryWorkspace() {
                   </AlertCard>
                 ) : null}
 
-                {patchErr ? <AlertCard variant="error" title="Patch error" description={patchErr} /> : null}
+                {patchErr ? <AlertCard variant="error" title="Could not save" description={patchErr} /> : null}
                 {patchOk ? <AlertCard variant="success" title="Recorded" description={patchOk} /> : null}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="kp-title">title</Label>
+                    <Label htmlFor="kp-title">Title</Label>
                     <Input id="kp-title" value={patchTitle} onChange={(e) => setPatchTitle(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>source_type</Label>
+                    <Label>Source type</Label>
                     <Select value={patchSourceType} onValueChange={setPatchSourceType}>
                       <SelectTrigger>
                         <SelectValue />
@@ -573,23 +573,23 @@ export function KnowledgeSourceLibraryWorkspace() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="kp-doi">doi</Label>
+                    <Label htmlFor="kp-doi">DOI</Label>
                     <Input id="kp-doi" value={patchDoi} onChange={(e) => setPatchDoi(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="kp-patent">patent_number</Label>
+                    <Label htmlFor="kp-patent">Patent number</Label>
                     <Input id="kp-patent" value={patchPatent} onChange={(e) => setPatchPatent(e.target.value)} />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="kp-url">source_url</Label>
+                    <Label htmlFor="kp-url">Source URL</Label>
                     <Input id="kp-url" value={patchUrl} onChange={(e) => setPatchUrl(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="kp-publisher">publisher</Label>
+                    <Label htmlFor="kp-publisher">Publisher</Label>
                     <Input id="kp-publisher" value={patchPublisher} onChange={(e) => setPatchPublisher(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="kp-pubdate">publication_date</Label>
+                    <Label htmlFor="kp-pubdate">Publication date</Label>
                     <Input
                       id="kp-pubdate"
                       type="date"
@@ -598,7 +598,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>reliability_label</Label>
+                    <Label>Reliability</Label>
                     <Select value={patchReliability} onValueChange={setPatchReliability}>
                       <SelectTrigger>
                         <SelectValue />
@@ -613,7 +613,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>status</Label>
+                    <Label>Status</Label>
                     <Select value={patchStatus} onValueChange={setPatchStatus}>
                       <SelectTrigger>
                         <SelectValue />
@@ -655,7 +655,7 @@ export function KnowledgeSourceLibraryWorkspace() {
             {uploadOk ? <AlertCard variant="success" title="Recorded" description={uploadOk} /> : null}
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
-                <Label htmlFor="ks-file">file</Label>
+                <Label htmlFor="ks-file">File</Label>
                 <Input
                   id="ks-file"
                   type="file"
@@ -689,12 +689,12 @@ export function KnowledgeSourceLibraryWorkspace() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[72px]">id</TableHead>
-                      <TableHead>filename</TableHead>
-                      <TableHead className="font-mono text-[11px]">sha256</TableHead>
-                      <TableHead>parse_status</TableHead>
-                      <TableHead className="text-right">warnings</TableHead>
-                  <TableHead>created_at</TableHead>
+                      <TableHead className="w-[72px]">ID</TableHead>
+                      <TableHead>File name</TableHead>
+                      <TableHead className="font-mono text-[11px]">SHA-256</TableHead>
+                      <TableHead>Parse status</TableHead>
+                      <TableHead className="text-right">Warnings</TableHead>
+                      <TableHead>Created</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

@@ -81,6 +81,33 @@ function formatWhen(iso: string | undefined): string {
   return formatStableUtcDateTime(iso)
 }
 
+/** Display-only labels for stored source-type values (the stored value is unchanged). */
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  fda_guidance: "FDA guidance",
+  ema_guideline: "EMA guideline",
+  ich_guideline: "ICH guideline",
+  usp_chapter: "USP chapter",
+  pmda_guidance: "PMDA guidance",
+  health_canada_guidance: "Health Canada guidance",
+  internal_sop: "Internal SOP",
+  company_policy: "Company policy",
+  custom_url: "Custom URL",
+  uploaded_document: "Uploaded document",
+  other: "Other",
+}
+
+/** Display-only humanizer (guidance_revision → "Guidance revision"). */
+function humanizeValue(raw: string | undefined | null): string {
+  if (!raw) return "—"
+  const words = raw.replace(/_/g, " ").trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+function sourceTypeLabel(raw: string | undefined | null): string {
+  if (!raw) return "—"
+  return SOURCE_TYPE_LABELS[raw] ?? humanizeValue(raw)
+}
+
 type JurisdictionRow = { id: number; name: string }
 
 function parseJurisdictions(raw: unknown): JurisdictionRow[] {
@@ -410,9 +437,9 @@ export function RegulatorySurveillanceDashboard() {
                     return (
                       <TableRow key={id != null ? `w-${id}` : `w-idx-${widx}`}>
                         <TableCell className="max-w-[200px] font-medium">{readRecordString(row, "title") ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{readRecordString(row, "source_type") ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{sourceTypeLabel(readRecordString(row, "source_type"))}</TableCell>
                         <TableCell className="text-xs">
-                          {jid != null ? jurisdictionNameById.get(jid) ?? `id ${jid}` : "—"}
+                          {jid != null ? jurisdictionNameById.get(jid) ?? `Jurisdiction ${jid}` : "—"}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
@@ -493,7 +520,7 @@ export function RegulatorySurveillanceDashboard() {
                 <SelectContent>
                   {WATCHER_SOURCE_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {sourceTypeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -577,7 +604,7 @@ export function RegulatorySurveillanceDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>id</TableHead>
+                  <TableHead>ID</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Change type</TableHead>
                   <TableHead>Severity</TableHead>
@@ -612,9 +639,9 @@ export function RegulatorySurveillanceDashboard() {
                       <TableRow key={id != null ? `ch-${id}` : `ch-idx-${idx}`}>
                         <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                         <TableCell className="max-w-[240px] text-sm">{readRecordString(row, "title") ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{readRecordString(row, "change_type") ?? "—"}</TableCell>
-                        <TableCell>{readRecordString(row, "severity") ?? "—"}</TableCell>
-                        <TableCell>{readRecordString(row, "review_status") ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{humanizeValue(readRecordString(row, "change_type"))}</TableCell>
+                        <TableCell>{humanizeValue(readRecordString(row, "severity"))}</TableCell>
+                        <TableCell>{humanizeValue(readRecordString(row, "review_status"))}</TableCell>
                         <TableCell className="tabular-nums">{dossierCount}</TableCell>
                         <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                           {formatWhen(readRecordString(row, "created_at"))}

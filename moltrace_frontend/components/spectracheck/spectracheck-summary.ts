@@ -41,7 +41,7 @@ function walk(value: unknown, visit: (key: string, nestedValue: unknown) => void
 
 function formatCandidate(value: unknown): string {
   if (typeof value === "string") return value
-  if (!isRecord(value)) return "Returned by backend"
+  if (!isRecord(value)) return "Unnamed candidate"
 
   const nestedAdduct = value.adduct
   if (isRecord(nestedAdduct) && typeof nestedAdduct.name === "string" && nestedAdduct.name.length > 0) {
@@ -53,7 +53,7 @@ function formatCandidate(value: unknown): string {
     .map((field) => value[field])
     .filter((field): field is string => typeof field === "string" && field.length > 0)
 
-  return fields.length > 0 ? fields.slice(0, 3).join(" · ") : "Returned by backend"
+  return fields.length > 0 ? fields.slice(0, 3).join(" · ") : "Unnamed candidate"
 }
 
 function findCandidateArray(data: unknown): unknown[] | null {

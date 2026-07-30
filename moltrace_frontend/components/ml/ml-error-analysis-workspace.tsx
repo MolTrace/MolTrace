@@ -317,7 +317,7 @@ export function MlErrorAnalysisWorkspace() {
         eyebrow="Records"
         title="Slices"
         icon={ListChecks}
-        description="Error analysis slices logged for this tenant — slice type, severity, sample count, and linked evaluation run."
+        description="Error analysis slices recorded for your organization — slice type, severity, sample count, and linked evaluation run."
       >
         <div className="space-y-4">
           <div className="table-scroll min-w-0">

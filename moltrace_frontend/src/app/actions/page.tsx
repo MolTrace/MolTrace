@@ -111,6 +111,61 @@ const ACTION_TYPES = [
 const SEVERITIES = ["info", "warning", "high", "critical"] as const
 const STATUSES = ["open", "in_progress", "resolved", "dismissed", "blocked"] as const
 
+/**
+ * Display-only labels. The keys are the values exchanged with the server and must not change;
+ * only the text a user reads is humanized here.
+ */
+const ACTION_TYPE_LABELS: Record<string, string> = {
+  create_dossier: "Create dossier",
+  link_evidence: "Link evidence",
+  run_regulatory_assessment: "Run regulatory assessment",
+  create_reaction_constraint: "Create reaction constraint",
+  run_reaction_optimization: "Run reaction optimization",
+  update_report: "Update report",
+  review_required: "Review required",
+  other: "Other",
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  open: "Open",
+  in_progress: "In progress",
+  resolved: "Resolved",
+  dismissed: "Dismissed",
+  blocked: "Blocked",
+}
+
+const SEVERITY_LABELS: Record<string, string> = {
+  info: "Info",
+  warning: "Warning",
+  high: "High",
+  critical: "Critical",
+}
+
+function titleCaseWords(raw: string): string {
+  const t = raw.replace(/[_-]+/g, " ").trim()
+  if (!t) return ""
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+
+function actionTypeLabel(raw: string): string {
+  return ACTION_TYPE_LABELS[raw] ?? titleCaseWords(raw)
+}
+
+function statusDisplayLabel(raw: string): string {
+  return STATUS_LABELS[raw] ?? titleCaseWords(raw)
+}
+
+function severityDisplayLabel(raw: string): string {
+  return SEVERITY_LABELS[raw] ?? titleCaseWords(raw)
+}
+
+/** "spectracheck_session" + 12 → "SpectraCheck session #12" (display only). */
+function recordRefLabel(type: string, id: number | null): string {
+  const label = titleCaseWords(type).replace(/spectracheck/gi, "SpectraCheck")
+  if (!label) return id == null ? "—" : `#${id}`
+  return id == null ? label : `${label} #${id}`
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
@@ -240,7 +295,7 @@ function CrossModuleActionQueueWorkspace() {
       })
       await load()
     } catch (e) {
-      setErr(formatApiError(e, "Update action item failed."))
+      setErr(formatApiError(e, "Could not update this action item."))
     } finally {
       setBusyId(null)
     }
@@ -250,7 +305,7 @@ function CrossModuleActionQueueWorkspace() {
     const t = title.trim()
     const d = description.trim()
     if (!t || !d) {
-      setCreateErr("title and description are required.")
+      setCreateErr("Title and description are required.")
       return
     }
     setCreateBusy(true)
@@ -279,7 +334,7 @@ function CrossModuleActionQueueWorkspace() {
       setTargetResourceId("")
       await load()
     } catch (e) {
-      setCreateErr(formatApiError(e, "Create action item failed."))
+      setCreateErr(formatApiError(e, "Could not create the action item."))
     } finally {
       setCreateBusy(false)
     }
@@ -309,62 +364,62 @@ function CrossModuleActionQueueWorkspace() {
           {createErr ? <p className="text-xs text-destructive">{createErr}</p> : null}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-1.5">
-              <Label>source program</Label>
+              <Label>Source program</Label>
               <Select value={sourceProgram} onValueChange={setSourceProgram}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{PROGRAMS.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>target program</Label>
+              <Label>Target program</Label>
               <Select value={targetProgram} onValueChange={setTargetProgram}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{PROGRAMS.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>action type</Label>
+              <Label>Action type</Label>
               <Select value={actionType} onValueChange={setActionType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{ACTION_TYPES.map((a) => <SelectItem key={a} value={a}>{a.replace(/_/g, " ")}</SelectItem>)}</SelectContent>
+                <SelectContent>{ACTION_TYPES.map((a) => <SelectItem key={a} value={a}>{actionTypeLabel(a)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>title</Label>
+              <Label>Title</Label>
               <Input value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
             <div className="space-y-1.5 md:col-span-2">
-              <Label>description</Label>
+              <Label>Description</Label>
               <Input value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>severity</Label>
+              <Label>Severity</Label>
               <Select value={severity} onValueChange={setSeverity}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{SEVERITIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{SEVERITIES.map((s) => <SelectItem key={s} value={s}>{severityDisplayLabel(s)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>status</Label>
+              <Label>Status</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{statusDisplayLabel(s)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>source resource type</Label>
+              <Label>Source record type</Label>
               <Input value={sourceResourceType} onChange={(e) => setSourceResourceType(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>source resource id</Label>
+              <Label>Source record ID</Label>
               <Input value={sourceResourceId} onChange={(e) => setSourceResourceId(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>target resource type</Label>
+              <Label>Target record type</Label>
               <Input value={targetResourceType} onChange={(e) => setTargetResourceType(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>target resource id</Label>
+              <Label>Target record ID</Label>
               <Input value={targetResourceId} onChange={(e) => setTargetResourceId(e.target.value)} />
             </div>
           </div>
@@ -421,7 +476,7 @@ function CrossModuleActionQueueWorkspace() {
           })()}
           <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <div className="space-y-1.5">
-              <Label className="text-xs">source program</Label>
+              <Label className="text-xs">Source program</Label>
               <Select value={fSource} onValueChange={setFSource}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -431,7 +486,7 @@ function CrossModuleActionQueueWorkspace() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">target program</Label>
+              <Label className="text-xs">Target program</Label>
               <Select value={fTarget} onValueChange={setFTarget}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -441,32 +496,32 @@ function CrossModuleActionQueueWorkspace() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">severity</Label>
+              <Label className="text-xs">Severity</Label>
               <Select value={fSeverity} onValueChange={setFSeverity}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">All</SelectItem>
-                  {SEVERITIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {SEVERITIES.map((s) => <SelectItem key={s} value={s}>{severityDisplayLabel(s)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">status</Label>
+              <Label className="text-xs">Status</Label>
               <Select value={fStatus} onValueChange={setFStatus}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">All</SelectItem>
-                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{statusDisplayLabel(s)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">action type</Label>
+              <Label className="text-xs">Action type</Label>
               <Select value={fActionType} onValueChange={setFActionType}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">All</SelectItem>
-                  {ACTION_TYPES.map((a) => <SelectItem key={a} value={a}>{a.replace(/_/g, " ")}</SelectItem>)}
+                  {ACTION_TYPES.map((a) => <SelectItem key={a} value={a}>{actionTypeLabel(a)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -476,16 +531,16 @@ function CrossModuleActionQueueWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>source program</TableHead>
-                  <TableHead>target program</TableHead>
-                  <TableHead>action type</TableHead>
-                  <TableHead>title</TableHead>
-                  <TableHead>severity</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>linked resource</TableHead>
-                  <TableHead>created date</TableHead>
-                  <TableHead>open source</TableHead>
-                  <TableHead>open target</TableHead>
+                  <TableHead>Source program</TableHead>
+                  <TableHead>Target program</TableHead>
+                  <TableHead>Action type</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Linked records</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Source record</TableHead>
+                  <TableHead>Target record</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -527,7 +582,7 @@ function CrossModuleActionQueueWorkspace() {
                       <TableRow key={id ?? i}>
                         <TableCell>{programLabel(srcProgram)}</TableCell>
                         <TableCell>{programLabel(tgtProgram)}</TableCell>
-                        <TableCell className="font-mono text-xs">{readStr(row.action_type) || "—"}</TableCell>
+                        <TableCell className="text-xs">{actionTypeLabel(readStr(row.action_type)) || "—"}</TableCell>
                         <TableCell className="max-w-[280px]">{readStr(row.title) || "—"}</TableCell>
                         <TableCell>
                           {(() => {
@@ -539,14 +594,14 @@ function CrossModuleActionQueueWorkspace() {
                                 className="font-mono text-[10px] font-bold uppercase tracking-wide"
                                 style={severityBadgeStyle(sev)}
                               >
-                                {sev}
+                                {severityDisplayLabel(sev)}
                               </Badge>
                             )
                           })()}
                         </TableCell>
                         <TableCell>
                           {id == null ? (
-                            <span>{readStr(row.status) || "—"}</span>
+                            <span>{statusDisplayLabel(readStr(row.status)) || "—"}</span>
                           ) : (
                             <Select
                               value={readStr(row.status) || "open"}
@@ -554,12 +609,12 @@ function CrossModuleActionQueueWorkspace() {
                               disabled={busyId === id}
                             >
                               <SelectTrigger className="h-8 w-[135px]"><SelectValue /></SelectTrigger>
-                              <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                              <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{statusDisplayLabel(s)}</SelectItem>)}</SelectContent>
                             </Select>
                           )}
                         </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {srcType || "—"}:{srcId ?? "—"} → {tgtType || "—"}:{tgtId ?? "—"}
+                        <TableCell className="text-xs">
+                          {recordRefLabel(srcType, srcId)} → {recordRefLabel(tgtType, tgtId)}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{formatDate(row.created_at)}</TableCell>
                         <TableCell>

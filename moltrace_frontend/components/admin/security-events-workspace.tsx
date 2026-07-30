@@ -385,7 +385,7 @@ export function SecurityEventsWorkspace() {
           eyebrow="Filters"
           title="Filters"
           icon={Filter}
-          description="Severity, event type, actor email, and limit are applied automatically. Date range and resource type narrow the loaded rows in your browser."
+          description="Severity, event type, actor email, and limit are applied automatically. Date range and resource type narrow the already-loaded events in your browser."
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
@@ -551,13 +551,13 @@ export function SecurityEventsWorkspace() {
         </ModuleCard>
       </div>
 
-      {/* 4. Developer JSON */}
+      {/* 4. Raw data, developer-mode only */}
       <DeveloperOnly>
         <div>
-          <h2 className="mb-3 text-sm font-medium text-muted-foreground">Developer JSON</h2>
+          <h2 className="mb-3 text-sm font-medium text-muted-foreground">Raw data (for troubleshooting)</h2>
           <Collapsible className="group rounded-md border">
             <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
-              Raw responses (redacted)
+              Raw security records (sensitive values redacted)
               <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
             </CollapsibleTrigger>
             <CollapsibleContent>

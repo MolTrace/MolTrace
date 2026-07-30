@@ -102,7 +102,7 @@ function feedbackLabel(f: SessionSaveFeedback): string {
     case "error":
       return "save failed"
     case "unavailable":
-      return "backend unavailable"
+      return "service unavailable"
     default:
       return "idle"
   }
@@ -142,7 +142,7 @@ export function SpectraCheckSessionControls({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base">Session</CardTitle>
-            <CardDescription>Backend SpectraCheck session, project/sample context, and saves.</CardDescription>
+            <CardDescription>Saved SpectraCheck session, project/sample context, and saves.</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <SecureShareDialog
@@ -232,7 +232,7 @@ export function SpectraCheckSessionControls({
             </div>
             {backendSessionId ? (
               <p className="text-xs text-muted-foreground">
-                Active backend session: <span className="font-mono">{backendSessionId}</span>
+                Active saved session: <span className="font-mono">{backendSessionId}</span>
               </p>
             ) : null}
           </div>

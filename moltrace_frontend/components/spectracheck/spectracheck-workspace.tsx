@@ -187,7 +187,7 @@ const SPECTRACHECK_NAV: SpectraNavGroup[] = [
     id: "developer",
     label: "Developer",
     sections: [
-      { value: "tab-dev-json", label: "Developer JSON", desc: "Raw backend responses for debugging, validation, and frontend/backend schema inspection." },
+      { value: "tab-dev-json", label: "Developer JSON", desc: "Raw results for troubleshooting, validation, and data-shape inspection." },
     ],
   },
 ]
@@ -1672,7 +1672,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 </Select>
                 {compoundClass !== COMPOUND_CLASS_UNSPECIFIED && (
                   <p className="text-[11px] text-muted-foreground">
-                    Sent to every analyze request as <span className="font-mono">compound_class</span>={" "}
+                    Applied to every analysis as the compound class:{" "}
                     <span
                       className="font-mono"
                       style={{ color: "var(--mt-teal-ink)" }}
@@ -2071,7 +2071,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     ))}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Sent as <code className="text-[10px]">experiment_type</code> when set.
+                    Included with the analysis when set.
                   </p>
                 </div>
 
@@ -3847,12 +3847,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <h2 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
               JSON snapshot hub
               <InfoTooltip
-                content="Use this for debugging backend response shape, warnings, and raw evidence data."
+                content="Use this for troubleshooting result shape, warnings, and raw evidence data."
                 label="About Developer JSON hub"
               />
             </h2>
             <p className="text-sm text-muted-foreground">
-              Latest payloads from this browser session — including upload previews. Use to verify response shape, warnings, and raw evidence.
+              Latest raw results from this browser session — including upload previews. Use to verify result shape, warnings, and raw evidence.
             </p>
           </div>
 
@@ -3899,10 +3899,10 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* Snapshot bodies */}
           <ModuleCard
             accent="teal"
-            eyebrow="Dev JSON · Step 2 · Payloads"
-            title="Raw response payloads"
+            eyebrow="Dev JSON · Step 2 · Raw results"
+            title="Raw data (for troubleshooting)"
             icon={FileText}
-            description="Each panel below contains a single endpoint's most recent response."
+            description="Each panel below holds the most recent raw result for a single analysis step."
             className="min-w-0"
           >
             <div className="space-y-6">

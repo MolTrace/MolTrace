@@ -191,7 +191,7 @@ export function MlDeploymentCandidatesWorkspace() {
       })
       const eid = readRecordNumber(best, "id")
       const mj = best["metrics_json"]
-      latestEvalSummary = `evaluation_run_id ${eid ?? "—"}; metrics_json ${summarizeJson(mj)}`
+      latestEvalSummary = `Run #${eid ?? "—"} · metrics ${summarizeJson(mj)}`
     }
     const calFor = calibrationRows.filter((r) => readRecordNumber(r, "model_artifact_id") === aid)
     const oodFor = oodRows.filter((r) => readRecordNumber(r, "model_artifact_id") === aid)
@@ -202,7 +202,7 @@ export function MlDeploymentCandidatesWorkspace() {
         const accId = readRecordNumber(acc, "id") ?? 0
         return id > accId ? r : acc
       })
-      calibrationLine = `status ${readRecordString(row, "status") ?? "—"}; method ${readRecordString(row, "calibration_method") ?? "—"}`
+      calibrationLine = `Status ${readRecordString(row, "status") ?? "—"} · method ${readRecordString(row, "calibration_method") ?? "—"}`
     }
     let oodLine = "—"
     if (oodFor.length > 0) {
@@ -211,7 +211,7 @@ export function MlDeploymentCandidatesWorkspace() {
         const accId = readRecordNumber(acc, "id") ?? 0
         return id > accId ? r : acc
       })
-      oodLine = `status ${readRecordString(row, "status") ?? "—"}; method ${readRecordString(row, "method") ?? "—"}`
+      oodLine = `Status ${readRecordString(row, "status") ?? "—"} · method ${readRecordString(row, "method") ?? "—"}`
     }
     return {
       hasSucceededEval: succeeded.length > 0,
@@ -325,7 +325,7 @@ export function MlDeploymentCandidatesWorkspace() {
       setApproveComment("")
       setReload((x) => x + 1)
     } catch (er) {
-      setApproveErr(formatApiError(er, "Approval request failed."))
+      setApproveErr(formatApiError(er, "Could not record the approval."))
     } finally {
       setApproveBusy(false)
     }
@@ -362,7 +362,7 @@ export function MlDeploymentCandidatesWorkspace() {
       setRejectReason("")
       setReload((x) => x + 1)
     } catch (er) {
-      setRejectErr(formatApiError(er, "Reject request failed."))
+      setRejectErr(formatApiError(er, "Could not record the rejection."))
     } finally {
       setRejectBusy(false)
     }
@@ -485,7 +485,7 @@ export function MlDeploymentCandidatesWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="te">Target endpoint (optional)</Label>
+              <Label htmlFor="te">Serving destination (optional)</Label>
               <Input id="te" value={createEndpoint} onChange={(e) => setCreateEndpoint(e.target.value)} autoComplete="off" />
             </div>
           </div>
@@ -573,7 +573,7 @@ export function MlDeploymentCandidatesWorkspace() {
                     {readRecordNumber(getSnapshot, "candidate_id") ?? "—"}
                   </span>
                 ) : (
-                  <span className="ml-2">snapshot unavailable</span>
+                  <span className="ml-2">Current status unavailable.</span>
                 )}
               </div>
 
@@ -612,7 +612,7 @@ export function MlDeploymentCandidatesWorkspace() {
                   <Badge variant="outline">{readRecordString(selected, "status") ?? "—"}</Badge>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Target endpoint</p>
+                  <p className="text-xs font-medium text-muted-foreground">Serving destination</p>
                   <p className="font-mono text-xs">{readRecordString(selected, "target_endpoint") ?? "—"}</p>
                 </div>
               </div>

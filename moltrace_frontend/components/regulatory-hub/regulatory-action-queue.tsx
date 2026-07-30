@@ -309,7 +309,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
     const title = createTitle.trim()
     const description = createDescription.trim()
     if (!title || !description) {
-      setCreateErr("title and description are required.")
+      setCreateErr("Title and description are required.")
       return
     }
     setCreateBusy(true)
@@ -426,7 +426,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
         }
       >
         <div className="space-y-1.5">
-          <Label className="text-xs">severity</Label>
+          <Label className="text-xs">Severity</Label>
           <Select value={filterSeverity} onValueChange={setFilterSeverity}>
             <SelectTrigger className="h-9">
               <SelectValue />
@@ -442,7 +442,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">status</Label>
+          <Label className="text-xs">Status</Label>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="h-9">
               <SelectValue />
@@ -458,7 +458,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">action_type</Label>
+          <Label className="text-xs">Action type</Label>
           <Select value={filterActionType} onValueChange={setFilterActionType}>
             <SelectTrigger className="h-9">
               <SelectValue />
@@ -475,7 +475,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
         </div>
         {dossierId == null ? (
           <div className="space-y-1.5">
-            <Label className="text-xs">dossier_id</Label>
+            <Label className="text-xs">Dossier</Label>
             <Select value={filterDossierId} onValueChange={setFilterDossierId}>
               <SelectTrigger className="h-9">
                 <SelectValue />
@@ -485,7 +485,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
                 {dossiers.flatMap((d) => {
                   const id = readRecordNumber(d, "id")
                   if (id == null) return []
-                  const title = readRecordString(d, "title") ?? `dossier ${id}`
+                  const title = readRecordString(d, "title") ?? `Dossier ${id}`
                   return [
                     <SelectItem key={id} value={String(id)}>
                       {title} ({id})
@@ -497,7 +497,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
           </div>
         ) : null}
         <div className="space-y-1.5">
-          <Label className="text-xs">assigned_to (contains)</Label>
+          <Label className="text-xs">Owner contains</Label>
           <Input
             className="h-9"
             value={filterAssigned}
@@ -509,7 +509,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
       </div>
       {dossierId != null ? (
         <p className="text-xs text-muted-foreground">
-          GET uses <span className="font-mono">dossier_id={dossierId}</span>; additional filters apply in the browser.
+          Showing action items for this dossier only; the filters above are applied in your browser.
         </p>
       ) : null}
 
@@ -517,18 +517,18 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="min-w-[140px]">title</TableHead>
-              <TableHead className="w-[140px]">action_type</TableHead>
-              <TableHead className="w-[90px]">severity</TableHead>
-              <TableHead className="w-[110px]">status</TableHead>
-              <TableHead className="w-[100px]">dossier</TableHead>
-              <TableHead className="w-[72px]">batch</TableHead>
-              <TableHead className="w-[80px]">compound</TableHead>
-              <TableHead className="min-w-[100px]">assigned_to</TableHead>
-              <TableHead className="w-[120px]">due_date</TableHead>
-              <TableHead className="w-[72px] text-right">citations</TableHead>
-              <TableHead className="w-[140px]">updated_at</TableHead>
-              <TableHead className="min-w-[220px]">actions</TableHead>
+              <TableHead className="min-w-[140px]">Title</TableHead>
+              <TableHead className="w-[140px]">Action type</TableHead>
+              <TableHead className="w-[90px]">Severity</TableHead>
+              <TableHead className="w-[110px]">Status</TableHead>
+              <TableHead className="w-[100px]">Dossier</TableHead>
+              <TableHead className="w-[72px]">Batch</TableHead>
+              <TableHead className="w-[80px]">Compound</TableHead>
+              <TableHead className="min-w-[100px]">Owner</TableHead>
+              <TableHead className="w-[120px]">Due date</TableHead>
+              <TableHead className="w-[72px] text-right">Citations</TableHead>
+              <TableHead className="w-[140px]">Updated</TableHead>
+              <TableHead className="min-w-[220px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -562,7 +562,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
                 const busy = patchBusyId === id
                 const did = readRecordNumber(row, "dossier_id")
                 const dossierLabel =
-                  did != null ? dossierTitleById.get(did) ?? `id ${did}` : "—"
+                  did != null ? dossierTitleById.get(did) ?? `Dossier ${did}` : "—"
                 return (
                   <TableRow key={id}>
                     <TableCell className="max-w-[220px] text-sm">
@@ -570,8 +570,8 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
                         {readRecordString(row, "title") ?? "—"}
                       </span>
                     </TableCell>
-                    <TableCell className="font-mono text-[11px]">
-                      {readRecordString(row, "action_type") ?? "—"}
+                    <TableCell className="text-[11px]">
+                      {labelFromSnake(readRecordString(row, "action_type") ?? undefined)}
                     </TableCell>
                     <TableCell className="text-xs">
                       {(() => {
@@ -722,7 +722,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
             <DialogTitle>Assign owner</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="assign-to">assigned_to</Label>
+            <Label htmlFor="assign-to">Owner</Label>
             <Input
               id="assign-to"
               value={assignDraft}
@@ -755,11 +755,11 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
           ) : null}
           <div className="grid gap-3">
             <div className="space-y-2">
-              <Label htmlFor="na-title">title</Label>
+              <Label htmlFor="na-title">Title</Label>
               <Input id="na-title" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="na-desc">description</Label>
+              <Label htmlFor="na-desc">Description</Label>
               <Textarea
                 id="na-desc"
                 rows={4}
@@ -770,7 +770,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>action_type</Label>
+                <Label>Action type</Label>
                 <Select value={createActionType} onValueChange={setCreateActionType}>
                   <SelectTrigger>
                     <SelectValue />
@@ -778,14 +778,14 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
                   <SelectContent>
                     {REGULATORY_ACTION_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {labelFromSnake(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>severity</Label>
+                <Label>Severity</Label>
                 <Select value={createSeverity} onValueChange={setCreateSeverity}>
                   <SelectTrigger>
                     <SelectValue />
@@ -793,14 +793,14 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
                   <SelectContent>
                     {REGULATORY_ACTION_SEVERITIES.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {labelFromSnake(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>status</Label>
+                <Label>Status</Label>
                 <Select value={createStatus} onValueChange={setCreateStatus}>
                   <SelectTrigger>
                     <SelectValue />
@@ -808,14 +808,14 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
                   <SelectContent>
                     {REGULATORY_ACTION_STATUSES.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {labelFromSnake(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="na-asg">assigned_to (optional)</Label>
+                <Label htmlFor="na-asg">Owner (optional)</Label>
                 <Input
                   id="na-asg"
                   value={createAssigned}
@@ -825,12 +825,12 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
             </div>
             {dossierId != null ? (
               <p className="text-xs text-muted-foreground">
-                <span className="font-mono">dossier_id</span> will be set to {dossierId}.
+                This item will be linked to dossier {dossierId}.
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Leave dossier unscoped unless you add <span className="font-mono">dossier_id</span> via API or create
-                from a dossier workspace.
+                This item will not be linked to a dossier. To link one, create the item from that dossier&apos;s
+                workspace instead.
               </p>
             )}
           </div>
@@ -840,7 +840,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
             </Button>
             <Button type="button" disabled={createBusy} onClick={() => void createItem()}>
               {createBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              POST create
+              Create action item
             </Button>
           </DialogFooter>
         </DialogContent>

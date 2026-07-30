@@ -50,7 +50,7 @@ function pickDetail(err: unknown): string {
     return err.message
   }
   if (err instanceof Error) return err.message
-  return "Request failed."
+  return "That didn't go through. Please try again."
 }
 
 export type OrganizationRow = {

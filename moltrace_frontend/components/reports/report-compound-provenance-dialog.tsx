@@ -264,10 +264,10 @@ export function ReportCompoundProvenanceDialog({
   if (structure) {
     const smiles = pickStr(structure, ["smiles", "Smiles"])
     const formula = pickStr(structure, ["formula", "Formula"])
-    if (smiles !== "—") structureLines.push(`smiles: ${smiles}`)
-    if (formula !== "—") structureLines.push(`formula: ${formula}`)
+    if (smiles !== "—") structureLines.push(`SMILES: ${smiles}`)
+    if (formula !== "—") structureLines.push(`Formula: ${formula}`)
     const mw = readRecordNumber(structure, "molecular_weight")
-    if (mw != null) structureLines.push(`molecular_weight: ${mw}`)
+    if (mw != null) structureLines.push(`Molecular weight: ${mw}`)
   }
 
   const nmr2d = innerReport && Array.isArray(innerReport.nmr2d_evidence) ? innerReport.nmr2d_evidence.filter(isRecord) : []
@@ -301,7 +301,7 @@ export function ReportCompoundProvenanceDialog({
     }
     const compound_id = Number.parseInt(cid, 10)
     if (!Number.isFinite(compound_id)) {
-      setLinkErr("compound_id must be a positive integer for this link action.")
+      setLinkErr("Select a valid compound from the search results before linking.")
       return
     }
     setLinkBusy(true)
@@ -329,7 +329,7 @@ export function ReportCompoundProvenanceDialog({
       writePersisted(reportId, next)
       setPersisted(next)
     } catch (e) {
-      setLinkErr(formatApiError(e, "Link compound failed."))
+      setLinkErr(formatApiError(e, "Could not link this compound to the report."))
     } finally {
       setLinkBusy(false)
     }
@@ -338,14 +338,14 @@ export function ReportCompoundProvenanceDialog({
   const linkedName = compoundEntity
     ? pickStr(compoundEntity, ["preferred_name", "preferredName", "name"])
     : persisted
-      ? `compound_id ${persisted.compound_id}`
+      ? `Compound ${persisted.compound_id}`
       : "—"
   const linkedRegistry = compoundEntity ? pickStr(compoundEntity, ["registry_id", "registryId"]) : "—"
   const linkedBatch =
     batchEntity != null
       ? pickStr(batchEntity, ["batch_code", "batchCode", "lot_code", "lotCode"])
       : persisted?.batch_id != null
-        ? `batch_id ${persisted.batch_id}`
+        ? `Batch ${persisted.batch_id}`
         : "—"
   const linkedSample = persisted?.sample_id?.trim() || reportSampleLabel
 
@@ -356,19 +356,18 @@ export function ReportCompoundProvenanceDialog({
         <DialogHeader>
           <DialogTitle>Compound provenance</DialogTitle>
           <DialogDescription>
-            GET /reports/{"{report_id}"} — POST /reports/{"{report_id}"}/link-compound. Provenance and navigation only;
-            does not assert report release approval.
+            Traceability and navigation only — this view does not assert report release approval.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-1 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">{reportTitle}</p>
           <p>
-            report_id: <span className="font-mono">{reportId}</span>
+            Report ID: <span className="font-mono">{reportId}</span>
             {sessionNumericId != null ? (
               <>
                 {" "}
-                · spectracheck_session_id:{" "}
+                · SpectraCheck session:{" "}
                 <Link className="underline-offset-4 hover:underline" href="/spectracheck">
                   {sessionNumericId}
                 </Link>
@@ -376,14 +375,15 @@ export function ReportCompoundProvenanceDialog({
             ) : null}
           </p>
           <p>
-            list hash preview: <span className="font-mono">{hashPreview}</span>
+            Report hash (preview): <span className="font-mono">{hashPreview}</span>
           </p>
         </div>
 
         <Alert>
           <AlertTitle className="text-sm">Provenance only</AlertTitle>
           <AlertDescription className="text-xs leading-relaxed">
-            Fields below are copied from API payloads for traceability. They are not independent regulatory claims.
+            Fields below are copied from the stored report record for traceability. They are not independent
+            regulatory claims.
           </AlertDescription>
         </Alert>
 
@@ -399,19 +399,19 @@ export function ReportCompoundProvenanceDialog({
           <h3 className="text-sm font-semibold">Linked compound (registry)</h3>
           <dl className="grid gap-2 text-xs sm:grid-cols-2">
             <div>
-              <dt className="text-muted-foreground">linked compound</dt>
+              <dt className="text-muted-foreground">Linked compound</dt>
               <dd className="font-medium">{linkedName}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">registry ID</dt>
+              <dt className="text-muted-foreground">Registry ID</dt>
               <dd className="font-mono">{linkedRegistry}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">linked batch</dt>
+              <dt className="text-muted-foreground">Linked batch</dt>
               <dd className="font-mono">{linkedBatch}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">sample / aliquot id</dt>
+              <dt className="text-muted-foreground">Sample / aliquot ID</dt>
               <dd className="font-mono">{linkedSample}</dd>
             </div>
           </dl>
@@ -421,16 +421,17 @@ export function ReportCompoundProvenanceDialog({
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">
-              No link stored in this browser session yet. Linking below records compound_id (and optional batch_id,
-              sample_id) after POST; GET /reports/{"{report_id}"} does not echo registry link fields here.
+              No link stored in this browser session yet. Linking below records the compound — plus an optional batch
+              and sample ID — for this report; the saved report record does not report the registry link back to this
+              view.
             </p>
           )}
         </section>
 
         <section className="space-y-2 rounded-md border p-3 text-sm">
-          <h3 className="text-sm font-semibold">Structure provenance (from report JSON)</h3>
+          <h3 className="text-sm font-semibold">Structure provenance (from the saved report)</h3>
           {structureLines.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No structure block parsed from payload.</p>
+            <p className="text-xs text-muted-foreground">No structure details recorded in this report.</p>
           ) : (
             <ul className="space-y-1 font-mono text-xs">
               {structureLines.map((line) => (
@@ -441,9 +442,9 @@ export function ReportCompoundProvenanceDialog({
         </section>
 
         <section className="space-y-2 rounded-md border p-3 text-sm">
-          <h3 className="text-sm font-semibold">Evidence links (from report JSON)</h3>
+          <h3 className="text-sm font-semibold">Evidence links (from the saved report)</h3>
           {nmr2d.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No nmr2d_evidence entries in payload.</p>
+            <p className="text-xs text-muted-foreground">No 2D NMR evidence links recorded in this report.</p>
           ) : (
             <ul className="space-y-2 text-xs">
               {nmr2d.map((row, i) => {
@@ -467,9 +468,9 @@ export function ReportCompoundProvenanceDialog({
         </section>
 
         <section className="space-y-2 rounded-md border p-3 text-sm">
-          <h3 className="text-sm font-semibold">Source hashes (payload scan)</h3>
+          <h3 className="text-sm font-semibold">Source hashes</h3>
           {uniqueHashes.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No hash-like strings collected from this GET payload.</p>
+            <p className="text-xs text-muted-foreground">No source hashes recorded in this report.</p>
           ) : (
             <ul className="max-h-40 space-y-1 overflow-y-auto font-mono text-[11px] break-all">
               {uniqueHashes.map((h) => (
@@ -484,12 +485,12 @@ export function ReportCompoundProvenanceDialog({
           <p className="text-xs text-muted-foreground">Search for a compound and link it to this report for provenance tracking.</p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor="rp-search">compound search</Label>
+              <Label htmlFor="rp-search">Compound search</Label>
               <Input
                 id="rp-search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="name / alias"
+                placeholder="Name or alias"
                 autoComplete="off"
               />
             </div>
@@ -499,7 +500,7 @@ export function ReportCompoundProvenanceDialog({
           </div>
           {searchErr ? <p className="text-xs text-destructive">{searchErr}</p> : null}
           <div className="space-y-2">
-            <Label>match</Label>
+            <Label>Matching compound</Label>
             <Select
               value={selectedCompoundId || "__none__"}
               onValueChange={(v) => setSelectedCompoundId(v === "__none__" ? "" : v)}
@@ -523,7 +524,7 @@ export function ReportCompoundProvenanceDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>optional batch</Label>
+            <Label>Batch (optional)</Label>
             <Select value={selectedBatchId} onValueChange={setSelectedBatchId} disabled={!selectedCompoundId}>
               <SelectTrigger>
                 <SelectValue placeholder={batchesLoading ? "Loading batches…" : "No batch"} />
@@ -544,12 +545,12 @@ export function ReportCompoundProvenanceDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="rp-sample">optional sample_id (POST body)</Label>
+            <Label htmlFor="rp-sample">Sample ID (optional)</Label>
             <Input
               id="rp-sample"
               value={optionalSampleId}
               onChange={(e) => setOptionalSampleId(e.target.value)}
-              placeholder="registry sample_id string"
+              placeholder="Registry sample ID"
               autoComplete="off"
             />
           </div>

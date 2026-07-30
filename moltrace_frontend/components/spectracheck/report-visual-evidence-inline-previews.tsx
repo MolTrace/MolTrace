@@ -102,7 +102,7 @@ export function ReportVisualEvidenceInlinePreviews({
   if (!hasPlotPayload) {
     return (
       <p className="text-[11px] text-muted-foreground">
-        No inline plot payload detected for this row (compose metadata may still list artifact references).
+        No inline plot data for this evidence item (the composed report may still reference stored artifacts).
       </p>
     )
   }

@@ -29,7 +29,7 @@ export function BackendStatusIndicator() {
     return (
       <Badge variant="outline" className="gap-1 text-muted-foreground">
         <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-        Checking backend
+        Checking data service
       </Badge>
     )
   }
@@ -38,7 +38,7 @@ export function BackendStatusIndicator() {
     return (
       <Badge variant="outline" className="gap-1 border-success/50 text-success">
         <span className="h-1.5 w-1.5 rounded-full bg-success" />
-        Backend connected
+        Data service connected
       </Badge>
     )
   }
@@ -46,7 +46,7 @@ export function BackendStatusIndicator() {
   return (
     <Badge variant="outline" className="gap-1 border-warning/50 text-warning">
       <span className="h-1.5 w-1.5 rounded-full bg-warning" />
-      Backend unavailable
+      Data service unavailable
     </Badge>
   )
 }

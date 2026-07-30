@@ -175,7 +175,7 @@ export function DossierAIDecisionsPanel({
           <div className="rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center">
             <p className="text-sm font-medium text-foreground">No AI decisions recorded yet.</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Governed AI decisions are written to the dossier&apos;s tamper-evident chain by the backend
+              Governed AI decisions are written to the dossier&apos;s tamper-evident chain automatically
               as the AI-assisted path runs; they will appear here.
             </p>
           </div>
@@ -191,7 +191,7 @@ export function DossierAIDecisionsPanel({
               return (
                 <div key={d.entry_hash} className="space-y-3 rounded-md border p-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{d.decision_type}</span>
+                    <span className="font-medium">{humanizeKey(d.decision_type)}</span>
                     <code className="font-mono text-xs text-muted-foreground">
                       {d.model_name}@{d.model_version}
                     </code>

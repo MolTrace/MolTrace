@@ -286,8 +286,8 @@ export function GsdTelemetryPanel({
   const resolvedDescription =
     description ??
     (mode === "admin"
-      ? "Pre-aggregated rollup of every spectrum.analyze_gsd audit event over the trailing window. Backend now owns the rollup and the promotion-gate verdict — FE renders both as-is."
-      : "Pre-aggregated rollup of your tenant's experimental-backend usage. Use to verify performance on your spectra and size opt-in adoption before the promotion gate clears.")
+      ? "Pre-aggregated rollup of every GSD analysis audit event over the trailing window. The rollup and the promotion-gate verdict are computed server-side and shown here as recorded."
+      : "Pre-aggregated rollup of your tenant's experimental-engine usage. Use to verify performance on your spectra and size opt-in adoption before the promotion gate clears.")
 
   if (state.status === "loading") {
     return (
@@ -384,7 +384,7 @@ export function GsdTelemetryPanel({
         </div>
       </div>
       <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-        {resolvedDescription} <span className="font-mono">window_days={summary.window_days}</span>.
+        {resolvedDescription} Trailing window: <span className="font-mono">{summary.window_days} days</span>.
       </p>
 
       {/* Quarter readiness band + adoption callout — paired narrative:
@@ -447,13 +447,13 @@ export function GsdTelemetryPanel({
         />
         <Kpi
           icon={Clock}
-          label="Median wall_ms"
+          label="Median run time"
           value={formatMs(summary.median_wall_ms)}
           sub="p50 of measured runs"
         />
         <Kpi
           icon={Gauge}
-          label="P95 wall_ms"
+          label="P95 run time"
           value={formatMs(summary.p95_wall_ms)}
           sub="tail latency · 95th percentile"
         />
@@ -507,7 +507,7 @@ export function GsdTelemetryPanel({
       {mode === "admin" && summary.flip_readiness_reasons && summary.flip_readiness_reasons.length > 0 ? (
         <div className="mt-6 rounded-xl border border-dashed bg-muted/30 p-4">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            Verdict reasons (backend-owned)
+            Verdict reasons (computed server-side)
           </p>
           <ul className="mt-3 space-y-1.5">
             {summary.flip_readiness_reasons.map((reason, idx) => (
@@ -578,8 +578,8 @@ function AdoptionCallout({
               ? "No tenants graduated yet — this user would be first."
               : "No tenants graduated yet across the platform."
             : scopedToUser
-              ? `${count.toLocaleString()} other tenant${count === 1 ? "" : "s"} already default to gsd_prompt3.`
-              : `${count.toLocaleString()} tenant${count === 1 ? "" : "s"} default to gsd_prompt3 platform-wide.`}
+              ? `${count.toLocaleString()} other tenant${count === 1 ? "" : "s"} already default to the GSD engine.`
+              : `${count.toLocaleString()} tenant${count === 1 ? "" : "s"} default to the GSD engine platform-wide.`}
         </p>
       </div>
     </div>
@@ -747,7 +747,7 @@ export function GsdReadinessVerdictCard({
           progress={s.invocations}
           target={s.flip_readiness_policy.min_invocations}
           windowDays={s.window_days}
-          reasons={s.flip_readiness_reasons ?? ["Unknown verdict from backend — defaulting to insufficient_data."]}
+          reasons={s.flip_readiness_reasons ?? ["Verdict not recognized — treating this as insufficient data."]}
           scope={scope}
           testId={testId}
         />
@@ -917,10 +917,9 @@ function ReadyToFlip({
               <>
                 {isUserScoped ? (
                   <>
-                    Subsequent <code className="font-mono">/spectrum/analyze/gsd</code> calls from{" "}
-                    {scope.label} now return{" "}
-                    <code className="font-mono">experimental: false</code> in both the response
-                    and the audit telemetry. Graduation recorded{" "}
+                    Subsequent GSD analyses run by {scope.label} are no longer flagged as
+                    experimental, in the results and in the audit telemetry alike. Graduation
+                    recorded{" "}
                     {effectiveGraduatedAt
                       ? new Date(effectiveGraduatedAt).toLocaleString()
                       : "just now"}
@@ -928,26 +927,24 @@ function ReadyToFlip({
                   </>
                 ) : (
                   <>
-                    Platform-wide flip-review has been recorded. The next FE deploy can ship the
-                    one-line default change with the documented change-control trail.
+                    Platform-wide promotion review has been recorded. The next release can make GSD
+                    the default with the documented change-control trail.
                   </>
                 )}
               </>
             ) : isUserScoped ? (
               <>
                 Every promotion-gate criterion is satisfied for {scope.label} in the trailing{" "}
-                {summary.window_days}-day window. Graduating this user moves their default from{" "}
-                <code className="font-mono">legacy</code> to{" "}
-                <code className="font-mono">gsd_prompt3</code> on their next session — without
-                affecting other tenants. A reason is required and recorded in the audit ledger.
+                {summary.window_days}-day window. Graduating this user switches their default
+                detection engine from Legacy to GSD on their next session — without affecting other
+                tenants. A reason is required and recorded in the audit ledger.
               </>
             ) : (
               <>
                 Every promotion-gate criterion is satisfied in the trailing {summary.window_days}
-                -day window. Kick off a flip-review with change-control: a one-line FE change moves
-                the selector default from <code className="font-mono">legacy</code> to{" "}
-                <code className="font-mono">gsd_prompt3</code> and the GSD_EXPERIMENTAL_TOOLTIP
-                copy should update at the same time.
+                -day window. Kick off a promotion review with change-control: the engine selector
+                default moves from Legacy to GSD, and the experimental-status wording should be
+                updated at the same time.
               </>
             )}
           </p>
@@ -1173,19 +1170,19 @@ function Blocked({
           <h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
             {scope.kind === "user"
               ? `${scope.label}: not ready to graduate.`
-              : "Gate criteria not met. Do not flip the FE default."}
+              : "Gate criteria not met. Do not make GSD the default engine."}
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-relaxed text-foreground/85">
             {scope.kind === "user" ? (
               <>
                 One or more criteria failed for {scope.label} in the trailing{" "}
-                {summary.window_days}-day window. The backend's reasons are the actionable list —
+                {summary.window_days}-day window. The recorded reasons are the actionable list —
                 each maps to a specific metric in the per-user telemetry panel.
               </>
             ) : (
               <>
                 One or more criteria failed in the trailing {summary.window_days}-day window. The
-                backend's reasons are the actionable list — each maps to a specific metric in the
+                recorded reasons are the actionable list — each maps to a specific metric in the
                 telemetry panel below.
               </>
             )}

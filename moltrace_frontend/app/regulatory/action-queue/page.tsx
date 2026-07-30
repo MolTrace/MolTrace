@@ -40,8 +40,7 @@ export default function RegulatoryActionQueuePage() {
                 <InfoTooltip label="Regulatory action queue" content={ACTION_QUEUE_TOOLTIP} />
               </div>
               <CardDescription>
-                GET /regulatory/action-items · PATCH /regulatory/action-items/{"{action_item_id}"} · POST
-                /regulatory/action-items. Dossier context:{" "}
+                Review, assign, and resolve regulatory action items across every dossier. Dossier context:{" "}
                 <Link href="/regulatory" className="underline-offset-4 hover:underline">
                   Regulatory home
                 </Link>

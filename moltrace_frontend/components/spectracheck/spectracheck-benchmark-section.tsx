@@ -242,7 +242,7 @@ export function SpectraCheckBenchmarkSection() {
               fields={BENCHMARK_CASE_FIELDS}
               initialValue={cases}
               onChange={setCases}
-              description="Each case is a (structure, observed NMR) pair. Nucleus is 1H or 13C; audit fields (sample_id, sha256, operator, instrument) and anything else are editable via each case's raw-JSON toggle."
+              description="Each case is a (structure, observed NMR) pair. Nucleus is 1H or 13C; audit fields (sample ID, SHA-256 checksum, operator, instrument) and anything else are editable via each case's raw-JSON toggle."
               idPrefix="bench-cases"
             />
           </div>

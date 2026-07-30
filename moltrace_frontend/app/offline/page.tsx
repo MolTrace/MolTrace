@@ -6,12 +6,12 @@ export default function OfflinePage() {
       <div className="mx-auto max-w-2xl">
         <Card className="border-muted">
           <CardHeader>
-            <CardTitle>Offline</CardTitle>
-            <CardDescription>Connection to MolTrace services is currently unavailable.</CardDescription>
+            <CardTitle>You&rsquo;re offline</CardTitle>
+            <CardDescription>MolTrace can&rsquo;t be reached right now.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            You are offline. You can review locally saved draft actions, but scientific analysis and report generation
-            require backend connection.
+            You can still review draft actions saved on this device. Spectral analysis and report
+            generation need a connection and will work again once you&rsquo;re back online.
           </CardContent>
         </Card>
       </div>

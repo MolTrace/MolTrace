@@ -28,7 +28,8 @@ import {
   type ReportLockDisplayStatus,
 } from "@/src/lib/reports/report-lock"
 
-const RELEASE_GATE_TOOLTIP = "Report release requires approved_confirmed human review."
+const RELEASE_GATE_TOOLTIP =
+  "Report release requires a completed human review recorded as approved and confirmed."
 
 function readStoredUserIsAdmin(): boolean {
   if (typeof window === "undefined") return false
@@ -45,11 +46,11 @@ function readStoredUserIsAdmin(): boolean {
 function statusLabel(s: ReportLockDisplayStatus): string {
   switch (s) {
     case "locked":
-      return "locked"
+      return "Locked"
     case "released":
-      return "released"
+      return "Released"
     default:
-      return "unlocked"
+      return "Unlocked"
   }
 }
 
@@ -143,7 +144,7 @@ export function ReportLockControls({
       onAfterMutation?.()
       await refresh()
     } catch (err) {
-      setActionErr(formatApiError(err, "Lock request failed."))
+      setActionErr(formatApiError(err, "Could not lock this report."))
     } finally {
       setActionBusy(false)
     }
@@ -160,7 +161,7 @@ export function ReportLockControls({
       onAfterMutation?.()
       await refresh()
     } catch (err) {
-      setActionErr(formatApiError(err, "Unlock request failed."))
+      setActionErr(formatApiError(err, "Could not unlock this report."))
     } finally {
       setActionBusy(false)
     }
@@ -190,7 +191,7 @@ export function ReportLockControls({
       onAfterMutation?.()
       await refresh()
     } catch (err) {
-      setActionErr(formatApiError(err, "Release request failed."))
+      setActionErr(formatApiError(err, "Could not release this report."))
     } finally {
       setActionBusy(false)
     }
@@ -285,7 +286,7 @@ export function ReportLockControls({
 
       {!hasConfirmedApproval && isAdmin ? (
         <p className="text-[11px] text-muted-foreground">
-          Platform admins may override the approval gate in the release dialog (recorded on the server).
+          Platform admins may override the approval gate in the release dialog (the override is recorded).
         </p>
       ) : null}
 

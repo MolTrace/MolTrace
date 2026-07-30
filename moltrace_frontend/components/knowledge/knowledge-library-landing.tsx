@@ -185,8 +185,8 @@ export function KnowledgeLibraryLanding() {
 
   function statSub(opts: { errored: boolean; empty: boolean; label: string }) {
     if (loading) return <p className="text-xs text-muted-foreground">Loading…</p>
-    if (opts.errored) return <p className="text-xs text-muted-foreground">Unable to load from backend.</p>
-    if (opts.empty) return <p className="text-xs text-muted-foreground">No data returned.</p>
+    if (opts.errored) return <p className="text-xs text-muted-foreground">Unable to load.</p>
+    if (opts.empty) return <p className="text-xs text-muted-foreground">No data yet.</p>
     return <p className="text-xs text-muted-foreground">{opts.label}</p>
   }
 
@@ -298,7 +298,7 @@ export function KnowledgeLibraryLanding() {
               {statSub({
                 errored: Boolean(errSources),
                 empty: !errSources && sources.length === 0,
-                label: "GET /knowledge/sources",
+                label: "Registered knowledge sources",
               })}
             </CardContent>
           </Card>
@@ -318,7 +318,7 @@ export function KnowledgeLibraryLanding() {
               {statSub({
                 errored: Boolean(errRuns),
                 empty: !errRuns && runs.length === 0,
-                label: "GET /knowledge/extractions/runs",
+                label: "Extraction runs recorded",
               })}
             </CardContent>
           </Card>
@@ -338,7 +338,7 @@ export function KnowledgeLibraryLanding() {
               {statSub({
                 errored: Boolean(errReview),
                 empty: !errReview && reviewTasks.length === 0,
-                label: "Open / in_review / needs_changes / deferred from review tasks",
+                label: "Open, in review, needs changes, or deferred",
               })}
             </CardContent>
           </Card>
@@ -358,7 +358,7 @@ export function KnowledgeLibraryLanding() {
               {statSub({
                 errored: Boolean(errReview),
                 empty: !errReview && taskCounts.accepted === 0,
-                label: "Review tasks with status accepted",
+                label: "Review tasks marked accepted",
               })}
             </CardContent>
           </Card>
@@ -378,7 +378,7 @@ export function KnowledgeLibraryLanding() {
               {statSub({
                 errored: Boolean(errTraining),
                 empty: !errTraining && trainingCandidates.length === 0,
-                label: "GET /knowledge/training-dataset-candidates",
+                label: "Nominated for model training",
               })}
             </CardContent>
           </Card>
@@ -398,7 +398,7 @@ export function KnowledgeLibraryLanding() {
               {statSub({
                 errored: Boolean(errBenchmark),
                 empty: !errBenchmark && benchmarkCandidates.length === 0,
-                label: "GET /knowledge/benchmark-dataset-candidates",
+                label: "Nominated for held-out benchmarking",
               })}
             </CardContent>
           </Card>
@@ -418,7 +418,7 @@ export function KnowledgeLibraryLanding() {
               {statSub({
                 errored: Boolean(errImprovement),
                 empty: !errImprovement && modelImprovement.length === 0,
-                label: "GET /knowledge/model-improvement-queue",
+                label: "Items in the improvement queue",
               })}
             </CardContent>
           </Card>
@@ -481,11 +481,11 @@ export function KnowledgeLibraryLanding() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>title</TableHead>
-                  <TableHead>source_type</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Source type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -541,11 +541,11 @@ export function KnowledgeLibraryLanding() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>extraction_type</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead className="text-right">extracted_count</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Extraction type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Records extracted</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -586,17 +586,17 @@ export function KnowledgeLibraryLanding() {
           ) : errReview ? (
             <p className="text-sm text-muted-foreground">{errReview}</p>
           ) : reviewTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No review tasks returned.</p>
+            <p className="text-sm text-muted-foreground">No review tasks yet.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>record_type</TableHead>
-                  <TableHead className="w-[88px]">record_id</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>title</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Record type</TableHead>
+                  <TableHead className="w-[88px]">Record ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -639,14 +639,14 @@ export function KnowledgeLibraryLanding() {
           ) : errTraining ? (
             <p className="text-sm text-muted-foreground">{errTraining}</p>
           ) : trainingCandidates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No training dataset candidates returned.</p>
+            <p className="text-sm text-muted-foreground">No training dataset candidates yet.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -683,14 +683,14 @@ export function KnowledgeLibraryLanding() {
           ) : errBenchmark ? (
             <p className="text-sm text-muted-foreground">{errBenchmark}</p>
           ) : benchmarkCandidates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No benchmark dataset candidates returned.</p>
+            <p className="text-sm text-muted-foreground">No benchmark dataset candidates yet.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -727,14 +727,14 @@ export function KnowledgeLibraryLanding() {
           ) : errImprovement ? (
             <p className="text-sm text-muted-foreground">{errImprovement}</p>
           ) : modelImprovement.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No model improvement items returned.</p>
+            <p className="text-sm text-muted-foreground">No model improvement items yet.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -771,14 +771,14 @@ export function KnowledgeLibraryLanding() {
           ) : errDatasetVersions ? (
             <p className="text-sm text-muted-foreground">{errDatasetVersions}</p>
           ) : datasetVersions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No dataset versions returned.</p>
+            <p className="text-sm text-muted-foreground">No dataset versions yet.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>updated_at</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Updated</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -803,7 +803,7 @@ export function KnowledgeLibraryLanding() {
       </ModuleCard>
 
       <p className="text-xs text-muted-foreground">
-        Knowledge Library lists are operational signals from your tenant API — not legal conclusions or agency positions.
+        Knowledge Library lists are operational signals from your organization’s own records — not legal conclusions or agency positions.
         See{" "}
         <Link className="font-medium text-primary underline-offset-4 hover:underline" href="/validation">
           Validation

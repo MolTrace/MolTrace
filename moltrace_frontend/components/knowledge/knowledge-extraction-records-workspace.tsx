@@ -126,7 +126,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
   const loadRecords = useCallback(async () => {
     const n = Number.parseInt(runIdInput.trim(), 10)
     if (!Number.isFinite(n) || n < 1) {
-      setLoadErr("extraction run id is required (positive integer).")
+      setLoadErr("Enter an extraction run ID as a positive whole number.")
       return
     }
     setLoading(true)
@@ -161,7 +161,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
     const name = reviewerName.trim()
     const comment = reviewerComment.trim()
     if (!name || !comment) {
-      setActionErr("reviewer_name and reviewer_comment are required for approval.")
+      setActionErr("Reviewer name and comment are required for approval.")
       return
     }
     setActionErr("")
@@ -181,7 +181,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
       setReviewerComment("")
       await refreshAfterAction()
     } catch (e) {
-      setActionErr(formatApiError(e, "Approve failed."))
+      setActionErr(formatApiError(e, "Could not approve the record."))
     } finally {
       setBusyApprove(false)
     }
@@ -192,7 +192,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
     const name = reviewerName.trim()
     const comment = reviewerComment.trim()
     if (!name || !comment) {
-      setActionErr("reviewer_name and reviewer_comment are required for rejection.")
+      setActionErr("Reviewer name and comment are required for rejection.")
       return
     }
     setActionErr("")
@@ -212,7 +212,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
       setReviewerComment("")
       await refreshAfterAction()
     } catch (e) {
-      setActionErr(formatApiError(e, "Reject failed."))
+      setActionErr(formatApiError(e, "Could not reject the record."))
     } finally {
       setBusyReject(false)
     }
@@ -221,17 +221,17 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
   async function submitLink() {
     if (selectedId == null || !selected) return
     if (reviewStatus !== "accepted") {
-      setActionErr("Linking requires review_status accepted; approve the record first.")
+      setActionErr("Linking requires an accepted review status; approve the record first.")
       return
     }
     const rel = linkRelation.trim()
     if (!rel) {
-      setActionErr("relation_type is required.")
+      setActionErr("A relationship is required.")
       return
     }
     const tidRaw = linkTargetId.trim()
     if (!tidRaw) {
-      setActionErr("target_id is required.")
+      setActionErr("A target ID is required.")
       return
     }
     let target_id: string | number = tidRaw
@@ -253,7 +253,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
       })
       setActionOk("Graph link created.")
     } catch (e) {
-      setActionErr(formatApiError(e, "Link failed."))
+      setActionErr(formatApiError(e, "Could not create the link."))
     } finally {
       setBusyLink(false)
     }
@@ -281,7 +281,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
       })
       setActionOk("Training dataset candidate created.")
     } catch (e) {
-      setActionErr(formatApiError(e, "Create training candidate failed."))
+      setActionErr(formatApiError(e, "Could not create the training candidate."))
     } finally {
       setBusyTrain(false)
     }
@@ -310,7 +310,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
       })
       setActionOk("Benchmark dataset candidate created.")
     } catch (e) {
-      setActionErr(formatApiError(e, "Create benchmark candidate failed."))
+      setActionErr(formatApiError(e, "Could not create the benchmark candidate."))
     } finally {
       setBusyBench(false)
     }
@@ -369,17 +369,13 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
         eyebrow="Load"
         title="Load records by extraction run"
         icon={Database}
-        description={
-          <code className="text-xs">
-            GET /knowledge/extractions/
-            {"{run_id}"}/
-            {recordKind === "reaction" ? "reactions" : recordKind === "analytical" ? "analytical" : "regulatory"}
-          </code>
-        }
+        description={`Enter the extraction run ID to list its ${
+          recordKind === "reaction" ? "reaction" : recordKind === "analytical" ? "analytical" : "regulatory"
+        } records.`}
       >
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-2">
-            <Label htmlFor="k-run-id">run_id</Label>
+            <Label htmlFor="k-run-id">Extraction run ID</Label>
             <Input
               id="k-run-id"
               className="w-[140px] font-mono"
@@ -412,36 +408,36 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No records loaded. Enter run_id and load.</p>
+            <p className="text-sm text-muted-foreground">No records loaded. Enter an extraction run ID, then choose Load.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[72px]">id</TableHead>
+                  <TableHead className="w-[72px]">ID</TableHead>
                   {recordKind === "reaction" ? (
                     <>
-                      <TableHead>reaction_type</TableHead>
-                      <TableHead>substrate_summary</TableHead>
-                      <TableHead>product_summary</TableHead>
-                      <TableHead className="text-right">yield_percent</TableHead>
+                      <TableHead>Reaction type</TableHead>
+                      <TableHead>Substrate</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Yield (%)</TableHead>
                     </>
                   ) : null}
                   {recordKind === "analytical" ? (
                     <>
-                      <TableHead>compound_name</TableHead>
-                      <TableHead>formula</TableHead>
-                      <TableHead className="text-right">exact_mass</TableHead>
+                      <TableHead>Compound</TableHead>
+                      <TableHead>Formula</TableHead>
+                      <TableHead className="text-right">Exact mass</TableHead>
                     </>
                   ) : null}
                   {recordKind === "regulatory" ? (
                     <>
-                      <TableHead>topic</TableHead>
-                      <TableHead className="max-w-[200px]">requirement_text</TableHead>
+                      <TableHead>Topic</TableHead>
+                      <TableHead className="max-w-[200px]">Requirement</TableHead>
                     </>
                   ) : null}
-                  <TableHead>citations</TableHead>
-                  <TableHead>review_status</TableHead>
-                  <TableHead className="w-[90px]">open</TableHead>
+                  <TableHead>Citations</TableHead>
+                  <TableHead>Review status</TableHead>
+                  <TableHead className="w-[90px]">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -534,14 +530,14 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
               <Alert variant="destructive">
                 <AlertTitle className="text-sm">Citation missing</AlertTitle>
                 <AlertDescription className="text-sm">
-                  citation_ids_json is empty — verify provenance before accepting this record.
+                  No citations are attached — verify provenance before accepting this record.
                 </AlertDescription>
               </Alert>
             ) : null}
 
             {warningLines.length > 0 ? (
               <Alert variant="destructive">
-                <AlertTitle className="text-sm">warnings_json</AlertTitle>
+                <AlertTitle className="text-sm">Extraction warnings</AlertTitle>
                 <AlertDescription>
                   <ul className="list-inside list-disc text-sm">
                     {warningLines.map((w, i) => (
@@ -554,7 +550,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
 
             {noteLines.length > 0 ? (
               <Alert>
-                <AlertTitle className="text-sm">notes_json</AlertTitle>
+                <AlertTitle className="text-sm">Extraction notes</AlertTitle>
                 <AlertDescription>
                   <ul className="list-inside list-disc text-sm">
                     {noteLines.map((n, i) => (
@@ -567,85 +563,85 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
 
             {recordKind === "reaction" && selected ? (
               <div className="grid gap-3 md:grid-cols-2">
-                <DetailKV label="reaction_name" value={readRecordString(selected, "reaction_name")} />
-                <DetailKV label="reaction_type" value={readRecordString(selected, "reaction_type")} />
-                <DetailKV label="review_status" value={readRecordString(selected, "review_status")} />
-                <DetailKV label="substrate_summary" value={readRecordString(selected, "substrate_summary")} wide />
-                <DetailKV label="product_summary" value={readRecordString(selected, "product_summary")} wide />
-                <DetailBlock label="product_smiles" mono value={readRecordString(selected, "product_smiles")} />
+                <DetailKV label="Reaction name" value={readRecordString(selected, "reaction_name")} />
+                <DetailKV label="Reaction type" value={readRecordString(selected, "reaction_type")} />
+                <DetailKV label="Review status" value={readRecordString(selected, "review_status")} />
+                <DetailKV label="Substrate" value={readRecordString(selected, "substrate_summary")} wide />
+                <DetailKV label="Product" value={readRecordString(selected, "product_summary")} wide />
+                <DetailBlock label="Product SMILES" mono value={readRecordString(selected, "product_smiles")} />
                 <DetailKV
-                  label="conditions (numeric)"
+                  label="Conditions"
                   value={[
-                    typeof selected["temperature_c"] === "number" ? `temperature_c: ${selected["temperature_c"]}` : null,
-                    typeof selected["time_h"] === "number" ? `time_h: ${selected["time_h"]}` : null,
-                    readRecordString(selected, "concentration") ? `concentration: ${readRecordString(selected, "concentration")}` : null,
-                    readRecordString(selected, "scale") ? `scale: ${readRecordString(selected, "scale")}` : null,
+                    typeof selected["temperature_c"] === "number" ? `Temperature: ${selected["temperature_c"]} °C` : null,
+                    typeof selected["time_h"] === "number" ? `Time: ${selected["time_h"]} h` : null,
+                    readRecordString(selected, "concentration") ? `Concentration: ${readRecordString(selected, "concentration")}` : null,
+                    readRecordString(selected, "scale") ? `Scale: ${readRecordString(selected, "scale")}` : null,
                   ]
                     .filter(Boolean)
                     .join(" · ") || "—"}
                   wide
                 />
                 <DetailKV
-                  label="yield_percent / conversion_percent / selectivity_percent / ee_percent"
+                  label="Yield / conversion / selectivity / ee (%)"
                   value={`${typeof selected["yield_percent"] === "number" ? selected["yield_percent"] : "—"} / ${typeof selected["conversion_percent"] === "number" ? selected["conversion_percent"] : "—"} / ${typeof selected["selectivity_percent"] === "number" ? selected["selectivity_percent"] : "—"} / ${typeof selected["ee_percent"] === "number" ? selected["ee_percent"] : "—"}`}
                   wide
                 />
-                <DetailKV label="impurity_summary" value={readRecordString(selected, "impurity_summary")} wide />
+                <DetailKV label="Impurities" value={readRecordString(selected, "impurity_summary")} wide />
                 <DetailKV
-                  label="confidence_score"
+                  label="Confidence score"
                   value={
                     typeof selected["confidence_score"] === "number" ? String(selected["confidence_score"]) : "—"
                   }
                 />
                 <DetailKV
-                  label="citation_ids_json"
+                  label="Citation IDs"
                   value={readIntList(selected["citation_ids_json"]).join(", ") || "—"}
                   wide
                 />
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">reagent_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Reagents</p>
                   <pre className="max-h-32 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
                     {jsonPretty(selected["reagent_json"])}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">solvent_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Solvents</p>
                   <pre className="max-h-32 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
                     {jsonPretty(selected["solvent_json"])}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">catalyst_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Catalysts</p>
                   <pre className="max-h-28 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
                     {jsonPretty(selected["catalyst_json"])}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">ligand_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Ligands</p>
                   <pre className="max-h-28 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
                     {jsonPretty(selected["ligand_json"])}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">base_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Bases</p>
                   <pre className="max-h-28 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
                     {jsonPretty(selected["base_json"])}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">additive_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Additives</p>
                   <pre className="max-h-28 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
                     {jsonPretty(selected["additive_json"])}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">conditions_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Reaction conditions</p>
                   <pre className="max-h-40 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
                     {jsonPretty(selected["conditions_json"])}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">outcome_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Reaction outcome</p>
                   <pre className="max-h-36 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
                     {jsonPretty(selected["outcome_json"])}
                   </pre>
@@ -655,58 +651,58 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
 
             {recordKind === "analytical" && selected ? (
               <div className="grid gap-3 md:grid-cols-2">
-                <DetailKV label="compound_name" value={readRecordString(selected, "compound_name")} wide />
-                <DetailKV label="review_status" value={readRecordString(selected, "review_status")} />
-                <DetailBlock label="structure_input" mono value={readRecordString(selected, "structure_input")} />
-                <DetailKV label="structure_format" value={readRecordString(selected, "structure_format")} />
-                <DetailKV label="formula" value={readRecordString(selected, "formula")} />
+                <DetailKV label="Compound name" value={readRecordString(selected, "compound_name")} wide />
+                <DetailKV label="Review status" value={readRecordString(selected, "review_status")} />
+                <DetailBlock label="Structure input" mono value={readRecordString(selected, "structure_input")} />
+                <DetailKV label="Structure format" value={readRecordString(selected, "structure_format")} />
+                <DetailKV label="Formula" value={readRecordString(selected, "formula")} />
                 <DetailKV
-                  label="exact_mass"
+                  label="Exact mass"
                   value={typeof selected["exact_mass"] === "number" ? String(selected["exact_mass"]) : "—"}
                 />
-                <DetailKV label="solvent" value={readRecordString(selected, "solvent")} />
+                <DetailKV label="Solvent" value={readRecordString(selected, "solvent")} />
                 <DetailKV
-                  label="frequency_mhz"
+                  label="Frequency (MHz)"
                   value={typeof selected["frequency_mhz"] === "number" ? String(selected["frequency_mhz"]) : "—"}
                 />
                 <DetailKV
-                  label="confidence_score"
+                  label="Confidence score"
                   value={
                     typeof selected["confidence_score"] === "number" ? String(selected["confidence_score"]) : "—"
                   }
                 />
                 <DetailKV
-                  label="citation_ids_json"
+                  label="Citation IDs"
                   value={readIntList(selected["citation_ids_json"]).join(", ") || "—"}
                   wide
                 />
-                <DetailKV label="analytical_method" value={readRecordString(selected, "analytical_method")} wide />
+                <DetailKV label="Analytical method" value={readRecordString(selected, "analytical_method")} wide />
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">nmr_1h_text</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">1H NMR</p>
                   <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                     {readRecordString(selected, "nmr_1h_text") ?? "—"}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">nmr_13c_text</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">13C NMR</p>
                   <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                     {readRecordString(selected, "nmr_13c_text") ?? "—"}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">hrms_text</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">HRMS</p>
                   <pre className="max-h-28 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                     {readRecordString(selected, "hrms_text") ?? "—"}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">msms_summary</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">MS/MS summary</p>
                   <pre className="max-h-28 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                     {readRecordString(selected, "msms_summary") ?? "—"}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">nmr_2d_summary</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">2D NMR summary</p>
                   <pre className="max-h-28 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                     {readRecordString(selected, "nmr_2d_summary") ?? "—"}
                   </pre>
@@ -717,48 +713,48 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
             {recordKind === "regulatory" && selected ? (
               <div className="grid gap-3 md:grid-cols-2">
                 <DetailKV
-                  label="topic"
+                  label="Topic"
                   value={readRecordString(selected, "topic") ?? (typeof selected["topic"] === "string" ? selected["topic"] : undefined)}
                 />
-                <DetailKV label="review_status" value={readRecordString(selected, "review_status")} />
+                <DetailKV label="Review status" value={readRecordString(selected, "review_status")} />
                 <DetailKV
-                  label="jurisdiction_id"
+                  label="Jurisdiction ID"
                   value={
                     typeof selected["jurisdiction_id"] === "number" ? String(selected["jurisdiction_id"]) : "—"
                   }
                 />
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">requirement_text</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Requirement text</p>
                   <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-sm">
                     {readRecordString(selected, "requirement_text") ?? "—"}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">threshold_summary_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Threshold summary</p>
                   <pre className="max-h-36 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                     {jsonPretty(selected.threshold_summary_json)}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">rule_candidate_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Rule candidate</p>
                   <pre className="max-h-36 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                     {jsonPretty(selected.rule_candidate_json)}
                   </pre>
                 </div>
                 <div className="md:col-span-2">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">action_candidate_json</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Action candidate</p>
                   <pre className="max-h-36 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                     {jsonPretty(selected.action_candidate_json)}
                   </pre>
                 </div>
                 <DetailKV
-                  label="confidence_score"
+                  label="Confidence score"
                   value={
                     typeof selected["confidence_score"] === "number" ? String(selected["confidence_score"]) : "—"
                   }
                 />
                 <DetailKV
-                  label="citation_ids_json"
+                  label="Citation IDs"
                   value={readIntList(selected["citation_ids_json"]).join(", ") || "—"}
                   wide
                 />
@@ -766,14 +762,14 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
             ) : null}
 
             <div className="space-y-2 border-t pt-4">
-              <Label htmlFor="kr-reviewer">reviewer_name</Label>
+              <Label htmlFor="kr-reviewer">Reviewer name</Label>
               <Input
                 id="kr-reviewer"
                 value={reviewerName}
                 onChange={(e) => setReviewerName(e.target.value)}
                 autoComplete="name"
               />
-              <Label htmlFor="kr-comment">reviewer_comment</Label>
+              <Label htmlFor="kr-comment">Reviewer comment</Label>
               <Textarea
                 id="kr-comment"
                 value={reviewerComment}
@@ -809,7 +805,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
               </p>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>target_type</Label>
+                  <Label>Target type</Label>
                   <Select value={linkTargetType} onValueChange={setLinkTargetType}>
                     <SelectTrigger>
                       <SelectValue />
@@ -824,21 +820,21 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="link-tid">target_id</Label>
+                  <Label htmlFor="link-tid">Target ID</Label>
                   <Input
                     id="link-tid"
                     value={linkTargetId}
                     onChange={(e) => setLinkTargetId(e.target.value)}
-                    placeholder="numeric id or string id"
+                    placeholder="Numeric or text ID"
                     className="font-mono text-sm"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="link-rel">relation_type</Label>
+                  <Label htmlFor="link-rel">Relationship</Label>
                   <Input id="link-rel" value={linkRelation} onChange={(e) => setLinkRelation(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>confidence_label</Label>
+                  <Label>Confidence</Label>
                   <Select value={linkConfidence} onValueChange={setLinkConfidence}>
                     <SelectTrigger>
                       <SelectValue />

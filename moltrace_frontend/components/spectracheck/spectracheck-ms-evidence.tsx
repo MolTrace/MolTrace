@@ -261,7 +261,7 @@ function LcmsAdvGroupingDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Grouped feature table (text)</CardTitle>
-            <CardDescription>Exported by the app <code className="text-xs">feature_table_text</code>.</CardDescription>
+            <CardDescription>The feature table exported by the grouping step.</CardDescription>
           </CardHeader>
           <CardContent>
             <pre className="max-h-[320px] overflow-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-xs">{ft}</pre>
@@ -351,7 +351,7 @@ function LcmsAdvConsensusDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Layer scores (subset)</CardTitle>
-            <CardDescription>From <code className="text-xs">layer_scores</code> on the first few families.</CardDescription>
+            <CardDescription>Per-layer scores for the first few families.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -392,7 +392,7 @@ function LcmsAdvConsensusDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Promoted feature family table</CardTitle>
-            <CardDescription>Families with <code className="text-xs">promoted_for_candidate_scoring</code>.</CardDescription>
+            <CardDescription>Families promoted for candidate scoring.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -436,7 +436,7 @@ function LcmsAdvDereplicationDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Top library hit</CardTitle>
-            <CardDescription>Highest-ranked row from <code className="text-xs">best_match</code> — decision-support only.</CardDescription>
+            <CardDescription>Highest-ranked match — decision support only.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
             <div>
@@ -773,7 +773,7 @@ function AdductInferenceDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Best adduct candidate</CardTitle>
-            <CardDescription>Top-ranked hypothesis from <code className="text-xs">best_adduct_candidate</code>.</CardDescription>
+            <CardDescription>Top-ranked adduct hypothesis.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p>
@@ -4497,7 +4497,7 @@ export function SpectraCheckMsEvidence({
                     value={lcmsDerFamilyTable}
                     onChange={(e) => setLcmsDerFamilyTable(e.target.value)}
                     rows={4}
-                    placeholder="family_id, anchor_mz, … from consensus export"
+                    placeholder="Family ID, anchor m/z, … from the consensus export"
                   />
                 </label>
                 {lcmsConResult != null && (

@@ -29,7 +29,9 @@ export function CompoundGraphPageWorkspace() {
       {compoundId ? (
         <CompoundScientificKnowledgeGraphPanel compoundId={compoundId} hideFullPageLink />
       ) : (
-        <p className="text-sm text-muted-foreground">Missing compound id in the route.</p>
+        <p className="text-sm text-muted-foreground">
+          No compound selected. Open a compound from the registry to see its knowledge graph.
+        </p>
       )}
     </div>
   )

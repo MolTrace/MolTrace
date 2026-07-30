@@ -29,6 +29,20 @@ const REVIEW_STATUSES = [
   "deferred",
 ] as const
 
+/** Display labels for the stored review statuses — the stored values are unchanged. */
+const REVIEW_STATUS_LABELS: Record<string, string> = {
+  unreviewed: "Not yet reviewed",
+  needs_changes: "Needs changes",
+  approved_plausible: "Approved — plausible",
+  approved_confirmed: "Approved — confirmed",
+  rejected: "Rejected",
+  deferred: "Deferred",
+}
+
+function reviewStatusLabel(value: string): string {
+  return REVIEW_STATUS_LABELS[value] ?? value.replace(/_/g, " ")
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
@@ -183,14 +197,14 @@ export function SpectraCheckSavedSessionReviewAudit({ backendSessionId }: { back
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Review gate</CardTitle>
           <CardDescription>
-            Human review for this saved SpectraCheck session. POST{" "}
-            <code className="text-xs">/spectracheck/sessions/{"{session_id}"}/review</code>.
+            Human review for this saved SpectraCheck session. Decisions are recorded against the
+            session and appear in its audit trail.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {noSession ? (
             <p className="text-sm text-muted-foreground">
-              Connect a backend session (Session card above) to save review decisions.
+              Connect a saved session (Session card above) to save review decisions.
             </p>
           ) : (
             <>
@@ -214,7 +228,7 @@ export function SpectraCheckSavedSessionReviewAudit({ backendSessionId }: { back
                   >
                     {REVIEW_STATUSES.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {reviewStatusLabel(s)}
                       </option>
                     ))}
                   </select>
@@ -256,7 +270,7 @@ export function SpectraCheckSavedSessionReviewAudit({ backendSessionId }: { back
         </CollapsibleTrigger>
         <CollapsibleContent className="border-t px-4 pb-4">
           {noSession ? (
-            <p className="py-2 text-sm text-muted-foreground">Connect a backend session to load audit events.</p>
+            <p className="py-2 text-sm text-muted-foreground">Connect a saved session to load audit events.</p>
           ) : auditError ? (
             <p className="py-2 text-sm text-destructive">{auditError}</p>
           ) : allEvents.length === 0 ? (

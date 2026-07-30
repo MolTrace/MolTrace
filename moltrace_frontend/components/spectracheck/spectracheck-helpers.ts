@@ -27,7 +27,7 @@ export function formatApiError(err: unknown, fallback: string): string {
     if (detail && detail.toLowerCase() !== "not found") {
       return sanitizePublicApiErrorMessage(detail, 404)
     }
-    return "Backend endpoint not available yet."
+    return "This capability is not available on this MolTrace instance yet."
   }
   if (err instanceof Error) {
     return sanitizePublicApiErrorMessage(err.message, err instanceof ApiError ? err.status : undefined)

@@ -17,6 +17,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  fileKindLabel,
+  workflowInputLabel,
+} from "@/src/components/spectracheck/spectracheck-display-labels"
 import type { WorkflowTemplateCardModel } from "@/src/components/spectracheck/WorkflowTemplateGallery"
 import { WorkflowRunTimeline } from "@/src/components/spectracheck/WorkflowRunTimeline"
 import type { EvidenceItem } from "@/src/lib/spectracheck/evidence-types"
@@ -269,13 +273,13 @@ export function WorkflowRunLauncher({
       setPhase(rid ? "created" : "idle")
       if (!rid) {
         setError(
-          "Workflow run was created but no workflow_run_id was found in the response. Check the summary below or Developer JSON.",
+          "The workflow run was created, but its run ID could not be read. Check the summary below.",
         )
       }
     } catch (err) {
       const msg =
         err instanceof ApiError
-          ? err.message || `Create failed (${err.status})`
+          ? err.message || "Could not create the workflow run."
           : err instanceof Error
             ? err.message
             : "Failed to create workflow run."
@@ -311,7 +315,7 @@ export function WorkflowRunLauncher({
     } catch (err) {
       const msg =
         err instanceof ApiError
-          ? err.message || `Start failed (${err.status})`
+          ? err.message || "Could not start the workflow run."
           : err instanceof Error
             ? err.message
             : "Failed to start workflow run."
@@ -326,7 +330,7 @@ export function WorkflowRunLauncher({
       case "session_id":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>session_id</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Input
               id={`wf-${key}`}
               value={sessionIdField}
@@ -339,21 +343,21 @@ export function WorkflowRunLauncher({
       case "sample_id":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>sample_id</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Input id={`wf-${key}`} value={sampleIdField} onChange={(e) => setSampleIdField(e.target.value)} />
           </div>
         )
       case "solvent":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>solvent</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Input id={`wf-${key}`} value={solventField} onChange={(e) => setSolventField(e.target.value)} />
           </div>
         )
       case "candidates_text":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>candidates_text</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Textarea
               id={`wf-${key}`}
               value={candidatesField}
@@ -366,7 +370,7 @@ export function WorkflowRunLauncher({
       case "observed_proton_text":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>observed_proton_text</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Textarea
               id={`wf-${key}`}
               value={protonField}
@@ -379,7 +383,7 @@ export function WorkflowRunLauncher({
       case "observed_carbon13_text":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>observed_carbon13_text</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Textarea
               id={`wf-${key}`}
               value={carbonField}
@@ -392,7 +396,7 @@ export function WorkflowRunLauncher({
       case "file_ids":
         return (
           <div key={key} className="space-y-2">
-            <Label>file_ids (session files)</Label>
+            <Label>{workflowInputLabel(key)}</Label>
             {sessionFiles.length === 0 ? (
               <p className="text-xs text-muted-foreground">No session files loaded for this SpectraCheck session.</p>
             ) : (
@@ -409,7 +413,7 @@ export function WorkflowRunLauncher({
                       <span className="text-muted-foreground"> · </span>
                       <span>{f.filename}</span>
                       <Badge variant="outline" className="ml-1 align-middle text-[9px] font-normal">
-                        {f.file_kind}
+                        {fileKindLabel(f.file_kind)}
                       </Badge>
                     </label>
                   </li>
@@ -421,21 +425,21 @@ export function WorkflowRunLauncher({
       case "observed_mz":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>observed_mz</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Input id={`wf-${key}`} value={observedMz} onChange={(e) => setObservedMz(e.target.value)} />
           </div>
         )
       case "adduct":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>adduct</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Input id={`wf-${key}`} value={adduct} onChange={(e) => setAdduct(e.target.value)} />
           </div>
         )
       case "msms_peak_list_text":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>msms_peak_list_text</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Textarea
               id={`wf-${key}`}
               value={msmsPeakList}
@@ -448,7 +452,7 @@ export function WorkflowRunLauncher({
       case "lcms_file_id":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>lcms_file_id</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Select value={lcmsFileId || "__none__"} onValueChange={(v) => setLcmsFileId(v === "__none__" ? "" : v)}>
               <SelectTrigger id={`wf-${key}`} className="font-mono text-xs">
                 <SelectValue placeholder="Select file id" />
@@ -467,7 +471,7 @@ export function WorkflowRunLauncher({
       case "blank_file_id":
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>blank_file_id (optional)</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)} (optional)</Label>
             <Select value={blankFileId || "__none__"} onValueChange={(v) => setBlankFileId(v === "__none__" ? "" : v)}>
               <SelectTrigger id={`wf-${key}`} className="font-mono text-xs">
                 <SelectValue placeholder="Optional blank reference file" />
@@ -492,14 +496,14 @@ export function WorkflowRunLauncher({
               onCheckedChange={(c) => setIncludeReportDraft(c === true)}
             />
             <Label htmlFor={`wf-${key}`} className="cursor-pointer font-normal">
-              include_report_draft
+              {workflowInputLabel(key)}
             </Label>
           </div>
         )
       default:
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={`wf-${key}`}>{key}</Label>
+            <Label htmlFor={`wf-${key}`}>{workflowInputLabel(key)}</Label>
             <Input
               id={`wf-${key}`}
               value={extraInputs[key] ?? ""}
@@ -542,7 +546,7 @@ export function WorkflowRunLauncher({
                 {evidenceItems.filter((i) => i.selectedForUnified).length > 0
                   ? ` · ${evidenceItems.filter((i) => i.selectedForUnified).length} selected for Unified`
                   : ""}
-                . Sent under <code className="text-[10px]">metadata</code> — file binaries are not stored in localStorage.
+                . Sent as evidence metadata only — file contents are never kept in browser storage.
               </p>
             </div>
           </>
@@ -564,14 +568,14 @@ export function WorkflowRunLauncher({
           <div className="rounded-md border bg-card p-3 text-xs">
             <p className="font-medium text-foreground">Workflow run summary</p>
             <p className="mt-1 font-mono text-[10px] text-muted-foreground break-all">
-              workflow_run_id: {workflowRunId}
+              Run ID: {workflowRunId}
             </p>
             <pre className="mt-2 max-h-48 overflow-auto rounded bg-muted/40 p-2 text-[10px] leading-relaxed">
               {JSON.stringify(createResponse, null, 2)}
             </pre>
             {startResponse != null ? (
               <>
-                <p className="mt-3 font-medium text-foreground">Start response</p>
+                <p className="mt-3 font-medium text-foreground">Start result</p>
                 <pre className="mt-2 max-h-36 overflow-auto rounded bg-muted/40 p-2 text-[10px] leading-relaxed">
                   {JSON.stringify(startResponse, null, 2)}
                 </pre>

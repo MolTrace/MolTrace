@@ -128,8 +128,12 @@ function ratingBadge(rating: string): { cls: string; label: string } {
       return { cls: "border-warning/50 text-warning", label: "marginal" }
     case "not_capable":
       return { cls: "border-destructive/50 text-destructive", label: "not capable" }
+    case "undefined":
+      // Capability indices are not computable (e.g. zero within-subgroup
+      // variation) — say so in words rather than showing "undefined".
+      return { cls: "text-muted-foreground", label: "not determined" }
     default:
-      return { cls: "text-muted-foreground", label: rating ? rating.replace(/_/g, " ") : "undefined" }
+      return { cls: "text-muted-foreground", label: rating ? rating.replace(/_/g, " ") : "not rated" }
   }
 }
 

@@ -984,17 +984,17 @@ export function DeploymentSettingsWorkspace() {
                       </Badge>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Checksums identify the exact fixture set, stable row fingerprint, and exported report payload.
+                      Checksums identify the exact fixture set, the stable record fingerprint, and the exported report file.
                     </p>
                     <dl className="grid gap-2 md:grid-cols-2">
                       <div>
-                        <dt className="font-medium text-muted-foreground">fixture identity SHA-256</dt>
+                        <dt className="font-medium text-muted-foreground">Fixture identity SHA-256</dt>
                         <dd className="font-mono break-all">
                           {readStr(fixtureProvenance, ["fixture_identity_sha256"]) || "—"}
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-medium text-muted-foreground">stable row fingerprint SHA-256</dt>
+                        <dt className="font-medium text-muted-foreground">Stable record fingerprint SHA-256</dt>
                         <dd className="font-mono break-all">
                           {readStr(fixtureProvenance, ["row_fingerprint_sha256"]) || "—"}
                         </dd>
@@ -1006,19 +1006,19 @@ export function DeploymentSettingsWorkspace() {
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-medium text-muted-foreground">shadow comparison SHA-256</dt>
+                        <dt className="font-medium text-muted-foreground">Shadow comparison SHA-256</dt>
                         <dd className="font-mono break-all">
                           {readStr(fixtureProvenance, ["shadow_comparison_sha256"]) || "—"}
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-medium text-muted-foreground">runtime effect SHA-256</dt>
+                        <dt className="font-medium text-muted-foreground">Runtime effect SHA-256</dt>
                         <dd className="font-mono break-all">
                           {readStr(fixtureProvenance, ["runtime_effect_sha256"]) || "—"}
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-medium text-muted-foreground">route policy</dt>
+                        <dt className="font-medium text-muted-foreground">Routing policy</dt>
                         <dd className="font-mono break-all">
                           {readStr(fixtureProvenance, ["route_policy"]) || "—"}
                         </dd>

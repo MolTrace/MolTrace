@@ -74,7 +74,7 @@ export function SessionEvidenceReadinessCard({ sessionId }: Props) {
       try {
         await loadGet()
       } catch {
-        setError("Session QC could not be completed right now. You can retry when the backend is available.")
+        setError("Session QC could not be completed right now. You can retry when the service is available.")
       }
     } finally {
       setBusy(false)

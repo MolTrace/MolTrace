@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { EntityPicker } from "@/components/ui/entity-picker"
 import { loadCompounds } from "@/lib/ui/entity-options"
+import { statusLabel } from "@/lib/ui/status"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -170,7 +171,7 @@ function graphRows(
     const toName = pickStr(r, ["related_preferred_name", "relatedPreferredName", "target_name", "targetName"])
     rows.push({
       from: selfLabel,
-      label: rel === "—" ? "relationship" : rel,
+      label: rel === "—" ? "Relationship" : statusLabel(rel),
       to: toName !== "—" ? `${toName} (${toId})` : toId !== "—" ? `compound ${toId}` : "—",
     })
   }
@@ -179,7 +180,7 @@ function graphRows(
     const rl = evidenceResourceLabel(e)
     rows.push({
       from: selfLabel,
-      label: et === "—" ? "evidence" : et,
+      label: et === "—" ? "Evidence" : statusLabel(et),
       to: rl,
     })
   }
@@ -274,7 +275,7 @@ export function CompoundDetailWorkspace() {
     if (!compoundId) return
     const v = aliasInput.trim()
     if (!v) {
-      setAliasErr("alias is required.")
+      setAliasErr("Alias is required.")
       return
     }
     setAliasBusy(true)
@@ -296,12 +297,12 @@ export function CompoundDetailWorkspace() {
     const tid = relTargetId.trim()
     const rt = relType.trim()
     if (!tid || !rt) {
-      setRelErr("related compound id and relationship type are required.")
+      setRelErr("Select a related compound and enter a relationship type.")
       return
     }
     const n = Number.parseInt(tid, 10)
     if (!Number.isFinite(n)) {
-      setRelErr("related compound id must be a positive integer.")
+      setRelErr("Select a valid related compound.")
       return
     }
     setRelBusy(true)
@@ -354,7 +355,7 @@ export function CompoundDetailWorkspace() {
         <AlertCard
           variant="error"
           title="Missing compound"
-          description="compound id is required in the URL."
+          description="No compound was specified. Open a compound from the registry to see its detail."
         />
       </div>
     )
@@ -443,7 +444,7 @@ export function CompoundDetailWorkspace() {
                     <div>
                       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">compound type</dt>
                       <dd className="mt-1">
-                        <Badge variant="outline">{pickStr(compound, ["compound_type", "compoundType"])}</Badge>
+                        <Badge variant="outline">{statusLabel(pickStr(compound, ["compound_type", "compoundType"]))}</Badge>
                       </dd>
                     </div>
                     <div>
@@ -472,17 +473,19 @@ export function CompoundDetailWorkspace() {
                     </div>
                     <div>
                       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">stereochemistry status</dt>
-                      <dd className="mt-1">{pickStr(compound, ["stereochemistry_status", "stereochemistryStatus"])}</dd>
+                      <dd className="mt-1">{statusLabel(pickStr(compound, ["stereochemistry_status", "stereochemistryStatus"]))}</dd>
                     </div>
                     <div>
                       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">salt/solvent status</dt>
-                      <dd className="mt-1">{pickStr(compound, ["salt_solvent_status", "saltSolventStatus"])}</dd>
+                      <dd className="mt-1">{statusLabel(pickStr(compound, ["salt_solvent_status", "saltSolventStatus"]))}</dd>
                     </div>
                     <div>
                       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">review/status</dt>
                       <dd className="mt-1 flex flex-wrap gap-2">
-                        <Badge variant="secondary">{pickStr(compound, ["status", "record_status", "recordStatus"])}</Badge>
-                        <Badge variant="outline">{pickStr(compound, ["review_status", "reviewStatus"])}</Badge>
+                        <Badge variant="secondary">
+                          {statusLabel(pickStr(compound, ["status", "record_status", "recordStatus"]))}
+                        </Badge>
+                        <Badge variant="outline">{statusLabel(pickStr(compound, ["review_status", "reviewStatus"]))}</Badge>
                       </dd>
                     </div>
                   </dl>
@@ -537,12 +540,14 @@ export function CompoundDetailWorkspace() {
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">
-                                {pickStr(row, ["validation_status", "validationStatus", "validity"])}
+                                {statusLabel(pickStr(row, ["validation_status", "validationStatus", "validity"]))}
                               </Badge>
                             </TableCell>
                             <TableCell>
                               <Badge variant="secondary">
-                                {pickStr(row, ["reviewer_status", "reviewerStatus", "review_status", "reviewStatus"])}
+                                {statusLabel(
+                                  pickStr(row, ["reviewer_status", "reviewerStatus", "review_status", "reviewStatus"]),
+                                )}
                               </Badge>
                             </TableCell>
                             <TableCell className="max-w-[280px] text-xs text-muted-foreground">{formatWarnings(row)}</TableCell>
@@ -612,7 +617,9 @@ export function CompoundDetailWorkspace() {
                         {aliases.map((row, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{pickStr(row, ["alias", "alias_text", "aliasText", "name"])}</TableCell>
-                            <TableCell className="text-xs">{pickStr(row, ["alias_kind", "aliasKind", "kind", "type"])}</TableCell>
+                            <TableCell className="text-xs">
+                              {statusLabel(pickStr(row, ["alias_kind", "aliasKind", "kind", "type"]))}
+                            </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
                               {pickStr(row, ["updated_at", "updatedAt", "created_at", "createdAt"])}
                             </TableCell>
@@ -688,7 +695,7 @@ export function CompoundDetailWorkspace() {
                                   const href = evidenceHref(row)
                                   return (
                                     <TableRow key={i}>
-                                      <TableCell className="text-xs">{evidenceTypeLabel(row)}</TableCell>
+                                      <TableCell className="text-xs">{statusLabel(evidenceTypeLabel(row))}</TableCell>
                                       <TableCell className="max-w-[240px] text-xs">{evidenceResourceLabel(row)}</TableCell>
                                       <TableCell>
                                         {href ? (
@@ -793,13 +800,15 @@ export function CompoundDetailWorkspace() {
                           return (
                             <TableRow key={i}>
                               <TableCell className="text-xs">
-                                {pickStr(row, ["relationship_type", "relationshipType", "type"])}
+                                {statusLabel(pickStr(row, ["relationship_type", "relationshipType", "type"]))}
                               </TableCell>
                               <TableCell className="font-mono text-xs">
                                 {pickStr(row, ["related_compound_id", "relatedCompoundId", "to_compound_id", "toCompoundId"])}
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline">{pickStr(row, ["status", "edge_status", "edgeStatus"])}</Badge>
+                                <Badge variant="outline">
+                                  {statusLabel(pickStr(row, ["status", "edge_status", "edgeStatus"]))}
+                                </Badge>
                               </TableCell>
                               <TableCell>
                                 {href ? (
@@ -866,7 +875,7 @@ export function CompoundDetailWorkspace() {
                 eyebrow="Detail"
                 title="Developer JSON"
                 icon={Code2}
-                description="Raw payloads for debugging."
+                description="Raw data for troubleshooting."
               >
                 <div>
                   <DeveloperJsonPanel data={devPayload} />
@@ -881,7 +890,7 @@ export function CompoundDetailWorkspace() {
         <AlertCard
           variant="info"
           title="No compound record"
-          description="Nothing returned for this id."
+          description="No compound was found for this id."
         />
       ) : null}
     </div>

@@ -91,7 +91,7 @@ export function LcmsWorkflowMetrics({ stepKey, data }: { stepKey: string; data: 
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">RT alignment status</CardTitle>
-            <CardDescription>Per-run alignment summary from the backend.</CardDescription>
+            <CardDescription>Per-run retention-time alignment summary.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {summaries.length === 0 ? (
@@ -211,7 +211,7 @@ export function LcmsWorkflowMetrics({ stepKey, data }: { stepKey: string; data: 
 
   return (
     <p className="text-sm text-muted-foreground">
-      Run this step to populate LC-MS metrics. Developer JSON below holds the full payload.
+      Run this step to populate LC-MS metrics. The full result is available below under raw data (for troubleshooting).
     </p>
   )
 }

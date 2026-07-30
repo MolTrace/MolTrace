@@ -702,7 +702,7 @@ function UnifiedConfidenceTab({
             </CollapsibleTrigger>
             <CollapsibleContent className="border-t px-4 pb-4">
               <p className="mb-2 text-xs text-muted-foreground">
-                Raw JSON payloads from selected queue items — not the full MS Evidence workspace tables.
+                Raw JSON from selected queue items — not the full MS Evidence workspace tables.
               </p>
               <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-3 text-[10px] leading-relaxed">
                 {JSON.stringify(

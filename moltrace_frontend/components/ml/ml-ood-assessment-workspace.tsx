@@ -301,7 +301,7 @@ export function MlOodAssessmentWorkspace() {
         eyebrow="Records"
         title="Assessments"
         icon={ShieldAlert}
-        description="Out-of-distribution assessments logged for this tenant — OOD method, status, associated artifact, and dataset version."
+        description="Out-of-distribution assessments recorded for your organization — OOD method, status, associated artifact, and dataset version."
       >
         <div className="space-y-4">
           <div className="table-scroll min-w-0">

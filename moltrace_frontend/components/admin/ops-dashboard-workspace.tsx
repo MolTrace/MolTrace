@@ -81,6 +81,15 @@ function humanizeKey(key: string): string {
   return key.replace(/_/g, " ")
 }
 
+/**
+ * Display-only label for the stored data-mode value ("partially_synced" →
+ * "Partially synced"). The stored value still drives the badge palette.
+ */
+function dataModeLabel(mode: string): string {
+  const text = mode.trim().replace(/_/g, " ")
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : mode
+}
+
 /** drift_status → badge palette (matches the dependency-badge convention). */
 function driftBadgeClass(status: string): string {
   switch (status.toLowerCase()) {
@@ -114,7 +123,7 @@ function DataModeFooter({ mode, generatedAt }: { mode: string; generatedAt?: str
   return (
     <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3 text-[10px] text-muted-foreground">
       <Badge variant="outline" className={cn("font-normal", dataModeClass(mode))}>
-        {mode}
+        {dataModeLabel(mode)}
       </Badge>
       {generatedAt ? <span className="font-mono">generated {generatedAt}</span> : null}
     </div>

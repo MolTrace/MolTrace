@@ -263,7 +263,7 @@ export function RenewalValueReportSection() {
       const raw = await apiFetch<unknown>("/analytics/renewal-report", { method: "POST", body })
       const parsed = parseRenewalReportResponse(raw)
       if (!parsed) {
-        setError("Unexpected response generating renewal report.")
+        setError("The generated renewal report could not be read. Please try again.")
         return
       }
       setReport(parsed)
@@ -283,7 +283,7 @@ export function RenewalValueReportSection() {
       const raw = await apiFetch<unknown>(`/analytics/renewal-report/${report.id}`, { method: "GET" })
       const parsed = parseRenewalReportResponse(raw)
       if (!parsed) {
-        setError("Unexpected response loading renewal report.")
+        setError("This renewal report could not be read. Please try again.")
         return
       }
       setReport(parsed)
@@ -392,7 +392,7 @@ export function RenewalValueReportSection() {
               id="renewal-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Optional — backend defaults if empty"
+              placeholder="Optional — a default title is used if left empty"
               maxLength={300}
             />
           </div>
@@ -419,15 +419,15 @@ export function RenewalValueReportSection() {
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Badge variant="secondary" className="font-normal">
-                  scope={report.scope}
+                  Scope: {report.scope}
                 </Badge>
                 {report.scope_id ? (
-                  <Badge variant="outline" className="font-mono text-xs font-normal">
-                    scope_id={report.scope_id}
+                  <Badge variant="outline" className="text-xs font-normal">
+                    Scope reference: <span className="ml-1 font-mono">{report.scope_id}</span>
                   </Badge>
                 ) : null}
                 <Badge variant="outline" className="font-normal">
-                  report_id={report.id}
+                  Report ID: {report.id}
                 </Badge>
               </div>
             </div>
@@ -439,7 +439,7 @@ export function RenewalValueReportSection() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold tabular-nums">{fmtNum(summaryM.total_hours_saved)}</div>
-                  <p className="text-xs text-muted-foreground">total_hours_saved (summary_json)</p>
+                  <p className="text-xs text-muted-foreground">Total hours saved in this period.</p>
                 </CardContent>
               </Card>
               <Card>
@@ -448,7 +448,7 @@ export function RenewalValueReportSection() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold tabular-nums">{fmtInt(summaryM.tasks_automated)}</div>
-                  <p className="text-xs text-muted-foreground">tasks_automated</p>
+                  <p className="text-xs text-muted-foreground">Automated task runs in this period.</p>
                 </CardContent>
               </Card>
               <Card>
@@ -457,7 +457,7 @@ export function RenewalValueReportSection() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold tabular-nums">{fmtInt(summaryM.reports_generated)}</div>
-                  <p className="text-xs text-muted-foreground">reports_generated</p>
+                  <p className="text-xs text-muted-foreground">Reports produced in this period.</p>
                 </CardContent>
               </Card>
               <Card>
@@ -475,7 +475,7 @@ export function RenewalValueReportSection() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Workflow value summary</CardTitle>
-                <CardDescription>From report_json.value_indicators and summary_json.workflows_completed.</CardDescription>
+                <CardDescription>Workflow completion and time-saved totals for this reporting period.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="table-scroll">
@@ -508,7 +508,7 @@ export function RenewalValueReportSection() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">QC / review summary</CardTitle>
-                <CardDescription>Aggregate counts from value_indicators — no raw spectra or file contents.</CardDescription>
+                <CardDescription>Aggregate counts only — no raw spectra or file contents.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="table-scroll">

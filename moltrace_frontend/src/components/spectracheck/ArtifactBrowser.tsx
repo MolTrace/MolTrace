@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { QualityAssessmentCard } from "@/src/components/spectracheck/QualityAssessmentCard"
 import { QualityFindingsTable } from "@/src/components/spectracheck/QualityFindingsTable"
 import { QualityStatusBadge } from "@/src/components/spectracheck/QualityStatusBadge"
+import { artifactTypeLabel } from "@/src/components/spectracheck/spectracheck-display-labels"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 import { Badge } from "@/components/ui/badge"
@@ -467,8 +468,8 @@ export function ArtifactBrowser({ sessionId }: Props) {
                   <TableRow key={row.artifact_id}>
                     <TableCell className="max-w-[200px] truncate font-medium">{row.title}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="font-mono text-[10px]">
-                        {row.artifact_type}
+                      <Badge variant="outline" className="text-[10px]">
+                        {artifactTypeLabel(row.artifact_type)}
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-[120px] truncate font-mono text-xs">{row.job_id ?? "—"}</TableCell>

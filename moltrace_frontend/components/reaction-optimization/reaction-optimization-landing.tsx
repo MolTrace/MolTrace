@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { CheckCircle2, FlaskConical, FolderOpen, ListChecks, Plus, ShieldCheck } from "lucide-react"
 import { apiFetch } from "@/lib/api/client"
 import { formatStableUtcDateTime } from "@/lib/utils"
+import { statusLabel } from "@/lib/ui/status"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import { Badge } from "@/components/ui/badge"
@@ -58,15 +59,24 @@ function readCreatedReactionProjectId(raw: unknown): number | undefined {
 }
 
 const OBJECTIVES: { value: ReactionObjectiveValue; label: string }[] = [
-  { value: "maximize_yield", label: "maximize_yield" },
-  { value: "maximize_selectivity", label: "maximize_selectivity" },
-  { value: "minimize_impurity", label: "minimize_impurity" },
-  { value: "maximize_conversion", label: "maximize_conversion" },
-  { value: "minimize_e_factor", label: "minimize_e_factor" },
-  { value: "maximize_atom_economy", label: "maximize_atom_economy" },
-  { value: "maximize_green_score", label: "maximize_green_score" },
-  { value: "multi_objective", label: "multi_objective" },
+  { value: "maximize_yield", label: "Maximize yield" },
+  { value: "maximize_selectivity", label: "Maximize selectivity" },
+  { value: "minimize_impurity", label: "Minimize impurity" },
+  { value: "maximize_conversion", label: "Maximize conversion" },
+  { value: "minimize_e_factor", label: "Minimize E-factor" },
+  { value: "maximize_atom_economy", label: "Maximize atom economy" },
+  { value: "maximize_green_score", label: "Maximize green score" },
+  { value: "multi_objective", label: "Multi-objective" },
 ]
+
+/** Readable text for a stored objective; unknown values fall back to sentence-cased words. */
+function objectiveDisplay(value: string | null | undefined): string {
+  const raw = (value ?? "").trim()
+  if (!raw) return "—"
+  const known = OBJECTIVES.find((o) => o.value === raw)
+  if (known) return known.label
+  return statusLabel(raw)
+}
 
 function fmtDate(iso: string): string {
   return formatStableUtcDateTime(iso)
@@ -566,10 +576,10 @@ export function ReactionOptimizationLanding() {
                     return (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.name}</TableCell>
-                        <TableCell className="font-mono text-xs">{p.objective}</TableCell>
+                        <TableCell className="text-xs">{objectiveDisplay(p.objective)}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="font-normal">
-                            {p.status}
+                            {statusLabel(p.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">

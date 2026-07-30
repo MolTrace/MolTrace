@@ -311,8 +311,8 @@ export function GsdIntegrationPanel({
       <Shell hint="Spectrum trace unavailable — integration needs the ppm/intensity arrays." testId={`${testId}-no-trace`}>
         {controls}
         <p className="mt-4 text-sm text-muted-foreground">
-          The integration endpoint integrates the displayed spectrum directly. Re-run preview /
-          analyze so the trace is available.
+          Region integration works on the displayed spectrum directly. Re-run preview or analysis
+          so the trace is available.
         </p>
       </Shell>
     )
@@ -324,14 +324,14 @@ export function GsdIntegrationPanel({
         {controls}
         <div className="mt-4 flex items-center gap-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          POST /spectrum/analyze/integration…
+          Integrating regions…
         </div>
       </Shell>
     )
   }
   if (state.status === "error") {
     return (
-      <Shell hint="Integration endpoint returned an error." testId={`${testId}-error`}>
+      <Shell hint="Region integration returned an error." testId={`${testId}-error`}>
         {controls}
         <div className="mt-4">
           <AlertCard variant="error" title="Region integration failed" description={state.error} />
@@ -351,7 +351,7 @@ export function GsdIntegrationPanel({
         eyebrow="Step 3e · Region integration"
         title="Region integrals"
         icon={Sigma}
-        description={`Backend: ${result.backend} · ${result.region_count} region${
+        description={`${result.region_count} region${
           result.region_count === 1 ? "" : "s"
         } (${regionSource === "multiplets" ? "detected multiplets" : "custom windows"}) integrated via ${METHOD_LABEL[result.method].toLowerCase()}. Relative values are normalised to the smallest region — the standard NMR ratio readout.`}
         className="min-w-0 overflow-visible shadow-none"
@@ -402,7 +402,7 @@ export function GsdIntegrationPanel({
                         <td className="px-3 py-2">
                           <span
                             className="inline-flex items-center rounded-full border bg-muted/40 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em]"
-                            title={`method_used: ${r.method_used}`}
+                            title={`Integration method: ${r.method_used}`}
                           >
                             {r.method_used}
                           </span>

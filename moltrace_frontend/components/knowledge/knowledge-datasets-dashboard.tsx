@@ -107,7 +107,7 @@ function formatWhen(iso: string | undefined): string {
 function readHumanReviewRequired(obj: unknown): string {
   if (!obj || typeof obj !== "object") return "—"
   const v = (obj as Record<string, unknown>).human_review_required
-  if (typeof v === "boolean") return v ? "true" : "false"
+  if (typeof v === "boolean") return v ? "Required" : "Not required"
   return "—"
 }
 
@@ -118,6 +118,13 @@ function truncateSummary(s: string, max = 160): string {
 }
 
 const SPLIT_KEYS = ["train", "validation", "test", "holdout"] as const
+
+const SPLIT_KEY_LABELS: Record<(typeof SPLIT_KEYS)[number], string> = {
+  train: "Train",
+  validation: "Validation",
+  test: "Test",
+  holdout: "Holdout",
+}
 
 const DATASET_TOOLTIP =
   "Dataset candidates are reviewed records that may become training, validation, test, or benchmark data. They must preserve citations and avoid leakage."
@@ -338,10 +345,10 @@ export function KnowledgeDatasetsDashboard() {
           metadata_json: {},
         },
       })
-      setPatchTrainOk("training-dataset-candidates updated.")
+      setPatchTrainOk("Training candidate updated.")
       setReloadToken((x) => x + 1)
     } catch (e) {
-      setPatchTrainErr(formatApiError(e, "Patch failed."))
+      setPatchTrainErr(formatApiError(e, "Could not save changes."))
     } finally {
       setPatchTrainBusy(false)
     }
@@ -364,10 +371,10 @@ export function KnowledgeDatasetsDashboard() {
           metadata_json: {},
         },
       })
-      setPatchBenchOk("benchmark-dataset-candidates updated.")
+      setPatchBenchOk("Benchmark candidate updated.")
       setReloadToken((x) => x + 1)
     } catch (e) {
-      setPatchBenchErr(formatApiError(e, "Patch failed."))
+      setPatchBenchErr(formatApiError(e, "Could not save changes."))
     } finally {
       setPatchBenchBusy(false)
     }
@@ -376,7 +383,7 @@ export function KnowledgeDatasetsDashboard() {
   async function submitCreateTraining() {
     const rid = Number.parseInt(createTrainRecordId.trim(), 10)
     if (!Number.isFinite(rid) || rid < 1) {
-      setCreateTrainErr("record_id must be a positive integer.")
+      setCreateTrainErr("Enter a record ID as a positive whole number.")
       return
     }
     const sidRaw = createTrainSourceId.trim()
@@ -384,7 +391,7 @@ export function KnowledgeDatasetsDashboard() {
     if (sidRaw) {
       const s = Number.parseInt(sidRaw, 10)
       if (!Number.isFinite(s) || s < 1) {
-        setCreateTrainErr("source_id must be empty or a positive integer.")
+        setCreateTrainErr("Leave the source ID blank, or enter a positive whole number.")
         return
       }
       source_id = s
@@ -406,10 +413,10 @@ export function KnowledgeDatasetsDashboard() {
           metadata_json: {},
         },
       })
-      setCreateTrainOk("POST /knowledge/training-dataset-candidates succeeded.")
+      setCreateTrainOk("Training candidate created.")
       setReloadToken((x) => x + 1)
     } catch (e) {
-      setCreateTrainErr(formatApiError(e, "Create failed."))
+      setCreateTrainErr(formatApiError(e, "Could not create the training candidate."))
     } finally {
       setCreateTrainBusy(false)
     }
@@ -418,7 +425,7 @@ export function KnowledgeDatasetsDashboard() {
   async function submitCreateBenchmark() {
     const rid = Number.parseInt(createBenchRecordId.trim(), 10)
     if (!Number.isFinite(rid) || rid < 1) {
-      setCreateBenchErr("record_id must be a positive integer.")
+      setCreateBenchErr("Enter a record ID as a positive whole number.")
       return
     }
     const sidRaw = createBenchSourceId.trim()
@@ -426,7 +433,7 @@ export function KnowledgeDatasetsDashboard() {
     if (sidRaw) {
       const s = Number.parseInt(sidRaw, 10)
       if (!Number.isFinite(s) || s < 1) {
-        setCreateBenchErr("source_id must be empty or a positive integer.")
+        setCreateBenchErr("Leave the source ID blank, or enter a positive whole number.")
         return
       }
       source_id = s
@@ -449,10 +456,10 @@ export function KnowledgeDatasetsDashboard() {
           metadata_json: {},
         },
       })
-      setCreateBenchOk("POST /knowledge/benchmark-dataset-candidates succeeded.")
+      setCreateBenchOk("Benchmark candidate created.")
       setReloadToken((x) => x + 1)
     } catch (e) {
-      setCreateBenchErr(formatApiError(e, "Create failed."))
+      setCreateBenchErr(formatApiError(e, "Could not create the benchmark candidate."))
     } finally {
       setCreateBenchBusy(false)
     }
@@ -463,7 +470,7 @@ export function KnowledgeDatasetsDashboard() {
     const ver = dvVersion.trim()
     const dt = dvDatasetType.trim()
     if (!name || !ver || !dt) {
-      setCreateDvErr("name, version, and dataset_type are required.")
+      setCreateDvErr("Name, version, and dataset type are required.")
       return
     }
     const train = parseCommaInts(dvTrainIds)
@@ -495,10 +502,10 @@ export function KnowledgeDatasetsDashboard() {
           metadata_json: {},
         },
       })
-      setCreateDvOk("POST /knowledge/dataset-versions succeeded.")
+      setCreateDvOk("Dataset version created.")
       setReloadToken((x) => x + 1)
     } catch (e) {
-      setCreateDvErr(formatApiError(e, "Create failed."))
+      setCreateDvErr(formatApiError(e, "Could not create the dataset version."))
     } finally {
       setCreateDvBusy(false)
     }
@@ -520,10 +527,10 @@ export function KnowledgeDatasetsDashboard() {
           metadata_json: {},
         },
       })
-      setPatchVOk("dataset-versions updated.")
+      setPatchVOk("Dataset version updated.")
       setReloadToken((x) => x + 1)
     } catch (e) {
-      setPatchVErr(formatApiError(e, "Patch failed."))
+      setPatchVErr(formatApiError(e, "Could not save changes."))
     } finally {
       setPatchVBusy(false)
     }
@@ -584,7 +591,7 @@ export function KnowledgeDatasetsDashboard() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
-                <Label>status filter</Label>
+                <Label>Status filter</Label>
                 <Select value={filterTrainStatus || "__all"} onValueChange={(v) => setFilterTrainStatus(v === "__all" ? "" : v)}>
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="All" />
@@ -624,17 +631,17 @@ export function KnowledgeDatasetsDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[72px]">id</TableHead>
-                      <TableHead>status</TableHead>
-                      <TableHead>dataset_type</TableHead>
-                      <TableHead>record_type</TableHead>
-                      <TableHead className="w-[88px]">record_id</TableHead>
-                      <TableHead className="w-[88px]">source_id</TableHead>
-                      <TableHead className="text-right">citation_ids_json</TableHead>
-                      <TableHead>quality_flags_json</TableHead>
-                      <TableHead>created_at</TableHead>
-                      <TableHead>human_review_required</TableHead>
-                      <TableHead className="w-[90px]">open</TableHead>
+                      <TableHead className="w-[72px]">ID</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Dataset type</TableHead>
+                      <TableHead>Record type</TableHead>
+                      <TableHead className="w-[88px]">Record ID</TableHead>
+                      <TableHead className="w-[88px]">Source ID</TableHead>
+                      <TableHead className="text-right">Citations</TableHead>
+                      <TableHead>Quality flags</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Human review</TableHead>
+                      <TableHead className="w-[90px]">Open</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -689,11 +696,11 @@ export function KnowledgeDatasetsDashboard() {
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="ct-source">source_id (optional)</Label>
+                  <Label htmlFor="ct-source">Source ID (optional)</Label>
                   <Input id="ct-source" className="font-mono" value={createTrainSourceId} onChange={(e) => setCreateTrainSourceId(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>record_type</Label>
+                  <Label>Record type</Label>
                   <Select value={createTrainRecordType} onValueChange={setCreateTrainRecordType}>
                     <SelectTrigger>
                       <SelectValue />
@@ -708,11 +715,11 @@ export function KnowledgeDatasetsDashboard() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ct-rid">record_id</Label>
+                  <Label htmlFor="ct-rid">Record ID</Label>
                   <Input id="ct-rid" className="font-mono" value={createTrainRecordId} onChange={(e) => setCreateTrainRecordId(e.target.value)} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label>dataset_type</Label>
+                  <Label>Dataset type</Label>
                   <Select value={createTrainDatasetType} onValueChange={setCreateTrainDatasetType}>
                     <SelectTrigger>
                       <SelectValue />
@@ -727,11 +734,11 @@ export function KnowledgeDatasetsDashboard() {
                   </Select>
                 </div>
                 <div className="space-y-2 md:col-span-3">
-                  <Label htmlFor="ct-cit">citation_ids_json (comma-separated integers)</Label>
+                  <Label htmlFor="ct-cit">Citation IDs (comma-separated)</Label>
                   <Input id="ct-cit" className="font-mono text-xs" value={createTrainCitations} onChange={(e) => setCreateTrainCitations(e.target.value)} />
                 </div>
                 <div className="space-y-2 md:col-span-3">
-                  <Label htmlFor="ct-fl">quality_flags_json (comma-separated)</Label>
+                  <Label htmlFor="ct-fl">Quality flags (comma-separated)</Label>
                   <Input id="ct-fl" className="font-mono text-xs" value={createTrainFlags} onChange={(e) => setCreateTrainFlags(e.target.value)} />
                 </div>
                 <div className="md:col-span-3 flex flex-wrap items-center gap-2">
@@ -749,16 +756,14 @@ export function KnowledgeDatasetsDashboard() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
-                    PATCH training candidate{" "}
-                    <code className="text-xs font-mono">
-                      /knowledge/training-dataset-candidates/{trainId}
-                    </code>
+                    Edit training candidate{" "}
+                    <span className="text-xs font-mono text-muted-foreground">#{trainId}</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid gap-3 md:grid-cols-3">
                     <div className="space-y-2">
-                      <Label>status</Label>
+                      <Label>Status</Label>
                       <Select value={patchTrainStatus} onValueChange={setPatchTrainStatus}>
                         <SelectTrigger>
                           <SelectValue />
@@ -773,17 +778,17 @@ export function KnowledgeDatasetsDashboard() {
                       </Select>
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="pt-cit">citation_ids_json</Label>
+                      <Label htmlFor="pt-cit">Citation IDs</Label>
                       <Input id="pt-cit" className="font-mono text-xs" value={patchTrainCitations} onChange={(e) => setPatchTrainCitations(e.target.value)} />
                     </div>
                     <div className="space-y-2 md:col-span-3">
-                      <Label htmlFor="pt-fl">quality_flags_json</Label>
+                      <Label htmlFor="pt-fl">Quality flags</Label>
                       <Textarea id="pt-fl" className="font-mono text-xs" rows={2} value={patchTrainFlags} onChange={(e) => setPatchTrainFlags(e.target.value)} />
                     </div>
                   </div>
                   <Button type="button" disabled={patchTrainBusy} onClick={() => void submitPatchTraining()}>
                     {patchTrainBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-                    Save PATCH
+                    Save changes
                   </Button>
                   {patchTrainErr ? <p className="text-sm text-destructive">{patchTrainErr}</p> : null}
                   {patchTrainOk ? <p className="text-sm text-muted-foreground">{patchTrainOk}</p> : null}
@@ -805,7 +810,7 @@ export function KnowledgeDatasetsDashboard() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
-                <Label>status filter</Label>
+                <Label>Status filter</Label>
                 <Select value={filterBenchStatus || "__all"} onValueChange={(v) => setFilterBenchStatus(v === "__all" ? "" : v)}>
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="All" />
@@ -845,19 +850,19 @@ export function KnowledgeDatasetsDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[72px]">id</TableHead>
-                      <TableHead>status</TableHead>
-                      <TableHead>benchmark_type</TableHead>
-                      <TableHead>record_type</TableHead>
-                      <TableHead className="w-[88px]">record_id</TableHead>
-                      <TableHead className="w-[88px]">source_id</TableHead>
-                      <TableHead className="text-right">citation_ids_json</TableHead>
-                      <TableHead>quality_flags_json</TableHead>
-                      <TableHead>leakage_risk_label</TableHead>
-                      <TableHead>split_recommendation</TableHead>
-                      <TableHead>created_at</TableHead>
-                      <TableHead>human_review_required</TableHead>
-                      <TableHead className="w-[90px]">open</TableHead>
+                      <TableHead className="w-[72px]">ID</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Benchmark type</TableHead>
+                      <TableHead>Record type</TableHead>
+                      <TableHead className="w-[88px]">Record ID</TableHead>
+                      <TableHead className="w-[88px]">Source ID</TableHead>
+                      <TableHead className="text-right">Citations</TableHead>
+                      <TableHead>Quality flags</TableHead>
+                      <TableHead>Leakage risk</TableHead>
+                      <TableHead>Split recommendation</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Human review</TableHead>
+                      <TableHead className="w-[90px]">Open</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -915,11 +920,11 @@ export function KnowledgeDatasetsDashboard() {
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="cb-source">source_id (optional)</Label>
+                  <Label htmlFor="cb-source">Source ID (optional)</Label>
                   <Input id="cb-source" className="font-mono" value={createBenchSourceId} onChange={(e) => setCreateBenchSourceId(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>record_type</Label>
+                  <Label>Record type</Label>
                   <Select value={createBenchRecordType} onValueChange={setCreateBenchRecordType}>
                     <SelectTrigger>
                       <SelectValue />
@@ -934,11 +939,11 @@ export function KnowledgeDatasetsDashboard() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cb-rid">record_id</Label>
+                  <Label htmlFor="cb-rid">Record ID</Label>
                   <Input id="cb-rid" className="font-mono" value={createBenchRecordId} onChange={(e) => setCreateBenchRecordId(e.target.value)} />
                 </div>
                 <div className="space-y-2 md:col-span-3">
-                  <Label>benchmark_type</Label>
+                  <Label>Benchmark type</Label>
                   <Select value={createBenchType} onValueChange={setCreateBenchType}>
                     <SelectTrigger>
                       <SelectValue />
@@ -953,7 +958,7 @@ export function KnowledgeDatasetsDashboard() {
                   </Select>
                 </div>
                 <div className="space-y-2 md:col-span-3">
-                  <Label htmlFor="cb-fl">quality_flags_json (comma-separated)</Label>
+                  <Label htmlFor="cb-fl">Quality flags (comma-separated)</Label>
                   <Input id="cb-fl" className="font-mono text-xs" value={createBenchFlags} onChange={(e) => setCreateBenchFlags(e.target.value)} />
                 </div>
                 <div className="md:col-span-3 flex flex-wrap items-center gap-2">
@@ -971,16 +976,14 @@ export function KnowledgeDatasetsDashboard() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
-                    PATCH benchmark candidate{" "}
-                    <code className="text-xs font-mono">
-                      /knowledge/benchmark-dataset-candidates/{benchId}
-                    </code>
+                    Edit benchmark candidate{" "}
+                    <span className="text-xs font-mono text-muted-foreground">#{benchId}</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                     <div className="space-y-2">
-                      <Label>status</Label>
+                      <Label>Status</Label>
                       <Select value={patchBenchStatus} onValueChange={setPatchBenchStatus}>
                         <SelectTrigger>
                           <SelectValue />
@@ -995,7 +998,7 @@ export function KnowledgeDatasetsDashboard() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>split_recommendation</Label>
+                      <Label>Split recommendation</Label>
                       <Select value={patchBenchSplit} onValueChange={setPatchBenchSplit}>
                         <SelectTrigger>
                           <SelectValue />
@@ -1010,7 +1013,7 @@ export function KnowledgeDatasetsDashboard() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>leakage_risk_label</Label>
+                      <Label>Leakage risk</Label>
                       <Select value={patchBenchLeak} onValueChange={setPatchBenchLeak}>
                         <SelectTrigger>
                           <SelectValue />
@@ -1025,13 +1028,13 @@ export function KnowledgeDatasetsDashboard() {
                       </Select>
                     </div>
                     <div className="space-y-2 md:col-span-4">
-                      <Label htmlFor="pb-fl">quality_flags_json</Label>
+                      <Label htmlFor="pb-fl">Quality flags</Label>
                       <Textarea id="pb-fl" className="font-mono text-xs" rows={2} value={patchBenchFlags} onChange={(e) => setPatchBenchFlags(e.target.value)} />
                     </div>
                   </div>
                   <Button type="button" disabled={patchBenchBusy} onClick={() => void submitPatchBenchmark()}>
                     {patchBenchBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-                    Save PATCH
+                    Save changes
                   </Button>
                   {patchBenchErr ? <p className="text-sm text-destructive">{patchBenchErr}</p> : null}
                   {patchBenchOk ? <p className="text-sm text-muted-foreground">{patchBenchOk}</p> : null}
@@ -1053,7 +1056,7 @@ export function KnowledgeDatasetsDashboard() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
-                <Label>status filter</Label>
+                <Label>Status filter</Label>
                 <Select value={filterVersionStatus || "__all"} onValueChange={(v) => setFilterVersionStatus(v === "__all" ? "" : v)}>
                   <SelectTrigger className="w-[220px]">
                     <SelectValue placeholder="All" />
@@ -1072,21 +1075,19 @@ export function KnowledgeDatasetsDashboard() {
 
             <Card className="border-dashed">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">POST dataset version</CardTitle>
+                <CardTitle className="text-base">Create dataset version</CardTitle>
                 <CardDescription>
-                  Populate <code className="text-xs">split_json</code> with keys <code className="text-xs">train</code>,{" "}
-                  <code className="text-xs">validation</code>, <code className="text-xs">test</code>,{" "}
-                  <code className="text-xs">holdout</code> (comma-separated candidate IDs per field).{" "}
-                  <code className="text-xs">source_record_ids_json</code> is the deduplicated union of split IDs.
+                  Assign candidate IDs to the train, validation, test, and holdout splits (comma-separated per field). The
+                  version&apos;s source record list is the deduplicated union of all four splits.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="dv-name">name</Label>
+                  <Label htmlFor="dv-name">Name</Label>
                   <Input id="dv-name" value={dvName} onChange={(e) => setDvName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>dataset_type</Label>
+                  <Label>Dataset type</Label>
                   <Select value={dvDatasetType} onValueChange={setDvDatasetType}>
                     <SelectTrigger>
                       <SelectValue />
@@ -1101,13 +1102,13 @@ export function KnowledgeDatasetsDashboard() {
                   </Select>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="dv-ver">version</Label>
+                  <Label htmlFor="dv-ver">Version</Label>
                   <Input id="dv-ver" className="font-mono" value={dvVersion} onChange={(e) => setDvVersion(e.target.value)} />
                 </div>
                 {SPLIT_KEYS.map((key) => (
                   <div key={key} className="space-y-2 md:col-span-2">
                     <Label htmlFor={`dv-${key}`}>
-                      split_json · <code className="text-xs">{key}</code> (comma-separated candidate IDs)
+                      {SPLIT_KEY_LABELS[key]} split (comma-separated candidate IDs)
                     </Label>
                     <Input
                       id={`dv-${key}`}
@@ -1134,7 +1135,7 @@ export function KnowledgeDatasetsDashboard() {
                 <div className="md:col-span-2 flex flex-wrap items-center gap-2">
                   <Button type="button" disabled={createDvBusy} onClick={() => void submitCreateDatasetVersion()}>
                     {createDvBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-                    POST /knowledge/dataset-versions
+                    Create dataset version
                   </Button>
                   {createDvErr ? <span className="text-sm text-destructive">{createDvErr}</span> : null}
                   {createDvOk ? <span className="text-sm text-muted-foreground">{createDvOk}</span> : null}
@@ -1166,18 +1167,18 @@ export function KnowledgeDatasetsDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[72px]">id</TableHead>
-                      <TableHead>name</TableHead>
-                      <TableHead>dataset_type</TableHead>
-                      <TableHead>version</TableHead>
-                      <TableHead>status</TableHead>
-                      <TableHead className="text-right">source_record_ids_json</TableHead>
-                      <TableHead>split_json</TableHead>
-                      <TableHead>quality_summary_json</TableHead>
-                      <TableHead>leakage_warnings_json</TableHead>
-                      <TableHead>human_review_required</TableHead>
-                      <TableHead>created_at</TableHead>
-                      <TableHead className="w-[90px]">open</TableHead>
+                      <TableHead className="w-[72px]">ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Dataset type</TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Source records</TableHead>
+                      <TableHead>Splits</TableHead>
+                      <TableHead>Quality summary</TableHead>
+                      <TableHead>Leakage warnings</TableHead>
+                      <TableHead>Human review</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="w-[90px]">Open</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1199,7 +1200,7 @@ export function KnowledgeDatasetsDashboard() {
                       const qs = row["quality_summary_json"]
                       const qsHint =
                         qs && typeof qs === "object" && !Array.isArray(qs)
-                          ? `${Object.keys(qs as Record<string, unknown>).length} keys`
+                          ? `${Object.keys(qs as Record<string, unknown>).length} entries`
                           : "—"
                       const lw = readStringList(row["leakage_warnings_json"]).length
                       return (
@@ -1241,16 +1242,9 @@ export function KnowledgeDatasetsDashboard() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
                     Dataset version{" "}
-                    <code className="font-mono text-xs">
-                      GET /knowledge/dataset-versions/{verId}
-                    </code>
+                    <span className="font-mono text-xs text-muted-foreground">#{verId}</span>
                   </CardTitle>
-                  <CardDescription>
-                    PATCH{" "}
-                    <code className="text-xs">
-                      /knowledge/dataset-versions/{verId}
-                    </code>
-                  </CardDescription>
+                  <CardDescription>Update the name, version label, or status below.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {versionDetailErr ? <p className="text-sm text-destructive">{versionDetailErr}</p> : null}
@@ -1262,7 +1256,7 @@ export function KnowledgeDatasetsDashboard() {
                   ) : versionDetail ? (
                     <div className="grid gap-2 text-sm">
                       <p>
-                        <span className="text-muted-foreground">name · version · dataset_type · status</span>
+                        <span className="text-muted-foreground">Name · version · dataset type · status</span>
                         <br />
                         {readRecordString(versionDetail, "name")} · {readRecordString(versionDetail, "version")} ·{" "}
                         {readRecordString(versionDetail, "dataset_type")} · {readRecordString(versionDetail, "status")}
@@ -1274,15 +1268,15 @@ export function KnowledgeDatasetsDashboard() {
 
                   <div className="grid gap-3 md:grid-cols-3">
                     <div className="space-y-2 md:col-span-3">
-                      <Label htmlFor="pv-name">name</Label>
+                      <Label htmlFor="pv-name">Name</Label>
                       <Input id="pv-name" value={patchVName} onChange={(e) => setPatchVName(e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="pv-ver">version</Label>
+                      <Label htmlFor="pv-ver">Version</Label>
                       <Input id="pv-ver" className="font-mono" value={patchVVersion} onChange={(e) => setPatchVVersion(e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <Label>status</Label>
+                      <Label>Status</Label>
                       <Select value={patchVStatus} onValueChange={setPatchVStatus}>
                         <SelectTrigger>
                           <SelectValue />
@@ -1299,7 +1293,7 @@ export function KnowledgeDatasetsDashboard() {
                   </div>
                   <Button type="button" disabled={patchVBusy} onClick={() => void submitPatchVersion()}>
                     {patchVBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-                    Save PATCH
+                    Save changes
                   </Button>
                   {patchVErr ? <p className="text-sm text-destructive">{patchVErr}</p> : null}
                   {patchVOk ? <p className="text-sm text-muted-foreground">{patchVOk}</p> : null}
@@ -1307,13 +1301,13 @@ export function KnowledgeDatasetsDashboard() {
                   {versionDetail ? (
                     <>
                       <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground">split_json (structure only)</p>
+                        <p className="text-xs font-medium text-muted-foreground">Split composition (structure only)</p>
                         <pre className="max-h-48 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                           {jsonPretty(versionDetail["split_json"])}
                         </pre>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground">source_record_ids_json</p>
+                        <p className="text-xs font-medium text-muted-foreground">Source record IDs</p>
                         <pre className="max-h-32 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px]">
                           {jsonPretty(versionDetail["source_record_ids_json"])}
                         </pre>
@@ -1333,7 +1327,7 @@ export function KnowledgeDatasetsDashboard() {
           eyebrow="Leakage"
           title="4. Leakage risk warnings"
           icon={ShieldAlert}
-          description="Aggregated from benchmark leakage_risk_label and dataset version leakage_warnings_json (summaries only)."
+          description="Aggregated from benchmark leakage risk labels and dataset version leakage warnings (summaries only)."
         >
           <div className="space-y-4">
             <div className="flex flex-wrap gap-3">
@@ -1354,7 +1348,7 @@ export function KnowledgeDatasetsDashboard() {
                   >
                     <CardContent className="space-y-1 pt-5 pb-5">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        leakage_risk_label · {k}
+                        Leakage risk · {k}
                       </p>
                       <div
                         className="font-mono text-3xl font-bold tabular-nums leading-none"
@@ -1362,14 +1356,14 @@ export function KnowledgeDatasetsDashboard() {
                       >
                         {leakageAnalytics.counts[k] ?? 0}
                       </div>
-                      <p className="text-xs text-muted-foreground">benchmark rows</p>
+                      <p className="text-xs text-muted-foreground">benchmark candidates</p>
                     </CardContent>
                   </Card>
                 )
               })}
             </div>
             {leakageAnalytics.warnings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No leakage_warnings_json entries on loaded dataset versions.</p>
+              <p className="text-sm text-muted-foreground">No leakage warnings on the loaded dataset versions.</p>
             ) : (
               <ul className="list-inside list-disc space-y-1 text-sm">
                 {leakageAnalytics.warnings.map((w, i) => (
@@ -1388,7 +1382,7 @@ export function KnowledgeDatasetsDashboard() {
           eyebrow="Quality"
           title="5. Quality flags"
           icon={BarChart3}
-          description="Counts from training and benchmark quality_flags_json (flag strings only)."
+          description="Counts from training and benchmark quality flags (flag names only)."
         >
           <div>
             {qualityFlagAnalytics.length === 0 ? (
@@ -1397,8 +1391,8 @@ export function KnowledgeDatasetsDashboard() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>flag</TableHead>
-                    <TableHead className="text-right">count</TableHead>
+                    <TableHead>Flag</TableHead>
+                    <TableHead className="text-right">Count</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

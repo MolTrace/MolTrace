@@ -161,9 +161,7 @@ function SummaryPanels({
               <Layers className="h-4 w-4" />
               Evidence layers
             </CardTitle>
-            <CardDescription>
-              From <code className="text-xs">evidence_layers_used</code> and related keys.
-            </CardDescription>
+            <CardDescription>Evidence layers this analysis drew on.</CardDescription>
           </CardHeader>
           <CardContent>
             {summary.evidenceLayers.length > 0 ? (
@@ -208,9 +206,7 @@ function SummaryPanels({
                   candidate vs. these inputs; conflicting signals <strong>require review</strong>.
                 </>
               ) : (
-                <>
-                  From <code className="text-xs">ranked_candidates</code> when present.
-                </>
+                <>Ordered by automated score, when the analysis returns a ranking.</>
               )}
             </CardDescription>
           </CardHeader>
@@ -356,7 +352,7 @@ export function TabResultSection({
           status="unavailable"
           risk_level="unknown"
           summary={loadingHint}
-          evidence_items={["Calling the backend through /api/backend."]}
+          evidence_items={["Contacting the MolTrace analysis service."]}
           citations={[]}
           review_status="waiting for evidence"
         />
@@ -376,7 +372,7 @@ export function TabResultSection({
           status="unavailable"
           risk_level="unknown"
           summary={emptyHint}
-          evidence_items={["Run an analysis to see evidence summaries and developer JSON."]}
+          evidence_items={["Run an analysis to see evidence summaries."]}
           citations={[]}
           review_status="not generated"
         />

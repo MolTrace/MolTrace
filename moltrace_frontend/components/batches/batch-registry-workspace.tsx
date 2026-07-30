@@ -38,6 +38,7 @@ import {
   pickStr,
   readBatchId,
 } from "@/components/batches/batch-registry-utils"
+import { statusLabel } from "@/lib/ui/status"
 import { Boxes, FileText, FlaskConical, Package, Plus } from "lucide-react"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { BatchRegulatoryAssessmentPanel } from "@/components/regulatory-hub/batch-regulatory-assessment-panel"
@@ -210,16 +211,16 @@ export function BatchRegistryWorkspace() {
     const cid = compoundId.trim()
     const bc = batchCode.trim()
     if (!cid) {
-      setCreateErr("compound_id is required.")
+      setCreateErr("Select a compound.")
       return
     }
     if (!bc) {
-      setCreateErr("batch_code is required.")
+      setCreateErr("Batch code is required.")
       return
     }
     const compound_id = Number.parseInt(cid, 10)
     if (!Number.isFinite(compound_id)) {
-      setCreateErr("compound_id must be a positive integer.")
+      setCreateErr("Select a valid compound.")
       return
     }
     setCreateBusy(true)
@@ -291,7 +292,7 @@ export function BatchRegistryWorkspace() {
     }
     const code = aliquotCode.trim()
     if (!code) {
-      setAlCreateErr("aliquot_code is required.")
+      setAlCreateErr("Aliquot code is required.")
       return
     }
     setAlCreateBusy(true)
@@ -402,7 +403,7 @@ export function BatchRegistryWorkspace() {
                   <SelectContent>
                     {SOURCE_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {statusLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -466,7 +467,7 @@ export function BatchRegistryWorkspace() {
         <div className="space-y-4">
           {loading ? <p className="text-sm text-muted-foreground">Loading batches…</p> : null}
           {!loading && batches.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No batches returned.</p>
+            <p className="text-sm text-muted-foreground">No batches registered yet.</p>
           ) : null}
           {!loading && batches.length > 0 ? (
             <div className="table-scroll">
@@ -499,7 +500,7 @@ export function BatchRegistryWorkspace() {
                         <TableCell className="font-mono text-xs">{pickStr(row, ["batch_code", "batchCode", "code"])}</TableCell>
                         <TableCell className="max-w-[200px] text-sm">{compoundDisplay}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{pickStr(row, ["source_type", "sourceType"])}</Badge>
+                          <Badge variant="outline">{statusLabel(pickStr(row, ["source_type", "sourceType"]))}</Badge>
                         </TableCell>
                         <TableCell className="tabular-nums text-sm">
                           {purity != null ? `${purity}%` : "—"}
@@ -515,7 +516,7 @@ export function BatchRegistryWorkspace() {
                           {amt != null ? amt.toLocaleString() : "—"} {unit !== "—" ? unit : ""}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{pickStr(row, ["status", "state"])}</Badge>
+                          <Badge variant="secondary">{statusLabel(pickStr(row, ["status", "state"]))}</Badge>
                         </TableCell>
                         <TableCell className="max-w-[220px] text-xs text-muted-foreground">
                           {linkedSessionReactionDossier(row)}
@@ -553,7 +554,7 @@ export function BatchRegistryWorkspace() {
         icon={FlaskConical}
         description={
           selectedBatchId
-            ? `GET /compound-registry/batches/${selectedBatchId}/aliquots`
+            ? `Aliquots recorded for the selected batch (${selectedBatchId}).`
             : "Select a batch in the table above."
         }
       >
@@ -599,7 +600,7 @@ export function BatchRegistryWorkspace() {
               {aliquotsLoading ? <p className="text-sm text-muted-foreground">Loading aliquots…</p> : null}
               {aliquotsErr ? <p className="text-xs text-destructive">{aliquotsErr}</p> : null}
               {!aliquotsLoading && aliquots.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No aliquots returned for this batch.</p>
+                <p className="text-sm text-muted-foreground">No aliquots recorded for this batch yet.</p>
               ) : null}
               {aliquots.length > 0 ? (
                 <div className="table-scroll">
@@ -626,7 +627,7 @@ export function BatchRegistryWorkspace() {
                           </TableCell>
                           <TableCell className="text-xs">{pickStr(row, ["storage_location", "storageLocation"])}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{pickStr(row, ["status", "state"])}</Badge>
+                            <Badge variant="outline">{statusLabel(pickStr(row, ["status", "state"]))}</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -646,15 +647,15 @@ export function BatchRegistryWorkspace() {
         icon={FileText}
         description={
           <span>
-            Enter a regulatory dossier id. If the selected batch row includes regulatory_dossier_id, it is filled
-            automatically. The panel below calls POST/GET /regulatory/dossiers/{"{dossier_id}"}/batch-assessment and includes
-            batch_id / compound_id from the selected batch when available.
+            Enter a regulatory dossier ID. If the selected batch is already linked to a dossier, it is filled in
+            automatically. The assessment below is scoped to that dossier and includes the selected batch and its compound
+            when available.
           </span>
         }
       >
         <div className="space-y-4">
           <div className="max-w-sm space-y-2">
-            <Label htmlFor="br-badid">dossier_id</Label>
+            <Label htmlFor="br-badid">regulatory dossier ID</Label>
             <Input
               id="br-badid"
               value={batchAssessmentDossierId}
@@ -676,8 +677,8 @@ export function BatchRegistryWorkspace() {
             />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Enter a valid dossier id (digits). Selecting a batch that stores regulatory_dossier_id fills this field when
-              available.
+              Enter a valid dossier ID (digits only). Selecting a batch that is already linked to a dossier fills this
+              field in automatically.
             </p>
           )}
         </div>

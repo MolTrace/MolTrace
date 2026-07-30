@@ -27,6 +27,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
+import { humanizeField, statusLabel } from "@/lib/ui/status"
 
 const DEMO_QUEUE_ITEMS = [
   {
@@ -242,12 +243,12 @@ export function AIEvidenceQueue({ onClose }: AIEvidenceQueueProps) {
                     risk_level={item.risk_level}
                     summary={item.summary || "Evidence summary unavailable."}
                     evidence_items={[
-                      `Entity: ${item.entity_type} ${item.entity_id}`,
+                      `Record: ${humanizeField(item.entity_type)} ${item.entity_id}`,
                       `Updated: ${item.updated_at}`,
                     ]}
                     citations={[]}
                     reviewer_name={item.reviewer_id != null ? `Reviewer ${item.reviewer_id}` : undefined}
-                    review_status={item.reviewed_at ? item.status : "awaiting review"}
+                    review_status={item.reviewed_at ? statusLabel(item.status) : "awaiting review"}
                     onApprove={() => openReview(item, "approved")}
                     onReject={() => openReview(item, "rejected")}
                     className="transition-shadow hover:shadow-md"

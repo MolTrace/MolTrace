@@ -1009,7 +1009,7 @@ export function RegulatoryIntelligenceLanding() {
                       const title = readRecordString(row, "title") ?? "—"
                       const jid = readRecordNumber(row, "jurisdiction_id")
                       const jLabel =
-                        jid != null ? jurisdictionNameById.get(jid) ?? `jurisdiction_id ${jid}` : "—"
+                        jid != null ? jurisdictionNameById.get(jid) ?? `Jurisdiction ${jid}` : "—"
                       const use = readRecordString(row, "intended_use") ?? "—"
                       const status = readRecordString(row, "status") ?? "—"
                       const updated = formatWhen(readRecordString(row, "updated_at") ?? readRecordString(row, "updatedAt"))
@@ -1247,7 +1247,7 @@ export function RegulatoryIntelligenceLanding() {
                       const title = readRecordString(row, "title") ?? "—"
                       const jid = readRecordNumber(row, "jurisdiction_id")
                       const jLabel =
-                        jid != null ? jurisdictionNameById.get(jid) ?? `jurisdiction_id ${jid}` : "—"
+                        jid != null ? jurisdictionNameById.get(jid) ?? `Jurisdiction ${jid}` : "—"
                       const updated = formatWhen(readRecordString(row, "updated_at"))
                       return (
                         <TableRow key={id ?? title}>

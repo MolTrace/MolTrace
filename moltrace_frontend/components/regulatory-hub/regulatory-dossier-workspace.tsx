@@ -402,7 +402,7 @@ function countRequirementStatus(rows: Record<string, unknown>[], status: string)
 
 function reviewStatusDisplay(row: Record<string, unknown>): string {
   if ("human_review_required" in row && typeof row.human_review_required === "boolean") {
-    return row.human_review_required ? "true" : "false"
+    return row.human_review_required ? "Review required" : "No review required"
   }
   const meta = row.metadata_json
   if (isRecord(meta)) {
@@ -434,6 +434,57 @@ function truncateText(s: string, max: number): string {
   const t = s.trim()
   if (t.length <= max) return t
   return `${t.slice(0, max)}…`
+}
+
+/** Display-only Yes/No for a stored true/false flag (the stored value is unchanged). */
+function yesNoDisplay(v: unknown): string {
+  return typeof v === "boolean" ? (v ? "Yes" : "No") : "—"
+}
+
+/**
+ * Display labels for stored option values. Only the text a scientist reads is
+ * mapped — the value sent back to the server is always the untouched key.
+ */
+const OPTION_LABELS: Record<string, string> = {
+  // evidence types
+  spectracheck_report: "SpectraCheck report",
+  unified_evidence: "Unified evidence",
+  qc_assessment: "QC assessment",
+  raw_file_hash: "Raw file hash",
+  reaction_experiment: "Reaction experiment",
+  reaction_report: "Reaction report",
+  analytical_artifact: "Analytical artifact",
+  human_note: "Reviewer note",
+  // requirement categories
+  analytical_evidence: "Analytical evidence",
+  claim_support: "Claim support",
+  // impurity types / sources
+  process_impurity: "Process impurity",
+  degradation_product: "Degradation product",
+  residual_solvent: "Residual solvent",
+  nmr_peak: "NMR peak",
+  ms_peak: "MS peak",
+  lcms_feature: "LC-MS feature",
+  reaction_route: "Reaction route",
+  user_entered: "User-entered",
+  // analytical method types
+  qnmr: "qNMR",
+  nmr_qualitative: "NMR (qualitative)",
+  hrms: "HRMS",
+  lcms: "LC-MS",
+  msms: "MS/MS",
+  hplc: "HPLC",
+  uplc: "UPLC",
+  // submission package types
+  ctd_module3: "CTD Module 3",
+  impurity_report: "Impurity report",
+  qnmr_validation: "qNMR validation",
+  ai_governance: "AI governance",
+  readiness_bundle: "Readiness bundle",
+}
+
+function optionLabel(raw: string): string {
+  return OPTION_LABELS[raw] ?? raw.replace(/_/g, " ")
 }
 
 type JurisdictionRow = { id: number; name: string }
@@ -1148,7 +1199,7 @@ export function RegulatoryDossierWorkspace() {
     const m = new Map<number, string>()
     for (const r of requirements) {
       const id = readRecordNumber(r, "id")
-      if (id != null) m.set(id, readRecordString(r, "title") ?? `requirement_id ${id}`)
+      if (id != null) m.set(id, readRecordString(r, "title") ?? `Requirement ${id}`)
     }
     return m
   }, [requirements])
@@ -1157,7 +1208,7 @@ export function RegulatoryDossierWorkspace() {
     if (!dossier) return "—"
     const jid = readRecordNumber(dossier, "jurisdiction_id")
     if (jid == null) return "—"
-    return jurisdictionNameById.get(jid) ?? `jurisdiction_id ${jid}`
+    return jurisdictionNameById.get(jid) ?? `Jurisdiction ${jid}`
   }, [dossier, jurisdictionNameById])
 
   const changeImpactAssessments = useMemo(() => {
@@ -1481,7 +1532,7 @@ export function RegulatoryDossierWorkspace() {
       naStructureText.trim().length > 0 || naImpurityId !== "none" || naEvidenceLinkId !== "none"
     if (!hasInput) {
       setNaErr(
-        "Add structure_text and/or select an impurity risk register row or regulatory evidence link so risk_signals_json is meaningful."
+        "Add structure text and/or select an impurity risk register entry or regulatory evidence link so the risk signals are meaningful."
       )
       return
     }
@@ -2252,7 +2303,7 @@ export function RegulatoryDossierWorkspace() {
     const jid = readRecordNumber(dossier, "jurisdiction_id")
     if (jid == null) return "—"
     const name = jurisdictionNameById.get(jid)
-    return name ? `${name} (jurisdiction_id ${jid})` : `jurisdiction_id ${jid}`
+    return name ? `${name} (jurisdiction ${jid})` : `Jurisdiction ${jid}`
   }, [dossier, jurisdictionNameById])
   const dossierReactionProjectId = useMemo(
     () => (dossier ? (readRecordNumber(dossier, "reaction_project_id") ?? null) : null),
@@ -2303,7 +2354,7 @@ export function RegulatoryDossierWorkspace() {
         <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Dossier</h1>
         {dossier ? (
           <p className="text-sm text-muted-foreground">
-            {readRecordString(dossier, "title") ?? `dossier_id ${dossierId}`}
+            {readRecordString(dossier, "title") ?? `Dossier ${dossierId}`}
           </p>
         ) : null}
       </header>
@@ -2694,7 +2745,7 @@ export function RegulatoryDossierWorkspace() {
                         <SelectContent>
                           {REQUIREMENT_CATEGORIES.map((c) => (
                             <SelectItem key={c} value={c}>
-                              {c}
+                              {optionLabel(c)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -2789,7 +2840,7 @@ export function RegulatoryDossierWorkspace() {
                               <TableCell className="max-w-[220px] font-medium">
                                 {readRecordString(r, "title") ?? "—"}
                               </TableCell>
-                              <TableCell className="text-xs">{readRecordString(r, "category") ?? "—"}</TableCell>
+                              <TableCell className="text-xs">{optionLabel(readRecordString(r, "category") ?? "—")}</TableCell>
                               <TableCell className="text-xs">{readRecordString(r, "priority") ?? "—"}</TableCell>
                               <TableCell>
                                 <Badge
@@ -2889,7 +2940,7 @@ export function RegulatoryDossierWorkspace() {
                             if (id == null) return []
                             return [
                               <SelectItem key={id} value={String(id)}>
-                                {readRecordString(r, "title") ?? `requirement_id ${id}`}
+                                {readRecordString(r, "title") ?? `Requirement ${id}`}
                               </SelectItem>,
                             ]
                           })}
@@ -2905,7 +2956,7 @@ export function RegulatoryDossierWorkspace() {
                         <SelectContent>
                           {EVIDENCE_TYPES.map((t) => (
                             <SelectItem key={t} value={t}>
-                              {t}
+                              {optionLabel(t)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -2919,7 +2970,7 @@ export function RegulatoryDossierWorkspace() {
                         onChange={(e) => setEvResourceId(e.target.value)}
                         inputMode="numeric"
                         autoComplete="off"
-                        placeholder="resource_id"
+                        placeholder="e.g. 1204"
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
@@ -2988,13 +3039,13 @@ export function RegulatoryDossierWorkspace() {
                           const id = readRecordNumber(r, "id")
                           const reqId = readRecordNumber(r, "requirement_id")
                           const reqTitleCell =
-                            reqId != null ? requirementTitleById.get(reqId) ?? `requirement_id ${reqId}` : "—"
+                            reqId != null ? requirementTitleById.get(reqId) ?? `Requirement ${reqId}` : "—"
                           const resId = readRecordNumber(r, "resource_id")
                           const et = readRecordString(r, "evidence_type")
                           const href = openEvidenceSourceHref(et ?? undefined, resId ?? undefined)
                           return (
                             <TableRow key={id ?? readRecordString(r, "title")}>
-                              <TableCell className="text-xs">{et ?? "—"}</TableCell>
+                              <TableCell className="text-xs">{et ? optionLabel(et) : "—"}</TableCell>
                               <TableCell className="max-w-[200px] font-medium">
                                 {readRecordString(r, "title") ?? "—"}
                               </TableCell>
@@ -3175,9 +3226,8 @@ export function RegulatoryDossierWorkspace() {
                   title="Workspace labels"
                   description={
                     <>
-                      Impurity name and structural_assignment are workspace labels; they do not assert confirmed identity
-                      unless supported by linked evidence (<span className="font-mono">evidence_link_id</span>) and qualified
-                      review.
+                      Impurity name and structural assignment are workspace labels; they do not assert confirmed identity
+                      unless supported by a linked evidence record and qualified review.
                     </>
                   }
                 />
@@ -3189,7 +3239,7 @@ export function RegulatoryDossierWorkspace() {
                   <h3 className="text-sm font-semibold">Add impurity</h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="reg-imp-name">impurity_name</Label>
+                      <Label htmlFor="reg-imp-name">Impurity name</Label>
                       <Input
                         id="reg-imp-name"
                         value={impName}
@@ -3199,7 +3249,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>impurity_type</Label>
+                      <Label>Impurity type</Label>
                       <Select value={impType} onValueChange={setImpType}>
                         <SelectTrigger>
                           <SelectValue />
@@ -3207,7 +3257,7 @@ export function RegulatoryDossierWorkspace() {
                         <SelectContent>
                           {IMPURITY_TYPES.map((t) => (
                             <SelectItem key={t} value={t}>
-                              {t}
+                              {optionLabel(t)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -3222,14 +3272,14 @@ export function RegulatoryDossierWorkspace() {
                         <SelectContent>
                           {IMPURITY_SOURCES.map((s) => (
                             <SelectItem key={s} value={s}>
-                              {s}
+                              {optionLabel(s)}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reg-imp-pct">observed_level_percent</Label>
+                      <Label htmlFor="reg-imp-pct">Observed level (%)</Label>
                       <Input
                         id="reg-imp-pct"
                         value={impLevelPct}
@@ -3240,7 +3290,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reg-imp-amt">observed_amount</Label>
+                      <Label htmlFor="reg-imp-amt">Observed amount</Label>
                       <Input
                         id="reg-imp-amt"
                         value={impAmount}
@@ -3251,7 +3301,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="reg-imp-struct">structural_assignment</Label>
+                      <Label htmlFor="reg-imp-struct">Structural assignment</Label>
                       <Textarea
                         id="reg-imp-struct"
                         rows={3}
@@ -3262,7 +3312,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reg-imp-compound">compound_id</Label>
+                      <Label htmlFor="reg-imp-compound">Compound ID</Label>
                       <Input
                         id="reg-imp-compound"
                         value={impCompoundId}
@@ -3273,7 +3323,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="reg-imp-evidence">evidence_link_id</Label>
+                      <Label htmlFor="reg-imp-evidence">Evidence link ID</Label>
                       <Input
                         id="reg-imp-evidence"
                         value={impEvidenceLink}
@@ -3283,8 +3333,8 @@ export function RegulatoryDossierWorkspace() {
                         placeholder="Optional — compound evidence link id when applicable"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Uses <span className="font-mono">compound_evidence_links.id</span>; dossier Evidence Links use a
-                        separate regulatory table and ids may differ.
+                        Use the ID from the compound evidence links; dossier Evidence Links are tracked separately, so
+                        their IDs may differ.
                       </p>
                     </div>
                     <div className="space-y-2 md:col-span-2">
@@ -3346,10 +3396,10 @@ export function RegulatoryDossierWorkspace() {
                               <TableCell className="max-w-[180px]">
                                 <div className="font-medium">{readRecordString(row, "impurity_name") ?? "—"}</div>
                                 <div className="text-xs text-muted-foreground">
-                                  {readRecordString(row, "impurity_type") ?? "—"}
+                                  {optionLabel(readRecordString(row, "impurity_type") ?? "—")}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-xs">{readRecordString(row, "source") ?? "—"}</TableCell>
+                              <TableCell className="text-xs">{optionLabel(readRecordString(row, "source") ?? "—")}</TableCell>
                               <TableCell className="text-xs">{impurityObservedLevelDisplay(row)}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className="text-xs capitalize">
@@ -3494,7 +3544,7 @@ export function RegulatoryDossierWorkspace() {
                             if (id == null) return null
                             return (
                               <SelectItem key={id} value={String(id)}>
-                                {readRecordString(r, "name") ?? `rule_set id ${id}`} (id {id})
+                                {readRecordString(r, "name") ?? `Rule set ${id}`} (id {id})
                               </SelectItem>
                             )
                           })}
@@ -3571,14 +3621,14 @@ export function RegulatoryDossierWorkspace() {
                         </div>
                       ) : null}
                       {matches.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No matched_solvents in this assessment.</p>
+                        <p className="text-sm text-muted-foreground">No matched solvents in this assessment.</p>
                       ) : (
                         <div className="table-scroll">
                           <Table>
                             <TableHeader>
                               <TableRow>
                                 <TableHead>solvent</TableHead>
-                                <TableHead>solvent_class</TableHead>
+                                <TableHead>solvent class</TableHead>
                                 <TableHead>PDE / limit</TableHead>
                                 <TableHead>observed level</TableHead>
                                 <TableHead>action required</TableHead>
@@ -3733,7 +3783,7 @@ export function RegulatoryDossierWorkspace() {
                   <h3 className="text-sm font-semibold">Run nitrosamine watch</h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>compound_id</Label>
+                      <Label>Compound ID</Label>
                       {nitrosamineCompoundChoices.length > 0 ? (
                         <Select value={naCompoundId} onValueChange={setNaCompoundId}>
                           <SelectTrigger>
@@ -3753,7 +3803,7 @@ export function RegulatoryDossierWorkspace() {
                           id="reg-na-compound"
                           inputMode="numeric"
                           autoComplete="off"
-                          placeholder="Optional — type compound_id if known"
+                          placeholder="Optional — type the compound ID if known"
                           value={naCompoundId === "none" ? "" : naCompoundId}
                           onChange={(e) => {
                             const v = e.target.value.trim()
@@ -3763,7 +3813,7 @@ export function RegulatoryDossierWorkspace() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label>batch_id</Label>
+                      <Label>Batch ID</Label>
                       <Input
                         id="reg-na-batch"
                         inputMode="numeric"
@@ -3774,7 +3824,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reg-na-measured">measured_ng_per_day</Label>
+                      <Label htmlFor="reg-na-measured">Measured intake (ng/day)</Label>
                       <Input
                         id="reg-na-measured"
                         inputMode="decimal"
@@ -3784,12 +3834,12 @@ export function RegulatoryDossierWorkspace() {
                         onChange={(e) => setNaMeasuredNgPerDay(e.target.value)}
                       />
                       <p className="text-xs text-muted-foreground">
-                        A watch counts toward the cumulative-risk rollup only with both a parseable nitrosamine{" "}
-                        <span className="font-mono">structure_text</span> and this measured value.
+                        A watch counts toward the cumulative-risk rollup only with both a readable nitrosamine structure
+                        and this measured value.
                       </p>
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="reg-na-structure">structure_text</Label>
+                      <Label htmlFor="reg-na-structure">Structure text</Label>
                       <Textarea
                         id="reg-na-structure"
                         rows={4}
@@ -3812,7 +3862,7 @@ export function RegulatoryDossierWorkspace() {
                             if (id == null) return []
                             return [
                               <SelectItem key={id} value={String(id)}>
-                                {readRecordString(r, "impurity_name") ?? `impurity_risk_register id ${id}`}
+                                {readRecordString(r, "impurity_name") ?? `Impurity entry ${id}`}
                               </SelectItem>,
                             ]
                           })}
@@ -3859,7 +3909,7 @@ export function RegulatoryDossierWorkspace() {
                             if (id == null) return []
                             return [
                               <SelectItem key={id} value={String(id)}>
-                                {readRecordString(r, "name") ?? `rule_set id ${id}`} (id {id})
+                                {readRecordString(r, "name") ?? `Rule set ${id}`} (id {id})
                               </SelectItem>,
                             ]
                           })}
@@ -3917,18 +3967,18 @@ export function RegulatoryDossierWorkspace() {
                         <div className="text-xs text-muted-foreground">
                           Latest assessment id{" "}
                           <span className="font-mono text-foreground">{readRecordNumber(assess, "id") ?? "—"}</span> ·
-                          created_at{" "}
+                          Created{" "}
                           <span className="font-mono text-foreground">
                             {formatWhen(readRecordString(assess, "created_at"))}
                           </span>{" "}
-                          · overall_status{" "}
+                          · Overall status{" "}
                           <Badge variant="outline" className="text-xs capitalize">
                             {(readRecordString(assess, "overall_status") ?? "—").replace(/_/g, " ")}
                           </Badge>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          <span className="text-xs text-muted-foreground">risk_category:</span>
+                          <span className="text-xs text-muted-foreground">Risk category:</span>
                           <Badge variant="secondary" className="font-mono text-xs">
                             {riskCat ?? "—"}
                           </Badge>
@@ -3939,16 +3989,16 @@ export function RegulatoryDossierWorkspace() {
                           ) : null}
                           {cpcaLike ? (
                             <Badge variant="outline" className="text-xs">
-                              CPCA-like review context (API risk_category)
+                              CPCA-like review context (risk category)
                             </Badge>
                           ) : null}
                         </div>
 
                         <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
-                          <span className="font-medium text-foreground">nitrosamine_confirmed (API field): </span>
-                          <span className="font-mono">{String(nitroConf)}</span>
+                          <span className="font-medium text-foreground">Nitrosamine confirmed: </span>
+                          <span>{typeof nitroConf === "boolean" ? (nitroConf ? "Yes" : "No") : "—"}</span>
                           <p className="mt-1 text-muted-foreground">
-                            System flag only; a value of false does not eliminate all possible nitrosamine risk without
+                            System flag only; a value of no does not eliminate all possible nitrosamine risk without
                             further evidence and qualified review.
                           </p>
                         </div>
@@ -3999,10 +4049,10 @@ export function RegulatoryDossierWorkspace() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead>risk_category</TableHead>
-                                  <TableHead>structural_pattern</TableHead>
-                                  <TableHead>acceptable_intake</TableHead>
-                                  <TableHead>ai_limit</TableHead>
+                                  <TableHead>risk category</TableHead>
+                                  <TableHead>structural pattern</TableHead>
+                                  <TableHead>acceptable intake</TableHead>
+                                  <TableHead>AI limit</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -4032,14 +4082,14 @@ export function RegulatoryDossierWorkspace() {
                         )}
 
                         <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-muted-foreground">human_review_required:</span>
+                          <span className="text-muted-foreground">Human review required:</span>
                           {hr === true ? (
                             <Badge variant="outline" className="text-xs">
-                              true
+                              Yes
                             </Badge>
                           ) : hr === false ? (
                             <Badge variant="secondary" className="text-xs">
-                              false
+                              No
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -4048,11 +4098,11 @@ export function RegulatoryDossierWorkspace() {
 
                         {actionIds.length ? (
                           <p className="text-xs text-muted-foreground">
-                            action_item_ids_json:{" "}
+                            Linked action items:{" "}
                             <span className="font-mono text-foreground">{actionIds.join(", ")}</span>
                           </p>
                         ) : (
-                          <p className="text-xs text-muted-foreground">action_item_ids_json: —</p>
+                          <p className="text-xs text-muted-foreground">Linked action items: —</p>
                         )}
                       </div>
                     )
@@ -4107,7 +4157,7 @@ export function RegulatoryDossierWorkspace() {
                         <SelectContent>
                           {ANALYTICAL_METHOD_TYPES.map((t) => (
                             <SelectItem key={t} value={t}>
-                              {t}
+                              {optionLabel(t)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -4197,7 +4247,7 @@ export function RegulatoryDossierWorkspace() {
                             }
                             return [
                               <SelectItem key={id} value={String(id)}>
-                                {et}: {readRecordString(r, "title") ?? `id ${id}`}
+                                {optionLabel(et)}: {readRecordString(r, "title") ?? `Item ${id}`}
                               </SelectItem>,
                             ]
                           })}
@@ -4371,9 +4421,9 @@ export function RegulatoryDossierWorkspace() {
                           </pre>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-muted-foreground">human_review_required:</span>
+                          <span className="text-muted-foreground">Human review required:</span>
                           <Badge variant="outline" className="text-xs">
-                            {String(latestQnmrProfile.human_review_required ?? "—")}
+                            {yesNoDisplay(latestQnmrProfile.human_review_required)}
                           </Badge>
                         </div>
                       </>
@@ -4388,11 +4438,11 @@ export function RegulatoryDossierWorkspace() {
                       <>
                         <div className="text-xs text-muted-foreground">
                           id <span className="font-mono text-foreground">{readRecordNumber(latestMethodProfile, "id")}</span>{" "}
-                          · method_type{" "}
+                          · method{" "}
                           <span className="font-mono text-foreground">
-                            {readRecordString(latestMethodProfile, "method_type") ?? "—"}
+                            {optionLabel(readRecordString(latestMethodProfile, "method_type") ?? "—")}
                           </span>{" "}
-                          · created_at{" "}
+                          · created{" "}
                           <span className="font-mono text-foreground">
                             {formatWhen(readRecordString(latestMethodProfile, "created_at"))}
                           </span>
@@ -4443,9 +4493,9 @@ export function RegulatoryDossierWorkspace() {
                           </ul>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-muted-foreground">human_review_required:</span>
+                          <span className="text-muted-foreground">Human review required:</span>
                           <Badge variant="outline" className="text-xs">
-                            {String(latestMethodProfile.human_review_required ?? "—")}
+                            {yesNoDisplay(latestMethodProfile.human_review_required)}
                           </Badge>
                         </div>
                       </>
@@ -4510,7 +4560,7 @@ export function RegulatoryDossierWorkspace() {
                   <h3 className="text-sm font-semibold">Create AI governance</h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="ag-name">ai_system_name</Label>
+                      <Label htmlFor="ag-name">AI system name</Label>
                       <Input
                         id="ag-name"
                         value={agName}
@@ -4519,7 +4569,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ag-mvid">model_version_id</Label>
+                      <Label htmlFor="ag-mvid">Model version ID</Label>
                       <Input
                         id="ag-mvid"
                         className="font-mono text-xs"
@@ -4530,7 +4580,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ag-mid">method_id</Label>
+                      <Label htmlFor="ag-mid">Method ID</Label>
                       <Input
                         id="ag-mid"
                         className="font-mono text-xs"
@@ -4541,7 +4591,7 @@ export function RegulatoryDossierWorkspace() {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="ag-wf">workflow_run_id</Label>
+                      <Label htmlFor="ag-wf">Workflow run ID</Label>
                       <Input
                         id="ag-wf"
                         className="font-mono text-xs"
@@ -4643,12 +4693,8 @@ export function RegulatoryDossierWorkspace() {
                       const evid = readIntListField(rec, "evidence_item_ids_json")
                       const valIds = readIntListField(rec, "validation_record_ids_json")
                       const gov = readRecordString(rec, "governance_status")
-                      const hOverride =
-                        typeof rec.human_override_available === "boolean"
-                          ? rec.human_override_available
-                          : "—"
-                      const hReview =
-                        typeof rec.human_review_required === "boolean" ? String(rec.human_review_required) : "—"
+                      const hOverride = yesNoDisplay(rec.human_override_available)
+                      const hReview = yesNoDisplay(rec.human_review_required)
                       const warnList =
                         Array.isArray(rec.warnings) && rec.warnings.every((x) => typeof x === "string")
                           ? (rec.warnings as string[])
@@ -4726,7 +4772,7 @@ export function RegulatoryDossierWorkspace() {
                                 <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                                   human override state
                                 </dt>
-                                <dd className="mt-1 font-mono text-xs">{String(hOverride)}</dd>
+                                <dd className="mt-1 font-mono text-xs">{hOverride}</dd>
                               </div>
                               <div>
                                 <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
@@ -4786,13 +4832,13 @@ export function RegulatoryDossierWorkspace() {
                             </div>
                             <Collapsible className="rounded-md border bg-muted/15">
                               <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-medium hover:bg-muted/40">
-                                <span>Explainability &amp; metadata (developer JSON)</span>
+                                <span>Explainability &amp; details (for troubleshooting)</span>
                                 <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
                               </CollapsibleTrigger>
                               <CollapsibleContent className="space-y-3 border-t px-3 pb-3 pt-2">
-                                <p className="text-xs text-muted-foreground">explainability_summary_json</p>
+                                <p className="text-xs text-muted-foreground">Explainability summary</p>
                                 <DeveloperJsonPanel data={explain} />
-                                <p className="text-xs text-muted-foreground">metadata_json (sensitive keys redacted)</p>
+                                <p className="text-xs text-muted-foreground">Additional details (sensitive values redacted)</p>
                                 <DeveloperJsonPanel data={metaSafe} />
                               </CollapsibleContent>
                             </Collapsible>
@@ -4869,8 +4915,8 @@ export function RegulatoryDossierWorkspace() {
             >
                 <AlertCard
                   variant="info"
-                  title="Compliance API outputs"
-                  description="Outputs below come from the regulatory compliance API (rule sets, thresholds, and dossier metadata). This view does not assert jurisdiction-specific legal obligations."
+                  title="Compliance outputs"
+                  description="Outputs below come from the regulatory compliance engine (rule sets, thresholds, and dossier details). This view does not assert jurisdiction-specific legal obligations."
                 />
 
                 <dl className="grid gap-3 sm:grid-cols-2">
@@ -4881,7 +4927,7 @@ export function RegulatoryDossierWorkspace() {
                     <dd className="mt-1 text-sm">{jurisdictionLabel}</dd>
                   </div>
                   <div>
-                    <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">jurisdiction_id</dt>
+                    <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">jurisdiction ID</dt>
                     <dd className="mt-1 font-mono text-sm">{readRecordNumber(dossier, "jurisdiction_id") ?? "—"}</dd>
                   </div>
                 </dl>
@@ -4959,7 +5005,7 @@ export function RegulatoryDossierWorkspace() {
                           if (id == null) return []
                           return [
                             <SelectItem key={id} value={String(id)}>
-                              {readRecordString(r, "name") ?? `rule_set id ${id}`} (id {id})
+                              {readRecordString(r, "name") ?? `Rule set ${id}`} (id {id})
                             </SelectItem>,
                           ]
                         })}
@@ -5025,13 +5071,13 @@ export function RegulatoryDossierWorkspace() {
                       const mapId = readRecordNumber(row, "id")
                       const key = mapId != null ? `jm-${mapId}` : `jm-row-${idx}`
                       const jid = readRecordNumber(row, "jurisdiction_id")
-                      const jname = jid != null ? jurisdictionNameById.get(jid) ?? `jurisdiction_id ${jid}` : "—"
+                      const jname = jid != null ? jurisdictionNameById.get(jid) ?? `Jurisdiction ${jid}` : "—"
                       const rsid = readRecordNumber(row, "rule_set_id")
                       const rsRow = rsid != null ? ruleSets.find((r) => readRecordNumber(r, "id") === rsid) : undefined
                       const rsLabel =
                         rsid == null
                           ? "—"
-                          : readRecordString(rsRow, "name") ?? `rule_set_id ${rsid}`
+                          : readRecordString(rsRow, "name") ?? `Rule set ${rsid}`
                       const warnList = jurisdictionalMapWarningLines(row)
                       const noteList = jurisdictionalMapNoteLines(row)
                       const thresholdSummary = row.threshold_summary_json
@@ -5073,7 +5119,7 @@ export function RegulatoryDossierWorkspace() {
                                   {rsid != null ? (
                                     <span className="font-mono text-xs text-muted-foreground">(id {rsid})</span>
                                   ) : (
-                                    <span className="text-xs text-muted-foreground">(rule_set_id null)</span>
+                                    <span className="text-xs text-muted-foreground">(no rule set linked)</span>
                                   )}
                                 </dd>
                               </div>
@@ -5276,10 +5322,10 @@ export function RegulatoryDossierWorkspace() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>change_event_id</TableHead>
+                            <TableHead>Change ID</TableHead>
                             <TableHead>Title</TableHead>
                             <TableHead>Review status</TableHead>
-                            <TableHead className="w-[130px]">open change button</TableHead>
+                            <TableHead className="w-[130px]">Open</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -5540,7 +5586,7 @@ export function RegulatoryDossierWorkspace() {
                 }
                 badge={
                   <Badge variant="secondary" className="shrink-0">
-                    human_review_required: {String(queryResult.human_review_required ?? "—")}
+                    Human review required: {yesNoDisplay(queryResult.human_review_required)}
                   </Badge>
                 }
               >
@@ -5559,18 +5605,18 @@ export function RegulatoryDossierWorkspace() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">answer</p>
                         <Badge variant="outline" className="text-xs capitalize">
-                          human_review_required:{" "}
-                          {String((queryResult.answer as Record<string, unknown>).human_review_required ?? "—")}
+                          Human review required:{" "}
+                          {yesNoDisplay((queryResult.answer as Record<string, unknown>).human_review_required)}
                         </Badge>
                       </div>
                       <div>
-                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">answer_text</p>
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">answer text</p>
                         <p className="mt-1 whitespace-pre-wrap leading-relaxed">
                           {readRecordString(queryResult.answer as Record<string, unknown>, "answer_text") ?? "—"}
                         </p>
                       </div>
                       <div>
-                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">confidence_label</p>
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">confidence</p>
                         <p className="mt-1 font-mono text-xs">
                           {readRecordString(queryResult.answer as Record<string, unknown>, "confidence_label") ?? "—"}
                         </p>
@@ -5582,15 +5628,15 @@ export function RegulatoryDossierWorkspace() {
                           humanReviewExtras={
                             <div className="mt-2 space-y-1 border-t border-border pt-2 text-[11px] text-muted-foreground">
                               <p>
-                                <span className="font-mono text-foreground/80">human_review_required (answer): </span>
-                                {String((queryResult.answer as Record<string, unknown>).human_review_required ?? "—")}
+                                <span className="text-foreground/80">Human review required (answer): </span>
+                                {yesNoDisplay((queryResult.answer as Record<string, unknown>).human_review_required)}
                               </p>
                               {readRecordString(
                                 queryResult.answer as Record<string, unknown>,
                                 "human_review_state",
                               ) ? (
                                 <p>
-                                  <span className="font-mono text-foreground/80">human_review_state: </span>
+                                  <span className="text-foreground/80">Human review state: </span>
                                   {readRecordString(
                                     queryResult.answer as Record<string, unknown>,
                                     "human_review_state",
@@ -5760,7 +5806,7 @@ export function RegulatoryDossierWorkspace() {
                         {readRecordString(riskAssessment, "overall_risk") ?? "—"}
                       </Badge>
                       <Badge variant="secondary" className="text-xs">
-                        human_review_required: {String(riskAssessment.human_review_required ?? "—")}
+                        Human review required: {yesNoDisplay(riskAssessment.human_review_required)}
                       </Badge>
                     </div>
 
@@ -5948,7 +5994,7 @@ export function RegulatoryDossierWorkspace() {
                       <Badge variant="outline">{readRecordString(dossier ?? {}, "status") ?? "—"}</Badge>
                     </div>
                     <div>
-                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">reviewer_name</p>
+                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">reviewer</p>
                       <p className="text-sm">{readRecordString(latestReview, "reviewer_name") ?? "—"}</p>
                     </div>
                     <div>
@@ -5958,7 +6004,7 @@ export function RegulatoryDossierWorkspace() {
                       </p>
                     </div>
                     <div>
-                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">created_at</p>
+                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">created</p>
                       <p className="text-sm text-muted-foreground">
                         {formatWhen(readRecordString(latestReview, "created_at"))}
                       </p>
@@ -5976,9 +6022,9 @@ export function RegulatoryDossierWorkspace() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>id</TableHead>
+                            <TableHead>ID</TableHead>
                             <TableHead>decision</TableHead>
-                            <TableHead>reviewer_name</TableHead>
+                            <TableHead>reviewer</TableHead>
                             <TableHead>Created</TableHead>
                             <TableHead>rationale (truncated)</TableHead>
                           </TableRow>
@@ -6294,7 +6340,7 @@ export function RegulatoryDossierWorkspace() {
                       <SelectContent>
                         {SUBMISSION_PACKAGE_TYPES.map((t) => (
                           <SelectItem key={t} value={t}>
-                            {t}
+                            {optionLabel(t)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -6307,7 +6353,7 @@ export function RegulatoryDossierWorkspace() {
                         id="sp-package-id"
                         value={submissionPackageIdInput}
                         onChange={(e) => setSubmissionPackageIdInput(e.target.value)}
-                        placeholder="package_id"
+                        placeholder="e.g. 1204"
                         className="max-w-[220px]"
                       />
                       <Button type="button" variant="outline" size="sm" disabled={submissionPackageLookupBusy} onClick={() => void loadSubmissionPackageById()}>
@@ -6484,16 +6530,17 @@ export function RegulatoryDossierWorkspace() {
                 >
                   Dossier · Developer JSON
                 </p>
-                <h2 className="font-mono text-xl font-bold tracking-tight">Raw payloads for debugging</h2>
+                <h2 className="font-mono text-xl font-bold tracking-tight">Raw data (for troubleshooting)</h2>
                 <p className="text-sm text-muted-foreground">
-                  Aggregated dossier payloads in this browser session — use to inspect backend response shape, warnings, and audit fields.
+                  Aggregated dossier records loaded in this browser session — use to inspect exact values, warnings, and
+                  audit fields.
                 </p>
               </div>
               <ModuleCard
                 accent="cyan"
                 eyebrow="Dossier · Developer JSON"
                 title="Developer JSON"
-                description="Aggregated payloads from this workspace (no automatic refresh on tab change)."
+                description="Aggregated raw records from this workspace (no automatic refresh on tab change)."
               >
                 <DeveloperJsonPanel data={devPayload} />
               </ModuleCard>

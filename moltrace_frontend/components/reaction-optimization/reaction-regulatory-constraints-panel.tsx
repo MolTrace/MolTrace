@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
+import { statusLabel } from "@/lib/ui/status"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -40,6 +41,23 @@ const CONSTRAINT_TYPES = [
   "jurisdictional_requirement",
   "other",
 ] as const
+
+/** Readable text for a stored constraint type. The stored value is never rewritten. */
+const CONSTRAINT_TYPE_LABELS: Record<string, string> = {
+  impurity_limit: "Impurity limit",
+  residual_solvent_limit: "Residual solvent limit",
+  nitrosamine_risk_avoidance: "Nitrosamine risk avoidance",
+  qnmr_validation_requirement: "qNMR validation requirement",
+  ai_governance_requirement: "AI governance requirement",
+  jurisdictional_requirement: "Jurisdictional requirement",
+  other: "Other",
+}
+
+function constraintTypeLabel(value: string | null | undefined): string {
+  const raw = (value ?? "").trim()
+  if (!raw) return "—"
+  return CONSTRAINT_TYPE_LABELS[raw] ?? statusLabel(raw)
+}
 
 type OptimizationCompliancePayload = {
   regulatory_constraints: Record<string, unknown>[]
@@ -266,7 +284,7 @@ export function ReactionRegulatoryConstraintsPanel({
                 <SelectContent>
                   {CONSTRAINT_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {constraintTypeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -371,7 +389,7 @@ export function ReactionRegulatoryConstraintsPanel({
                       : "—"
                     return (
                       <TableRow key={readString(constraintId) || `c-${idx}`}>
-                        <TableCell className="font-mono text-xs">{readStr(row, "constraint_type") || "—"}</TableCell>
+                        <TableCell className="text-xs">{constraintTypeLabel(readStr(row, "constraint_type"))}</TableCell>
                         <TableCell className="font-mono text-xs">{readStr(row, "dossier_id") || "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{actionIds || "—"}</TableCell>
                         <TableCell className="text-xs">{readStr(row, "severity") || "—"}</TableCell>

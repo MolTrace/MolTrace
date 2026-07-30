@@ -371,7 +371,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
         eyebrow="Diff"
         title="Diff excerpts"
         icon={ScrollText}
-        description="Structured diff rows from the change record."
+        description="Structured before/after excerpts captured on the change record."
       >
         <div className="space-y-3">
           {diffs.length === 0 ? (
@@ -748,9 +748,9 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
         <ModuleCard
           accent="cyan"
           eyebrow="Audit"
-          title="Developer JSON"
+          title="Raw data (for troubleshooting)"
           icon={FileSearch}
-          description="Collapsed raw payloads for debugging and audit."
+          description="Collapsed raw records kept for troubleshooting and audit."
         >
           <div className="space-y-3">
             <DeveloperJsonPanel data={{ change, source_versions: { old: oldVersion, new: newVersion }, impactRows, proposalRows }} />

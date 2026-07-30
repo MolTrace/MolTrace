@@ -350,7 +350,7 @@ export function WorkflowRunTimeline({
     } catch (err) {
       const msg =
         err instanceof ApiError
-          ? err.message || `Failed (${err.status})`
+          ? err.message || "Could not load the workflow run."
           : err instanceof Error
             ? err.message
             : "Failed to load workflow run."
@@ -438,7 +438,7 @@ export function WorkflowRunTimeline({
         if (!cancelled) {
           const msg =
             err instanceof ApiError
-              ? err.message || `Artifacts failed (${err.status})`
+              ? err.message || "Could not load the run artifacts."
               : err instanceof Error
                 ? err.message
                 : "Failed to load workflow artifacts."
@@ -463,7 +463,7 @@ export function WorkflowRunTimeline({
     } catch (err) {
       const msg =
         err instanceof ApiError
-          ? err.message || `Cancel failed (${err.status})`
+          ? err.message || "Could not cancel the workflow run."
           : err instanceof Error
             ? err.message
             : "Cancel request failed."
@@ -648,7 +648,7 @@ export function WorkflowRunTimeline({
           </Button>
         </div>
 
-        {artifactsLoading ? <p className="text-xs text-muted-foreground">Loading workflow artifacts payload…</p> : null}
+        {artifactsLoading ? <p className="text-xs text-muted-foreground">Loading workflow artifacts…</p> : null}
         {artifactsError ? <p className="text-xs text-destructive">{artifactsError}</p> : null}
 
         <Collapsible className="rounded-lg border">

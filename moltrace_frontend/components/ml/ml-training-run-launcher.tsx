@@ -299,7 +299,7 @@ export function MlTrainingRunLauncher() {
       await apiFetch(`/ml/training-runs/${id}/cancel`, { method: "POST" })
       setReloadToken((x) => x + 1)
     } catch (e) {
-      setFormErr(formatApiError(e, "Cancel failed."))
+      setFormErr(formatApiError(e, "Could not cancel the training run."))
     } finally {
       setCancelId(null)
     }

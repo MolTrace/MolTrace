@@ -66,6 +66,18 @@ const TARGET_ROUTE_OPTIONS = [
   "unchanged",
 ] as const
 
+/**
+ * Display-only labels for the target formats. The keys are the stored format
+ * identifiers sent with the request — only the label on screen is humanized.
+ */
+const TARGET_ROUTE_LABELS: Record<(typeof TARGET_ROUTE_OPTIONS)[number], string> = {
+  moltrace_spectrum_json: "MolTrace spectrum",
+  moltrace_lcms_json: "MolTrace LC-MS",
+  moltrace_regulatory_source_json: "MolTrace regulatory source",
+  moltrace_reaction_table_json: "MolTrace reaction table",
+  unchanged: "Leave unchanged",
+}
+
 function isRecord(v: unknown): v is Row {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
@@ -508,7 +520,7 @@ export function FileIngestionNormalizationWorkspace() {
               >
                 {TARGET_ROUTE_OPTIONS.map((option) => (
                   <option key={option} value={option}>
-                    {option}
+                    {TARGET_ROUTE_LABELS[option]}
                   </option>
                 ))}
               </select>
@@ -624,7 +636,7 @@ export function FileIngestionNormalizationWorkspace() {
           </div>
           <DeveloperOnly>
             <details className="rounded-md border p-3">
-              <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
+              <summary className="cursor-pointer text-sm font-medium">Raw data (for troubleshooting)</summary>
               <pre className="mt-3 max-h-[24rem] overflow-auto text-[10px]">{JSON.stringify(developerJson, null, 2)}</pre>
             </details>
           </DeveloperOnly>

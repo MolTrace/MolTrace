@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
+import { statusLabel } from "@/lib/ui/status"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,6 +49,24 @@ const RELEASE_TYPE_OPTIONS = [
   "connector_update",
   "regulatory_rule_update",
 ] as const
+
+// Display names for the release types above. The values themselves are what the
+// release record stores, so they stay exactly as they are — only what a
+// validation reviewer reads changes.
+const RELEASE_TYPE_LABELS: Record<string, string> = {
+  frontend: "User interface",
+  backend: "Analysis services",
+  full_platform: "Full platform",
+  model_update: "Model update",
+  connector_update: "Connector update",
+  regulatory_rule_update: "Regulatory rule update",
+}
+
+function releaseTypeLabel(releaseType: string | null | undefined): string {
+  const raw = (releaseType ?? "").trim()
+  if (!raw) return "-"
+  return RELEASE_TYPE_LABELS[raw] ?? statusLabel(raw)
+}
 
 const SENSITIVE_KEY_PATTERN = /(secret|password|token|credential|authorization|raw|blob|binary|content_json)/i
 
@@ -342,7 +361,7 @@ export function SystemReleasesWorkspace() {
                   <SelectContent>
                     {RELEASE_TYPE_OPTIONS.map((option) => (
                       <SelectItem key={option} value={option}>
-                        {option}
+                        {releaseTypeLabel(option)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -412,7 +431,7 @@ export function SystemReleasesWorkspace() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Release type</p>
-                    <p className="font-medium">{readStr(detailRelease.release_type) || "-"}</p>
+                    <p className="font-medium">{releaseTypeLabel(readStr(detailRelease.release_type))}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Approval status</p>
@@ -529,7 +548,7 @@ export function SystemReleasesWorkspace() {
                   return (
                     <TableRow key={id || JSON.stringify(release)}>
                       <TableCell className="font-medium">{readStr(release.release_version) || "-"}</TableCell>
-                      <TableCell>{readStr(release.release_type) || "-"}</TableCell>
+                      <TableCell>{releaseTypeLabel(readStr(release.release_type))}</TableCell>
                       <TableCell><StatusBadge status={release.approval_status} /></TableCell>
                       <TableCell>{validationProjectRef(release.validation_project_id)}</TableCell>
                       <TableCell>{formatDate(release.created_at)}</TableCell>
