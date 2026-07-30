@@ -71,6 +71,14 @@ function readIntList(v: unknown): number[] {
   return v.filter((x): x is number => typeof x === "number" && Number.isFinite(x))
 }
 
+/** Display-only humanizer for stored values (guidance_revision → "Guidance revision").
+ *  The stored value is never rewritten — only what the reader sees. */
+function humanizeValue(raw: string | undefined | null): string {
+  if (!raw) return "—"
+  const words = raw.replace(/_/g, " ").trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
 export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number }) {
   const changeViewedForId = useRef<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -182,11 +190,11 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
     setReviewErr("")
     setReviewOk("")
     if (!reviewer) {
-      setReviewErr("reviewer name is required.")
+      setReviewErr("Reviewer name is required.")
       return
     }
     if (!rationale) {
-      setReviewErr("rationale is required.")
+      setReviewErr("Rationale is required.")
       return
     }
     setReviewBusy(true)
@@ -203,7 +211,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       setReviewOk("Change review saved.")
       await load()
     } catch (e) {
-      setReviewErr(formatApiError(e, "Save change review failed."))
+      setReviewErr(formatApiError(e, "Could not save the change review."))
     } finally {
       setReviewBusy(false)
     }
@@ -264,7 +272,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       setImpactOk("Impact assessment completed.")
       await load()
     } catch (e) {
-      setImpactErr(formatApiError(e, "Run impact assessment failed."))
+      setImpactErr(formatApiError(e, "Could not run the impact assessment."))
     } finally {
       setImpactBusy(false)
     }
@@ -290,14 +298,14 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Change Detail</h1>
         <p className="text-sm text-muted-foreground">
-          source change detected signals, possible impact triage, and requires qualified review workflow.
+          Detected source-change signals, possible-impact triage, and the qualified-review workflow.
         </p>
       </header>
 
       <AlertCard
         variant="warning"
         title="Requires qualified review"
-        description="This page shows source change detected and possible impact summaries from stored records. It is not legal advice."
+        description="This page shows detected source changes and possible-impact summaries from stored records. It is not legal advice."
       />
 
       {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
@@ -316,9 +324,9 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
           <p className="text-muted-foreground">{readRecordString(change, "summary") ?? "—"}</p>
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge variant="outline">Change ID {changeId}</Badge>
-            <Badge variant="outline">Change type {readRecordString(change, "change_type") ?? "—"}</Badge>
-            <Badge variant="outline">severity {readRecordString(change, "severity") ?? "—"}</Badge>
-            <Badge variant="outline">Review status {readRecordString(change, "review_status") ?? "—"}</Badge>
+            <Badge variant="outline">Change type {humanizeValue(readRecordString(change, "change_type"))}</Badge>
+            <Badge variant="outline">Severity {humanizeValue(readRecordString(change, "severity"))}</Badge>
+            <Badge variant="outline">Review status {humanizeValue(readRecordString(change, "review_status"))}</Badge>
             <Badge variant="outline">Source ID {readRecordNumber(change, "source_id") ?? "—"}</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -339,27 +347,27 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
           <ModuleCard accent="cyan" eyebrow="Old" title="Old version" icon={FileText}>
             <div className="space-y-1 text-xs">
               <p className="font-mono">Old version ID {readRecordNumber(change, "old_version_id") ?? "—"}</p>
-              <p>version label: {readRecordString(oldVersion, "version_label") ?? "—"}</p>
-              <p>source date: {formatWhen(readRecordString(oldVersion, "source_date") ?? undefined)}</p>
-              <p>retrieved date: {formatWhen(readRecordString(oldVersion, "retrieved_at") ?? undefined)}</p>
+              <p>Version label: {readRecordString(oldVersion, "version_label") ?? "—"}</p>
+              <p>Source date: {formatWhen(readRecordString(oldVersion, "source_date") ?? undefined)}</p>
+              <p>Retrieved: {formatWhen(readRecordString(oldVersion, "retrieved_at") ?? undefined)}</p>
               <p className="font-mono break-all">
-                SHA-256/content hash:{" "}
+                SHA-256 content hash:{" "}
                 {readRecordString(oldVersion, "sha256") ?? readRecordString(oldVersion, "content_hash") ?? "—"}
               </p>
-              <p>status: {readRecordString(oldVersion, "status") ?? "—"}</p>
+              <p>Status: {humanizeValue(readRecordString(oldVersion, "status"))}</p>
             </div>
           </ModuleCard>
           <ModuleCard accent="cyan" eyebrow="New" title="New version" icon={FileText}>
             <div className="space-y-1 text-xs">
               <p className="font-mono">New version ID {readRecordNumber(change, "new_version_id") ?? "—"}</p>
-              <p>version label: {readRecordString(newVersion, "version_label") ?? "—"}</p>
-              <p>source date: {formatWhen(readRecordString(newVersion, "source_date") ?? undefined)}</p>
-              <p>retrieved date: {formatWhen(readRecordString(newVersion, "retrieved_at") ?? undefined)}</p>
+              <p>Version label: {readRecordString(newVersion, "version_label") ?? "—"}</p>
+              <p>Source date: {formatWhen(readRecordString(newVersion, "source_date") ?? undefined)}</p>
+              <p>Retrieved: {formatWhen(readRecordString(newVersion, "retrieved_at") ?? undefined)}</p>
               <p className="font-mono break-all">
-                SHA-256/content hash:{" "}
+                SHA-256 content hash:{" "}
                 {readRecordString(newVersion, "sha256") ?? readRecordString(newVersion, "content_hash") ?? "—"}
               </p>
-              <p>status: {readRecordString(newVersion, "status") ?? "—"}</p>
+              <p>Status: {humanizeValue(readRecordString(newVersion, "status"))}</p>
             </div>
           </ModuleCard>
         </div>
@@ -375,31 +383,31 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       >
         <div className="space-y-3">
           {diffs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No diff excerpts returned.</p>
+            <p className="text-sm text-muted-foreground">No diff excerpts on this change.</p>
           ) : (
             diffs.map((row, idx) => (
               <ModuleCard
                 key={readRecordNumber(row, "id") ?? idx}
                 accent="cyan"
                 eyebrow="Diff"
-                title={`Diff type ${readRecordString(row, "diff_type") ?? "—"} · ID ${readRecordNumber(row, "id") ?? "—"}`}
+                title={`Diff type ${humanizeValue(readRecordString(row, "diff_type"))} · ID ${readRecordNumber(row, "id") ?? "—"}`}
                 icon={ScrollText}
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">before excerpt</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Before</p>
                     <blockquote className="mt-1 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm leading-relaxed">
                       {readRecordString(row, "before_excerpt") ?? "—"}
                     </blockquote>
                   </div>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">after excerpt</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">After</p>
                     <blockquote className="mt-1 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm leading-relaxed">
                       {readRecordString(row, "after_excerpt") ?? "—"}
                     </blockquote>
                   </div>
                   <div className="md:col-span-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">diff summary</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Change summary</p>
                     <p className="mt-1 text-sm">{readRecordString(row, "diff_summary") ?? "—"}</p>
                   </div>
                 </div>
@@ -418,7 +426,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       >
         <div>
           {topicList.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No affected topics returned.</p>
+            <p className="text-sm text-muted-foreground">No affected topics recorded.</p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {topicList.map((t, i) => (
@@ -440,12 +448,12 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       >
         <div>
           {affectedDossiers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No affected dossiers returned.</p>
+            <p className="text-sm text-muted-foreground">No affected dossiers recorded.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {affectedDossiers.map((id) => (
                 <Button key={`dossier-${id}`} variant="outline" size="sm" asChild>
-                  <Link href={`/regulatory/dossiers/${id}`}>dossier {id}</Link>
+                  <Link href={`/regulatory/dossiers/${id}`}>Dossier {id}</Link>
                 </Button>
               ))}
             </div>
@@ -476,8 +484,8 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                   <p className="font-medium">{readRecordString(row, "title") ?? "—"}</p>
                   <p className="mt-1 text-muted-foreground">{readRecordString(row, "rationale") ?? "—"}</p>
                   <p className="mt-2 text-xs">
-                    proposal_type {readRecordString(row, "proposal_type") ?? "—"} · status{" "}
-                    {readRecordString(row, "status") ?? "—"}
+                    Proposal type {humanizeValue(readRecordString(row, "proposal_type"))} · Status{" "}
+                    {humanizeValue(readRecordString(row, "status"))}
                   </p>
                   {readRecordNumber(row, "id") != null ? (
                     <p className="mt-2">
@@ -521,7 +529,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
           </Button>
 
           {latestImpact == null ? (
-            <p className="text-sm text-muted-foreground">No impact assessments returned.</p>
+            <p className="text-sm text-muted-foreground">No impact assessment has been run for this change yet.</p>
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -530,7 +538,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                   style={{ borderTop: "3px solid var(--mt-cyan)" }}
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted dossiers</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Impacted dossiers</p>
                     <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan-ink)" }}>{impactedDossierIds.length}</p>
                   </CardContent>
                 </Card>
@@ -539,7 +547,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                   style={{ borderTop: "3px solid var(--mt-cyan)" }}
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted requirements</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Impacted requirements</p>
                     <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan-ink)" }}>{impactedRequirementIds.length}</p>
                   </CardContent>
                 </Card>
@@ -548,7 +556,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                   style={{ borderTop: "3px solid var(--mt-amber)" }}
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted action items</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Impacted action items</p>
                     <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-amber)" }}>{impactedActionItemIds.length}</p>
                   </CardContent>
                 </Card>
@@ -557,7 +565,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                   style={{ borderTop: "3px solid var(--mt-cyan)" }}
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted rule sets</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Impacted rule sets</p>
                     <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-cyan-ink)" }}>{impactedRuleSetIds.length}</p>
                   </CardContent>
                 </Card>
@@ -566,7 +574,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                   style={{ borderTop: "3px solid var(--mt-violet)" }}
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">impacted AI governance records</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Impacted AI governance records</p>
                     <p className="font-mono text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--mt-violet-ink)" }}>{impactedAiGovIds.length}</p>
                   </CardContent>
                 </Card>
@@ -575,18 +583,18 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                   style={{ borderTop: `3px solid ${latestImpact.human_review_required ? "var(--mt-red)" : "var(--mt-cyan)"}` }}
                 >
                   <CardContent className="space-y-1 pt-5 pb-5 text-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">human review required</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Human review</p>
                     <Badge variant={latestImpact.human_review_required ? "destructive" : "secondary"}>
-                      {latestImpact.human_review_required ? "required" : "not flagged"}
+                      {latestImpact.human_review_required ? "Required" : "Not flagged"}
                     </Badge>
                   </CardContent>
                 </Card>
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">recommended actions</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recommended actions</p>
                 {recommendedActions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No recommended actions returned.</p>
+                  <p className="text-sm text-muted-foreground">No recommended actions.</p>
                 ) : (
                   <div className="space-y-2">
                     {recommendedActions.map((act, idx) => (
@@ -595,7 +603,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                           <p className="font-medium">{readRecordString(act, "title") ?? "—"}</p>
                           <p className="text-muted-foreground">{readRecordString(act, "description") ?? "—"}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Action type {readRecordString(act, "action_type") ?? "—"}
+                            Action type {humanizeValue(readRecordString(act, "action_type"))}
                           </p>
                         </CardContent>
                       </Card>
@@ -606,7 +614,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">warnings</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Warnings</p>
                   {warningLines.length === 0 ? (
                     <p className="mt-1 text-sm text-muted-foreground">No warnings.</p>
                   ) : (
@@ -618,7 +626,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                   )}
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">notes</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes</p>
                   {noteLines.length === 0 ? (
                     <p className="mt-1 text-sm text-muted-foreground">No notes.</p>
                   ) : (
@@ -634,18 +642,18 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Affected Dossiers</p>
                 {impactedDossierIds.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No impacted dossiers returned.</p>
+                  <p className="text-sm text-muted-foreground">No impacted dossiers.</p>
                 ) : (
                   <div className="table-scroll">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>dossier</TableHead>
-                          <TableHead>jurisdiction</TableHead>
-                          <TableHead>status</TableHead>
-                          <TableHead>affected requirements</TableHead>
-                          <TableHead>open action items</TableHead>
-                          <TableHead>recommended action</TableHead>
+                          <TableHead>Dossier</TableHead>
+                          <TableHead>Jurisdiction</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Affected requirements</TableHead>
+                          <TableHead>Open action items</TableHead>
+                          <TableHead>Recommended action</TableHead>
                           <TableHead>Open dossier</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -665,9 +673,9 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
                             <TableRow key={`aff-dossier-${dossierId}`}>
                               <TableCell className="font-mono text-xs">{dossierId}</TableCell>
                               <TableCell className="text-xs">
-                                {jid != null ? jurisdictionNameById.get(jid) ?? `id ${jid}` : "—"}
+                                {jid != null ? jurisdictionNameById.get(jid) ?? `Jurisdiction ${jid}` : "—"}
                               </TableCell>
-                              <TableCell className="text-xs">{readRecordString(dossier, "status") ?? "—"}</TableCell>
+                              <TableCell className="text-xs">{humanizeValue(readRecordString(dossier, "status"))}</TableCell>
                               <TableCell className="tabular-nums text-xs">{impactedRequirementIds.length}</TableCell>
                               <TableCell className="tabular-nums text-xs">{openActionItems}</TableCell>
                               <TableCell className="text-xs">{readRecordString(rec, "title") ?? "—"}</TableCell>
@@ -702,7 +710,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="chg-reviewer">reviewer name</Label>
+              <Label htmlFor="chg-reviewer">Reviewer name</Label>
               <Input
                 id="chg-reviewer"
                 value={reviewerName}
@@ -711,22 +719,22 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
               />
             </div>
             <div className="space-y-2">
-              <Label>decision</Label>
+              <Label>Decision</Label>
               <Select value={reviewDecision} onValueChange={setReviewDecision}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="accepted">accepted</SelectItem>
-                  <SelectItem value="rejected">rejected</SelectItem>
-                  <SelectItem value="deferred">deferred</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="deferred">Deferred</SelectItem>
                   <SelectItem value="in_review">In review</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="chg-rationale">rationale required</Label>
+            <Label htmlFor="chg-rationale">Rationale (required)</Label>
             <Textarea
               id="chg-rationale"
               rows={4}

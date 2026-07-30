@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
+import { statusLabel } from "@/lib/ui/status"
 import { countMetricKeysForAnalytics, trackMlOodAssessmentCreated } from "@/src/lib/analytics/analytics-client"
 import { ArrowLeft, Loader2, Plus, RefreshCw, ShieldAlert } from "lucide-react"
 
@@ -257,7 +258,7 @@ export function MlOodAssessmentWorkspace() {
                 <SelectContent>
                   {OOD_METHODS.map((m) => (
                     <SelectItem key={m} value={m}>
-                      {m}
+                      {statusLabel(m)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -272,7 +273,7 @@ export function MlOodAssessmentWorkspace() {
                 <SelectContent>
                   {OOD_STATUS.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s}
+                      {statusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -308,7 +309,7 @@ export function MlOodAssessmentWorkspace() {
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : assessments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No assessments returned.</p>
+              <p className="text-sm text-muted-foreground">No assessments yet.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -333,9 +334,9 @@ export function MlOodAssessmentWorkspace() {
                         <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{readRecordNumber(row, "model_artifact_id") ?? "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{readRecordNumber(row, "dataset_version_id") ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{readRecordString(row, "method") ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(readRecordString(row, "method"))}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                          <Badge variant="outline">{statusLabel(readRecordString(row, "status"))}</Badge>
                         </TableCell>
                         <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
                           {summarizeJson(row["ood_summary_json"])}

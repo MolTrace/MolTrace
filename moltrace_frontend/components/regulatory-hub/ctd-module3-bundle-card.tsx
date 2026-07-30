@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
+import { statusLabel } from "@/lib/ui/status"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -113,7 +114,7 @@ export function CtdModule3BundleCard({ dossierId }: Props) {
         await loadBundle()
       }
     } catch (e) {
-      setErr(formatApiError(e, "Generate CTD / CMC bundle failed."))
+      setErr(formatApiError(e, "Could not generate the CTD / CMC bundle."))
     } finally {
       setBusy(false)
     }
@@ -124,7 +125,7 @@ export function CtdModule3BundleCard({ dossierId }: Props) {
     return [...readList(bundle.warnings), ...readList(bundle.warnings_json)]
   }, [bundle])
 
-  const reviewStatus = readString(bundle?.status) || "—"
+  const reviewStatus = statusLabel(readString(bundle?.status))
   const reportSha = readString(bundle?.report_sha256) || sectionText(bundle, "report_sha256", "sha256") || "—"
 
   return (
@@ -152,8 +153,8 @@ export function CtdModule3BundleCard({ dossierId }: Props) {
       <CardContent className="space-y-4">
         <Alert>
           <AlertDescription className="text-xs text-muted-foreground">
-            Treat returned sections as draft support records. Use "ready for review" and "evidence gap" signals to
-            drive human review.
+            Treat every section below as a draft support record. Use the &quot;ready for review&quot; and &quot;evidence
+            gap&quot; signals to drive human review.
           </AlertDescription>
         </Alert>
         {err ? (
@@ -238,7 +239,7 @@ export function CtdModule3BundleCard({ dossierId }: Props) {
 
             <Collapsible className="rounded-md border">
               <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium hover:bg-muted/50">
-                Developer JSON
+                Raw data (for troubleshooting)
                 <ChevronDown className="h-4 w-4" />
               </CollapsibleTrigger>
               <CollapsibleContent className="border-t px-3 py-3">

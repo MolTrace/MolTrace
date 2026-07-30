@@ -78,6 +78,30 @@ const TARGET_ROUTE_LABELS: Record<(typeof TARGET_ROUTE_OPTIONS)[number], string>
   unchanged: "Leave unchanged",
 }
 
+/**
+ * Display-only label for a stored token — de-underscores and capitalizes
+ * ("partially_normalized" → "Partially normalized"). Placeholder dashes pass
+ * through untouched. The stored value is never rewritten.
+ */
+function displayLabel(value: string): string {
+  const text = value.trim()
+  if (!text || text === "—") return text || "—"
+  const words = text.replace(/_/g, " ")
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/**
+ * Reader-facing name for a stored format identifier. Falls back to the generic
+ * de-underscored form for formats outside the known target list (e.g. the
+ * source format an instrument reported).
+ */
+function formatLabel(value: string): string {
+  const text = value.trim()
+  if (!text || text === "—") return text || "—"
+  const known = TARGET_ROUTE_LABELS[text as (typeof TARGET_ROUTE_OPTIONS)[number]]
+  return known ?? displayLabel(text)
+}
+
 function isRecord(v: unknown): v is Row {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
@@ -458,7 +482,7 @@ export function FileIngestionNormalizationWorkspace() {
                         <TableCell className="font-mono text-[10px]">{run.ingestion_run_id}</TableCell>
                         <TableCell className="text-xs">
                           <Badge variant="outline" className={`font-normal ${statusBadgeClass(run.status)}`}>
-                            {run.status}
+                            {displayLabel(run.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-xs">
@@ -578,12 +602,12 @@ export function FileIngestionNormalizationWorkspace() {
                       <TableCell className="font-mono text-[10px]">{run.normalization_run_id}</TableCell>
                       <TableCell className="text-xs">
                         <Badge variant="outline" className={`font-normal ${statusBadgeClass(run.status)}`}>
-                          {run.status}
+                          {displayLabel(run.status)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs">{run.file_id}</TableCell>
-                      <TableCell className="text-xs">{run.source_format}</TableCell>
-                      <TableCell className="text-xs">{run.target_format}</TableCell>
+                      <TableCell className="text-xs">{formatLabel(run.source_format)}</TableCell>
+                      <TableCell className="text-xs">{formatLabel(run.target_format)}</TableCell>
                       <TableCell className="text-xs">{run.output_artifact_id}</TableCell>
                       <TableCell className="text-xs">{run.warnings.length ? run.warnings.join("; ") : "—"}</TableCell>
                       <TableCell className="text-xs">{run.notes}</TableCell>
@@ -628,7 +652,8 @@ export function FileIngestionNormalizationWorkspace() {
               {selectedNormalizationRun?.output_artifact_id ?? "—"}
             </p>
             <p>
-              <span className="font-semibold">Derived output:</span> {selectedNormalizationRun?.target_format ?? "—"}
+              <span className="font-semibold">Derived output:</span>{" "}
+              {selectedNormalizationRun ? formatLabel(selectedNormalizationRun.target_format) : "—"}
             </p>
             <p>
               <span className="font-semibold">Requires review:</span> yes

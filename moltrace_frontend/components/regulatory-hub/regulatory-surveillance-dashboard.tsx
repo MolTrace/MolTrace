@@ -325,7 +325,7 @@ export function RegulatorySurveillanceDashboard() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Surveillance</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Track regulatory source Versions, detect changes, and assess impact on dossiers, rules, action items, and reports.
+          Track regulatory source versions, detect changes, and assess impact on dossiers, rules, action items, and reports.
         </p>
       </div>
 
@@ -442,9 +442,9 @@ export function RegulatorySurveillanceDashboard() {
                           {jid != null ? jurisdictionNameById.get(jid) ?? `Jurisdiction ${jid}` : "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                          <Badge variant="outline">{humanizeValue(readRecordString(row, "status"))}</Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-xs">{readRecordString(row, "check_frequency") ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{humanizeValue(readRecordString(row, "check_frequency"))}</TableCell>
                         <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                           {formatWhen(lastChecked)}
                         </TableCell>
@@ -561,7 +561,7 @@ export function RegulatorySurveillanceDashboard() {
                 <SelectContent>
                   {CHECK_FREQUENCIES.map((f) => (
                     <SelectItem key={f} value={f}>
-                      {f}
+                      {humanizeValue(f)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -576,7 +576,7 @@ export function RegulatorySurveillanceDashboard() {
                 <SelectContent>
                   {WATCHER_STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s}
+                      {humanizeValue(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -703,16 +703,16 @@ export function RegulatorySurveillanceDashboard() {
                       <p className="text-xs text-muted-foreground line-clamp-2">{readRecordString(row, "message") ?? ""}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      <Badge variant="outline">{readRecordString(row, "severity") ?? "—"}</Badge>
-                      <Badge variant="secondary">{readRecordString(row, "status") ?? "—"}</Badge>
+                      <Badge variant="outline">{humanizeValue(readRecordString(row, "severity"))}</Badge>
+                      <Badge variant="secondary">{humanizeValue(readRecordString(row, "status"))}</Badge>
                       {did != null ? (
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
-                          <Link href={`/regulatory/dossiers/${did}`}>dossier {did}</Link>
+                          <Link href={`/regulatory/dossiers/${did}`}>Dossier {did}</Link>
                         </Button>
                       ) : null}
                       {cid != null ? (
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
-                          <Link href={`/regulatory/changes/${cid}`}>change {cid}</Link>
+                          <Link href={`/regulatory/changes/${cid}`}>Change {cid}</Link>
                         </Button>
                       ) : null}
                     </div>

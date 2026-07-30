@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatStableUtcDateTime } from "@/lib/utils"
+import { statusLabel } from "@/lib/ui/status"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { Badge } from "@/components/ui/badge"
@@ -81,6 +82,12 @@ function formatWhen(iso: string | undefined): string {
 
 function parseCitationRow(raw: unknown): Record<string, unknown> | null {
   return isRecord(raw) ? raw : null
+}
+
+/** Display-only label for a stored source-type value (the stored value is unchanged). */
+function sourceTypeLabel(raw: string | undefined | null): string {
+  if (!raw) return "—"
+  return statusLabel(raw)
 }
 
 export function RegulatorySourceLibraryWorkspace() {
@@ -189,7 +196,7 @@ export function RegulatorySourceLibraryWorkspace() {
     setUploadOk("")
     const title = uploadTitle.trim()
     if (!title) {
-      setUploadErr("title is required.")
+      setUploadErr("Title is required.")
       return
     }
     if (!uploadFile || uploadFile.size === 0) {
@@ -288,13 +295,13 @@ export function RegulatorySourceLibraryWorkspace() {
             </span>
           </p>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">quote excerpt</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Quote excerpt</p>
             <blockquote className="mt-1 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm leading-relaxed">
               {quote?.trim() ? quote : "—"}
             </blockquote>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">summary</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Summary</p>
             <p className="mt-1 text-muted-foreground">{summary?.trim() ? summary : "—"}</p>
           </div>
         </CardContent>
@@ -356,7 +363,7 @@ export function RegulatorySourceLibraryWorkspace() {
       }
       await loadSources()
     } catch (e) {
-      setConnectorImportErr(formatApiError(e, "Import source from connector failed."))
+      setConnectorImportErr(formatApiError(e, "Could not import that source from the connector."))
       setConnectorImportResult(null)
     } finally {
       setConnectorImportBusy(false)
@@ -417,7 +424,7 @@ export function RegulatorySourceLibraryWorkspace() {
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="src-title">title</Label>
+                <Label htmlFor="src-title">Title</Label>
                 <Input
                   id="src-title"
                   value={uploadTitle}
@@ -426,7 +433,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>source type</Label>
+                <Label>Source type</Label>
                 <Select value={uploadSourceType} onValueChange={setUploadSourceType}>
                   <SelectTrigger>
                     <SelectValue />
@@ -434,7 +441,7 @@ export function RegulatorySourceLibraryWorkspace() {
                   <SelectContent>
                     {SOURCE_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {sourceTypeLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -457,7 +464,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 </Select>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="src-url">source URL optional</Label>
+                <Label htmlFor="src-url">Source URL (optional)</Label>
                 <Input
                   id="src-url"
                   value={uploadSourceUrl}
@@ -466,7 +473,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="src-date">source date optional</Label>
+                <Label htmlFor="src-date">Source date (optional)</Label>
                 <Input
                   id="src-date"
                   type="date"
@@ -475,7 +482,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="src-version">version optional</Label>
+                <Label htmlFor="src-version">Version (optional)</Label>
                 <Input
                   id="src-version"
                   value={uploadVersion}
@@ -484,7 +491,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="src-file">file upload optional</Label>
+                <Label htmlFor="src-file">Document file</Label>
                 <Input
                   id="src-file"
                   type="file"
@@ -514,7 +521,7 @@ export function RegulatorySourceLibraryWorkspace() {
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="connector-import-connector">connector</Label>
+                <Label htmlFor="connector-import-connector">Connector</Label>
                 <Input
                   id="connector-import-connector"
                   value={connectorImportConnector}
@@ -523,7 +530,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="connector-import-external-record">external record</Label>
+                <Label htmlFor="connector-import-external-record">External record</Label>
                 <Input
                   id="connector-import-external-record"
                   value={connectorImportExternalRecord}
@@ -532,7 +539,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>source type</Label>
+                <Label>Source type</Label>
                 <Select value={connectorImportSourceType} onValueChange={setConnectorImportSourceType}>
                   <SelectTrigger>
                     <SelectValue />
@@ -540,14 +547,14 @@ export function RegulatorySourceLibraryWorkspace() {
                   <SelectContent>
                     {SOURCE_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {sourceTypeLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="connector-import-jurisdiction">jurisdiction</Label>
+                <Label htmlFor="connector-import-jurisdiction">Jurisdiction</Label>
                 <Input
                   id="connector-import-jurisdiction"
                   value={connectorImportJurisdiction}
@@ -556,7 +563,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="connector-import-dossier">dossier optional</Label>
+                <Label htmlFor="connector-import-dossier">Dossier (optional)</Label>
                 <Input
                   id="connector-import-dossier"
                   value={connectorImportDossier}
@@ -565,7 +572,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="connector-import-file-id">file ID</Label>
+                <Label htmlFor="connector-import-file-id">File ID</Label>
                 <Input
                   id="connector-import-file-id"
                   value={connectorImportFileId}
@@ -574,7 +581,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="connector-import-external-object-id">external object ID</Label>
+                <Label htmlFor="connector-import-external-object-id">External object ID</Label>
                 <Input
                   id="connector-import-external-object-id"
                   value={connectorImportExternalObjectId}
@@ -595,7 +602,7 @@ export function RegulatorySourceLibraryWorkspace() {
                 </CardHeader>
                 <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
                   <p className="sm:col-span-2">
-                    <span className="text-muted-foreground">imported source title:</span>{" "}
+                    <span className="text-muted-foreground">Imported source title:</span>{" "}
                     {readConnectorImportString(["imported_source_title", "title", "source_title"]) || "—"}
                   </p>
                   <p className="sm:col-span-2">
@@ -603,19 +610,19 @@ export function RegulatorySourceLibraryWorkspace() {
                     {readConnectorImportString(["sha256", "file_sha256"]) || "—"}
                   </p>
                   <p>
-                    <span className="text-muted-foreground">source type:</span>{" "}
-                    {readConnectorImportString(["source_type"]) || "—"}
+                    <span className="text-muted-foreground">Source type:</span>{" "}
+                    {sourceTypeLabel(readConnectorImportString(["source_type"]))}
                   </p>
                   <p>
-                    <span className="text-muted-foreground">citation extraction status:</span>{" "}
-                    {readConnectorImportString(["citation_extraction_status", "citation_status"]) || "—"}
+                    <span className="text-muted-foreground">Citation extraction:</span>{" "}
+                    {statusLabel(readConnectorImportString(["citation_extraction_status", "citation_status"]))}
                   </p>
                   <p className="sm:col-span-2">
-                    <span className="text-muted-foreground">warnings:</span>{" "}
+                    <span className="text-muted-foreground">Warnings:</span>{" "}
                     {readConnectorImportWarnings().join("; ") || "—"}
                   </p>
                   <details className="sm:col-span-2 rounded-md border p-2">
-                    <summary className="cursor-pointer text-xs font-medium">Developer JSON</summary>
+                    <summary className="cursor-pointer text-xs font-medium">Raw data (for troubleshooting)</summary>
                     <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(connectorImportResult, null, 2)}</pre>
                   </details>
                 </CardContent>
@@ -656,13 +663,13 @@ export function RegulatorySourceLibraryWorkspace() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>title</TableHead>
-                      <TableHead>source type</TableHead>
-                      <TableHead>jurisdiction</TableHead>
-                      <TableHead>version</TableHead>
-                      <TableHead>source date</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Source type</TableHead>
+                      <TableHead>Jurisdiction</TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Source date</TableHead>
                       <TableHead>SHA-256</TableHead>
-                      <TableHead>status</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="w-[90px]">Open</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -670,14 +677,14 @@ export function RegulatorySourceLibraryWorkspace() {
                     {sources.map((row) => {
                       const id = readRecordNumber(row, "id")
                       const title = readRecordString(row, "title") ?? "—"
-                      const st = readRecordString(row, "source_type") ?? "—"
+                      const st = sourceTypeLabel(readRecordString(row, "source_type"))
                       const jid = readRecordNumber(row, "jurisdiction_id")
-                      const jLabel = jid != null ? jurisdictionNameById.get(jid) ?? `id ${jid}` : "—"
+                      const jLabel = jid != null ? jurisdictionNameById.get(jid) ?? `Jurisdiction ${jid}` : "—"
                       const version = readRecordString(row, "version") ?? "—"
                       const srcDateRaw = readRecordString(row, "source_date")
                       const srcDate = srcDateRaw ? formatWhen(srcDateRaw) : "—"
                       const sha = readRecordString(row, "sha256")
-                      const status = readRecordString(row, "status") ?? "—"
+                      const status = statusLabel(readRecordString(row, "status"))
                       return (
                         <TableRow key={id ?? title}>
                           <TableCell className="max-w-[220px] font-medium">{title}</TableCell>
@@ -734,7 +741,7 @@ export function RegulatorySourceLibraryWorkspace() {
         >
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="src-search-q">query</Label>
+              <Label htmlFor="src-search-q">Search terms</Label>
               <Textarea id="src-search-q" rows={3} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -764,7 +771,7 @@ export function RegulatorySourceLibraryWorkspace() {
                     <SelectItem value="none">Any</SelectItem>
                     {SOURCE_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {sourceTypeLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -788,7 +795,7 @@ export function RegulatorySourceLibraryWorkspace() {
                   </ul>
                 ) : null}
                 <div>
-                  <p className="mb-2 text-sm font-medium">sources</p>
+                  <p className="mb-2 text-sm font-medium">Sources</p>
                   {searchSources.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No sources in this result.</p>
                   ) : (
@@ -805,7 +812,7 @@ export function RegulatorySourceLibraryWorkspace() {
                           >
                             {readRecordString(s, "title") ?? "—"}{" "}
                             <span className="font-mono text-xs text-muted-foreground">
-                              (id {readRecordNumber(s, "id") ?? "—"})
+                              (Source {readRecordNumber(s, "id") ?? "—"})
                             </span>
                           </button>
                         </li>
@@ -814,7 +821,7 @@ export function RegulatorySourceLibraryWorkspace() {
                   )}
                 </div>
                 <div>
-                  <p className="mb-2 text-sm font-medium">citations</p>
+                  <p className="mb-2 text-sm font-medium">Citations</p>
                   {searchCitations.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No citations in this result.</p>
                   ) : (

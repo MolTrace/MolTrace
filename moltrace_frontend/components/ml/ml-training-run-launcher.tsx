@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
+import { statusLabel } from "@/lib/ui/status"
 import {
   countMetricKeysForAnalytics,
   trackMlTrainingRunCompleted,
@@ -331,11 +332,10 @@ export function MlTrainingRunLauncher() {
         <AlertTriangle className="h-4 w-4" aria-hidden />
         <AlertTitle className="text-sm">Governance</AlertTitle>
         <AlertDescription className="text-sm text-muted-foreground">
-          Training completion creates artifacts for follow-up work: when a run succeeds, treat outcomes as{" "}
-          <span className="font-medium text-foreground">training complete</span> and check for{" "}
-          <span className="font-medium text-foreground">model artifact created</span> via{" "}
-          <code className="text-xs">the model artifact ID</code>. Every run still{" "}
-          <span className="font-medium text-foreground">requires evaluation</span> before deployment decisions.
+          Training completion creates artifacts for follow-up work: when a run succeeds, treat the outcome as{" "}
+          <span className="font-medium text-foreground">training complete</span> and confirm that a{" "}
+          <span className="font-medium text-foreground">model artifact</span> was created for it. Every run still{" "}
+          <span className="font-medium text-foreground">requires evaluation</span> before any deployment decision.
         </AlertDescription>
       </Alert>
 
@@ -354,7 +354,7 @@ export function MlTrainingRunLauncher() {
 
       {partialErr ? (
         <Alert variant="destructive">
-          <AlertTitle>Partial load</AlertTitle>
+          <AlertTitle>Some data could not be loaded</AlertTitle>
           <AlertDescription className="space-y-1 text-xs">
             {errTasks ? <p>Task list: {errTasks}</p> : null}
             {errVersions ? <p>Dataset versions: {errVersions}</p> : null}
@@ -383,7 +383,7 @@ export function MlTrainingRunLauncher() {
                   <SelectContent>
                     {taskKeyOptions.map((k) => (
                       <SelectItem key={k} value={k}>
-                        {k}
+                        {statusLabel(k)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -413,7 +413,7 @@ export function MlTrainingRunLauncher() {
                     const st = readRecordString(row, "status") ?? ""
                     return (
                       <SelectItem key={id} value={String(id)}>
-                        #{id} {name} {ver ? `(${ver})` : ""} — {st}
+                        #{id} {name} {ver ? `(${ver})` : ""} — {statusLabel(st)}
                       </SelectItem>
                     )
                   })}
@@ -454,7 +454,7 @@ export function MlTrainingRunLauncher() {
                 <SelectContent>
                   {MODEL_FAMILIES.map((f) => (
                     <SelectItem key={f} value={f}>
-                      {f}
+                      {statusLabel(f)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -513,11 +513,10 @@ export function MlTrainingRunLauncher() {
       >
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Labels: <span className="font-medium text-foreground">training complete</span> aligns with{" "}
-            <code className="text-xs">the run succeeds</code>;{" "}
-            <span className="font-medium text-foreground">model artifact created</span> when{" "}
-            <code className="text-xs">the model artifact ID</code> is present;{" "}
-            <span className="font-medium text-foreground">requires evaluation</span> for downstream release checks.
+            What the run labels mean: <span className="font-medium text-foreground">training complete</span> — the run
+            succeeded; <span className="font-medium text-foreground">model artifact created</span> — the run produced a
+            model artifact; <span className="font-medium text-foreground">requires evaluation</span> — release checks are
+            still outstanding.
           </p>
           <div className="table-scroll min-w-0">
             {loading ? (
@@ -525,7 +524,7 @@ export function MlTrainingRunLauncher() {
             ) : errRuns ? (
               <p className="text-sm text-muted-foreground">{errRuns}</p>
             ) : trainingRuns.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No training runs returned.</p>
+              <p className="text-sm text-muted-foreground">No training runs yet.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -558,7 +557,7 @@ export function MlTrainingRunLauncher() {
                           <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              <Badge variant="secondary">{st || "—"}</Badge>
+                              <Badge variant="secondary">{statusLabel(st)}</Badge>
                               {done ? (
                                 <span className="text-[11px] text-muted-foreground">
                                   training complete
@@ -570,7 +569,7 @@ export function MlTrainingRunLauncher() {
                           <TableCell className="font-mono text-xs">
                             {readRecordNumber(row, "dataset_version_id") ?? "—"}
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{readStr(row, ["model_family"]) || "—"}</TableCell>
+                          <TableCell className="text-xs">{statusLabel(readStr(row, ["model_family"]))}</TableCell>
                           <TableCell className="max-w-[200px] truncate font-mono text-[11px] text-muted-foreground">
                             {summarizeMetrics(metricsRaw)}
                           </TableCell>

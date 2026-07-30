@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
+import { statusLabel } from "@/lib/ui/status"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { Badge } from "@/components/ui/badge"
@@ -102,7 +103,7 @@ export function RegulatoryNotificationsCompactCard({ dossierId }: RegulatoryNoti
                   <span className="font-medium text-foreground">{readRecordString(row, "title") ?? "—"}</span>
                   {readRecordString(row, "severity") ? (
                     <Badge variant="outline" className="ml-2 align-middle text-[10px]">
-                      {readRecordString(row, "severity")}
+                      {statusLabel(readRecordString(row, "severity"))}
                     </Badge>
                   ) : null}
                 </li>

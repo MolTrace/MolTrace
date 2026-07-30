@@ -184,17 +184,17 @@ export function RegulatoryRuleUpdatesWorkspace() {
     setCreateOk("")
     const changeIdNum = Number.parseInt(createChangeId.trim(), 10)
     if (!Number.isFinite(changeIdNum) || changeIdNum < 1) {
-      setCreateErr("source change is required.")
+      setCreateErr("A source change is required.")
       return
     }
     const title = createTitle.trim()
     if (!title) {
-      setCreateErr("title is required.")
+      setCreateErr("Title is required.")
       return
     }
     const rationale = createRationale.trim()
     if (!rationale) {
-      setCreateErr("rationale is required.")
+      setCreateErr("Rationale is required.")
       return
     }
     setCreateBusy(true)
@@ -223,7 +223,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
       setCreateFormKey((k) => k + 1)
       await load()
     } catch (e) {
-      setCreateErr(formatApiError(e, "Create rule update proposal failed."))
+      setCreateErr(formatApiError(e, "Could not create the rule update proposal."))
     } finally {
       setCreateBusy(false)
     }
@@ -236,11 +236,11 @@ export function RegulatoryRuleUpdatesWorkspace() {
     const reviewer = reviewerName.trim()
     const comment = reviewComment.trim()
     if (!reviewer) {
-      setReviewErr("reviewer name is required.")
+      setReviewErr("Reviewer name is required.")
       return
     }
     if (!comment) {
-      setReviewErr("reviewer comment/rationale is required.")
+      setReviewErr("A reviewer comment / rationale is required.")
       return
     }
     setReviewBusy(true)
@@ -271,7 +271,9 @@ export function RegulatoryRuleUpdatesWorkspace() {
       const fresh = await apiFetch<unknown>(`/regulatory/rule-update-proposals/${selectedProposalId}`, { method: "GET" })
       setSelectedProposal(isRecord(fresh) ? fresh : null)
     } catch (e) {
-      setReviewErr(formatApiError(e, `${action === "approve" ? "Approve" : "Reject"} failed.`))
+      setReviewErr(
+        formatApiError(e, action === "approve" ? "Could not approve the proposal." : "Could not reject the proposal."),
+      )
     } finally {
       setReviewBusy(false)
     }
@@ -338,7 +340,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
           ) : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="rup-change-id">source change</Label>
+              <Label htmlFor="rup-change-id">Source change</Label>
               <Select value={createChangeId || "__none__"} onValueChange={(v) => setCreateChangeId(v === "__none__" ? "" : v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a change" />
@@ -348,7 +350,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
                   {changes.map((row, idx) => {
                     const id = readRecordNumber(row, "id")
                     if (id == null) return null
-                    const title = readRecordString(row, "title") ?? `change ${id}`
+                    const title = readRecordString(row, "title") ?? `Change ${id}`
                     return (
                       <SelectItem key={`chg-${id}-${idx}`} value={String(id)}>
                         {title} ({id})
@@ -359,7 +361,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>proposal type</Label>
+              <Label>Proposal type</Label>
               <Select value={createProposalType} onValueChange={setCreateProposalType}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -374,11 +376,11 @@ export function RegulatoryRuleUpdatesWorkspace() {
               </Select>
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="rup-title">title</Label>
+              <Label htmlFor="rup-title">Title</Label>
               <Input id="rup-title" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} autoComplete="off" />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="rup-rationale">rationale</Label>
+              <Label htmlFor="rup-rationale">Rationale</Label>
               <Textarea
                 id="rup-rationale"
                 rows={4}
@@ -387,7 +389,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rup-rule-set">rule set optional</Label>
+              <Label htmlFor="rup-rule-set">Rule set (optional)</Label>
               <Input
                 id="rup-rule-set"
                 value={createRuleSetId}
@@ -442,13 +444,13 @@ export function RegulatoryRuleUpdatesWorkspace() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>title</TableHead>
-                  <TableHead>proposal type</TableHead>
-                  <TableHead>source change</TableHead>
-                  <TableHead>rule set</TableHead>
-                  <TableHead>status</TableHead>
-                  <TableHead>reviewer</TableHead>
-                  <TableHead>updated date</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Proposal type</TableHead>
+                  <TableHead>Source change</TableHead>
+                  <TableHead>Rule set</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Reviewer</TableHead>
+                  <TableHead>Updated</TableHead>
                   <TableHead>Open</TableHead>
                 </TableRow>
               </TableHeader>
@@ -468,17 +470,17 @@ export function RegulatoryRuleUpdatesWorkspace() {
                             className="text-primary underline-offset-4 hover:underline"
                             title={changeTitleById.get(changeEventId) ?? ""}
                           >
-                            change {changeEventId}
+                            Change {changeEventId}
                           </Link>
                         ) : (
                           "—"
                         )}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {ruleSetId != null ? ruleSetNameById.get(ruleSetId) ?? `id ${ruleSetId}` : "—"}
+                        {ruleSetId != null ? ruleSetNameById.get(ruleSetId) ?? `Rule set ${ruleSetId}` : "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{humanizeValue(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="text-xs">{readRecordString(row, "reviewer_name") ?? "—"}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
@@ -536,7 +538,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
                 <p className="font-medium">{readRecordString(selectedProposal, "title") ?? "—"}</p>
                 <p className="text-muted-foreground">{readRecordString(selectedProposal, "rationale") ?? "—"}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  status {readRecordString(selectedProposal, "status") ?? "—"} · Proposal ID{" "}
+                  Status {humanizeValue(readRecordString(selectedProposal, "status"))} · Proposal ID{" "}
                   {readRecordNumber(selectedProposal, "id") ?? "—"}
                 </p>
                 {readRecordString(selectedProposal, "status") === "applied" ? (
@@ -548,7 +550,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="rup-reviewer">reviewer name</Label>
+                  <Label htmlFor="rup-reviewer">Reviewer name</Label>
                   <Input
                     id="rup-reviewer"
                     value={reviewerName}
@@ -557,7 +559,7 @@ export function RegulatoryRuleUpdatesWorkspace() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rup-comment">reviewer comment/rationale required</Label>
+                  <Label htmlFor="rup-comment">Reviewer comment / rationale (required)</Label>
                   <Textarea
                     id="rup-comment"
                     rows={4}

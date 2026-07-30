@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
+import { statusLabel } from "@/lib/ui/status"
 import { countMetricKeysForAnalytics, trackMlCalibrationAssessmentCreated } from "@/src/lib/analytics/analytics-client"
 import { ArrowLeft, ListChecks, Loader2, Plus, RefreshCw } from "lucide-react"
 
@@ -178,7 +179,7 @@ export function MlCalibrationWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Calibration assessments</h1>
           <p className="text-sm text-muted-foreground">
-            Assess probabilistic calibration using registry methods; metrics and status come from the recorded assessment.
+            Assess probabilistic calibration using standard methods; metrics and status come from the recorded assessment.
           </p>
         </div>
         <BackendStatusIndicator />
@@ -239,7 +240,7 @@ export function MlCalibrationWorkspace() {
                     if (id == null) return null
                     return (
                       <SelectItem key={id} value={String(id)}>
-                        #{id} {readRecordString(row, "status") ?? ""}
+                        #{id} {statusLabel(readRecordString(row, "status"))}
                       </SelectItem>
                     )
                   })}
@@ -257,7 +258,7 @@ export function MlCalibrationWorkspace() {
                 <SelectContent>
                   {CALIBRATION_METHODS.map((m) => (
                     <SelectItem key={m} value={m}>
-                      {m}
+                      {statusLabel(m)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -272,7 +273,7 @@ export function MlCalibrationWorkspace() {
                 <SelectContent>
                   {CALIBRATION_STATUS.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s}
+                      {statusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -316,7 +317,7 @@ export function MlCalibrationWorkspace() {
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : assessments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No assessments returned.</p>
+              <p className="text-sm text-muted-foreground">No assessments yet.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -338,9 +339,9 @@ export function MlCalibrationWorkspace() {
                         <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{readRecordNumber(row, "model_artifact_id") ?? "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{readRecordNumber(row, "evaluation_run_id") ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{readRecordString(row, "calibration_method") ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(readRecordString(row, "calibration_method"))}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                          <Badge variant="outline">{statusLabel(readRecordString(row, "status"))}</Badge>
                         </TableCell>
                         <TableCell className="max-w-[240px] truncate text-xs text-muted-foreground">
                           {summarizeJson(row["calibration_metrics_json"])}

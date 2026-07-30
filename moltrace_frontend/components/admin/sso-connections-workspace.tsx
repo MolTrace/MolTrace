@@ -260,7 +260,9 @@ export function SSOConnectionsWorkspace() {
           <p className="mt-1 text-xs text-muted-foreground">
             Add this exact URI to the IdP application&apos;s allowed redirect URIs. MolTrace derives it from its own
             service address — it can never be set from this page or by a browser.
-            {REDIRECT_URI ? null : " Set NEXT_PUBLIC_SSO_API_ORIGIN to display the exact value."}
+            {REDIRECT_URI
+              ? null
+              : " Replace the bracketed part with your MolTrace service address — your MolTrace administrator can configure it so the exact value appears here."}
           </p>
         </div>
       </ModuleCard>

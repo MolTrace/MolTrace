@@ -75,6 +75,22 @@ type SectionState = {
 
 const EMPTY_SECTION: SectionState = { payload: null, error: "" }
 
+/** Reader-facing name for each section, used in its load-failure message. */
+const SECTION_LABELS: Record<SectionKey, string> = {
+  tenant: "the tenant record",
+  environments: "environments",
+  entitlements: "entitlements",
+  pilotPrograms: "pilot programs",
+  onboarding: "onboarding projects",
+  dataBoundary: "the data boundary",
+  securityProfile: "the security profile",
+  validationProfile: "the validation profile",
+  usageSummary: "the usage summary",
+  roi: "the ROI summary",
+  healthScore: "the health score",
+  procurementPackages: "procurement packages",
+}
+
 const PROGRAM_ORDER = ["SpectraCheck", "Regentry", "Reaction Optimization"] as const
 const ENTITLEMENT_PROGRAM_ORDER = [
   { label: "SpectraCheck", values: ["spectracheck"] },
@@ -366,11 +382,23 @@ function statusBadgeClass(status: string): string {
   return "text-muted-foreground"
 }
 
-function Field({ label, value, valueKey }: { label: string; value: unknown; valueKey?: string }) {
+function Field({
+  label,
+  value,
+  valueKey,
+  humanize,
+}: {
+  label: string
+  value: unknown
+  valueKey?: string
+  /** Render the stored value as a readable label (status/type/stage fields). */
+  humanize?: boolean
+}) {
+  const text = safeFormatValue(valueKey ?? label, value)
   return (
     <div>
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 break-words text-sm">{safeFormatValue(valueKey ?? label, value)}</p>
+      <p className="mt-1 break-words text-sm">{humanize && text !== "-" ? optionLabel(text) : text}</p>
     </div>
   )
 }
@@ -474,7 +502,7 @@ function RecordFields({
   empty,
 }: {
   row: Row | null
-  fields: { label: string; key: string; keys?: string[] }[]
+  fields: { label: string; key: string; keys?: string[]; humanize?: boolean }[]
   empty: string
 }) {
   if (!row) return <p className="text-sm text-muted-foreground">{empty}</p>
@@ -486,6 +514,7 @@ function RecordFields({
           label={field.label}
           value={readFirst(row, field.keys ?? [field.key]) || row[field.key]}
           valueKey={field.key}
+          humanize={field.humanize}
         />
       ))}
     </div>
@@ -646,7 +675,9 @@ function EntitlementsPanel({
                   return (
                     <TableRow key={entitlementId}>
                       <TableCell className="text-xs">{readFirst(row, ["feature_key"]) || "-"}</TableCell>
-                      <TableCell className="text-xs">{readFirst(row, ["program"]) || "-"}</TableCell>
+                      <TableCell className="text-xs">
+                        {readFirst(row, ["program"]) ? optionLabel(readFirst(row, ["program"])) : "-"}
+                      </TableCell>
                       <TableCell className="text-xs">{safeFormatValue("enabled", row.enabled)}</TableCell>
                       <TableCell className="max-w-[24rem] text-xs">{safeFormatValue("limit_json", row.limit_json)}</TableCell>
                       <TableCell className="text-xs">{readFirst(row, ["effective_start"]) || "-"}</TableCell>
@@ -693,7 +724,7 @@ function EntitlementsPanel({
               <SelectContent>
                 {ENTITLEMENT_PROGRAM_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -706,8 +737,8 @@ function EntitlementsPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">true</SelectItem>
-                <SelectItem value="false">false</SelectItem>
+                <SelectItem value="true">Enabled</SelectItem>
+                <SelectItem value="false">Disabled</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -908,7 +939,7 @@ function PilotProgramsPanel({
                     disabled={actionBusyId === pilotId || currentStatus === "active"}
                     onClick={() => void patchPilotStatus(row, "active")}
                   >
-                    active
+                    Set active
                   </Button>
                   <Button
                     type="button"
@@ -917,7 +948,7 @@ function PilotProgramsPanel({
                     disabled={actionBusyId === pilotId || currentStatus === "paused"}
                     onClick={() => void patchPilotStatus(row, "paused")}
                   >
-                    paused
+                    Pause
                   </Button>
                 </div>
               )
@@ -929,11 +960,11 @@ function PilotProgramsPanel({
       <SectionCard title="Pilot program detail" description="Detail view of the selected pilot program — objectives, success criteria, risks, and current status." error={selectedPilotError}>
         <RecordFields
           row={selectedPilot}
-          empty="Select Load detail from a pilot program row."
+          empty="Choose Load detail on one of the pilot programs above."
           fields={[
             { label: "Title", key: "title" },
             { label: "Objective", key: "objective" },
-            { label: "Status", key: "status" },
+            { label: "Status", key: "status", humanize: true },
             { label: "Start date", key: "start_date" },
             { label: "End date", key: "end_date" },
             { label: "Target programs", key: "target_programs_json" },
@@ -958,7 +989,7 @@ function PilotProgramsPanel({
               <SelectContent>
                 {PILOT_STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1294,7 +1325,7 @@ function OnboardingPanel({
               <SelectContent>
                 {ONBOARDING_STAGE_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1317,10 +1348,10 @@ function OnboardingPanel({
           empty="Select an onboarding project."
           fields={[
             { label: "Title", key: "title" },
-            { label: "Status", key: "status" },
+            { label: "Status", key: "status", humanize: true },
             { label: "Owner name", key: "owner_name" },
             { label: "Customer contact", key: "customer_contact" },
-            { label: "Implementation stage", key: "implementation_stage" },
+            { label: "Implementation stage", key: "implementation_stage", humanize: true },
           ]}
         />
         {selectedProjectId ? (
@@ -1334,7 +1365,7 @@ function OnboardingPanel({
                 disabled={actionBusyId === selectedProjectId}
                 onClick={() => void patchOnboardingProject(selectedProjectId, { status: option })}
               >
-                {option}
+                {optionLabel(option)}
               </Button>
             ))}
           </div>
@@ -1369,7 +1400,9 @@ function OnboardingPanel({
                     return (
                       <div key={taskId} className="space-y-2 rounded-md border bg-background p-3">
                         <p className="text-sm font-medium">{readFirst(task, ["title"]) || "-"}</p>
-                        <p className="text-xs text-muted-foreground">{readFirst(task, ["program"]) || "-"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {readFirst(task, ["program"]) ? optionLabel(readFirst(task, ["program"])) : "-"}
+                        </p>
                         <p className="text-xs text-muted-foreground">{readFirst(task, ["owner"]) || "Unassigned"}</p>
                         <div className="flex flex-wrap gap-1">
                           {TASK_BOARD_COLUMNS.map((nextColumn) => (
@@ -1414,7 +1447,7 @@ function OnboardingPanel({
               <SelectContent>
                 {IMPLEMENTATION_TASK_TYPE_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1429,7 +1462,7 @@ function OnboardingPanel({
               <SelectContent>
                 {IMPLEMENTATION_TASK_PROGRAM_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1569,12 +1602,12 @@ function DataBoundaryPanel({
           row={row}
           empty="No data boundary yet."
           fields={[
-            { label: "Isolation mode", key: "isolation_mode" },
+            { label: "Isolation mode", key: "isolation_mode", humanize: true },
             { label: "Encryption profile", key: "encryption_profile" },
             { label: "Storage prefix", key: "storage_prefix" },
             { label: "Allowed regions", key: "allowed_regions_json" },
             { label: "Data residency notes", key: "data_residency_notes" },
-            { label: "Status", key: "status" },
+            { label: "Status", key: "status", humanize: true },
           ]}
         />
       </SectionCard>
@@ -1593,7 +1626,7 @@ function DataBoundaryPanel({
               <SelectContent>
                 {DATA_BOUNDARY_ISOLATION_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1608,7 +1641,7 @@ function DataBoundaryPanel({
               <SelectContent>
                 {TENANT_PROFILE_STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1761,7 +1794,7 @@ function SecurityProfilePanel({
             { label: "IP allowlist", key: "ip_allowlist_json" },
             { label: "Security frameworks", key: "security_frameworks_json" },
             { label: "Risk summary", key: "risk_summary_json" },
-            { label: "Status", key: "status" },
+            { label: "Status", key: "status", humanize: true },
           ]}
         />
       </SectionCard>
@@ -1778,8 +1811,8 @@ function SecurityProfilePanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">true</SelectItem>
-                <SelectItem value="false">false</SelectItem>
+                <SelectItem value="true">Enabled</SelectItem>
+                <SelectItem value="false">Disabled</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1790,8 +1823,8 @@ function SecurityProfilePanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">true</SelectItem>
-                <SelectItem value="false">false</SelectItem>
+                <SelectItem value="true">Required</SelectItem>
+                <SelectItem value="false">Not required</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1812,7 +1845,7 @@ function SecurityProfilePanel({
               <SelectContent>
                 {TENANT_PROFILE_STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1979,7 +2012,7 @@ function ValidationProfilePanel({
             { label: "E-signature required", key: "esignature_required" },
             { label: "Data integrity assessment IDs", key: "data_integrity_assessment_ids_json" },
             { label: "Inspection package IDs", key: "inspection_package_ids_json" },
-            { label: "Status", key: "status" },
+            { label: "Status", key: "status", humanize: true },
           ]}
         />
       </SectionCard>
@@ -1999,7 +2032,7 @@ function ValidationProfilePanel({
             <p className="text-xs font-medium text-muted-foreground">Readiness status</p>
             <div className="mt-1">
               <Badge variant="outline" className={`font-normal ${statusBadgeClass(readinessStatus)}`}>
-                {readinessStatus}
+                {optionLabel(readinessStatus)}
               </Badge>
             </div>
           </div>
@@ -2018,8 +2051,8 @@ function ValidationProfilePanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">true</SelectItem>
-                <SelectItem value="false">false</SelectItem>
+                <SelectItem value="true">Required</SelectItem>
+                <SelectItem value="false">Not required</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -2030,8 +2063,8 @@ function ValidationProfilePanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">true</SelectItem>
-                <SelectItem value="false">false</SelectItem>
+                <SelectItem value="true">Required</SelectItem>
+                <SelectItem value="false">Not required</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -2044,7 +2077,7 @@ function ValidationProfilePanel({
               <SelectContent>
                 {TENANT_VALIDATION_PROFILE_STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2290,7 +2323,7 @@ function HealthScorePanel({
             <p className="text-xs font-medium text-muted-foreground">Status</p>
             <div className="mt-2">
               <Badge variant="outline" className={`font-normal ${statusBadgeClass(status)}`}>
-                {status}
+                {optionLabel(status)}
               </Badge>
             </div>
           </div>
@@ -2503,11 +2536,13 @@ function ProcurementPackagesPanel({
                   return (
                     <TableRow key={packageId}>
                       <TableCell className="text-xs">{readFirst(row, ["title"]) || "-"}</TableCell>
-                      <TableCell className="text-xs">{readFirst(row, ["package_type"]) || "-"}</TableCell>
+                      <TableCell className="text-xs">
+                        {readFirst(row, ["package_type"]) ? optionLabel(readFirst(row, ["package_type"])) : "-"}
+                      </TableCell>
                       <TableCell className="text-xs">
                         {status ? (
                           <Badge variant="outline" className={`font-normal ${statusBadgeClass(status)}`}>
-                            {status}
+                            {optionLabel(status)}
                           </Badge>
                         ) : (
                           "-"
@@ -2550,7 +2585,7 @@ function ProcurementPackagesPanel({
               <SelectContent>
                 {PROCUREMENT_PACKAGE_TYPE_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2626,9 +2661,9 @@ function ProcurementPackagesPanel({
           row={selectedPackage}
           empty="Open a procurement package to view safe summaries."
           fields={[
-            { label: "Package status", key: "status" },
+            { label: "Package status", key: "status", humanize: true },
             { label: "Package SHA-256", key: "package_sha256" },
-            { label: "Package type", key: "package_type" },
+            { label: "Package type", key: "package_type", humanize: true },
             { label: "Created date", key: "created_at" },
           ]}
         />
@@ -2679,9 +2714,9 @@ function ProcurementPackagesPanel({
       </SectionCard>
 
       <DeveloperOnly>
-        <SectionCard title="Developer JSON">
+        <SectionCard title="Raw data (for troubleshooting)">
           <details className="rounded-md border bg-muted/20 p-3">
-            <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
+            <summary className="cursor-pointer text-sm font-medium">Show raw package data</summary>
             <div className="mt-3">
               <JsonBlock value={developerJson ?? { status: "No procurement package selected." }} />
             </div>
@@ -2781,7 +2816,7 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
               <SelectContent>
                 {AUDIT_EXPORT_SCOPE_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option}
+                    {optionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2842,7 +2877,7 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
             <p className="text-xs font-medium text-muted-foreground">Export status</p>
             <div className="mt-1">
               <Badge variant="outline" className={`font-normal ${statusBadgeClass(selectedExportStatus)}`}>
-                {selectedExportStatus}
+                {optionLabel(selectedExportStatus)}
               </Badge>
             </div>
           </div>
@@ -2863,9 +2898,9 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
       </SectionCard>
 
       <DeveloperOnly>
-        <SectionCard title="Developer JSON">
+        <SectionCard title="Raw data (for troubleshooting)">
           <details className="rounded-md border bg-muted/20 p-3">
-            <summary className="cursor-pointer text-sm font-medium">Developer JSON</summary>
+            <summary className="cursor-pointer text-sm font-medium">Show raw export data</summary>
             <div className="mt-3">
               <JsonBlock value={selectedExport ?? { status: "No audit export selected." }} />
             </div>
@@ -2931,7 +2966,8 @@ export function TenantDetailWorkspace() {
           const payload = await apiFetch<unknown>(endpoint, { method: "GET" })
           return [key, { payload, error: "" }] as const
         } catch (error) {
-          return [key, { payload: null, error: formatErr(error, `Could not load ${key}.`) }] as const
+          const sectionLabel = SECTION_LABELS[key as SectionKey] ?? "this section"
+          return [key, { payload: null, error: formatErr(error, `Could not load ${sectionLabel}.`) }] as const
         }
       }),
     )
@@ -3054,7 +3090,7 @@ export function TenantDetailWorkspace() {
           <TabsTrigger value="procurement_packages">Procurement Packages</TabsTrigger>
           <TabsTrigger value="audit_export">Audit Export</TabsTrigger>
           <DeveloperOnly>
-            <TabsTrigger value="developer_json">Developer JSON</TabsTrigger>
+            <TabsTrigger value="developer_json">Raw data</TabsTrigger>
           </DeveloperOnly>
         </TabsList>
 
@@ -3084,8 +3120,8 @@ export function TenantDetailWorkspace() {
               fields={[
                 { label: "Display name", key: "display_name" },
                 { label: "Tenant key", key: "tenant_key" },
-                { label: "Tenant type", key: "tenant_type" },
-                { label: "Status", key: "status" },
+                { label: "Tenant type", key: "tenant_type", humanize: true },
+                { label: "Status", key: "status", humanize: true },
                 { label: "Primary contact", key: "primary_contact_email", keys: ["primary_contact_email", "primary_contact"] },
                 { label: "Updated date", key: "updated_at", keys: ["updated_at", "updated_date"] },
               ]}
@@ -3216,7 +3252,7 @@ export function TenantDetailWorkspace() {
 
         <DeveloperOnly>
           <TabsContent value="developer_json">
-            <SectionCard title="Developer JSON">
+            <SectionCard title="Raw data (for troubleshooting)">
               <JsonBlock value={developerBundle} />
             </SectionCard>
           </TabsContent>

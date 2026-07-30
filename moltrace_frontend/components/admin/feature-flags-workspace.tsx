@@ -502,7 +502,7 @@ export function FeatureFlagsWorkspace() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Select Load detail from a feature flag row.</p>
+            <p className="text-sm text-muted-foreground">Choose Load detail on one of the feature flags above.</p>
           )}
         </div>
       </ModuleCard>
