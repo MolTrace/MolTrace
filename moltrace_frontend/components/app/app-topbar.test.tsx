@@ -31,6 +31,8 @@ vi.mock("@/components/app/tenant-selector", () => ({
 
 vi.mock("@/lib/api/ai-evidence", () => ({
   fetchAiEvidenceQueue: vi.fn(async () => []),
+  loadSharedAiEvidenceQueue: vi.fn(async () => []),
+  AI_EVIDENCE_QUEUE_UPDATED_EVENT: "moltrace:ai-evidence-queue-updated",
 }))
 
 vi.mock("@/lib/api/client", async (importOriginal) => {

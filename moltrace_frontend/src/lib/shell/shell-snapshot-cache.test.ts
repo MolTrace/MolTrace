@@ -69,7 +69,7 @@ describe("shell snapshot cache", () => {
   it("clears everything when no prefix is given (tenant switch / auth reset)", () => {
     writeShellSnapshot(SHELL_SNAPSHOT_KEYS.tenantContext, "tenant")
     writeShellSnapshot(SHELL_SNAPSHOT_KEYS.overviewData, "overview")
-    writeShellSnapshot(SHELL_SNAPSHOT_KEYS.aiEvidenceCount, 3)
+    writeShellSnapshot(SHELL_SNAPSHOT_KEYS.aiEvidenceRows, [{ id: 3 }])
 
     invalidateShellSnapshots()
 

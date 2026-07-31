@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -13,11 +14,22 @@ vi.mock("@/components/app/app-sidebar", () => ({
 }))
 
 vi.mock("@/components/app/app-topbar", () => ({
-  AppTopbar: () => <header data-testid="app-topbar" />,
+  AppTopbar: ({ onToggleEvidenceQueue }: { onToggleEvidenceQueue: () => void }) => (
+    <header data-testid="app-topbar">
+      <button type="button" onClick={onToggleEvidenceQueue}>
+        Toggle AI Evidence Queue
+      </button>
+    </header>
+  ),
 }))
 
 vi.mock("@/components/app/ai-evidence-queue", () => ({
   AIEvidenceQueue: () => <aside data-testid="evidence-queue" />,
+}))
+
+vi.mock("@/src/components/app-shell/AIEvidenceQueueSheet", () => ({
+  AIEvidenceQueueSheet: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="evidence-queue-sheet" /> : null,
 }))
 
 vi.mock("@/components/app/overview-data-context", () => ({
@@ -60,9 +72,15 @@ function installViewport({
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: vi.fn((query: string) => {
-      const matches =
-        query.includes("max-width")
-          ? width < 768
+      // The shell asks for `(min-width: 1024px)` to decide whether there is room
+      // to dock the evidence panel, so the mock has to answer width queries in
+      // both directions rather than defaulting everything else to false.
+      const minWidth = /\(min-width:\s*(\d+)px\)/.exec(query)
+      const maxWidth = /\(max-width:\s*(\d+)px\)/.exec(query)
+      const matches = minWidth
+        ? width >= Number(minWidth[1])
+        : maxWidth
+          ? width <= Number(maxWidth[1])
           : query === "(pointer: coarse)"
             ? coarsePointer
             : query === "(hover: none)"
@@ -86,6 +104,9 @@ function installViewport({
 describe("ResponsiveAppShell shell mode", () => {
   beforeEach(() => {
     installViewport({ width: 1200, coarsePointer: false, noHover: false })
+    // The shell persists panel/sidebar choices, so one test's dismissal would
+    // otherwise carry into the next.
+    window.localStorage.clear()
   })
 
   it("keeps the desktop shell for a narrow desktop window", () => {
@@ -115,6 +136,60 @@ describe("ResponsiveAppShell shell mode", () => {
       expect(screen.getByLabelText("Mobile bottom navigation")).toBeInTheDocument()
     })
     expect(screen.queryByTestId("desktop-sidebar")).not.toBeInTheDocument()
+    // The 320px docked slab still has no place on a phone — but see the next
+    // test: the queue is now reachable there as a sheet. This assertion used to
+    // be the whole story, which is what made the mobile AI Queue button dead.
     expect(screen.queryByTestId("evidence-queue")).not.toBeInTheDocument()
+  })
+
+  it("opens the evidence queue as a sheet when a phone taps the topbar control", async () => {
+    installViewport({ width: 500, coarsePointer: true, noHover: true })
+    const user = userEvent.setup()
+
+    render(
+      <ResponsiveAppShell>
+        <div>Content</div>
+      </ResponsiveAppShell>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Mobile bottom navigation")).toBeInTheDocument()
+    })
+    // Closed until asked for: the shell remounts on every navigation, so a sheet
+    // that defaulted open would cover the page on each nav tap.
+    expect(screen.queryByTestId("evidence-queue-sheet")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: /Toggle AI Evidence Queue/i }))
+    expect(screen.getByTestId("evidence-queue-sheet")).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: /Toggle AI Evidence Queue/i }))
+    expect(screen.queryByTestId("evidence-queue-sheet")).not.toBeInTheDocument()
+  })
+
+  it("remembers a dismissed desktop panel across a remount", async () => {
+    installViewport({ width: 1200, coarsePointer: false, noHover: false })
+    const user = userEvent.setup()
+
+    const first = render(
+      <ResponsiveAppShell>
+        <div>Content</div>
+      </ResponsiveAppShell>,
+    )
+    expect(screen.getByTestId("evidence-queue")).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: /Toggle AI Evidence Queue/i }))
+    await waitFor(() => {
+      expect(screen.queryByTestId("evidence-queue")).not.toBeInTheDocument()
+    })
+    first.unmount()
+
+    render(
+      <ResponsiveAppShell>
+        <div>Content</div>
+      </ResponsiveAppShell>,
+    )
+    await waitFor(() => {
+      expect(screen.queryByTestId("evidence-queue")).not.toBeInTheDocument()
+    })
   })
 })

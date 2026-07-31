@@ -64,7 +64,9 @@ const SENSITIVE_KEY_PATTERN =
 const SENSITIVE_TEXT_PATTERN =
   /\b(system prompt|developer prompt|chain of thought|chain-of-thought|api key|bearer token|service credential|private key)\b/i
 
-function moduleLabel(module: EvidenceModule): string {
+/** The app's one readable name per module. Exported so callers that group or
+ *  filter by module label the same way this card does. */
+export function moduleLabel(module: EvidenceModule): string {
   switch (module) {
     case "spectracheck":
       return "SpectraCheck"
