@@ -182,6 +182,11 @@ class Settings:
     enable_2d_nmr: bool = True
     enable_2d_contour_preview: bool = True
     enable_raw_2d_fid_beta: bool = False
+    # Which products this deployment serves. Every paid deployment is dedicated to one customer,
+    # so this is the SKU boundary: a SpectraCheck-only install sets
+    # MOLTRACE_ENABLED_MODULES=spectracheck and the module gate refuses the rest. Defaults to all
+    # three, so an existing connected-platform deployment is unaffected by the gate landing.
+    enabled_modules: tuple[str, ...] = ("spectracheck", "regulatory_hub", "reaction_optimization")
     release_stage: str = "week21-release-candidate"
     release_version: str = "0.21.0"
 
@@ -358,6 +363,10 @@ def get_settings() -> Settings:
         enable_2d_nmr=_parse_bool(os.getenv("ENABLE_2D_NMR"), True),
         enable_2d_contour_preview=_parse_bool(os.getenv("ENABLE_2D_CONTOUR_PREVIEW"), True),
         enable_raw_2d_fid_beta=_parse_bool(os.getenv("ENABLE_RAW_2D_FID_BETA"), False),
+        enabled_modules=_parse_csv(
+            os.getenv("MOLTRACE_ENABLED_MODULES"),
+            ("spectracheck", "regulatory_hub", "reaction_optimization"),
+        ),
         release_stage=os.getenv("RELEASE_STAGE", "week21-release-candidate"),
         release_version=os.getenv("RELEASE_VERSION", "0.21.0"),
     )
@@ -365,6 +374,14 @@ def get_settings() -> Settings:
 
 def validate_startup_settings(settings: Settings) -> list[str]:
     issues: list[str] = []
+    # A typo here would serve a customer the wrong product, so it is a startup issue rather than
+    # something to discover from a 403 later.
+    try:
+        from .module_access import normalize_enabled_modules
+
+        normalize_enabled_modules(settings.enabled_modules)
+    except ValueError as exc:
+        issues.append(str(exc))
     if settings.app_env == "production" and not settings.api_key:
         issues.append("API_KEY is not set for production.")
     if settings.app_env == "production" and not settings.sso_encryption_key:

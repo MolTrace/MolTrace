@@ -73,6 +73,7 @@ from . import method_registry_store as method_store
 from . import mfa_store as mfa_store
 from . import mfa_webauthn as mfa_webauthn
 from . import ml_model_factory_store as ml_store
+from . import module_access as module_access
 from . import mobile_store as mobile_store
 from . import oidc_client as oidc_client
 from . import operations_store as ops_store
@@ -534,6 +535,7 @@ from .models import (
     ModelVersion,
     ModelVersionCreate,
     ModelVersionUpdate,
+    ModuleCapability,
     ModulePriorityMap,
     ModulePriorityMapPatch,
     MS1AdductInferenceRequest,
@@ -859,6 +861,7 @@ from .models import (
     StructureSummary,
     SubscriptionPlan,
     SubscriptionPlanCreate,
+    SystemCapabilities,
     SystemHealthResponse,
     ReleaseEvidenceIngestRequest,
     SystemReleaseApproveRequest,
@@ -2049,6 +2052,36 @@ async def _baseline_access_gate(request: Request) -> None:
     rate_limit.enforce(request, context)
 
 
+async def _module_licence_gate(request: Request) -> None:
+    """Router-level product gate: refuse routes belonging to a module this deployment does not serve.
+
+    Attached once at ``include_router`` time, exactly like :func:`_baseline_access_gate`, so a new
+    route inherits it rather than having to remember it. The classification lives in
+    ``module_access`` and is pinned by ``tests/test_module_access.py``, which fails if any route is
+    neither assigned to a product nor declared platform.
+
+    An *unclassified* path is served. That is a deliberate asymmetry: the test is what enforces
+    exhaustiveness, and a forgotten map entry should be a red build, never a production outage on a
+    core route. The denial carries a machine-readable code in both the body and the
+    ``X-MolTrace-Module`` header so a client can distinguish "not in this plan" from "not allowed".
+    """
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    if not path:
+        return
+    module = module_access.module_for_route(path)
+    if module is None:
+        return
+    enabled = getattr(request.app.state, "enabled_modules", module_access.ALL_MODULES)
+    if module in enabled:
+        return
+    raise HTTPException(
+        status_code=403,
+        detail=module_access.MODULE_NOT_LICENSED_DETAIL,
+        headers={module_access.MODULE_HEADER: module},
+    )
+
+
 async def _abuse_rate_limit_gate(request: Request) -> None:
     """Rate-limit-only gate (Prompt 16) for routers that do NOT run ``_baseline_access_gate`` — the
     SCIM router (its own token scheme) and the nmr2d router (per-route auth). Resolves the principal
@@ -2658,6 +2691,13 @@ def _sanitize_public_error_detail(value: Any) -> Any:
     return _redact_public_error_text(str(value))
 
 
+#: 403 details that survive sanitization because a client must branch on them. Keep this tiny and
+#: keep every member a fixed machine code — never an explanation of *why* a permission failed.
+PUBLIC_MACHINE_READABLE_403_DETAILS: frozenset[str] = frozenset(
+    {module_access.MODULE_NOT_LICENSED_DETAIL}
+)
+
+
 def _safe_http_exception_detail(status_code: int, detail: Any) -> Any:
     if status_code == status.HTTP_401_UNAUTHORIZED:
         return PUBLIC_AUTH_REQUIRED_DETAIL
@@ -2668,6 +2708,12 @@ def _safe_http_exception_detail(status_code: int, detail: Any) -> Any:
         # to enable, so that detail is preserved (still sanitized for safety).
         if isinstance(detail, str) and "feature flag" in detail.lower():
             return _sanitize_public_error_detail(detail)
+        # Machine-readable codes a client must be able to act on. "This plan does not include
+        # that product" is a different situation from "you may not do that", and the caller needs
+        # to tell them apart to show the right thing. The code names no user, resource or reason
+        # for a permission failure, so preserving it leaks nothing.
+        if isinstance(detail, str) and detail in PUBLIC_MACHINE_READABLE_403_DETAILS:
+            return detail
         return PUBLIC_ACCESS_DENIED_DETAIL
     return _sanitize_public_error_detail(detail)
 
@@ -2968,6 +3014,33 @@ def system_version_route(request: Request) -> dict[str, Any]:
         "timestamp": datetime.now(UTC).isoformat(),
         "notes": ["Version metadata does not indicate scientific validation status."],
     }
+
+
+@router.get(
+    "/system/capabilities",
+    response_model=SystemCapabilities,
+    dependencies=[Depends(require_access_context)],
+)
+def system_capabilities_route(request: Request) -> SystemCapabilities:
+    """Which products this workspace includes.
+
+    The client reads this once to decide what to show, so an unavailable product never appears as
+    a broken link or an empty screen. The server remains the authority — this is what the
+    interface renders from, not what access is decided by.
+    """
+    enabled = tuple(
+        getattr(request.app.state, "enabled_modules", module_access.ALL_MODULES)
+    )
+    return SystemCapabilities(
+        modules=[
+            ModuleCapability(
+                module=key,
+                display_name=module_access.MODULE_DISPLAY_NAMES[key],
+                included=key in enabled,
+            )
+            for key in module_access.ALL_MODULES
+        ]
+    )
 
 
 @router.get("/.well-known/security.txt", include_in_schema=False)
@@ -30032,16 +30105,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # authenticated-or-public gate, so a new endpoint fails closed unless explicitly listed in
     # PUBLIC_ROUTE_PATHS. scim_router (SCIM-token auth) and nmr2d_router (per-route auth) keep
     # their own schemes.
-    app.include_router(router, dependencies=[Depends(_baseline_access_gate)])
+    # The module gate rides alongside the baseline for the same reason: attached once here, a new
+    # route inherits the product classification instead of having to remember it.
+    app.include_router(
+        router,
+        dependencies=[Depends(_baseline_access_gate), Depends(_module_licence_gate)],
+    )
     # scim_router / nmr2d_router keep their own auth schemes but still need abuse throttling
     # (Prompt 16) — they don't run _baseline_access_gate, so attach the rate-limit-only gate.
+    # SCIM is deliberately exempt from the module gate: it is provisioning infrastructure
+    # authenticated by its own token, not a product surface.
     app.include_router(scim_router, dependencies=[Depends(_abuse_rate_limit_gate)])
     from .nmr2d_routes import router as nmr2d_router
 
-    app.include_router(nmr2d_router, dependencies=[Depends(_abuse_rate_limit_gate)])
+    # 2D NMR is unambiguously SpectraCheck, so it carries the module gate even though it keeps
+    # its own auth scheme.
+    app.include_router(
+        nmr2d_router,
+        dependencies=[Depends(_abuse_rate_limit_gate), Depends(_module_licence_gate)],
+    )
     app.state.session_factory = session_factory
     app.state.settings = settings
     app.state.api_key = settings.api_key
+    try:
+        app.state.enabled_modules = module_access.normalize_enabled_modules(
+            settings.enabled_modules
+        )
+    except ValueError:
+        # validate_startup_settings already recorded this as a startup issue; serve the full
+        # platform rather than nothing, so a misconfigured value is loud but not an outage.
+        app.state.enabled_modules = module_access.ALL_MODULES
     app.state.startup_issues = startup_issues
     app.state.started_at = datetime.now(UTC)
     return app
