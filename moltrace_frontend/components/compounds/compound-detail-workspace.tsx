@@ -310,7 +310,8 @@ export function CompoundDetailWorkspace() {
     try {
       await apiFetch(`${base}/relationships`, {
         method: "POST",
-        body: { related_compound_id: n, relationship_type: rt },
+        // CompoundRelationshipCreate (extra="forbid") field is target_compound_id.
+        body: { target_compound_id: n, relationship_type: rt },
       })
       setRelTargetId("")
       setRelType("")
