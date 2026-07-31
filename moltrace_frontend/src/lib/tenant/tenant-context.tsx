@@ -68,6 +68,10 @@ type TenantContextValue = {
   entitlements: TenantEntitlementRecord[]
   featureFlags: TenantFeatureFlagRecord[]
   moduleAccess: TenantModuleAccess[]
+  /** True when this organization actually has entitlement records. When false,
+   *  every module reads as permitted simply because nothing is configured — so
+   *  surfaces must not present that as a granted licence. */
+  licensingConfigured: boolean
   isAdmin: boolean
   loading: boolean
   error: string
@@ -110,6 +114,7 @@ const LOCAL_TENANT_CONTEXT: TenantContextValue = {
   entitlements: [],
   featureFlags: [],
   moduleAccess: LOCAL_MODULE_ACCESS,
+  licensingConfigured: false,
   isAdmin: false,
   loading: false,
   error: "",
@@ -427,6 +432,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       entitlements,
       featureFlags,
       moduleAccess,
+      licensingConfigured: entitlements.length > 0,
       isAdmin,
       loading,
       error,
