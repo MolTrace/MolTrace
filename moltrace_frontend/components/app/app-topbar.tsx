@@ -30,7 +30,12 @@ import { useOptionalOverviewData } from "@/components/app/overview-data-context"
 import { useDeveloperMode } from "@/components/developer-mode-provider"
 import { apiFetch } from "@/lib/api/client"
 import { clearAuthSession } from "@/lib/auth/session"
-import { fetchAiEvidenceQueue } from "@/lib/api/ai-evidence"
+import {
+  AI_EVIDENCE_QUEUE_UPDATED_EVENT,
+  fetchAiEvidenceQueue,
+  loadSharedAiEvidenceQueue,
+  type AIEvidenceItem,
+} from "@/lib/api/ai-evidence"
 import { humanizeField } from "@/lib/ui/status"
 import {
   invalidateShellSnapshots,
@@ -64,6 +69,9 @@ import {
 
 interface AppTopbarProps {
   onToggleEvidenceQueue: () => void
+  /** Whether the evidence queue surface is currently showing, so the trigger can
+   *  report its state instead of looking like a plain action button. */
+  evidenceQueueOpen?: boolean
 }
 
 // ── Tiny helpers for parsing arbitrary backend rows ──────────────────────────
@@ -118,7 +126,7 @@ type NotificationItem = {
   accent: string
 }
 
-export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
+export function AppTopbar({ onToggleEvidenceQueue, evidenceQueueOpen = false }: AppTopbarProps) {
   const [commandOpen, setCommandOpen] = useState(false)
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -127,22 +135,22 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
   const tenantContext = useTenant()
   const tenantDisplayName = tenantContext.tenantDisplayName
 
-  // ── Real AI Queue badge count: prefer fetched count, fall back to overview ──
+  // ── Real AI Queue badge count: prefer the queue itself, fall back to overview ──
   // Seeded from the cross-navigation snapshot: the topbar remounts on every
   // route change (each page renders its own <AppShell>), and re-fetching the
-  // queue just to redraw a badge made every nav tap wait on a request.
+  // queue just to redraw a badge made every nav tap wait on a request. The
+  // snapshot holds the ROWS and the evidence panel reads the same entry, so the
+  // badge here can never disagree with the list the panel shows.
   const [aiQueueCount, setAiQueueCount] = useState<number | null>(
-    () => readShellSnapshot<number>(SHELL_SNAPSHOT_KEYS.aiEvidenceCount) ?? null,
+    () => readShellSnapshot<AIEvidenceItem[]>(SHELL_SNAPSHOT_KEYS.aiEvidenceRows)?.length ?? null,
   )
   useEffect(() => {
-    if (isShellSnapshotFresh(SHELL_SNAPSHOT_KEYS.aiEvidenceCount, SHELL_SNAPSHOT_MAX_AGE_MS)) return
+    if (isShellSnapshotFresh(SHELL_SNAPSHOT_KEYS.aiEvidenceRows, SHELL_SNAPSHOT_MAX_AGE_MS)) return
 
     let cancelled = false
-    void loadShellSnapshot(SHELL_SNAPSHOT_KEYS.aiEvidenceCount, () =>
-      fetchAiEvidenceQueue(100).then((rows) => rows.length),
-    )
-      .then((count) => {
-        if (!cancelled) setAiQueueCount(count)
+    void loadSharedAiEvidenceQueue(loadShellSnapshot, SHELL_SNAPSHOT_KEYS.aiEvidenceRows)
+      .then((rows) => {
+        if (!cancelled) setAiQueueCount(rows.length)
       })
       .catch(() => {
         // Leave as null so the fallback (overview metrics) is used
@@ -150,6 +158,16 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
     return () => {
       cancelled = true
     }
+  }, [])
+  // The panel can refresh the queue on demand; without this the badge would keep
+  // showing the count it mounted with while the list beside it showed another.
+  useEffect(() => {
+    function onQueueUpdated(event: Event) {
+      const next = (event as CustomEvent<unknown>).detail
+      if (typeof next === "number" && Number.isFinite(next)) setAiQueueCount(next)
+    }
+    window.addEventListener(AI_EVIDENCE_QUEUE_UPDATED_EVENT, onQueueUpdated)
+    return () => window.removeEventListener(AI_EVIDENCE_QUEUE_UPDATED_EVENT, onQueueUpdated)
   }, [])
   const overviewQueueCount = overview?.metrics?.evidenceQueue
   const badgeCount =
@@ -346,10 +364,26 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Toggle AI Evidence Queue"
+              className="relative"
+              // The count rides in the label rather than as visible text: the
+              // icon button is too small for a legible number, but a reader on a
+              // screen reader still needs to know how many items are waiting.
+              aria-label={
+                badgeCount > 0
+                  ? `Toggle AI Evidence Queue, ${badgeCount} ${badgeCount === 1 ? "item" : "items"} waiting`
+                  : "Toggle AI Evidence Queue"
+              }
+              aria-expanded={evidenceQueueOpen}
               onClick={onToggleEvidenceQueue}
             >
               <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
+              {badgeCount > 0 ? (
+                <span
+                  className="absolute right-1 top-1 h-2 w-2 rounded-full ring-2 ring-background"
+                  style={{ backgroundColor: "var(--mt-teal)" }}
+                  aria-hidden
+                />
+              ) : null}
             </Button>
           ) : (
             <Button
@@ -358,6 +392,7 @@ export function AppTopbar({ onToggleEvidenceQueue }: AppTopbarProps) {
               className="gap-2 font-mono text-xs font-semibold uppercase tracking-[0.06em]"
               onClick={onToggleEvidenceQueue}
               aria-label="Toggle AI Evidence Queue"
+              aria-expanded={evidenceQueueOpen}
             >
               <Sparkles className="h-4 w-4" style={{ color: "var(--mt-teal)" }} aria-hidden />
               <span>AI Queue</span>

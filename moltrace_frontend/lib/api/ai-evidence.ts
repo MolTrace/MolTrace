@@ -54,6 +54,56 @@ export async function fetchAiEvidenceQueue(limit = 100): Promise<AIEvidenceItem[
   return asAiEvidenceItems(payload)
 }
 
+export const AI_EVIDENCE_MODULES: AIEvidenceModule[] = [
+  "spectracheck",
+  "regulatory",
+  "reactions",
+  "ai_services",
+]
+
+/** Where a module's own workspace lives, for linking out of the queue. */
+export const AI_EVIDENCE_MODULE_HREFS: Record<AIEvidenceModule, string> = {
+  spectracheck: "/spectracheck",
+  regulatory: "/regulatory",
+  reactions: "/reactions",
+  ai_services: "/ai",
+}
+
+/**
+ * The shared queue read.
+ *
+ * The topbar badge and the evidence panel both mount inside the app shell and
+ * both used to fetch the queue on their own — two requests per navigation whose
+ * answers could disagree, so the badge could read 3 while the panel listed 5.
+ * Routing both through one snapshot key makes the number single-sourced and
+ * costs one request per shell lifetime rather than one per component.
+ */
+export function loadSharedAiEvidenceQueue(
+  loadSnapshot: <T>(key: string, loader: () => Promise<T>) => Promise<T>,
+  key: string,
+  limit = 100,
+): Promise<AIEvidenceItem[]> {
+  return loadSnapshot(key, () => fetchAiEvidenceQueue(limit))
+}
+
+/**
+ * Announces a fresh queue read to anything already on screen.
+ *
+ * Writing the shared snapshot is not enough on its own: the topbar reads it once
+ * when it mounts, so a manual refresh in the panel would leave the badge showing
+ * the count from before the refresh until the next navigation remounted it.
+ */
+export const AI_EVIDENCE_QUEUE_UPDATED_EVENT = "moltrace:ai-evidence-queue-updated"
+
+export function publishAiEvidenceQueue(rows: AIEvidenceItem[]): void {
+  if (typeof window === "undefined") return
+  try {
+    window.dispatchEvent(new CustomEvent(AI_EVIDENCE_QUEUE_UPDATED_EVENT, { detail: rows.length }))
+  } catch {
+    /* CustomEvent unsupported — the badge catches up on the next navigation */
+  }
+}
+
 export async function reviewAiEvidenceItem(
   evidence_id: number | string,
   body: AIEvidenceReviewRequest,

@@ -102,7 +102,9 @@ export function invalidateShellSnapshots(keyPrefix?: string): void {
 export const SHELL_SNAPSHOT_KEYS = {
   tenantContext: "shell:tenant-context",
   overviewData: "shell:overview-data",
-  aiEvidenceCount: "shell:ai-evidence-count",
+  /** The queue ROWS, not a count: the topbar badge and the evidence panel both
+   *  read this one entry so they can never disagree about how many items exist. */
+  aiEvidenceRows: "shell:ai-evidence-rows",
   topbarNotifications: "shell:topbar-notifications",
 } as const
 
