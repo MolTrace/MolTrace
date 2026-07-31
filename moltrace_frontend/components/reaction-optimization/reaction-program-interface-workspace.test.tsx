@@ -31,7 +31,7 @@ describe("ReactionProgramInterfaceWorkspace — mobile tab layout", () => {
   it("renders both tab triggers with their full labels", () => {
     render(<ReactionProgramInterfaceWorkspace />)
     expect(
-      screen.getByRole("tab", { name: "Reaction Optimization" }),
+      screen.getByRole("tab", { name: "Optimization" }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole("tab", { name: "Reaction Studio (program-level)" }),

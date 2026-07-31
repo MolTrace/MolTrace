@@ -40,7 +40,7 @@ type Row = Record<string, unknown>
 const PROGRAM_ORDER = [
   { label: "SpectraCheck", values: ["spectracheck"] },
   { label: "Regentry", values: ["regulatory_hub"] },
-  { label: "Reaction Optimization", values: ["reaction_optimization"] },
+  { label: "Repho", values: ["reaction_optimization"] },
   { label: "Validation Center", values: ["validation_center"] },
   { label: "Connectors", values: ["connectors"] },
   { label: "ML / AI", values: ["ml_ai"] },

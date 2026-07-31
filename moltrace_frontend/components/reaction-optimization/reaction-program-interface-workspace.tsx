@@ -17,7 +17,7 @@ export function ReactionProgramInterfaceWorkspace() {
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
           style={{ color: "var(--mt-violet-ink)" }}
         >
-          MolTrace · Reaction Optimization
+          MolTrace · Repho
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Reaction program workspace</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
@@ -47,7 +47,7 @@ export function ReactionProgramInterfaceWorkspace() {
             value="reaction-overview"
             className="shrink-0 font-mono data-[state=active]:[background-color:var(--mt-violet)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
           >
-            Reaction Optimization
+            Optimization
           </TabsTrigger>
           <TabsTrigger
             value="reaction-studio"

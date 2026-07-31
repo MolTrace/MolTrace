@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 type JsonRecord = Record<string, unknown>
 
 type ModuleSummary = {
-  title: "SpectraCheck" | "Regentry" | "Reaction Optimization"
+  title: "SpectraCheck" | "Regentry" | "Repho"
   status: string
   openActionCount: number | null
   warnings: string[]
@@ -127,7 +127,7 @@ function buildModuleSummaries(root: JsonRecord): ModuleSummary[] {
       buttonLabel: "Open Regentry",
     },
     {
-      title: "Reaction Optimization",
+      title: "Repho",
       status: readFirstString(reactionSummary, ["status", "optimization_status", "overall_status"]) || "Unknown",
       openActionCount:
         readFirstNumber(reactionSummary, [
@@ -144,7 +144,7 @@ function buildModuleSummaries(root: JsonRecord): ModuleSummary[] {
         readFirstString(reactionSummary, ["next_recommended_action", "next_action", "recommended_next_action"]) ||
         globalNext,
       href: "/reactions",
-      buttonLabel: "Open Reaction Optimization",
+      buttonLabel: "Open Repho",
     },
   ]
 }

@@ -14,7 +14,7 @@ const navItems = [
   { href: "/platform", label: "Home", icon: Home },
   { href: "/spectracheck", label: "SpectraCheck", icon: SpectraCheckLogoIcon },
   { href: "/regulatory", label: "Regentry", icon: ShieldCheck },
-  { href: "/reactions", label: "Reaction Optimization", icon: FlaskConical },
+  { href: "/reactions", label: "Repho", icon: FlaskConical },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/roi", label: "Automation ROI", icon: BarChart3 },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

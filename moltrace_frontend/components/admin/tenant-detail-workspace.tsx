@@ -91,11 +91,11 @@ const SECTION_LABELS: Record<SectionKey, string> = {
   procurementPackages: "procurement packages",
 }
 
-const PROGRAM_ORDER = ["SpectraCheck", "Regentry", "Reaction Optimization"] as const
+const PROGRAM_ORDER = ["SpectraCheck", "Regentry", "Repho"] as const
 const ENTITLEMENT_PROGRAM_ORDER = [
   { label: "SpectraCheck", values: ["spectracheck"] },
   { label: "Regentry", values: ["regulatory_hub"] },
-  { label: "Reaction Optimization", values: ["reaction_optimization"] },
+  { label: "Repho", values: ["reaction_optimization"] },
   { label: "Validation Center", values: ["validation_center"] },
   { label: "Connectors", values: ["connectors"] },
   { label: "ML / AI", values: ["ml_ai"] },
@@ -162,11 +162,19 @@ const IMPLEMENTATION_TASK_PROGRAM_OPTIONS = [
   "cross_module",
   "system",
 ] as const
+// Onboarding task titles exactly as the server names them — matched with `===`
+// at the sort site below, so these are wire values, not labels. The module is
+// called Repho everywhere a reader sees it, so rename it for DISPLAY only;
+// renaming the constant would drop every task to the end of the order.
 const DEFAULT_TASK_DISPLAY_ORDER = [
   "SpectraCheck setup",
   "Regentry setup",
   "Reaction Optimization setup",
 ] as const
+
+function taskDisplayLabel(title: string): string {
+  return title.replace(/\bReaction Optimization\b/, "Repho")
+}
 const DATA_BOUNDARY_ISOLATION_OPTIONS = [
   "shared_database_tenant_scoped",
   "dedicated_schema",
@@ -227,7 +235,7 @@ function isRecord(value: unknown): value is Row {
  */
 const OPTION_LABEL_OVERRIDES: Record<string, string> = {
   regulatory_hub: "Regentry",
-  reaction_optimization: "Reaction Optimization",
+  reaction_optimization: "Repho",
   validation_center: "Validation Center",
   ml_ai: "ML / AI",
   ai_ml: "AI / ML",
@@ -1376,7 +1384,7 @@ function OnboardingPanel({
         <div className="space-y-2 text-sm">
           {DEFAULT_TASK_DISPLAY_ORDER.map((item, index) => (
             <div key={item} className="rounded-md border bg-muted/20 px-3 py-2">
-              {index + 1}. {item}
+              {index + 1}. {taskDisplayLabel(item)}
             </div>
           ))}
         </div>
@@ -2277,7 +2285,7 @@ function UsageRoiPanel({
         />
         <UsageProgramCard
           order={3}
-          title="Reaction Optimization usage"
+          title="Repho usage"
           usage={reactionUsage}
           metrics={[
             {

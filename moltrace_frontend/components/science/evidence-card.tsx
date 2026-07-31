@@ -73,7 +73,7 @@ export function moduleLabel(module: EvidenceModule): string {
     case "regulatory":
       return "Regentry"
     case "reactions":
-      return "Reaction Optimization"
+      return "Repho"
     case "ai_services":
       return "AI Services"
     default:

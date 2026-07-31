@@ -339,7 +339,7 @@ export function ValidationReadinessDashboardCards() {
   const moduleBadges = [
     ["SpectraCheck", moduleProjects(snapshot.projects, "spectracheck")],
     ["Regentry", moduleProjects(snapshot.projects, "regulatory_hub")],
-    ["Reaction Optimization", moduleProjects(snapshot.projects, "reaction_optimization")],
+    ["Repho", moduleProjects(snapshot.projects, "reaction_optimization")],
   ] as const
 
   return (
@@ -506,7 +506,7 @@ export function ReactionValidationReadinessCard() {
           <StatusBadgeLine
             label="Validated optimization workflow status"
             badge={workflowCoverage}
-            detail={`${reactionProjects.length} Reaction Optimization validation project record(s).`}
+            detail={`${reactionProjects.length} Repho validation project record(s).`}
           />
           <Metric
             label="Deviation links"

@@ -141,7 +141,7 @@ describe("AIEvidenceQueuePanel", () => {
     })
     await user.click(screen.getByRole("button", { name: /Reactions\s*0/i }))
 
-    expect(screen.getByText("No evidence from Reaction Optimization right now.")).toBeInTheDocument()
+    expect(screen.getByText("No evidence from Repho right now.")).toBeInTheDocument()
   })
 
   it("surfaces a plain-language notice when the queue cannot be read", async () => {

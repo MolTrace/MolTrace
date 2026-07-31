@@ -68,7 +68,7 @@ describe("Reaction Program Interface Workspace (wrapper tabs)", () => {
       "@/components/reaction-optimization/reaction-program-interface-workspace"
     )
     renderC(<ReactionProgramInterfaceWorkspace />)
-    expect(screen.getByRole("tab", { name: /Reaction Optimization/i })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: /^Optimization$/ })).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: /Reaction Studio/i })).toBeInTheDocument()
   })
 
@@ -77,7 +77,7 @@ describe("Reaction Program Interface Workspace (wrapper tabs)", () => {
       "@/components/reaction-optimization/reaction-program-interface-workspace"
     )
     renderC(<ReactionProgramInterfaceWorkspace />)
-    expect(screen.getByRole("tab", { name: /Reaction Optimization/i })).toHaveClass(
+    expect(screen.getByRole("tab", { name: /^Optimization$/ })).toHaveClass(
       "data-[state=active]:[color:#04080F]",
     )
     expect(screen.getByRole("tab", { name: /Reaction Studio/i })).toHaveClass(

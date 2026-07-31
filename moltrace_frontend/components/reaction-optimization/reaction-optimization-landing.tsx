@@ -239,9 +239,9 @@ export function ReactionOptimizationLanding() {
             className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
             style={{ color: "var(--mt-violet-ink)" }}
           >
-            MolTrace · Reaction Optimization
+            MolTrace · Repho
           </p>
-          <h1 className="font-mono text-2xl font-bold tracking-tight">Reaction Optimization</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight">Repho</h1>
           <p className="text-sm text-muted-foreground">
             Review next-best-experiment recommendations, constraints, and optimization history.
           </p>

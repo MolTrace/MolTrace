@@ -1491,7 +1491,7 @@ export function DashboardV0() {
               <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.openRegulatoryBlockers)}</p>
             </div>
             <div className="rounded-md border bg-muted/20 p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">3. Reaction Optimization summary</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">3. Repho summary</p>
               <p className="mt-2 text-xs text-muted-foreground">reaction constraints created</p>
               <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.reactionConstraintsCreated)}</p>
               <p className="mt-2 text-xs text-muted-foreground">recommendations affected by compliance</p>

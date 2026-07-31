@@ -170,8 +170,8 @@ export function ReactionOptimizationHandoffCard({
     <Card className="border-muted">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-base">Reaction Optimization Handoff</CardTitle>
-          <InfoTooltip label="Reaction Optimization handoff" content={TOOLTIP} />
+          <CardTitle className="text-base">Repho handoff</CardTitle>
+          <InfoTooltip label="Repho handoff" content={TOOLTIP} />
         </div>
         <CardDescription>
           Handoff from dossier action items into compliance-driven optimization constraints. Requires qualified human
@@ -233,7 +233,7 @@ export function ReactionOptimizationHandoffCard({
             {sending ? "Creating…" : "Create reaction constraints"}
           </Button>
           <Button type="button" variant="outline" asChild>
-            <Link href={openReactionHref}>Open Reaction Optimization</Link>
+            <Link href={openReactionHref}>Open Repho</Link>
           </Button>
         </div>
 

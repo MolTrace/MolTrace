@@ -8,7 +8,7 @@ import { ReactionProgramInterfaceWorkspace } from "@/components/reaction-optimiz
 export default function ReactionsPage() {
   return (
     <AppShell>
-      <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading Reaction Optimization…</div>}>
+      <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading Repho…</div>}>
         <ReactionProgramInterfaceWorkspace />
       </Suspense>
     </AppShell>

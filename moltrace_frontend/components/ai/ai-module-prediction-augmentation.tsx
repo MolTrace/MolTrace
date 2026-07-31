@@ -51,7 +51,7 @@ const MODULE_VAR: Record<ModuleKey, string> = {
 
 const MODULE_LABEL: Record<ModuleKey, string> = {
   spectracheck: "SpectraCheck",
-  reaction_optimization: "Reaction Optimization",
+  reaction_optimization: "Repho",
   regulatory: "Regulatory",
   knowledge_extraction: "Knowledge Extraction",
 }

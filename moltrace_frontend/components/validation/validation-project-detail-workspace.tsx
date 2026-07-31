@@ -1067,7 +1067,7 @@ export function ValidationProjectDetailWorkspace() {
             >
               <div className="space-y-2 text-sm">
                 <div className="rounded-md border bg-muted/20 px-3 py-2">
-                  SpectraCheck {" -> "} Regentry {" -> "} Reaction Optimization
+                  SpectraCheck {" -> "} Regentry {" -> "} Repho
                 </div>
               </div>
             </ModuleCard>
