@@ -137,7 +137,7 @@ const VARIABLES_TOOLTIP =
   "Reaction variables define the condition space for experiment planning and recommendation."
 
 const OBJECTIVE_PROFILE_TOOLTIP =
-  "What the optimizer should improve — one metric, or a weighted multi-objective score."
+  "What the optimizer should improve — one metric (yield, selectivity, purity) or a weighted composite, together with the per-target weights and thresholds the optimization engine applies."
 
 const DESIGN_SPACE_TOOLTIP =
   "Defines the reaction conditions the optimizer is allowed to explore."
@@ -193,7 +193,7 @@ const LITERATURE_PRIORS_TOOLTIP =
   "Literature, internal history, or your own mechanistic context that can inform optimization."
 
 const BO_ADVISOR_COMPARISON_TOOLTIP =
-  "Where mathematical optimization and chemical reasoning agree or disagree. Final experiment scheduling still requires human review."
+  "Where mathematical optimization and chemical reasoning agree or disagree: each candidate is lined up against the advisor's concern signals so agreement and disagreement are visible per candidate."
 
 const ADVISOR_REVIEW_DECISIONS = [
   "accept_for_review",
@@ -211,8 +211,10 @@ const ADVISOR_TAB_TOOLTIP =
 const EXECUTION_TAB_TOOLTIP =
   "Connects approved recommendations to planned experiments, analytical results, outcomes, and the next cycle. Human confirmation is required."
 
+// Mechanism only — the matching caveat ("Recording a planned experiment is not
+// confirmation that laboratory work occurred") is visible in the card description.
 const APPROVED_RECOMMENDATIONS_CONVERT_TOOLTIP =
-  "Approved recommendations can be converted into planned experiments. This does not mean the experiment has been performed."
+  "Converting an approved recommendation writes a planned experiment. The conversion asks for a rationale and lets you assign the new experiment to an execution batch."
 
 const EXECUTION_BOARD_TOOLTIP =
   "Execution status is manually updated by the user. MolTrace does not assume an experiment was performed until it is marked completed."
@@ -232,6 +234,62 @@ const OUTCOME_EXTRACTION_METHOD_OPTIONS = [
 
 const OPTIMIZATION_CYCLE_TIMELINE_TOOLTIP =
   "How each batch of experiments updates the model and informs the next round."
+
+/*
+ * Mechanism tooltips.
+ *
+ * These carry the *how* — surrogate details, acquisition functions, decision
+ * thresholds, data scoping — out of the card descriptions so a scanning reader
+ * is not taxed by them. Caveats deliberately did NOT move here: "advisory",
+ * "decision-support only", "deploys nothing", "requires human review" and the
+ * like stay in the visible description, because a hedge behind a hover is a
+ * weaker hedge.
+ */
+
+const WARM_START_TOOLTIP =
+  "Fits a prior from the accumulated outcomes of the campaigns you select and uses it to seed the model for a new campaign. The default source is this campaign alone; adding related campaigns you own makes it transfer learning."
+
+const AB_PROMOTION_TOOLTIP =
+  "Held-out metrics and safety-flag recall are compared side by side. The verdict reads promotable only when the challenger shows no safety regression and dominates the champion on the metrics you enter."
+
+const EXECUTION_BATCH_PLANNER_TOOLTIP =
+  "Create a batch, assign planned experiments to it as items, and move each item through its status as lab work progresses. Item status is recorded progress you enter by hand."
+
+const CYCLE_READY_TOOLTIP =
+  "Bayesian optimization and advisor runs read the objective, cost, and safety profiles saved on this project, so confirmed outcomes are picked up the next time you start a run."
+
+const ADVISOR_HUMAN_REVIEW_TOOLTIP =
+  "Approve, flag for revision, or reject a specific advisor run. The decision, the reviewer, and the comment are recorded against that run."
+
+const OUTCOME_EXTRACTION_TOOLTIP =
+  "Yield, conversion, and related outcome fields live on the experiment record — the Experiments tab is where they are read back."
+
+const LATEST_BO_BATCH_TOOLTIP =
+  "Each candidate carries the model's predicted score, its uncertainty, and the expected improvement the acquisition function used to rank it."
+
+const EVIDENCE_SUMMARY_TOOLTIP =
+  "One row per experiment with a linked SpectraCheck session: confidence status, QC outcome, and how many evidence records the session holds. Open SpectraCheck for the full spectral evidence."
+
+const EVIDENCE_LINKS_TOOLTIP =
+  "One row per experiment linked to a SpectraCheck session, with the session metadata, record counts, and QC status. Use Open for the full spectral evidence."
+
+const EXPERIMENT_MATRIX_TOOLTIP =
+  "One row per unique condition set, with its outcome metrics and the SpectraCheck session linked to it for analytical evidence."
+
+const ADD_VARIABLE_TOOLTIP =
+  "A variable's type, unit, and allowed-value constraints apply to every experiment in this project, so the design space and every recommendation stay inside them."
+
+const RECOMMENDATIONS_LIST_TOOLTIP =
+  "Candidates are ranked by the improvement the model predicts. Approving or rejecting one records your reviewer name and comment against it."
+
+const LATEST_BO_RUN_TOOLTIP =
+  "Reports the acquisition function and surrogate model used, how many experiments went in, and any diagnostics or warnings the run emitted."
+
+const ADVISOR_RUN_TOOLTIP =
+  "The advisor reads the current Bayesian optimization suggestions alongside your mechanistic hypotheses and literature priors, then flags which next experiments it would prioritise."
+
+const EXECUTION_STATUS_TABLE_TOOLTIP =
+  "One row per planned run, showing its recorded yield, its analytical link, and the SpectraCheck session attached to it."
 
 const REACTION_OPTIMIZATION_CYCLE_STATUS_OPTIONS = [
   "draft",
@@ -5165,8 +5223,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Reaction · Add Variable"
-            title="add variable"
-            description="Define a new reaction variable with its type, unit, and allowed-value constraints for use across all experiments in this project."
+            title={
+              <span className="inline-flex items-center gap-2">
+                add variable
+                <InfoTooltip content={ADD_VARIABLE_TOOLTIP} label="Where a variable applies" />
+              </span>
+            }
+            description="Define a new reaction variable for this project."
           >
               <form className="grid gap-4 md:grid-cols-2" onSubmit={(e) => void submitVariable(e)}>
                 <div className="space-y-2 md:col-span-2">
@@ -5250,8 +5313,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Reaction · Experiment Matrix"
-            title="experiment matrix"
-            description="Reaction experiment matrix — each row records a unique condition set, outcome metrics, and the SpectraCheck session linked for analytical evidence."
+            title={
+              <span className="inline-flex items-center gap-2">
+                experiment matrix
+                <InfoTooltip content={EXPERIMENT_MATRIX_TOOLTIP} label="What each row records" />
+              </span>
+            }
+            description="Every experiment run in this project, one row each."
           >
             <div className="table-scroll">
               <Table>
@@ -5373,8 +5441,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Reaction · Evidence Summary"
-            title="SpectraCheck evidence summary"
-            description="Analytical evidence summary for experiments with linked SpectraCheck sessions — confidence status, QC outcome, and evidence record count. Open SpectraCheck for full spectral evidence."
+            title={
+              <span className="inline-flex items-center gap-2">
+                SpectraCheck evidence summary
+                <InfoTooltip content={EVIDENCE_SUMMARY_TOOLTIP} label="What this summary shows" />
+              </span>
+            }
+            description="Analytical evidence for experiments with a linked SpectraCheck session."
           >
             <div className="table-scroll">
               <Table>
@@ -5672,7 +5745,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={OBJECTIVE_PROFILE_TOOLTIP} label="About objective profile" />
               </span>
             }
-            description="Define the optimization objective — yield, selectivity, purity, or a composite target — including weighting and thresholds used by the optimization engine."
+            description="Set the target this project optimizes toward."
           >
               <form className="space-y-6" onSubmit={(e) => void saveObjectiveProfile(e)}>
                 <div className="space-y-2">
@@ -6212,8 +6285,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Optimization · Warm-start"
-            title="Warm-start from related campaigns"
-            description="Fit an advisory prior from your accumulated, verified data on related campaigns you own, so a new campaign reaches the target in fewer experiments. Fit only from owned, SpectraCheck-verified data — never the frozen evaluation gold set — and it never overrides the optimiser."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Warm-start from related campaigns
+                <InfoTooltip content={WARM_START_TOOLTIP} label="How the warm-start prior is fitted" />
+              </span>
+            }
+            description="Reach the target in fewer experiments by reusing past campaigns. Advisory — it never overrides the optimiser. Fits only from owned, SpectraCheck-verified data — never the frozen evaluation gold set."
           >
             <form className="space-y-4" onSubmit={(e) => void buildWarmStartPrior(e)}>
               <div className="space-y-2">
@@ -6552,8 +6630,13 @@ export function ReactionProjectDetail() {
             <ModuleCard
               accent="violet"
               eyebrow="Optimization · Latest BO Run"
-              title="latest Bayesian optimization run"
-              description="Bayesian optimization run summary — algorithm, model, input experiment count, status, diagnostics, and warnings from the most recent run."
+              title={
+                <span className="inline-flex items-center gap-2">
+                  latest Bayesian optimization run
+                  <InfoTooltip content={LATEST_BO_RUN_TOOLTIP} label="What the run summary reports" />
+                </span>
+              }
+              description="Summary of the most recent Bayesian optimization run."
             >
               <div className="space-y-4">
                 {isRecord(lastBoRun) ? (
@@ -6766,7 +6849,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={BENCHMARK_TOOLTIP} label="About benchmarking" />
               </span>
             }
-            description="Benchmark optimization algorithms against this project's historical experiment data. Results compare relative algorithm behavior on this dataset only — not universal superiority."
+            description="Replay optimization algorithms over this project's past experiments. Results compare relative algorithm behavior on this dataset only — not universal superiority."
           >
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
@@ -7058,8 +7141,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Advisor · Run"
-            title="Optimization Advisor"
-            description="LLM-assisted advisor integrating BO suggestions, mechanistic hypotheses, and literature priors to flag next-experiment priorities. All recommendations require human review."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Optimization Advisor
+                <InfoTooltip content={ADVISOR_RUN_TOOLTIP} label="What the advisor reads" />
+              </span>
+            }
+            description="Flags which next experiments to prioritise. All recommendations require human review."
           >
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
@@ -7767,7 +7855,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={LITERATURE_PRIORS_TOOLTIP} label="About reaction priors" />
               </span>
             }
-            description="Literature references, prior knowledge summaries, and user-entered citations used as advisor context. Citations are not generated by the platform."
+            description="Literature and prior knowledge used as advisor context. Citations are not generated by the platform."
           >
             <div className="space-y-6">
               <form className="space-y-4" onSubmit={(e) => void createLiteraturePrior(e)}>
@@ -7912,7 +8000,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={BO_ADVISOR_COMPARISON_TOOLTIP} label="About BO vs Advisor comparison" />
               </span>
             }
-            description="Compare Bayesian optimization rankings with advisor concern signals to surface agreement and disagreement across candidates. Output is advisory — final experiment scheduling requires human review."
+            description="Compare Bayesian optimization rankings with the advisor's concerns. Output is advisory — final experiment scheduling requires human review."
           >
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
@@ -8119,8 +8207,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Advisor · Human Review"
-            title="Human Review"
-            description="Record a human review decision on an advisor run — approve, flag for revision, or reject. Advisor output is decision-support only and does not autonomously schedule experiments."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Human Review
+                <InfoTooltip content={ADVISOR_HUMAN_REVIEW_TOOLTIP} label="What a review decision records" />
+              </span>
+            }
+            description="Record a review decision on an advisor run. Advisor output is decision-support only and does not autonomously schedule experiments."
           >
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -8269,8 +8362,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Recommendations · Latest BO Batch"
-            title="Latest BO recommendation batch"
-            description="Most recent Bayesian optimization recommendation batch — ranked candidates with predicted scores, model uncertainty, and estimated improvement. All values are probabilistic and require human review."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Latest BO recommendation batch
+                <InfoTooltip content={LATEST_BO_BATCH_TOOLTIP} label="What each candidate carries" />
+              </span>
+            }
+            description="Ranked candidates from the most recent Bayesian optimization run. All values are probabilistic and require human review."
           >
             <div className="space-y-4">
               {!loading && latestBatchRows.length === 0 ? (
@@ -8432,8 +8530,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Recommendations · List"
-            title="Recommendations"
-            description="Proposed next-experiment recommendations from the optimization engine — ranked by predicted improvement. Approve or reject each with a reviewer name and comment."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Recommendations
+                <InfoTooltip content={RECOMMENDATIONS_LIST_TOOLTIP} label="How candidates are ranked" />
+              </span>
+            }
+            description="Proposed next experiments awaiting your approve-or-reject decision."
           >
             <div className="space-y-6">
               {/* R9/R10 — advisory re-ranks (mutually exclusive); the optimiser's own rank stays visible. */}
@@ -8737,8 +8840,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Models · A/B promotion gate"
-            title="A/B model promotion (advisory)"
-            description="Compare a challenger model against the champion on held-out metrics + safety-flag recall. Decision-support only — it deploys nothing. A challenger is promotable only when it has no safety regression AND dominates the champion; a human still signs off and rollback stays available."
+            title={
+              <span className="inline-flex items-center gap-2">
+                A/B model promotion (advisory)
+                <InfoTooltip content={AB_PROMOTION_TOOLTIP} label="How the promotion verdict is decided" />
+              </span>
+            }
+            description="Compare a challenger model against the current champion. Decision-support only — it deploys nothing; a human still signs off and rollback stays available."
           >
             <form className="space-y-4" onSubmit={(e) => void evaluateAbPromotion(e)}>
               <div className="grid gap-4 md:grid-cols-2">
@@ -8882,8 +8990,13 @@ export function ReactionProjectDetail() {
             <ModuleCard
               accent="violet"
               eyebrow="Execution · Cycle Ready"
-              title="Ready for next optimization cycle"
-              description="Confirmed outcomes are ready to seed the next optimization cycle. Bayesian optimization and advisor runs use the saved objective, cost, and safety profiles — neither triggers automatically after outcome confirmation."
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Ready for next optimization cycle
+                  <InfoTooltip content={CYCLE_READY_TOOLTIP} label="What the next cycle reads" />
+                </span>
+              }
+              description="Confirmed outcomes are ready to seed the next optimization cycle. Neither Bayesian optimization nor the advisor triggers automatically after outcome confirmation."
             >
               <div className="space-y-4">
                 <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
@@ -8969,7 +9082,7 @@ export function ReactionProjectDetail() {
                 />
               </span>
             }
-            description="Approved recommendations pending conversion to planned experiments. Conversion requires a rationale and optionally an execution batch assignment. Recording a planned experiment is not confirmation that laboratory work occurred."
+            description="Approved recommendations pending conversion to planned experiments. Recording a planned experiment is not confirmation that laboratory work occurred."
           >
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
@@ -9161,8 +9274,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Execution · Batch Planner"
-            title="Execution Batch Planner"
-            description="Plan and track lab execution batches — create batches, assign planned experiments as items, and update item status as lab work progresses. Statuses reflect recorded progress only and do not trigger any lab automation."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Execution Batch Planner
+                <InfoTooltip content={EXECUTION_BATCH_PLANNER_TOOLTIP} label="How execution batches work" />
+              </span>
+            }
+            description="Plan and track lab execution batches. Statuses reflect recorded progress only and do not trigger any lab automation."
           >
             <div className="space-y-8">
               <form className="space-y-4" onSubmit={(e) => void createExecutionBatchPlanner(e)}>
@@ -9543,7 +9661,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={EXECUTION_BOARD_TOOLTIP} label="Manual execution status" />
               </span>
             }
-            description="Lab execution board — manually advance execution item status as reactions are run. Status transitions are user-initiated; no autonomous lab scheduling occurs here."
+            description="Advance each execution item as reactions are run. Status transitions are user-initiated; no autonomous lab scheduling occurs here."
             className="min-w-0"
           >
             <div className="space-y-4">
@@ -9687,8 +9805,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Execution · Status Table"
-            title="Experiment execution board"
-            description="Experiment status reflects manually recorded lab progress — yield, analytical link, and linked SpectraCheck session for each planned run."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Experiment execution board
+                <InfoTooltip content={EXECUTION_STATUS_TABLE_TOOLTIP} label="What each row shows" />
+              </span>
+            }
+            description="Experiment status reflects manually recorded lab progress."
           >
             <div className="table-scroll">
               <Table>
@@ -9757,7 +9880,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={ANALYTICAL_RESULTS_INTAKE_TOOLTIP} label="Analytical results context" />
               </span>
             }
-            description="Link concise analytical metadata and summary values to execution items. Full spectral evidence and QC records remain in SpectraCheck."
+            description="Link analytical summary values to execution items. Full spectral evidence and QC records remain in SpectraCheck."
           >
             <div className="space-y-6">
               <form className="space-y-4" onSubmit={(e) => void addAnalyticalResultToExecutionItem(e)}>
@@ -9960,8 +10083,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Execution · Outcome Extraction"
-            title="Outcome extraction"
-            description="Yield, conversion, and related fields are recorded on experiments as the outcome (see Experiments tab). The UI does not autonomously import numerical outcomes from spectral files."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Outcome extraction
+                <InfoTooltip content={OUTCOME_EXTRACTION_TOOLTIP} label="Where outcomes are stored" />
+              </span>
+            }
+            description="Records confirmed yield and conversion onto the experiment. The UI does not autonomously import numerical outcomes from spectral files."
           >
             <div className="space-y-4">
               <p className="text-xs text-muted-foreground">
@@ -10329,7 +10457,7 @@ export function ReactionProjectDetail() {
                 <InfoTooltip content={OPTIMIZATION_CYCLE_TIMELINE_TOOLTIP} label="About optimization cycles" />
               </span>
             }
-            description="Timeline of recent Bayesian optimization, heuristic, and advisor runs across all cycles — ordering is informational, not an autonomous loop."
+            description="Recent Bayesian optimization, heuristic, and advisor runs across all cycles. Ordering is informational, not an autonomous loop."
           >
             <div className="space-y-4">
               <p className="text-xs text-muted-foreground">
@@ -10918,8 +11046,13 @@ export function ReactionProjectDetail() {
           <ModuleCard
             accent="violet"
             eyebrow="Reaction · Evidence Links"
-            title="Evidence Links"
-            description="Analytical evidence summary for all experiments linked to a SpectraCheck session — metadata, record counts, and QC status. Use Open for full spectral evidence."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Evidence Links
+                <InfoTooltip content={EVIDENCE_LINKS_TOOLTIP} label="What this table shows" />
+              </span>
+            }
+            description="Every experiment linked to a SpectraCheck session."
           >
             <div className="table-scroll">
               <Table>

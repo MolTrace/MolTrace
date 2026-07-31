@@ -136,7 +136,7 @@ const QA_MANDATORY_WARNING =
   "Draft regulatory interpretation. Requires qualified human review."
 
 const IMPURITY_REGISTER_TOOLTIP =
-  "Tracks process impurities, degradation products, residual solvents, nitrosamine risks, unknown features, and regulatory threshold triggers for the dossier."
+  "Tracks process impurities, degradation products, residual solvents, nitrosamine risks, unknown features, and regulatory threshold triggers for the dossier. Add new impurities, run a batch regulatory assessment, and track review status against applicable limits."
 
 const IMPURITY_TYPES = [
   "process_impurity",
@@ -158,7 +158,7 @@ const IMPURITY_SOURCES = [
 ] as const
 
 const RESIDUAL_SOLVENT_WATCH_TOOLTIP =
-  "Maps detected or reported residual solvents to regulatory solvent classes, permitted exposure concepts, and dossier action items."
+  "Maps detected or reported residual solvents to regulatory solvent classes, permitted exposure concepts, and dossier action items. Detected solvents are matched against the active rule sets for this dossier's jurisdiction; rule set and source evidence are recorded with each run."
 
 const RESIDUAL_SOURCE_EVIDENCE_OPTIONS = [
   { value: "spectracheck_report", label: "SpectraCheck report" },
@@ -172,13 +172,13 @@ const RESIDUAL_RULE_NOT_CONFIGURED_MSG =
   "Source rule not configured. Add or select a regulatory rule set."
 
 const NITROSAMINE_WATCH_TOOLTIP =
-  "Screens structures, impurity records, and evidence links for nitrosamine-related review triggers. Results require qualified review."
+  "Screens structures, impurity records, and evidence links for structural and process signals that may indicate nitrosamine impurity risk. Results require qualified review."
 
 const QNMR_METHOD_VALIDATION_TOOLTIP =
   "Assesses whether qNMR or analytical-method outputs include the documentation needed for review, such as ATP, validation parameters, calibration, uncertainty, audit trail, and source hashes."
 
 const AI_GOVERNANCE_RECORD_TOOLTIP =
-  "Documents model/method versions, explainability, validation status, human oversight, and audit trail for AI-assisted analytical or regulatory outputs."
+  "Documents model/method versions, explainability, validation status, human oversight, and audit trail for AI-assisted analytical or regulatory outputs. Captures the AI system name, intended use, and oversight requirements for regulatory traceability."
 
 const AI_GOVERNANCE_STATUSES = [
   "not_assessed",
@@ -211,7 +211,22 @@ const ANALYTICAL_METHOD_TYPES = [
 ] as const
 
 const REQUIREMENTS_CHECKLIST_TOOLTIP =
-  "Requirements are checklist items for a dossier. They should be supported by citations, analytical evidence, or reviewer justification."
+  "Requirements are checklist items for a dossier. They should be supported by citations, analytical evidence, or reviewer justification. Track completion status, add requirements, and update items as evidence is gathered."
+
+const CITED_QA_TOOLTIP =
+  "Questions are answered from source-referenced guidance held in the regulatory source library; responses are not synthesized in the browser."
+
+const DOSSIER_REVIEW_TOOLTIP =
+  "Approve, reject, or escalate. The decision, the reviewer, and the timestamp are recorded against the dossier."
+
+const EVIDENCE_LINKS_TOOLTIP =
+  "Artefacts are linked by ID and summary. Open SpectraCheck or Reaction Studio for the full evidence detail — raw data is never copied into the dossier."
+
+const RISK_ASSESSMENT_TOOLTIP =
+  "Highlights gaps and contradictions across dossier requirements, evidence links, and cited sources for internal readiness review."
+
+const COMPLIANCE_OUTPUTS_TOOLTIP =
+  "Outputs below are computed from the active rule sets, their thresholds, and this dossier's own details."
 
 const JURISDICTIONAL_MAP_TOOLTIP =
   "Compares dossier requirements, thresholds, source documents, and action items across selected jurisdictions."
@@ -1532,7 +1547,7 @@ export function RegulatoryDossierWorkspace() {
       naStructureText.trim().length > 0 || naImpurityId !== "none" || naEvidenceLinkId !== "none"
     if (!hasInput) {
       setNaErr(
-        "Add structure text and/or select an impurity risk register entry or regulatory evidence link so the risk signals are meaningful."
+        "Add structure text, or select an impurity risk register entry or evidence link, to get meaningful risk signals."
       )
       return
     }
@@ -2475,7 +2490,7 @@ export function RegulatoryDossierWorkspace() {
               </p>
               <h2 className="font-mono text-xl font-bold tracking-tight">Dossier metadata at a glance</h2>
               <p className="text-sm text-muted-foreground">
-                Title, jurisdiction, intended use, status, last update, and review state — the source of truth for the rest of the workspace.
+                The source of truth for the rest of the workspace.
               </p>
             </div>
             {Number.isFinite(dossierId) ? <RegulatoryNotificationsCompactCard dossierId={dossierId} /> : null}
@@ -2722,7 +2737,7 @@ export function RegulatoryDossierWorkspace() {
                   <InfoTooltip label="Requirements checklist" content={REQUIREMENTS_CHECKLIST_TOOLTIP} />
                 </span>
               }
-              description="Regulatory requirements checklist for this dossier — track completion status, add new requirements, and update individual items as evidence is gathered."
+              description="Regulatory requirements checklist for this dossier."
             >
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                   <h3 className="text-sm font-semibold">Add requirement</h3>
@@ -2920,8 +2935,13 @@ export function RegulatoryDossierWorkspace() {
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Evidence Links"
-              title="Evidence Links"
-              description="Link analytical or reaction artefacts to dossier requirements by ID and summary — open SpectraCheck or Reaction Studio for full evidence detail without copying raw data here."
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Evidence Links
+                  <InfoTooltip label="Evidence links" content={EVIDENCE_LINKS_TOOLTIP} />
+                </span>
+              }
+              description="Link analytical or reaction artefacts to dossier requirements."
             >
               <div className="space-y-6">
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
@@ -3206,7 +3226,7 @@ export function RegulatoryDossierWorkspace() {
                   <InfoTooltip label="Impurity risk register" content={IMPURITY_REGISTER_TOOLTIP} />
                 </span>
               }
-              description="Identified impurity entries with assessed risk levels — add new impurities, run a batch regulatory assessment, and track review status against applicable limits."
+              description="Identified impurity entries with assessed risk levels."
               badge={
                 <Button
                   type="button"
@@ -3475,7 +3495,7 @@ export function RegulatoryDossierWorkspace() {
                   <InfoTooltip label="Residual solvent watch" content={RESIDUAL_SOLVENT_WATCH_TOOLTIP} />
                 </span>
               }
-              description="ICH Q3C residual solvent assessment — detected solvents are matched against active regulatory rule sets for this dossier's jurisdiction. Rule set and source evidence are recorded with each run."
+              description="ICH Q3C residual solvent assessment for this dossier."
             >
               <div className="space-y-6">
                 {residualSolventMissingRuleHint ? (
@@ -3761,7 +3781,7 @@ export function RegulatoryDossierWorkspace() {
               }
               description={
                 <>
-                  Nitrosamine risk review — monitors for structural and process signals that may indicate nitrosamine impurity risk. Treat all outputs as{" "}
+                  Nitrosamine risk review for this dossier. Treat all outputs as{" "}
                   <span className="font-medium text-foreground">review required</span> unless a qualified reviewer explicitly confirms or dismisses each signal.
                 </>
               }
@@ -4136,14 +4156,21 @@ export function RegulatoryDossierWorkspace() {
                   <InfoTooltip label="qNMR / Method Validation" content={QNMR_METHOD_VALIDATION_TOOLTIP} />
                 </span>
               }
-              description="qNMR compliance readiness and method validation profile — readiness states are ready for review, gaps identified, or not assessed. Do not equate with validated unless both system outputs and a qualified reviewer explicitly support that qualification."
+              description="qNMR compliance readiness and method validation profile. Do not equate with validated unless both system outputs and a qualified reviewer explicitly support that qualification."
             >
               <div className="space-y-6">
                 <AlertCard
                   variant="info"
                   title="Documentation readiness signals only"
-                  description="This workspace captures documentation readiness signals only. Use “ready for review”, “gaps identified”, or “not assessed” when describing states; avoid calling a method “validated” unless both system outputs and qualified review explicitly support that wording."
-                />
+                  description="Avoid calling a method “validated” unless both system outputs and qualified review explicitly support that wording."
+                >
+                  <p className="text-xs text-muted-foreground">
+                    Describe states as{" "}
+                    <span className="font-medium text-foreground">ready for review</span>,{" "}
+                    <span className="font-medium text-foreground">gaps identified</span>, or{" "}
+                    <span className="font-medium text-foreground">not assessed</span>.
+                  </p>
+                </AlertCard>
 
                 <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                   <h3 className="text-sm font-semibold">Assess method validation readiness</h3>
@@ -4547,7 +4574,7 @@ export function RegulatoryDossierWorkspace() {
                   <InfoTooltip label="AI Governance" content={AI_GOVERNANCE_RECORD_TOOLTIP} />
                 </span>
               }
-              description="AI governance record for this dossier — documents the AI system name, version, intended use, and human oversight requirements for regulatory traceability."
+              description="AI governance record for this dossier."
             >
               <div className="space-y-6">
                 {agCreateErr ? (
@@ -4905,7 +4932,7 @@ export function RegulatoryDossierWorkspace() {
               }
               description={
                 <>
-                  Maps this dossier's requirements and evidence to applicable jurisdictions and rule sets. Jurisdiction catalogue and source catalogue are available via{" "}
+                  Maps this dossier's requirements and evidence to applicable jurisdictions and rule sets. Catalogues live in{" "}
                   <Link href="/regulatory/sources" className="underline-offset-4 hover:underline">
                     Regulatory Sources
                   </Link>
@@ -4915,8 +4942,13 @@ export function RegulatoryDossierWorkspace() {
             >
                 <AlertCard
                   variant="info"
-                  title="Compliance outputs"
-                  description="Outputs below come from the regulatory compliance engine (rule sets, thresholds, and dossier details). This view does not assert jurisdiction-specific legal obligations."
+                  title={
+                    <span className="inline-flex items-center gap-2">
+                      Compliance outputs
+                      <InfoTooltip label="Compliance outputs" content={COMPLIANCE_OUTPUTS_TOOLTIP} />
+                    </span>
+                  }
+                  description="This view does not assert jurisdiction-specific legal obligations."
                 />
 
                 <dl className="grid gap-3 sm:grid-cols-2">
@@ -5508,8 +5540,13 @@ export function RegulatoryDossierWorkspace() {
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Cited Q&A"
-              title="Cited Q&A"
-              description="Cited regulatory Q&A — questions are answered by the app using source-referenced guidance; responses are not synthesized in the browser. This is not legal advice."
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Cited Q&A
+                  <InfoTooltip label="Cited Q&A" content={CITED_QA_TOOLTIP} />
+                </span>
+              }
+              description="Cited regulatory Q&A for this dossier. This is not legal advice."
             >
               <div className="space-y-4">
                 <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -5771,8 +5808,13 @@ export function RegulatoryDossierWorkspace() {
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Risk Assessment"
-              title="Risk Assessment"
-              description="Source-supported risk signals for this dossier — highlights gaps and contradictions for internal readiness review. Output requires qualified regulatory judgment and is not a substitute for it."
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Risk Assessment
+                  <InfoTooltip label="Risk assessment" content={RISK_ASSESSMENT_TOOLTIP} />
+                </span>
+              }
+              description="Source-supported risk signals for this dossier. Output requires qualified regulatory judgment and is not a substitute for it."
               badge={
                 <Button type="button" variant="outline" size="sm" disabled={riskRefreshBusy} onClick={() => void createRiskAssessment()}>
                   {riskRefreshBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -5901,14 +5943,19 @@ export function RegulatoryDossierWorkspace() {
               </p>
               <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer decision &amp; attribution</h2>
               <p className="text-sm text-muted-foreground">
-                Record an internal review decision (approve / reject / escalate) with reviewer attribution. Not legal advice or external regulatory approval.
+                Record an internal review decision with reviewer attribution. Not legal advice or external regulatory approval.
               </p>
             </div>
             <ModuleCard
               accent="cyan"
               eyebrow="Dossier · Review"
-              title="Review"
-              description="Record an internal review decision on this dossier — approve, reject, or escalate — with reviewer attribution. Not legal advice or external regulatory approval."
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Review
+                  <InfoTooltip label="Dossier review" content={DOSSIER_REVIEW_TOOLTIP} />
+                </span>
+              }
+              description="Record an internal review decision on this dossier. Not legal advice or external regulatory approval."
             >
               <div className="space-y-4">
                 <Alert>

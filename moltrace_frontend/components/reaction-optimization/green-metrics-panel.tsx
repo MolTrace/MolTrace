@@ -44,6 +44,13 @@ import {
   type GreenMetricsRequest,
 } from "@/lib/reaction/green-metrics"
 
+/**
+ * Mechanism only. The caveat ("Decision-support; human review required") stays
+ * in the visible description — a hedge behind a hover is a weaker hedge.
+ */
+const GREEN_METRICS_TOOLTIP =
+  "Deterministic E-factor, PMI, atom economy and RME computed from the component masses you record, plus a composite solvent score from the CHEM21 solvent selection table."
+
 type ExperimentRow = { id: number; code: string }
 
 type ComponentRow = {
@@ -241,9 +248,10 @@ export function GreenMetricsPanel({
           <span className="inline-flex items-center gap-2">
             <Leaf className="h-4 w-4" aria-hidden />
             Green metrics
+            <InfoTooltip content={GREEN_METRICS_TOOLTIP} label="How green metrics are computed" />
           </span>
         }
-        description="Deterministic per-experiment E-factor, PMI, atom economy and RME, plus a CHEM21 solvent-table composite score. A scale-up / regulatory deliverable; decision-support, human review required."
+        description="Green-chemistry metrics per experiment, for scale-up and regulatory packages. Decision-support; human review required."
       >
         {error ? <AlertCard variant="error" title="Green metrics" description={error} /> : null}
 

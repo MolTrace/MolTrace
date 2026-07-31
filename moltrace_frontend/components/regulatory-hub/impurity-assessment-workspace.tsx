@@ -67,6 +67,12 @@ type Route = AssessRequest["route"]
 type SubstanceType = AssessRequest["substance_type"]
 type TriState = "positive" | "negative" | "unset"
 
+const IMPURITY_ASSESSMENT_COVERAGE_TOOLTIP =
+  "Covers ICH Q3A/B thresholds, Q3C residual solvents, Q3D elemental impurities, M7 mutagenic impurities, and FDA CPCA nitrosamine classification, plus cumulative nitrosamine risk. Every engine is deterministic."
+
+const ASSESSMENT_PARAMETERS_TOOLTIP =
+  "An assessment with no impurities entered still reports the ICH Q3A/B thresholds for the dose."
+
 const ROUTE_OPTIONS: { value: Route; label: string }[] = [
   { value: "oral", label: "Oral" },
   { value: "parenteral", label: "Parenteral" },
@@ -318,12 +324,11 @@ export function ImpurityAssessmentWorkspace() {
         <h1 className="inline-flex items-center gap-2 font-mono text-2xl font-bold tracking-tight">
           <FlaskConical className="h-6 w-6" style={{ color: "var(--mt-cyan)" }} aria-hidden />
           Impurity Assessment
+          <InfoTooltip label="Impurity assessment coverage" content={IMPURITY_ASSESSMENT_COVERAGE_TOOLTIP} />
         </h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          One assessment across five deterministic engines — ICH Q3A/B thresholds, Q3C residual
-          solvents, Q3D elemental impurities, M7 mutagenic impurities, and FDA CPCA nitrosamine
-          classification (plus cumulative nitrosamine risk). Enter a dose and any impurities to
-          assess; every limit is decision-support and requires qualified review.
+          One assessment across the ICH and FDA impurity standards. Every limit is decision-support
+          and requires qualified review.
         </p>
       </header>
 
@@ -331,9 +336,14 @@ export function ImpurityAssessmentWorkspace() {
       <ModuleCard
         accent="cyan"
         eyebrow="Impurity Assessment · Input"
-        title="Assessment parameters"
+        title={
+          <span className="inline-flex items-center gap-2">
+            Assessment parameters
+            <InfoTooltip label="Assessment parameters" content={ASSESSMENT_PARAMETERS_TOOLTIP} />
+          </span>
+        }
         icon={FlaskConical}
-        description="Only daily dose is required. Each impurity list is optional — an empty assessment still reports the Q3A/B thresholds for the dose."
+        description="Only daily dose is required; every impurity list is optional."
       >
         <div className="space-y-6">
           {/* Core parameters */}

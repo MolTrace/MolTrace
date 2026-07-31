@@ -12,6 +12,7 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -336,7 +337,13 @@ export function RegulatoryDossierLinkedCompoundCard({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Linked Compound</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          Linked Compound
+          <InfoTooltip
+            label="Linked compound"
+            content="The compound summary is kept in this browser session for convenience, because the dossier record itself does not carry the registry details back."
+          />
+        </CardTitle>
         <CardDescription>
           Registry provenance link. Does not indicate dossier approval or regulatory sign-off.
         </CardDescription>
@@ -378,8 +385,7 @@ export function RegulatoryDossierLinkedCompoundCard({
             </div>
           ) : (
             <p className="mt-2 text-xs text-muted-foreground">
-              No compound link stored in this browser session yet. Use search below, then link — the summary is kept
-              here for convenience because the dossier record itself does not carry the registry details back.
+              No compound link stored in this browser session yet. Use search below, then link.
             </p>
           )}
         </div>

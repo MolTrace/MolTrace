@@ -12,6 +12,7 @@ import { Cpu } from "lucide-react"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import {
   getCapabilityReadout,
   getSdlStatus,
@@ -20,6 +21,13 @@ import {
   type CapabilityReadout,
   type SdlSiteStatus,
 } from "@/lib/reaction/phase-c"
+
+/**
+ * Mechanism only. The caveat ("optional, default-off extras — their absence
+ * here is the designed state, not an error") stays in the visible description.
+ */
+const CAPABILITY_READOUT_TOOLTIP =
+  "Each row reports three independent things: whether the module is installed, whether its feature flag is on, and whether it is active right now. Yield GNN activation is granted per call by a benchmark gate, so it reads inactive even with the flag on."
 
 const CAPABILITY_LABEL: Record<string, string> = {
   forward_prediction: "Forward prediction (generative)",
@@ -60,7 +68,12 @@ export function MlCapabilitiesPanel() {
     <ModuleCard
       accent="slate"
       eyebrow="Developer · ML capabilities"
-      title="Heavy-ML capability readout"
+      title={
+        <span className="inline-flex items-center gap-2">
+          Heavy-ML capability readout
+          <InfoTooltip content={CAPABILITY_READOUT_TOOLTIP} label="How to read this capability readout" />
+        </span>
+      }
       icon={Cpu}
       description="What this deployment has actually enabled. Heavy generative paths are optional, default-off extras — their absence here is the designed state, not an error."
     >
