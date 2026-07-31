@@ -1994,6 +1994,31 @@ def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float
     raw_integrations = _provisional_integrations(in_range_estimates)
     if not raw_integrations:
         return ([], {"raw_estimated_total_h": 0.0, "integration_normalized_to_target": False})
+
+    # Drop noise-level maxima rather than promoting them to the 0.5 H floor.
+    # Measured on real archival 1H FIDs: a 10-proton compound produced 34 peaks
+    # of which 25 sat EXACTLY on the floor, contributing 12.5 H of pure
+    # quantiser output — the reported total was 76 H. The distribution is
+    # cleanly bimodal (real peaks >= 3% of the total, floor peaks at 0.66%), so
+    # the quantiser itself is the discriminator: anything that would round to
+    # zero protons is not a proton.
+    #
+    # Removing them also unblocks scaling. _normalize_integrations_to_target
+    # bails when the peak count exceeds twice the target proton count, so a
+    # noise tail of 25 spurious maxima was forcing every real spectrum onto the
+    # provisional scale.
+    survivors = [
+        index for index, value in enumerate(raw_integrations) if value >= 0.25
+    ]
+    dropped_noise_count = len(raw_integrations) - len(survivors)
+    if survivors and dropped_noise_count:
+        in_range_estimates = [in_range_estimates[index] for index in survivors]
+        # Rescale on the survivors: the reference peak is now the smallest REAL
+        # resonance rather than a noise spike, which also retires the
+        # max*0.08 guard that otherwise pins the tallest peak at ~12.5 H
+        # regardless of how many protons the molecule contains.
+        raw_integrations = _provisional_integrations(in_range_estimates)
+
     integrations = _round_half_integrations(raw_integrations, minimum=0.5)
     normalized_to_target = False
     raw_total_h = round(sum(raw_integrations), 3)
@@ -2058,6 +2083,7 @@ def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float
         # it implies independently matched the structure. That is the one case
         # where the totals agreeing is corroboration rather than arithmetic.
         "integration_totals_agree_independently": totals_agree_independently,
+        "noise_peaks_dropped": dropped_noise_count,
     }
     if out_of_range_shifts:
         meta["out_of_range_dropped_count"] = len(out_of_range_shifts)
