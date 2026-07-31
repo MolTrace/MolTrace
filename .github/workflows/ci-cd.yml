@@ -169,6 +169,24 @@ jobs:
     # exact test, instead of the whole shard dying silently at the cap (which is
     # what made the earlier unsharded cancellation impossible to diagnose).
     timeout-minutes: 30
+    # These slow tests are numerically heavy (scipy least_squares / lmfit /
+    # linear_sum_assignment → LAPACK/OpenBLAS). Under pytest-xdist on Linux, N workers
+    # each spawning M BLAS/OpenMP threads oversubscribe the runner, and — worse —
+    # OpenBLAS initialised before execnet forks a worker can crash in the child. That
+    # is exactly the "worker 'gwN' crashed while running ..." failure seen on CI, while
+    # the same tests pass on macOS/ARM (different fork/BLAS behaviour). Pin every
+    # numerical thread pool to 1 so each worker's BLAS stays single-threaded — xdist
+    # already supplies the parallelism, so there is no speed cost — which removes both
+    # the oversubscription and the fork crash. PYTHONFAULTHANDLER makes any residual
+    # native crash print a C-level traceback (naming the exact call) instead of a bare
+    # "worker crashed".
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+      VECLIB_MAXIMUM_THREADS: "1"
+      PYTHONFAULTHANDLER: "1"
     defaults:
       run:
         working-directory: moltrace_backend
