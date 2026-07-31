@@ -45,9 +45,19 @@ const FEEDBACK_TYPES = [
 ] as const
 
 const QUEUE_KEYS = ["candidates", "active_learning_candidates", "items", "results", "rows", "data"]
-const SOURCE_MODULES = ["spectracheck", "reaction_optimization", "regulatory", "knowledge_extraction", "reports"] as const
+// These lists must exactly match the backend Literals (extra="forbid" 422s any other value):
+// ActiveLearningSourceModule and ActiveLearningStatus in moltrace_backend models.py.
+const SOURCE_MODULES = [
+  "spectracheck",
+  "msms",
+  "lcms",
+  "reaction_optimization",
+  "regulatory",
+  "knowledge_extraction",
+  "report",
+] as const
 const PRIORITIES = ["low", "medium", "high", "critical"] as const
-const STATUSES = ["new", "in_review", "queued_for_dataset", "accepted", "rejected", "resolved"] as const
+const STATUSES = ["proposed", "accepted", "rejected", "queued_for_dataset", "resolved"] as const
 
 function isRecord(v: unknown): v is Row {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -183,7 +193,8 @@ export function AiActiveLearningWorkspace() {
           reviewer_name: reviewerName.trim() || null,
           reviewer_comment: reviewerComment.trim() || null,
           reason_code: wireReasonCode,
-          review_outcome: feedbackType,
+          // PredictionReviewRequest (extra="forbid") field is `decision`, not `review_outcome`.
+          decision: feedbackType,
         },
       })
 
@@ -217,8 +228,9 @@ export function AiActiveLearningWorkspace() {
           reason: candidateReason.trim(),
           priority: candidatePriority,
           status: candidateStatus,
-          linked_prediction: Number.isFinite(predId) && predId > 0 ? predId : null,
-          linked_model_improvement_item: Number.isFinite(miId) && miId > 0 ? miId : null,
+          // ActiveLearningCandidateCreate (extra="forbid") field names:
+          prediction_run_id: Number.isFinite(predId) && predId > 0 ? predId : null,
+          linked_model_improvement_item_id: Number.isFinite(miId) && miId > 0 ? miId : null,
         },
       })
       trackAiActiveLearningCandidateCreated({

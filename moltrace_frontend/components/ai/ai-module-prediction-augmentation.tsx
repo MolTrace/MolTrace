@@ -253,15 +253,15 @@ export function AiModulePredictionAugmentation({
       await apiFetch("/ai/active-learning/candidates", {
         method: "POST",
         body: {
+          // ActiveLearningCandidateCreate (extra="forbid"): valid enum values only.
+          // reason ∈ ActiveLearningReason, status ∈ ActiveLearningStatus (default "proposed"),
+          // and the id keys are prediction_run_id / linked_model_improvement_item_id.
           source_module: moduleKey,
-          reason:
-            confidence != null && confidence < 0.5
-              ? "low_confidence_prediction"
-              : "prediction_feedback_case",
+          reason: confidence != null && confidence < 0.5 ? "low_confidence" : "other",
           priority: confidence != null && confidence < 0.5 ? "high" : "medium",
-          status: "new",
-          linked_prediction: Number(predictionId),
-          linked_model_improvement_item: null,
+          status: "proposed",
+          prediction_run_id: Number(predictionId),
+          linked_model_improvement_item_id: null,
         },
       })
       trackAiActiveLearningCandidateCreated({

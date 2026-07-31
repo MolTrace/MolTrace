@@ -115,9 +115,9 @@ export function AiShadowEvaluationsWorkspace() {
         method: "POST",
         body: {
           service_key: serviceKey.trim(),
-          production_model_artifact: Number(productionModelArtifact),
-          candidate_model_artifact: Number(candidateModelArtifact),
-          dataset_version: Number(datasetVersion),
+          production_model_artifact_id: Number(productionModelArtifact),
+          candidate_model_artifact_id: Number(candidateModelArtifact),
+          dataset_version_id: Number(datasetVersion),
         },
       })
       trackAiShadowEvaluationCompleted({
