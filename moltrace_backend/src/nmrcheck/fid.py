@@ -611,6 +611,26 @@ def _coerce_varian_value(raw: str) -> Any:
     return value
 
 
+def _param_array_element(params: dict[str, Any], name: str, index: int) -> float | None:
+    """Read one element of a Bruker parameter ARRAY (``##$D=``, ``##$P=``).
+
+    ``_param`` unwraps a list to its first element, which is wrong for these:
+    the relaxation delay is D[1] by Bruker convention, not D[0]. Reading D[0]
+    reported a 1 s delay as 0.0 s, and would report a carefully-set 30 s qNMR
+    delay as 0.0 too — gating genuinely quantitative work as unquantifiable.
+    """
+    lowered = {key.lower(): value for key, value in params.items()}
+    raw = params.get(name, lowered.get(name.lower()))
+    if isinstance(raw, dict):
+        raw = raw.get("values", raw.get("value"))
+    if isinstance(raw, (list, tuple)) and len(raw) > index:
+        try:
+            return float(raw[index])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def _unwrap_param_value(value: Any) -> Any:
     if isinstance(value, dict):
         if "values" in value:
@@ -3266,7 +3286,12 @@ def process_bruker_1d_zip(
                 # protons, and a presaturation sequence attenuates everything
                 # near the irradiated solvent line.
                 "acquisition_quality": assess_1h_acquisition(
-                    relaxation_delay_s=_param_float(params, "D1", "D", "RD"),
+                    # D[1] is the relaxation delay; D[0] is a settling delay.
+                    relaxation_delay_s=(
+                        _param_array_element(params, "D", 1)
+                        if _param_array_element(params, "D", 1) is not None
+                        else _param_float(params, "D1", "RD")
+                    ),
                     td=_param_float(params, "TD"),
                     sw_hz=_param_float(params, "SW_h", "SWH"),
                     scans=(
