@@ -148,7 +148,8 @@ function lastAnalyticsRequestBody(): AnalyticsRequestBody {
     return JSON.parse(raw) as AnalyticsRequestBody
   }
   if (raw != null && typeof raw === "object" && !Array.isArray(raw)) {
-    return raw as AnalyticsRequestBody
+    /** Mock passes a plain object envelope, not a real `BodyInit`, so narrow via `unknown`. */
+    return raw as unknown as AnalyticsRequestBody
   }
   throw new Error("unexpected analytics request body shape")
 }
