@@ -173,7 +173,11 @@ export function SpectraCheckSavedSessionReviewAudit({ backendSessionId }: { back
       await postSessionReview(backendSessionId.trim(), {
         reviewer_name: reviewerName.trim(),
         reviewer_comment: reviewerComment.trim(),
-        review_status: reviewStatus,
+        // Backend SpectraCheckReviewCreate has model_config extra="forbid" and requires
+        // `status` (the SpectraCheckReviewStatus enum). Do NOT send `review_status` here —
+        // that is the *response/record* field name; on the request it 422s as both
+        // "status: field required" and "review_status: extra inputs not permitted".
+        status: reviewStatus,
       })
       await loadReview()
       await loadAudit()
