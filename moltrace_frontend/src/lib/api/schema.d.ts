@@ -38369,13 +38369,27 @@ export interface components {
         };
         /**
          * SpectrumRetrieveHit
-         * @description One retrieved reference spectrum (id + L2 distance, lower = more similar).
+         * @description One retrieved reference spectrum (id + distance, lower = more similar).
+         *
+         *     ``l2_distance`` is a true (not squared) L2 distance. Against a per-nucleus index
+         *     it is the mean over the nuclei the query and this reference **share**, plus a
+         *     coverage penalty for the query nuclei this reference does not carry — so part of
+         *     the value can be penalty rather than measured disagreement, and in the limit
+         *     (identical on the shared nucleus, the other never measured) all of it is. The two
+         *     ``nuclei_*`` fields say which case a row is, because they carry different
+         *     evidential weight: agreement checked against one nucleus is weaker support than
+         *     the same number checked against two. Both are empty when the configured index
+         *     does not report coverage, not when nothing matched.
          */
         SpectrumRetrieveHit: {
             /** Id */
             id: string;
             /** L2 Distance */
             l2_distance: number;
+            /** Nuclei Compared */
+            nuclei_compared?: string[];
+            /** Nuclei Absent */
+            nuclei_absent?: string[];
         };
         /**
          * SpectrumRetrieveRequest
