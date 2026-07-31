@@ -3,7 +3,8 @@ export class ApiError extends Error {
   data: unknown
 
   constructor(status: number, data: unknown, message?: string) {
-    super(message || `Request failed with status ${status}`)
+    // Default is user-visible: no HTTP status codes in reader-facing copy.
+    super(message || "Request could not be completed. Please try again.")
     this.name = "ApiError"
     this.status = status
     this.data = data
@@ -24,7 +25,8 @@ export const AUTH_TOKEN_STORAGE_KEY = "moltrace.access_token"
 export const AUTH_USER_STORAGE_KEY = "moltrace.user"
 export const TENANT_ID_STORAGE_KEY = "moltrace.current_tenant_id"
 export const GENERIC_REQUEST_FAILURE_MESSAGE = "Request could not be completed. Please try again."
-const BACKEND_CONNECTION_FAILURE_MESSAGE = "Backend connection failed. Please retry in a moment."
+// User-facing text only — "backend" is implementation language a scientist should never read.
+const BACKEND_CONNECTION_FAILURE_MESSAGE = "Could not reach the MolTrace service. Please retry in a moment."
 
 const INTERNAL_ERROR_MESSAGE_PATTERN =
   /(backend\s+requires\s+authentication|for\s+local\s+development|disable\s+backend\s+auth|disable_auth|disable_backend_auth|todo:|authorization\s*:\s*bearer|bearer\s*<\s*token\s*>|bearer\s+token|x-api-key|api[_\s-]?key|\b(?:get|post|put|patch|delete)\s+\/[a-z0-9]|\/api\/backend\/|raw\s+prompt|system\s+prompt|developer\s+prompt|chain[_\s-]?of[_\s-]?thought|\bcot\b|reasoning[_\s-]?trace|credential\s*[:=]|secret\s*[:=]|password\s*[:=]|private[_\s-]?key|service[_\s-]?account|traceback\s+\(most\s+recent\s+call\s+last\)|\bfile\s+"[^"]+")/i

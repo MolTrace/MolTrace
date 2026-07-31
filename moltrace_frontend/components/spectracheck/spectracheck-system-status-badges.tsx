@@ -123,12 +123,12 @@ export function SpectraCheckSystemStatusBadges() {
           {backendConnected ? (
             <Badge variant="outline" className={cn(badgeBase, "border-success/40 text-success")}>
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
-              Backend connected
+              System connected
             </Badge>
           ) : (
             <Badge variant="outline" className={cn(badgeBase, "border-warning/50 text-warning")}>
               <span className="h-1.5 w-1.5 rounded-full bg-warning" />
-              Backend unavailable
+              System unavailable
             </Badge>
           )}
           <Tooltip>

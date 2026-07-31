@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { QualityStatusBadge, type QualityGateStatus } from "@/src/components/spectracheck/QualityStatusBadge"
+import { humanizeTokenForDisplay } from "@/src/components/spectracheck/spectracheck-display-labels"
 import { cn } from "@/lib/utils"
 
 const QC_TITLE_TOOLTIP =
@@ -75,19 +76,19 @@ export function QualityAssessmentCard({
         <div className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <p className="text-xs font-medium text-muted-foreground">Readiness</p>
-            <p className="font-medium">{readinessLabel}</p>
+            <p className="font-medium">{humanizeTokenForDisplay(readinessLabel)}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">Quality score</p>
             <p className="font-mono">{qualityScore != null ? qualityScore.toFixed(3) : "—"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted-foreground">Target type</p>
-            <p>{targetType}</p>
+            <p className="text-xs font-medium text-muted-foreground">Assessed item</p>
+            <p>{humanizeTokenForDisplay(targetType)}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">Modality</p>
-            <p>{modality}</p>
+            <p>{humanizeTokenForDisplay(modality)}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">Warnings</p>

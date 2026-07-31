@@ -4,7 +4,9 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { FeedbackButton } from "@/src/components/analytics/FeedbackButton"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { statusLabel } from "@/lib/ui/status"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,19 +26,10 @@ function isRecord(v: unknown): v is Row {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
 
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.data
-    if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return err.message || fallback
-  }
-  if (err instanceof Error) return err.message
-  return fallback
-}
-
 function summarizeValue(v: unknown): string {
   if (v == null) return "-"
-  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v)
+  if (typeof v === "boolean") return v ? "Yes" : "No"
+  if (typeof v === "string" || typeof v === "number") return String(v)
   if (Array.isArray(v)) return v.map((x) => summarizeValue(x)).join(", ")
   return JSON.stringify(v)
 }
@@ -65,6 +58,15 @@ function readBoolLike(row: Row, keys: string[]): boolean | null {
   return null
 }
 
+/** Reader-facing out-of-domain wording; the stored value is unchanged. */
+function oodDisplay(row: Row): string {
+  const status = readRecordString(row, "ood_status")
+  if (status?.trim()) return statusLabel(status)
+  const flag = readBoolLike(row, ["is_ood", "out_of_domain"])
+  if (flag != null) return flag ? "Out of domain" : "In domain"
+  return "-"
+}
+
 export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -81,7 +83,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
       } catch (err) {
         if (!cancelled) {
           setPrediction(null)
-          setError(formatErr(err, `Could not load this prediction.`))
+          setError(formatApiError(err, `Could not load this prediction.`))
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -121,7 +123,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
 
       {loading ? <p className="text-sm text-muted-foreground">Loading prediction detail...</p> : null}
       {error ? (
-        <AlertCard variant="error" title="Load error" description={error} />
+        <AlertCard variant="error" title="Couldn’t load this prediction" description={error} />
       ) : null}
 
       {prediction ? (
@@ -168,7 +170,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
               eyebrow="Output"
               title={
                 <span className="flex items-center gap-2">
-                  <Badge variant="outline">{readRecordString(prediction, "status") ?? "-"}</Badge>
+                  <Badge variant="outline">{statusLabel(readRecordString(prediction, "status"))}</Badge>
                 </span>
               }
               icon={Sparkles}
@@ -211,7 +213,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
               </p>
               <p>
                 <span className="font-medium">Out-of-domain status:</span>{" "}
-                {summarizeValue(prediction.ood_status ?? prediction.is_ood ?? prediction.out_of_domain)}
+                {oodDisplay(prediction)}
               </p>
               <p>
                 <span className="font-medium">Explanation:</span> {summarizeValue(prediction.explanation)}

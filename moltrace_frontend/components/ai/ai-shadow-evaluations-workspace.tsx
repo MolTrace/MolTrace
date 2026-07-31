@@ -1,7 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { statusLabel } from "@/lib/ui/status"
 import { readRecordString } from "@/components/projects/project-workspace-utils"
 import {
   trackAiShadowEvaluationCompleted,
@@ -33,16 +35,6 @@ function extractRows(data: unknown): Row[] {
     if (Array.isArray(value)) return value.filter(isRecord) as Row[]
   }
   return []
-}
-
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.data
-    if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return `HTTP ${err.status}: ${err.message || fallback}`
-  }
-  if (err instanceof Error) return err.message
-  return fallback
 }
 
 function formatWhen(iso: string): string {
@@ -84,7 +76,7 @@ export function AiShadowEvaluationsWorkspace() {
       const data = await apiFetch<unknown>("/ai/shadow-evaluations", { method: "GET" })
       setRows(extractRows(data))
     } catch (err) {
-      setLoadErr(formatErr(err, "Could not load shadow evaluations."))
+      setLoadErr(formatApiError(err, "Could not load shadow evaluations."))
       setRows([])
     } finally {
       setLoading(false)
@@ -101,7 +93,7 @@ export function AiShadowEvaluationsWorkspace() {
       const data = await apiFetch<unknown>(`/ai/shadow-evaluations/${shadowRunId}`, { method: "GET" })
       setSelected(isRecord(data) ? data : null)
     } catch (err) {
-      setDetailErr(formatErr(err, `Could not load shadow evaluation ${shadowRunId}.`))
+      setDetailErr(formatApiError(err, `Could not load shadow evaluation ${shadowRunId}.`))
       setSelected(null)
     }
   }
@@ -135,7 +127,7 @@ export function AiShadowEvaluationsWorkspace() {
       setFormOk("Shadow evaluation submitted.")
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setFormErr(formatErr(err, "Could not submit shadow evaluation."))
+      setFormErr(formatApiError(err, "Could not submit shadow evaluation."))
     } finally {
       setSubmitBusy(false)
     }
@@ -199,7 +191,7 @@ export function AiShadowEvaluationsWorkspace() {
                   <TableRow key={`${id}-${idx}`}>
                     <TableCell>{id}</TableCell>
                     <TableCell>{readStr(row, ["service_key"])}</TableCell>
-                    <TableCell><Badge variant="outline">{readStr(row, ["status"])}</Badge></TableCell>
+                    <TableCell><Badge variant="outline">{statusLabel(readStr(row, ["status"]))}</Badge></TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatWhen(readStr(row, ["created_at", "timestamp"]))}</TableCell>
                     <TableCell><Button size="sm" variant="outline" onClick={() => void loadDetail(id)}>Open</Button></TableCell>
                   </TableRow>
@@ -224,7 +216,7 @@ export function AiShadowEvaluationsWorkspace() {
           {selected ? (
             <div className="mt-3 rounded-md border bg-muted/20 p-3 text-sm">
               <p><span className="font-medium">Shadow run:</span> {readRecordString(selected, "shadow_run_id") ?? readRecordString(selected, "id") ?? "-"}</p>
-              <p><span className="font-medium">Status:</span> {readRecordString(selected, "status") ?? "-"}</p>
+              <p><span className="font-medium">Status:</span> {statusLabel(readRecordString(selected, "status"))}</p>
               <p><span className="font-medium">Summary:</span> {readRecordString(selected, "summary") ?? "-"}</p>
             </div>
           ) : null}

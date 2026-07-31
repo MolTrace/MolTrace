@@ -164,8 +164,8 @@ const RESIDUAL_SOURCE_EVIDENCE_OPTIONS = [
   { value: "spectracheck_report", label: "SpectraCheck report" },
   { value: "nmr_solvent_flag", label: "NMR solvent/impurity flag" },
   { value: "lcms_feature", label: "LC-MS feature" },
-  { value: "user_entered", label: "user-entered" },
-  { value: "reaction_route", label: "reaction route" },
+  { value: "user_entered", label: "User-entered" },
+  { value: "reaction_route", label: "Reaction route" },
 ] as const
 
 const RESIDUAL_RULE_NOT_CONFIGURED_MSG =
@@ -3998,8 +3998,8 @@ export function RegulatoryDossierWorkspace() {
                           <span className="font-medium text-foreground">Nitrosamine confirmed: </span>
                           <span>{typeof nitroConf === "boolean" ? (nitroConf ? "Yes" : "No") : "—"}</span>
                           <p className="mt-1 text-muted-foreground">
-                            System flag only; a value of no does not eliminate all possible nitrosamine risk without
-                            further evidence and qualified review.
+                            System flag only; a value of &quot;No&quot; does not eliminate all possible nitrosamine
+                            risk without further evidence and qualified review.
                           </p>
                         </div>
 
@@ -6023,10 +6023,10 @@ export function RegulatoryDossierWorkspace() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>ID</TableHead>
-                            <TableHead>decision</TableHead>
-                            <TableHead>reviewer</TableHead>
+                            <TableHead>Decision</TableHead>
+                            <TableHead>Reviewer</TableHead>
                             <TableHead>Created</TableHead>
-                            <TableHead>rationale (truncated)</TableHead>
+                            <TableHead>Rationale (truncated)</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

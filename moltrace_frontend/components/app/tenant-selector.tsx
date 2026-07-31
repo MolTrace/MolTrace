@@ -36,7 +36,7 @@ export function TenantSelector() {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="min-w-0 gap-2">
           <Building2 className="h-4 w-4 shrink-0" />
-          <span className="max-w-36 truncate">{isMobile ? "Workspace" : tenantDisplayName}</span>
+          <span className="max-w-36 truncate">{isMobile ? "Organization" : tenantDisplayName}</span>
           {lockedCount > 0 ? (
             <Badge variant="outline" className={isMobile ? "hidden" : "inline-flex h-5 px-1.5 text-[10px]"}>
               {lockedCount} locked
@@ -50,7 +50,7 @@ export function TenantSelector() {
             <span className="truncate">{tenantDisplayName}</span>
             <span className="text-xs font-normal text-muted-foreground">
               {tenantStatus}
-              {error ? " · Workspace details unavailable" : ""}
+              {error ? " · Organization details unavailable" : ""}
             </span>
           </div>
         </DropdownMenuLabel>
@@ -58,7 +58,7 @@ export function TenantSelector() {
         {isAdmin ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Switch tenant</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Switch organization</DropdownMenuLabel>
             {tenants.map((tenant) => (
               <DropdownMenuItem
                 key={tenant.id}
@@ -88,7 +88,7 @@ export function TenantSelector() {
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={loading} onSelect={() => void refreshTenantContext()}>
           <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh workspace access
+          Refresh organization access
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

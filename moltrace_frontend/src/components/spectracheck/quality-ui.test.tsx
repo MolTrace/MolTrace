@@ -27,6 +27,11 @@ describe("QualityFindingsTable", () => {
     render(<QualityFindingsTable findings={MOCK_QUALITY_FINDINGS} />)
     expect(screen.getByText("HASH_MISMATCH")).toBeInTheDocument()
     expect(screen.getByText("LAYER_SPARSE")).toBeInTheDocument()
+    // Severity and layer are humanized for the reader; the stored values
+    // ("warning", "msms_annotation") are unchanged.
+    expect(screen.getByText("Warning")).toBeInTheDocument()
+    expect(screen.getByText("MS/MS annotation")).toBeInTheDocument()
+    expect(screen.getByText("Session files")).toBeInTheDocument()
   })
 })
 

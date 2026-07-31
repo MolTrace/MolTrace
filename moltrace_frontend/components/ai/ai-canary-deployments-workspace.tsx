@@ -1,7 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { statusLabel } from "@/lib/ui/status"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import {
   trackAiCanaryDeploymentApproved,
@@ -37,16 +39,6 @@ function extractRows(data: unknown, keys: string[]): Row[] {
     if (Array.isArray(value)) return value.filter(isRecord) as Row[]
   }
   return []
-}
-
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.data
-    if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return `HTTP ${err.status}: ${err.message || fallback}`
-  }
-  if (err instanceof Error) return err.message
-  return fallback
 }
 
 function formatWhen(iso: string): string {
@@ -120,7 +112,7 @@ export function AiCanaryDeploymentsWorkspace() {
       setModelCards(extractRows(cardData, CARD_KEYS))
       setEvaluationRuns(extractRows(evalData, EVAL_KEYS))
     } catch (err) {
-      setLoadErr(formatErr(err, "Could not load canary deployment data."))
+      setLoadErr(formatApiError(err, "Could not load canary deployment data."))
       setRows([])
       setArtifacts([])
       setModelCards([])
@@ -141,7 +133,7 @@ export function AiCanaryDeploymentsWorkspace() {
       setSelectedDetail(isRecord(data) ? data : null)
     } catch (err) {
       setSelectedDetail(null)
-      setDetailErr(formatErr(err, `Could not load canary deployment ${canaryId}.`))
+      setDetailErr(formatApiError(err, `Could not load canary deployment ${canaryId}.`))
     }
   }
 
@@ -173,7 +165,7 @@ export function AiCanaryDeploymentsWorkspace() {
       setFormOk("Canary deployment proposed.")
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setFormErr(formatErr(err, "Could not propose canary deployment."))
+      setFormErr(formatApiError(err, "Could not propose canary deployment."))
     } finally {
       setSubmitBusy(false)
     }
@@ -209,7 +201,7 @@ export function AiCanaryDeploymentsWorkspace() {
       }
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setActionErr(formatErr(err, `Could not ${action} canary deployment ${canaryId}.`))
+      setActionErr(formatApiError(err, `Could not ${action} canary deployment ${canaryId}.`))
     } finally {
       setActionBusyId(null)
     }
@@ -233,7 +225,7 @@ export function AiCanaryDeploymentsWorkspace() {
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertTitle>Missing readiness checks</AlertTitle>
           <AlertDescription>
-            {`${!hasModelCard ? "Model card missing. " : ""}${!hasEvaluation ? "Succeeded evaluation missing." : ""}`.trim()}
+            {`${!hasModelCard ? "Model card missing. " : ""}${!hasEvaluation ? "No successful evaluation run for this candidate." : ""}`.trim()}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -303,7 +295,7 @@ export function AiCanaryDeploymentsWorkspace() {
                     <TableCell>{readStr(row, ["canary_id", "id"])}</TableCell>
                     <TableCell>{readStr(row, ["service_key"])}</TableCell>
                     <TableCell>{readStr(row, ["candidate_model_artifact"])}</TableCell>
-                    <TableCell><Badge variant="outline">{readStr(row, ["status"])}</Badge></TableCell>
+                    <TableCell><Badge variant="outline">{statusLabel(readStr(row, ["status"]))}</Badge></TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatWhen(readStr(row, ["created_at", "timestamp"]))}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -328,7 +320,7 @@ export function AiCanaryDeploymentsWorkspace() {
           {selectedDetail ? (
             <div className="rounded-md border bg-muted/20 p-3 text-sm">
               <p><span className="font-medium">Canary:</span> {readRecordString(selectedDetail, "canary_id") ?? readRecordString(selectedDetail, "id") ?? "-"}</p>
-              <p><span className="font-medium">Status:</span> {readRecordString(selectedDetail, "status") ?? "-"}</p>
+              <p><span className="font-medium">Status:</span> {statusLabel(readRecordString(selectedDetail, "status"))}</p>
               <p><span className="font-medium">Summary:</span> {readRecordString(selectedDetail, "summary") ?? "-"}</p>
             </div>
           ) : null}

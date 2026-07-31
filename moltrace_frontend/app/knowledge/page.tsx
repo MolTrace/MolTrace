@@ -15,13 +15,13 @@ export default function KnowledgeLibraryPage() {
             serviceOptions={[
               {
                 id: "record-quality-scorer",
-                label: "record quality scorer",
+                label: "Record quality scorer",
                 serviceKey: "knowledge_record_quality_scorer",
                 taskKey: "record_quality_scoring",
               },
               {
                 id: "extraction-confidence-scorer",
-                label: "extraction confidence scorer",
+                label: "Extraction confidence scorer",
                 serviceKey: "knowledge_extraction_confidence_scorer",
                 taskKey: "extraction_confidence_scoring",
               },

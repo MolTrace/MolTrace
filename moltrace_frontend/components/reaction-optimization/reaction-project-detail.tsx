@@ -1028,9 +1028,25 @@ function formatAllowedValuesDisplay(raw: unknown): string {
 
 function formatDefaultDisplay(raw: unknown): string {
   if (raw == null) return "—"
-  if (typeof raw === "boolean") return raw ? "true" : "false"
+  // Display only — the stored value is still a true/false flag.
+  if (typeof raw === "boolean") return raw ? "Yes" : "No"
   if (typeof raw === "number" && Number.isFinite(raw)) return String(raw)
   return String(raw)
+}
+
+/** Reader-facing name for a variable's type. The stored values ("boolean", …) are
+ *  unchanged — statusLabel() alone would still print developer vocabulary. */
+const VARIABLE_TYPE_LABELS: Record<string, string> = {
+  categorical: "Categorical",
+  numeric: "Numeric",
+  boolean: "Yes / no",
+  text: "Free text",
+}
+
+function variableTypeLabel(raw: unknown): string {
+  const value = typeof raw === "string" ? raw.trim() : ""
+  if (!value) return "—"
+  return VARIABLE_TYPE_LABELS[value.toLowerCase()] ?? statusLabel(value)
 }
 
 function jsonPreview(raw: unknown, maxChars = 800): string {
@@ -3805,7 +3821,7 @@ export function ReactionProjectDetail() {
         tone: "ok",
         text:
           experiment_id != null
-            ? `Planned experiment recorded (experiment id ${experiment_id}; status ${experiment_status}). Saving a conversion does not mean the experiment was performed in the lab.`
+            ? `Planned experiment recorded (experiment id ${experiment_id}; status ${statusLabel(experiment_status)}). Saving a conversion does not mean the experiment was performed in the lab.`
             : "Conversion completed — check the experiment list to confirm an experiment was created.",
       })
       trackReactionRecommendationConvertedToExperiment({
@@ -5043,7 +5059,7 @@ export function ReactionProjectDetail() {
                       rank {String(latestRec.rank ?? "—")}
                     </Badge>
                     <Badge variant="outline">{String(latestRec.label ?? "")}</Badge>
-                    <Badge variant="outline">{String(latestRec.status ?? "")}</Badge>
+                    <Badge variant="outline">{latestRec.status ? statusLabel(latestRec.status) : ""}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">{fmtIso(latestRec.updated_at)}</p>
                   <p className="line-clamp-4 text-muted-foreground">{String(latestRec.rationale ?? "")}</p>
@@ -5126,7 +5142,7 @@ export function ReactionProjectDetail() {
                     variables.filter(isRecord).map((v) => (
                       <TableRow key={String(v.id)}>
                         <TableCell className="font-medium">{String(v.name ?? "")}</TableCell>
-                        <TableCell className="font-mono text-xs">{String(v.variable_type ?? "")}</TableCell>
+                        <TableCell className="text-xs">{variableTypeLabel(v.variable_type)}</TableCell>
                         <TableCell>{String(v.unit ?? "—")}</TableCell>
                         <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
                           {formatAllowedValuesDisplay(v.allowed_values_json)}
@@ -5164,10 +5180,11 @@ export function ReactionProjectDetail() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="categorical">categorical</SelectItem>
-                      <SelectItem value="numeric">numeric</SelectItem>
-                      <SelectItem value="boolean">boolean</SelectItem>
-                      <SelectItem value="text">text</SelectItem>
+                      {/* Labels are display-only; value= stays byte-identical (sent to the server). */}
+                      <SelectItem value="categorical">Categorical</SelectItem>
+                      <SelectItem value="numeric">Numeric</SelectItem>
+                      <SelectItem value="boolean">Yes / no</SelectItem>
+                      <SelectItem value="text">Free text</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -7914,7 +7931,7 @@ export function ReactionProjectDetail() {
                         const bid = readBoRunId(row)
                         return (
                           <SelectItem key={`cmp-bo-${bid}`} value={bid}>
-                            {bid} {typeof row.algorithm === "string" ? `· ${row.algorithm}` : ""} ·{" "}
+                            {bid} {typeof row.algorithm === "string" ? `· ${optionLabel(row.algorithm)}` : ""} ·{" "}
                             {fmtIso(row.created_at)}
                           </SelectItem>
                         )

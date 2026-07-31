@@ -12,6 +12,7 @@ import {
   KNOWLEDGE_LINK_CONFIDENCE_LABELS,
   KNOWLEDGE_LINK_TARGET_TYPES,
   KNOWLEDGE_TRAINING_DATASET_TYPES,
+  knowledgeLabel,
 } from "@/components/knowledge/knowledge-constants"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -251,7 +252,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
           metadata_json: {},
         },
       })
-      setActionOk("Graph link created.")
+      setActionOk("Link created.")
     } catch (e) {
       setActionErr(formatApiError(e, "Could not create the link."))
     } finally {
@@ -444,13 +445,13 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                 {rows.map((row, idx) => {
                   const id = readRecordNumber(row, "id")
                   const cit = readIntList(row["citation_ids_json"]).length
-                  const rs = readRecordString(row, "review_status") ?? "—"
+                  const rs = knowledgeLabel(readRecordString(row, "review_status"))
                   return (
                     <TableRow key={id != null ? `row-${id}` : `row-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                       {recordKind === "reaction" ? (
                         <>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "reaction_type") ?? "—"}</TableCell>
+                          <TableCell className="text-xs">{readRecordString(row, "reaction_type") ?? "—"}</TableCell>
                           <TableCell className="max-w-[140px] truncate text-xs">
                             {readRecordString(row, "substrate_summary") ?? "—"}
                           </TableCell>
@@ -523,7 +524,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
           eyebrow="Detail"
           title="Record detail & review"
           icon={ClipboardCheck}
-          description="Read-only extracted fields; approval requires reviewer identity and comment."
+          description="Extracted values are shown read-only; approval requires reviewer identity and a comment."
         >
           <div className="space-y-4">
             {citationMissing ? (
@@ -565,7 +566,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
               <div className="grid gap-3 md:grid-cols-2">
                 <DetailKV label="Reaction name" value={readRecordString(selected, "reaction_name")} />
                 <DetailKV label="Reaction type" value={readRecordString(selected, "reaction_type")} />
-                <DetailKV label="Review status" value={readRecordString(selected, "review_status")} />
+                <DetailKV label="Review status" value={knowledgeLabel(readRecordString(selected, "review_status"))} />
                 <DetailKV label="Substrate" value={readRecordString(selected, "substrate_summary")} wide />
                 <DetailKV label="Product" value={readRecordString(selected, "product_summary")} wide />
                 <DetailBlock label="Product SMILES" mono value={readRecordString(selected, "product_smiles")} />
@@ -652,7 +653,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
             {recordKind === "analytical" && selected ? (
               <div className="grid gap-3 md:grid-cols-2">
                 <DetailKV label="Compound name" value={readRecordString(selected, "compound_name")} wide />
-                <DetailKV label="Review status" value={readRecordString(selected, "review_status")} />
+                <DetailKV label="Review status" value={knowledgeLabel(readRecordString(selected, "review_status"))} />
                 <DetailBlock label="Structure input" mono value={readRecordString(selected, "structure_input")} />
                 <DetailKV label="Structure format" value={readRecordString(selected, "structure_format")} />
                 <DetailKV label="Formula" value={readRecordString(selected, "formula")} />
@@ -716,7 +717,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   label="Topic"
                   value={readRecordString(selected, "topic") ?? (typeof selected["topic"] === "string" ? selected["topic"] : undefined)}
                 />
-                <DetailKV label="Review status" value={readRecordString(selected, "review_status")} />
+                <DetailKV label="Review status" value={knowledgeLabel(readRecordString(selected, "review_status"))} />
                 <DetailKV
                   label="Jurisdiction ID"
                   value={
@@ -799,7 +800,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
             </div>
 
             <div className="space-y-3 border-t pt-4">
-              <p className="text-sm font-medium">Link to target entity</p>
+              <p className="text-sm font-medium">Link to a related record</p>
               <p className="text-xs text-muted-foreground">
                 Attach this extracted record to a project, sample, compound, or batch. Available once review status is <strong>accepted</strong>.
               </p>
@@ -813,7 +814,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                     <SelectContent>
                       {KNOWLEDGE_LINK_TARGET_TYPES.map((t) => (
                         <SelectItem key={t} value={t}>
-                          {t}
+                          {knowledgeLabel(t)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -842,7 +843,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                     <SelectContent>
                       {KNOWLEDGE_LINK_CONFIDENCE_LABELS.map((c) => (
                         <SelectItem key={c} value={c}>
-                          {c}
+                          {knowledgeLabel(c)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -865,7 +866,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   <SelectContent>
                     {KNOWLEDGE_TRAINING_DATASET_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {knowledgeLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -887,7 +888,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   <SelectContent>
                     {KNOWLEDGE_BENCHMARK_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t}
+                        {knowledgeLabel(t)}
                       </SelectItem>
                     ))}
                   </SelectContent>

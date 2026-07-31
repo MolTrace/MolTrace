@@ -1,5 +1,6 @@
 "use client"
 
+import { statusLabel } from "@/lib/ui/status"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { trackWatchFolderScanRun } from "@/src/lib/analytics/analytics-client"
@@ -470,7 +471,7 @@ export function InstrumentWatchFolderWorkspace() {
                         <TableCell className="text-xs">{row.folder_path}</TableCell>
                         <TableCell className="text-xs">{row.target_program}</TableCell>
                         <TableCell className="text-xs">{row.target_route}</TableCell>
-                        <TableCell className="text-xs">{row.status}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(row.status)}</TableCell>
                         <TableCell className="text-xs">{row.last_scan}</TableCell>
                         <TableCell className="text-xs">
                           discovered {row.discovered_count ?? "—"} / ingested {row.ingested_count ?? "—"} / skipped{" "}

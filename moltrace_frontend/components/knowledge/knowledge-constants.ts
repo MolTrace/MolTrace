@@ -1,3 +1,27 @@
+import { statusLabel } from "@/lib/ui/status"
+
+/** The handful of stored values whose generic humanization reads wrong
+ *  ("Msms annotation", "Lcms feature", "Eln export"). Everything else goes
+ *  through statusLabel(). Keys are the stored values and are never sent
+ *  anywhere — only the label a reader sees comes from here. */
+const KNOWLEDGE_VALUE_LABELS: Record<string, string> = {
+  msms: "MS/MS",
+  lcms: "LC-MS",
+  msms_annotation: "MS/MS annotation",
+  lcms_feature: "LC-MS feature",
+  lcms_feature_consensus: "LC-MS feature consensus",
+  eln_export: "ELN export",
+}
+
+/** Reader-facing label for any stored knowledge-library value. The stored
+ *  value itself is unchanged — pass it to `value=` as-is and only wrap the
+ *  visible child in this. */
+export function knowledgeLabel(value: unknown): string {
+  const raw = typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : ""
+  if (!raw) return "—"
+  return KNOWLEDGE_VALUE_LABELS[raw.toLowerCase()] ?? statusLabel(raw)
+}
+
 /** Mirrors backend KnowledgeSourceType — do not rename values (API contract). */
 export const KNOWLEDGE_SOURCE_TYPES = [
   "journal_article",

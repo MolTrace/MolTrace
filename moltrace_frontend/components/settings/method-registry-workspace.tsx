@@ -17,6 +17,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Activity, BarChart3, Cpu, FlaskConical, Gauge, ServerOff } from "lucide-react"
+import { statusLabel } from "@/lib/ui/status"
 
 const TOOLTIP =
   "The method registry records the exact scientific methods, model versions, scoring profiles, and thresholds used to produce evidence and reports."
@@ -68,17 +69,6 @@ function summarizeUnknown(v: unknown, maxLen = 160): string {
     const s = JSON.stringify(v)
     return s.length > maxLen ? `${s.slice(0, maxLen)}…` : s
   }
-  return "—"
-}
-
-function formatEndpointsCell(raw: unknown): string {
-  if (raw == null) return "—"
-  if (typeof raw === "string") return raw.trim() || "—"
-  if (Array.isArray(raw)) {
-    const parts = raw.map((x) => (typeof x === "string" ? x : JSON.stringify(x)))
-    return parts.length ? parts.join(", ") : "—"
-  }
-  if (isRecord(raw)) return summarizeUnknown(raw, 240)
   return "—"
 }
 
@@ -231,14 +221,13 @@ export function MethodRegistryWorkspace() {
                       <TableHead className="text-xs">Status</TableHead>
                       <TableHead className="text-xs">Default scoring profile</TableHead>
                       <TableHead className="text-xs">Default threshold profile</TableHead>
-                      <TableHead className="text-xs">API paths</TableHead>
                       <TableHead className="text-xs">Updated date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {methods.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-xs text-muted-foreground">
+                        <TableCell colSpan={7} className="text-xs text-muted-foreground">
                           No methods found.
                         </TableCell>
                       </TableRow>
@@ -252,7 +241,7 @@ export function MethodRegistryWorkspace() {
                           <TableCell className="text-xs">{readStr(row, ["version", "semver"]) || "—"}</TableCell>
                           <TableCell className="text-xs">
                             <Badge variant="outline" className="font-normal">
-                              {readStr(row, ["status"]) || "—"}
+                              {statusLabel(readStr(row, ["status"]))}
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-[10rem] text-xs">
@@ -270,9 +259,6 @@ export function MethodRegistryWorkspace() {
                               "threshold_profile",
                               "threshold_profile_name",
                             ]) || "—"}
-                          </TableCell>
-                          <TableCell className="max-w-[14rem] font-mono text-[10px] break-all">
-                            {formatEndpointsCell(row.endpoint_paths ?? row.endpoints ?? row.api_paths)}
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                             {readStr(row, ["updated_at", "updatedAt", "modified_at", "modifiedAt"]) || "—"}
@@ -328,7 +314,7 @@ export function MethodRegistryWorkspace() {
                           <TableCell className="text-xs">{readStr(row, ["version"]) || "—"}</TableCell>
                           <TableCell className="text-xs">
                             <Badge variant="outline" className="font-normal">
-                              {readStr(row, ["status"]) || "—"}
+                              {statusLabel(readStr(row, ["status"]))}
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-[12rem] font-mono text-[10px] break-all">
@@ -385,7 +371,7 @@ export function MethodRegistryWorkspace() {
                           <TableCell className="text-xs">{readStr(row, ["method", "method_name", "linked_method"]) || "—"}</TableCell>
                           <TableCell className="text-xs">
                             <Badge variant="outline" className="font-normal">
-                              {readStr(row, ["status"]) || "—"}
+                              {statusLabel(readStr(row, ["status"]))}
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-[20rem] text-xs">{summarizeUnknown(row.weights_summary ?? row.weights)}</TableCell>
@@ -439,7 +425,7 @@ export function MethodRegistryWorkspace() {
                           <TableCell className="text-xs">{readStr(row, ["version"]) || "—"}</TableCell>
                           <TableCell className="text-xs">
                             <Badge variant="outline" className="font-normal">
-                              {readStr(row, ["status"]) || "—"}
+                              {statusLabel(readStr(row, ["status"]))}
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-[20rem] text-xs">{summarizeUnknown(row.thresholds_summary ?? row.thresholds)}</TableCell>

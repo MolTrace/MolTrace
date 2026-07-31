@@ -76,21 +76,39 @@ function isAuthErr(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 401 || err.status === 403)
 }
 
-/** Humanize a monitoring-threshold key: psi_warn → "psi warn". */
+/** Humanize a monitoring-threshold key: psi_warn → "psi warn" (rendered uppercase). */
 function humanizeKey(key: string): string {
   return key.replace(/_/g, " ")
 }
 
 /**
+ * Words that keep their domain casing when a stored token is rendered — model
+ * registry roles ("lora_adapter" → "LoRA adapter", "hose_kb" → "HOSE KB") and
+ * metric abbreviations ("mae_ppm" → "MAE ppm"). Units stay lowercase. An
+ * ML-literate reader loses information when these are sentence-cased.
+ */
+const CASED_WORDS: Record<string, string> = {
+  ok: "OK", lora: "LoRA", hose: "HOSE", kb: "KB", gnn: "GNN", ml: "ML", ai: "AI",
+  ood: "OOD", qa: "QA", api: "API", nmr: "NMR", sla: "SLA",
+  mae: "MAE", rmse: "RMSE", mse: "MSE", mad: "MAD", sd: "SD", r2: "R²",
+  psi: "PSI", ks: "KS", auc: "AUC", roc: "ROC", snr: "SNR", ppm: "ppm", hz: "Hz",
+}
+
+/**
  * Display-only label for a stored token ("audit_chain" → "Audit chain",
- * "breach" → "Breach"). The stored value still drives the badge palette and
- * every comparison — only the on-screen text changes.
+ * "breach" → "Breach", "mae_ppm" → "MAE ppm"). The stored value still drives
+ * the badge palette and every comparison — only the on-screen text changes.
  */
 function tokenLabel(value: string): string {
-  const text = value.trim().replace(/_/g, " ")
-  if (!text) return value
-  if (text.toLowerCase() === "ok") return "OK"
-  return text.charAt(0).toUpperCase() + text.slice(1)
+  const words = value.trim().split(/[_\s]+/).filter(Boolean)
+  if (words.length === 0) return value
+  return words
+    .map((word, i) => {
+      const cased = CASED_WORDS[word.toLowerCase()]
+      if (cased) return cased
+      return i === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word
+    })
+    .join(" ")
 }
 
 /**

@@ -87,7 +87,8 @@ async function proxy(request: NextRequest, context: RouteContext) {
     console.error("[api/backend proxy] fetch failed:", target.toString(), err)
     return NextResponse.json(
       {
-        detail: "Backend connection failed. Please retry in a moment.",
+        // `detail` is surfaced verbatim in the UI — keep it plain language, no "backend".
+        detail: "Could not reach the MolTrace service. Please retry in a moment.",
         target: target.toString(),
         error: String((err as Error)?.message ?? err),
       },

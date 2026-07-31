@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { FileCheck2, FileText, Plus } from "lucide-react"
+import { statusLabel } from "@/lib/ui/status"
 
 type Row = Record<string, unknown>
 
@@ -659,7 +660,7 @@ export function ControlledRecordsWorkspace() {
                   return (
                     <TableRow key={id || JSON.stringify(record)} className={archived ? "opacity-70" : undefined}>
                       <TableCell className="font-medium">{readStr(record.title) || "-"}</TableCell>
-                      <TableCell>{readStr(record.record_type) || "-"}</TableCell>
+                      <TableCell>{statusLabel(readStr(record.record_type))}</TableCell>
                       <TableCell>{readStr(record.resource_id) || "-"}</TableCell>
                       <TableCell>{readStr(record.version) || "-"}</TableCell>
                       <TableCell>

@@ -237,7 +237,7 @@ const VERDICT_STYLE: Record<FlipReadinessVerdict, { label: string; chip: string;
     icon: AlertTriangle,
   },
   insufficient_data: {
-    label: "Insufficient data · awaiting more tenant runs",
+    label: "Insufficient data · awaiting more runs",
     chip: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
     dot: "bg-amber-500",
     icon: HelpCircle,
@@ -282,12 +282,12 @@ export function GsdTelemetryPanel({
     title ??
     (mode === "admin"
       ? "GSD readiness · server-aggregated telemetry"
-      : "GSD telemetry · this tenant")
+      : "GSD telemetry · your organization")
   const resolvedDescription =
     description ??
     (mode === "admin"
       ? "Pre-aggregated rollup of every GSD analysis audit event over the trailing window. The rollup and the promotion-gate verdict are computed server-side and shown here as recorded."
-      : "Pre-aggregated rollup of your tenant's experimental-engine usage. Use to verify performance on your spectra and size opt-in adoption before the promotion gate clears.")
+      : "Pre-aggregated rollup of your organization's experimental-engine usage. Use to verify performance on your spectra and size opt-in adoption before the promotion gate clears.")
 
   if (state.status === "loading") {
     return (
@@ -562,7 +562,7 @@ function AdoptionCallout({
       <div className="flex items-center gap-2">
         <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-          Adoption · graduated tenants
+          Adoption · graduated organizations
         </p>
       </div>
       <div className="mt-2">
@@ -575,11 +575,11 @@ function AdoptionCallout({
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
           {noneYet
             ? scopedToUser
-              ? "No tenants graduated yet — this user would be first."
-              : "No tenants graduated yet across the platform."
+              ? "No organizations graduated yet — this user would be first."
+              : "No organizations graduated yet across the platform."
             : scopedToUser
-              ? `${count.toLocaleString()} other tenant${count === 1 ? "" : "s"} already default to the GSD engine.`
-              : `${count.toLocaleString()} tenant${count === 1 ? "" : "s"} default to the GSD engine platform-wide.`}
+              ? `${count.toLocaleString()} other organization${count === 1 ? "" : "s"} already default to the GSD engine.`
+              : `${count.toLocaleString()} organization${count === 1 ? "" : "s"} default to the GSD engine platform-wide.`}
         </p>
       </div>
     </div>
@@ -809,14 +809,14 @@ function NeedMoreData({
           <h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
             {scope.kind === "user"
               ? `Awaiting more runs from ${scope.label}.`
-              : "Awaiting more tenant runs."}
+              : "Awaiting more runs across all organizations."}
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-relaxed text-foreground/85">
             Invocation count is below the threshold required to evaluate the promotion gate. The
             gate can't fail or pass yet — it can only wait.{" "}
             {scope.kind === "user"
               ? "Reach out to this user to encourage GSD opt-in on their next SpectraCheck session."
-              : "Encourage opt-in adoption in tenant accounts (the SpectraCheck Overview panel surfaces the per-tenant invitation)."}
+              : "Encourage opt-in adoption in customer organizations (the SpectraCheck Overview panel surfaces the per-organization invitation)."}
           </p>
           <div className="mt-6 rounded-xl border bg-background/50 p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -937,7 +937,7 @@ function ReadyToFlip({
                 Every promotion-gate criterion is satisfied for {scope.label} in the trailing{" "}
                 {summary.window_days}-day window. Graduating this user switches their default
                 detection engine from Legacy to GSD on their next session — without affecting other
-                tenants. A reason is required and recorded in the audit ledger.
+                organizations. A reason is required and recorded in the audit ledger.
               </>
             ) : (
               <>

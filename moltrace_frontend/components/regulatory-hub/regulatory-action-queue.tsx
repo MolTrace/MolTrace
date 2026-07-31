@@ -280,7 +280,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
         })
       }
     } catch (e) {
-      setErr(formatApiError(e, "Update failed."))
+      setErr(formatApiError(e, "Could not update the action item."))
     } finally {
       setPatchBusyId(null)
     }
@@ -299,7 +299,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
       setAssignTargetId(null)
       await load()
     } catch (e) {
-      setErr(formatApiError(e, "Assign failed."))
+      setErr(formatApiError(e, "Could not save the owner for this action item."))
     } finally {
       setPatchBusyId(null)
     }
@@ -342,7 +342,7 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
       setCreateDescription("")
       await load()
     } catch (e) {
-      setCreateErr(formatApiError(e, "Create failed."))
+      setCreateErr(formatApiError(e, "Could not create the action item."))
     } finally {
       setCreateBusy(false)
     }

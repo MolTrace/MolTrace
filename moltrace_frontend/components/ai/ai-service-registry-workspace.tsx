@@ -1,7 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { statusLabel } from "@/lib/ui/status"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -61,18 +63,6 @@ function readBool(v: unknown): boolean | null {
   return null
 }
 
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.data
-    if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) {
-      return data.detail
-    }
-    return err.message || fallback
-  }
-  if (err instanceof Error) return err.message
-  return fallback
-}
-
 function isExplicitlyApprovedForServing(deploymentRows: Row[], artifactId: number): boolean {
   for (const row of deploymentRows) {
     const rowArtifactId = readRecordNumber(row, "model_artifact_id")
@@ -128,7 +118,7 @@ export function AiServiceRegistryWorkspace() {
       setArtifacts(extractRows(artifactData, ARTIFACT_KEYS))
       setDeploymentCandidates(extractRows(deploymentData, DEPLOYMENT_KEYS))
     } catch (err) {
-      setLoadErr(formatErr(err, "Could not load service registry data."))
+      setLoadErr(formatApiError(err, "Could not load service registry data."))
       setServices([])
       setArtifacts([])
       setDeploymentCandidates([])
@@ -165,7 +155,7 @@ export function AiServiceRegistryWorkspace() {
       } catch (err) {
         if (!cancelled) {
           setServiceDetail(null)
-          setDetailErr(formatErr(err, `Could not load service ${selectedServiceId}.`))
+          setDetailErr(formatApiError(err, `Could not load service ${selectedServiceId}.`))
         }
       }
     })()
@@ -229,7 +219,7 @@ export function AiServiceRegistryWorkspace() {
       setFormOk("Service created.")
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setFormErr(formatErr(err, "Could not create service."))
+      setFormErr(formatApiError(err, "Could not create service."))
     } finally {
       setSubmitBusy(false)
     }
@@ -239,7 +229,7 @@ export function AiServiceRegistryWorkspace() {
     setFormErr("")
     setFormOk("")
     if (selectedServiceId == null) {
-      setFormErr("Select a service row to update.")
+      setFormErr("Select a service in the table to update.")
       return
     }
     if (!serviceKey.trim() || !name.trim() || !targetModule.trim() || !taskKey.trim()) {
@@ -270,7 +260,7 @@ export function AiServiceRegistryWorkspace() {
       setFormOk("Service updated.")
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setFormErr(formatErr(err, `Could not update service ${selectedServiceId}.`))
+      setFormErr(formatApiError(err, `Could not update service ${selectedServiceId}.`))
     } finally {
       setSubmitBusy(false)
     }
@@ -307,7 +297,7 @@ export function AiServiceRegistryWorkspace() {
 
       {loadErr ? (
         <Alert variant="destructive">
-          <AlertTitle>Load error</AlertTitle>
+          <AlertTitle>Couldn’t load the service registry</AlertTitle>
           <AlertDescription>{loadErr}</AlertDescription>
         </Alert>
       ) : null}
@@ -341,12 +331,12 @@ export function AiServiceRegistryWorkspace() {
                   <TableRow key={`${id ?? "row"}-${idx}`} data-state={active ? "selected" : undefined} onClick={() => setSelectedServiceId(id ?? null)} className="cursor-pointer">
                     <TableCell>{readRecordString(row, "service_key") ?? "—"}</TableCell>
                     <TableCell>{readRecordString(row, "name") ?? "—"}</TableCell>
-                    <TableCell>{readRecordString(row, "target_module") ?? "—"}</TableCell>
+                    <TableCell>{statusLabel(readRecordString(row, "target_module"))}</TableCell>
                     <TableCell>{readRecordString(row, "task_key") ?? "—"}</TableCell>
                     <TableCell>{readRecordString(row, "active_model_artifact_id") ?? "—"}</TableCell>
                     <TableCell>{readRecordString(row, "fallback_model_artifact_id") ?? "—"}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                      <Badge variant="outline">{statusLabel(readRecordString(row, "status"))}</Badge>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {formatWhen(readRecordString(row, "updated_at") ?? readRecordString(row, "created_at"))}
@@ -384,7 +374,7 @@ export function AiServiceRegistryWorkspace() {
         <div className="space-y-4">
           {detailErr ? (
             <Alert variant="destructive">
-              <AlertTitle>Service detail error</AlertTitle>
+              <AlertTitle>Couldn’t load service details</AlertTitle>
               <AlertDescription>{detailErr}</AlertDescription>
             </Alert>
           ) : null}
@@ -429,7 +419,7 @@ export function AiServiceRegistryWorkspace() {
                 <SelectContent>
                   {TARGET_MODULE_OPTIONS.map((opt) => (
                     <SelectItem key={opt} value={opt}>
-                      {opt}
+                      {statusLabel(opt)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -488,7 +478,7 @@ export function AiServiceRegistryWorkspace() {
                 <SelectContent>
                   {STATUS_OPTIONS.map((opt) => (
                     <SelectItem key={opt} value={opt}>
-                      {opt}
+                      {statusLabel(opt)}
                     </SelectItem>
                   ))}
                 </SelectContent>

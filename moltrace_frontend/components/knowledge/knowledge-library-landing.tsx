@@ -2,8 +2,10 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
+import { knowledgeLabel } from "@/components/knowledge/knowledge-constants"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -61,16 +63,6 @@ function formatWhen(iso: string | undefined): string {
   return new Date(d).toLocaleString()
 }
 
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const d = err.data
-    if (isRecord(d) && typeof d.detail === "string") return d.detail
-    return err.message || fallback
-  }
-  if (err instanceof Error) return err.message
-  return fallback
-}
-
 const PENDING_TASK_STATUSES = new Set(["open", "in_review", "needs_changes", "deferred"])
 const APPROVED_TASK_STATUS = "accepted"
 
@@ -111,31 +103,31 @@ export function KnowledgeLibraryLanding() {
 
     const [s, r, t, tr, bc, mi, dv] = await Promise.all([
       apiFetch<unknown>("/knowledge/sources", { method: "GET" }).catch((e) => {
-        setErrSources(formatErr(e, "Could not load sources."))
+        setErrSources(formatApiError(e, "Could not load sources."))
         return []
       }),
       apiFetch<unknown>("/knowledge/extractions/runs", { method: "GET" }).catch((e) => {
-        setErrRuns(formatErr(e, "Could not load extraction runs."))
+        setErrRuns(formatApiError(e, "Could not load extraction runs."))
         return []
       }),
       apiFetch<unknown>("/knowledge/review-tasks", { method: "GET" }).catch((e) => {
-        setErrReview(formatErr(e, "Could not load review tasks."))
+        setErrReview(formatApiError(e, "Could not load review tasks."))
         return []
       }),
       apiFetch<unknown>("/knowledge/training-dataset-candidates", { method: "GET" }).catch((e) => {
-        setErrTraining(formatErr(e, "Could not load training dataset candidates."))
+        setErrTraining(formatApiError(e, "Could not load training dataset candidates."))
         return []
       }),
       apiFetch<unknown>("/knowledge/benchmark-dataset-candidates", { method: "GET" }).catch((e) => {
-        setErrBenchmark(formatErr(e, "Could not load benchmark dataset candidates."))
+        setErrBenchmark(formatApiError(e, "Could not load benchmark dataset candidates."))
         return []
       }),
       apiFetch<unknown>("/knowledge/model-improvement-queue", { method: "GET" }).catch((e) => {
-        setErrImprovement(formatErr(e, "Could not load model improvement queue."))
+        setErrImprovement(formatApiError(e, "Could not load model improvement queue."))
         return []
       }),
       apiFetch<unknown>("/knowledge/dataset-versions", { method: "GET" }).catch((e) => {
-        setErrDatasetVersions(formatErr(e, "Could not load dataset versions."))
+        setErrDatasetVersions(formatApiError(e, "Could not load dataset versions."))
         return []
       }),
     ])
@@ -267,7 +259,7 @@ export function KnowledgeLibraryLanding() {
         errBenchmark ||
         errImprovement ||
         errDatasetVersions) && (
-        <AlertCard variant="error" title="Partial load">
+        <AlertCard variant="error" title="Some sections could not load">
           <div className="space-y-1 text-xs text-foreground/90">
             {errSources ? <p>Sources: {errSources}</p> : null}
             {errRuns ? <p>Extraction runs: {errRuns}</p> : null}
@@ -497,9 +489,9 @@ export function KnowledgeLibraryLanding() {
                       <TableCell className="max-w-[240px] truncate text-sm">
                         {readRecordString(row, "title") ?? "—"}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{readRecordString(row, "source_type") ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "source_type"))}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatWhen(readRecordString(row, "updated_at") ?? readRecordString(row, "created_at"))}
@@ -518,7 +510,7 @@ export function KnowledgeLibraryLanding() {
         eyebrow="Extractions"
         title="Recent extraction runs"
         icon={FileStack}
-        description="Recent knowledge extraction pipeline runs — source, status, extracted entity count, and run timestamp."
+        description="Recent knowledge extraction runs — source, status, extracted record count, and when each run finished."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -556,9 +548,9 @@ export function KnowledgeLibraryLanding() {
                   return (
                     <TableRow key={id != null ? `run-${id}` : `run-i-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{readRecordString(row, "extraction_type") ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "extraction_type"))}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="secondary">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-sm">{ecNum != null ? ecNum : "—"}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
@@ -578,7 +570,7 @@ export function KnowledgeLibraryLanding() {
         eyebrow="Review"
         title="Review queue preview"
         icon={ClipboardCheck}
-        description="Extracted knowledge claims pending expert review — status, source, and entity type for each queued review task."
+        description="Extracted knowledge claims pending expert review — status, source, and record type for each queued review task."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -606,10 +598,10 @@ export function KnowledgeLibraryLanding() {
                   return (
                     <TableRow key={id != null ? `rt-${id}` : `rt-i-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{readRecordString(row, "record_type") ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "record_type"))}</TableCell>
                       <TableCell className="font-mono text-xs">{rid ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="max-w-[220px] truncate text-sm">
                         {readRecordString(row, "title") ?? "—"}
@@ -656,7 +648,7 @@ export function KnowledgeLibraryLanding() {
                     <TableRow key={id != null ? `tr-${id}` : `tr-i-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatWhen(readRecordString(row, "updated_at") ?? readRecordString(row, "created_at"))}
@@ -700,7 +692,7 @@ export function KnowledgeLibraryLanding() {
                     <TableRow key={id != null ? `bc-${id}` : `bc-i-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatWhen(readRecordString(row, "updated_at") ?? readRecordString(row, "created_at"))}
@@ -744,7 +736,7 @@ export function KnowledgeLibraryLanding() {
                     <TableRow key={id != null ? `mi-${id}` : `mi-i-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatWhen(readRecordString(row, "updated_at") ?? readRecordString(row, "created_at"))}
@@ -763,7 +755,7 @@ export function KnowledgeLibraryLanding() {
         eyebrow="Versions"
         title="Dataset versions"
         icon={BookMarked}
-        description="Versioned knowledge dataset snapshots — approval status, entity counts, and provenance for each curated release."
+        description="Versioned knowledge dataset snapshots — approval status, record counts, and provenance for each curated release."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -788,7 +780,7 @@ export function KnowledgeLibraryLanding() {
                     <TableRow key={id != null ? `dv-${id}` : `dv-i-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatWhen(readRecordString(row, "updated_at") ?? readRecordString(row, "created_at"))}

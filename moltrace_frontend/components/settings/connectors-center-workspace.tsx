@@ -18,6 +18,7 @@ import {
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Activity, AlertTriangle, HeartPulse, Plug, Plus, RefreshCw, XCircle } from "lucide-react"
+import { statusLabel } from "@/lib/ui/status"
 
 type Row = Record<string, unknown>
 
@@ -343,7 +344,7 @@ export function ConnectorsCenterWorkspace() {
                         <TableCell className="text-xs">{connector.display_name}</TableCell>
                         <TableCell className="text-xs">{connector.connector_type}</TableCell>
                         <TableCell className="text-xs">{connector.target_program}</TableCell>
-                        <TableCell className="text-xs">{connector.status}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(connector.status)}</TableCell>
                         <TableCell className="text-xs">{connector.last_health_check}</TableCell>
                         <TableCell className="text-xs">{connector.updated_date}</TableCell>
                         <TableCell>
@@ -480,7 +481,7 @@ export function ConnectorsCenterWorkspace() {
                   ) : (
                     healthChecks.map((row, idx) => (
                       <TableRow key={`${readStr(row.id) || idx}`}>
-                        <TableCell className="text-xs">{readStr(row.status) || "—"}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(readStr(row.status))}</TableCell>
                         <TableCell className="text-xs">{readStr(row.checked_at ?? row.created_at) || "—"}</TableCell>
                         <TableCell className="text-xs">{readStr(row.message ?? row.detail) || "—"}</TableCell>
                       </TableRow>

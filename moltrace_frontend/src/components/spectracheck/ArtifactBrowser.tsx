@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ApiError, apiFetch, buildApiPath, readStoredAuthToken } from "@/lib/api/client"
+import { ApiError, apiFetch, buildApiPath, readStoredAuthToken, sanitizePublicApiErrorMessage } from "@/lib/api/client"
 import { parseQualityControlPayload } from "@/src/lib/spectracheck/quality-control-assessment"
 import type { EvidenceLayerType } from "@/src/lib/spectracheck/evidence-types"
 import { extractMethodProvenanceFromUnknown } from "@/src/lib/spectracheck/evidence-method-provenance"
@@ -196,7 +196,12 @@ async function downloadArtifactToDisk(artifactId: string, fallbackName: string) 
   })
   if (!response.ok) {
     const data = await response.json().catch(() => response.text())
-    throw new ApiError(response.status, data, `Download failed (${response.status})`)
+    // Message can reach the reader via formatApiError — no status codes in the copy.
+    throw new ApiError(
+      response.status,
+      data,
+      sanitizePublicApiErrorMessage("This file could not be downloaded. Please try again.", response.status)
+    )
   }
   const blob = await response.blob()
   const cd = response.headers.get("content-disposition") || ""
@@ -425,7 +430,7 @@ export function ArtifactBrowser({ sessionId }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         {!hasSession ? (
-          <p className="text-sm text-muted-foreground">Load or save a backend session to list artifacts.</p>
+          <p className="text-sm text-muted-foreground">Load or save a session to list its artifacts.</p>
         ) : null}
         {listError ? <p className="text-sm text-destructive">{listError}</p> : null}
 

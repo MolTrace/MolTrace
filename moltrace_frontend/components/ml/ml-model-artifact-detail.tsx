@@ -1,5 +1,6 @@
 "use client"
 
+import { statusLabel } from "@/lib/ui/status"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -349,7 +350,7 @@ export function MlModelArtifactDetail() {
                         <TableRow key={id != null ? `ev-${id}` : `ev-${idx}`}>
                           <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{readStr(row, ["status"]) || "—"}</Badge>
+                            <Badge variant="outline">{statusLabel(readStr(row, ["status"]))}</Badge>
                           </TableCell>
                           <TableCell className="font-mono text-xs">
                             {readRecordNumber(row, "dataset_version_id") ?? "—"}

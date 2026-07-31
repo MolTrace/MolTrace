@@ -234,7 +234,7 @@ const OPTION_LABEL_OVERRIDES: Record<string, string> = {
   ai_governance: "AI governance",
   cross_module: "Cross-module",
   shared_database_tenant_scoped: "Shared database (tenant-scoped)",
-  dedicated_schema: "Dedicated database schema",
+  dedicated_schema: "Dedicated database space",
   go_live: "Go-live",
   ready_for_go_live: "Ready for go-live",
   approved_internal: "Approved (internal)",

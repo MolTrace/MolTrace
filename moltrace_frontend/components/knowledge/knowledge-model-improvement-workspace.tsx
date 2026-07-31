@@ -12,6 +12,7 @@ import {
   MODEL_IMPROVEMENT_SOURCE_TYPES,
   MODEL_IMPROVEMENT_STATUSES,
   MODEL_IMPROVEMENT_TARGET_MODULES,
+  knowledgeLabel,
 } from "@/components/knowledge/knowledge-constants"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -285,7 +286,7 @@ export function KnowledgeModelImprovementWorkspace() {
                     <SelectItem value="__all">All</SelectItem>
                     {MODEL_IMPROVEMENT_STATUSES.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {knowledgeLabel(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -339,16 +340,16 @@ export function KnowledgeModelImprovementWorkspace() {
                       const lid = readRecordNumber(row, "linked_record_id")
                       const linked =
                         lt != null || lid != null
-                          ? `${lt ?? "—"} · ${lid != null ? lid : "—"}`
+                          ? `${knowledgeLabel(lt)} · ${lid != null ? lid : "—"}`
                           : "—"
                       return (
                         <TableRow key={id != null ? `mi-${id}` : `mi-${idx}`}>
                           <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "target_module") ?? "—"}</TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "source_type") ?? "—"}</TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "priority") ?? "—"}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "target_module"))}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "source_type"))}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "priority"))}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                            <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                           </TableCell>
                           <TableCell className="max-w-[260px] truncate text-xs" title={sum}>
                             {sum ? truncateSummary(sum, 120) : "—"}
@@ -401,7 +402,7 @@ export function KnowledgeModelImprovementWorkspace() {
                 <SelectContent>
                   {MODEL_IMPROVEMENT_SOURCE_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {knowledgeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -416,7 +417,7 @@ export function KnowledgeModelImprovementWorkspace() {
                 <SelectContent>
                   {MODEL_IMPROVEMENT_TARGET_MODULES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {knowledgeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -431,7 +432,7 @@ export function KnowledgeModelImprovementWorkspace() {
                 <SelectContent>
                   {MODEL_IMPROVEMENT_PRIORITIES.map((p) => (
                     <SelectItem key={p} value={p}>
-                      {p}
+                      {knowledgeLabel(p)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -447,7 +448,7 @@ export function KnowledgeModelImprovementWorkspace() {
                   <SelectItem value="__none__">—</SelectItem>
                   {KNOWLEDGE_REVIEW_RECORD_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {knowledgeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -545,7 +546,7 @@ export function KnowledgeModelImprovementWorkspace() {
                     <SelectContent>
                       {MODEL_IMPROVEMENT_PRIORITIES.map((p) => (
                         <SelectItem key={p} value={p}>
-                          {p}
+                          {knowledgeLabel(p)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -560,7 +561,7 @@ export function KnowledgeModelImprovementWorkspace() {
                     <SelectContent>
                       {MODEL_IMPROVEMENT_STATUSES.map((s) => (
                         <SelectItem key={s} value={s}>
-                          {s}
+                          {knowledgeLabel(s)}
                         </SelectItem>
                       ))}
                     </SelectContent>

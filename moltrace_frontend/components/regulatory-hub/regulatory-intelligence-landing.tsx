@@ -1,5 +1,6 @@
 "use client"
 
+import { statusLabel } from "@/lib/ui/status"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -1167,7 +1168,7 @@ export function RegulatoryIntelligenceLanding() {
                       <TableRow key={s.id}>
                         <TableCell className="max-w-[280px] font-medium">{s.title}</TableCell>
                         <TableCell className="font-mono text-xs">{s.source_type}</TableCell>
-                        <TableCell>{s.status}</TableCell>
+                        <TableCell>{statusLabel(s.status)}</TableCell>
                         <TableCell>{s.version ?? "—"}</TableCell>
                       </TableRow>
                     ))}

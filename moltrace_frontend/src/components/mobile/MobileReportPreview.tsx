@@ -227,7 +227,7 @@ export function MobileReportPreview({ reportId: reportIdProp = null }: { reportI
               <p className="mt-1 text-xs text-muted-foreground">{preview.methodModelProvenance}</p>
             </div>
             <div className="rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">Source file fingerprints</p>
+              <p className="text-xs text-muted-foreground">Source file hashes</p>
               <p className="mt-1 break-all text-xs text-muted-foreground">
                 {preview.sourceHashes.length > 0 ? preview.sourceHashes.join(" · ") : "—"}
               </p>

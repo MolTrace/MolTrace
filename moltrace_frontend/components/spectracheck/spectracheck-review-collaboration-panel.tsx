@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
+import { statusLabel } from "@/lib/ui/status"
 import { ChevronDown } from "lucide-react"
 
 const COMMENT_TYPES = ["note", "question", "concern", "contradiction", "approval_note"] as const
@@ -488,8 +489,8 @@ export function SpectraCheckReviewCollaborationPanel({ sessionId }: SpectraCheck
                           <TableCell className="max-w-[14rem] font-mono text-[10px] break-all">
                             {readStr(row, ["email", "user_email", "reviewer_email"]) || "—"}
                           </TableCell>
-                          <TableCell className="text-xs">{readStr(row, ["role"]) || "—"}</TableCell>
-                          <TableCell className="text-xs">{readStr(row, ["status"]) || "—"}</TableCell>
+                          <TableCell className="text-xs">{statusLabel(readStr(row, ["role"]))}</TableCell>
+                          <TableCell className="text-xs">{statusLabel(readStr(row, ["status"]))}</TableCell>
                         </TableRow>
                       ))
                     )}
@@ -513,8 +514,9 @@ export function SpectraCheckReviewCollaborationPanel({ sessionId }: SpectraCheck
                     </SelectTrigger>
                     <SelectContent>
                       {COMMENT_TYPES.map((t) => (
+                        // ``value`` stays the stored token; only the label is humanized.
                         <SelectItem key={t} value={t}>
-                          {t}
+                          {statusLabel(t)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -575,7 +577,7 @@ export function SpectraCheckReviewCollaborationPanel({ sessionId }: SpectraCheck
                           <TableRow key={cid || String(i)}>
                             <TableCell className="align-top text-xs">
                               <Badge variant="outline" className="font-normal">
-                                {readStr(row, ["comment_type", "type"]) || "—"}
+                                {statusLabel(readStr(row, ["comment_type", "type"])) || "—"}
                               </Badge>
                             </TableCell>
                             <TableCell className="max-w-prose align-top text-xs">
@@ -680,7 +682,8 @@ export function SpectraCheckReviewCollaborationPanel({ sessionId }: SpectraCheck
                         return (
                           <TableRow key={tid || String(i)}>
                             <TableCell className="max-w-[12rem] text-xs">{readStr(row, ["title", "summary"]) || "—"}</TableCell>
-                            <TableCell className="text-xs">{st}</TableCell>
+                            {/* ``st`` stays the stored token for the resolve check below. */}
+                            <TableCell className="text-xs">{statusLabel(st)}</TableCell>
                             <TableCell className="text-right">
                               {tid ? (
                                 <Button

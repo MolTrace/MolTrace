@@ -262,7 +262,7 @@ export function SSOConnectionsWorkspace() {
             service address — it can never be set from this page or by a browser.
             {REDIRECT_URI
               ? null
-              : " Replace the bracketed part with your MolTrace service address — your MolTrace administrator can configure it so the exact value appears here."}
+              : " The URI above is a template: replace <your-api-origin> with the host your MolTrace API is served from. Whoever operates your MolTrace deployment can confirm that host, and can have the exact URI shown here instead of the placeholder."}
           </p>
         </div>
       </ModuleCard>
@@ -414,7 +414,7 @@ export function SSOConnectionsWorkspace() {
                 spellCheck={false}
               />
               <p className="text-xs text-muted-foreground">
-                Write-only — stored AES-256-GCM encrypted and never displayed again.
+                Write-only — stored AES-256-GCM encrypted and never retrievable after it is saved.
                 {editingId ? " Leave blank to keep the current secret." : ""}
               </p>
             </div>

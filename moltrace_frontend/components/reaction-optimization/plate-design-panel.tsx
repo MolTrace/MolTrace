@@ -430,7 +430,7 @@ export function PlateDesignPanel({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label className="text-xs" htmlFor="plate-bool">
-                Boolean variables — comma-separated names
+                Yes / no variables — comma-separated names
               </Label>
               <Input
                 id="plate-bool"

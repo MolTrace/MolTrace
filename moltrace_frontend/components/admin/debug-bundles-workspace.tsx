@@ -27,15 +27,17 @@ const SCOPE_OPTIONS = ["system", "project", "sample", "session", "job", "report"
 
 /**
  * Display-only labels for the stored scope values. The keys are what we send —
- * only the text on screen is humanized.
+ * only the text on screen is humanized. Kept as plain nouns because the same
+ * label is used both in the scope picker and as the value in the bundle
+ * read-out below ("Scope: Project").
  */
 const SCOPE_LABELS: Record<(typeof SCOPE_OPTIONS)[number], string> = {
   system: "Whole system",
-  project: "A project",
-  sample: "A sample",
-  session: "A session",
-  job: "A job",
-  report: "A report",
+  project: "Project",
+  sample: "Sample",
+  session: "Session",
+  job: "Job",
+  report: "Report",
 }
 
 function scopeLabel(scope: string): string {

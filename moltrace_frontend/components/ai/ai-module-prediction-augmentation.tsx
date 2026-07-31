@@ -1,7 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { statusLabel } from "@/lib/ui/status"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import {
   trackAiActiveLearningCandidateCreated,
@@ -72,16 +74,6 @@ type AnyRecord = Record<string, unknown>
 
 function isRecord(v: unknown): v is AnyRecord {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
-}
-
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.data
-    if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return `HTTP ${err.status}: ${err.message || fallback}`
-  }
-  if (err instanceof Error) return err.message
-  return fallback
 }
 
 function confidenceBucket(value: unknown): string {
@@ -214,7 +206,7 @@ export function AiModulePredictionAugmentation({
       }
       setOk("Prediction request submitted.")
     } catch (e) {
-      setErr(formatErr(e, "Could not submit prediction request."))
+      setErr(formatApiError(e, "Could not submit prediction request."))
     } finally {
       setBusy(false)
     }
@@ -247,7 +239,7 @@ export function AiModulePredictionAugmentation({
       })
       setFeedbackOk("Prediction feedback submitted.")
     } catch (e) {
-      setFeedbackErr(formatErr(e, "Could not submit prediction feedback."))
+      setFeedbackErr(formatApiError(e, "Could not submit prediction feedback."))
     } finally {
       setFeedbackBusy(false)
     }
@@ -279,7 +271,7 @@ export function AiModulePredictionAugmentation({
       })
       setQueueMsg("Added to Active Learning Queue.")
     } catch (e) {
-      setQueueMsg(formatErr(e, "Could not add to Active Learning Queue."))
+      setQueueMsg(formatApiError(e, "Could not add to Active Learning Queue."))
     } finally {
       setQueueBusy(false)
     }
@@ -467,7 +459,7 @@ export function AiModulePredictionAugmentation({
               evidence_items={[
                 `Service: ${selected.serviceKey}`,
                 `Task: ${selected.taskKey}`,
-                `Status: ${predictionStatus ?? "-"}`,
+                `Status: ${statusLabel(predictionStatus)}`,
                 `Model artifact: ${readRecordString(prediction, "model_artifact_id") ?? "-"}`,
                 `Deployment candidate: ${readRecordString(prediction, "deployment_candidate_id") ?? "-"}`,
               ]}

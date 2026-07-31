@@ -29,7 +29,8 @@ export function RecentAnalysisJobsSection({ jobIds }: { jobIds: readonly string[
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Recent Analysis Jobs</CardTitle>
         <CardDescription>
-          Jobs started from Overview or upload tabs during this session. Status polls automatically until completion.
+          Jobs started from Overview or upload tabs during this session. Status refreshes on its own until each job
+          finishes.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -41,8 +42,8 @@ export function RecentAnalysisJobsSection({ jobIds }: { jobIds: readonly string[
               </EmptyMedia>
               <EmptyTitle>No analysis jobs yet</EmptyTitle>
               <EmptyDescription>
-                Jobs you start from Overview or the upload tabs will appear here and poll
-                automatically until they complete.
+                Jobs you start from Overview or the upload tabs will appear here and refresh on
+                their own until they finish.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

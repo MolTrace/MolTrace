@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { KNOWLEDGE_EXTRACTION_TYPES } from "@/components/knowledge/knowledge-constants"
+import { KNOWLEDGE_EXTRACTION_TYPES, knowledgeLabel } from "@/components/knowledge/knowledge-constants"
 import {
   Empty,
   EmptyDescription,
@@ -242,7 +242,7 @@ export function KnowledgeExtractionsWorkspace() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Knowledge extractions</h1>
         <p className="text-sm text-muted-foreground">
-          Run typed extractions against uploaded files. Outputs require human review before reuse.
+          Run extractions on uploaded files, by type. Outputs require human review before reuse.
         </p>
       </div>
 
@@ -259,7 +259,7 @@ export function KnowledgeExtractionsWorkspace() {
         eyebrow="Run"
         title="Run extraction"
         icon={PlayCircle}
-        description="Trigger an extraction pipeline run on a source document to parse and classify knowledge claims for review queue intake."
+        description="Run an extraction on a source document to parse and classify knowledge claims for the review queue."
       >
         <div className="space-y-4">
           {runErr ? (
@@ -345,7 +345,7 @@ export function KnowledgeExtractionsWorkspace() {
                 <SelectContent>
                   {KNOWLEDGE_EXTRACTION_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {knowledgeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -364,7 +364,7 @@ export function KnowledgeExtractionsWorkspace() {
         eyebrow="History"
         title="Extraction runs"
         icon={Activity}
-        description="History of extraction pipeline runs — status, extracted claim count, and completion timestamp for each source document processed."
+        description="History of extraction runs — status, extracted claim count, and completion time for each source document processed."
       >
         <div className="table-scroll min-w-0">
           <div className="mb-3">
@@ -411,9 +411,9 @@ export function KnowledgeExtractionsWorkspace() {
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                       <TableCell className="font-mono text-xs">{readRecordNumber(row, "source_id") ?? "—"}</TableCell>
                       <TableCell className="font-mono text-xs">{readRecordNumber(row, "source_file_id") ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{readRecordString(row, "extraction_type") ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "extraction_type"))}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-sm">{ecNum != null ? ecNum : "—"}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
@@ -449,7 +449,7 @@ export function KnowledgeExtractionsWorkspace() {
           eyebrow="Detail"
           title="Extraction run detail"
           icon={FileText}
-          description="Full detail for the selected extraction run — extracted claims, warnings, and processing metadata."
+          description="Full detail for the selected extraction run — extracted claims, warnings, and processing details."
         >
           <div className="space-y-4">
             {detailLoading ? (
@@ -486,7 +486,7 @@ export function KnowledgeExtractionsWorkspace() {
                 <DeveloperJsonPanel data={runDetail} />
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">No detail.</p>
+              <p className="text-sm text-muted-foreground">No details available.</p>
             )}
           </div>
         </ModuleCard>

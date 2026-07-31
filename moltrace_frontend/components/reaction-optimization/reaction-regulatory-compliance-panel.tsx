@@ -1,5 +1,6 @@
 "use client"
 
+import { statusLabel } from "@/lib/ui/status"
 import { useEffect, useMemo, useState } from "react"
 import { ChevronDown, Loader2, Scale, ShieldAlert, ShieldCheck } from "lucide-react"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
@@ -36,7 +37,7 @@ function ViolationDetail({ v }: { v: ComplianceViolation }) {
             variant="secondary"
             className={cn("uppercase", SEVERITY_BADGE_CLASS[v.severity] ?? "")}
           >
-            {v.severity}
+            {statusLabel(v.severity)}
           </Badge>
         ) : null}
         <Badge variant="outline">{v.isHard ? "hard limit" : "soft limit"}</Badge>
@@ -75,7 +76,7 @@ function ComplianceRow({ item }: { item: ComplianceItem }) {
             {meta.label}
           </Badge>
         </TableCell>
-        <TableCell className="text-muted-foreground">{item.status}</TableCell>
+        <TableCell className="text-muted-foreground">{statusLabel(item.status)}</TableCell>
         <TableCell className="text-right">
           {hasDetail ? (
             <Collapsible open={open} onOpenChange={setOpen}>

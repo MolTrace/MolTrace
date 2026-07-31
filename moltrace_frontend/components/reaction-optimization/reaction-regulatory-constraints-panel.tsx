@@ -392,11 +392,11 @@ export function ReactionRegulatoryConstraintsPanel({
                         <TableCell className="text-xs">{constraintTypeLabel(readStr(row, "constraint_type"))}</TableCell>
                         <TableCell className="font-mono text-xs">{readStr(row, "dossier_id") || "—"}</TableCell>
                         <TableCell className="font-mono text-xs">{actionIds || "—"}</TableCell>
-                        <TableCell className="text-xs">{readStr(row, "severity") || "—"}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(readStr(row, "severity"))}</TableCell>
                         <TableCell className="max-w-[260px] text-xs text-muted-foreground">
                           {JSON.stringify(row.constraint_json ?? {})}
                         </TableCell>
-                        <TableCell className="text-xs">{readStr(row, "status") || "—"}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(readStr(row, "status"))}</TableCell>
                         <TableCell>
                           {typeof constraintId === "number" ? (
                             <div className="flex flex-wrap gap-1">

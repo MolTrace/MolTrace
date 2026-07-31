@@ -1,5 +1,6 @@
 "use client"
 
+import { statusLabel } from "@/lib/ui/status"
 import { useCallback, useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { trackExternalObjectLinkCreated, trackMappingTemplateCreated } from "@/src/lib/analytics/analytics-client"
@@ -599,7 +600,7 @@ export function MappingTemplatesWorkspace() {
                         <TableCell className="text-xs">{row.connector}</TableCell>
                         <TableCell className="text-xs">{row.source_type}</TableCell>
                         <TableCell className="text-xs">{row.external_key}</TableCell>
-                        <TableCell className="text-xs">{row.status}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(row.status)}</TableCell>
                         <TableCell>
                           <Button
                             type="button"
@@ -704,7 +705,7 @@ export function MappingTemplatesWorkspace() {
                         <TableCell className="font-mono text-[10px]">{row.external_record_id}</TableCell>
                         <TableCell className="text-xs">{row.target_type}</TableCell>
                         <TableCell className="text-xs">{row.target_id}</TableCell>
-                        <TableCell className="text-xs">{row.status}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(row.status)}</TableCell>
                       </TableRow>
                     ))
                   )}

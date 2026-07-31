@@ -14,6 +14,7 @@ import { extractMlModelProvenanceFromUnknown } from "@/src/lib/ml/model-provenan
 import type { AnalysisJobStatus, UseAnalysisJobReturn } from "@/src/lib/spectracheck/useAnalysisJob"
 import { useSpectraCheckEvidence } from "@/src/lib/spectracheck/useSpectraCheckEvidence"
 import { ChevronDown } from "lucide-react"
+import { statusLabel } from "@/lib/ui/status"
 import { cn } from "@/lib/utils"
 
 function statusBadgeClass(s: AnalysisJobStatus | null): string {
@@ -86,14 +87,14 @@ export function AnalysisJobTimeline({
         </CardTitle>
         {!compact ? (
           <CardDescription>
-            Job status updates from the backend. Polling pauses when the job reaches a terminal state.
+            Status refreshes on its own while the job is active, and stops once the job finishes, fails, or is canceled.
           </CardDescription>
         ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
         {backendUnavailable ? (
           <p className="text-sm text-warning">
-            Backend unavailable or unreachable — job actions may fail until the API is reachable.
+            MolTrace cannot reach the analysis service right now — job actions may fail until the connection is restored.
           </p>
         ) : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -101,21 +102,21 @@ export function AnalysisJobTimeline({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground">Status</span>
           <Badge variant="outline" className={cn("gap-1", statusBadgeClass(status))}>
-            {status ?? "—"}
+            {statusLabel(status)}
           </Badge>
           {polling ? (
             <Badge variant="secondary" className="text-[10px]">
-              polling
+              live
             </Badge>
           ) : null}
         </div>
 
         {jobId ? (
-          <p className="font-mono text-xs text-muted-foreground break-all">
-            job id: {jobId}
+          <p className="text-xs text-muted-foreground break-all">
+            Job reference: <span className="font-mono">{jobId}</span>
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground">No active job id.</p>
+          <p className="text-xs text-muted-foreground">No job running.</p>
         )}
 
         <div className="space-y-2">
@@ -228,7 +229,7 @@ export function AnalysisJobTimeline({
                       {ev.timestamp ? <span>{ev.timestamp}</span> : null}
                       {ev.type ? (
                         <Badge variant="secondary" className="text-[10px]">
-                          {ev.type}
+                          {statusLabel(ev.type)}
                         </Badge>
                       ) : null}
                     </div>

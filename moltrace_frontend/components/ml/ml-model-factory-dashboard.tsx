@@ -1,5 +1,6 @@
 "use client"
 
+import { statusLabel } from "@/lib/ui/status"
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
@@ -513,10 +514,10 @@ export function MlModelFactoryDashboard() {
                         {readStr(row, ["name", "title", "label"]) || "—"}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        {readStr(row, ["task_type", "type"]) || "—"}
+                        {statusLabel(readStr(row, ["task_type", "type"]))}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readStr(row, ["status", "state"]) || "—"}</Badge>
+                        <Badge variant="outline">{statusLabel(readStr(row, ["status", "state"]))}</Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatWhen(readStr(row, ["updated_at", "modified_at", "created_at"]))}
@@ -561,7 +562,7 @@ export function MlModelFactoryDashboard() {
                     <TableRow key={id != null ? `tr-${id}` : `tr-i-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{readStr(row, ["status", "state"]) || "—"}</Badge>
+                        <Badge variant="secondary">{statusLabel(readStr(row, ["status", "state"]))}</Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {(readRecordNumber(row, "dataset_version_id") ?? readStr(row, ["dataset_version_id"])) || "—"}
@@ -613,7 +614,7 @@ export function MlModelFactoryDashboard() {
                     <TableRow key={id != null ? `ev-${id}` : `ev-i-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readStr(row, ["status", "state"]) || "—"}</Badge>
+                        <Badge variant="outline">{statusLabel(readStr(row, ["status", "state"]))}</Badge>
                       </TableCell>
                       <TableCell className="max-w-[280px] truncate text-xs text-muted-foreground">{short || "—"}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
@@ -659,10 +660,10 @@ export function MlModelFactoryDashboard() {
                     <TableRow key={id != null ? `dc-${id}` : `dc-i-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{readStr(row, ["status", "state"]) || "—"}</Badge>
+                        <Badge variant="secondary">{statusLabel(readStr(row, ["status", "state"]))}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readStr(row, ["approval_status", "review_status"]) || "—"}</Badge>
+                        <Badge variant="outline">{statusLabel(readStr(row, ["approval_status", "review_status"]))}</Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {(readRecordNumber(row, "model_version_id") ?? readStr(row, ["model_version_id"])) || "—"}

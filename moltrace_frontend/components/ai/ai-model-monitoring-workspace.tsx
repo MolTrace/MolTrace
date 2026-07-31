@@ -1,7 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { statusLabel } from "@/lib/ui/status"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -58,16 +60,6 @@ function formatWhen(iso: string): string {
   return new Date(t).toLocaleString()
 }
 
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.data
-    if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return `HTTP ${err.status}: ${err.message || fallback}`
-  }
-  if (err instanceof Error) return err.message
-  return fallback
-}
-
 export function AiModelMonitoringWorkspace() {
   const [loading, setLoading] = useState(true)
   const [reloadToken, setReloadToken] = useState(0)
@@ -94,7 +86,7 @@ export function AiModelMonitoringWorkspace() {
           const data = await apiFetch<unknown>("/ai/model-monitoring", { method: "GET" })
           setMonitoring(data)
         } catch (err) {
-          setLoadErr(formatErr(err, "Could not load monitoring data."))
+          setLoadErr(formatApiError(err, "Could not load monitoring data."))
           setMonitoring(null)
         }
       })(),
@@ -103,7 +95,7 @@ export function AiModelMonitoringWorkspace() {
           const data = await apiFetch<unknown>("/ai/model-monitoring/events", { method: "GET" })
           setEvents(extractRows(data, EVENT_KEYS))
         } catch (err) {
-          setEventsErr(formatErr(err, "Could not load monitoring events."))
+          setEventsErr(formatApiError(err, "Could not load monitoring events."))
           setEvents([])
         }
       })(),
@@ -154,7 +146,7 @@ export function AiModelMonitoringWorkspace() {
       setPostOk("Monitoring event submitted.")
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setPostErr(formatErr(err, "Could not submit monitoring event."))
+      setPostErr(formatApiError(err, "Could not submit monitoring event."))
     } finally {
       setPostBusy(false)
     }
@@ -254,7 +246,7 @@ export function AiModelMonitoringWorkspace() {
                 <TableRow key={`${readStr(row, ["id", "event_id"])}-${idx}`}>
                   <TableCell>{readStr(row, ["event_type", "event"])}</TableCell>
                   <TableCell>{readStr(row, ["service_key"])}</TableCell>
-                  <TableCell><Badge variant="outline">{readStr(row, ["status"])}</Badge></TableCell>
+                  <TableCell><Badge variant="outline">{statusLabel(readStr(row, ["status"]))}</Badge></TableCell>
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatWhen(readStr(row, ["created_at", "timestamp"]))}</TableCell>
                 </TableRow>
               ))}
