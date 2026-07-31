@@ -15,6 +15,7 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -30,6 +31,14 @@ import {
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v)
 }
+
+/**
+ * Mechanism only. The caveats ("NOT a safety opinion", "Advisory decision support",
+ * "a qualified chemist reviews every prediction") stay in the visible description —
+ * a hedge behind a hover is a weaker hedge.
+ */
+const FORWARD_CHECK_TOOLTIP =
+  "Runs the reactant and product SMILES you enter through the same frozen safety and green-chemistry engines used for route scoring. The model's own confidence is rendered beside those scores rather than blended into them."
 
 export function ForwardCheckPanel({ projectId }: { projectId: number }) {
   const [reactantsText, setReactantsText] = useState("")
@@ -118,9 +127,14 @@ export function ForwardCheckPanel({ projectId }: { projectId: number }) {
     <ModuleCard
       accent="teal"
       eyebrow="Safety · Forward check"
-      title="Check a predicted product"
+      title={
+        <span className="inline-flex items-center gap-2">
+          Check a predicted product
+          <InfoTooltip content={FORWARD_CHECK_TOOLTIP} label="How the forward check works" />
+        </span>
+      }
       icon={FlaskConical}
-      description="Screens an externally-predicted or planned product against the frozen safety and green-chemistry engines. Model confidence is NOT a safety opinion — both render side-by-side. Advisory decision support; a qualified chemist reviews every prediction."
+      description="Screens a product predicted or planned elsewhere before you act. Model confidence is NOT a safety opinion — both render side-by-side. Advisory decision support; a qualified chemist reviews every prediction."
     >
       <form className="space-y-3" onSubmit={(e) => void check(e)}>
         <div className="grid gap-3 md:grid-cols-2">

@@ -20,7 +20,14 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { ArrowLeft, FileText, GitBranch, GitCompare, Loader2 } from "lucide-react"
+
+const VERSION_TIMELINE_TOOLTIP =
+  "Each version captures the document state at a point in time, so changes can be tracked and compared."
+
+const COMPARE_VERSIONS_TOOLTIP =
+  "Select an old and a new version to highlight additions, removals, and changes between them."
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -197,9 +204,14 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
       <ModuleCard
         accent="cyan"
         eyebrow="Timeline"
-        title="Version timeline"
+        title={
+          <span className="inline-flex items-center gap-2">
+            Version timeline
+            <InfoTooltip label="Version timeline" content={VERSION_TIMELINE_TOOLTIP} />
+          </span>
+        }
         icon={GitBranch}
-        description="Version history for this regulatory source — each version captures the document state at a point in time for change tracking and comparison."
+        description="Version history for this regulatory source."
       >
         <div className="space-y-3">
           <p className="text-sm">
@@ -259,9 +271,14 @@ export function RegulatorySourceVersionTimelineWorkspace({ sourceId }: { sourceI
       <ModuleCard
         accent="cyan"
         eyebrow="Compare"
-        title="Compare versions"
+        title={
+          <span className="inline-flex items-center gap-2">
+            Compare versions
+            <InfoTooltip label="Compare versions" content={COMPARE_VERSIONS_TOOLTIP} />
+          </span>
+        }
         icon={GitCompare}
-        description="Side-by-side text comparison between two versions of this regulatory source — select old and new versions to highlight additions, removals, and changes."
+        description="Side-by-side text comparison between two versions of this source."
       >
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">

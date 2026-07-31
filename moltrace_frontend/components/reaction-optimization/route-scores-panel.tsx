@@ -15,6 +15,7 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RouteTreeField } from "@/components/ui/route-tree-field"
@@ -36,6 +37,14 @@ import {
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v)
 }
+
+/**
+ * Mechanism only. Every caveat ("Advisory decision support", "never a safety
+ * determination or synthesis instruction", "Route GENERATION is not available
+ * in this app") stays in the visible description.
+ */
+const ROUTE_SCORE_TOOLTIP =
+  "Every node in the tree is scored by the same frozen safety and green-chemistry engines used elsewhere in Repho, with reagent screen hits listed per step. A node that cannot be scored ranks worse than critical rather than passing."
 
 /** Native, dependency-free render of the nested route tree (product → precursors). */
 function RouteTreeNode({ node, depth }: { node: Record<string, unknown>; depth: number }) {
@@ -275,9 +284,14 @@ export function RouteScoresPanel({ projectId }: { projectId: number }) {
     <ModuleCard
       accent="violet"
       eyebrow="Routes · Scoring"
-      title="Score a synthesis route"
+      title={
+        <span className="inline-flex items-center gap-2">
+          Score a synthesis route
+          <InfoTooltip content={ROUTE_SCORE_TOOLTIP} label="How route scoring works" />
+        </span>
+      }
       icon={GitBranch}
-      description="Scores a route tree with the frozen safety and green-chemistry engines. Advisory decision support — never a safety determination or synthesis instruction. Route GENERATION is not available in this app; input is manual by design."
+      description="Rates a route tree on safety and green-chemistry risk. Advisory decision support — never a safety determination or synthesis instruction. Route GENERATION is not available in this app; input is manual by design."
     >
       <form className="space-y-3" onSubmit={(e) => void score(e)}>
         <div className="space-y-1">

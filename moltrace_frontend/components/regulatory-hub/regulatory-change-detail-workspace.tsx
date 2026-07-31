@@ -518,7 +518,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
           </span>
         }
         icon={Network}
-        description="Assess the downstream impact of this regulatory change across affected dossiers, requirements, rule sets, action items, and AI governance records."
+        description="Assess the downstream impact of this regulatory change."
       >
         <div className="space-y-4">
           {impactErr ? <AlertCard variant="error" title="Impact error" description={impactErr} /> : null}
@@ -703,9 +703,17 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
       <ModuleCard
         accent="cyan"
         eyebrow="Review"
-        title="Review decision"
+        title={
+          <span className="flex items-center gap-2">
+            Review decision
+            <InfoTooltip
+              label="Review decision"
+              content="Approve, reject, or escalate. The decision is recorded with reviewer attribution and a comment."
+            />
+          </span>
+        }
         icon={ListChecks}
-        description="Record a formal review decision on this regulatory change — approve, reject, or escalate — with reviewer attribution and comment."
+        description="Record a formal review decision on this regulatory change."
       >
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">

@@ -7,6 +7,7 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { JsonObjectField } from "@/components/ui/json-object-field"
@@ -35,6 +36,14 @@ import {
   type PlateFormat,
   type PlateStrategy,
 } from "@/lib/reaction/plate-designs"
+
+/**
+ * Mechanism only. The caveat ("Advisory; requires human review before
+ * execution") stays in the visible description — a hedge behind a hover is a
+ * weaker hedge.
+ */
+const PLATE_DESIGN_TOOLTIP =
+  "Wells are filled by the strategy you pick — Sobol sequence, Latin hypercube, full factorial, or a BO-seed population — from the numeric ranges and categorical levels you define. The same inputs always produce the same plate map."
 
 type NumericRow = { name: string; low: string; high: string }
 type CategoricalRow = { name: string; levels: string }
@@ -287,8 +296,13 @@ export function PlateDesignPanel({
     <ModuleCard
       accent="violet"
       eyebrow="Optimization · HTE / DoE Plate Designs"
-      title="plate designs"
-      description="Generate a deterministic plate over the design space; export CSV/JSON for lab robotics. Advisory; requires human review before execution."
+      title={
+        <span className="inline-flex items-center gap-2">
+          plate designs
+          <InfoTooltip content={PLATE_DESIGN_TOOLTIP} label="How plate designs are laid out" />
+        </span>
+      }
+      description="Lay out a plate over your design space; export CSV/JSON for the lab. Advisory; requires human review before execution."
     >
       <div className="space-y-5">
         {error ? (

@@ -15,6 +15,7 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { ObjectArrayField } from "@/components/ui/object-array-field"
@@ -28,6 +29,13 @@ import {
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v)
 }
+
+/**
+ * Mechanism only. "Advisory", "never a synthesis instruction" and the
+ * model-and-uncertainty disclosure promise stay in the visible description.
+ */
+const YIELD_PREDICTION_TOOLTIP =
+  "Fits a surrogate model (k-nearest-neighbour or Gaussian process, whichever the data supports) on this project's own completed experiments only — no other campaign and no shared corpus — then scores each condition set you enter."
 
 /** Parse the conditions textarea: one JSON object per line, or a JSON array. */
 export function parseConditionsInput(text: string): {
@@ -172,9 +180,14 @@ export function YieldPredictionPanel({
     <ModuleCard
       accent="violet"
       eyebrow="Optimization · Yield surrogate"
-      title="Predict yield"
+      title={
+        <span className="inline-flex items-center gap-2">
+          Predict yield
+          <InfoTooltip content={YIELD_PREDICTION_TOOLTIP} label="How the yield surrogate works" />
+        </span>
+      }
       icon={LineChart}
-      description="Advisory: fits a surrogate on this project's own completed experiments. Ranks candidates for review — never a synthesis instruction; the producing model and its uncertainty always show with the number."
+      description="Ranks candidate condition sets by predicted yield. Advisory — never a synthesis instruction; the producing model and its uncertainty always show with the number."
     >
       <form className="space-y-3" onSubmit={(e) => void predict(e)}>
         <div className="space-y-1">

@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -31,6 +32,15 @@ import { Textarea } from "@/components/ui/textarea"
 import { JsonObjectField } from "@/components/ui/json-object-field"
 import { NumberListField } from "@/components/ui/number-list-field"
 import { AlertTriangle, ArrowLeft, ClipboardCheck, ListChecks, Loader2, Plus } from "lucide-react"
+
+const CREATE_PROPOSAL_TOOLTIP =
+  "Captures the proposal type, the rationale for the change, and the rule set the proposal affects."
+
+const PROPOSAL_TABLE_TOOLTIP =
+  "Filter by status, proposal type, or the source change that triggered it to manage the review queue."
+
+const PROPOSAL_DETAIL_TOOLTIP =
+  "Records a formal approval or rejection, with reviewer attribution, against the selected proposal."
 
 const PROPOSAL_TYPES = [
   "create_rule",
@@ -323,9 +333,14 @@ export function RegulatoryRuleUpdatesWorkspace() {
       <ModuleCard
         accent="cyan"
         eyebrow="Create"
-        title="Create proposal"
+        title={
+          <span className="inline-flex items-center gap-2">
+            Create proposal
+            <InfoTooltip label="Create proposal" content={CREATE_PROPOSAL_TOOLTIP} />
+          </span>
+        }
         icon={Plus}
-        description="Propose a rule set or guidance update in response to a detected regulatory change — includes proposal type, rationale, and affected rule set."
+        description="Propose a rule set or guidance update for a detected regulatory change."
       >
         <div className="space-y-4">
           {createErr ? (
@@ -431,9 +446,14 @@ export function RegulatoryRuleUpdatesWorkspace() {
       <ModuleCard
         accent="cyan"
         eyebrow="Records"
-        title="Proposal table"
+        title={
+          <span className="inline-flex items-center gap-2">
+            Proposal table
+            <InfoTooltip label="Proposal table" content={PROPOSAL_TABLE_TOOLTIP} />
+          </span>
+        }
         icon={ListChecks}
-        description="All rule update proposals across regulatory changes — filter by status, proposal type, or source change to manage the review queue."
+        description="All rule update proposals across regulatory changes."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -507,9 +527,14 @@ export function RegulatoryRuleUpdatesWorkspace() {
       <ModuleCard
         accent="cyan"
         eyebrow="Detail"
-        title="Proposal detail & review"
+        title={
+          <span className="inline-flex items-center gap-2">
+            Proposal detail &amp; review
+            <InfoTooltip label="Proposal detail and review" content={PROPOSAL_DETAIL_TOOLTIP} />
+          </span>
+        }
         icon={ClipboardCheck}
-        description="Review a rule update proposal in detail and record a formal approval or rejection decision with reviewer attribution."
+        description="Review a rule update proposal in detail and record a decision."
       >
         <div className="space-y-4">
           {selectedProposalErr ? (

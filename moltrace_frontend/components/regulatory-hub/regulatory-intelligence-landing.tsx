@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -1078,8 +1079,16 @@ export function RegulatoryIntelligenceLanding() {
           <ModuleCard
             accent="cyan"
             eyebrow="Regulatory · Impurities"
-            title="Impurity assessment"
-            description="One report across ICH Q3A/B, Q3C, Q3D, M7 and FDA CPCA nitrosamine engines — dose in, thresholds and pass/fail out."
+            title={
+              <span className="inline-flex items-center gap-2">
+                Impurity assessment
+                <InfoTooltip
+                  label="Impurity assessment coverage"
+                  content="Covers ICH Q3A/B, Q3C residual solvents, Q3D elemental impurities, M7 mutagenic impurities, and FDA CPCA nitrosamine classification in one report."
+                />
+              </span>
+            }
+            description="Dose in; ICH and FDA impurity thresholds and pass/fail out."
             href="/regulatory/impurities"
             ctaLabel="Open impurity assessment"
           />

@@ -16,6 +16,7 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -38,6 +39,14 @@ import {
 
 const DISCLAIMER_FALLBACK =
   "Decision-support only; NOT a safety determination and never the sole basis for one. Any reaction flagged medium or above, and any energetic or reactive group, requires review by a qualified process-safety professional and a formal Process Hazard Analysis (PHA) before execution."
+
+/**
+ * Mechanism only. The caveats ("Decision-support only", "NOT a safety
+ * determination", "a clear result is never a safety clearance") stay in the
+ * visible description — a hedge behind a hover is a weaker hedge.
+ */
+const SAFETY_SCREENING_TOOLTIP =
+  "Substructure matching with RDKit SMARTS patterns over each SMILES you enter, graded by risk level. A hit at medium or above holds the project gate until a reviewer approves or rejects the screening."
 
 function smilesFromText(text: string): string[] {
   return text
@@ -297,8 +306,13 @@ export function SafetyScreeningPanel({
     <ModuleCard
       accent="amber"
       eyebrow="Reaction · Structural Safety Screening"
-      title="energetic / reactive-group screening"
-      description="Structural RDKit-SMARTS screen with an expert-review gate. Decision-support only — NOT a safety determination, and a clear result is never a safety clearance."
+      title={
+        <span className="inline-flex items-center gap-2">
+          energetic / reactive-group screening
+          <InfoTooltip content={SAFETY_SCREENING_TOOLTIP} label="How the structural screen works" />
+        </span>
+      }
+      description="Flags hazardous substructures and holds the project until a reviewer signs off. Decision-support only — NOT a safety determination, and a clear result is never a safety clearance."
     >
       <div className="space-y-5">
         {error ? (

@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +51,9 @@ type SPCMeasurement = components["schemas"]["SPCMeasurementInput"]
 type SPCCapability = components["schemas"]["SPCCapabilityOut"]
 type SPCSignal = components["schemas"]["SPCSignalOut"]
 type RuleSet = SPCRequest["rule_set"]
+
+const PROCESS_CAPABILITY_TOOLTIP =
+  "Renders a control chart with the capability indices Cp/Cpk/Pp/Ppk/Cpm, plus Shewhart control-rule, CUSUM, and EWMA signals."
 
 const RULE_SET_OPTIONS: { value: RuleSet; label: string }[] = [
   { value: "western_electric", label: "Western Electric" },
@@ -467,9 +471,10 @@ export function SPCProcessCapabilityPanel() {
         <span className="inline-flex items-center gap-2">
           <Activity className="h-4 w-4" aria-hidden />
           Process Capability &amp; Trending
+          <InfoTooltip label="Process capability and trending" content={PROCESS_CAPABILITY_TOOLTIP} />
         </span>
       }
-      description="Trends a single parameter to catch drift before a specification breach. Control chart, Cp/Cpk/Pp/Ppk/Cpm, and Shewhart / CUSUM / EWMA signals. Decision-support only."
+      description="Trends a single parameter to catch drift before a specification breach. Decision-support only."
     >
       <div className="space-y-6">
         {/* ── Inputs ── */}
