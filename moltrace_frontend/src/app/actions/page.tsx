@@ -95,7 +95,7 @@ function statusBadgeStyle(status: string) {
 const PROGRAMS = [
   { key: "spectracheck", label: "SpectraCheck" },
   { key: "regulatory_hub", label: "Regentry" },
-  { key: "reaction_optimization", label: "Reaction Optimization" },
+  { key: "reaction_optimization", label: "Repho" },
 ] as const
 
 const ACTION_TYPES = [
@@ -434,7 +434,7 @@ function CrossModuleActionQueueWorkspace() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Cross-Module Action Queue</CardTitle>
           <CardDescription>
-            All open and resolved action items across SpectraCheck, Regentry, and Reaction Optimization. Update status inline as work progresses.
+            All open and resolved action items across SpectraCheck, Regentry, and Repho. Update status inline as work progresses.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -660,7 +660,7 @@ export default function CrossModuleActionQueuePage() {
             </p>
             <h1 className="font-mono text-2xl font-bold tracking-tight">Action Queue</h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Coordinate work across SpectraCheck, Regentry, and Reaction Optimization.
+              Coordinate work across SpectraCheck, Regentry, and Repho.
             </p>
           </div>
           <Tabs defaultValue="action_queue" className="space-y-6">

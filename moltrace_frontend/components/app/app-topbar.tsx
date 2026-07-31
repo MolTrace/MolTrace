@@ -110,7 +110,7 @@ type SearchReaction = { id: number; name: string }
 const MODULE_DISPLAY_NAME: Record<string, string> = {
   spectracheck: "SpectraCheck",
   regulatory: "Regentry",
-  reactions: "Reaction Optimization",
+  reactions: "Repho",
   ai_services: "AI Services",
 }
 function moduleDisplayName(module: string): string {
@@ -644,7 +644,7 @@ export function AppTopbar({ onToggleEvidenceQueue, evidenceQueueOpen = false }: 
               }}
             >
               <FlaskConical className="mr-2 h-4 w-4" />
-              <span>Open Reaction Optimization</span>
+              <span>Open Repho</span>
             </CommandItem>
             <CommandItem
               onSelect={() => {

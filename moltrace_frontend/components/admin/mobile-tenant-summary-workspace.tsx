@@ -46,6 +46,9 @@ type MobileTenantSummary = {
 }
 
 const LOCAL_TENANT_ID = "local-development"
+// Server-supplied onboarding task titles, matched case-insensitively below to
+// rank them. These are wire values, not labels — the rendered text comes from
+// the server, so renaming the module here would only break the ordering.
 const DEFAULT_TASK_ORDER = ["SpectraCheck setup", "Regentry setup", "Reaction Optimization setup"]
 
 function isRecord(value: unknown): value is Row {
