@@ -44,6 +44,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useIncludedModules } from "@/src/lib/modules/included-modules-provider"
 
 export type SidebarNavItem = {
   name: string
@@ -139,6 +140,7 @@ function mostSpecificActiveHref(pathname: string, hrefs: string[]): string | nul
 }
 
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
+  const { isRouteOffered } = useIncludedModules()
   const pathname = usePathname()
 
   const primaryHrefs = useMemo(
@@ -235,14 +237,21 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
 
         {/* Primary navigation — grouped by job */}
         <nav className="flex-1 space-y-3 overflow-y-auto p-2" aria-label="Primary">
-          {navGroups.map((group) => (
-            <div key={group.label} role="group" aria-label={group.label} className="space-y-1">
-              <SectionLabel label={group.label} />
-              {group.items.map((item) => (
-                <NavLink key={item.href} item={item} active={item.href === activeHref} />
-              ))}
-            </div>
-          ))}
+          {/* Only offer what the server will serve. Routes belonging to a product this
+              deployment does not include are refused with a 403, so showing them is a dead
+              end; a group that empties out disappears entirely rather than leaving a header
+              over nothing. Fails OPEN when the capability readout is unavailable. */}
+          {navGroups
+            .map((group) => ({ group, items: group.items.filter((i) => isRouteOffered(i.href)) }))
+            .filter(({ items }) => items.length > 0)
+            .map(({ group, items }) => (
+              <div key={group.label} role="group" aria-label={group.label} className="space-y-1">
+                <SectionLabel label={group.label} />
+                {items.map((item) => (
+                  <NavLink key={item.href} item={item} active={item.href === activeHref} />
+                ))}
+              </div>
+            ))}
         </nav>
 
         {/* Team */}

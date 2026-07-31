@@ -3,14 +3,44 @@ import { humanizeField } from "@/lib/ui/status"
 export class ApiError extends Error {
   status: number
   data: unknown
+  /**
+   * The product this deployment does not serve, when the refusal was a licensing gate rather
+   * than a permission failure. Set from the `X-MolTrace-Module` response header on a 403.
+   *
+   * "Not in your plan" and "not allowed" are different states and must not render the same:
+   * one is an upgrade path, the other is an access error. The proxy already forwards this
+   * header even on the sanitized branch, so the signal survives without a proxy change.
+   */
+  moduleNotIncluded: string | null
 
-  constructor(status: number, data: unknown, message?: string) {
+  constructor(status: number, data: unknown, message?: string, moduleNotIncluded: string | null = null) {
     // Default is user-visible: no HTTP status codes in reader-facing copy.
     super(message || "Request could not be completed. Please try again.")
     this.name = "ApiError"
     this.status = status
     this.data = data
+    this.moduleNotIncluded = moduleNotIncluded
   }
+}
+
+/** True when a failure is "this workspace does not include that product", not "access denied". */
+export function isModuleNotIncludedError(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.moduleNotIncluded != null
+}
+
+/**
+ * Read the refused product from a 403.
+ *
+ * Prefers the header (always present, survives body sanitization) and falls back to the body
+ * code when the proxy is configured to pass `module_not_licensed` through.
+ */
+export function readRefusedModule(response: Response, data: unknown): string | null {
+  if (response.status !== 403) return null
+  const header = response.headers.get("X-MolTrace-Module")
+  if (header && header.trim()) return header.trim()
+  const detail =
+    typeof data === "object" && data !== null ? (data as { detail?: unknown }).detail : undefined
+  return detail === "module_not_licensed" ? "" : null
 }
 
 const DEFAULT_API_BASE = "/api/backend"
@@ -398,8 +428,14 @@ export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Prom
   if (!response.ok) {
     const data = await readResponseData(response)
     const rawMessage = messageFromErrorData(data, response.statusText)
-    const message = sanitizePublicApiErrorMessage(rawMessage, response.status)
-    throw new ApiError(response.status, data, message)
+    // A licensing refusal is not an access failure — carry the product so callers can render
+    // an honest "not included in this workspace" state instead of a permission error toast.
+    const refusedModule = readRefusedModule(response, data)
+    const message =
+      refusedModule != null
+        ? "This workspace does not include that product."
+        : sanitizePublicApiErrorMessage(rawMessage, response.status)
+    throw new ApiError(response.status, data, message, refusedModule)
   }
 
   if (response.status === 204) {
