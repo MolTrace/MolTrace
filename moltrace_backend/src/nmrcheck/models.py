@@ -5896,6 +5896,22 @@ class PredictionAuditEntry(BaseModel):
 
 
 ProductProgramKey = Literal["spectracheck", "regulatory_hub", "reaction_optimization"]
+
+
+class ModuleCapability(BaseModel):
+    """Whether one product is part of this workspace."""
+
+    module: ProductProgramKey
+    display_name: str
+    included: bool
+
+
+class SystemCapabilities(BaseModel):
+    """What this workspace includes, so the interface only offers what is actually available."""
+
+    modules: list[ModuleCapability] = Field(default_factory=list)
+
+
 ProductProgramStatus = Literal["active", "hidden", "deprecated"]
 ModulePriorityContext = Literal[
     "global",
